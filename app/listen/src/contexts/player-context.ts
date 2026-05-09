@@ -39,6 +39,7 @@ export interface PlayerActionsValue {
   prev: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
+  setPlaybackRate: (rate: number) => void;
   clearQueue: () => void;
   toggleShuffle: () => void;
   cycleRepeat: () => void;

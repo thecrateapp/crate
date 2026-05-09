@@ -45,18 +45,18 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
 def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(monkeypatch):
     from crate import radio_engine
 
-    captured = []
     candidates = [
         _candidate(1, title="Too Close", artist="Candidate", vector=_vector(0.0)),
         _candidate(2, title="Good", artist="Candidate", vector=_vector(0.4)),
     ]
+    captured_queries = []
 
-    def fake_find_best_candidate(*args, **kwargs):
-        captured.append({"args": args, "kwargs": kwargs})
-        return candidates[len(captured) - 1] if len(captured) <= len(candidates) else None
+    def fake_find_candidate_rows(*args, **kwargs):
+        captured_queries.append({"args": args, "kwargs": kwargs})
+        return candidates
 
     monkeypatch.setattr(radio_engine, "_load_radio_graphs", lambda: ({}, {}, {}))
-    monkeypatch.setattr(radio_engine, "_find_best_candidate", fake_find_best_candidate)
+    monkeypatch.setattr(radio_engine, "find_candidate_rows", fake_find_candidate_rows)
 
     session = {
         "id": "session",
@@ -76,12 +76,8 @@ def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(mon
     tracks = radio_engine._generate_batch(session, count=1)
 
     assert [track["track_id"] for track in tracks] == [2]
-    assert len(captured) == 2
-    kwargs = captured[0]["kwargs"]
-    assert kwargs["artist_affinity"] is radio_engine._artist_affinity
-    assert kwargs["genre_overlap"] is radio_engine._genre_overlap
-    assert kwargs["candidate_pool_size"] == 60
-    assert captured[0]["args"][7] == ["Seed Artist", "__radio_seed_genres__"]
+    assert len(captured_queries) == 1
+    assert captured_queries[0]["kwargs"]["limit"] == 60
     assert set(session["used_track_ids"]) == {1, 2}
     assert session["current_target"][0] > 0.06
 

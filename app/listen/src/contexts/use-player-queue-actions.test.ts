@@ -20,8 +20,10 @@ vi.mock("@/lib/gapless-player", () => ({
   restoreVolume: vi.fn(),
   seekTo: vi.fn(),
   setLoop: vi.fn(),
+  setPlaybackRate: vi.fn(),
   setSingleMode: vi.fn(),
   setVolume: vi.fn(),
+  stop: vi.fn(),
 }));
 
 const TRACK: Track = {

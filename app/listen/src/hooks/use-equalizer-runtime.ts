@@ -10,11 +10,11 @@ import {
   getEqualizerSnapshot,
   type EqualizerSnapshot,
 } from "@/lib/equalizer-prefs";
+import { androidNativeEngine, shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { setEqualizer as engineSetEqualizer } from "@/lib/gapless-player";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 
 const FLAT_GAINS: EqGains = new Array(EQ_BAND_COUNT).fill(0);
-
 export function useEqualizerSnapshotState() {
   const [snapshot, setSnapshot] = useState<EqualizerSnapshot>(getEqualizerSnapshot);
 
@@ -62,6 +62,13 @@ export function useEqualizerRuntime(currentTrack: Track | undefined) {
   const { effectiveGains } = useResolvedEqualizer(snapshot, currentTrack);
 
   useEffect(() => {
+    if (shouldUseAndroidNativePlayer()) {
+      engineSetEqualizer(false, FLAT_GAINS);
+      void androidNativeEngine.setEq(snapshot.enabled, [...effectiveGains], 80).catch((error) => {
+        console.error("[native-player] failed to apply equalizer:", error);
+      });
+      return;
+    }
     engineSetEqualizer(canUseWebAudioEffects && snapshot.enabled, effectiveGains);
   }, [effectiveGains, snapshot.enabled]);
 }

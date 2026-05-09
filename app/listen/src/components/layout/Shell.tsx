@@ -1,16 +1,19 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import {
-  Home, Compass, Rss, Library, Music, Disc, Heart, Users, User,
-  ListMusic, PanelLeftClose, PanelLeftOpen, ChevronRight, BarChart3,
+  Home, Compass, Rss, Library, Music, Disc, Heart, Users,
+  ListMusic, PanelLeftClose, PanelLeftOpen, ChevronRight, BarChart3, Zap, Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { TopBar } from "@/components/layout/TopBar";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
 import { isReservedArtistChildSlug } from "@/lib/library-routes";
+import { startShapedRadio } from "@/lib/radio";
+import { triggerHaptic } from "@/lib/haptics";
 
 const SIDEBAR_KEY = "listen-sidebar-expanded";
 const SIDEBAR_EVENT = "listen-sidebar-changed";
@@ -251,10 +254,11 @@ const MOBILE_NAV = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/explore", icon: Compass, label: "Explore" },
   { to: "/library", icon: Library, label: "Library" },
-  { to: "/stats", icon: BarChart3, label: "Stats" },
   { to: "/upcoming", icon: Rss, label: "Upcoming" },
-  { to: "/settings", icon: User, label: "Profile" },
 ] as const;
+
+const DISCOVERY_LONG_PRESS_MS = 2400;
+const DISCOVERY_HOLD_CIRCUMFERENCE = 157;
 
 function hasOverlayHeader(pathname: string) {
   if (/^\/artists\/[^/]+$/.test(pathname) || /^\/albums\/[^/]+\/[^/]+$/.test(pathname)) {
@@ -271,9 +275,16 @@ function hasOverlayHeader(pathname: string) {
 export function Shell() {
   const isDesktop = useIsDesktop();
   const location = useLocation();
-  const { currentTrack } = usePlayerActions();
+  const { currentTrack, playAll, playSource } = usePlayerActions();
+  const { isPlaying } = usePlayerState();
   const hasTrack = !!currentTrack;
   const [sidebarExpanded, setSidebarExpanded] = useState(getStoredExpanded);
+  const [startingDiscoveryRadio, setStartingDiscoveryRadio] = useState(false);
+  const [discoveryHoldActive, setDiscoveryHoldActive] = useState(false);
+  const [discoveryHoldProgress, setDiscoveryHoldProgress] = useState(0);
+  const discoveryHoldTimerRef = useRef<number | null>(null);
+  const discoveryHoldFrameRef = useRef<number | null>(null);
+  const discoveryHoldCompletedRef = useRef(false);
   const overlayHeader = hasOverlayHeader(location.pathname);
   const headerOffsetClass = overlayHeader ? "" : "pt-24";
   const desktopContentPadClass = overlayHeader ? "pt-0 pb-6" : "py-6";
@@ -299,6 +310,98 @@ export function Shell() {
 
   const sidebarW = sidebarExpanded ? "ml-52" : "ml-14";
   const sidebarLeft = sidebarExpanded ? "left-52" : "left-14";
+  const discoveryRadioActive = isPlaying && playSource?.radio?.seedType === "discovery";
+  const discoveryLongPressRequired = hasTrack && !discoveryRadioActive;
+  const discoveryHoldDashOffset = DISCOVERY_HOLD_CIRCUMFERENCE * (1 - discoveryHoldProgress);
+
+  function clearDiscoveryHold() {
+    if (discoveryHoldTimerRef.current !== null) {
+      window.clearTimeout(discoveryHoldTimerRef.current);
+      discoveryHoldTimerRef.current = null;
+    }
+    if (discoveryHoldFrameRef.current !== null) {
+      window.cancelAnimationFrame(discoveryHoldFrameRef.current);
+      discoveryHoldFrameRef.current = null;
+    }
+    setDiscoveryHoldActive(false);
+    setDiscoveryHoldProgress(0);
+  }
+
+  function animateDiscoveryHold(startedAt: number) {
+    const elapsed = performance.now() - startedAt;
+    const progress = Math.min(1, elapsed / DISCOVERY_LONG_PRESS_MS);
+    setDiscoveryHoldProgress(progress);
+    if (progress < 1) {
+      discoveryHoldFrameRef.current = window.requestAnimationFrame(() => animateDiscoveryHold(startedAt));
+    }
+  }
+
+  async function startDiscoveryRadioFromDock() {
+    if (startingDiscoveryRadio) return;
+    setStartingDiscoveryRadio(true);
+    try {
+      const result = await startShapedRadio("discovery");
+      if (!result?.tracks.length) {
+        toast.info("Discovery Radio needs a bit more listening history");
+        return;
+      }
+      playAll(result.tracks, 0, result.source);
+    } catch {
+      toast.error("Failed to start Discovery Radio");
+    } finally {
+      setStartingDiscoveryRadio(false);
+    }
+  }
+
+  function handleDiscoveryRadioTap() {
+    if (discoveryHoldCompletedRef.current) {
+      discoveryHoldCompletedRef.current = false;
+      return;
+    }
+    if (discoveryRadioActive && currentTrack) {
+      window.dispatchEvent(new CustomEvent("crate:open-fullscreen-player"));
+      return;
+    }
+    if (discoveryLongPressRequired) {
+      toast.info("Hold Radio to switch to Discovery", { duration: 1600 });
+      return;
+    }
+    void startDiscoveryRadioFromDock();
+  }
+
+  function handleDiscoveryRadioPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!discoveryLongPressRequired || startingDiscoveryRadio) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    triggerHaptic("selection");
+    setDiscoveryHoldActive(true);
+    setDiscoveryHoldProgress(0);
+    const startedAt = performance.now();
+    discoveryHoldFrameRef.current = window.requestAnimationFrame(() => animateDiscoveryHold(startedAt));
+    discoveryHoldTimerRef.current = window.setTimeout(() => {
+      discoveryHoldTimerRef.current = null;
+      if (discoveryHoldFrameRef.current !== null) {
+        window.cancelAnimationFrame(discoveryHoldFrameRef.current);
+        discoveryHoldFrameRef.current = null;
+      }
+      discoveryHoldCompletedRef.current = true;
+      setDiscoveryHoldActive(false);
+      setDiscoveryHoldProgress(1);
+      triggerHaptic("medium");
+      void startDiscoveryRadioFromDock();
+    }, DISCOVERY_LONG_PRESS_MS);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (discoveryHoldTimerRef.current !== null) {
+        window.clearTimeout(discoveryHoldTimerRef.current);
+      }
+      if (discoveryHoldFrameRef.current !== null) {
+        window.cancelAnimationFrame(discoveryHoldFrameRef.current);
+      }
+    };
+  }, []);
 
   if (isDesktop) {
       return (
@@ -352,32 +455,138 @@ export function Shell() {
 
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 bg-app-surface"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-20"
         style={{
           height: hasTrack
             ? "var(--listen-mobile-bottom-chrome-height)"
             : "var(--listen-mobile-bottom-nav-height)",
+          background:
+            "linear-gradient(0deg, rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.94) 68%, rgba(10,10,15,0) 100%)",
         }}
       />
 
       <PlayerBar />
 
       <nav
-        className="z-app-player fixed bottom-0 left-0 right-0 isolate flex items-center justify-around border-t border-white/5 bg-app-surface px-1.5"
+        className={`z-app-player fixed isolate flex items-center justify-around overflow-visible border border-white/10 bg-[#181818]/95 px-1.5 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl ${
+          hasTrack ? "rounded-b-[2rem] border-t-0" : "rounded-[2rem]"
+        }`}
         style={{
-          paddingBottom: "var(--listen-safe-bottom)",
-          height: "var(--listen-mobile-bottom-nav-height)",
-          contain: "paint",
+          bottom: "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset))",
+          left: "max(1rem, var(--listen-safe-left))",
+          right: "max(1rem, var(--listen-safe-right))",
+          height: "var(--listen-mobile-bottom-nav-content-height)",
         }}
       >
-        {MOBILE_NAV.map(({ to, icon: Icon, label }) => (
+        {MOBILE_NAV.slice(0, 2).map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === "/"}
   
             className={({ isActive }) =>
-              `flex min-w-0 flex-1 touch-manipulation flex-col items-center gap-1 rounded-xl px-1.5 py-1.5 transition-colors active:bg-white/5 ${isActive ? "text-primary" : "text-white/40 hover:text-white/70"}`
+              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${isActive ? "bg-white/[0.07] text-primary" : "text-white/[0.42] hover:text-white/70"}`
+            }
+          >
+            <Icon size={20} />
+            <span className="max-w-full truncate text-[9.5px] leading-none">{label}</span>
+          </NavLink>
+        ))}
+        <button
+          type="button"
+          aria-label={
+            discoveryRadioActive
+              ? "Open Now Playing"
+              : discoveryLongPressRequired
+                ? "Hold to start Discovery Radio"
+                : "Start Discovery Radio"
+          }
+          title={discoveryLongPressRequired ? "Hold to start Discovery Radio" : undefined}
+          onClick={() => void handleDiscoveryRadioTap()}
+          onPointerDown={handleDiscoveryRadioPointerDown}
+          onPointerUp={clearDiscoveryHold}
+          onPointerCancel={clearDiscoveryHold}
+          onPointerLeave={clearDiscoveryHold}
+          onContextMenu={(event) => {
+            if (discoveryLongPressRequired) event.preventDefault();
+          }}
+          disabled={startingDiscoveryRadio}
+          className="relative flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 text-primary transition active:scale-[0.97] active:bg-white/[0.06] disabled:opacity-70"
+        >
+          <span
+            className={`relative flex h-11 w-11 items-center justify-center rounded-full border shadow-[0_0_22px_rgba(34,211,238,0.34)] ${
+              discoveryRadioActive
+                ? "border-primary/50 bg-primary text-black"
+                : "border-primary/[0.22] bg-primary/[0.92] text-black"
+            }`}
+          >
+            {discoveryHoldActive ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -inset-4 rounded-full opacity-80 blur-xl"
+                  style={{
+                    background:
+                      "radial-gradient(circle, rgba(207,250,254,0.24) 0%, rgba(34,211,238,0.18) 34%, rgba(6,182,212,0.08) 56%, transparent 74%)",
+                  }}
+                />
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 58 58"
+                  className="pointer-events-none absolute -inset-[7px] h-[58px] w-[58px] -rotate-90 overflow-visible"
+                >
+                  <defs>
+                    <linearGradient id="discovery-hold-gradient" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="rgba(6,182,212,0.12)" />
+                      <stop offset="58%" stopColor="rgba(34,211,238,0.72)" />
+                      <stop offset="100%" stopColor="rgba(207,250,254,0.96)" />
+                    </linearGradient>
+                  </defs>
+                  <circle
+                    cx="29"
+                    cy="29"
+                    r="25"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="2"
+                  />
+                  <circle
+                    cx="29"
+                    cy="29"
+                    r="25"
+                    fill="none"
+                    stroke="url(#discovery-hold-gradient)"
+                    strokeDasharray={DISCOVERY_HOLD_CIRCUMFERENCE}
+                    strokeDashoffset={discoveryHoldDashOffset}
+                    strokeLinecap="round"
+                    strokeWidth="3"
+                    style={{
+                      filter:
+                        "drop-shadow(0 0 5px rgba(34,211,238,0.72)) drop-shadow(0 0 14px rgba(6,182,212,0.34))",
+                    }}
+                  />
+                </svg>
+              </>
+            ) : null}
+            {startingDiscoveryRadio ? (
+              <Loader2 size={23} className="relative z-10 animate-spin" />
+            ) : discoveryRadioActive ? (
+              <Disc size={23} className="relative z-10" />
+            ) : (
+              <Zap size={23} className="relative z-10" fill="currentColor" />
+            )}
+          </span>
+          <span className="max-w-full truncate text-[9.5px] font-semibold leading-none text-primary">
+            {discoveryRadioActive ? "Playing" : "Radio"}
+          </span>
+        </button>
+        {MOBILE_NAV.slice(2).map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({ isActive }) =>
+              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${isActive ? "bg-white/[0.07] text-primary" : "text-white/[0.42] hover:text-white/70"}`
             }
           >
             <Icon size={20} />

@@ -433,6 +433,11 @@ export function setVolume(vol: number): void {
   applyVolume(vol);
 }
 
+export function setPlaybackRate(rate: number): void {
+  const safeRate = Math.max(0.25, Math.min(rate, 4));
+  instance?.setPlaybackRate(safeRate);
+}
+
 export function getPosition(): number {
   return instance?.getPosition() ?? 0;
 }

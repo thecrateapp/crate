@@ -10,7 +10,9 @@ import type { EqFeatures } from "@/hooks/use-eq-features";
  *
  *   - Modern masterings are already over-EQ'd; we apply small corrections
  *     (usually ±2 dB, rarely ±3) rather than aggressive shapes.
- *   - When in doubt (high dynamic range, unknown loudness), return flat.
+ *   - When in doubt (unknown loudness), stay close to flat.
+ *   - High dynamic range reduces the correction strength, but it should not
+ *     erase other clear signals like very dark/bright tonality.
  *   - Signals are composable: each heuristic contributes additively so
  *     two weak signals don't dominate a single strong one.
  *
@@ -48,10 +50,10 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
 
   const { brightness, loudness, dynamicRange, energy, acousticness } = features;
 
-  // Highly dynamic tracks: protect the artistic intent, bail out.
-  if (typeof dynamicRange === "number" && dynamicRange > 14) {
-    return FLAT;
-  }
+  const dynamicRangeScale =
+    typeof dynamicRange === "number" && dynamicRange > 14
+      ? 0.35
+      : 1;
 
   // Brightness correction — tilt the upper shelf toward neutral.
   if (typeof brightness === "number") {
@@ -112,5 +114,9 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
 
   // Clamp total per-band movement to ±4 dB so multiple heuristics
   // stacking can't produce wild curves.
-  return gains.map((g) => Math.max(-4, Math.min(4, g)));
+  return gains.map((g) => {
+    const scaled = g * dynamicRangeScale;
+    if (Math.abs(scaled) < 0.05) return 0;
+    return Math.max(-4, Math.min(4, Number(scaled.toFixed(2))));
+  });
 }

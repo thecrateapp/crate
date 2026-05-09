@@ -7,6 +7,7 @@ import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import type { ReplayMix, ReplayTrack } from "./home-model";
 import { ContinueListeningCard, SectionHeader, SectionRail } from "./HomeSections";
@@ -303,6 +304,7 @@ export function HomeReplaySection({
   onPlayReplay: () => void;
   onPlayTrack: (track: ReplayTrack) => void;
 }) {
+  const isDesktop = useIsDesktop();
   if (!replayPreview.length) return null;
 
   return (
@@ -310,8 +312,8 @@ export function HomeReplaySection({
       <SectionHeader
         title={replay?.title || "Replay this month"}
         subtitle={replay?.subtitle || "A playable recap of your current listening window."}
-        actionLabel="Open Stats"
-        onAction={onOpenStats}
+        actionLabel={isDesktop ? "Open Stats" : undefined}
+        onAction={isDesktop ? onOpenStats : undefined}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">

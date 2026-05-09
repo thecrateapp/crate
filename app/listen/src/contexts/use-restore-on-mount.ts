@@ -6,12 +6,15 @@ import { getStoredQueue } from "@/contexts/player-utils";
 import {
   fadeInAndPlay as gpFadeInAndPlay,
   loadQueue as gpLoadQueue,
+  pause as gpPause,
   play as gpPlay,
   restoreVolume as gpRestoreVolume,
   seekTo as gpSeekTo,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
+  stop as gpStop,
 } from "@/lib/gapless-player";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 
 const SOFT_PAUSE_FADE_MS = 220;
 const AUTOPLAY_TIMEOUT_MS = 2500;
@@ -28,6 +31,11 @@ interface UseRestoreOnMountOptions {
   bufferingIntentRef: MutableRefObject<boolean>;
   buildEngineUrls: (tracks: Track[]) => string[];
   pullFromEngine: (sourceQueue?: Track[]) => unknown;
+  pushToEngine: (
+    queue: Track[],
+    index: number,
+    options?: { autoplay?: boolean; positionMs?: number },
+  ) => void;
   commitIsBuffering: (buffering: boolean) => void;
   commitCurrentTime: (time: number) => void;
   markSeekPosition: (time: number) => void;
@@ -84,6 +92,7 @@ export function useRestoreOnMount({
   bufferingIntentRef,
   buildEngineUrls,
   pullFromEngine,
+  pushToEngine,
   commitIsBuffering,
   commitCurrentTime,
   markSeekPosition,
@@ -140,11 +149,24 @@ export function useRestoreOnMount({
       0,
       Math.min(storedRef.current.currentIndex, restoredQueue.length - 1),
     );
+    pendingRestoreTimeRef.current =
+      storedRef.current.currentTime > 0 ? storedRef.current.currentTime : 0;
+
+    if (shouldUseAndroidNativePlayer()) {
+      gpPause();
+      gpStop();
+      gpLoadQueue([], 0);
+      resumeAfterReloadRef.current = false;
+      pushToEngine(restoredQueue, restoredIndex, {
+        autoplay: storedRef.current.wasPlaying,
+        positionMs: Math.max(0, pendingRestoreTimeRef.current * 1000),
+      });
+      return;
+    }
+
     gpLoadQueue(buildEngineUrls(restoredQueue), restoredIndex);
     gpSetLoop(repeatRef.current === "all");
     gpSetSingleMode(repeatRef.current === "one");
-    pendingRestoreTimeRef.current =
-      storedRef.current.currentTime > 0 ? storedRef.current.currentTime : 0;
 
     // pullFromEngine commits queue/index/duration internally.
     pullFromEngine(restoredQueue);
@@ -157,7 +179,7 @@ export function useRestoreOnMount({
       commitCurrentTime(pendingRestoreTimeRef.current);
       markSeekPosition(pendingRestoreTimeRef.current);
     }
-  }, [buildEngineUrls, commitCurrentTime, markSeekPosition, pullFromEngine, repeatRef]);
+  }, [buildEngineUrls, commitCurrentTime, markSeekPosition, pullFromEngine, pushToEngine, repeatRef]);
 
   // Timer cleanup on unmount.
   useEffect(() => () => cancelRestoreAutoplay(), [cancelRestoreAutoplay]);

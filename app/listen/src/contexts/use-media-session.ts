@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { Track } from "./player-types";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import {
   onNativeMediaControl,
@@ -40,6 +41,8 @@ export function useMediaSession({
   }, [currentTime, duration, next, pause, prev, resume, seek]);
 
   useEffect(() => {
+    if (shouldUseAndroidNativePlayer()) return;
+
     let disposed = false;
     let cleanup: (() => void) | null = null;
 
@@ -125,6 +128,8 @@ export function useMediaSession({
     Math.max(0, duration > 0 ? Math.min(currentTime, duration) : currentTime),
   );
   useEffect(() => {
+    if (shouldUseAndroidNativePlayer()) return;
+
     if (!currentTrack) {
       void stopNativeMediaSession();
       return;

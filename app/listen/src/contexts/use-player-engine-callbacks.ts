@@ -97,6 +97,10 @@ export function usePlayerEngineCallbacks({
     onTimeUpdate: (positionMs, trackIndex) => {
       const positionSeconds = positionMs / 1000;
       clearStallTimer();
+      if (bufferingIntentRef.current) {
+        bufferingIntentRef.current = false;
+        commitIsBuffering(false);
+      }
       commitCurrentTime(positionSeconds);
       recordProgress(positionSeconds);
       if (trackIndex !== currentIndexRef.current && trackIndex >= 0) {
@@ -236,8 +240,12 @@ export function usePlayerEngineCallbacks({
         beginSoftInterruption(online ? "stream" : "offline");
       });
     },
-    onBuffering: () => {
-      if (bufferingIntentRef.current || isPlayingRef.current) {
+    onBuffering: (path) => {
+      const currentTrack = currentTrackRef.current;
+      const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
+      if (path && currentPath && path !== currentPath) return;
+      if (isCurrentTrackFullyBuffered()) return;
+      if (bufferingIntentRef.current || !isPlayingRef.current) {
         commitIsBuffering(true);
       }
       scheduleStallProtection();

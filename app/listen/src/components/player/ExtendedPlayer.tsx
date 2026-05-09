@@ -19,6 +19,7 @@ import { useMusicVisualizer } from "@/components/player/visualizer/useMusicVisua
 import { useVisualizerConfig } from "@/components/player/visualizer/useVisualizerConfig";
 import { measureVisualizerCanvasRect } from "@/components/player/visualizer/canvas-layout";
 import { VisualizerSettingsPanel } from "@/components/player/visualizer/VisualizerSettingsPanel";
+import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import { useCrossfadeAwareProgress, useCrossfadeProgress } from "@/hooks/use-crossfade-progress";
@@ -64,17 +65,20 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const equalizerButtonRef = useRef<HTMLButtonElement>(null);
   const vizSettingsRef = useRef<HTMLDivElement>(null);
   const vizSettingsButtonRef = useRef<HTMLButtonElement>(null);
+  const vizRef = useRef<MusicVisualizer | null>(null);
   const playbackState = useMemo(() => ({ isPlaying, volume }), [isPlaying, volume]);
-  const vizRef = useMusicVisualizer(
-    canvasRef,
-    `${currentTrack?.id ?? "none"}:${analyserVersion}`,
-    open && isDesktop,
-    playbackState,
-  );
   const vizCfg = useVisualizerConfig(vizRef, currentTrack, open && isDesktop, crossfadeTransition);
   const isCdMode = vizCfg.surfaceMode === "cd";
   const isVisualizerMode = vizCfg.surfaceMode === "visualizer";
   const [canvasRect, setCanvasRect] = useState<{ top: number; left: number; width: number; height: number; referenceSize: number } | null>(null);
+  useMusicVisualizer(
+    canvasRef,
+    `${currentTrack?.id ?? "none"}:${analyserVersion}`,
+    open && isDesktop && isVisualizerMode && canvasRect != null,
+    playbackState,
+    "spheres",
+    vizRef,
+  );
 
   // Measure cover position relative to the left panel and give the WebGL
   // canvas a bit more breathing room than the visualizer itself needs.

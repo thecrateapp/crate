@@ -99,6 +99,7 @@ export function createMockPlayerActions(
     prev: vi.fn(),
     seek: vi.fn(),
     setVolume: vi.fn(),
+    setPlaybackRate: vi.fn(),
     clearQueue: vi.fn(),
     toggleShuffle: vi.fn(),
     cycleRepeat: vi.fn(),

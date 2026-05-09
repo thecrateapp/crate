@@ -211,3 +211,12 @@ export function migrateLegacyToken(defaultUrl: string): void {
     localStorage.removeItem(LEGACY_TOKEN_KEY);
   } catch { /* ignore */ }
 }
+
+export function seedDefaultServer(defaultUrl: string): void {
+  if (!isNative) return;
+  if (getServers().length > 0) return;
+  const normalised = normaliseServerUrl(defaultUrl);
+  if (!normalised) return;
+  const seeded = addServer(normalised);
+  setCurrentServerId(seeded.id);
+}

@@ -30,13 +30,16 @@ describe("computeAdaptiveGains", () => {
     expect(gains.every((g) => g === 0)).toBe(true);
   });
 
-  it("protects highly dynamic tracks — always flat", () => {
+  it("dampens highly dynamic tracks without erasing other strong signals", () => {
     const gains = computeAdaptiveGains(mkFeatures({
       brightness: 0.15,   // would normally lift highs
       energy: 0.9,        // would normally push bass
-      dynamicRange: 18,   // escape hatch
+      dynamicRange: 18,   // preserve intent, but keep clear tonal correction
     }));
-    expect(gains.every((g) => g === 0)).toBe(true);
+    expect(gains[1]!).toBeGreaterThan(0);
+    expect(gains[1]!).toBeLessThan(1.5);
+    expect(gains[8]!).toBeGreaterThan(0);
+    expect(gains[8]!).toBeLessThan(2);
   });
 
   it("lifts highs on dark tracks", () => {

@@ -100,6 +100,7 @@ describe("track action shared helpers", () => {
         title: "Track Seven",
         albumId: 77,
         albumSlug: "album",
+        duration: 211,
         format: "flac",
         bitrate: 1411,
         sampleRate: 96000,

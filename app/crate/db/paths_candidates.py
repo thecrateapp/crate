@@ -128,6 +128,19 @@ def _curation_penalty(candidate: dict) -> float:
     return min(penalty, 0.25)
 
 
+def _vector_distance(candidate: dict, target: list[float]) -> float:
+    vector = candidate.get("bliss_vector") or []
+    if len(vector) != len(target) or not vector:
+        return _coerce_float(candidate.get("distance")) or 1.0
+
+    dot = sum(float(vector[index]) * float(target[index]) for index in range(len(target)))
+    left_norm = sum(float(value) * float(value) for value in vector) ** 0.5
+    right_norm = sum(float(value) * float(value) for value in target) ** 0.5
+    if left_norm <= 0 or right_norm <= 0:
+        return _coerce_float(candidate.get("distance")) or 1.0
+    return max(0.0, min(2.0, 1.0 - (dot / (left_norm * right_norm))))
+
+
 def _find_best_candidate(
     target: list[float],
     exclude_ids: set[int],
@@ -145,16 +158,53 @@ def _find_best_candidate(
 ) -> dict | None:
     """Find the best track near ``target`` using hybrid bliss/affinity scoring."""
     rows = find_candidate_rows(target, exclude_ids, limit=candidate_pool_size)
+    return _select_best_candidate_from_rows(
+        rows,
+        target,
+        exclude_ids,
+        exclude_titles,
+        recent_artists,
+        sim_graph,
+        genre_map,
+        member_graph,
+        target_artists,
+        artist_affinity=artist_affinity,
+        genre_overlap=genre_overlap,
+        recent_tracks=recent_tracks,
+    )
+
+
+def _select_best_candidate_from_rows(
+    rows: list[dict],
+    target: list[float],
+    exclude_ids: set[int],
+    exclude_titles: set[str],
+    recent_artists: list[str],
+    sim_graph: dict[str, dict[str, float]],
+    genre_map: dict[str, dict[str, float]],
+    member_graph: dict[str, set[str]],
+    target_artists: list[str],
+    *,
+    artist_affinity=lambda *_args, **_kwargs: 0.0,
+    genre_overlap=lambda *_args, **_kwargs: 0.0,
+    recent_tracks: list[dict] | None = None,
+) -> dict | None:
+    """Rank a prefetched candidate pool without going back to Postgres."""
     if not rows:
         return None
 
-    max_dist = max(float(row["distance"]) for row in rows) or 1.0
+    scored_rows: list[tuple[dict, float]] = [
+        (dict(row), _vector_distance(dict(row), target))
+        for row in rows
+    ]
+    max_dist = max(distance for _row, distance in scored_rows) or 1.0
     best: dict | None = None
     best_score = float("inf")
     track_context = _latest_track_context(recent_tracks)
 
-    for row in rows:
-        candidate = dict(row)
+    for candidate, distance in scored_rows:
+        if candidate.get("id") in exclude_ids:
+            continue
         artist = candidate["artist"]
         title = candidate["title"]
         title_key = f"{artist}::{title}".lower()
@@ -167,7 +217,7 @@ def _find_best_candidate(
             if consecutive >= _MAX_CONSECUTIVE_SAME_ARTIST:
                 continue
 
-        bliss_norm = float(candidate["distance"]) / max_dist
+        bliss_norm = distance / max_dist
         affinity = artist_affinity(artist, recent_artists + target_artists, sim_graph, member_graph)
         overlap = genre_overlap(artist, target_artists, genre_map)
 
@@ -188,6 +238,7 @@ def _find_best_candidate(
         if score < best_score:
             best_score = score
             best = candidate
+            best["distance"] = distance
 
     if best:
         best["bliss_vector"] = list(best["bliss_vector"]) if best.get("bliss_vector") else None
@@ -198,4 +249,5 @@ def _find_best_candidate(
 __all__ = [
     "_find_anchor_track",
     "_find_best_candidate",
+    "_select_best_candidate_from_rows",
 ]

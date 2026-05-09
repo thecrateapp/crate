@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { MusicVisualizer } from './MusicVisualizer';
 import { createAnalyserNode } from '@/hooks/use-audio-visualizer';
 import { getAnalyserNode } from '@/lib/gapless-player';
@@ -15,8 +15,10 @@ export function useMusicVisualizer(
   active: boolean,
   playbackState: { volume: number; isPlaying: boolean },
   mode: VisualizerMode = "spheres",
+  externalVizRef?: MutableRefObject<MusicVisualizer | null>,
 ) {
-  const vizRef = useRef<MusicVisualizer | null>(null);
+  const internalVizRef = useRef<MusicVisualizer | null>(null);
+  const vizRef = externalVizRef ?? internalVizRef;
   const playbackStateRef = useRef(playbackState);
 
   useEffect(() => {

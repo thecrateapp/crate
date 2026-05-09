@@ -54,7 +54,11 @@ public class CrateMediaSessionPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         Intent intent = new Intent(getContext(), CratePlaybackService.class)
-            .setAction(CratePlaybackService.ACTION_STOP_SERVICE);
+            .setAction(CratePlaybackService.ACTION_STOP_SERVICE)
+            .putExtra(
+                CratePlaybackService.EXTRA_SUPPRESS_CONTROL,
+                call.getBoolean("suppressControl", false)
+            );
         getContext().startService(intent);
         call.resolve();
     }

@@ -22,6 +22,7 @@ import { toPlayableTrack } from "@/lib/playable-track";
 import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 type Tab = "playlists" | "artists" | "albums" | "liked";
 
@@ -590,7 +591,8 @@ function LikedTab() {
 
 export function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: stats, refetch: refetchStats } = useApi<MeStats>("/api/me");
+  const isDesktop = useIsDesktop();
+  const { data: stats, refetch: refetchStats } = useApi<MeStats>(isDesktop ? "/api/me" : null);
   const tab = parseTab(searchParams.get("tab"));
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -615,7 +617,7 @@ export function Library() {
 
       {/* Stats */}
       {stats && (
-        <div className="flex gap-2">
+        <div className="hidden gap-2 md:flex">
           <StatBox value={stats.followed_artists} label="Artists" />
           <StatBox value={stats.saved_albums} label="Albums" />
           <StatBox value={stats.liked_tracks} label="Tracks" />

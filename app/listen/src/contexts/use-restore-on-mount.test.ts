@@ -2,14 +2,24 @@ import { renderHook, act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutableRefObject } from "react";
 
+const nativePlayerMock = vi.hoisted(() => ({
+  shouldUseAndroidNativePlayer: vi.fn(() => false),
+}));
+
 vi.mock("@/lib/gapless-player", () => ({
   fadeInAndPlay: vi.fn(() => Promise.resolve()),
   loadQueue: vi.fn(),
+  pause: vi.fn(),
   play: vi.fn(),
   restoreVolume: vi.fn(),
   seekTo: vi.fn(),
   setLoop: vi.fn(),
   setSingleMode: vi.fn(),
+  stop: vi.fn(),
+}));
+
+vi.mock("@/lib/android-native-engine", () => ({
+  shouldUseAndroidNativePlayer: nativePlayerMock.shouldUseAndroidNativePlayer,
 }));
 
 import * as gaplessPlayer from "@/lib/gapless-player";
@@ -54,6 +64,7 @@ function createOptions(opts: TestOptions = {}) {
     bufferingIntentRef: { current: false } as MutableRefObject<boolean>,
     buildEngineUrls: vi.fn((tracks: Track[]) => tracks.map((t) => `/stream/${t.id}`)),
     pullFromEngine: vi.fn(),
+    pushToEngine: vi.fn(),
     commitIsBuffering: vi.fn(),
     commitCurrentTime: vi.fn(),
     markSeekPosition: vi.fn(),
@@ -66,6 +77,7 @@ beforeEach(() => {
   Object.values(gaplessPlayer).forEach((fn) => {
     if (typeof fn === "function" && "mockClear" in fn) (fn as { mockClear: () => void }).mockClear();
   });
+  nativePlayerMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
 });
 
 afterEach(() => {
@@ -91,6 +103,25 @@ describe("useRestoreOnMount", () => {
     expect(opts.buildEngineUrls).toHaveBeenCalledWith([TRACK_A, TRACK_B]);
     expect(mockLoadQueue).toHaveBeenCalledWith(["/stream/a", "/stream/b"], 1);
     expect(opts.pullFromEngine).toHaveBeenCalledWith([TRACK_A, TRACK_B]);
+  });
+
+  it("restores through the native player without starting a gapless stream", () => {
+    nativePlayerMock.shouldUseAndroidNativePlayer.mockReturnValue(true);
+    setStored([TRACK_A, TRACK_B], 1, 12, true);
+    const opts = createOptions();
+
+    const { result } = renderHook(() => useRestoreOnMount(opts));
+
+    expect(gaplessPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(gaplessPlayer.stop).toHaveBeenCalledTimes(1);
+    expect(mockLoadQueue).toHaveBeenCalledWith([], 0);
+    expect(opts.buildEngineUrls).not.toHaveBeenCalled();
+    expect(opts.pullFromEngine).not.toHaveBeenCalled();
+    expect(opts.pushToEngine).toHaveBeenCalledWith([TRACK_A, TRACK_B], 1, {
+      autoplay: true,
+      positionMs: 12_000,
+    });
+    expect(result.current.resumeAfterReloadRef.current).toBe(false);
   });
 
   it("seeks to stored position and reflects it in React state", () => {

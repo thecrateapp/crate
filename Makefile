@@ -463,6 +463,7 @@ trust-local-ca: ## Trust Caddy's local CA for HTTPS (run after first 'make dev',
 
 CAP_DIR := app/listen
 CAP_IOS_TARGET ?= $(shell cd $(CAP_DIR) && npx cap run ios --list 2>/dev/null | grep "iPhone.*Pro " | head -1 | awk '{print $$NF}')
+CAP_DEBUG_SERVER_URL ?= https://listen.lespedants.org
 
 # Android Studio JBR + SDK paths (required for Gradle/emulator)
 export JAVA_HOME ?= $(HOME)/Applications/Android Studio.app/Contents/jbr/Contents/Home
@@ -475,7 +476,7 @@ cap-build: ## Build Listen for Capacitor (bakes production API URL)
 
 .PHONY: cap-ios
 cap-ios: ## Build and run Listen on iOS Simulator
-	@cd $(CAP_DIR) && npm run build:cap
+	@cd $(CAP_DIR) && VITE_API_URL="$(CAP_DEBUG_SERVER_URL)" npm run build:cap
 	@echo "$(YELLOW)Launching iOS Simulator...$(NC)"
 	@cd $(CAP_DIR) && npx cap run ios --target "$(CAP_IOS_TARGET)"
 
@@ -485,7 +486,7 @@ cap-ios-open: ## Open Listen iOS project in Xcode
 
 .PHONY: cap-android
 cap-android: ## Build and run Listen on Android Emulator
-	@cd $(CAP_DIR) && npm run build:cap
+	@cd $(CAP_DIR) && VITE_API_URL="$(CAP_DEBUG_SERVER_URL)" npm run build:cap
 	@echo "$(YELLOW)Launching Android Emulator...$(NC)"
 	@cd $(CAP_DIR) && npx cap run android
 
