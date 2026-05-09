@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 
 from crate.db.queries.paths import (
     load_artist_genres,
@@ -28,10 +29,19 @@ def _load_artist_genres() -> dict[str, dict[str, float]]:
     return load_artist_genres()
 
 
-def _expand_genre_weights(genres: dict[str, float]) -> dict[str, float]:
+def _genre_cache_key(genres: dict[str, float]) -> tuple[tuple[str, float], ...]:
+    return tuple(
+        sorted(
+            (str(raw_genre), float(raw_weight or 0.0))
+            for raw_genre, raw_weight in (genres or {}).items()
+        )
+    )
+
+
+@lru_cache(maxsize=4096)
+def _expand_genre_weight_items(items: tuple[tuple[str, float], ...]) -> tuple[tuple[str, float], ...]:
     expanded: dict[str, float] = {}
-    for raw_genre, raw_weight in (genres or {}).items():
-        weight = float(raw_weight or 0.0)
+    for raw_genre, weight in items:
         if weight <= 0:
             continue
         canonical_slug = resolve_genre_slug(raw_genre) or slugify_genre(raw_genre)
@@ -45,7 +55,11 @@ def _expand_genre_weights(genres: dict[str, float]) -> dict[str, float]:
             related_slug = resolve_genre_slug(related_term) or slugify_genre(related_term)
             if related_slug and related_slug not in expanded:
                 expanded[related_slug] = weight * 0.35
-    return expanded
+    return tuple(sorted(expanded.items()))
+
+
+def _expand_genre_weights(genres: dict[str, float]) -> dict[str, float]:
+    return dict(_expand_genre_weight_items(_genre_cache_key(genres)))
 
 
 def _artist_affinity(

@@ -150,6 +150,30 @@ def test_genre_overlap_uses_taxonomy_ancestors():
     assert overlap > 0.0
 
 
+def test_genre_overlap_reuses_expanded_taxonomy(monkeypatch):
+    from crate.db import paths_similarity
+
+    calls: list[str] = []
+    paths_similarity._expand_genre_weight_items.cache_clear()
+
+    def fake_related_terms(slug: str, *, limit: int, max_depth: int) -> list[str]:
+        calls.append(slug)
+        return [f"{slug}-related"]
+
+    monkeypatch.setattr(paths_similarity, "get_related_genre_terms", fake_related_terms)
+
+    genre_map = {
+        "candidate": {"post-hardcore": 1.0},
+        "target": {"hardcore punk": 1.0},
+    }
+
+    first = paths_similarity._genre_overlap("Candidate", ["Target"], genre_map)
+    second = paths_similarity._genre_overlap("Candidate", ["Target"], genre_map)
+
+    assert first == second
+    assert calls == ["post-hardcore", "hardcore-punk"]
+
+
 def test_home_mix_preparation_deprioritizes_liked_and_overplayed_tracks():
     from crate.db.home_builder_mix_generation import _prepare_mix_candidate_rows
 
