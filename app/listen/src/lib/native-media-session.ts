@@ -22,7 +22,7 @@ type NativeMediaControlEvent = {
 type CrateMediaSessionPlugin = {
   start(options: NativeMediaSessionPayload): Promise<void>;
   update(options: NativeMediaSessionPayload): Promise<void>;
-  stop(): Promise<void>;
+  stop(options?: { suppressControl?: boolean }): Promise<void>;
   addListener(
     eventName: "control",
     listener: (event: NativeMediaControlEvent) => void,
@@ -40,10 +40,10 @@ export async function syncNativeMediaSession(payload: NativeMediaSessionPayload)
   }
 }
 
-export async function stopNativeMediaSession(): Promise<void> {
+export async function stopNativeMediaSession(options?: { suppressControl?: boolean }): Promise<void> {
   if (!isNative) return;
   try {
-    await nativeMediaSession.stop();
+    await nativeMediaSession.stop(options);
   } catch {
     // Ignore native bridge failures during teardown.
   }

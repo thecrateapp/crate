@@ -12,7 +12,7 @@ export function TopBar() {
       <div className="flex flex-shrink-0 items-center gap-2 pointer-events-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white/60 transition-colors hover:bg-black/50 hover:text-white md:h-9 md:w-9"
+          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white/60 transition-colors hover:bg-black/50 hover:text-white md:h-9 md:w-9"
           aria-label="Go back"
           title="Go back"
         >

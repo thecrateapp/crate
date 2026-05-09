@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 
 from crate.db.paths import (
     _centroid,
-    _find_best_candidate,
     _lerp,
     _load_artist_genres,
     _load_artist_similarity_graph,
@@ -22,7 +21,9 @@ from crate.db.paths import (
     resolve_bliss_centroid,
     resolve_endpoint_label,
 )
+from crate.db.paths_candidates import _select_best_candidate_from_rows
 from crate.db.paths_similarity import _artist_affinity, _genre_overlap
+from crate.db.queries.paths import find_candidate_rows
 from crate.db.queries.radio import (
     count_user_radio_signals,
     get_followed_artist_seed_rows,
@@ -47,6 +48,7 @@ _SESSION_TTL = 86400  # 24 hours
 _DISLIKE_PENALTY_RADIUS = 0.10
 _BATCH_SIZE = 20
 _RADIO_CANDIDATE_POOL_SIZE = 60
+_RADIO_PREFETCH_LIMIT = 360
 _MAX_GENERATION_ATTEMPT_MULTIPLIER = 4
 _SEED_ANCHOR_BLEND = 0.02
 _GRAPH_CACHE_TTL_SECONDS = 3600
@@ -422,7 +424,15 @@ def _generate_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict]:
         target_artists.append(genre_context_key)
 
     tracks: list[dict] = []
-    max_attempts = max(count + 5, count * _MAX_GENERATION_ATTEMPT_MULTIPLIER)
+    candidate_rows = find_candidate_rows(
+        target,
+        _db_exclude_ids(used_track_ids),
+        limit=min(_RADIO_PREFETCH_LIMIT, max(_RADIO_CANDIDATE_POOL_SIZE, count * 12)),
+    )
+    max_attempts = min(
+        len(candidate_rows),
+        max(count + 5, count * _MAX_GENERATION_ATTEMPT_MULTIPLIER),
+    )
     attempts = 0
 
     while len(tracks) < count and attempts < max_attempts:
@@ -430,12 +440,11 @@ def _generate_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict]:
         import random
         drift = [target[d] + random.gauss(0, 0.02) for d in range(len(target))]
 
-        candidate = _find_best_candidate(
-            drift, _db_exclude_ids(used_track_ids), used_titles, recent_artists,
+        candidate = _select_best_candidate_from_rows(
+            candidate_rows, drift, used_ids, used_titles, recent_artists,
             sim_graph, genre_map, member_graph, target_artists,
             artist_affinity=_artist_affinity,
             genre_overlap=_genre_overlap,
-            candidate_pool_size=_RADIO_CANDIDATE_POOL_SIZE,
             recent_tracks=recent_tracks,
         )
 

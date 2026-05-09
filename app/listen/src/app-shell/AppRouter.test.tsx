@@ -57,6 +57,7 @@ vi.mock("@/lib/server-store", () => ({
   SERVER_STORE_EVENT: "crate-server-store-change",
   getCurrentServer: () => runtimeState.currentServer,
   migrateLegacyToken: vi.fn(),
+  seedDefaultServer: vi.fn(),
 }));
 
 describe("AppRouter", () => {

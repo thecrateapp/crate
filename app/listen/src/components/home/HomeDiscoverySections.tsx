@@ -23,6 +23,7 @@ import type {
   HomeDiscoveryPayload,
   HomeGeneratedPlaylistSummary,
   HomeHeroArtist,
+  HomeListeningHistoryCard,
   HomeRadioStation,
   HomeRecentItem,
   HomeSectionId,
@@ -56,6 +57,20 @@ function mixArtistSummary(item: HomeGeneratedPlaylistSummary): string {
   if (names.length === 2) return `${first}, ${second}`;
   if (names.length === 3) return `${first}, ${second}, ${third}`;
   return `${first}, ${second}, ${third} and more`;
+}
+
+const HISTORY_TONES = [
+  "from-cyan-400/30 via-teal-950/65 to-black",
+  "from-amber-300/30 via-stone-950/70 to-black",
+  "from-indigo-400/30 via-slate-950/70 to-black",
+  "from-rose-300/30 via-red-950/60 to-black",
+  "from-lime-300/35 via-emerald-950/55 to-black",
+  "from-fuchsia-300/30 via-purple-950/65 to-black",
+];
+
+function historyLabel(item: HomeListeningHistoryCard, index: number): string {
+  if (index === 0 && item.title === "My Most Listened") return "MY MOST LISTENED";
+  return item.period_label;
 }
 
 function recentArtwork(item: HomeRecentItem): string | null {
@@ -671,6 +686,90 @@ export function CustomMixCard({
         onClose={actionMenu.close}
       />
     </div>
+  );
+}
+
+export function ListeningHistorySection({
+  items,
+  onOpenHistory,
+}: {
+  items: HomeListeningHistoryCard[];
+  onOpenHistory: () => void;
+}) {
+  const rail = useSectionRail(items.length);
+  if (!items.length) return null;
+
+  return (
+    <section className="space-y-4">
+      <SectionHeader
+        title="Your listening history"
+        subtitle="Monthly snapshots of what actually stayed on repeat."
+        actionLabel="View all"
+        onAction={onOpenHistory}
+        railControls={rail}
+      />
+      <SectionRail railRef={rail.railRef}>
+        {items.map((item, index) => (
+          <ListeningHistoryCard
+            key={item.id}
+            item={item}
+            index={index}
+            onOpen={onOpenHistory}
+          />
+        ))}
+      </SectionRail>
+    </section>
+  );
+}
+
+function ListeningHistoryCard({
+  item,
+  index,
+  onOpen,
+}: {
+  item: HomeListeningHistoryCard;
+  index: number;
+  onOpen: () => void;
+}) {
+  const tone = HISTORY_TONES[index % HISTORY_TONES.length];
+  const artists = item.subtitle || "Your most played music from this period.";
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group w-[196px] flex-shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 lg:w-[calc((100%-5rem)/6)] xl:w-[calc((100%-6rem)/7)]"
+    >
+      <div
+        className={cn(
+          "relative aspect-[1.08] overflow-hidden rounded-[2px] border border-white/8 bg-gradient-to-br",
+          tone,
+        )}
+      >
+        <div className="absolute inset-0 opacity-45 mix-blend-screen transition duration-500 group-hover:scale-[1.04] group-hover:opacity-60">
+          <PlaylistArtwork
+            name={item.title}
+            tracks={item.artwork_tracks}
+            className="h-full w-full rounded-none"
+          />
+        </div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.25),transparent_32%),linear-gradient(180deg,transparent,rgba(0,0,0,0.62))]" />
+        <div className="absolute right-3 top-3 grid grid-cols-3 gap-0.5 opacity-90">
+          {Array.from({ length: 6 }).map((_, dot) => (
+            <span key={dot} className="h-1.5 w-1.5 rotate-45 bg-white/70" />
+          ))}
+        </div>
+        <div className="absolute inset-x-3 bottom-3">
+          <div className="max-w-[92%] text-[clamp(1.7rem,3vw,3.1rem)] font-black uppercase leading-[0.82] tracking-[-0.08em] text-white text-pretty">
+            {historyLabel(item, index)}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 space-y-1">
+        <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
+        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{artists}</p>
+      </div>
+    </button>
   );
 }
 

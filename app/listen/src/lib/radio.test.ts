@@ -17,8 +17,8 @@ vi.mock("@/lib/library-routes", () => ({
   artistPhotoApiUrl: vi.fn(() => undefined),
 }));
 
-import { api } from "@/lib/api";
-import { fetchArtistRadio, fetchHomePlaylistRadio, fetchRadioContinuation } from "@/lib/radio";
+import { ApiError, api } from "@/lib/api";
+import { fetchArtistRadio, fetchHomePlaylistRadio, fetchRadioContinuation, startShapedRadio } from "@/lib/radio";
 import type { PlaySource } from "@/contexts/player-types";
 
 const mockApi = vi.mocked(api);
@@ -212,5 +212,23 @@ describe("seeded radio wrappers", () => {
       seedId: "daily-discovery",
       shapedSessionId: "home-sess",
     });
+  });
+});
+
+describe("startShapedRadio", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+  });
+
+  it("returns null only for unavailable radio responses", async () => {
+    mockApi.mockRejectedValue(new ApiError(422, "Unavailable"));
+
+    await expect(startShapedRadio("discovery")).resolves.toBeNull();
+  });
+
+  it("surfaces operational failures instead of reporting missing history", async () => {
+    mockApi.mockRejectedValue(new ApiError(500, "API 500"));
+
+    await expect(startShapedRadio("discovery")).rejects.toThrow("API 500");
   });
 });

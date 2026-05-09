@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import { toEngineTracks, toEngineTrack } from "@/contexts/player-engine-adapter";
 import {
   addTrack as gpAddTrack,
   fadeInAndPlay as gpFadeInAndPlay,
@@ -21,8 +22,10 @@ import {
   restoreVolume as gpRestoreVolume,
   seekTo as gpSeekTo,
   setLoop as gpSetLoop,
+  setPlaybackRate as gpSetPlaybackRate,
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
+  stop as gpStop,
 } from "@/lib/gapless-player";
 import {
   clampIndex,
@@ -30,15 +33,54 @@ import {
   shuffleKeepingCurrent,
 } from "@/contexts/player-queue-helpers";
 import { getStreamUrl, getTrackCacheKey, STORAGE_KEY } from "@/contexts/player-utils";
+import {
+  androidNativeEngine as nativeEngine,
+  isAndroidNativePlayerAvailable,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
 import { isNative } from "@/lib/capacitor-runtime";
-import type { PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
+import { getCrossfadeDurationPreference, type PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
+import { createQueueRevision, type EngineRepeatMode } from "@/lib/playback-engine";
 
 const SOFT_PAUSE_FADE_MS = 220;
 const PREV_DOUBLE_TAP_WINDOW_MS = 1500;
-
 function shouldUseImmediateTransportAction(): boolean {
   return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
+function toEngineRepeatMode(repeat: RepeatMode): EngineRepeatMode {
+  return repeat;
+}
+
+function getKnownDuration(track: Track | undefined): number {
+  return typeof track?.duration === "number" && Number.isFinite(track.duration) && track.duration > 0
+    ? track.duration
+    : 0;
+}
+
+function nativeCrossfadeMs(): number {
+  return Math.max(0, getCrossfadeDurationPreference() * 1000);
+}
+
+function silenceGaplessEngine() {
+  gpPause();
+  gpStop();
+  gpLoadQueue([], 0);
+}
+
+function stopNativeEngineIfAvailable(context: string) {
+  if (!isAndroidNativePlayerAvailable()) return;
+  void nativeEngine.stop().catch((error) => {
+    console.error(`[native-player] failed to stop ${context}:`, error);
+  });
+}
+
+function playbackPositionMs(currentTimeSeconds: number): number {
+  if (shouldUseAndroidNativePlayer()) {
+    return Math.max(0, Math.round(currentTimeSeconds * 1000));
+  }
+  return gpGetPosition();
 }
 
 interface UsePlayerQueueActionsParams {
@@ -150,17 +192,46 @@ export function usePlayerQueueActions({
     flushCurrentPlayEvent("interrupted");
 
     preparePlaybackDelivery(tracks, normalizedIndex, playbackDeliveryPolicy, { immediate: true });
-    gpLoadQueue(buildEngineUrls(tracks), normalizedIndex, { restartIfSameIndex: true });
-    gpSetLoop(repeatRef.current === "all");
-    gpSetSingleMode(repeatRef.current === "one");
-
+    const activeTrack = tracks[normalizedIndex];
     commitCurrentTime(0);
+    commitDuration(getKnownDuration(activeTrack));
     bufferingIntentRef.current = !restartingSameQueueAtSameIndex;
     commitIsBuffering(!restartingSameQueueAtSameIndex);
     const nextSource = source || (tracks.length > 1
       ? { type: "queue" as const, name: "Queue" }
       : { type: "track" as const, name: tracks[normalizedIndex]!.title });
     setPlaySource(nextSource);
+
+    if (shouldUseAndroidNativePlayer()) {
+      silenceGaplessEngine();
+      commitQueue(tracks);
+      commitCurrentIndex(normalizedIndex);
+      if (activeTrack) {
+        rememberActiveTrack(activeTrack);
+        startTrackerSession(activeTrack, nextSource);
+      }
+      commitIsPlaying(true);
+      void nativeEngine.loadQueue({
+        revision: createQueueRevision(),
+        tracks: toEngineTracks(tracks),
+        currentIndex: normalizedIndex,
+        positionMs: 0,
+        autoplay: true,
+        repeat: toEngineRepeatMode(repeatRef.current),
+        crossfadeMs: nativeCrossfadeMs(),
+        volume: lastNonZeroVolumeRef.current,
+      }).catch((error) => {
+        console.error("[native-player] failed to load queue:", error);
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+      });
+      return;
+    }
+
+    stopNativeEngineIfAvailable("before web queue load");
+    gpLoadQueue(buildEngineUrls(tracks), normalizedIndex, { restartIfSameIndex: true });
+    gpSetLoop(repeatRef.current === "all");
+    gpSetSingleMode(repeatRef.current === "one");
 
     const { resolvedTrack } = pullFromEngine(tracks);
     if (resolvedTrack) {
@@ -173,10 +244,14 @@ export function usePlayerQueueActions({
     buildEngineUrls,
     cancelSoftInterruption,
     cancelRestoreAutoplay,
+    commitCurrentIndex,
     commitCurrentTime,
     commitIsBuffering,
+    commitIsPlaying,
+    commitQueue,
     currentIndexRef,
     flushCurrentPlayEvent,
+    lastNonZeroVolumeRef,
     rememberActiveTrack,
     resetPlaybackIntelligence,
     pullFromEngine,
@@ -206,6 +281,14 @@ export function usePlayerQueueActions({
     cancelSoftInterruption();
     bufferingIntentRef.current = false;
     commitIsBuffering(false);
+    if (shouldUseAndroidNativePlayer()) {
+      silenceGaplessEngine();
+      void nativeEngine.pause().catch((error) => {
+        console.error("[native-player] failed to pause:", error);
+      });
+      commitIsPlaying(false);
+      return;
+    }
     if (shouldUseImmediateTransportAction()) {
       gpPause();
       return;
@@ -213,13 +296,21 @@ export function usePlayerQueueActions({
     void gpFadeOutAndPause(SOFT_PAUSE_FADE_MS).catch(() => {
       gpPause();
     });
-  }, [cancelSoftInterruption, commitIsBuffering]);
+  }, [bufferingIntentRef, cancelSoftInterruption, commitIsBuffering, commitIsPlaying]);
 
   const resume = useCallback(() => {
     if (!queueRef.current.length) return;
     cancelSoftInterruption();
     bufferingIntentRef.current = true;
     commitIsBuffering(true);
+    if (shouldUseAndroidNativePlayer()) {
+      silenceGaplessEngine();
+      void nativeEngine.play().catch((error) => {
+        console.error("[native-player] failed to resume:", error);
+        commitIsBuffering(false);
+      });
+      return;
+    }
     if (shouldUseImmediateTransportAction()) {
       gpRestoreVolume();
       gpPlay();
@@ -253,13 +344,25 @@ export function usePlayerQueueActions({
 
     const nextIndex = currentIndexRef.current + 1;
     if (nextIndex < queueRef.current.length) {
-      gpNext();
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.next().catch((error) => {
+          console.error("[native-player] failed to skip next:", error);
+        });
+      } else {
+        gpNext();
+      }
       advanceToTrack(nextIndex);
       return;
     }
 
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
-      gpGotoTrack(0, true);
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.jumpTo(0, true).catch((error) => {
+          console.error("[native-player] failed to wrap queue:", error);
+        });
+      } else {
+        gpGotoTrack(0, true);
+      }
       advanceToTrack(0);
       return;
     }
@@ -284,7 +387,13 @@ export function usePlayerQueueActions({
       currentTimeSeconds: currentPositionSeconds,
       justRestartedCurrentTrack,
     })) {
-      gpSeekTo(0);
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.seekTo(0).catch((error) => {
+          console.error("[native-player] failed to restart track:", error);
+        });
+      } else {
+        gpSeekTo(0);
+      }
       commitCurrentTime(0);
       markSeekPosition(0);
       prevRestartTrackKeyRef.current = activeTrackKey;
@@ -297,7 +406,13 @@ export function usePlayerQueueActions({
     if (currentIndexRef.current > 0) {
       const targetIndex = currentIndexRef.current - 1;
       clearPrevRestartLatch();
-      gpGotoTrack(targetIndex, true);
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.previous().catch((error) => {
+          console.error("[native-player] failed to skip previous:", error);
+        });
+      } else {
+        gpGotoTrack(targetIndex, true);
+      }
       advanceToTrack(targetIndex);
       return;
     }
@@ -305,7 +420,13 @@ export function usePlayerQueueActions({
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
       const wrappedIndex = queueRef.current.length - 1;
       clearPrevRestartLatch();
-      gpGotoTrack(wrappedIndex, true);
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.jumpTo(wrappedIndex, true).catch((error) => {
+          console.error("[native-player] failed to wrap previous:", error);
+        });
+      } else {
+        gpGotoTrack(wrappedIndex, true);
+      }
       advanceToTrack(wrappedIndex);
     }
   }, [
@@ -326,7 +447,13 @@ export function usePlayerQueueActions({
   const seek = useCallback((time: number) => {
     const shouldResumeBufferingFlow = isPlayingRef.current;
     bufferingIntentRef.current = shouldResumeBufferingFlow;
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.seekTo(time * 1000).catch((error) => {
+        console.error("[native-player] failed to seek:", error);
+      });
+    } else {
     gpSeekTo(time * 1000);
+    }
     commitCurrentTime(time);
     commitIsBuffering(shouldResumeBufferingFlow);
     markSeekPosition(time);
@@ -334,6 +461,11 @@ export function usePlayerQueueActions({
 
   const setVolume = useCallback((volume: number) => {
     const effectiveVolume = isNative ? 1 : volume;
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.setVolume(effectiveVolume).catch((error) => {
+        console.error("[native-player] failed to set volume:", error);
+      });
+    }
     gpSetVolume(effectiveVolume);
     setVolumeState(effectiveVolume);
     if (effectiveVolume > 0) {
@@ -347,6 +479,17 @@ export function usePlayerQueueActions({
     }
   }, [lastNonZeroVolumeRef, setVolumeState]);
 
+  const setPlaybackRate = useCallback((rate: number) => {
+    const safeRate = Math.max(0.25, Math.min(rate, 4));
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.setPlaybackRate(safeRate).catch((error) => {
+        console.error("[native-player] failed to set playback rate:", error);
+      });
+    } else {
+      gpSetPlaybackRate(safeRate);
+    }
+  }, []);
+
   const clearQueue = useCallback(() => {
     cancelSoftInterruption();
     pendingRestoreTimeRef.current = 0;
@@ -355,7 +498,9 @@ export function usePlayerQueueActions({
     bufferingIntentRef.current = false;
     resetPlaybackIntelligence();
     flushCurrentPlayEvent("interrupted");
+    stopNativeEngineIfAvailable("clear queue");
     gpPause();
+    gpStop();
     gpLoadQueue([], 0);
     resetEngineTrackMap();
     commitQueue([]);
@@ -405,7 +550,7 @@ export function usePlayerQueueActions({
       setShuffleState(true);
       pushToEngine(nextQueue, 0, {
         autoplay: isPlayingRef.current,
-        positionMs: gpGetPosition(),
+        positionMs: playbackPositionMs(currentTimeRef.current),
       });
       return;
     }
@@ -422,9 +567,10 @@ export function usePlayerQueueActions({
     setShuffleState(false);
     pushToEngine(original, nextIndex, {
       autoplay: isPlayingRef.current,
-      positionMs: gpGetPosition(),
+      positionMs: playbackPositionMs(currentTimeRef.current),
     });
   }, [
+    currentTimeRef,
     currentIndexRef,
     isPlayingRef,
     pushToEngine,
@@ -437,16 +583,26 @@ export function usePlayerQueueActions({
 
   const cycleRepeat = useCallback(() => {
     setRepeatState((previousMode) => {
-      if (previousMode === "off") return "all";
-      if (previousMode === "all") return "one";
-      return "off";
+      const nextMode = previousMode === "off" ? "all" : previousMode === "all" ? "one" : "off";
+      if (shouldUseAndroidNativePlayer()) {
+        void nativeEngine.setRepeat(toEngineRepeatMode(nextMode)).catch((error) => {
+          console.error("[native-player] failed to set repeat:", error);
+        });
+      }
+      return nextMode;
     });
   }, [setRepeatState]);
 
   const jumpTo = useCallback((index: number) => {
     if (index < 0 || index >= queueRef.current.length) return;
     pendingRestoreTimeRef.current = 0;
-    gpGotoTrack(index, true);
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.jumpTo(index, true).catch((error) => {
+        console.error("[native-player] failed to jump:", error);
+      });
+    } else {
+      gpGotoTrack(index, true);
+    }
     advanceToTrack(index);
     commitIsPlaying(true);
   }, [advanceToTrack, commitIsPlaying, pendingRestoreTimeRef, queueRef]);
@@ -456,7 +612,13 @@ export function usePlayerQueueActions({
     const nextQueue = [...queueRef.current];
     nextQueue.splice(insertAt, 0, track);
 
-    gpInsertTrack(insertAt, registerEngineTrack(track));
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.insertTrack(insertAt, toEngineTrack(track)).catch((error) => {
+        console.error("[native-player] failed to insert track:", error);
+      });
+    } else {
+      gpInsertTrack(insertAt, registerEngineTrack(track));
+    }
     commitQueue(nextQueue);
 
     if (unshuffledQueueRef.current) {
@@ -466,7 +628,13 @@ export function usePlayerQueueActions({
 
   const addToQueue = useCallback((track: Track) => {
     const nextQueue = [...queueRef.current, track];
-    gpAddTrack(registerEngineTrack(track));
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.appendTracks([toEngineTrack(track)]).catch((error) => {
+        console.error("[native-player] failed to append track:", error);
+      });
+    } else {
+      gpAddTrack(registerEngineTrack(track));
+    }
     commitQueue(nextQueue);
 
     if (unshuffledQueueRef.current) {
@@ -499,8 +667,14 @@ export function usePlayerQueueActions({
       return;
     }
 
-    gpRemoveTrack(index);
-    if (removedTrack) unregisterEngineTrack(removedTrack);
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.removeTrack(index).catch((error) => {
+        console.error("[native-player] failed to remove track:", error);
+      });
+    } else {
+      gpRemoveTrack(index);
+      if (removedTrack) unregisterEngineTrack(removedTrack);
+    }
     const nextIndex = index < currentIndexRef.current
       ? currentIndexRef.current - 1
       : currentIndexRef.current;
@@ -546,14 +720,20 @@ export function usePlayerQueueActions({
     if (movingCurrent) {
       pushToEngine(nextQueue, toIndex, {
         autoplay: isPlayingRef.current,
-        positionMs: gpGetPosition(),
+        positionMs: playbackPositionMs(currentTimeRef.current),
       });
       return;
     }
 
-    gpRemoveTrack(fromIndex);
-    unregisterEngineTrack(moved);
-    gpInsertTrack(toIndex, registerEngineTrack(moved));
+    if (shouldUseAndroidNativePlayer()) {
+      void nativeEngine.reorderTrack(fromIndex, toIndex).catch((error) => {
+        console.error("[native-player] failed to reorder queue:", error);
+      });
+    } else {
+      gpRemoveTrack(fromIndex);
+      unregisterEngineTrack(moved);
+      gpInsertTrack(toIndex, registerEngineTrack(moved));
+    }
 
     let nextIndex = activeIndex;
     if (fromIndex < activeIndex && toIndex >= activeIndex) {
@@ -570,6 +750,7 @@ export function usePlayerQueueActions({
     commitCurrentIndex,
     commitQueue,
     currentIndexRef,
+    currentTimeRef,
     isPlayingRef,
     pushToEngine,
     queueRef,
@@ -587,6 +768,7 @@ export function usePlayerQueueActions({
     prev,
     seek,
     setVolume,
+    setPlaybackRate,
     clearQueue,
     toggleShuffle,
     cycleRepeat,

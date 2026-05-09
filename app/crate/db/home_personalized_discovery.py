@@ -9,7 +9,9 @@ from crate.db.home_builders import (
     _build_recommended_tracks,
     _build_recent_global_artists,
     _build_suggested_albums,
+    _fallback_recent_interest_tracks,
     _get_home_hero,
+    _query_discovery_tracks,
     _track_payload,
 )
 from crate.db.home_context import (
@@ -22,6 +24,36 @@ from crate.db.home_personalized_collections import (
     get_home_recently_played,
 )
 from crate.db.queries.user_library import get_replay_mix
+from crate.db.queries.user_library_stats_tops import get_listening_history_cards
+
+
+def _build_home_recommended_tracks(
+    user_id: int,
+    *,
+    recent_releases: list[dict],
+    interest_artists_lower: list[str],
+    top_genres_lower: list[str],
+    limit: int,
+) -> list[dict]:
+    discovery_fallback = _query_discovery_tracks(
+        user_id,
+        genres=top_genres_lower[:4],
+        excluded_artist_names=interest_artists_lower[:16],
+        limit=max(limit * 6, 120),
+    )
+    if not discovery_fallback and interest_artists_lower:
+        discovery_fallback = _fallback_recent_interest_tracks(
+            user_id,
+            interest_artists_lower=interest_artists_lower,
+            limit=max(limit * 4, 80),
+        )
+    return _build_recommended_tracks(
+        user_id,
+        recent_releases=recent_releases,
+        interest_artists_lower=interest_artists_lower,
+        limit=limit,
+        fallback_tracks=discovery_fallback,
+    )
 
 
 def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | None:
@@ -70,10 +102,11 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
         }
 
     if section_id == "recommended-tracks":
-        rows = _build_recommended_tracks(
+        rows = _build_home_recommended_tracks(
             user_id,
             recent_releases=recent_releases,
             interest_artists_lower=interest_artists_lower,
+            top_genres_lower=top_genres_lower,
             limit=limit,
         )
         return {
@@ -136,12 +169,12 @@ def build_home_discovery_payload(user_id: int) -> dict:
         precomputed_mixes["my-new-arrivals"] = my_new_arrivals_mix
 
     suggested_albums = _build_suggested_albums(recent_releases, 14)
-    recommended_tracks = _build_recommended_tracks(
+    recommended_tracks = _build_home_recommended_tracks(
         user_id,
         recent_releases=recent_releases,
         interest_artists_lower=interest_artists_lower,
+        top_genres_lower=top_genres_lower,
         limit=18,
-        fallback_tracks=precomputed_mixes.get("my-new-arrivals", ("", "", []))[2],
     )
     custom_mixes = _build_custom_mix_summaries(
         user_id,
@@ -164,6 +197,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         "favorite_artists": get_home_favorite_artists(user_id),
         "essentials": _build_core_playlists(user_id, merged_artists, 7),
         "recent_global_artists": _build_recent_global_artists(7),
+        "listening_history": get_listening_history_cards(user_id, limit=8),
         "replay": get_replay_mix(user_id, window="30d", limit=18),
         "upcoming": _build_home_upcoming(user_id, lookup_limit=120, item_limit=12, followed=followed),
     }

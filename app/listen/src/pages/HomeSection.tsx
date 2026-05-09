@@ -184,6 +184,15 @@ export function HomeSection() {
         <p className="mt-2 text-sm text-muted-foreground">{data.subtitle}</p>
       </div>
 
+      {!data.items.length ? (
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-12 text-center">
+          <p className="text-sm font-medium text-foreground">Nothing ready here yet</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            Crate could not find enough playable, non-duplicated tracks for this section right now.
+          </p>
+        </div>
+      ) : null}
+
       {data.id === "recently-played" ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.items.map((item, index) => (

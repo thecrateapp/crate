@@ -204,6 +204,33 @@ export function PlayerBar() {
     return () => window.removeEventListener("crate:native-back", handleNativeBack);
   }, [extendedOpen, fsOpen, hasFloatingOverlayOpen, showEqualizer, showLyrics, showQueue]);
 
+  useEffect(() => {
+    if (isDesktop) return;
+
+    const closeMobileSurfaces = (event?: Event) => {
+      if (
+        event?.type === "visibilitychange" &&
+        typeof document !== "undefined" &&
+        document.visibilityState !== "hidden"
+      ) {
+        return;
+      }
+      setFsOpen(false);
+      setExtendedOpen(false);
+      setShowQueue(false);
+      setShowLyrics(false);
+      setShowEqualizer(false);
+      setHasFloatingOverlayOpen(false);
+    };
+
+    window.addEventListener("crate:app-paused", closeMobileSurfaces as EventListener);
+    document.addEventListener("visibilitychange", closeMobileSurfaces);
+    return () => {
+      window.removeEventListener("crate:app-paused", closeMobileSurfaces as EventListener);
+      document.removeEventListener("visibilitychange", closeMobileSurfaces);
+    };
+  }, [isDesktop, setFsOpen]);
+
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
 
@@ -286,6 +313,19 @@ export function PlayerBar() {
     }
   }, [fsOpen, isDesktop]);
 
+  useEffect(() => {
+    const handleOpenFullscreen = () => {
+      if (isDesktop || !currentTrack) return;
+      setShouldRenderFullscreenPlayer(true);
+      void preloadFullscreenPlayer();
+      setFsOpen(true);
+    };
+    window.addEventListener("crate:open-fullscreen-player", handleOpenFullscreen);
+    return () => {
+      window.removeEventListener("crate:open-fullscreen-player", handleOpenFullscreen);
+    };
+  }, [currentTrack, isDesktop, setFsOpen]);
+
   if (!currentTrack) return null;
 
   const liked = isLiked(
@@ -315,13 +355,13 @@ export function PlayerBar() {
   }
 
   function prepareFullscreenPlayer() {
-    setShouldRenderFullscreenPlayer(true);
     void preloadFullscreenPlayer();
   }
 
   function openFullscreenPlayer() {
     triggerHaptic("medium");
-    prepareFullscreenPlayer();
+    setShouldRenderFullscreenPlayer(true);
+    void preloadFullscreenPlayer();
     setFsOpen(true);
   }
 
@@ -410,12 +450,18 @@ export function PlayerBar() {
 
       {!hidePlayerBarForMobileFullscreen ? (
         <div
-          className={`fixed left-2 right-2 md:left-3 md:right-3 isolate h-[var(--listen-mobile-player-height)] overflow-hidden rounded-2xl border border-white/8 bg-app-surface/68 backdrop-blur-xl shadow-[0_24px_56px_rgba(0,0,0,0.34)] transition-all duration-200 md:h-[82px] ${hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player"}`}
+          className={cn(
+            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-hidden border border-white/10 transition-all duration-200 md:left-3 md:right-3 md:h-[82px] md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl",
+            !isDesktop && "rounded-t-[2rem] rounded-b-none border-b-0 bg-[#181818]/95 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl",
+            hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
+          )}
           style={{
-            bottom: isDesktop ? 12 : "calc(var(--listen-mobile-bottom-nav-height) + var(--listen-mobile-player-gap))",
-            left: isDesktop ? undefined : "max(0.5rem, var(--listen-safe-left))",
-            right: isDesktop ? undefined : "max(0.5rem, var(--listen-safe-right))",
-            contain: "paint",
+            bottom: isDesktop
+              ? 12
+              : "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset) + var(--listen-mobile-bottom-nav-content-height))",
+            left: isDesktop ? undefined : "max(1rem, var(--listen-safe-left))",
+            right: isDesktop ? undefined : "max(1rem, var(--listen-safe-right))",
+            contain: isDesktop ? "paint" : undefined,
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -698,7 +744,7 @@ export function PlayerBar() {
                 size="sm"
               />
             ) : (
-              <button onClick={handlePreviousTrack} aria-label="Previous track" className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white">
+              <button onClick={handlePreviousTrack} aria-label="Previous track" className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white">
                 <SkipBack size={18} fill="currentColor" />
               </button>
             )}
@@ -706,7 +752,7 @@ export function PlayerBar() {
               onClick={handlePlayPause}
               aria-label={isPlaying ? "Pause" : "Play"}
               className={cn(
-                "flex h-11 w-11 touch-manipulation items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 active:scale-95",
+                "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 active:scale-95",
                 transportButtonClass,
               )}
             >
@@ -723,12 +769,12 @@ export function PlayerBar() {
                 onTouchStart={prepareFullscreenPlayer}
                 onClick={openFullscreenPlayer}
                 aria-label="Open fullscreen player"
-                className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-white/35 transition-colors active:bg-white/5 active:text-white/60 hover:text-white/60"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/35 transition-colors active:bg-white/5 active:text-white/60 hover:text-white/60"
               >
                 <Maximize2 size={16} />
               </button>
             ) : (
-              <button onClick={handleNextTrack} aria-label="Next track" className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white">
+              <button onClick={handleNextTrack} aria-label="Next track" className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white">
                 <SkipForward size={18} fill="currentColor" />
               </button>
             )}

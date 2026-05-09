@@ -11,6 +11,7 @@ export interface Track {
   albumEntityUid?: string;
   albumSlug?: string;
   albumCover?: string;
+  duration?: number;
   path?: string;
   libraryTrackId?: number;
   format?: string;

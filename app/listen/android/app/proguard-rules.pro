@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Media3 native playback
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**

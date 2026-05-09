@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections import Counter
+from datetime import date, datetime, timezone
+
 from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import normalize_stats_window
@@ -231,7 +234,128 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
     }
 
 
+def _coerce_datetime(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+
+def _history_subtitle(top_artists: list[str]) -> str:
+    if not top_artists:
+        return "Your most played music from this period."
+    if len(top_artists) <= 3:
+        return ", ".join(top_artists)
+    return f"{top_artists[0]}, {top_artists[1]}, {top_artists[2]} and more"
+
+
+def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
+    with read_scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT
+                    upe.ended_at,
+                    COALESCE(lt.title, upe.title) AS title,
+                    COALESCE(lt.artist, upe.artist) AS artist,
+                    COALESCE(lt.album, upe.album) AS album,
+                    art.id AS artist_id,
+                    art.entity_uid::text AS artist_entity_uid,
+                    art.slug AS artist_slug,
+                    COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
+                    COALESCE(alb_by_id.entity_uid::text, alb_by_name.entity_uid::text) AS album_entity_uid,
+                    COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
+                    COALESCE(upe.played_seconds, 0) AS played_seconds
+                FROM user_play_events upe
+                LEFT JOIN library_tracks lt
+                  ON lt.id = upe.track_id
+                  OR (upe.track_id IS NULL AND upe.track_entity_uid IS NOT NULL AND lt.entity_uid = upe.track_entity_uid)
+                LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
+                LEFT JOIN library_albums alb_by_name
+                  ON alb_by_id.id IS NULL
+                 AND alb_by_name.artist = COALESCE(lt.artist, upe.artist)
+                 AND alb_by_name.name = COALESCE(lt.album, upe.album)
+                LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, upe.artist)
+                WHERE upe.user_id = :user_id
+                  AND upe.ended_at >= NOW() - INTERVAL '395 days'
+                ORDER BY upe.ended_at DESC
+                LIMIT :row_limit
+                """
+            ),
+            {"user_id": user_id, "row_limit": 5000},
+        ).mappings().all()
+
+    buckets: dict[tuple[int, int], dict] = {}
+    for row in rows:
+        played_at = _coerce_datetime(row.get("ended_at"))
+        if not played_at:
+            continue
+        key = (played_at.year, played_at.month)
+        bucket = buckets.setdefault(
+            key,
+            {
+                "period_start": date(played_at.year, played_at.month, 1),
+                "artist_counts": Counter(),
+                "play_count": 0,
+                "minutes_listened": 0.0,
+                "artwork_tracks": [],
+                "seen_albums": set(),
+            },
+        )
+        artist = (row.get("artist") or "").strip()
+        album = (row.get("album") or "").strip()
+        if artist:
+            bucket["artist_counts"][artist] += 1
+        bucket["play_count"] += 1
+        bucket["minutes_listened"] += float(row.get("played_seconds") or 0) / 60
+        album_key = row.get("album_id") or (artist.lower(), album.lower())
+        if artist and album and album_key not in bucket["seen_albums"] and len(bucket["artwork_tracks"]) < 4:
+            bucket["seen_albums"].add(album_key)
+            bucket["artwork_tracks"].append(
+                {
+                    "title": row.get("title") or "",
+                    "artist": artist,
+                    "artist_id": row.get("artist_id"),
+                    "artist_entity_uid": row.get("artist_entity_uid"),
+                    "artist_slug": row.get("artist_slug"),
+                    "album": album,
+                    "album_id": row.get("album_id"),
+                    "album_entity_uid": row.get("album_entity_uid"),
+                    "album_slug": row.get("album_slug"),
+                }
+            )
+
+    now = datetime.now(timezone.utc)
+    cards: list[dict] = []
+    for (year, month), bucket in sorted(buckets.items(), reverse=True):
+        top_artists = [artist for artist, _ in bucket["artist_counts"].most_common(5)]
+        period_start = bucket["period_start"]
+        month_name = period_start.strftime("%B")
+        cards.append(
+            {
+                "id": f"month-{year}-{month:02d}",
+                "kind": "month",
+                "title": "My Most Listened" if year == now.year and month == now.month else f"{month_name} {year}",
+                "period_label": month_name.upper(),
+                "period_start": period_start.isoformat(),
+                "subtitle": _history_subtitle(top_artists),
+                "top_artists": top_artists,
+                "play_count": bucket["play_count"],
+                "minutes_listened": round(bucket["minutes_listened"], 1),
+                "artwork_tracks": bucket["artwork_tracks"],
+            }
+        )
+        if len(cards) >= limit:
+            break
+    return cards
+
+
 __all__ = [
+    "get_listening_history_cards",
     "get_replay_mix",
     "get_top_albums",
     "get_top_artists",

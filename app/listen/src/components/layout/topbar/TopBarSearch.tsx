@@ -339,8 +339,8 @@ export function TopBarSearch() {
         "group relative flex-1 shrink-0 overflow-visible md:flex-none md:origin-right",
         "transition-[width,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
         searchOpen
-          ? "w-[min(22rem,calc(100vw-7.25rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
-          : "w-11",
+          ? "w-[min(22rem,calc(100vw-8.75rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
+          : "w-12 md:w-11",
       )}
       onMouseEnter={() => { if (canHover) openSearch(false); }}
       onMouseLeave={() => { if (canHover) scheduleCollapseIfIdle(); }}
@@ -367,7 +367,7 @@ export function TopBarSearch() {
               focusInputSoon();
             }}
             className={cn(
-              "absolute left-0 top-0 z-10 flex h-11 w-11 items-center justify-center rounded-xl transition-[color,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+              "absolute left-0 top-0 z-10 flex h-12 w-12 touch-manipulation items-center justify-center rounded-xl transition-[color,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11",
               searchOpen
                 ? "text-white/42"
                 : "text-white/56 group-hover:text-white/82 group-hover:scale-[1.03]",
@@ -409,7 +409,7 @@ export function TopBarSearch() {
             onKeyDown={handleKeyDown}
             placeholder="Search artists, albums, tracks..."
             className={cn(
-              "h-11 w-full rounded-xl border-0 bg-transparent pl-11 text-[15px] text-white outline-none",
+              "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-white outline-none md:h-11 md:pl-11 md:text-[15px]",
               "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
               "placeholder:text-white/40",
               searchOpen

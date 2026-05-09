@@ -366,8 +366,11 @@ export async function startShapedRadio(
         },
       },
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 422)) {
+      return null;
+    }
+    throw error;
   }
 }
 

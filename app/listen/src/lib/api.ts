@@ -6,6 +6,7 @@ import { isNative, platform } from "@/lib/capacitor";
 import {
   getCurrentServer,
   migrateLegacyToken,
+  seedDefaultServer,
   setCurrentServerAuthTokens,
   setCurrentServerRefreshToken,
   setCurrentServerToken,
@@ -23,6 +24,7 @@ const BUILD_TIME_DEFAULT = import.meta.env.VITE_API_URL || "";
 // Run the legacy-token migration once on module load. It's a no-op
 // after the first time and on fresh installs.
 migrateLegacyToken(BUILD_TIME_DEFAULT);
+seedDefaultServer(BUILD_TIME_DEFAULT);
 
 /**
  * Resolve the active API base URL.

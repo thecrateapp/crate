@@ -23,7 +23,7 @@ export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: Ra
   if (!trackId) return null;
 
   const buttonClass = size === "sm"
-    ? "h-9 w-9"
+    ? "h-11 w-11"
     : "h-8 w-8";
   const iconSize = size === "sm" ? 16 : 14;
 
@@ -48,7 +48,7 @@ export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: Ra
     <div className="flex items-center gap-1">
       <button
         onClick={handleLike}
-        className={`flex ${buttonClass} items-center justify-center rounded-full transition ${
+        className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
           liked
             ? "bg-primary/15 text-primary"
             : "text-white/30 hover:bg-white/5 hover:text-white/60"
@@ -60,7 +60,7 @@ export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: Ra
       </button>
       <button
         onClick={handleDislike}
-        className={`flex ${buttonClass} items-center justify-center rounded-full transition ${
+        className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
           disliked
             ? "bg-red-500/15 text-red-400"
             : "text-white/30 hover:bg-white/5 hover:text-white/60"

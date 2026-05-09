@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { BarChart3, Clock3, Disc3, Music2, Play, SkipForward, Tag, TrendingUp } from "lucide-react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 
 import {
   OverviewCard,
@@ -23,8 +23,16 @@ import {
 import { useApi } from "@/hooks/use-api";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 export function Stats() {
+  const isDesktop = useIsDesktop();
+  if (!isDesktop) return <Navigate to="/" replace />;
+
+  return <DesktopStats />;
+}
+
+function DesktopStats() {
   const [selectedWindow, setSelectedWindow] = useState<StatsWindow>("30d");
   const { play, playAll } = usePlayerActions();
   const { data: dashboard, loading: dashboardLoading } = useApi<StatsDashboard>(

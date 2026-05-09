@@ -1,5 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { Radio as RadioIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
@@ -8,6 +9,7 @@ import {
   EssentialsSection,
   FavoriteArtistsSection,
   HomeTasteHero,
+  ListeningHistorySection,
   openRecentItemPath,
   RadioStationsSection,
   RecentlyPlayedSection,
@@ -38,13 +40,14 @@ import type {
   ReplayMix,
 } from "@/components/home/home-model";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { api, apiSseUrl } from "@/lib/api";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
-import { fetchAlbumRadio, fetchArtistRadio, fetchHomePlaylistRadio } from "@/lib/radio";
+import { fetchAlbumRadio, fetchArtistRadio, fetchHomePlaylistRadio, startShapedRadio } from "@/lib/radio";
 import { albumCoverApiUrl, artistPagePath } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import {
@@ -94,6 +97,8 @@ export function Home() {
   const navigate = useNavigate();
   const { play, playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
+  const isDesktop = useIsDesktop();
+  const [startingDiscoveryRadio, setStartingDiscoveryRadio] = useState(false);
 
   const { data: discovery, refetch: refetchDiscovery } =
     useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
@@ -406,6 +411,23 @@ export function Home() {
     playAll(queue, 0, { type: "playlist", name: replay.title });
   }
 
+  async function startDiscoveryRadio() {
+    if (startingDiscoveryRadio) return;
+    setStartingDiscoveryRadio(true);
+    try {
+      const result = await startShapedRadio("discovery");
+      if (!result?.tracks.length) {
+        toast.info("Discovery Radio needs a bit more listening history");
+        return;
+      }
+      playAll(result.tracks, 0, result.source);
+    } catch {
+      toast.error("Failed to start Discovery Radio");
+    } finally {
+      setStartingDiscoveryRadio(false);
+    }
+  }
+
   return (
     <div className="space-y-10" {...pullHandlers}>
       <PullIndicator distance={pullDistance} refreshing={refreshing} />
@@ -416,30 +438,57 @@ export function Home() {
           <p className="mt-1 text-sm text-muted-foreground">{getHomeDateString()}</p>
         </div>
 
-        <HomeTasteHero
-          heroes={heroes}
-          isFollowing={isFollowing}
-          onOpenArtist={(artist) => {
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-          onPlay={(artist) => void playHeroArtist(artist)}
-          onToggleFollow={(artist) => void toggleHeroFollow(artist)}
-          onInfo={(artist) => {
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-        />
+        {!isDesktop ? (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => void startDiscoveryRadio()}
+              disabled={startingDiscoveryRadio}
+              className="flex min-h-14 touch-manipulation items-center gap-3 rounded-2xl border border-primary/25 bg-primary/12 px-4 text-left text-sm font-semibold text-foreground shadow-[0_0_28px_rgba(34,211,238,0.08)] transition active:scale-[0.98] disabled:opacity-60"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-black">
+                <RadioIcon size={18} />
+              </span>
+              Play Radio
+            </button>
+            <button
+              type="button"
+              onClick={playReplayMix}
+              disabled={!replay?.items?.length}
+              className="flex min-h-14 touch-manipulation items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-left text-sm font-semibold text-foreground transition active:scale-[0.98] disabled:opacity-45"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-primary">
+                <RotateCcw size={18} />
+              </span>
+              Replay
+            </button>
+          </div>
+        ) : (
+          <HomeTasteHero
+            heroes={heroes}
+            isFollowing={isFollowing}
+            onOpenArtist={(artist) => {
+              navigate(
+                artistPagePath({
+                  artistId: artist.id,
+                  artistSlug: artist.slug,
+                  artistName: artist.name,
+                }),
+              );
+            }}
+            onPlay={(artist) => void playHeroArtist(artist)}
+            onToggleFollow={(artist) => void toggleHeroFollow(artist)}
+            onInfo={(artist) => {
+              navigate(
+                artistPagePath({
+                  artistId: artist.id,
+                  artistSlug: artist.slug,
+                  artistName: artist.name,
+                }),
+              );
+            }}
+          />
+        )}
       </div>
 
       <RecentlyPlayedSection
@@ -459,24 +508,32 @@ export function Home() {
 
       <SuggestedAlbumsSection albums={currentDiscovery?.suggested_albums || []} onViewAll={openHomeSection} />
 
-      <RecommendedTracksSection tracks={recommendedTracks} onViewAll={openHomeSection} />
+      {isDesktop ? (
+        <RecommendedTracksSection tracks={recommendedTracks} onViewAll={openHomeSection} />
+      ) : null}
 
-      <RadioStationsSection
-        stations={currentDiscovery?.radio_stations || []}
-        onPlayStation={(station) => void playRadioStation(station)}
-        onViewAll={openHomeSection}
-      />
+      {isDesktop ? (
+        <RadioStationsSection
+          stations={currentDiscovery?.radio_stations || []}
+          onPlayStation={(station) => void playRadioStation(station)}
+          onViewAll={openHomeSection}
+        />
+      ) : null}
 
-      <FavoriteArtistsSection artists={currentDiscovery?.favorite_artists || []} onViewAll={openHomeSection} />
+      {isDesktop ? (
+        <FavoriteArtistsSection artists={currentDiscovery?.favorite_artists || []} onViewAll={openHomeSection} />
+      ) : null}
 
-      <EssentialsSection
-        items={currentDiscovery?.essentials || []}
-        onOpenPlaylist={(item) => navigate(homePlaylistPath(item.id))}
-        onPlayPlaylist={(item) => void playHomePlaylist(item)}
-        onShufflePlaylist={(item) => void shuffleHomePlaylist(item)}
-        onStartRadio={(item) => void startHomePlaylistRadio(item)}
-        onViewAll={openHomeSection}
-      />
+      {isDesktop ? (
+        <EssentialsSection
+          items={currentDiscovery?.essentials || []}
+          onOpenPlaylist={(item) => navigate(homePlaylistPath(item.id))}
+          onPlayPlaylist={(item) => void playHomePlaylist(item)}
+          onShufflePlaylist={(item) => void shuffleHomePlaylist(item)}
+          onStartRadio={(item) => void startHomePlaylistRadio(item)}
+          onViewAll={openHomeSection}
+        />
+      ) : null}
 
       <HomeUpcomingSection
         previewItems={upcomingPreview}
@@ -491,19 +548,28 @@ export function Home() {
         onSaveReminder={(insight) => void acknowledgeInsight(insight)}
       />
 
-      <HomeReplaySection
-        replay={replay || undefined}
-        replayPreview={replayPreview}
-        onOpenStats={() => navigate("/stats")}
-        onPlayReplay={playReplayMix}
-        onPlayTrack={(item) => play(toPlayerTrack(item), { type: "track", name: item.title })}
-      />
+      {isDesktop ? (
+        <>
+          <ListeningHistorySection
+            items={currentDiscovery?.listening_history || []}
+            onOpenHistory={() => navigate("/stats")}
+          />
 
-        <JustLandedSection
-          artists={recentGlobalArtists}
-          loading={globalArtistsLoading}
-          onOpenExplore={() => navigate("/explore")}
-        />
+          <HomeReplaySection
+            replay={replay || undefined}
+            replayPreview={replayPreview}
+            onOpenStats={() => navigate("/stats")}
+            onPlayReplay={playReplayMix}
+            onPlayTrack={(item) => play(toPlayerTrack(item), { type: "track", name: item.title })}
+          />
+
+          <JustLandedSection
+            artists={recentGlobalArtists}
+            loading={globalArtistsLoading}
+            onOpenExplore={() => navigate("/explore")}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

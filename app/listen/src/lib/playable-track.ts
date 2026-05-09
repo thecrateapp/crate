@@ -111,6 +111,7 @@ export function toPlayableTrack(
     albumEntityUid: input.albumEntityUid ?? input.album_entity_uid ?? undefined,
     albumSlug: input.albumSlug ?? input.album_slug ?? undefined,
     albumCover,
+    duration: input.duration ?? undefined,
     path: input.path ?? input.track_path ?? undefined,
     libraryTrackId: getPlayableTrackLibraryId(input),
     format: input.format ?? undefined,

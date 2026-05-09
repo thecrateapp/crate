@@ -249,6 +249,19 @@ export interface HomeGeneratedPlaylistSummary {
   kind: "mix" | "core";
 }
 
+export interface HomeListeningHistoryCard {
+  id: string;
+  kind: "month";
+  title: string;
+  period_label: string;
+  period_start: string;
+  subtitle: string;
+  top_artists: string[];
+  play_count: number;
+  minutes_listened: number;
+  artwork_tracks: PlaylistArtworkTrack[];
+}
+
 export interface HomeArtworkArtist {
   artist_name: string;
   artist_id?: number;
@@ -341,6 +354,7 @@ export interface HomeDiscoveryPayload {
   radio_stations: HomeRadioStation[];
   favorite_artists: HomeFavoriteArtist[];
   essentials: HomeGeneratedPlaylistSummary[];
+  listening_history?: HomeListeningHistoryCard[];
   recent_global_artists?: GlobalArtist[];
   upcoming?: HomeUpcomingResponse;
   replay?: ReplayMix;

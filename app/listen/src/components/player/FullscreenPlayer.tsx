@@ -4,7 +4,6 @@ import { ItemActionMenu, ItemActionMenuButton, useItemActionMenu } from "@/compo
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
-import { PlayerSurfaceModeSwitch } from "@/components/player/PlayerSurfaceModeSwitch";
 import { SpinningDisc } from "@/components/player/SpinningDisc";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerArtist";
@@ -39,6 +38,7 @@ import {
   SlidersHorizontal,
   SkipBack,
   SkipForward,
+  Square,
 } from "lucide-react";
 import { artistPagePath } from "@/lib/library-routes";
 import { usePlayer, usePlayerActions, type Track } from "@/contexts/PlayerContext";
@@ -135,7 +135,7 @@ function FullscreenQueueRow({
         buttonRef={actionMenu.triggerRef}
         hasActions={actionMenu.hasActions}
         onClick={actionMenu.openFromTrigger}
-        className="h-9 w-9 shrink-0 opacity-85 transition-opacity hover:opacity-100"
+        className="h-11 w-11 shrink-0 opacity-85 transition-opacity hover:opacity-100"
       />
       <ItemActionMenu
         actions={actions}
@@ -164,7 +164,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     shuffle,
     repeat,
   } = usePlayer();
-  const { pause, resume, next, prev, toggleShuffle, cycleRepeat } = usePlayerActions();
+  const { pause, resume, next, prev, setPlaybackRate, toggleShuffle, cycleRepeat } = usePlayerActions();
   const { isLiked, toggleTrackLike } = useLikedTracks();
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   // Keep the crossfade visuals, but let time/progress track the live
@@ -255,6 +255,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   function cycleRepeatWithFeedback() {
     triggerHaptic("selection");
     cycleRepeat();
+  }
+
+  function toggleSurfaceModeWithFeedback() {
+    triggerHaptic("selection");
+    const nextMode = surfaceMode === "cd" ? "cover" : "cd";
+    setSurfaceMode(nextMode);
+    setPlayerSurfaceModePreference(nextMode);
   }
 
   // Animate in/out
@@ -481,81 +488,35 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         <div className="w-10 h-1 rounded-full bg-white/20" />
       </div>
 
-      {/* Header row 1: close + compact actions */}
-      <div className="flex items-center justify-between px-4 pb-1">
+      {/* Header: close + tab pills */}
+      <div className="flex items-center gap-2 px-4 pb-3">
         <button
           onClick={closeWithFeedback}
           aria-label="Close player"
-          className="w-11 h-11 flex items-center justify-center -ml-2 text-white/60 active:text-white"
+          className="flex h-12 w-12 shrink-0 touch-manipulation items-center justify-center -ml-2 text-white/60 active:text-white"
         >
           <ChevronDown size={28} />
         </button>
 
-        <div className="flex items-center -mr-2">
-          <PlayerSurfaceModeSwitch
-            allowVisualizer={false}
-            className="mr-1"
-            mode={surfaceMode}
-            onChange={(mode) => {
-              triggerHaptic("selection");
-              const nextMode = mode === "visualizer" ? "cd" : mode;
-              setSurfaceMode(nextMode);
-              setPlayerSurfaceModePreference(nextMode);
-            }}
-            size="md"
-            variant="ghost"
-          />
-          {allowMobileEqualizer ? (
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TAB_PILLS.map(({ id, icon: Icon, label }) => (
             <button
-              ref={equalizerButtonRef}
+              key={id}
               onClick={() => {
                 triggerHaptic("selection");
-                setShowEqualizer((v) => !v);
+                setActiveTab(id);
               }}
-              aria-label="Equalizer"
-              className={`w-11 h-11 flex items-center justify-center transition-colors ${showEqualizer ? "text-primary" : "text-white/40 active:text-white/60"}`}
+              className={`flex min-h-11 shrink-0 touch-manipulation items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                activeTab === id
+                  ? "bg-white/12 text-white border border-white/15"
+                  : "text-white/40 border border-transparent active:text-white/60"
+              }`}
             >
-              <SlidersHorizontal size={18} />
+              <Icon size={13} />
+              {label}
             </button>
-          ) : isMobileAudioRuntime ? (
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("warning");
-                toast.info(
-                  stableMobileAudioPipeline
-                    ? "Enable Enhanced mobile audio in Settings, then restart Listen to use EQ on mobile."
-                    : "Restart Listen to apply the mobile audio mode change.",
-                );
-              }}
-              aria-label="Equalizer is disabled in stable mobile audio mode"
-              className="w-11 h-11 flex items-center justify-center text-white/20"
-            >
-              <SlidersHorizontal size={18} />
-            </button>
-          ) : null}
+          ))}
         </div>
-      </div>
-
-      {/* Header row 2: tab pills */}
-      <div className="flex items-center gap-2 px-4 pb-3">
-        {TAB_PILLS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            onClick={() => {
-              triggerHaptic("selection");
-              setActiveTab(id);
-            }}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
-              activeTab === id
-                ? "bg-white/12 text-white border border-white/15"
-                : "text-white/40 border border-transparent active:text-white/60"
-            }`}
-          >
-            <Icon size={13} />
-            {label}
-          </button>
-        ))}
       </div>
 
       {allowMobileEqualizer && showEqualizer && (
@@ -592,6 +553,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 isPlaying={isPlaying}
                 jogEnabled
                 onJoggingChange={(jogging) => { draggingRef.current = jogging; }}
+                onPlaybackRateChange={setPlaybackRate}
                 onSeek={seek}
                 onTogglePlay={togglePlaybackWithFeedback}
               />
@@ -669,7 +631,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             <button
               onClick={toggleShuffleWithFeedback}
               aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
-              className={`flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
+              className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
                 shuffle ? "text-primary" : "text-white/35 active:text-white/70"
               }`}
             >
@@ -705,7 +667,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             <button
               onClick={cycleRepeatWithFeedback}
               aria-label={`Repeat: ${repeat}`}
-              className={`flex h-11 w-11 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
+              className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
                 repeat !== "off" ? "text-primary" : "text-white/35 active:text-white/70"
               }`}
             >
@@ -713,17 +675,56 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             </button>
           </div>
 
-          <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-3">
+          <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2">
             <button
               onClick={() => { void toggleLikeWithFeedback(); }}
               aria-label={liked ? "Unlike track" : "Like track"}
-              className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+              className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
             >
               <Heart size={19} className={liked ? "fill-primary text-primary" : ""} />
             </button>
+            {allowMobileEqualizer ? (
+              <button
+                ref={equalizerButtonRef}
+                onClick={() => {
+                  triggerHaptic("selection");
+                  setShowEqualizer((v) => !v);
+                }}
+                aria-label="Equalizer"
+                className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-colors active:bg-white/8 ${
+                  showEqualizer ? "text-primary" : "text-white/55 active:text-white"
+                }`}
+              >
+                <SlidersHorizontal size={19} />
+              </button>
+            ) : isMobileAudioRuntime ? (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic("warning");
+                  toast.info(
+                    stableMobileAudioPipeline
+                      ? "Enable Enhanced mobile audio in Settings, then restart Listen to use EQ on mobile."
+                      : "Restart Listen to apply the mobile audio mode change.",
+                  );
+                }}
+                aria-label="Equalizer is disabled in stable mobile audio mode"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/20"
+              >
+                <SlidersHorizontal size={19} />
+              </button>
+            ) : null}
+            <button
+              onClick={toggleSurfaceModeWithFeedback}
+              aria-label={surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"}
+              title={surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"}
+              className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+            >
+              {surfaceMode === "cd" ? <Square size={18} /> : <Disc3 size={19} />}
+            </button>
             <PlayerTrackMenu
               currentTrack={currentTrack}
-              className="h-11 w-11 rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
+              className="h-12 w-12 rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
             />
           </div>
         </div>

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from crate.db.home_builder_shared import _coerce_datetime, _merge_track_rows, _select_diverse_tracks_with_backfill
+from crate.db.home_builder_shared import _coerce_datetime, _merge_track_rows, _select_diverse_tracks
 from crate.db.home_builder_discovery_queries import track_candidates_for_album_ids
 
 
@@ -85,9 +85,13 @@ def build_recommended_tracks(
         row for row in recommended_track_rows if not row.get("user_play_count") and not row.get("is_liked")
     ]
     if len(recommended_track_rows) < limit:
-        fallback_rows = [dict(track) for track in (fallback_tracks or [])]
+        fallback_rows = [
+            dict(track)
+            for track in (fallback_tracks or [])
+            if not track.get("user_play_count") and not track.get("is_liked")
+        ]
         recommended_track_rows = _merge_track_rows(recommended_track_rows, fallback_rows)
-    return _select_diverse_tracks_with_backfill(recommended_track_rows, limit=limit, max_per_artist=2, max_per_album=2)
+    return _select_diverse_tracks(recommended_track_rows, limit=limit, max_per_artist=2, max_per_album=2)
 
 
 __all__ = [

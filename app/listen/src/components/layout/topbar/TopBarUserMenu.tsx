@@ -54,26 +54,28 @@ export function TopBarUserMenu() {
         </div>
       </div>
       <AppPopoverDivider />
-      <AppMenuButton onClick={() => go(profilePath)} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton onClick={() => go(profilePath)} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
         <User size={14} /> Profile
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/people")} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton onClick={() => go("/people")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
         <Users size={14} /> People
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/jam")} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton onClick={() => go("/jam")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
         <Radio size={14} /> Jam sessions
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/upload")} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton onClick={() => go("/upload")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
         <Upload size={14} /> Upload music
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/stats")} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
-        <BarChart3 size={14} /> Stats
-      </AppMenuButton>
-      <AppMenuButton onClick={() => go("/settings")} className="gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      {isDesktop ? (
+        <AppMenuButton onClick={() => go("/stats")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+          <BarChart3 size={14} /> Stats
+        </AppMenuButton>
+      ) : null}
+      <AppMenuButton onClick={() => go("/settings")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
         <Settings size={14} /> Settings
       </AppMenuButton>
       <AppPopoverDivider />
-      <AppMenuButton onClick={() => { setShowUserMenu(false); void logout(); }} className="gap-2.5 px-3 py-2 text-[13px]" danger>
+      <AppMenuButton onClick={() => { setShowUserMenu(false); void logout(); }} className="min-h-11 gap-2.5 px-3 py-2 text-[13px]" danger>
         <LogOut size={14} /> Sign out
       </AppMenuButton>
     </>
@@ -86,7 +88,7 @@ export function TopBarUserMenu() {
           ref={userMenuButtonRef}
           onClick={() => setShowUserMenu(!showUserMenu)}
           aria-label="User menu"
-          className="flex h-11 w-11 md:h-12 md:w-12 items-center justify-center rounded-full border border-white/10 bg-black/30 backdrop-blur-sm text-sm font-medium text-white/70 transition-colors hover:bg-black/50 hover:text-white overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.18)]"
+          className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/30 text-sm font-medium text-white/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
         >
           {avatarUrl ? (
             <img src={avatarUrl} alt="" onError={handleAvatarError} className="h-full w-full object-cover" />

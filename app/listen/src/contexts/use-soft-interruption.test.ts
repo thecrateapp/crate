@@ -32,7 +32,6 @@ import type { MutableRefObject } from "react";
 import type { Track } from "./player-types";
 
 const mockFadeOutAndPause = vi.mocked(gaplessPlayer.fadeOutAndPause);
-const mockGetPosition = vi.mocked(gaplessPlayer.getPosition);
 const mockIsOnline = vi.mocked(capacitor.isOnline);
 const globalFetch = global.fetch;
 
@@ -61,8 +60,6 @@ function createRefs(overrides: {
 beforeEach(() => {
   vi.useFakeTimers();
   mockFadeOutAndPause.mockClear();
-  mockGetPosition.mockReset();
-  mockGetPosition.mockReturnValue(0);
   mockIsOnline.mockClear();
   mockIsOnline.mockResolvedValue(true);
   global.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, body: null } as Response)) as typeof fetch;
@@ -271,12 +268,8 @@ describe("useSoftInterruption", () => {
     expect(refs.commitIsBuffering.mock.calls.length).toBe(before);
   });
 
-  it("retries playback after a background resume leaves playback stalled", async () => {
+  it("does not auto-retry playback after returning from background", async () => {
     const refs = createRefs({ isPlaying: true, isBuffering: true });
-    mockGetPosition
-      .mockReturnValueOnce(10_000)
-      .mockReturnValueOnce(10_000)
-      .mockReturnValue(10_000);
     renderHook(() => useSoftInterruption(refs));
 
     act(() => {
@@ -287,13 +280,15 @@ describe("useSoftInterruption", () => {
       window.dispatchEvent(new CustomEvent("crate:app-resumed"));
     });
 
-    expect(gaplessPlayer.play).toHaveBeenCalled();
+    expect(gaplessPlayer.play).not.toHaveBeenCalled();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(refs.commitIsBuffering).toHaveBeenCalledWith(false);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_600);
     });
 
-    expect(refs.commitIsBuffering).toHaveBeenCalledWith(true);
-    expect(mockFadeOutAndPause).toHaveBeenCalled();
+    expect(refs.commitIsBuffering).not.toHaveBeenCalledWith(true);
+    expect(mockFadeOutAndPause).not.toHaveBeenCalled();
   });
 });

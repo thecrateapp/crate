@@ -526,6 +526,7 @@ class HomeDiscoveryResponse(BaseModel):
     radio_stations: list[dict[str, Any]] = Field(default_factory=list)
     favorite_artists: list[dict[str, Any]] = Field(default_factory=list)
     essentials: list[HomeCardResponse] = Field(default_factory=list)
+    listening_history: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class HomeSectionResponse(BaseModel):
