@@ -230,6 +230,25 @@ cmd_pull() {
   dc pull --ignore-buildable --ignore-pull-failures
 }
 
+ensure_project_images_for_tag() {
+  local tag="$1"
+  local failures=0
+  local image
+
+  for image in "${PROJECT_IMAGES[@]}"; do
+    if docker image inspect "${image}:${tag}" >/dev/null 2>&1; then
+      continue
+    fi
+    if docker pull -q "${image}:${tag}" >/dev/null 2>&1; then
+      continue
+    fi
+    log "Image unavailable for rollback: ${image}:${tag}"
+    failures=$((failures + 1))
+  done
+
+  [[ "$failures" -eq 0 ]]
+}
+
 cmd_up() {
   log "Starting updated stack without building on the server"
   dc up -d --no-build --remove-orphans
@@ -288,6 +307,7 @@ PY
 
 cmd_rollback() {
   local rollback_tag
+  local target_tag
   local rollback_services=()
   local service
 
@@ -308,16 +328,23 @@ cmd_rollback() {
     fi
   done
 
-  set_env_value CRATE_IMAGE_TAG "$rollback_tag"
+  target_tag="$(env_value CRATE_IMAGE_TAG)"
+  if [[ -z "$target_tag" ]]; then
+    target_tag="$rollback_tag"
+  fi
+  set_env_value CRATE_IMAGE_TAG "$target_tag"
   dc config -q
 
-  log "Restarting previous images with CRATE_IMAGE_TAG=${rollback_tag}"
+  log "Checking rollback images for CRATE_IMAGE_TAG=${target_tag}"
+  ensure_project_images_for_tag "$target_tag"
+
+  log "Restarting previous images with CRATE_IMAGE_TAG=${target_tag}"
   for service in "${PROJECT_SERVICES[@]}"; do
     if compose_has_service "$service"; then
       rollback_services+=("$service")
     fi
   done
-  CRATE_IMAGE_TAG="$rollback_tag" "${COMPOSE[@]}" up -d --no-build --remove-orphans "${rollback_services[@]}"
+  CRATE_IMAGE_TAG="$target_tag" "${COMPOSE[@]}" up -d --no-build --remove-orphans "${rollback_services[@]}"
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
 }
 
