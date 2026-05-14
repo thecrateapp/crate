@@ -1,12 +1,13 @@
 import { getApiBase } from "@/lib/api";
-import { isNative } from "@/lib/capacitor-runtime";
+import { usesConfigurableServer } from "@/lib/platform";
 
 export const AUTH_USER_ID_KEY = "listen-auth-user-id";
 
 function getServerScope(serverOrigin?: string): string {
-  const rawOrigin = serverOrigin || getApiBase() || (
-    typeof window !== "undefined" ? window.location.origin : "listen"
-  );
+  const rawOrigin =
+    serverOrigin ||
+    getApiBase() ||
+    (typeof window !== "undefined" ? window.location.origin : "listen");
   try {
     return new URL(rawOrigin).origin.replace(/\/+$/, "");
   } catch {
@@ -15,7 +16,7 @@ function getServerScope(serverOrigin?: string): string {
 }
 
 export function getAuthUserIdStorageKey(serverOrigin?: string): string {
-  if (!isNative) return AUTH_USER_ID_KEY;
+  if (!usesConfigurableServer) return AUTH_USER_ID_KEY;
   return `${AUTH_USER_ID_KEY}:${encodeURIComponent(getServerScope(serverOrigin))}`;
 }
 
@@ -56,7 +57,10 @@ export function getStoredAuthUserId(serverOrigin?: string): string | null {
   return legacyValue;
 }
 
-export function setStoredAuthUserId(userId: string | number, serverOrigin?: string): void {
+export function setStoredAuthUserId(
+  userId: string | number,
+  serverOrigin?: string,
+): void {
   const scopedKey = getAuthUserIdStorageKey(serverOrigin);
   safeSetStorageItem(scopedKey, String(userId));
   if (scopedKey !== AUTH_USER_ID_KEY) {

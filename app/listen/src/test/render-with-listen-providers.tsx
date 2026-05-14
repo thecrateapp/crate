@@ -34,7 +34,9 @@ export interface ListenRenderOptions extends Omit<RenderOptions, "wrapper"> {
   route?: string;
 }
 
-export function createMockAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
+export function createMockAuthUser(
+  overrides: Partial<AuthUser> = {},
+): AuthUser {
   return {
     id: 1,
     email: "listener@example.test",
@@ -118,9 +120,9 @@ export function createMockOfflineValue(
   const getIdleState = vi.fn<
     (value?: string | number | null) => OfflineItemState
   >(() => "idle");
-  const toggleOffline = vi.fn<
-    () => Promise<"enabled" | "removed">
-  >(async () => "enabled");
+  const toggleOffline = vi.fn<() => Promise<"enabled" | "removed">>(
+    async () => "enabled",
+  );
   return {
     supported: true,
     syncing: false,
@@ -167,6 +169,7 @@ export function seedNativeServer(
     label: overrides.label ?? "crate.example.test",
     url: overrides.url ?? "https://crate.example.test",
     token: overrides.token ?? null,
+    tokenExpiresAt: overrides.tokenExpiresAt ?? null,
     refreshToken: overrides.refreshToken ?? null,
   };
   localStorage.setItem("crate-servers", JSON.stringify([server]));
@@ -181,10 +184,7 @@ export function clearNativeServers() {
   window.dispatchEvent(new CustomEvent(SERVER_STORE_EVENT));
 }
 
-function withOptionalRoute(
-  ui: ReactNode,
-  path?: string,
-) {
+function withOptionalRoute(ui: ReactNode, path?: string) {
   if (!path) return ui;
   return (
     <Routes>

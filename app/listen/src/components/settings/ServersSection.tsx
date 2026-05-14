@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Plus, Trash2, Server, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { isNative } from "@/lib/capacitor";
+import { usesConfigurableServer } from "@/lib/platform";
 import {
   getCurrentServerId,
   getServers,
@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * Settings panel listing configured Crate servers. Only rendered in
- * Capacitor builds — on web, there's always a single implicit server
+ * configurable shells — on web, there's always a single implicit server
  * (the one that served the app) so this UI would be confusing.
  *
  * Switching server drops the app back to the login screen for that
@@ -39,7 +39,7 @@ export function ServersSection() {
     return () => window.removeEventListener(SERVER_STORE_EVENT, sync);
   }, []);
 
-  if (!isNative) return null;
+  if (!usesConfigurableServer) return null;
 
   const handleSwitch = async (server: ServerConfig) => {
     if (server.id === currentId) return;

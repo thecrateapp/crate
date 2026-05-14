@@ -18,12 +18,8 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
-import {
-} from "@/contexts/player-queue-helpers";
-import {
-  getTrackCacheKey,
-  getStreamUrl,
-} from "@/contexts/player-utils";
+import {} from "@/contexts/player-queue-helpers";
+import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
   destroyPlayer as gpDestroyPlayer,
@@ -33,7 +29,10 @@ import {
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
 } from "@/lib/gapless-player";
-import { toEngineTrack, toEngineTracks } from "@/contexts/player-engine-adapter";
+import {
+  toEngineTrack,
+  toEngineTracks,
+} from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
 import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
@@ -43,6 +42,10 @@ import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
 import { usePlayerAuthSync } from "@/contexts/use-player-auth-sync";
+import {
+  useDesktopTrayCommands,
+  useDesktopTrayNowPlaying,
+} from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
@@ -52,8 +55,16 @@ import {
 } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
-import { androidNativeEngine, shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
-import type { EngineEventMap, EngineEventName, EnginePositionEvent, EngineState } from "@/lib/playback-engine";
+import {
+  androidNativeEngine,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
+import type {
+  EngineEventMap,
+  EngineEventName,
+  EnginePositionEvent,
+  EngineState,
+} from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
   getPlaybackDeliveryPolicyPreference,
@@ -97,7 +108,11 @@ function projectedNativePositionSeconds(
   durationMs?: number | null,
 ): number {
   const positionSeconds = nativeMsToSeconds(positionMs);
-  if (!isPlaying || typeof nativeTimeMs !== "number" || !Number.isFinite(nativeTimeMs)) {
+  if (
+    !isPlaying ||
+    typeof nativeTimeMs !== "number" ||
+    !Number.isFinite(nativeTimeMs)
+  ) {
     return positionSeconds;
   }
   const elapsedSeconds = Math.max(0, (Date.now() - nativeTimeMs) / 1000);
@@ -107,7 +122,9 @@ function projectedNativePositionSeconds(
 }
 
 function trackDurationSeconds(track: Track | undefined): number {
-  return typeof track?.duration === "number" && Number.isFinite(track.duration) && track.duration > 0
+  return typeof track?.duration === "number" &&
+    Number.isFinite(track.duration) &&
+    track.duration > 0
     ? track.duration
     : 0;
 }
@@ -147,19 +164,22 @@ export { shouldRestartTrackBeforePrev } from "@/contexts/player-queue-helpers";
 
 export function usePlayerState(): PlayerStateValue {
   const ctx = useContext(PlayerStateContext);
-  if (!ctx) throw new Error("usePlayerState must be used within PlayerProvider");
+  if (!ctx)
+    throw new Error("usePlayerState must be used within PlayerProvider");
   return ctx;
 }
 
 export function usePlayerActions(): PlayerActionsValue {
   const ctx = useContext(PlayerActionsContext);
-  if (!ctx) throw new Error("usePlayerActions must be used within PlayerProvider");
+  if (!ctx)
+    throw new Error("usePlayerActions must be used within PlayerProvider");
   return ctx;
 }
 
 export function usePlayerProgress(): PlayerProgressValue {
   const ctx = useContext(PlayerProgressContext);
-  if (!ctx) throw new Error("usePlayerProgress must be used within PlayerProvider");
+  if (!ctx)
+    throw new Error("usePlayerProgress must be used within PlayerProvider");
   return ctx;
 }
 
@@ -171,7 +191,8 @@ export function usePlayer(): PlayerContextValue {
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [playbackNeedsUserGesture, setPlaybackNeedsUserGesture] = useState(false);
+  const [playbackNeedsUserGesture, setPlaybackNeedsUserGesture] =
+    useState(false);
   const {
     queue,
     currentIndex,
@@ -272,10 +293,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   });
   useEqualizerRuntime(currentTrack);
 
-  const getPlaybackSnapshot = useCallback(() => ({
-    currentTime: currentTimeRef.current,
-    duration: durationRef.current,
-  }), []);
+  const getPlaybackSnapshot = useCallback(
+    () => ({
+      currentTime: currentTimeRef.current,
+      duration: durationRef.current,
+    }),
+    [],
+  );
 
   const {
     startSession: startTrackerSession,
@@ -336,163 +360,186 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // Domain-level actions for usePlaybackIntelligence. Verb-oriented
   // instead of raw state setters — the hook no longer needs to reason
   // about engine sync, de-duplication or playback sequencing.
-  const appendIntelligenceTracks = useCallback((tracks: Track[]) => {
-    const queue = queueRef.current;
-    const existingKeys = new Set(
-      [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-    );
-    const unique: Track[] = [];
-    for (const track of tracks) {
-      const key = getTrackCacheKey(track);
-      if (!key || existingKeys.has(key)) continue;
-      existingKeys.add(key);
-      unique.push(track);
-    }
-    if (unique.length === 0) return;
-
-    const nextQueue = [...queue, ...unique];
-    const nativePlayerActive = shouldUseAndroidNativePlayer();
-    if (nativePlayerActive) {
-      void androidNativeEngine.appendTracks(toEngineTracks(unique)).catch((error) => {
-        console.error("[native-player] failed to append intelligence tracks:", error);
-      });
-    } else {
-      for (const track of unique) {
-        gpAddTrack(registerEngineTrack(track));
+  const appendIntelligenceTracks = useCallback(
+    (tracks: Track[]) => {
+      const queue = queueRef.current;
+      const existingKeys = new Set(
+        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
+      );
+      const unique: Track[] = [];
+      for (const track of tracks) {
+        const key = getTrackCacheKey(track);
+        if (!key || existingKeys.has(key)) continue;
+        existingKeys.add(key);
+        unique.push(track);
       }
-    }
-    commitQueue(nextQueue);
+      if (unique.length === 0) return;
 
-    // Keep the un-shuffled snapshot in sync so restoring original order
-    // later (toggle shuffle off / reload after shuffle-on session) doesn't
-    // silently drop radio-refill or continuation tracks fetched while
-    // shuffle was active.
-    if (unshuffledQueueRef.current) {
-      unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
-    }
-  }, [commitQueue, recentlyPlayed, registerEngineTrack]);
-
-  const insertSuggestionAfterCurrent = useCallback((candidates: Track[]) => {
-    const queue = queueRef.current;
-    const insertionIndex = currentIndexRef.current + 1;
-    if (insertionIndex <= 0 || insertionIndex > queue.length) return;
-    if (queue[insertionIndex]?.isSuggested) return;
-
-    const existingKeys = new Set(
-      [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-    );
-    const suggestion = candidates.find((t) => {
-      const k = getTrackCacheKey(t);
-      return !!k && !existingKeys.has(k);
-    });
-    if (!suggestion) return;
-
-    const marked: Track = {
-      ...suggestion,
-      isSuggested: true,
-      suggestionSource: "playlist",
-    };
-    const nextQueue = [...queue];
-    nextQueue.splice(insertionIndex, 0, marked);
-    if (shouldUseAndroidNativePlayer()) {
-      void androidNativeEngine.insertTrack(insertionIndex, toEngineTrack(marked)).catch((error) => {
-        console.error("[native-player] failed to insert suggested track:", error);
-      });
-    } else {
-      gpInsertTrack(insertionIndex, registerEngineTrack(marked));
-    }
-    commitQueue(nextQueue);
-
-    // Mirror into the un-shuffled snapshot. We don't know where the
-    // suggestion would live in the original sequence, so we append it
-    // at the end — good enough for restore fidelity (no track lost).
-    if (unshuffledQueueRef.current) {
-      unshuffledQueueRef.current = [...unshuffledQueueRef.current, marked];
-    }
-  }, [commitQueue, recentlyPlayed, registerEngineTrack]);
-
-  const appendAndAdvance = useCallback((tracks: Track[]) => {
-    const queue = queueRef.current;
-    const existingKeys = new Set(
-      [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
-    );
-    const unique: Track[] = [];
-    for (const track of tracks) {
-      const key = getTrackCacheKey(track);
-      if (!key || existingKeys.has(key)) continue;
-      existingKeys.add(key);
-      unique.push(track);
-    }
-    if (unique.length === 0) {
-      commitIsBuffering(false);
-      return;
-    }
-
-    const nextQueue = [...queue, ...unique];
-    const nativePlayerActive = shouldUseAndroidNativePlayer();
-    if (nativePlayerActive) {
-      void androidNativeEngine.appendTracks(toEngineTracks(unique)).then(() => {
-        void androidNativeEngine.jumpTo(queue.length, true);
-      }).catch((error) => {
-        console.error("[native-player] failed to append and advance:", error);
-      });
-    } else {
-      for (const track of unique) {
-        gpAddTrack(registerEngineTrack(track));
+      const nextQueue = [...queue, ...unique];
+      const nativePlayerActive = shouldUseAndroidNativePlayer();
+      if (nativePlayerActive) {
+        void androidNativeEngine
+          .appendTracks(toEngineTracks(unique))
+          .catch((error) => {
+            console.error(
+              "[native-player] failed to append intelligence tracks:",
+              error,
+            );
+          });
+      } else {
+        for (const track of unique) {
+          gpAddTrack(registerEngineTrack(track));
+        }
       }
-    }
-    commitQueue(nextQueue);
+      commitQueue(nextQueue);
 
-    // Mirror into the un-shuffled snapshot so shuffle-off/reload
-    // doesn't drop the freshly-fetched continuation tracks.
-    if (unshuffledQueueRef.current) {
-      unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
-    }
-
-    // Advance to the first newly appended track. The old session is
-    // ending by user request (they hit next at the end of the album),
-    // so flush it explicitly before starting the new one.
-    const nextIndex = queue.length;
-    const outgoing = queueRef.current[currentIndexRef.current];
-    flushCurrentPlayEvent("skipped", outgoing);
-    if (!nativePlayerActive) {
-      gpGotoTrack(nextIndex, true);
-    }
-    advanceCursorTo(nextIndex);
-    const incoming = nextQueue[nextIndex];
-    if (incoming) startTrackerSession(incoming, playSourceRef.current);
-    commitIsPlaying(true);
-  }, [
-    advanceCursorTo,
-    commitIsBuffering,
-    commitIsPlaying,
-    commitQueue,
-    flushCurrentPlayEvent,
-    recentlyPlayed,
-    registerEngineTrack,
-    startTrackerSession,
-  ]);
-
-  const {
-    continueInfinitePlayback,
-    resetPlaybackIntelligence,
-  } = usePlaybackIntelligence({
-    queue,
-    currentIndex,
-    isPlaying,
-    playSource,
-    shuffle,
-    infinitePlaybackEnabled,
-    smartPlaylistSuggestionsEnabled,
-    smartPlaylistSuggestionsCadence,
-    recentlyPlayed,
-    actions: {
-      appendTracks: appendIntelligenceTracks,
-      insertSuggestionAfterCurrent,
-      appendAndAdvance,
-      setBuffering: commitIsBuffering,
+      // Keep the un-shuffled snapshot in sync so restoring original order
+      // later (toggle shuffle off / reload after shuffle-on session) doesn't
+      // silently drop radio-refill or continuation tracks fetched while
+      // shuffle was active.
+      if (unshuffledQueueRef.current) {
+        unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
+      }
     },
-  });
+    [commitQueue, recentlyPlayed, registerEngineTrack],
+  );
+
+  const insertSuggestionAfterCurrent = useCallback(
+    (candidates: Track[]) => {
+      const queue = queueRef.current;
+      const insertionIndex = currentIndexRef.current + 1;
+      if (insertionIndex <= 0 || insertionIndex > queue.length) return;
+      if (queue[insertionIndex]?.isSuggested) return;
+
+      const existingKeys = new Set(
+        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
+      );
+      const suggestion = candidates.find((t) => {
+        const k = getTrackCacheKey(t);
+        return !!k && !existingKeys.has(k);
+      });
+      if (!suggestion) return;
+
+      const marked: Track = {
+        ...suggestion,
+        isSuggested: true,
+        suggestionSource: "playlist",
+      };
+      const nextQueue = [...queue];
+      nextQueue.splice(insertionIndex, 0, marked);
+      if (shouldUseAndroidNativePlayer()) {
+        void androidNativeEngine
+          .insertTrack(insertionIndex, toEngineTrack(marked))
+          .catch((error) => {
+            console.error(
+              "[native-player] failed to insert suggested track:",
+              error,
+            );
+          });
+      } else {
+        gpInsertTrack(insertionIndex, registerEngineTrack(marked));
+      }
+      commitQueue(nextQueue);
+
+      // Mirror into the un-shuffled snapshot. We don't know where the
+      // suggestion would live in the original sequence, so we append it
+      // at the end — good enough for restore fidelity (no track lost).
+      if (unshuffledQueueRef.current) {
+        unshuffledQueueRef.current = [...unshuffledQueueRef.current, marked];
+      }
+    },
+    [commitQueue, recentlyPlayed, registerEngineTrack],
+  );
+
+  const appendAndAdvance = useCallback(
+    (tracks: Track[]) => {
+      const queue = queueRef.current;
+      const existingKeys = new Set(
+        [...queue, ...recentlyPlayed].map((t) => getTrackCacheKey(t)),
+      );
+      const unique: Track[] = [];
+      for (const track of tracks) {
+        const key = getTrackCacheKey(track);
+        if (!key || existingKeys.has(key)) continue;
+        existingKeys.add(key);
+        unique.push(track);
+      }
+      if (unique.length === 0) {
+        commitIsBuffering(false);
+        return;
+      }
+
+      const nextQueue = [...queue, ...unique];
+      const nativePlayerActive = shouldUseAndroidNativePlayer();
+      if (nativePlayerActive) {
+        void androidNativeEngine
+          .appendTracks(toEngineTracks(unique))
+          .then(() => {
+            void androidNativeEngine.jumpTo(queue.length, true);
+          })
+          .catch((error) => {
+            console.error(
+              "[native-player] failed to append and advance:",
+              error,
+            );
+          });
+      } else {
+        for (const track of unique) {
+          gpAddTrack(registerEngineTrack(track));
+        }
+      }
+      commitQueue(nextQueue);
+
+      // Mirror into the un-shuffled snapshot so shuffle-off/reload
+      // doesn't drop the freshly-fetched continuation tracks.
+      if (unshuffledQueueRef.current) {
+        unshuffledQueueRef.current = [...unshuffledQueueRef.current, ...unique];
+      }
+
+      // Advance to the first newly appended track. The old session is
+      // ending by user request (they hit next at the end of the album),
+      // so flush it explicitly before starting the new one.
+      const nextIndex = queue.length;
+      const outgoing = queueRef.current[currentIndexRef.current];
+      flushCurrentPlayEvent("skipped", outgoing);
+      if (!nativePlayerActive) {
+        gpGotoTrack(nextIndex, true);
+      }
+      advanceCursorTo(nextIndex);
+      const incoming = nextQueue[nextIndex];
+      if (incoming) startTrackerSession(incoming, playSourceRef.current);
+      commitIsPlaying(true);
+    },
+    [
+      advanceCursorTo,
+      commitIsBuffering,
+      commitIsPlaying,
+      commitQueue,
+      flushCurrentPlayEvent,
+      recentlyPlayed,
+      registerEngineTrack,
+      startTrackerSession,
+    ],
+  );
+
+  const { continueInfinitePlayback, resetPlaybackIntelligence } =
+    usePlaybackIntelligence({
+      queue,
+      currentIndex,
+      isPlaying,
+      playSource,
+      shuffle,
+      infinitePlaybackEnabled,
+      smartPlaylistSuggestionsEnabled,
+      smartPlaylistSuggestionsCadence,
+      recentlyPlayed,
+      actions: {
+        appendTracks: appendIntelligenceTracks,
+        insertSuggestionAfterCurrent,
+        appendAndAdvance,
+        setBuffering: commitIsBuffering,
+      },
+    });
 
   const clearNativeBufferingWatchdog = useCallback(() => {
     if (nativeBufferingWatchdogRef.current === null) return;
@@ -507,7 +554,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const streamUrl = track ? getStreamUrl(track) : "";
     const redactedUrl = redactDiagnosticUrl(streamUrl);
 
-    let status: number | "network-error" | "timeout" | "no-track" = track ? "network-error" : "no-track";
+    let status: number | "network-error" | "timeout" | "no-track" = track
+      ? "network-error"
+      : "no-track";
     let detail = "";
     if (track && streamUrl) {
       const controller = new AbortController();
@@ -522,11 +571,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
         response.body?.cancel().catch(() => {});
         status = response.status;
-        detail = response.ok || response.status === 206
-          ? "Range probe succeeded from WebView"
-          : response.statusText;
+        detail =
+          response.ok || response.status === 206
+            ? "Range probe succeeded from WebView"
+            : response.statusText;
       } catch (error) {
-        status = error instanceof DOMException && error.name === "AbortError" ? "timeout" : "network-error";
+        status =
+          error instanceof DOMException && error.name === "AbortError"
+            ? "timeout"
+            : "network-error";
         detail = error instanceof Error ? error.message : String(error);
       } finally {
         window.clearTimeout(timeout);
@@ -536,7 +589,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (probeId !== nativeBufferingProbeIdRef.current) return;
     persistNativePlaybackDiagnostic({
       type: "buffering-timeout",
-      track: track ? { id: track.id, title: track.title, artist: track.artist } : null,
+      track: track
+        ? { id: track.id, title: track.title, artist: track.artist }
+        : null,
       streamUrl: redactedUrl,
       probeStatus: status,
       detail,
@@ -555,260 +610,307 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }, NATIVE_BUFFERING_WATCHDOG_MS);
   }, [clearNativeBufferingWatchdog, probeNativeBuffering]);
 
-  const applyNativePosition = useCallback((event: EnginePositionEvent) => {
-    const positionSeconds = projectedNativePositionSeconds(
-      event.positionMs,
-      event.nativeTimeMs,
-      event.isPlaying,
-      event.durationMs,
-    );
-    const nativeDurationSeconds = nativeMsToSeconds(event.durationMs);
-    const fallbackDurationSeconds = trackDurationSeconds(queueRef.current[event.index] ?? currentTrackRef.current);
-    commitCurrentTime(positionSeconds);
-    if (nativeDurationSeconds > 0 || fallbackDurationSeconds > 0) {
-      commitDuration(nativeDurationSeconds || fallbackDurationSeconds);
-    }
-    commitIsPlaying(event.isPlaying);
-    if (event.isPlaying) {
-      recordProgress(positionSeconds);
-    }
-  }, [commitCurrentTime, commitDuration, commitIsPlaying, currentTrackRef, queueRef, recordProgress]);
-
-  const applyNativeState = useCallback((
-    state: EngineState,
-    options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
-  ) => {
-    const positionSeconds = projectedNativePositionSeconds(
-      state.positionMs,
-      state.nativeTimeMs,
-      state.isPlaying,
-      state.durationMs,
-    );
-    const nativeDurationSeconds = nativeMsToSeconds(state.durationMs);
-    commitCurrentTime(positionSeconds);
-    if (state.queueSize === 0) {
-      commitDuration(0);
-    }
-
-    const queue = queueRef.current;
-    if (state.index >= 0 && state.index < queue.length) {
-      const previousIndex = currentIndexRef.current;
-      const incomingTrack = queue[state.index];
-      const durationSeconds = nativeDurationSeconds || trackDurationSeconds(incomingTrack);
-      if (durationSeconds > 0) {
-        commitDuration(durationSeconds);
-      }
-      if (state.index !== previousIndex) {
-        const outgoingTrack = queue[previousIndex];
-        if (options.rotateIndexChange) {
-          const reason = nativeTransitionFlushReason(
-            undefined,
-            previousIndex,
-            state.index,
-            queue.length,
-            repeatRef.current,
-          );
-          if (reason) {
-            rotateTrackerSession(reason, outgoingTrack, incomingTrack, playSourceRef.current);
-          }
-        } else if (state.isPlaying) {
-          ensureTrackerSession(incomingTrack, playSourceRef.current);
-        }
-        commitCurrentIndex(state.index);
-        rememberActiveTrack(incomingTrack);
-      } else {
-        rememberActiveTrack(incomingTrack);
-        if (state.isPlaying) {
-          ensureTrackerSession(incomingTrack, playSourceRef.current);
-        }
-      }
-    }
-
-    const isPassiveLifecycleBuffering = options.passiveLifecycle && state.playbackState === "buffering";
-    commitIsPlaying(state.isPlaying);
-    commitIsBuffering(isPassiveLifecycleBuffering ? false : state.playbackState === "buffering");
-    if (state.playbackState === "buffering" && !isPassiveLifecycleBuffering) {
-      scheduleNativeBufferingWatchdog();
-    } else {
-      clearNativeBufferingWatchdog();
-    }
-    if (state.isPlaying) {
-      recordProgress(positionSeconds);
-    }
-  }, [
-    clearNativeBufferingWatchdog,
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    commitIsPlaying,
-    currentIndexRef,
-    ensureTrackerSession,
-    playSourceRef,
-    queueRef,
-    recordProgress,
-    rememberActiveTrack,
-    repeatRef,
-    rotateTrackerSession,
-    scheduleNativeBufferingWatchdog,
-  ]);
-
-  const applyNativeTrackChange = useCallback((
-    event: EnginePositionEvent & { reason?: string },
-  ) => {
-    const queue = queueRef.current;
-    if (event.index < 0 || event.index >= queue.length) return;
-
-    const previousIndex = currentIndexRef.current;
-    const incomingTrack = queue[event.index];
-    const outgoingTrack = queue[previousIndex];
-    const positionSeconds = projectedNativePositionSeconds(
-      event.positionMs,
-      event.nativeTimeMs,
-      event.isPlaying,
-      event.durationMs,
-    );
-    const durationSeconds = nativeMsToSeconds(event.durationMs) || trackDurationSeconds(incomingTrack);
-    commitCurrentTime(positionSeconds);
-    if (durationSeconds > 0) {
-      commitDuration(durationSeconds);
-    }
-
-    if (event.index !== previousIndex) {
-      const reason = nativeTransitionFlushReason(
-        event.reason,
-        previousIndex,
-        event.index,
-        queue.length,
-        repeatRef.current,
+  const applyNativePosition = useCallback(
+    (event: EnginePositionEvent) => {
+      const positionSeconds = projectedNativePositionSeconds(
+        event.positionMs,
+        event.nativeTimeMs,
+        event.isPlaying,
+        event.durationMs,
       );
-      if (reason) {
-        rotateTrackerSession(reason, outgoingTrack, incomingTrack, playSourceRef.current);
-      } else {
-        ensureTrackerSession(incomingTrack, playSourceRef.current);
+      const nativeDurationSeconds = nativeMsToSeconds(event.durationMs);
+      const fallbackDurationSeconds = trackDurationSeconds(
+        queueRef.current[event.index] ?? currentTrackRef.current,
+      );
+      commitCurrentTime(positionSeconds);
+      if (nativeDurationSeconds > 0 || fallbackDurationSeconds > 0) {
+        commitDuration(nativeDurationSeconds || fallbackDurationSeconds);
       }
-      commitCurrentIndex(event.index);
-      rememberActiveTrack(incomingTrack);
-    } else {
-      rememberActiveTrack(incomingTrack);
+      commitIsPlaying(event.isPlaying);
       if (event.isPlaying) {
-        ensureTrackerSession(incomingTrack, playSourceRef.current);
+        recordProgress(positionSeconds);
       }
-    }
+    },
+    [
+      commitCurrentTime,
+      commitDuration,
+      commitIsPlaying,
+      currentTrackRef,
+      queueRef,
+      recordProgress,
+    ],
+  );
 
-    commitIsPlaying(event.isPlaying);
-    commitIsBuffering(false);
-  }, [
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    commitIsPlaying,
-    currentIndexRef,
-    ensureTrackerSession,
-    playSourceRef,
-    queueRef,
-    rememberActiveTrack,
-    repeatRef,
-    rotateTrackerSession,
-  ]);
+  const applyNativeState = useCallback(
+    (
+      state: EngineState,
+      options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
+    ) => {
+      const positionSeconds = projectedNativePositionSeconds(
+        state.positionMs,
+        state.nativeTimeMs,
+        state.isPlaying,
+        state.durationMs,
+      );
+      const nativeDurationSeconds = nativeMsToSeconds(state.durationMs);
+      commitCurrentTime(positionSeconds);
+      if (state.queueSize === 0) {
+        commitDuration(0);
+      }
 
-  const handleNativeEvent = useCallback(<K extends EngineEventName>(
-    eventName: K,
-    payload: EngineEventMap[K],
-  ) => {
-    if (eventName === "positionChanged") {
-      applyNativePosition(payload as EnginePositionEvent);
-      return;
-    }
-    if (eventName === "playEventCheckpoint") {
-      applyNativePosition(payload as EnginePositionEvent);
-      return;
-    }
-    if (eventName === "stateChanged") {
-      applyNativeState(payload as EngineState);
-      return;
-    }
-    if (eventName === "trackChanged") {
-      applyNativeTrackChange(payload as EnginePositionEvent & { reason?: string });
-      return;
-    }
-    if (eventName === "bufferingChanged") {
-      const isNativeBuffering = (payload as { isBuffering: boolean }).isBuffering;
-      commitIsBuffering(isNativeBuffering);
-      if (isNativeBuffering) {
+      const queue = queueRef.current;
+      if (state.index >= 0 && state.index < queue.length) {
+        const previousIndex = currentIndexRef.current;
+        const incomingTrack = queue[state.index];
+        const durationSeconds =
+          nativeDurationSeconds || trackDurationSeconds(incomingTrack);
+        if (durationSeconds > 0) {
+          commitDuration(durationSeconds);
+        }
+        if (state.index !== previousIndex) {
+          const outgoingTrack = queue[previousIndex];
+          if (options.rotateIndexChange) {
+            const reason = nativeTransitionFlushReason(
+              undefined,
+              previousIndex,
+              state.index,
+              queue.length,
+              repeatRef.current,
+            );
+            if (reason) {
+              rotateTrackerSession(
+                reason,
+                outgoingTrack,
+                incomingTrack,
+                playSourceRef.current,
+              );
+            }
+          } else if (state.isPlaying) {
+            ensureTrackerSession(incomingTrack, playSourceRef.current);
+          }
+          commitCurrentIndex(state.index);
+          rememberActiveTrack(incomingTrack);
+        } else {
+          rememberActiveTrack(incomingTrack);
+          if (state.isPlaying) {
+            ensureTrackerSession(incomingTrack, playSourceRef.current);
+          }
+        }
+      }
+
+      const isPassiveLifecycleBuffering =
+        options.passiveLifecycle && state.playbackState === "buffering";
+      commitIsPlaying(state.isPlaying);
+      commitIsBuffering(
+        isPassiveLifecycleBuffering
+          ? false
+          : state.playbackState === "buffering",
+      );
+      if (state.playbackState === "buffering" && !isPassiveLifecycleBuffering) {
         scheduleNativeBufferingWatchdog();
       } else {
         clearNativeBufferingWatchdog();
       }
-      return;
-    }
-    if (eventName === "nearQueueEnd") {
-      continueInfinitePlayback();
-      return;
-    }
-    if (eventName === "queueEnded") {
-      const endedTrack = queueRef.current[currentIndexRef.current];
-      clearNativeBufferingWatchdog();
-      flushCurrentPlayEvent("completed", endedTrack);
-      bufferingIntentRef.current = false;
-      commitIsPlaying(false);
-      commitIsBuffering(false);
-      return;
-    }
-    if (eventName === "error") {
-      const nativeError = payload as EngineEventMap["error"];
-      const summary = nativePlaybackErrorMessage(nativeError);
-      persistNativePlaybackDiagnostic({
-        type: "error",
-        ...nativeError,
-        url: redactDiagnosticUrl(nativeError.url),
-      });
-      clearNativeBufferingWatchdog();
-      console.error("[native-player] playback error:", payload);
-      toast.error("Native playback failed", {
-        description: summary,
-        duration: 9000,
-      });
-      bufferingIntentRef.current = false;
-      commitIsPlaying(false);
-      commitIsBuffering(false);
-      beginSoftInterruption("stream");
-    }
-  }, [
-    applyNativePosition,
-    applyNativeState,
-    applyNativeTrackChange,
-    beginSoftInterruption,
-    bufferingIntentRef,
-    clearNativeBufferingWatchdog,
-    commitIsPlaying,
-    commitIsBuffering,
-    continueInfinitePlayback,
-    currentIndexRef,
-    flushCurrentPlayEvent,
-    queueRef,
-    scheduleNativeBufferingWatchdog,
-  ]);
+      if (state.isPlaying) {
+        recordProgress(positionSeconds);
+      }
+    },
+    [
+      clearNativeBufferingWatchdog,
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsBuffering,
+      commitIsPlaying,
+      currentIndexRef,
+      ensureTrackerSession,
+      playSourceRef,
+      queueRef,
+      recordProgress,
+      rememberActiveTrack,
+      repeatRef,
+      rotateTrackerSession,
+      scheduleNativeBufferingWatchdog,
+    ],
+  );
 
-  const reconcileNativePlayback = useCallback((options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {}) => {
-    if (!shouldUseAndroidNativePlayer()) return;
-    void androidNativeEngine.getState().then((state) => {
-      if (!state) return;
-      applyNativeState(state, options);
-    }).catch(() => {});
-  }, [applyNativeState]);
+  const applyNativeTrackChange = useCallback(
+    (event: EnginePositionEvent & { reason?: string }) => {
+      const queue = queueRef.current;
+      if (event.index < 0 || event.index >= queue.length) return;
+
+      const previousIndex = currentIndexRef.current;
+      const incomingTrack = queue[event.index];
+      const outgoingTrack = queue[previousIndex];
+      const positionSeconds = projectedNativePositionSeconds(
+        event.positionMs,
+        event.nativeTimeMs,
+        event.isPlaying,
+        event.durationMs,
+      );
+      const durationSeconds =
+        nativeMsToSeconds(event.durationMs) ||
+        trackDurationSeconds(incomingTrack);
+      commitCurrentTime(positionSeconds);
+      if (durationSeconds > 0) {
+        commitDuration(durationSeconds);
+      }
+
+      if (event.index !== previousIndex) {
+        const reason = nativeTransitionFlushReason(
+          event.reason,
+          previousIndex,
+          event.index,
+          queue.length,
+          repeatRef.current,
+        );
+        if (reason) {
+          rotateTrackerSession(
+            reason,
+            outgoingTrack,
+            incomingTrack,
+            playSourceRef.current,
+          );
+        } else {
+          ensureTrackerSession(incomingTrack, playSourceRef.current);
+        }
+        commitCurrentIndex(event.index);
+        rememberActiveTrack(incomingTrack);
+      } else {
+        rememberActiveTrack(incomingTrack);
+        if (event.isPlaying) {
+          ensureTrackerSession(incomingTrack, playSourceRef.current);
+        }
+      }
+
+      commitIsPlaying(event.isPlaying);
+      commitIsBuffering(false);
+    },
+    [
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsBuffering,
+      commitIsPlaying,
+      currentIndexRef,
+      ensureTrackerSession,
+      playSourceRef,
+      queueRef,
+      rememberActiveTrack,
+      repeatRef,
+      rotateTrackerSession,
+    ],
+  );
+
+  const handleNativeEvent = useCallback(
+    <K extends EngineEventName>(eventName: K, payload: EngineEventMap[K]) => {
+      if (eventName === "positionChanged") {
+        applyNativePosition(payload as EnginePositionEvent);
+        return;
+      }
+      if (eventName === "playEventCheckpoint") {
+        applyNativePosition(payload as EnginePositionEvent);
+        return;
+      }
+      if (eventName === "stateChanged") {
+        applyNativeState(payload as EngineState);
+        return;
+      }
+      if (eventName === "trackChanged") {
+        applyNativeTrackChange(
+          payload as EnginePositionEvent & { reason?: string },
+        );
+        return;
+      }
+      if (eventName === "bufferingChanged") {
+        const isNativeBuffering = (payload as { isBuffering: boolean })
+          .isBuffering;
+        commitIsBuffering(isNativeBuffering);
+        if (isNativeBuffering) {
+          scheduleNativeBufferingWatchdog();
+        } else {
+          clearNativeBufferingWatchdog();
+        }
+        return;
+      }
+      if (eventName === "nearQueueEnd") {
+        continueInfinitePlayback();
+        return;
+      }
+      if (eventName === "queueEnded") {
+        const endedTrack = queueRef.current[currentIndexRef.current];
+        clearNativeBufferingWatchdog();
+        flushCurrentPlayEvent("completed", endedTrack);
+        bufferingIntentRef.current = false;
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+        return;
+      }
+      if (eventName === "error") {
+        const nativeError = payload as EngineEventMap["error"];
+        const summary = nativePlaybackErrorMessage(nativeError);
+        persistNativePlaybackDiagnostic({
+          type: "error",
+          ...nativeError,
+          url: redactDiagnosticUrl(nativeError.url),
+        });
+        clearNativeBufferingWatchdog();
+        console.error("[native-player] playback error:", payload);
+        toast.error("Native playback failed", {
+          description: summary,
+          duration: 9000,
+        });
+        bufferingIntentRef.current = false;
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+        beginSoftInterruption("stream");
+      }
+    },
+    [
+      applyNativePosition,
+      applyNativeState,
+      applyNativeTrackChange,
+      beginSoftInterruption,
+      bufferingIntentRef,
+      clearNativeBufferingWatchdog,
+      commitIsPlaying,
+      commitIsBuffering,
+      continueInfinitePlayback,
+      currentIndexRef,
+      flushCurrentPlayEvent,
+      queueRef,
+      scheduleNativeBufferingWatchdog,
+    ],
+  );
+
+  const reconcileNativePlayback = useCallback(
+    (
+      options: { rotateIndexChange?: boolean; passiveLifecycle?: boolean } = {},
+    ) => {
+      if (!shouldUseAndroidNativePlayer()) return;
+      void androidNativeEngine
+        .getState()
+        .then((state) => {
+          if (!state) return;
+          applyNativeState(state, options);
+        })
+        .catch(() => {});
+    },
+    [applyNativeState],
+  );
 
   useEffect(() => {
     const onPrefsChanged = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        crossfadeSeconds?: number;
-        smartCrossfadeEnabled?: boolean;
-        infinitePlaybackEnabled?: boolean;
-        playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
-        smartPlaylistSuggestionsEnabled?: boolean;
-        smartPlaylistSuggestionsCadence?: number;
-      }>).detail;
+      const detail = (
+        event as CustomEvent<{
+          crossfadeSeconds?: number;
+          smartCrossfadeEnabled?: boolean;
+          infinitePlaybackEnabled?: boolean;
+          playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
+          smartPlaylistSuggestionsEnabled?: boolean;
+          smartPlaylistSuggestionsCadence?: number;
+        }>
+      ).detail;
       syncEffectiveCrossfade();
       if (typeof detail?.smartCrossfadeEnabled === "boolean") {
         setSmartCrossfadeEnabled(detail.smartCrossfadeEnabled);
@@ -826,60 +928,97 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
       }
       if (typeof detail?.smartPlaylistSuggestionsEnabled === "boolean") {
-        setSmartPlaylistSuggestionsEnabled(detail.smartPlaylistSuggestionsEnabled);
+        setSmartPlaylistSuggestionsEnabled(
+          detail.smartPlaylistSuggestionsEnabled,
+        );
       } else {
-        setSmartPlaylistSuggestionsEnabled(getSmartPlaylistSuggestionsPreference());
+        setSmartPlaylistSuggestionsEnabled(
+          getSmartPlaylistSuggestionsPreference(),
+        );
       }
       if (typeof detail?.smartPlaylistSuggestionsCadence === "number") {
-        setSmartPlaylistSuggestionsCadence(detail.smartPlaylistSuggestionsCadence);
+        setSmartPlaylistSuggestionsCadence(
+          detail.smartPlaylistSuggestionsCadence,
+        );
       } else {
-        setSmartPlaylistSuggestionsCadence(getSmartPlaylistSuggestionsCadencePreference());
+        setSmartPlaylistSuggestionsCadence(
+          getSmartPlaylistSuggestionsCadencePreference(),
+        );
       }
     };
 
-    window.addEventListener(PLAYER_PLAYBACK_PREFS_EVENT, onPrefsChanged as EventListener);
+    window.addEventListener(
+      PLAYER_PLAYBACK_PREFS_EVENT,
+      onPrefsChanged as EventListener,
+    );
     return () => {
-      window.removeEventListener(PLAYER_PLAYBACK_PREFS_EVENT, onPrefsChanged as EventListener);
+      window.removeEventListener(
+        PLAYER_PLAYBACK_PREFS_EVENT,
+        onPrefsChanged as EventListener,
+      );
     };
   }, [syncEffectiveCrossfade]);
 
   useEffect(() => {
     syncEffectiveCrossfade();
-  }, [syncEffectiveCrossfade, queue, currentIndex, playSource, repeat, shuffle, smartCrossfadeEnabled]);
+  }, [
+    syncEffectiveCrossfade,
+    queue,
+    currentIndex,
+    playSource,
+    repeat,
+    shuffle,
+    smartCrossfadeEnabled,
+  ]);
 
   useEffect(() => {
     if (!shouldUseAndroidNativePlayer()) return;
     let disposed = false;
     const removers: Array<() => void> = [];
     const addListeners = async () => {
-      const positionRemove = await androidNativeEngine.on("positionChanged", (event) => {
-        if (disposed) return;
-        applyNativePosition(event);
-      });
+      const positionRemove = await androidNativeEngine.on(
+        "positionChanged",
+        (event) => {
+          if (disposed) return;
+          applyNativePosition(event);
+        },
+      );
       removers.push(positionRemove);
 
-      const checkpointRemove = await androidNativeEngine.on("playEventCheckpoint", (event) => {
-        if (disposed) return;
-        applyNativePosition(event);
-      });
+      const checkpointRemove = await androidNativeEngine.on(
+        "playEventCheckpoint",
+        (event) => {
+          if (disposed) return;
+          applyNativePosition(event);
+        },
+      );
       removers.push(checkpointRemove);
 
-      const stateRemove = await androidNativeEngine.on("stateChanged", (event) => {
-        if (disposed) return;
-        applyNativeState(event);
-      });
+      const stateRemove = await androidNativeEngine.on(
+        "stateChanged",
+        (event) => {
+          if (disposed) return;
+          applyNativeState(event);
+        },
+      );
       removers.push(stateRemove);
 
-      const trackRemove = await androidNativeEngine.on("trackChanged", (event) => {
-        if (disposed) return;
-        applyNativeTrackChange(event);
-      });
+      const trackRemove = await androidNativeEngine.on(
+        "trackChanged",
+        (event) => {
+          if (disposed) return;
+          applyNativeTrackChange(event);
+        },
+      );
       removers.push(trackRemove);
 
-      const bufferingRemove = await androidNativeEngine.on("bufferingChanged", (event) => {
-        if (disposed) return;
-        commitIsBuffering(event.isBuffering);
-      });
+      const bufferingRemove = await androidNativeEngine.on(
+        "bufferingChanged",
+        (event) => {
+          if (disposed) return;
+          commitIsBuffering(event.isBuffering);
+        },
+      );
       removers.push(bufferingRemove);
 
       const nearEndRemove = await androidNativeEngine.on("nearQueueEnd", () => {
@@ -888,10 +1027,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       });
       removers.push(nearEndRemove);
 
-      const queueEndedRemove = await androidNativeEngine.on("queueEnded", (event) => {
-        if (disposed) return;
-        handleNativeEvent("queueEnded", event);
-      });
+      const queueEndedRemove = await androidNativeEngine.on(
+        "queueEnded",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("queueEnded", event);
+        },
+      );
       removers.push(queueEndedRemove);
 
       const errorRemove = await androidNativeEngine.on("error", (event) => {
@@ -905,20 +1047,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       console.error("[native-player] failed to attach listeners:", error);
     });
 
-    void androidNativeEngine.drainEvents().then((events) => {
-      if (disposed) return;
-      for (const event of events) {
-        handleNativeEvent(event.event, event.payload);
-      }
-    }).catch(() => {});
+    void androidNativeEngine
+      .drainEvents()
+      .then((events) => {
+        if (disposed) return;
+        for (const event of events) {
+          handleNativeEvent(event.event, event.payload);
+        }
+      })
+      .catch(() => {});
 
     reconcileNativePlayback();
     const onNativeResume = () => {
-      reconcileNativePlayback({ rotateIndexChange: true, passiveLifecycle: true });
+      reconcileNativePlayback({
+        rotateIndexChange: true,
+        passiveLifecycle: true,
+      });
     };
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        reconcileNativePlayback({ rotateIndexChange: true, passiveLifecycle: true });
+        reconcileNativePlayback({
+          rotateIndexChange: true,
+          passiveLifecycle: true,
+        });
       }
     };
     window.addEventListener("crate:app-resumed", onNativeResume);
@@ -1090,7 +1241,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener(AUTH_RUNTIME_RESET_EVENT, handleAuthRuntimeReset);
     return () => {
-      window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, handleAuthRuntimeReset);
+      window.removeEventListener(
+        AUTH_RUNTIME_RESET_EVENT,
+        handleAuthRuntimeReset,
+      );
     };
   }, []);
 
@@ -1098,9 +1252,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const handleNeedsUserGesture = () => {
       setPlaybackNeedsUserGesture(true);
     };
-    window.addEventListener(PLAYBACK_NEEDS_USER_GESTURE_EVENT, handleNeedsUserGesture);
+    window.addEventListener(
+      PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+      handleNeedsUserGesture,
+    );
     return () => {
-      window.removeEventListener(PLAYBACK_NEEDS_USER_GESTURE_EVENT, handleNeedsUserGesture);
+      window.removeEventListener(
+        PLAYBACK_NEEDS_USER_GESTURE_EVENT,
+        handleNeedsUserGesture,
+      );
     };
   }, []);
 
@@ -1132,10 +1292,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setVolume,
   });
 
-  useMediaSession({ currentTrack, isPlaying, currentTime, duration, pause, resume, next, prev, seek });
+  useDesktopTrayCommands({ isPlayingRef, pause, resume, previous: prev, next });
+  useDesktopTrayNowPlaying({ currentTrack, isPlaying });
+
+  useMediaSession({
+    currentTrack,
+    isPlaying,
+    currentTime,
+    duration,
+    pause,
+    resume,
+    next,
+    prev,
+    seek,
+  });
 
   const stateValue = useMemo<PlayerStateValue>(
-    () => ({ isPlaying, isBuffering, volume, analyserVersion, crossfadeTransition }),
+    () => ({
+      isPlaying,
+      isBuffering,
+      volume,
+      analyserVersion,
+      crossfadeTransition,
+    }),
     [analyserVersion, crossfadeTransition, isPlaying, isBuffering, volume],
   );
 

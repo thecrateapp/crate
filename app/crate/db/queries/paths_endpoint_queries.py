@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope
 
 
-def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[list[float]]:
-    with read_scope() as session:
+def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str, *, session=None) -> list[list[float]]:
+    with optional_scope(session) as s:
         if endpoint_type == "track":
-            row = session.execute(
+            row = s.execute(
                 text(
                     """
                     SELECT bliss_vector
@@ -33,7 +33,7 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
             return [list(row["bliss_vector"])] if row else []
 
         if endpoint_type == "album":
-            rows = session.execute(
+            rows = s.execute(
                 text(
                     """
                     SELECT bliss_vector FROM library_tracks
@@ -51,7 +51,7 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
             return [list(r["bliss_vector"]) for r in rows]
 
         if endpoint_type == "artist":
-            rows = session.execute(
+            rows = s.execute(
                 text(
                     """
                     SELECT t.bliss_vector
@@ -78,7 +78,7 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
             return [list(r["bliss_vector"]) for r in rows]
 
         if endpoint_type == "genre":
-            rows = session.execute(
+            rows = s.execute(
                 text(
                     """
                     SELECT t.bliss_vector
@@ -98,10 +98,10 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
     return []
 
 
-def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
-    with read_scope() as session:
+def resolve_endpoint_label(endpoint_type: str, value: str, *, session=None) -> str:
+    with optional_scope(session) as s:
         if endpoint_type == "track":
-            row = session.execute(
+            row = s.execute(
                 text(
                     """
                     SELECT title, artist
@@ -121,7 +121,7 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
             return f"{row['title']} — {row['artist']}" if row else value
 
         if endpoint_type == "album":
-            row = session.execute(
+            row = s.execute(
                 text(
                     """
                     SELECT name, artist
@@ -141,7 +141,7 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
             return f"{row['name']} — {row['artist']}" if row else value
 
         if endpoint_type == "artist":
-            row = session.execute(
+            row = s.execute(
                 text(
                     """
                     SELECT name
@@ -161,7 +161,7 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
             return row["name"] if row else value
 
         if endpoint_type == "genre":
-            row = session.execute(
+            row = s.execute(
                 text("SELECT name FROM genres WHERE slug = :slug"),
                 {"slug": value},
             ).mappings().first()

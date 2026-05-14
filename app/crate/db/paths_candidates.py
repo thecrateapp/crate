@@ -128,17 +128,18 @@ def _curation_penalty(candidate: dict) -> float:
     return min(penalty, 0.25)
 
 
-def _vector_distance(candidate: dict, target: list[float]) -> float:
+def _vector_distance(candidate: dict, target: list[float], *, target_norm: float | None = None) -> float:
     vector = candidate.get("bliss_vector") or []
     if len(vector) != len(target) or not vector:
         return _coerce_float(candidate.get("distance")) or 1.0
 
     dot = sum(float(vector[index]) * float(target[index]) for index in range(len(target)))
     left_norm = sum(float(value) * float(value) for value in vector) ** 0.5
-    right_norm = sum(float(value) * float(value) for value in target) ** 0.5
-    if left_norm <= 0 or right_norm <= 0:
+    if target_norm is None:
+        target_norm = sum(float(value) * float(value) for value in target) ** 0.5
+    if left_norm <= 0 or target_norm <= 0:
         return _coerce_float(candidate.get("distance")) or 1.0
-    return max(0.0, min(2.0, 1.0 - (dot / (left_norm * right_norm))))
+    return max(0.0, min(2.0, 1.0 - (dot / (left_norm * target_norm))))
 
 
 def _find_best_candidate(

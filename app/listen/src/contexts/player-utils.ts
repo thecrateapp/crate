@@ -1,6 +1,7 @@
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { getApiBase, getAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
+import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
@@ -160,7 +161,14 @@ export function getStreamUrl(track: Track): string {
   const base = _apiBase();
   const path = trackStreamApiPath(track);
   const streamPath = path || `/api/tracks/${track.id}/stream`;
-  return withStreamQuery(`${base}${streamPath}`);
+  const url = withStreamQuery(`${base}${streamPath}`);
+  recordDevLog("stream", "resolved stream url", {
+    track: track.title,
+    artist: track.artist,
+    policy: getPlaybackDeliveryPolicyPreference(),
+    url: redactUrl(url),
+  }, "debug");
+  return url;
 }
 
 /** Append playback-delivery policy and auth token. Gapless-5 creates

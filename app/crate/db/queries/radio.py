@@ -21,6 +21,7 @@ from crate.db.queries.radio_seed_queries import (
 )
 from crate.db.queries.radio_user_queries import (
     count_user_radio_signals,
+    get_discovery_seed_sources,
     get_followed_artist_seed_rows,
     get_followed_artist_vectors,
     get_recent_liked_seed_rows,
@@ -35,6 +36,7 @@ from crate.db.queries.radio_user_queries import (
 __all__ = [
     "count_user_radio_signals",
     "get_album_for_radio",
+    "get_discovery_seed_sources",
     "get_followed_artist_seed_rows",
     "get_followed_artist_vectors",
     "get_home_playlist_seed",

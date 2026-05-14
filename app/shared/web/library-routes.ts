@@ -122,7 +122,9 @@ function publicAlbumSlug(input: AlbumRouteInput) {
     const normalizedAlbumSlug = slugifySegment(input.albumSlug, "album");
     const normalizedArtistSlug = input.artistSlug ? slugifySegment(input.artistSlug, "artist") : null;
     if (normalizedArtistSlug && normalizedAlbumSlug.startsWith(`${normalizedArtistSlug}-`)) {
-      return normalizedAlbumSlug.slice(normalizedArtistSlug.length + 1);
+      const strippedArtistPrefix = normalizedAlbumSlug.slice(normalizedArtistSlug.length + 1);
+      if (strippedArtistPrefix.startsWith(`${normalizedArtistSlug}-`)) return strippedArtistPrefix;
+      if (!/^(?:[ivxlcdm]+|\d+)$/i.test(strippedArtistPrefix)) return strippedArtistPrefix;
     }
     return normalizedAlbumSlug;
   }

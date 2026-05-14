@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -10,6 +12,8 @@ from pathlib import Path
 from crate.api._deps import json_dumps
 from crate.api.openapi import custom_openapi, variant_openapi
 from crate.db.core import init_db
+
+log = logging.getLogger(__name__)
 
 SECURITY_RESPONSE_HEADERS = {
     "X-Frame-Options": "DENY",
@@ -34,9 +38,27 @@ CORS_ALLOWED_HEADERS = [
 ]
 
 
+def _extra_cors_origins() -> list[str]:
+    raw = os.environ.get("CRATE_CORS_EXTRA_ORIGINS", "")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
 class DateAwareJSONResponse(JSONResponse):
     def render(self, content) -> bytes:
         return json_dumps(content).encode("utf-8")
+
+
+async def _refresh_radio_graphs_periodically() -> None:
+    while True:
+        await asyncio.sleep(300)
+        try:
+            from crate.radio_engine import clear_radio_graph_cache, _load_radio_graphs
+            clear_radio_graph_cache()
+            await asyncio.to_thread(_load_radio_graphs)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("Radio graph background refresh failed", exc_info=True)
 
 
 @asynccontextmanager
@@ -44,7 +66,25 @@ async def lifespan(app: FastAPI):
     init_db()
     from crate.utils import init_musicbrainz
     init_musicbrainz()
-    yield
+
+    # Pre-warm radio graphs so the first radio request does not pay
+    # the cost of loading artist similarities, genres, and members
+    # from PostgreSQL into Python dicts.
+    try:
+        from crate.radio_engine import _load_radio_graphs
+        _load_radio_graphs()
+    except Exception:
+        log.warning("Radio graph pre-warm failed", exc_info=True)
+
+    radio_refresh_task = asyncio.create_task(_refresh_radio_graphs_periodically())
+    try:
+        yield
+    finally:
+        radio_refresh_task.cancel()
+        try:
+            await radio_refresh_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:
@@ -145,11 +185,16 @@ def create_app() -> FastAPI:
         # Capacitor native shells
         "capacitor://localhost",
         "https://localhost",
+        # Tauri desktop shell
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
     ]
     # Docs lives on a fixed domain regardless of the operator's DOMAIN.
     allowed_origins += [
         "https://docs.cratemusic.app",
     ]
+    allowed_origins += _extra_cors_origins()
     if is_dev:
         # Dev-only origins — Vite dev servers + dev subdomains
         allowed_origins += [
@@ -157,6 +202,7 @@ def create_app() -> FastAPI:
             "https://docs.dev.cratemusic.app",
             "http://localhost:3000", "http://localhost:5173",
             "http://localhost:5174", "http://localhost:4173",
+            "http://localhost:5178", "http://127.0.0.1:5178",
             "http://127.0.0.1:4173", "http://localhost:8585",
         ]
     app.add_middleware(

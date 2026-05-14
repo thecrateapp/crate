@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
   onNativeMediaControl,
   stopNativeMediaSession,
   syncNativeMediaSession,
 } from "@/lib/native-media-session";
+import { isTauriRuntime } from "@/lib/platform";
 
 /**
  * Sync the Web MediaSession API with the current player state.
@@ -34,10 +36,26 @@ export function useMediaSession({
   prev: () => void;
   seek: (time: number) => void;
 }) {
-  const actionsRef = useRef({ pause, resume, next, prev, seek, currentTime, duration });
+  const actionsRef = useRef({
+    pause,
+    resume,
+    next,
+    prev,
+    seek,
+    currentTime,
+    duration,
+  });
 
   useEffect(() => {
-    actionsRef.current = { pause, resume, next, prev, seek, currentTime, duration };
+    actionsRef.current = {
+      pause,
+      resume,
+      next,
+      prev,
+      seek,
+      currentTime,
+      duration,
+    };
   }, [currentTime, duration, next, pause, prev, resume, seek]);
 
   useEffect(() => {
@@ -101,7 +119,13 @@ export function useMediaSession({
       album: currentTrack.album || "",
       artwork,
     });
-  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.album, currentTrack?.albumCover]);
+  }, [
+    currentTrack?.id,
+    currentTrack?.title,
+    currentTrack?.artist,
+    currentTrack?.album,
+    currentTrack?.albumCover,
+  ]);
 
   // Update playback state
   useEffect(() => {
@@ -127,6 +151,43 @@ export function useMediaSession({
   const nativePositionSeconds = Math.floor(
     Math.max(0, duration > 0 ? Math.min(currentTime, duration) : currentTime),
   );
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+
+    if (!currentTrack) {
+      syncDesktopMediaSession({
+        title: null,
+        artist: null,
+        album: null,
+        artwork: null,
+        isPlaying: false,
+        position: 0,
+        duration: 0,
+      });
+      return;
+    }
+
+    const coverUrl = resolveMaybeApiAssetUrl(currentTrack.albumCover);
+    syncDesktopMediaSession({
+      title: currentTrack.title || "Unknown",
+      artist: currentTrack.artist || "",
+      album: currentTrack.album || "",
+      artwork: coverUrl || null,
+      isPlaying,
+      position: nativePositionSeconds,
+      duration: duration || 0,
+    });
+  }, [
+    currentTrack?.id,
+    currentTrack?.title,
+    currentTrack?.artist,
+    currentTrack?.album,
+    currentTrack?.albumCover,
+    duration,
+    isPlaying,
+    nativePositionSeconds,
+  ]);
+
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) return;
 
@@ -165,17 +226,27 @@ export function useMediaSession({
       ["pause", () => actionsRef.current.pause()],
       ["previoustrack", () => actionsRef.current.prev()],
       ["nexttrack", () => actionsRef.current.next()],
-      ["seekto", (details) => {
-        if (details.seekTime != null) actionsRef.current.seek(details.seekTime);
-      }],
-      ["seekbackward", (details) => {
-        const { currentTime, seek } = actionsRef.current;
-        seek(Math.max(0, currentTime - (details.seekOffset || 10)));
-      }],
-      ["seekforward", (details) => {
-        const { currentTime, duration, seek } = actionsRef.current;
-        seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
-      }],
+      [
+        "seekto",
+        (details) => {
+          if (details.seekTime != null)
+            actionsRef.current.seek(details.seekTime);
+        },
+      ],
+      [
+        "seekbackward",
+        (details) => {
+          const { currentTime, seek } = actionsRef.current;
+          seek(Math.max(0, currentTime - (details.seekOffset || 10)));
+        },
+      ],
+      [
+        "seekforward",
+        (details) => {
+          const { currentTime, duration, seek } = actionsRef.current;
+          seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
+        },
+      ],
     ];
 
     for (const [action, handler] of actions) {
@@ -190,7 +261,9 @@ export function useMediaSession({
       for (const [action] of actions) {
         try {
           navigator.mediaSession.setActionHandler(action, null);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     };
   }, []);

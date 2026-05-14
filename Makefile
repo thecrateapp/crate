@@ -503,6 +503,32 @@ cap-android-list: ## List available Android Emulator targets
 	@cd $(CAP_DIR) && npx cap run android --list
 
 # ===========================================================================
+# TAURI (desktop native builds)
+# ===========================================================================
+
+TAURI_DIR := app/listen-desktop
+
+.PHONY: tauri-dev
+tauri-dev: ## Build and run Crate desktop with Tauri dev mode
+	@cd $(TAURI_DIR) && npm run tauri:dev
+
+.PHONY: tauri-build-app
+tauri-build-app: ## Build Crate desktop macOS .app bundle
+	@cd $(TAURI_DIR) && npm run tauri:build:app
+
+.PHONY: tauri-build
+tauri-build: ## Build Crate desktop local app bundle
+	@cd $(TAURI_DIR) && npm run tauri:build
+
+.PHONY: tauri-build-all
+tauri-build-all: ## Build Crate desktop all release bundles
+	@cd $(TAURI_DIR) && npm run tauri:build:all
+
+.PHONY: tauri-collect-artifacts
+tauri-collect-artifacts: ## Collect Crate desktop release artifacts into desktop-artifacts/
+	@$(TAURI_DIR)/scripts/collect-artifacts.sh local
+
+# ===========================================================================
 # HELP
 # ===========================================================================
 

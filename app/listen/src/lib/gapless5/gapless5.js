@@ -49,6 +49,14 @@ const Gapless5State = {
   Error    : 5,
 };
 
+const devLog = (scope, message, detail, level = 'info') => {
+  try {
+    globalThis.__crateDevLog?.(scope, message, detail, level);
+  } catch {
+    // best-effort diagnostics only
+  }
+};
+
 const LogLevel = {
   Debug: 1, // show log.debug and up
   Info: 2, // show log.info and up
@@ -518,7 +526,27 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             (incomingBuffer) => {
               onLoadedWebAudio(incomingBuffer);
             }
-          );
+          ).catch((error) => {
+            log.warn(`WebAudio decode failed for ${audioPath}: ${error?.message || error}`);
+            devLog('gapless5', 'webaudio decode failed', {
+              path: audioPath,
+              error: error?.message || String(error),
+              hasHtml5Audio: audio !== null,
+              html5ReadyState: audio?.readyState ?? null,
+              html5NetworkState: audio?.networkState ?? null,
+            }, 'warn');
+            request = null;
+            if (audio !== null) {
+              if (audio.readyState >= 2) {
+                onLoadedHTML5Audio();
+                return;
+              }
+              if (!audio.error) {
+                return;
+              }
+            }
+            onError(error);
+          });
         }
       };
       if (audioPath.startsWith('blob:')) {
@@ -535,15 +563,8 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
           }
         });
       } else {
-        request = new XMLHttpRequest();
-        request.open('get', audioPath, true);
-        request.responseType = 'arraybuffer';
-        request.onload = () => {
-          if (request) {
-            onLoadWebAudio(request.response);
-          }
-        };
-        // [vendored patch] Losing the WebAudio XHR mid-load should NOT
+        request = new AbortController();
+        // [vendored patch] Losing the WebAudio fetch mid-load should NOT
         // kill playback when the HTML5 <audio> element is already
         // playing this track — we'd just miss the "upgrade" to
         // sample-perfect WebAudio and stay on the streaming HTML5
@@ -551,32 +572,68 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
         // later runs out, its own 'error' event will escalate then.
         const xhrFailSafe = (reason) => {
           if (!request) return;
+          devLog('gapless5', 'webaudio fetch failed', {
+            path: audioPath,
+            reason,
+            hasHtml5Audio: audio !== null,
+            html5ReadyState: audio?.readyState ?? null,
+            html5NetworkState: audio?.networkState ?? null,
+          }, 'warn');
           if (audio !== null && state === Gapless5State.Play) {
-            log.warn(`WebAudio XHR ${reason} for ${audioPath}; staying on HTML5`);
+            log.warn(`WebAudio fetch ${reason} for ${audioPath}; staying on HTML5`);
             request = null;
             return;
           }
           onError('Failed to load audio track');
         };
-        request.onerror = () => xhrFailSafe('failed');
-        request.onloadend = () => {
-          if (request && isErrorStatus(request.status)) {
-            xhrFailSafe(`HTTP ${request.status}`);
-          }
-        };
-        request.send();
+        fetch(audioPath, { signal: request.signal })
+          .then((response) => {
+            if (!request) return null;
+            if (!response.ok) {
+              xhrFailSafe(`HTTP ${response.status}`);
+              return null;
+            }
+            return response.arrayBuffer().then((data) => ({ response, data }));
+          })
+          .then((loaded) => {
+            if (!request || !loaded) return;
+            devLog('gapless5', 'webaudio fetch loaded', {
+              path: audioPath,
+              status: loaded.response.status,
+              bytes: loaded.data.byteLength,
+            }, 'debug');
+            onLoadWebAudio(loaded.data);
+          })
+          .catch((error) => {
+            if (error?.name === 'AbortError') return;
+            xhrFailSafe(error?.message || 'failed');
+          });
       }
     }
     if (player.useHTML5Audio) {
       const getHtml5Audio = () => {
         const audioObj = new Audio();
         audioObj.controls = false;
+        audioObj.preload = 'auto';
+        audioObj.crossOrigin = 'anonymous';
         // no pitch preservation, to be consistent with WebAudio:
         audioObj.preservesPitch = false;
         audioObj.mozPreservesPitch = false;
         audioObj.webkitPreservesPitch = false;
         audioObj.addEventListener('loadedmetadata', onLoadedHTML5Metadata, false);
+        audioObj.addEventListener('loadeddata', onLoadedHTML5Audio, false);
+        audioObj.addEventListener('canplay', onLoadedHTML5Audio, false);
         audioObj.addEventListener('canplaythrough', onLoadedHTML5Audio, false);
+        audioObj.addEventListener('loadeddata', () => devLog('gapless5', 'html5 loadeddata', {
+          path: audioPath,
+          readyState: audioObj.readyState,
+          networkState: audioObj.networkState,
+        }, 'debug'), false);
+        audioObj.addEventListener('canplay', () => devLog('gapless5', 'html5 canplay', {
+          path: audioPath,
+          readyState: audioObj.readyState,
+          networkState: audioObj.networkState,
+        }, 'debug'), false);
         // [vendored patch] Once WebAudio has taken over (buffer !== null
         // + state === Play), the HTML5 element is dormant: source of
         // sound is the decoded RAM buffer, not the <audio> tag. A
@@ -589,6 +646,22 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
             log.warn(`HTML5 audio error ignored (WebAudio is live): ${audioPath}`);
             return;
           }
+          if (player.useWebAudio && request !== null && audioObj.error?.code === 4) {
+            log.warn(`HTML5 audio cannot play ${audioPath}; waiting for WebAudio decode`);
+            devLog('gapless5', 'html5 unsupported; waiting for webaudio', {
+              path: audioPath,
+              readyState: audioObj.readyState,
+              networkState: audioObj.networkState,
+            }, 'warn');
+            return;
+          }
+          devLog('gapless5', 'html5 error', {
+            path: audioPath,
+            code: audioObj.error?.code ?? null,
+            message: audioObj.error?.message ?? null,
+            readyState: audioObj.readyState,
+            networkState: audioObj.networkState,
+          }, 'error');
           onError(err);
         }, false);
         // TODO: switch to audio.networkState, now that it's universally supported

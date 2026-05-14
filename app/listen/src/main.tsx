@@ -2,8 +2,9 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
 import { App } from "./App";
-import { initCapacitor, isNative } from "./lib/capacitor";
+import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
+import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
 import "./index.css";
 
 async function disableDevServiceWorker() {
@@ -35,14 +36,14 @@ const isCapacitorBuild = import.meta.env.MODE === "capacitor";
 // Load Poppins only on web — iOS/Android use system fonts (San
 // Francisco / Roboto) for a native feel. The mode guard is build-time
 // constant, so Vite drops the font chunk from Capacitor bundles.
-if (!isCapacitorBuild && !isNative) {
+if (!isCapacitorBuild && !usesMobileShell) {
   import("../../shared/fonts/poppins.css");
 }
 
 initCapacitor();
 void primeOfflineRuntimeProfile();
 
-if (!isNative && typeof window !== "undefined" && "serviceWorker" in navigator) {
+if (shouldRegisterServiceWorker && typeof window !== "undefined" && "serviceWorker" in navigator) {
   if (import.meta.env.DEV) {
     void disableDevServiceWorker();
   } else {

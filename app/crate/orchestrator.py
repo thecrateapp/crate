@@ -58,6 +58,11 @@ class Orchestrator:
 
         from crate.utils import init_musicbrainz
         init_musicbrainz()
+        try:
+            from crate.radio_engine import _load_radio_graphs
+            _load_radio_graphs()
+        except Exception:
+            log.warning("Radio graph pre-warm failed", exc_info=True)
 
         # Clean up orphaned tasks from previous crash
         self._cleanup_orphaned_tasks()

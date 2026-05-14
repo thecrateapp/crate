@@ -4,7 +4,7 @@ import { Navigate, useLocation } from "react-router";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { connectCacheEvents } from "@/lib/cache";
-import { isNative } from "@/lib/capacitor";
+import { usesConfigurableServer } from "@/lib/platform";
 import { getCurrentServer, SERVER_STORE_EVENT } from "@/lib/server-store";
 import { AuthSpinner } from "@/app-shell/AppFallbacks";
 
@@ -31,16 +31,16 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
 export function ServerGate({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const [hasServer, setHasServer] = useState(() => !isNative || Boolean(getCurrentServer()));
+  const [hasServer, setHasServer] = useState(() => !usesConfigurableServer || Boolean(getCurrentServer()));
 
   useEffect(() => {
-    if (!isNative) return;
+    if (!usesConfigurableServer) return;
     const sync = () => setHasServer(Boolean(getCurrentServer()));
     window.addEventListener(SERVER_STORE_EVENT, sync);
     return () => window.removeEventListener(SERVER_STORE_EVENT, sync);
   }, []);
 
-  if (!isNative) return <>{children}</>;
+  if (!usesConfigurableServer) return <>{children}</>;
   if (hasServer) return <>{children}</>;
   if (location.pathname === "/server-setup") return <>{children}</>;
   return <Navigate to="/server-setup" replace />;

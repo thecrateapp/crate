@@ -81,11 +81,13 @@ class TestBootstrap:
 
         assert _count(TEST_DB_NAME) == 1
         # The main "crate" database only exists in local dev environments.
-        # In CI there is only the test database, so skip the leak check.
+        # In CI there is only the test database, and a local dev DB can also
+        # exist before its schema is bootstrapped, so skip when there is no
+        # usable main schema to inspect.
         try:
             assert _count("crate") == 0
-        except psycopg2.OperationalError:
-            pass  # DB doesn't exist in CI — no leak possible
+        except (psycopg2.OperationalError, psycopg2.errors.UndefinedTable):
+            pass  # DB/schema doesn't exist here — no leak possible
 
     def test_fresh_bootstrap_includes_late_legacy_columns(self, pg_db):
         from crate.db.tx import transaction_scope
