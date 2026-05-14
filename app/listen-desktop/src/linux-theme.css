@@ -1,0 +1,116 @@
+html[data-crate-linux-theme="true"] {
+  --color-primary: var(--crate-linux-accent, #3584e4);
+  --color-ring: var(--crate-linux-accent, #3584e4);
+  --active-dot: var(--crate-linux-accent, #3584e4);
+}
+
+html[data-crate-linux-desktop="true"],
+html[data-crate-linux-desktop="true"] body,
+html[data-crate-linux-desktop="true"] #root {
+  max-width: 100%;
+  overflow-x: hidden;
+  scrollbar-color: transparent transparent !important;
+  scrollbar-width: none !important;
+}
+
+html[data-crate-linux-desktop="true"] * {
+  scrollbar-color: transparent transparent !important;
+  scrollbar-width: none !important;
+}
+
+html[data-crate-linux-desktop="true"]::-webkit-scrollbar,
+html[data-crate-linux-desktop="true"] body::-webkit-scrollbar,
+html[data-crate-linux-desktop="true"] #root::-webkit-scrollbar,
+html[data-crate-linux-desktop="true"] ::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+html[data-crate-linux-desktop="true"]::-webkit-scrollbar-track,
+html[data-crate-linux-desktop="true"]::-webkit-scrollbar-thumb,
+html[data-crate-linux-desktop="true"] body::-webkit-scrollbar-track,
+html[data-crate-linux-desktop="true"] body::-webkit-scrollbar-thumb,
+html[data-crate-linux-desktop="true"] #root::-webkit-scrollbar-track,
+html[data-crate-linux-desktop="true"] #root::-webkit-scrollbar-thumb,
+html[data-crate-linux-desktop="true"] ::-webkit-scrollbar-track,
+html[data-crate-linux-desktop="true"] ::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+html[data-crate-linux-desktop="true"] [data-slot="scroll-area-scrollbar"] {
+  display: none !important;
+}
+
+html[data-crate-linux-theme="true"] body {
+  font-family: var(--crate-linux-font-family, Poppins, system-ui, sans-serif);
+}
+
+html[data-crate-linux-theme="true"][data-crate-linux-scheme="dark"] {
+  color-scheme: dark;
+  --color-background: #1e1e1e;
+  --color-foreground: #f6f5f4;
+  --color-primary-foreground: #ffffff;
+  --color-muted-foreground: #a7a7a7;
+  --color-card: #242424;
+  --color-card-foreground: #f6f5f4;
+  --color-secondary: #303030;
+  --color-secondary-foreground: #f6f5f4;
+  --color-muted: #2a2a2a;
+  --color-accent: #303030;
+  --color-accent-foreground: #f6f5f4;
+  --color-popover: #242424;
+  --color-popover-foreground: #f6f5f4;
+  --color-border: rgba(255, 255, 255, 0.13);
+  --color-input: #2a2a2a;
+  --surface-app: #1e1e1e;
+  --surface-panel: #242424;
+  --surface-raised: #303030;
+  --surface-modal: rgba(36, 36, 36, 0.96);
+  --surface-popover: rgba(36, 36, 36, 0.96);
+  --scrollbar-thumb: #3d3d3d;
+  --scrollbar-hover: #4a4a4a;
+  --gradient-bg: #1e1e1e;
+  --gradient-bg-85: rgba(30, 30, 30, 0.85);
+  --gradient-bg-90: rgba(30, 30, 30, 0.9);
+  --gradient-bg-40: rgba(30, 30, 30, 0.4);
+  --gradient-bg-50: rgba(30, 30, 30, 0.5);
+}
+
+html[data-crate-linux-theme="true"][data-crate-linux-scheme="light"] {
+  color-scheme: light;
+  --color-background: #fafafa;
+  --color-foreground: #202124;
+  --color-primary-foreground: #ffffff;
+  --color-muted-foreground: #6b7280;
+  --color-card: #ffffff;
+  --color-card-foreground: #202124;
+  --color-secondary: #f0f1f3;
+  --color-secondary-foreground: #202124;
+  --color-muted: #eef0f2;
+  --color-accent: #eef0f2;
+  --color-accent-foreground: #202124;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #202124;
+  --color-border: rgba(0, 0, 0, 0.13);
+  --color-input: #ffffff;
+  --surface-app: #fafafa;
+  --surface-panel: #ffffff;
+  --surface-raised: #f0f1f3;
+  --surface-modal: rgba(255, 255, 255, 0.96);
+  --surface-popover: rgba(255, 255, 255, 0.96);
+  --scrollbar-thumb: #d0d3d8;
+  --scrollbar-hover: #b9bec7;
+  --gradient-bg: #fafafa;
+  --gradient-bg-85: rgba(250, 250, 250, 0.85);
+  --gradient-bg-90: rgba(250, 250, 250, 0.9);
+  --gradient-bg-40: rgba(250, 250, 250, 0.4);
+  --gradient-bg-50: rgba(250, 250, 250, 0.5);
+}
+
+html[data-crate-linux-theme="true"] body,
+html[data-crate-linux-theme="true"] #root {
+  background: var(--surface-app);
+}

@@ -8,6 +8,7 @@ tests/scripts working while the backend migration finishes.
 
 from crate.db.queries.radio import (
     count_user_radio_signals,
+    get_discovery_seed_sources,
     get_followed_artist_seed_rows,
     get_followed_artist_vectors,
     get_home_playlist_seed,
@@ -31,6 +32,7 @@ from crate.db.repositories.radio import persist_radio_feedback
 
 __all__ = [
     "count_user_radio_signals",
+    "get_discovery_seed_sources",
     "get_followed_artist_seed_rows",
     "get_followed_artist_vectors",
     "get_home_playlist_seed",

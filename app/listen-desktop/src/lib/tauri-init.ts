@@ -6,12 +6,17 @@ import {
 } from "@/lib/desktop-tray";
 import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 
+import { initLinuxScrollBehavior } from "./linux-scroll";
+import { initLinuxDesktopTheme } from "./linux-theme";
+
 export function initTauriRuntime(): void {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.listenRuntime = "tauri";
   recordTauriAuthDiagnostic("OAuth bridge initializing");
   recordDevLog("tauri", "runtime init");
   installTauriInvokeBridge();
+  initLinuxScrollBehavior();
+  initLinuxDesktopTheme();
   ensureDesktopWindowSize();
   installNativeHttpFetch();
   void initTrayBridge();

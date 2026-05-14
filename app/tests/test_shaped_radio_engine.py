@@ -31,7 +31,7 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
         for index in range(5)
     ]
 
-    monkeypatch.setattr(radio_engine, "get_recent_liked_seed_rows", lambda *_args, **_kwargs: rows)
+    monkeypatch.setattr(radio_engine, "get_discovery_seed_sources", lambda *_args, **_kwargs: {1: rows})
 
     resolved = radio_engine.resolve_discovery_seed(9)
 
@@ -40,6 +40,42 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert label == "Your recent likes"
     assert context["seed_artists"] == ["Artist 0", "Artist 1"]
     assert context["seed_track_ids"] == [0, 1, 2, 3, 4]
+
+
+def test_start_radio_reuses_single_read_session(monkeypatch):
+    from contextlib import contextmanager
+
+    from crate import radio_engine
+
+    sentinel_session = object()
+    seen_sessions = []
+
+    @contextmanager
+    def fake_read_scope():
+        yield sentinel_session
+
+    def fake_resolve_seed(_user_id, _seed_type, _seed_value, *, session=None):
+        seen_sessions.append(session)
+        return _vector(0.2), "Seed", {"seed_artists": ["Seed Artist"], "seed_track_ids": [1]}
+
+    def fake_load_feedback_history(_user_id, *, session=None):
+        seen_sessions.append(session)
+        return [], []
+
+    def fake_generate_batch(_session, count=radio_engine._BATCH_SIZE, *, db_session=None):
+        seen_sessions.append(db_session)
+        return []
+
+    monkeypatch.setattr(radio_engine, "read_scope", fake_read_scope)
+    monkeypatch.setattr(radio_engine, "_resolve_seed", fake_resolve_seed)
+    monkeypatch.setattr(radio_engine, "load_feedback_history", fake_load_feedback_history)
+    monkeypatch.setattr(radio_engine, "_generate_batch", fake_generate_batch)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _session: None)
+
+    result = radio_engine.start_radio(7, seed_type="track", seed_value="1")
+
+    assert result is not None
+    assert seen_sessions == [sentinel_session, sentinel_session, sentinel_session]
 
 
 def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(monkeypatch):
@@ -55,7 +91,7 @@ def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(mon
         captured_queries.append({"args": args, "kwargs": kwargs})
         return candidates
 
-    monkeypatch.setattr(radio_engine, "_load_radio_graphs", lambda: ({}, {}, {}))
+    monkeypatch.setattr(radio_engine, "_load_radio_graphs", lambda **_kwargs: ({}, {}, {}))
     monkeypatch.setattr(radio_engine, "find_candidate_rows", fake_find_candidate_rows)
 
     session = {
@@ -172,6 +208,58 @@ def test_genre_overlap_reuses_expanded_taxonomy(monkeypatch):
 
     assert first == second
     assert calls == ["post-hardcore", "hardcore-punk"]
+
+
+def test_radio_genre_overlap_scorer_uses_ancestor_only_expansion(monkeypatch):
+    from crate.db import paths_similarity
+    import crate.genre_taxonomy as taxonomy
+
+    monkeypatch.setattr(
+        taxonomy,
+        "_get_runtime_taxonomy_graph",
+        lambda: (_ for _ in ()).throw(AssertionError("runtime taxonomy is too slow for radio")),
+    )
+    monkeypatch.setattr(
+        paths_similarity,
+        "get_related_genre_terms",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("related expansion is too slow for radio")),
+    )
+
+    scorer = paths_similarity.make_radio_genre_overlap_scorer(
+        {
+            "candidate": {"beatdown hardcore": 1.0},
+            "target": {"hardcore punk": 1.0},
+        },
+        ["Target"],
+    )
+
+    assert scorer("Candidate", ["Target"], {}) > 0.0
+
+
+def test_runtime_taxonomy_graph_throttles_shared_revision_checks(monkeypatch):
+    import crate.genre_taxonomy as taxonomy
+
+    graph = taxonomy._clone_runtime_graph(taxonomy._STATIC_RUNTIME_GRAPH)
+    calls: list[float] = []
+    now = [100.0]
+
+    monkeypatch.setattr(taxonomy.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(taxonomy, "_RUNTIME_GRAPH_CACHE", graph)
+    monkeypatch.setattr(taxonomy, "_RUNTIME_GRAPH_CACHE_REVISION", "rev-1")
+    monkeypatch.setattr(taxonomy, "_RUNTIME_GRAPH_REVISION_CHECKED_AT", 95.0)
+    monkeypatch.setattr(
+        taxonomy,
+        "_load_shared_taxonomy_revision",
+        lambda: calls.append(now[0]) or "rev-1",
+    )
+
+    assert taxonomy._get_runtime_taxonomy_graph() is graph
+    assert calls == []
+
+    now[0] = 140.0
+
+    assert taxonomy._get_runtime_taxonomy_graph() is graph
+    assert calls == [140.0]
 
 
 def test_home_mix_preparation_deprioritizes_liked_and_overplayed_tracks():

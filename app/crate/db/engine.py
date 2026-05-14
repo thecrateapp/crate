@@ -44,9 +44,9 @@ def _default_pool_settings() -> tuple[int, int]:
     """Return (pool_size, max_overflow) based on runtime context."""
     runtime = os.environ.get("CRATE_RUNTIME", "").lower()
     if runtime == "api":
-        return 4, 2   # API: keep connection pressure low on small hardware
+        return 8, 4   # API: enough headroom for radio start/next under concurrency
     elif runtime == "worker":
-        return 2, 1   # Worker: background tasks should be conservative too
+        return 2, 1   # Worker: background tasks should be conservative
     return 4, 2       # Fallback (dev, tests)
 
 

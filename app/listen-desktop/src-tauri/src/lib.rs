@@ -2,12 +2,13 @@
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
     thread,
 };
+#[cfg(target_os = "macos")]
+use tauri::menu::{Menu, SubmenuBuilder};
 #[cfg(desktop)]
-use tauri::menu::{
-    Menu, MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder,
-};
+use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem};
 #[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(desktop)]
@@ -17,6 +18,12 @@ use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(desktop)]
 use tauri_plugin_window_state::StateFlags;
 
+#[cfg(target_os = "linux")]
+mod linux_desktop_integration;
+#[cfg(target_os = "linux")]
+mod linux_desktop_theme;
+#[cfg(target_os = "linux")]
+mod linux_media_controls;
 #[cfg(target_os = "macos")]
 mod macos_dock_menu;
 #[cfg(target_os = "macos")]
@@ -62,6 +69,7 @@ pub(crate) struct DesktopMediaSessionPayload {
 struct DesktopMenuState {
     tray_title: MenuItem<tauri::Wry>,
     tray_artist: MenuItem<tauri::Wry>,
+    is_playing: Arc<Mutex<bool>>,
 }
 
 #[cfg(desktop)]
@@ -96,6 +104,9 @@ fn update_now_playing(
         .tray_artist
         .set_text(truncate_menu_text(artist, 58))
         .map_err(|err| err.to_string())?;
+    if let Ok(mut is_playing) = state.is_playing.lock() {
+        *is_playing = payload.is_playing;
+    }
 
     Ok(())
 }
@@ -105,8 +116,30 @@ fn update_now_playing(
 fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     macos_media_controls::update_now_playing(&payload);
+    #[cfg(target_os = "linux")]
+    linux_media_controls::update_now_playing(&payload);
 
     Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn cache_desktop_media_artwork(
+    cache_key: String,
+    bytes: Vec<u8>,
+    mime_type: Option<String>,
+) -> Result<Option<String>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        linux_media_controls::cache_artwork(&cache_key, &bytes, mime_type.as_deref())
+            .map_err(|err| err.to_string())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (cache_key, bytes, mime_type);
+        Ok(None)
+    }
 }
 
 #[cfg(desktop)]
@@ -114,6 +147,22 @@ fn update_desktop_media_session(payload: DesktopMediaSessionPayload) -> Result<(
 fn ensure_desktop_window_size(window: tauri::Window) -> Result<(), String> {
     enforce_desktop_window_size(&window);
     Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
+    #[cfg(target_os = "linux")]
+    {
+        serde_json::to_value(linux_desktop_theme::snapshot())
+            .map(Some)
+            .map_err(|err| err.to_string())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        Ok(None)
+    }
 }
 
 #[cfg(desktop)]
@@ -307,12 +356,34 @@ fn emit_playback_command<R: tauri::Runtime>(
 
 #[cfg(desktop)]
 fn emit_tray_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>, command: &str) {
-    emit_playback_command(app, command, true);
+    emit_playback_command(app, command, false);
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) fn emit_system_media_command(app: &tauri::AppHandle, command: &str) {
     emit_playback_command(app, command, false);
+}
+
+#[cfg(desktop)]
+fn current_play_pause_command<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> &'static str {
+    let Some(state) = app.try_state::<DesktopMenuState>() else {
+        return "play_pause";
+    };
+
+    let command = match state.is_playing.lock() {
+        Ok(is_playing) => play_pause_command_for_state(*is_playing),
+        Err(_) => "play_pause",
+    };
+    command
+}
+
+#[cfg(desktop)]
+fn play_pause_command_for_state(is_playing: bool) -> &'static str {
+    if is_playing {
+        "pause"
+    } else {
+        "play"
+    }
 }
 
 #[cfg(desktop)]
@@ -320,7 +391,7 @@ fn handle_playback_menu_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, id: 
     match id {
         "play" => emit_tray_command(app, "play"),
         "pause" => emit_tray_command(app, "pause"),
-        "play_pause" => emit_tray_command(app, "play_pause"),
+        "play_pause" => emit_tray_command(app, current_play_pause_command(app)),
         "previous" => emit_tray_command(app, "previous"),
         "next" => emit_tray_command(app, "next"),
         "show" => show_main_window(app),
@@ -380,16 +451,38 @@ fn handle_activation_args<R: tauri::Runtime>(
         }
     }
 
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.set_focus();
-        if !urls.is_empty() {
+    if !urls.is_empty() {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
             dispatch_deep_link_urls(&window, urls);
         }
     }
 
     for command in commands {
         handle_playback_menu_event(app, &command);
+    }
+}
+
+#[cfg(desktop)]
+fn register_deep_links(app: &tauri::App) {
+    #[cfg(target_os = "linux")]
+    if let Err(err) = app.deep_link().register_all() {
+        eprintln!("failed to register Crate deep links: {err}");
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = app;
+}
+
+#[cfg(desktop)]
+fn app_icon_image() -> tauri::Result<Image<'static>> {
+    Image::from_bytes(include_bytes!("../icons/icon.png"))
+}
+
+#[cfg(desktop)]
+fn set_desktop_window_icon<R: tauri::Runtime>(window: &WebviewWindow<R>) {
+    if let Ok(icon) = app_icon_image() {
+        let _ = window.set_icon(icon);
     }
 }
 
@@ -401,7 +494,7 @@ fn is_supported_activation_command(command: &str) -> bool {
     )
 }
 
-#[cfg(desktop)]
+#[cfg(target_os = "macos")]
 fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let play_pause = MenuItemBuilder::with_id("play_pause", "Play / Pause").build(app)?;
     let previous = MenuItemBuilder::with_id("previous", "Previous").build(app)?;
@@ -415,12 +508,12 @@ fn build_app_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     Ok(menu)
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
 fn tray_icon_image() -> tauri::Result<Image<'static>> {
     Image::from_bytes(include_bytes!("../icons/tray-template.png"))
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(not(target_os = "macos"))]
 fn tray_icon_image() -> tauri::Result<Image<'static>> {
     Image::from_bytes(include_bytes!("../icons/tray-color.png"))
 }
@@ -491,11 +584,17 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<DesktopMenuState> {
     Ok(DesktopMenuState {
         tray_title: now_title,
         tray_artist: now_artist,
+        is_playing: Arc::new(Mutex::new(false)),
     })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    if let Err(err) = linux_desktop_integration::ensure_registered() {
+        eprintln!("failed to register Crate desktop integration: {err}");
+    }
+
     let mut builder = tauri::Builder::default();
 
     #[cfg(desktop)]
@@ -505,9 +604,14 @@ pub fn run() {
         }));
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .menu(build_app_menu)
+            .on_menu_event(|app, event| handle_playback_menu_event(app, event.id().as_ref()));
+    }
+
     builder
-        .menu(|app| build_app_menu(app))
-        .on_menu_event(|app, event| handle_playback_menu_event(app, event.id().as_ref()))
         .on_window_event(handle_window_lifecycle_event)
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_http::init())
@@ -522,13 +626,17 @@ pub fn run() {
             {
                 let menu_state = setup_tray(app)?;
                 app.manage(menu_state);
+                register_deep_links(app);
                 #[cfg(target_os = "macos")]
                 macos_dock_menu::install(app);
                 #[cfg(target_os = "macos")]
                 macos_media_controls::install(app);
+                #[cfg(target_os = "linux")]
+                linux_media_controls::install(app);
 
                 let handle = app.handle().clone();
                 if let Some(window) = handle.get_webview_window("main") {
+                    set_desktop_window_icon(&window);
                     enforce_desktop_webview_window_size(&window);
                 }
                 handle_activation_args(&handle, std::env::args());
@@ -554,7 +662,9 @@ pub fn run() {
             ping,
             update_now_playing,
             update_desktop_media_session,
-            ensure_desktop_window_size
+            cache_desktop_media_artwork,
+            ensure_desktop_window_size,
+            linux_desktop_theme_snapshot
         ])
         .build(tauri::generate_context!())
         .expect("error while building Crate desktop")
@@ -563,7 +673,7 @@ pub fn run() {
 
 #[cfg(all(test, desktop))]
 mod tests {
-    use super::is_supported_activation_command;
+    use super::{is_supported_activation_command, play_pause_command_for_state};
 
     #[test]
     fn activation_commands_include_system_media_controls() {
@@ -580,5 +690,11 @@ mod tests {
         }
 
         assert!(!is_supported_activation_command("delete_everything"));
+    }
+
+    #[test]
+    fn play_pause_menu_resolves_to_explicit_transport_commands() {
+        assert_eq!(play_pause_command_for_state(true), "pause");
+        assert_eq!(play_pause_command_for_state(false), "play");
     }
 }

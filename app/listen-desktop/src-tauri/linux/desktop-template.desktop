@@ -6,7 +6,9 @@ Exec={{exec}} %u
 Icon={{icon}}
 Terminal=false
 Categories={{categories}}
+MimeType=x-scheme-handler/cratemusic;
 StartupNotify=true
+StartupWMClass=app.cratemusic.crate.desktop
 Actions=PlayPause;Previous;Next;
 
 [Desktop Action PlayPause]

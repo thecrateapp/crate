@@ -59,6 +59,12 @@ def run_worker(config: dict):
 
     init_db()
     init_musicbrainz()
+    try:
+        from crate.radio_engine import _load_radio_graphs
+        _load_radio_graphs()
+    except Exception:
+        log.warning("Radio graph pre-warm failed", exc_info=True)
+
     cleanup_orphaned_tasks(pools=queues)
 
     # Runtime semaphores use TTLs and owner checks.  Do not clear them on

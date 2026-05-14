@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -20,6 +20,15 @@ function setup(isPlaying = false) {
   };
   renderHook(() => useDesktopTrayCommands(controls));
   return controls;
+}
+
+function setUserAgent(value: string): string {
+  const originalUserAgent = window.navigator.userAgent;
+  Object.defineProperty(window.navigator, "userAgent", {
+    configurable: true,
+    value,
+  });
+  return originalUserAgent;
 }
 
 describe("useDesktopTrayCommands", () => {
@@ -90,6 +99,7 @@ describe("useDesktopTrayNowPlaying", () => {
   });
 
   it("syncs rich media session metadata with the desktop shell", () => {
+    const originalUserAgent = setUserAgent("Mozilla/5.0 Mac OS X");
     const invoke = vi.fn().mockResolvedValue(undefined);
     window.__crateTauriInvoke = invoke;
 
@@ -115,6 +125,79 @@ describe("useDesktopTrayNowPlaying", () => {
       },
     });
 
+    setUserAgent(originalUserAgent);
+    delete window.__crateTauriInvoke;
+  });
+
+  it("caches Linux MPRIS artwork as a local file URL", async () => {
+    const originalUserAgent = setUserAgent("Mozilla/5.0 Linux x86_64");
+
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "image/jpeg" : null,
+      },
+      blob: async () => ({
+        size: 3,
+        type: "image/jpeg",
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      }),
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const invoke = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce("file:///tmp/crate-cover.jpg")
+      .mockResolvedValueOnce(undefined);
+    window.__crateTauriInvoke = invoke;
+
+    syncDesktopMediaSession({
+      title: "Minerva",
+      artist: "Deftones",
+      album: "Deftones",
+      artwork: "https://api.example.test/cover.jpg?token=secret",
+      isPlaying: true,
+      position: 12,
+      duration: 260,
+    });
+
+    expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+      payload: {
+        title: "Minerva",
+        artist: "Deftones",
+        album: "Deftones",
+        artwork: null,
+        isPlaying: true,
+        position: 12,
+        duration: 260,
+      },
+    });
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("cache_desktop_media_artwork", {
+        cacheKey: "https://api.example.test/cover.jpg?token=secret",
+        bytes: [1, 2, 3],
+        mimeType: "image/jpeg",
+      });
+    });
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_desktop_media_session", {
+        payload: {
+          title: "Minerva",
+          artist: "Deftones",
+          album: "Deftones",
+          artwork: "file:///tmp/crate-cover.jpg",
+          isPlaying: true,
+          position: 12,
+          duration: 260,
+        },
+      });
+    });
+
+    setUserAgent(originalUserAgent);
+    vi.unstubAllGlobals();
     delete window.__crateTauriInvoke;
   });
 });

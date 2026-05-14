@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -10,6 +12,8 @@ from pathlib import Path
 from crate.api._deps import json_dumps
 from crate.api.openapi import custom_openapi, variant_openapi
 from crate.db.core import init_db
+
+log = logging.getLogger(__name__)
 
 SECURITY_RESPONSE_HEADERS = {
     "X-Frame-Options": "DENY",
@@ -44,12 +48,43 @@ class DateAwareJSONResponse(JSONResponse):
         return json_dumps(content).encode("utf-8")
 
 
+async def _refresh_radio_graphs_periodically() -> None:
+    while True:
+        await asyncio.sleep(300)
+        try:
+            from crate.radio_engine import clear_radio_graph_cache, _load_radio_graphs
+            clear_radio_graph_cache()
+            await asyncio.to_thread(_load_radio_graphs)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("Radio graph background refresh failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     from crate.utils import init_musicbrainz
     init_musicbrainz()
-    yield
+
+    # Pre-warm radio graphs so the first radio request does not pay
+    # the cost of loading artist similarities, genres, and members
+    # from PostgreSQL into Python dicts.
+    try:
+        from crate.radio_engine import _load_radio_graphs
+        _load_radio_graphs()
+    except Exception:
+        log.warning("Radio graph pre-warm failed", exc_info=True)
+
+    radio_refresh_task = asyncio.create_task(_refresh_radio_graphs_periodically())
+    try:
+        yield
+    finally:
+        radio_refresh_task.cancel()
+        try:
+            await radio_refresh_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:
