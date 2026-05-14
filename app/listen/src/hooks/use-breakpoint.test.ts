@@ -22,6 +22,7 @@ describe("useIsDesktop", () => {
   });
 
   afterEach(() => {
+    delete document.documentElement.dataset.listenRuntime;
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: originalMatchMedia,
@@ -33,8 +34,9 @@ describe("useIsDesktop", () => {
     expect(result.current).toBe(false);
   });
 
-  it("accepts ssr option without crashing", () => {
-    const { result } = renderHook(() => useIsDesktop({ ssr: true }));
-    expect(typeof result.current).toBe("boolean");
+  it("forces desktop for the Tauri runtime", () => {
+    document.documentElement.dataset.listenRuntime = "tauri";
+    const { result } = renderHook(() => useIsDesktop());
+    expect(result.current).toBe(true);
   });
 });

@@ -8,7 +8,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-import { ApiError } from "@/lib/api";
 import {
   addServer,
   normaliseServerUrl,
@@ -57,12 +56,13 @@ async function probe(url: string): Promise<ProbeState> {
       inviteOnly: Boolean((data as { invite_only?: boolean }).invite_only),
     };
   } catch (err) {
-    if (err instanceof ApiError) {
-      return { status: "error", message: err.message };
-    }
+    const message = err instanceof Error ? err.message : "";
     return {
       status: "error",
-      message: err instanceof Error ? err.message : "Could not reach that host",
+      message:
+        message === "Load failed" || message === "Failed to fetch"
+          ? "Could not connect. Check the URL and try again."
+          : message || "Could not reach that host",
     };
   }
 }
@@ -91,27 +91,33 @@ export function ServerSetup() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-app-surface px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
-        <div className="flex flex-col items-center pb-2">
-          <img src="/icons/logo.svg" alt="Crate" className="mb-2 h-16 w-16" />
-          <h1 className="text-2xl font-bold text-white">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#08090d] px-6 py-10 text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(6,182,212,0.18),transparent_34%),radial-gradient(circle_at_12%_70%,rgba(20,184,166,0.08),transparent_28%)]" />
+      <form
+        onSubmit={handleSubmit}
+        className="relative w-full max-w-[560px] rounded-[26px] border border-white/10 bg-[#101118]/90 p-8 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:p-10"
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[24px] border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_50px_-24px_rgba(34,211,238,0.9)]">
+            <img src="/icons/logo.svg" alt="Crate" className="h-14 w-14" />
+          </div>
+          <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">
             Connect to a Crate server
           </h1>
-          <p className="mt-2 text-center text-sm text-muted-foreground">
-            Point the app at your Crate instance. You can add more later from
-            Settings.
+          <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
+            Enter the API URL for your Crate instance. You can add more servers
+            later from Settings.
           </p>
         </div>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <label className="mt-8 flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
             Server URL
           </span>
           <div className="relative">
             <Server
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+              size={18}
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-cyan-200/50"
             />
             <input
               type="url"
@@ -122,7 +128,7 @@ export function ServerSetup() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://api.your-crate.com"
-              className="h-12 w-full rounded-xl border border-white/10 bg-white/5 pl-10 pr-3 text-[15px] text-white outline-none placeholder:text-white/40 focus:border-cyan-400/60"
+              className="h-14 w-full rounded-[16px] border border-white/10 bg-white/[0.04] pl-12 pr-4 text-base text-white outline-none transition placeholder:text-slate-600 hover:border-white/20 focus:border-cyan-300/70 focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgba(34,211,238,0.08)]"
               required
             />
           </div>
@@ -131,28 +137,37 @@ export function ServerSetup() {
         {/* Status strip. One line, changes tone based on probeState. */}
         <StatusLine state={probeState} />
 
-        <button
-          type="submit"
-          disabled={probeState.status === "probing"}
-          className="group flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-400 py-3 text-sm font-semibold text-[#05161c] shadow-[0_0_24px_-6px_rgba(6,182,212,0.6)] transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {probeState.status === "probing" ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Reaching the server…
-            </>
-          ) : (
-            <>
-              Continue
-              <ArrowRight
-                size={16}
-                className="transition group-hover:translate-x-0.5"
-              />
-            </>
-          )}
-        </button>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="submit"
+            disabled={probeState.status === "probing"}
+            className="group flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[16px] bg-cyan-300 px-5 text-sm font-semibold text-[#041217] shadow-[0_0_34px_-12px_rgba(34,211,238,0.75)] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {probeState.status === "probing" ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Checking server…
+              </>
+            ) : (
+              <>
+                Continue
+                <ArrowRight
+                  size={16}
+                  className="transition group-hover:translate-x-0.5"
+                />
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setUrl("http://localhost:8585")}
+            className="min-h-12 rounded-[16px] border border-white/10 px-5 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
+          >
+            Local dev
+          </button>
+        </div>
 
-        <p className="pt-2 text-center text-[12px] leading-5 text-white/40">
+        <p className="pt-5 text-center text-[12px] leading-5 text-slate-500">
           Don't run your own server yet?{" "}
           <a
             href="https://docs.cratemusic.app/technical/development-deployment-and-operations"

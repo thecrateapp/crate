@@ -1,0 +1,39 @@
+{
+  "name": "crate-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5178 --strictPort",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 4178",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build:app": "tauri build --bundles app",
+    "tauri:build": "tauri build --bundles app",
+    "tauri:build:macos": "tauri build --bundles app",
+    "tauri:build:linux": "tauri build --bundles appimage,deb,rpm",
+    "tauri:build:windows": "tauri build --bundles nsis,msi",
+    "tauri:build:all": "tauri build",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@crate/ui": "*",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-deep-link": "^2.4.9",
+    "@tauri-apps/plugin-http": "^2.5.9",
+    "@tauri-apps/plugin-opener": "^2.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router": "^7.13.2",
+    "sonner": "^2.0.7",
+    "vite": "^8.0.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@tauri-apps/cli": "^2.0.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3"
+  }
+}

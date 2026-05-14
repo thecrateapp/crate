@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope
 
 
 def _similarity_graph_from_rows(rows) -> dict[str, dict[str, float]]:
@@ -44,10 +44,10 @@ def _artist_genres_from_rows(rows) -> dict[str, dict[str, float]]:
     return result
 
 
-def load_artist_similarity_graph() -> dict[str, dict[str, float]]:
-    with read_scope() as session:
+def load_artist_similarity_graph(*, session=None) -> dict[str, dict[str, float]]:
+    with optional_scope(session) as s:
         rows = (
-            session.execute(
+            s.execute(
                 text("SELECT artist_name, similar_name, score FROM artist_similarities")
             )
             .mappings()
@@ -56,10 +56,10 @@ def load_artist_similarity_graph() -> dict[str, dict[str, float]]:
     return _similarity_graph_from_rows(rows)
 
 
-def load_shared_members_graph() -> dict[str, set[str]]:
-    with read_scope() as session:
+def load_shared_members_graph(*, session=None) -> dict[str, set[str]]:
+    with optional_scope(session) as s:
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT a.name AS artist, m->>'name' AS member
@@ -76,10 +76,10 @@ def load_shared_members_graph() -> dict[str, set[str]]:
     return _member_graph_from_rows(rows)
 
 
-def load_artist_genres() -> dict[str, dict[str, float]]:
-    with read_scope() as session:
+def load_artist_genres(*, session=None) -> dict[str, dict[str, float]]:
+    with optional_scope(session) as s:
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT ag.artist_name, g.name, ag.weight
@@ -93,19 +93,22 @@ def load_artist_genres() -> dict[str, dict[str, float]]:
     return _artist_genres_from_rows(rows)
 
 
-def load_artist_radio_graphs() -> tuple[
+def load_artist_radio_graphs(
+    *,
+    session=None,
+) -> tuple[
     dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]
 ]:
-    with read_scope() as session:
+    with optional_scope(session) as s:
         similarity_rows = (
-            session.execute(
+            s.execute(
                 text("SELECT artist_name, similar_name, score FROM artist_similarities")
             )
             .mappings()
             .all()
         )
         genre_rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT ag.artist_name, g.name, ag.weight
@@ -117,7 +120,7 @@ def load_artist_radio_graphs() -> tuple[
             .all()
         )
         member_rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT a.name AS artist, m->>'name' AS member

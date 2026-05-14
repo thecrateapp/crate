@@ -1,5 +1,5 @@
 import { getApiBase } from "@/lib/api";
-import { isNative } from "@/lib/capacitor-runtime";
+import { usesConfigurableServer } from "@/lib/platform";
 
 export const AUTH_USER_ID_KEY = "listen-auth-user-id";
 
@@ -16,7 +16,7 @@ function getServerScope(serverOrigin?: string): string {
 }
 
 export function getAuthUserIdStorageKey(serverOrigin?: string): string {
-  if (!isNative) return AUTH_USER_ID_KEY;
+  if (!usesConfigurableServer) return AUTH_USER_ID_KEY;
   return `${AUTH_USER_ID_KEY}:${encodeURIComponent(
     getServerScope(serverOrigin),
   )}`;

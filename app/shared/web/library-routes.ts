@@ -123,23 +123,17 @@ function publicAlbumSlug(input: AlbumRouteInput) {
     const normalizedArtistSlug = input.artistSlug
       ? slugifySegment(input.artistSlug, "artist")
       : null;
-    const strippedArtistPrefix =
+    if (
       normalizedArtistSlug &&
       normalizedAlbumSlug.startsWith(`${normalizedArtistSlug}-`)
-        ? normalizedAlbumSlug.slice(normalizedArtistSlug.length + 1)
-        : null;
-    if (
-      normalizedArtistSlug &&
-      strippedArtistPrefix?.startsWith(`${normalizedArtistSlug}-`)
     ) {
-      return strippedArtistPrefix;
-    }
-    if (
-      normalizedArtistSlug &&
-      strippedArtistPrefix &&
-      !/^(?:[ivxlcdm]+|\d+)$/i.test(strippedArtistPrefix)
-    ) {
-      return strippedArtistPrefix;
+      const strippedArtistPrefix = normalizedAlbumSlug.slice(
+        normalizedArtistSlug.length + 1,
+      );
+      if (strippedArtistPrefix.startsWith(`${normalizedArtistSlug}-`))
+        return strippedArtistPrefix;
+      if (!/^(?:[ivxlcdm]+|\d+)$/i.test(strippedArtistPrefix))
+        return strippedArtistPrefix;
     }
     return normalizedAlbumSlug;
   }

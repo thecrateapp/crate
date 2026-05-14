@@ -62,7 +62,7 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
+    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, null);
     expect(consumePendingOAuthNext()).toBe("/mixes");
     expect(consumePendingOAuthNext()).toBeNull();
   });
@@ -73,7 +73,7 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
+    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, null);
     expect(consumePendingOAuthNext()).toBe("/mixes");
   });
 
@@ -83,24 +83,7 @@ describe("capacitor OAuth callback helpers", () => {
     );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith(
-      "abc123",
-      "refresh456",
-      undefined,
-    );
-  });
-
-  it("stores access expiry when the callback includes it", async () => {
-    const result = await consumeOAuthCallbackUrl(
-      "cratemusic://oauth/callback?token=abc123&access_expires_at=2026-05-12T13%3A08%3A10%2B00%3A00&next=%2Fmixes",
-    );
-
-    expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith(
-      "abc123",
-      undefined,
-      "2026-05-12T13:08:10+00:00",
-    );
+    expect(setAuthTokens).toHaveBeenCalledWith("abc123", "refresh456", null);
   });
 
   it("ignores unrelated URLs", async () => {
@@ -114,8 +97,8 @@ describe("capacitor OAuth callback helpers", () => {
   it("parses token and next from plain search params too", () => {
     expect(getOAuthCallbackPayload("?token=abc123&next=%2Fstats")).toEqual({
       token: "abc123",
-      accessExpiresAt: null,
       refreshToken: null,
+      accessExpiresAt: null,
       next: "/stats",
     });
   });

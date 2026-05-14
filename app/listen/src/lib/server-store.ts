@@ -1,10 +1,10 @@
 /**
- * Multi-Crate server configuration — Capacitor-only.
+ * Multi-Crate server configuration — configurable native shells.
  *
  * Listen Web is always a first-party surface for a single Crate instance
- * (the same one that serves the web app). Capacitor builds, in contrast,
- * are a single APK that can be pointed at ANY Crate instance the user
- * operates. That means we need:
+ * (the same one that serves the web app). Capacitor and Tauri builds, in
+ * contrast, can be pointed at a Crate instance the user operates. That means
+ * we need:
  *
  *   - a place to remember the servers a user has added
  *   - per-server auth tokens (each instance issues its own)
@@ -14,7 +14,7 @@
  * Everything lives in localStorage. The shape is intentionally small so
  * a future export/import flow is trivial.
  */
-import { isNative } from "@/lib/capacitor";
+import { usesConfigurableServer } from "@/lib/platform";
 
 const SERVERS_KEY = "crate-servers";
 const CURRENT_KEY = "crate-current-server";
@@ -78,7 +78,7 @@ export function deriveLabel(url: string): string {
 }
 
 export function getServers(): ServerConfig[] {
-  if (!isNative) return [];
+  if (!usesConfigurableServer) return [];
   try {
     return safeJsonParse<ServerConfig[]>(
       localStorage.getItem(SERVERS_KEY),
@@ -94,7 +94,7 @@ export function getServers(): ServerConfig[] {
 }
 
 export function getCurrentServerId(): string | null {
-  if (!isNative) return null;
+  if (!usesConfigurableServer) return null;
   try {
     return localStorage.getItem(CURRENT_KEY);
   } catch {
@@ -240,7 +240,7 @@ export function updateServerLabel(id: string, label: string): void {
  * calls are cheap.
  */
 export function migrateLegacyToken(defaultUrl: string): void {
-  if (!isNative) return;
+  if (!usesConfigurableServer) return;
   if (getServers().length > 0) return;
   try {
     const legacyToken = localStorage.getItem(LEGACY_TOKEN_KEY);
@@ -248,12 +248,7 @@ export function migrateLegacyToken(defaultUrl: string): void {
     const seeded = addServer(defaultUrl);
     const patched = getServers().map((s) =>
       s.id === seeded.id
-        ? {
-            ...s,
-            token: legacyToken,
-            tokenExpiresAt: null,
-            refreshToken: null,
-          }
+        ? { ...s, token: legacyToken, tokenExpiresAt: null, refreshToken: null }
         : s,
     );
     writeServers(patched);
@@ -265,7 +260,7 @@ export function migrateLegacyToken(defaultUrl: string): void {
 }
 
 export function seedDefaultServer(defaultUrl: string): void {
-  if (!isNative) return;
+  if (!usesConfigurableServer) return;
   if (getServers().length > 0) return;
   const normalised = normaliseServerUrl(defaultUrl);
   if (!normalised) return;

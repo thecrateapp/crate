@@ -24,7 +24,7 @@ const {
   getAuthTokenMock: vi.fn<() => string | null>(() => null),
   navigateMock: vi.fn(),
   primeOfflineRuntimeProfileMock: vi.fn(),
-  refreshAuthTokenMock: vi.fn(() => Promise.resolve(null)),
+  refreshAuthTokenMock: vi.fn(() => Promise.resolve(false)),
   setActiveOfflineProfileKeyMock: vi.fn(),
   setAuthTokenMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
@@ -91,7 +91,7 @@ describe("AuthProvider", () => {
     navigateMock.mockReset();
     primeOfflineRuntimeProfileMock.mockReset();
     refreshAuthTokenMock.mockReset();
-    refreshAuthTokenMock.mockResolvedValue(null);
+    refreshAuthTokenMock.mockResolvedValue(false);
     setActiveOfflineProfileKeyMock.mockReset();
     setAuthTokenMock.mockReset();
     syncOfflineProfileToServiceWorkerMock.mockReset();

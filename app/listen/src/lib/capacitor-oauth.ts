@@ -22,16 +22,16 @@ export function consumePendingOAuthNext(): string | null {
 
 export function getOAuthCallbackPayload(search: string | URLSearchParams): {
   token: string | null;
-  accessExpiresAt: string | null;
   refreshToken: string | null;
+  accessExpiresAt: string | null;
   next: string;
 } {
   const params =
     typeof search === "string" ? new URLSearchParams(search) : search;
   return {
     token: params.get("token"),
-    accessExpiresAt: params.get("access_expires_at"),
     refreshToken: params.get("refresh_token"),
+    accessExpiresAt: params.get("access_expires_at"),
     next: params.get("next") || "/",
   };
 }
@@ -40,13 +40,13 @@ export function persistOAuthCallbackPayload(search: string | URLSearchParams): {
   handled: boolean;
   next: string;
 } {
-  const { token, accessExpiresAt, refreshToken, next } =
+  const { token, refreshToken, accessExpiresAt, next } =
     getOAuthCallbackPayload(search);
   if (!token) {
     return { handled: false, next };
   }
 
-  setAuthTokens(token, refreshToken ?? undefined, accessExpiresAt ?? undefined);
+  setAuthTokens(token, refreshToken ?? undefined, accessExpiresAt);
   storePendingOAuthNext(next);
   return { handled: true, next };
 }

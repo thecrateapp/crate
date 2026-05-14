@@ -4,6 +4,7 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import re
+import time
 import unicodedata
 
 
@@ -612,6 +613,8 @@ _GENRE_DEFINITIONS: tuple[GenreDefinition, ...] = tuple(
 
 _RUNTIME_GRAPH_CACHE: dict | None = None
 _RUNTIME_GRAPH_CACHE_REVISION: str | None = None
+_RUNTIME_GRAPH_REVISION_CHECKED_AT = 0.0
+_RUNTIME_GRAPH_REVISION_CHECK_TTL_SECONDS = 30.0
 _RUNTIME_GRAPH_INVALIDATION_SESSION_KEY = "_genre_taxonomy_invalidation_registered"
 _RUNTIME_GRAPH_REVISION_KEY = "genre_taxonomy:revision"
 
@@ -729,9 +732,9 @@ _STATIC_RUNTIME_GRAPH = _build_static_runtime_graph()
 
 def _load_shared_taxonomy_revision() -> str | None:
     try:
-        from crate.db.cache_runtime import get_redis
+        from crate.db.cache_runtime import _get_redis
 
-        redis_client = get_redis()
+        redis_client = _get_redis()
         if redis_client:
             value = redis_client.get(_RUNTIME_GRAPH_REVISION_KEY)
             if value:
@@ -755,9 +758,9 @@ def _publish_shared_taxonomy_revision(revision: str | None = None) -> str:
     revision_value = revision or datetime.now(timezone.utc).isoformat()
 
     try:
-        from crate.db.cache_runtime import get_redis
+        from crate.db.cache_runtime import _get_redis
 
-        redis_client = get_redis()
+        redis_client = _get_redis()
         if redis_client:
             redis_client.set(_RUNTIME_GRAPH_REVISION_KEY, revision_value)
     except Exception:
@@ -774,9 +777,13 @@ def _publish_shared_taxonomy_revision(revision: str | None = None) -> str:
 
 
 def invalidate_runtime_taxonomy_cache(*, broadcast: bool = False) -> None:
-    global _RUNTIME_GRAPH_CACHE, _RUNTIME_GRAPH_CACHE_REVISION
+    global \
+        _RUNTIME_GRAPH_CACHE, \
+        _RUNTIME_GRAPH_CACHE_REVISION, \
+        _RUNTIME_GRAPH_REVISION_CHECKED_AT
     _RUNTIME_GRAPH_CACHE = None
     _RUNTIME_GRAPH_CACHE_REVISION = None
+    _RUNTIME_GRAPH_REVISION_CHECKED_AT = 0.0
     _DEPTH_CACHE.clear()
     if broadcast:
         _publish_shared_taxonomy_revision()
@@ -797,9 +804,21 @@ def invalidate_runtime_taxonomy_cache_after_commit(session) -> None:
 
 
 def _get_runtime_taxonomy_graph() -> dict:
-    global _RUNTIME_GRAPH_CACHE, _RUNTIME_GRAPH_CACHE_REVISION
+    global \
+        _RUNTIME_GRAPH_CACHE, \
+        _RUNTIME_GRAPH_CACHE_REVISION, \
+        _RUNTIME_GRAPH_REVISION_CHECKED_AT
+
+    now = time.monotonic()
+    if (
+        _RUNTIME_GRAPH_CACHE is not None
+        and now - _RUNTIME_GRAPH_REVISION_CHECKED_AT
+        < _RUNTIME_GRAPH_REVISION_CHECK_TTL_SECONDS
+    ):
+        return _RUNTIME_GRAPH_CACHE
 
     shared_revision = _load_shared_taxonomy_revision()
+    _RUNTIME_GRAPH_REVISION_CHECKED_AT = now
 
     if (
         _RUNTIME_GRAPH_CACHE is not None
@@ -933,6 +952,19 @@ def resolve_genre_slug(value: str) -> str | None:
     if slug in graph["aliases_to_slug"]:
         return graph["aliases_to_slug"][slug]
     return slug
+
+
+def resolve_static_genre_slug(value: str) -> str | None:
+    normalized = (value or "").strip().lower()
+    if not normalized:
+        return None
+    direct = _STATIC_RUNTIME_GRAPH["aliases_to_slug"].get(normalized)
+    if direct:
+        return direct
+    slug = slugify_genre(normalized)
+    if not slug:
+        return None
+    return _STATIC_RUNTIME_GRAPH["aliases_to_slug"].get(slug) or slug
 
 
 def get_genre_display_name(value: str) -> str:
@@ -1079,6 +1111,34 @@ def get_top_level_slug(value: str) -> str:
 def get_genre_ancestor_slugs(value: str, *, include_self: bool = True) -> list[str]:
     graph = _get_runtime_taxonomy_graph()
     slug = resolve_genre_slug(value)
+    if not slug:
+        return []
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    queue: deque[str] = deque(
+        [slug] if include_self else sorted(graph["parents_by_slug"].get(slug, set()))
+    )
+
+    while queue:
+        current_slug = queue.popleft()
+        if not current_slug or current_slug in seen:
+            continue
+        seen.add(current_slug)
+        if current_slug in graph["nodes_by_slug"]:
+            ordered.append(current_slug)
+        for parent_slug in sorted(graph["parents_by_slug"].get(current_slug, set())):
+            if parent_slug not in seen:
+                queue.append(parent_slug)
+
+    return ordered
+
+
+def get_static_genre_ancestor_slugs(
+    value: str, *, include_self: bool = True
+) -> list[str]:
+    graph = _STATIC_RUNTIME_GRAPH
+    slug = resolve_static_genre_slug(value)
     if not slug:
         return []
 
@@ -1277,7 +1337,7 @@ def _aggregate_genre_rows(rows: list[dict]) -> list[dict]:
             bucket["score"] += score
             if raw_name not in bucket["sources"]:
                 bucket["sources"].append(raw_name)
-            if canonical and slug:
+            if canonical:
                 bucket["name"] = graph["nodes_by_slug"][slug]["name"]
                 bucket["canonical"] = True
                 bucket["top_level_slug"] = get_top_level_slug(slug) or slug

@@ -319,13 +319,13 @@ class TestOAuthRedirectHelpers:
 
 class TestOAuthStart:
     @staticmethod
-    def _request(headers: list[tuple[bytes, bytes]] | None = None) -> Request:
+    def _request(headers: list[tuple[bytes, bytes]] | None = None, query_string: bytes = b"") -> Request:
         return Request(
             {
                 "type": "http",
                 "method": "POST",
                 "path": "/api/auth/oauth/google/start",
-                "query_string": b"",
+                "query_string": query_string,
                 "headers": headers or [],
                 "client": ("127.0.0.1", 12345),
                 "scheme": "http",
@@ -513,6 +513,66 @@ class TestOAuthStart:
             )
 
         assert captured_state["app_id"] == "listen-native"
+
+    @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
+    def test_native_oauth_callback_uses_listen_origin(self):
+        from crate.api.auth import _oauth_callback_url
+
+        assert (
+            _oauth_callback_url("google", "cratemusic://oauth/callback")
+            == "https://listen.lespedants.org/api/auth/oauth/google/callback"
+        )
+
+    @patch.dict("os.environ", {"DOMAIN": "lespedants.org"}, clear=False)
+    def test_tauri_loopback_oauth_callback_uses_listen_origin(self):
+        from crate.api.auth import _oauth_callback_url
+
+        assert (
+            _oauth_callback_url(
+                "google",
+                "http://127.0.0.1:17654/oauth/callback",
+                app_id="listen-tauri",
+            )
+            == "https://listen.lespedants.org/api/auth/oauth/google/callback"
+        )
+
+    def test_tauri_loopback_return_to_requires_tauri_app_id(self):
+        from crate.api.auth import _validate_return_to
+
+        return_to = "http://127.0.0.1:17654/oauth/callback?next=%2F"
+
+        assert _validate_return_to(return_to, app_id="listen-tauri") == return_to
+        assert _validate_return_to(return_to, app_id="listen-web") == "/"
+
+    def test_post_auth_redirect_url_adds_token_for_tauri_loopback(self):
+        from crate.api.auth import _post_auth_redirect_url
+
+        assert (
+            _post_auth_redirect_url("http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123")
+            == "http://127.0.0.1:17654/oauth/callback?next=%2F&token=abc123"
+        )
+
+    def test_oauth_start_preserves_tauri_app_id_from_query(self):
+        from crate.api.auth import oauth_start
+        from crate.api.schemas.auth import OAuthStartRequest
+
+        captured_state: dict[str, Any] = {}
+        request = self._request(query_string=b"app_id=listen-tauri")
+        request.state.user = None
+
+        with patch("crate.api.auth._provider_available", return_value=True), \
+             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
+             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
+             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
+             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
+            asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="cratemusic://oauth/callback")))
+
+        assert captured_state["app_id"] == "listen-tauri"
+
+    def test_listen_tauri_is_native_listen_app_id(self):
+        from crate.api.auth import _is_native_listen_app_id
+
+        assert _is_native_listen_app_id("listen-tauri") is True
 
 
 class TestAuthUserAvatarProxy:

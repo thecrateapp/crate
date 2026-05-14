@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.queries.paths_shared import array_distance_sql
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope, read_scope
 
 
 def _normalize_track_row(row) -> dict | None:
@@ -163,6 +163,7 @@ def find_candidate_rows(
     exclude_ids: set[int],
     *,
     limit: int,
+    session=None,
 ) -> list[dict]:
     probe_vector = to_pgvector_literal(target)
     probe_array = list(target)
@@ -173,9 +174,10 @@ def find_candidate_rows(
         exclude_clause = "AND t.id != ALL(:exclude)"
         params["exclude"] = list(exclude_ids)
 
-    with read_scope() as session:
+    with optional_scope(session) as s:
+        s.execute(text("SET LOCAL ivfflat.probes = 10"))
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     f"""
                 SELECT t.id, t.entity_uid, t.title, a.artist,
@@ -204,7 +206,7 @@ def find_candidate_rows(
         if not rows:
             fallback_distance = array_distance_sql("t.bliss_vector")
             rows = (
-                session.execute(
+                s.execute(
                     text(
                         f"""
                     SELECT t.id, t.entity_uid, t.title, a.artist,
@@ -230,11 +232,7 @@ def find_candidate_rows(
                 .all()
             )
 
-    return [
-        normalized
-        for row in rows
-        if (normalized := _normalize_track_row(row)) is not None
-    ]
+    return [_normalize_track_row(row) for row in rows]
 
 
 __all__ = [

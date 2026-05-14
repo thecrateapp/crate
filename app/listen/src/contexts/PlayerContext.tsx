@@ -18,6 +18,7 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
+import {} from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
@@ -41,6 +42,10 @@ import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
 import { usePlayerAuthSync } from "@/contexts/use-player-auth-sync";
+import {
+  useDesktopTrayCommands,
+  useDesktopTrayNowPlaying,
+} from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
@@ -1286,6 +1291,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     seek,
     setVolume,
   });
+
+  useDesktopTrayCommands({ isPlayingRef, pause, resume, previous: prev, next });
+  useDesktopTrayNowPlaying({ currentTrack, isPlaying });
 
   useMediaSession({
     currentTrack,

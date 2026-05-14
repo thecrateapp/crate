@@ -1,5 +1,5 @@
-import { AUTH_TOKEN_EVENT, apiSseUrl } from "@/lib/api";
-import { isNative } from "@/lib/capacitor";
+import { apiSseUrl } from "@/lib/api";
+import { usesConfigurableServer } from "@/lib/platform";
 import { recordAssetInvalidationScope } from "@/lib/library-routes";
 import {
   markSseChannelClosed,
@@ -242,7 +242,6 @@ function _evictOldest(count: number): void {
 // ── SSE Listener ───────────────────────────────────────────────
 
 let eventSource: EventSource | null = null;
-let authTokenListener: (() => void) | null = null;
 const invalidationListeners = new Set<(scope: string) => void>();
 const CACHE_EVENTS_CHANNEL = "cache-invalidations";
 const CACHE_EVENTS_DEGRADE_AFTER_MS = 75_000;
@@ -274,71 +273,57 @@ export function onCacheEventsHealthChange(
 export function connectCacheEvents(): () => void {
   if (eventSource) return () => {};
 
-  function open() {
-    const url = apiSseUrl("/api/cache/events");
+  const url = apiSseUrl("/api/cache/events");
 
-    try {
-      eventSource = new EventSource(url, { withCredentials: !isNative });
+  try {
+    eventSource = new EventSource(url, {
+      withCredentials: !usesConfigurableServer,
+    });
 
-      eventSource.onopen = () => {
-        markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
-          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-        });
-      };
-
-      eventSource.onmessage = (event) => {
-        const scope = event.data?.trim();
-        if (!scope) return;
-        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-        });
-        recordAssetInvalidationScope(scope);
-        cacheInvalidate(scope);
-        for (const fn of invalidationListeners) {
-          try {
-            fn(scope);
-          } catch {
-            /* ignore listener errors */
-          }
-        }
-      };
-
-      eventSource.addEventListener("heartbeat", () => {
-        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-        });
+    eventSource.onopen = () => {
+      markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
+        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
       });
+    };
 
-      eventSource.onerror = () => {
-        markSseChannelError(CACHE_EVENTS_CHANNEL, {
-          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-        });
-        // EventSource auto-reconnects with Last-Event-ID. Just log.
-        console.debug("[cache] SSE connection lost, reconnecting...");
-      };
-    } catch {
-      // EventSource not supported or blocked
-    }
+    eventSource.onmessage = (event) => {
+      const scope = event.data?.trim();
+      if (!scope) return;
+      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+      });
+      recordAssetInvalidationScope(scope);
+      cacheInvalidate(scope);
+      for (const fn of invalidationListeners) {
+        try {
+          fn(scope);
+        } catch {
+          /* ignore listener errors */
+        }
+      }
+    };
+
+    eventSource.addEventListener("heartbeat", () => {
+      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+      });
+    });
+
+    eventSource.onerror = () => {
+      markSseChannelError(CACHE_EVENTS_CHANNEL, {
+        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+      });
+      // EventSource auto-reconnects with Last-Event-ID. Just log.
+      console.debug("[cache] SSE connection lost, reconnecting...");
+    };
+  } catch {
+    // EventSource not supported or blocked
   }
-
-  open();
-
-  authTokenListener = () => {
-    if (!isNative) return;
-    eventSource?.close();
-    eventSource = null;
-    open();
-  };
-  window.addEventListener(AUTH_TOKEN_EVENT, authTokenListener);
 
   return () => {
     markSseChannelClosed(CACHE_EVENTS_CHANNEL, {
       degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
     });
-    if (authTokenListener) {
-      window.removeEventListener(AUTH_TOKEN_EVENT, authTokenListener);
-      authTokenListener = null;
-    }
     eventSource?.close();
     eventSource = null;
   };

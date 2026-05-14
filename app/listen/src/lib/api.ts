@@ -5,7 +5,11 @@ import {
   redirectToLoginOnUnauthorized,
   shouldRedirectToLoginOnUnauthorized,
 } from "@/lib/auth-route-policy";
-import { isNative, platform } from "@/lib/capacitor";
+import {
+  getListenAppId,
+  isTauriRuntime,
+  usesConfigurableServer,
+} from "@/lib/platform";
 import {
   getCurrentServer,
   migrateLegacyToken,
@@ -23,12 +27,12 @@ export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
 const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
 
 /**
- * Default URL used when no server has been configured yet in a native
- * build. Taken from the build-time env so the APK ships with a sensible
- * first choice (the reference cratemusic.app instance) while still
- * letting the user point the app at their own server.
+ * Development-only desktop convenience. Release builds must not ship with a
+ * preconfigured server; users should choose their own Crate instance.
  */
-const BUILD_TIME_DEFAULT = import.meta.env.VITE_API_URL || "";
+const DEV_TAURI_DEFAULT_SERVER = "https://api.lespedants.org";
+const BUILD_TIME_DEFAULT =
+  import.meta.env.DEV && isTauriRuntime ? DEV_TAURI_DEFAULT_SERVER : "";
 
 // Run the legacy-token migration once on module load. It's a no-op
 // after the first time and on fresh installs.
@@ -40,15 +44,15 @@ seedDefaultServer(BUILD_TIME_DEFAULT);
  *
  *   - Web: empty string. Listen Web is same-origin with its backend
  *     (proxied by Caddy/Traefik). Relative fetches are correct.
- *   - Capacitor: the URL of the current server from the server-store,
- *     or the build-time default if no server is configured yet (which
- *     happens only during first boot before ServerSetup runs).
+ *   - Configurable runtimes: the URL of the current server from the
+ *     server-store. Tauri dev also gets a local development default so
+ *     desktop iteration starts directly against prod-like API.
  *
  * This is re-evaluated on every call so switching servers in-flight
  * takes effect for the next request without a reload.
  */
 export function getApiBase(): string {
-  if (!isNative) return "";
+  if (!usesConfigurableServer) return "";
   const server = getCurrentServer();
   return server?.url || BUILD_TIME_DEFAULT;
 }
@@ -94,13 +98,17 @@ function isSameOriginUrl(url: string): boolean {
 }
 
 function shouldAttachQueryToken(url: string): boolean {
-  if (isNative) return true;
+  if (usesConfigurableServer) return true;
   return isAbsoluteHttpUrl(url) && !isSameOriginUrl(url);
+}
+
+function apiCredentials(): RequestCredentials {
+  return usesConfigurableServer ? "omit" : "include";
 }
 
 /** Resolve an SSE path to a full URL, adding auth token for native clients. */
 export function apiSseUrl(path: string): string {
-  if (!isNative) return apiUrl(path);
+  if (!usesConfigurableServer) return apiUrl(path);
   const token = getAuthToken();
   if (!token) return apiUrl(path);
   const separator = path.includes("?") ? "&" : "?";
@@ -176,7 +184,7 @@ export function apiWsUrl(path: string): string {
 // have its own session. On web, the token is stored in localStorage.
 
 export function getAuthToken(): string | null {
-  if (isNative) return getCurrentServer()?.token ?? null;
+  if (usesConfigurableServer) return getCurrentServer()?.token ?? null;
   try {
     return localStorage.getItem("listen-auth-token");
   } catch {
@@ -185,7 +193,7 @@ export function getAuthToken(): string | null {
 }
 
 export function getAuthTokenExpiresAt(): string | null {
-  if (isNative) return getCurrentServer()?.tokenExpiresAt ?? null;
+  if (usesConfigurableServer) return getCurrentServer()?.tokenExpiresAt ?? null;
   try {
     return localStorage.getItem(WEB_TOKEN_EXPIRES_AT_KEY);
   } catch {
@@ -194,7 +202,7 @@ export function getAuthTokenExpiresAt(): string | null {
 }
 
 export function getRefreshToken(): string | null {
-  if (isNative) return getCurrentServer()?.refreshToken ?? null;
+  if (usesConfigurableServer) return getCurrentServer()?.refreshToken ?? null;
   return null;
 }
 
@@ -233,7 +241,7 @@ export function setAuthToken(
 }
 
 export function setRefreshToken(refreshToken: string | null) {
-  if (isNative) {
+  if (usesConfigurableServer) {
     setCurrentServerRefreshToken(refreshToken);
     return;
   }
@@ -251,12 +259,10 @@ export function setAuthTokens(
 ) {
   const nextAccessExpiresAt =
     accessExpiresAt === undefined ? decodeJwtExpiresAt(token) : accessExpiresAt;
-  if (isNative) {
-    if (refreshToken === undefined) {
+  if (usesConfigurableServer) {
+    if (refreshToken === undefined)
       setCurrentServerToken(token, nextAccessExpiresAt);
-    } else {
-      setCurrentServerAuthTokens(token, refreshToken, nextAccessExpiresAt);
-    }
+    else setCurrentServerAuthTokens(token, refreshToken, nextAccessExpiresAt);
     emitAuthTokenChange();
     return;
   }
@@ -281,7 +287,7 @@ export function getApiAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
   const token = getAuthToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  headers["X-Crate-App"] = isNative ? `listen-${platform}` : "listen-web";
+  headers["X-Crate-App"] = getListenAppId();
   headers["X-Device-Label"] = getListenDeviceLabel();
   headers["X-Device-Fingerprint"] = getListenDeviceFingerprint();
   return headers;
@@ -301,7 +307,7 @@ if (typeof window !== "undefined") {
 // re-read on every request so server switches are live. We pass a
 // base-URL getter and wrap calls through our own thin proxy.
 const innerApi = createApiClient({
-  credentials: "include",
+  credentials: apiCredentials(),
   defaultHeaders: getApiAuthHeaders,
 });
 
@@ -330,7 +336,7 @@ export async function refreshAuthToken(): Promise<boolean> {
     headers["Content-Type"] = "application/json";
     const response = await fetch(`${getApiBase()}/api/auth/refresh`, {
       method: "POST",
-      credentials: "include",
+      credentials: apiCredentials(),
       headers,
       body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
     }).catch(() => null);
@@ -404,7 +410,7 @@ export async function apiFetch(
   const request = () =>
     fetch(`${getApiBase()}${path}`, {
       ...init,
-      credentials: "include",
+      credentials: apiCredentials(),
       headers,
     });
   let response = await request();
@@ -415,7 +421,7 @@ export async function apiFetch(
   ) {
     response = await fetch(`${getApiBase()}${path}`, {
       ...init,
-      credentials: "include",
+      credentials: apiCredentials(),
       headers: {
         ...((init?.headers as Record<string, string>) || {}),
         ...getApiAuthHeaders(),

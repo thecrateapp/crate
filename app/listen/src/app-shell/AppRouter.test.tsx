@@ -6,7 +6,7 @@ import { AppRouter } from "@/app-shell/AppRouter";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const runtimeState = vi.hoisted(() => ({
-  isNative: false,
+  usesConfigurableServer: false,
   currentServer: {
     id: "srv-1",
     label: "Crate",
@@ -49,9 +49,11 @@ vi.mock("@/lib/cache", () => ({
   connectCacheEvents: vi.fn(() => vi.fn()),
 }));
 
-vi.mock("@/lib/capacitor", () => ({
-  get isNative() {
-    return runtimeState.isNative;
+vi.mock("@/lib/platform", () => ({
+  getListenAppId: () => "listen-web",
+  isTauriRuntime: false,
+  get usesConfigurableServer() {
+    return runtimeState.usesConfigurableServer;
   },
 }));
 
@@ -64,7 +66,7 @@ vi.mock("@/lib/server-store", () => ({
 
 describe("AppRouter", () => {
   beforeEach(() => {
-    runtimeState.isNative = false;
+    runtimeState.usesConfigurableServer = false;
     runtimeState.currentServer = {
       id: "srv-1",
       label: "Crate",
@@ -101,8 +103,8 @@ describe("AppRouter", () => {
     expect(screen.queryByText("Login page")).toBeNull();
   });
 
-  it("redirects native clients without a configured server to setup", async () => {
-    runtimeState.isNative = true;
+  it("redirects configurable-shell clients without a server to setup", async () => {
+    runtimeState.usesConfigurableServer = true;
     runtimeState.currentServer = null;
 
     renderWithListenProviders(<AppRouter />, {

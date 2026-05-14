@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockNavigate, mockRefetch, mockSetAuthTokens } = vi.hoisted(() => ({
@@ -62,7 +62,7 @@ describe("AuthCallback", () => {
     expect(mockSetAuthTokens).toHaveBeenCalledWith(
       "oauth-token",
       undefined,
-      undefined,
+      null,
     );
     expect(localStorage.getItem("crate-oauth-next")).toBe("/stats");
     expect(mockRefetch).toHaveBeenCalledTimes(1);
@@ -102,5 +102,23 @@ describe("AuthCallback", () => {
     });
     expect(mockRefetch).not.toHaveBeenCalled();
     expect(mockSetAuthTokens).not.toHaveBeenCalled();
+  });
+
+  it("bridges Tauri desktop callbacks back to the app without hydrating web auth", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/callback?desktop=tauri&token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+    );
+
+    render(<AuthCallback />);
+
+    const link = screen.getByRole("link", { name: "Open Crate" });
+    expect(link.getAttribute("href")).toBe(
+      "cratemusic://oauth/callback?token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+    );
+    expect(mockSetAuthTokens).not.toHaveBeenCalled();
+    expect(mockRefetch).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

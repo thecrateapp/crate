@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react";
 import type { Track } from "./player-types";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { syncDesktopMediaSession } from "@/lib/desktop-tray";
 import {
   onNativeMediaControl,
   stopNativeMediaSession,
   syncNativeMediaSession,
 } from "@/lib/native-media-session";
+import { isTauriRuntime } from "@/lib/platform";
 
 /**
  * Sync the Web MediaSession API with the current player state.
@@ -149,6 +151,43 @@ export function useMediaSession({
   const nativePositionSeconds = Math.floor(
     Math.max(0, duration > 0 ? Math.min(currentTime, duration) : currentTime),
   );
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+
+    if (!currentTrack) {
+      syncDesktopMediaSession({
+        title: null,
+        artist: null,
+        album: null,
+        artwork: null,
+        isPlaying: false,
+        position: 0,
+        duration: 0,
+      });
+      return;
+    }
+
+    const coverUrl = resolveMaybeApiAssetUrl(currentTrack.albumCover);
+    syncDesktopMediaSession({
+      title: currentTrack.title || "Unknown",
+      artist: currentTrack.artist || "",
+      album: currentTrack.album || "",
+      artwork: coverUrl || null,
+      isPlaying,
+      position: nativePositionSeconds,
+      duration: duration || 0,
+    });
+  }, [
+    currentTrack?.id,
+    currentTrack?.title,
+    currentTrack?.artist,
+    currentTrack?.album,
+    currentTrack?.albumCover,
+    duration,
+    isPlaying,
+    nativePositionSeconds,
+  ]);
+
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) return;
 

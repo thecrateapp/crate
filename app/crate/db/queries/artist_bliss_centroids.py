@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope
 
 
-def get_artist_bliss_centroid(artist_ref: str) -> dict | None:
+def get_artist_bliss_centroid(artist_ref: str, *, session=None) -> dict | None:
     if not artist_ref:
         return None
 
-    with read_scope() as session:
+    with optional_scope(session) as s:
         row = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT

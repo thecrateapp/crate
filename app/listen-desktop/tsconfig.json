@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../listen/src/*"],
+      "@capacitor/app": ["./src/lib/stubs/capacitor-app.ts"],
+      "@capacitor/browser": ["./src/lib/stubs/capacitor-browser.ts"],
+      "@capacitor/core": ["./src/lib/stubs/capacitor-core.ts"],
+      "@capacitor/filesystem": ["./src/lib/stubs/capacitor-filesystem.ts"],
+      "@capacitor/haptics": ["./src/lib/stubs/capacitor-haptics.ts"],
+      "@capacitor/keyboard": ["./src/lib/stubs/capacitor-keyboard.ts"],
+      "@capacitor/network": ["./src/lib/stubs/capacitor-network.ts"],
+      "@capacitor/splash-screen": [
+        "./src/lib/stubs/capacitor-splash-screen.ts"
+      ],
+      "@capacitor/status-bar": ["./src/lib/stubs/capacitor-status-bar.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "../listen/src",
+    "../shared/web/**/*.ts",
+    "../shared/ui/**/*.ts",
+    "../shared/ui/**/*.tsx"
+  ],
+  "exclude": [
+    "../listen/src/**/*.test.ts",
+    "../listen/src/**/*.test.tsx",
+    "../shared/ui/**/*.test.ts",
+    "../shared/ui/**/*.test.tsx"
+  ]
+}

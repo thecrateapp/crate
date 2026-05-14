@@ -26,24 +26,24 @@ def _lerp(a: list[float], b: list[float], t: float) -> list[float]:
     return [a[d] + (b[d] - a[d]) * t for d in range(len(a))]
 
 
-def resolve_bliss_centroid(endpoint_type: str, value: str) -> list[float] | None:
+def resolve_bliss_centroid(endpoint_type: str, value: str, *, session=None) -> list[float] | None:
     """Resolve an endpoint (track/album/artist/genre) to a bliss centroid vector."""
     log.info("resolve_bliss_centroid: type=%s value=%s", endpoint_type, value)
     if endpoint_type == "artist":
         from crate.db.queries.artist_bliss_centroids import get_artist_bliss_centroid
 
-        cached = get_artist_bliss_centroid(value)
+        cached = get_artist_bliss_centroid(value, session=session)
         if cached and cached.get("bliss_vector"):
             return list(cached["bliss_vector"])
 
-    vectors = fetch_bliss_vectors_for_endpoint(endpoint_type, value)
+    vectors = fetch_bliss_vectors_for_endpoint(endpoint_type, value, session=session)
     if endpoint_type == "artist":
         log.info("resolve artist id=%s: found %d vectors", value, len(vectors))
     return _centroid(vectors) if vectors else None
 
 
-def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
-    return _resolve_endpoint_label(endpoint_type, value)
+def resolve_endpoint_label(endpoint_type: str, value: str, *, session=None) -> str:
+    return _resolve_endpoint_label(endpoint_type, value, session=session)
 
 
 __all__ = [

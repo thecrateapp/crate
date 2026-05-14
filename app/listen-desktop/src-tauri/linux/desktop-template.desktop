@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment={{comment}}
+Exec={{exec}} %u
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+MimeType=x-scheme-handler/cratemusic;
+StartupNotify=true
+StartupWMClass=app.cratemusic.crate.desktop
+Actions=PlayPause;Previous;Next;
+
+[Desktop Action PlayPause]
+Name=Play / Pause
+Exec={{exec}} --crate-command=play_pause
+
+[Desktop Action Previous]
+Name=Previous
+Exec={{exec}} --crate-command=previous
+
+[Desktop Action Next]
+Name=Next
+Exec={{exec}} --crate-command=next

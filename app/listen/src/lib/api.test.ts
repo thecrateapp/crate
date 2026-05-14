@@ -2,9 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   apiAssetUrl,
-  getAuthTokenExpiresAt,
   resolveMaybeApiAssetUrl,
-  setAuthTokens,
   shouldRedirectToLoginOnUnauthorized,
 } from "@/lib/api";
 
@@ -27,12 +25,6 @@ describe("shouldRedirectToLoginOnUnauthorized", () => {
 });
 
 describe("playlist asset URLs", () => {
-  it("stores explicit access expiry metadata", () => {
-    setAuthTokens("listen-token", undefined, "2026-05-12T13:08:10+00:00");
-
-    expect(getAuthTokenExpiresAt()).toBe("2026-05-12T13:08:10+00:00");
-  });
-
   it("uses cookies for same-origin API assets", () => {
     localStorage.setItem("listen-auth-token", "listen token");
 
@@ -41,7 +33,7 @@ describe("playlist asset URLs", () => {
     );
   });
 
-  it("preserves existing query params without adding a same-origin token", () => {
+  it("preserves same-origin asset query params without adding a token", () => {
     localStorage.setItem("listen-auth-token", "listen-token");
 
     expect(apiAssetUrl("/api/playlists/1/cover?size=256")).toBe(

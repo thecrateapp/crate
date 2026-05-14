@@ -6,7 +6,7 @@ import random
 
 from sqlalchemy import text
 
-from crate.db.tx import read_scope
+from crate.db.tx import optional_scope, read_scope
 
 
 def get_track_path_by_id(track_id: int) -> str | None:
@@ -82,10 +82,10 @@ def get_playlist_for_radio(playlist_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def get_random_library_seed_rows(limit: int = 30) -> list[dict]:
-    with read_scope() as session:
+def get_random_library_seed_rows(limit: int = 30, *, session=None) -> list[dict]:
+    with optional_scope(session) as s:
         max_row = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT MAX(id)::INTEGER AS max_id
@@ -103,7 +103,7 @@ def get_random_library_seed_rows(limit: int = 30) -> list[dict]:
 
         start_id = random.randint(1, max_id)
         rows = (
-            session.execute(
+            s.execute(
                 text(
                     """
                 SELECT t.id AS track_id, t.artist, t.bliss_vector
@@ -120,8 +120,9 @@ def get_random_library_seed_rows(limit: int = 30) -> list[dict]:
             .all()
         )
         if len(rows) < limit:
-            fallback_rows = (
-                session.execute(
+            rows = (
+                list(rows)
+                + s.execute(
                     text(
                         """
                     SELECT t.id AS track_id, t.artist, t.bliss_vector
@@ -137,18 +138,20 @@ def get_random_library_seed_rows(limit: int = 30) -> list[dict]:
                 .mappings()
                 .all()
             )
-            rows = list(rows) + list(fallback_rows)
     return [dict(row) for row in rows]
 
 
-def get_random_library_vectors(limit: int = 30) -> list[list[float]]:
-    return [list(row["bliss_vector"]) for row in get_random_library_seed_rows(limit)]
+def get_random_library_vectors(limit: int = 30, *, session=None) -> list[list[float]]:
+    return [
+        list(row["bliss_vector"])
+        for row in get_random_library_seed_rows(limit, session=session)
+    ]
 
 
-def get_track_bliss_vector(track_id: int) -> list[float] | None:
-    with read_scope() as session:
+def get_track_bliss_vector(track_id: int, *, session=None) -> list[float] | None:
+    with optional_scope(session) as s:
         row = (
-            session.execute(
+            s.execute(
                 text(
                     "SELECT bliss_vector FROM library_tracks WHERE id = :id AND bliss_vector IS NOT NULL"
                 ),

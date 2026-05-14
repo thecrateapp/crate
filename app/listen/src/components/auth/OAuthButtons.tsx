@@ -2,12 +2,26 @@ import { useCallback } from "react";
 
 import { api, getApiBase } from "@/lib/api";
 import { isNative, platform } from "@/lib/capacitor";
+import { isTauriRuntime } from "@/lib/platform";
 import { OAuthButtons as OAuthButtonsBase } from "@crate/ui/domain/auth/OAuthButtons";
 
 interface OAuthButtonsProps {
   returnTo?: string;
   inviteToken?: string;
 }
+
+type TauriOpenerGlobal = Window &
+  typeof globalThis & {
+    __TAURI__?: {
+      opener?: {
+        openUrl?: (url: string) => Promise<void> | void;
+        open?: (url: string) => Promise<void> | void;
+      };
+      shell?: {
+        open?: (url: string) => Promise<void> | void;
+      };
+    };
+  };
 
 const fetchProviders = () =>
   api<
@@ -37,6 +51,11 @@ function associatedListenOrigin(base: string): string | null {
     ) {
       return "https://listen.dev.lespedants.org";
     }
+    if (hostname.startsWith("listen.")) return `${protocol}//${hostname}`;
+    if (hostname.startsWith("api."))
+      return `${protocol}//listen.${hostname.slice(4)}`;
+    if (hostname.startsWith("admin."))
+      return `${protocol}//listen.${hostname.slice(6)}`;
   } catch {
     return null;
   }
@@ -54,6 +73,28 @@ function nativeOAuthCallbackUrl(base: string, returnTo: string | null): URL {
   return callbackUrl;
 }
 
+function tauriOAuthCallbackUrl(returnTo: string | null): URL {
+  const callbackUrl = new URL("http://127.0.0.1:17654/oauth/callback");
+  if (returnTo && returnTo !== "/")
+    callbackUrl.searchParams.set("next", returnTo);
+  return callbackUrl;
+}
+
+export async function openExternalOAuthUrl(url: string): Promise<void> {
+  const tauri = (window as TauriOpenerGlobal).__TAURI__;
+  const opener =
+    tauri?.opener?.openUrl ?? tauri?.opener?.open ?? tauri?.shell?.open;
+  if (opener) {
+    await opener(url);
+    return;
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.location.href = url;
+  }
+}
+
 export function OAuthButtons({
   returnTo = "/",
   inviteToken,
@@ -63,6 +104,15 @@ export function OAuthButtons({
       const base = getApiBase() || window.location.origin;
       const target = new URL(loginUrl, base);
       if (invite) target.searchParams.set("invite", invite);
+      if (isTauriRuntime) {
+        const callbackUrl = tauriOAuthCallbackUrl(rt);
+        target.searchParams.set("return_to", callbackUrl.toString());
+        target.searchParams.set("app_id", "listen-tauri");
+        void openExternalOAuthUrl(target.toString()).catch(() => {
+          window.location.href = target.toString();
+        });
+        return;
+      }
       if (isNative) {
         const callbackUrl = nativeOAuthCallbackUrl(base, rt);
         target.searchParams.set("return_to", callbackUrl.toString());

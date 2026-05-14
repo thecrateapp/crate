@@ -5,6 +5,6 @@
     "app/shared/ui",
     "app/ui",
     "app/listen",
-    "app/site"
+    "app/listen-desktop"
   ]
 }

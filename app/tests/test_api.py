@@ -5,10 +5,22 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
+from crate.api import _extra_cors_origins
 
-def _make_mock_session(
-    fetchone_returns=None, fetchall_returns=None, fetchall_side_effects=None
-):
+
+def test_extra_cors_origins_parse_operator_env(monkeypatch):
+    monkeypatch.setenv(
+        "CRATE_CORS_EXTRA_ORIGINS",
+        " tauri://localhost/, https://tauri.localhost ,,",
+    )
+
+    assert _extra_cors_origins() == [
+        "tauri://localhost",
+        "https://tauri.localhost",
+    ]
+
+
+def _make_mock_session(fetchone_returns=None, fetchall_returns=None, fetchall_side_effects=None):
     """Create a mock transaction_scope that simulates session.execute().mappings().first()/.all()."""
     call_index = [0]
 
@@ -27,15 +39,9 @@ def _make_mock_session(
             idx = call_index[0]
             call_index[0] += 1
             if fetchall_side_effects:
-                rows = (
-                    fetchall_side_effects[idx]
-                    if idx < len(fetchall_side_effects)
-                    else []
-                )
+                rows = fetchall_side_effects[idx] if idx < len(fetchall_side_effects) else []
             elif fetchone_returns and idx < len(fetchone_returns):
-                rows = (
-                    [fetchone_returns[idx]] if fetchone_returns[idx] is not None else []
-                )
+                rows = [fetchone_returns[idx]] if fetchone_returns[idx] is not None else []
             elif fetchall_returns:
                 rows = fetchall_returns[idx] if idx < len(fetchall_returns) else []
             else:
@@ -65,57 +71,34 @@ class TestArtistsAPI:
         }
         # get_artists_count calls session.execute().mappings().first() -> {"cnt": 1}
         # get_artists_page calls session.execute().mappings().all() -> [mock_row]
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [{"cnt": 1}],  # first() returns first element
-                [mock_row],  # all() returns list
-            ]
-        )
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"cnt": 1}],   # first() returns first element
+            [mock_row],      # all() returns list
+        ])
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
-            ),
-            patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.get_all_artist_issue_counts", return_value={}), \
+             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope):
             resp = test_app.get("/api/artists")
             assert resp.status_code == 200
             data = resp.json()
             assert "items" in data
             assert data["total"] == 1
             assert data["items"][0]["name"] == "Radiohead"
-            assert (
-                data["items"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
-            )
+            assert data["items"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
 
     def test_get_artists_pagination(self, test_app):
-        rows = [
-            {
-                "name": f"Artist {i}",
-                "album_count": 1,
-                "track_count": 10,
-                "total_size": 1000,
-                "formats_json": [],
-                "primary_format": None,
-                "has_photo": 0,
-            }
-            for i in range(3)
-        ]
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [{"cnt": 5}],
-                rows,
-            ]
-        )
+        rows = [{"name": f"Artist {i}", "album_count": 1, "track_count": 10,
+                 "total_size": 1000, "formats_json": [], "primary_format": None, "has_photo": 0}
+                for i in range(3)]
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"cnt": 5}],
+            rows,
+        ])
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
-            ),
-            patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.get_all_artist_issue_counts", return_value={}), \
+             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope):
             resp = test_app.get("/api/artists?page=1&per_page=3")
             assert resp.status_code == 200
             data = resp.json()
@@ -124,43 +107,18 @@ class TestArtistsAPI:
 
     def test_get_artists_list_view_batches_genres(self, test_app):
         rows = [
-            {
-                "name": "Artist 1",
-                "album_count": 1,
-                "track_count": 10,
-                "total_size": 1000,
-                "formats_json": [],
-                "primary_format": None,
-                "has_photo": 0,
-            },
-            {
-                "name": "Artist 2",
-                "album_count": 1,
-                "track_count": 8,
-                "total_size": 900,
-                "formats_json": [],
-                "primary_format": None,
-                "has_photo": 0,
-            },
+            {"name": "Artist 1", "album_count": 1, "track_count": 10, "total_size": 1000, "formats_json": [], "primary_format": None, "has_photo": 0},
+            {"name": "Artist 2", "album_count": 1, "track_count": 8, "total_size": 900, "formats_json": [], "primary_format": None, "has_photo": 0},
         ]
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [{"cnt": 2}],
-                rows,
-            ]
-        )
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"cnt": 2}],
+            rows,
+        ])
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
-            ),
-            patch(
-                "crate.api.browse_artist.get_artist_list_genres_map",
-                return_value={"Artist 1": ["post-hardcore"], "Artist 2": ["emo"]},
-            ) as genres_map,
-            patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.get_all_artist_issue_counts", return_value={}), \
+             patch("crate.api.browse_artist.get_artist_list_genres_map", return_value={"Artist 1": ["post-hardcore"], "Artist 2": ["emo"]}) as genres_map, \
+             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope):
             resp = test_app.get("/api/artists?view=list")
             assert resp.status_code == 200
             data = resp.json()
@@ -169,20 +127,14 @@ class TestArtistsAPI:
             genres_map.assert_called_once_with(["Artist 1", "Artist 2"])
 
     def test_get_artists_with_query(self, test_app):
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [{"cnt": 0}],
-                [],
-            ]
-        )
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"cnt": 0}],
+            [],
+        ])
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
-            ),
-            patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.get_all_artist_issue_counts", return_value={}), \
+             patch("crate.db.queries.browse_artist_listing.read_scope", mock_scope):
             resp = test_app.get("/api/artists?q=radio&sort=name")
             assert resp.status_code == 200
             data = resp.json()
@@ -191,23 +143,14 @@ class TestArtistsAPI:
     def test_get_artists_popularity_sort_uses_consolidated_signal(self, test_app):
         captured: dict[str, str] = {}
 
-        def fake_get_artists_page(
-            select_cols, joins, where_sql, order_sql, params, per_page, offset
-        ):
+        def fake_get_artists_page(select_cols, joins, where_sql, order_sql, params, per_page, offset):
             captured["order_sql"] = order_sql
             return []
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch(
-                "crate.api.browse_artist.get_all_artist_issue_counts", return_value={}
-            ),
-            patch("crate.api.browse_artist.get_artists_count", return_value=0),
-            patch(
-                "crate.api.browse_artist.get_artists_page",
-                side_effect=fake_get_artists_page,
-            ),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.get_all_artist_issue_counts", return_value={}), \
+             patch("crate.api.browse_artist.get_artists_count", return_value=0), \
+             patch("crate.api.browse_artist.get_artists_page", side_effect=fake_get_artists_page):
             resp = test_app.get("/api/artists?sort=popularity")
             assert resp.status_code == 200
 
@@ -259,17 +202,10 @@ class TestArtistDetailAPI:
             },
         ]
 
-        with (
-            patch("crate.api.browse_artist.get_cache", return_value=None),
-            patch("crate.api.browse_artist.set_cache"),
-            patch(
-                "crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks
-            ),
-            patch(
-                "crate.api.browse_artist.get_top_tracks",
-                return_value=[{"title": "Track Two"}, {"title": "Track One"}],
-            ) as mock_top_tracks,
-        ):
+        with patch("crate.api.browse_artist.get_cache", return_value=None), \
+             patch("crate.api.browse_artist.set_cache"), \
+             patch("crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks), \
+             patch("crate.api.browse_artist.get_top_tracks", return_value=[{"title": "Track Two"}, {"title": "Track One"}]) as mock_top_tracks:
             payload = browse_artist._get_artist_top_tracks_payload("Tool", count=5)
 
         assert [item["title"] for item in payload[:2]] == ["Track Two", "Track One"]
@@ -284,41 +220,21 @@ class TestArtistDetailAPI:
             "has_photo": 0,
         }
         mock_albums = [
-            {
-                "id": 1,
-                "slug": "lateralus",
-                "name": "Lateralus",
-                "track_count": 13,
-                "total_size": 500000000,
-                "formats": ["flac"],
-                "year": "2001",
-                "has_cover": 1,
-            },
+            {"id": 1, "slug": "lateralus", "name": "Lateralus", "track_count": 13, "total_size": 500000000,
+             "formats": ["flac"], "year": "2001", "has_cover": 1},
         ]
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [{"name": "Progressive Metal"}],
-            ]
-        )
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"name": "Progressive Metal"}],
+        ])
 
-        with (
-            patch("crate.api.browse_artist.has_library_data", return_value=True),
-            patch("crate.api.browse_artist.artist_name_from_ref", return_value="Tool"),
-            patch(
-                "crate.api.browse_artist.get_library_artist", return_value=mock_artist
-            ),
-            patch(
-                "crate.api.browse_artist.get_library_albums", return_value=mock_albums
-            ),
-            patch(
-                "crate.api.browse_artist.get_album_quality_map",
-                return_value={
-                    1: {"format": "flac", "bit_depth": 16, "sample_rate": 44100}
-                },
-            ),
-            patch("crate.api.browse_artist.get_artist_issue_count", return_value=0),
-            patch("crate.db.queries.browse_artist_genres.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_artist.has_library_data", return_value=True), \
+             patch("crate.api.browse_artist.artist_name_from_ref", return_value="Tool"), \
+             patch("crate.api.browse_artist.get_library_artist", return_value=mock_artist), \
+             patch("crate.api.browse_artist.get_library_albums", return_value=mock_albums), \
+             patch("crate.api.browse_artist.get_album_quality_map", return_value={1: {"format": "flac", "bit_depth": 16, "sample_rate": 44100}}), \
+             patch("crate.api.browse_artist.get_artist_issue_count", return_value=0), \
+             patch("crate.db.queries.browse_artist_genres.read_scope", mock_scope):
+
             resp = test_app.get("/api/artists/7")
             assert resp.status_code == 200
             data = resp.json()
@@ -345,15 +261,8 @@ class TestArtistDetailAPI:
             "is_v2": True,
         }
 
-        with (
-            patch(
-                "crate.api.browse_artist.get_library_artist_by_slug",
-                return_value={"id": 7, "slug": "tool", "name": "Tool"},
-            ),
-            patch(
-                "crate.api.browse_artist.api_artist", return_value=artist_payload
-            ) as mock_api_artist,
-        ):
+        with patch("crate.api.browse_artist.get_library_artist_by_slug", return_value={"id": 7, "slug": "tool", "name": "Tool"}), \
+             patch("crate.api.browse_artist.api_artist", return_value=artist_payload) as mock_api_artist:
             resp = test_app.get("/api/artist-slugs/tool")
 
         assert resp.status_code == 200
@@ -382,16 +291,8 @@ class TestArtistDetailAPI:
             "artist_hot_rank": None,
         }
 
-        with (
-            patch(
-                "crate.api.browse_artist.get_library_artist_by_slug",
-                return_value={"id": 7, "slug": "tool", "name": "Tool"},
-            ),
-            patch(
-                "crate.api.browse_artist._build_artist_page_payload",
-                return_value=artist_payload,
-            ) as mock_payload,
-        ):
+        with patch("crate.api.browse_artist.get_library_artist_by_slug", return_value={"id": 7, "slug": "tool", "name": "Tool"}), \
+             patch("crate.api.browse_artist._build_artist_page_payload", return_value=artist_payload) as mock_payload:
             resp = test_app.get("/api/artist-slugs/tool/page")
 
         assert resp.status_code == 200
@@ -412,19 +313,7 @@ class TestArtistDetailAPI:
             "id": 7,
             "slug": "tool",
             "name": "Tool",
-            "albums": [
-                {
-                    "id": 1,
-                    "slug": "lateralus",
-                    "name": "Lateralus",
-                    "display_name": "Lateralus",
-                    "tracks": 13,
-                    "formats": ["flac"],
-                    "size_mb": 512,
-                    "year": "2001",
-                    "has_cover": True,
-                }
-            ],
+            "albums": [{"id": 1, "slug": "lateralus", "name": "Lateralus", "display_name": "Lateralus", "tracks": 13, "formats": ["flac"], "size_mb": 512, "year": "2001", "has_cover": True}],
             "total_tracks": 50,
             "total_size_mb": 4096,
             "primary_format": "flac",
@@ -433,65 +322,33 @@ class TestArtistDetailAPI:
             "issue_count": 0,
             "is_v2": True,
         }
-        info_payload = {
-            "similar": [
-                {"name": "A Perfect Circle", "id": 9, "slug": "a-perfect-circle"}
-            ]
-        }
-        top_tracks_payload = [
-            {
-                "id": "track-1",
-                "track_id": 91,
-                "title": "The Grudge",
-                "artist": "Tool",
-                "artist_id": 7,
-                "artist_slug": "tool",
-                "album": "Lateralus",
-                "album_id": 1,
-                "album_slug": "lateralus",
-                "duration": 490,
-                "track": 1,
-                "format": "flac",
-            }
-        ]
+        info_payload = {"similar": [{"name": "A Perfect Circle", "id": 9, "slug": "a-perfect-circle"}]}
+        top_tracks_payload = [{
+            "id": "track-1",
+            "track_id": 91,
+            "title": "The Grudge",
+            "artist": "Tool",
+            "artist_id": 7,
+            "artist_slug": "tool",
+            "album": "Lateralus",
+            "album_id": 1,
+            "album_slug": "lateralus",
+            "duration": 490,
+            "track": 1,
+            "format": "flac",
+        }]
         shows_payload = {"events": [], "configured": True, "source": "cache"}
-        enrichment_payload = {
-            "setlist": {
-                "probable_setlist": [
-                    {"title": "The Grudge", "frequency": 7, "play_count": 3}
-                ],
-                "total_shows": 1,
-            }
-        }
+        enrichment_payload = {"setlist": {"probable_setlist": [{"title": "The Grudge", "frequency": 7, "play_count": 3}], "total_shows": 1}}
 
-        with (
-            patch("crate.api.browse_artist.get_cache", return_value=None),
-            patch("crate.api.browse_artist.set_cache") as mock_set_cache,
-            patch("crate.api.browse_artist.artist_name_from_ref", return_value="Tool"),
-            patch(
-                "crate.api.browse_artist.api_artist", return_value=artist_payload
-            ) as mock_artist,
-            patch(
-                "crate.api.browse_artist._get_artist_page_info",
-                return_value=info_payload,
-            ) as mock_info,
-            patch(
-                "crate.api.browse_artist._get_artist_top_tracks_payload",
-                return_value=top_tracks_payload,
-            ) as mock_top_tracks,
-            patch(
-                "crate.api.browse_artist._get_artist_page_shows",
-                return_value=shows_payload,
-            ) as mock_shows,
-            patch(
-                "crate.api.browse_artist.get_top_artists",
-                return_value=[{"artist_id": 3}, {"artist_id": 7}, {"artist_id": 9}],
-            ) as mock_top_artists,
-            patch(
-                "crate.api.enrichment.get_artist_page_enrichment",
-                return_value=enrichment_payload,
-            ) as mock_enrichment,
-        ):
+        with patch("crate.api.browse_artist.get_cache", return_value=None), \
+             patch("crate.api.browse_artist.set_cache") as mock_set_cache, \
+             patch("crate.api.browse_artist.artist_name_from_ref", return_value="Tool"), \
+             patch("crate.api.browse_artist.api_artist", return_value=artist_payload) as mock_artist, \
+             patch("crate.api.browse_artist._get_artist_page_info", return_value=info_payload) as mock_info, \
+             patch("crate.api.browse_artist._get_artist_top_tracks_payload", return_value=top_tracks_payload) as mock_top_tracks, \
+             patch("crate.api.browse_artist._get_artist_page_shows", return_value=shows_payload) as mock_shows, \
+             patch("crate.api.browse_artist.get_top_artists", return_value=[{"artist_id": 3}, {"artist_id": 7}, {"artist_id": 9}]) as mock_top_artists, \
+             patch("crate.api.enrichment.get_artist_page_enrichment", return_value=enrichment_payload) as mock_enrichment:
             resp = test_app.get("/api/artists/7/page")
 
         assert resp.status_code == 200
@@ -526,29 +383,15 @@ class TestArtistDetailAPI:
             "is_v2": True,
         }
 
-        with (
-            patch("crate.api.browse_artist.get_cache", return_value=None),
-            patch("crate.api.browse_artist.set_cache"),
-            patch(
-                "crate.api.browse_artist.artist_name_from_ref",
-                return_value="Poison The Well",
-            ) as mock_artist_name_from_ref,
-            patch("crate.api.browse_artist.api_artist", return_value=artist_payload),
-            patch(
-                "crate.api.browse_artist._get_artist_page_info",
-                return_value={"similar": []},
-            ),
-            patch(
-                "crate.api.browse_artist._get_artist_top_tracks_payload",
-                return_value=[],
-            ),
-            patch(
-                "crate.api.browse_artist._get_artist_page_shows",
-                return_value={"events": [], "configured": False, "source": "none"},
-            ),
-            patch("crate.api.browse_artist.get_top_artists", return_value=[]),
-            patch("crate.api.enrichment.get_artist_page_enrichment", return_value={}),
-        ):
+        with patch("crate.api.browse_artist.get_cache", return_value=None), \
+             patch("crate.api.browse_artist.set_cache"), \
+             patch("crate.api.browse_artist.artist_name_from_ref", return_value="Poison The Well") as mock_artist_name_from_ref, \
+             patch("crate.api.browse_artist.api_artist", return_value=artist_payload), \
+             patch("crate.api.browse_artist._get_artist_page_info", return_value={"similar": []}), \
+             patch("crate.api.browse_artist._get_artist_top_tracks_payload", return_value=[]), \
+             patch("crate.api.browse_artist._get_artist_page_shows", return_value={"events": [], "configured": False, "source": "none"}), \
+             patch("crate.api.browse_artist.get_top_artists", return_value=[]), \
+             patch("crate.api.enrichment.get_artist_page_enrichment", return_value={}):
             resp = test_app.get("/api/artists/52/page?slug=poison-the-well")
 
         assert resp.status_code == 200
@@ -570,29 +413,15 @@ class TestArtistDetailAPI:
             "is_v2": True,
         }
 
-        with (
-            patch("crate.api.browse_artist.get_cache", return_value=None),
-            patch("crate.api.browse_artist.set_cache"),
-            patch(
-                "crate.api.browse_artist.artist_name_from_ref",
-                return_value="Poison The Well",
-            ),
-            patch("crate.api.browse_artist.api_artist", return_value=artist_payload),
-            patch(
-                "crate.api.browse_artist._get_artist_page_info",
-                return_value={"similar": []},
-            ),
-            patch(
-                "crate.api.browse_artist._get_artist_top_tracks_payload",
-                return_value=[],
-            ),
-            patch(
-                "crate.api.browse_artist._get_artist_page_shows",
-                return_value={"events": [], "configured": False, "source": "none"},
-            ),
-            patch("crate.api.browse_artist.get_top_artists", return_value=[]),
-            patch("crate.api.enrichment.get_artist_page_enrichment", return_value={}),
-        ):
+        with patch("crate.api.browse_artist.get_cache", return_value=None), \
+             patch("crate.api.browse_artist.set_cache"), \
+             patch("crate.api.browse_artist.artist_name_from_ref", return_value="Poison The Well"), \
+             patch("crate.api.browse_artist.api_artist", return_value=artist_payload), \
+             patch("crate.api.browse_artist._get_artist_page_info", return_value={"similar": []}), \
+             patch("crate.api.browse_artist._get_artist_top_tracks_payload", return_value=[]), \
+             patch("crate.api.browse_artist._get_artist_page_shows", return_value={"events": [], "configured": False, "source": "none"}), \
+             patch("crate.api.browse_artist.get_top_artists", return_value=[]), \
+             patch("crate.api.enrichment.get_artist_page_enrichment", return_value={}):
             resp = test_app.get("/api/artists/52/page?slug=poison-the-well")
 
         assert resp.status_code == 200
@@ -616,26 +445,13 @@ class TestArtistDetailAPI:
             "lineup": ["High Vis"],
         }
 
-        with (
-            patch(
-                "crate.api.browse_artist._library_artist_ref",
-                return_value={"id": 52, "slug": "high-vis"},
-            ),
-            patch(
-                "crate.api.browse_artist.get_artist_genres_by_name",
-                return_value=["post-hardcore"],
-            ),
-            patch(
-                "crate.api.browse_artist.db_get_shows",
-                return_value=[duplicate_show, dict(duplicate_show)],
-            ),
-            patch("crate.api.browse_artist.get_attending_show_ids", return_value={99}),
-            patch("crate.setlistfm.get_cached_probable_setlist", return_value=[]),
-            patch("crate.ticketmaster.is_configured", return_value=True),
-        ):
-            payload = _get_artist_page_shows(
-                user_id=1, name="High Vis", limit=12, country=""
-            )
+        with patch("crate.api.browse_artist._library_artist_ref", return_value={"id": 52, "slug": "high-vis"}), \
+             patch("crate.api.browse_artist.get_artist_genres_by_name", return_value=["post-hardcore"]), \
+             patch("crate.api.browse_artist.db_get_shows", return_value=[duplicate_show, dict(duplicate_show)]), \
+             patch("crate.api.browse_artist.get_attending_show_ids", return_value={99}), \
+             patch("crate.setlistfm.get_cached_probable_setlist", return_value=[]), \
+             patch("crate.ticketmaster.is_configured", return_value=True):
+            payload = _get_artist_page_shows(user_id=1, name="High Vis", limit=12, country="")
 
         assert payload["source"] == "cache"
         assert len(payload["events"]) == 1
@@ -664,216 +480,57 @@ class TestArtistDetailAPI:
             "has_cover": True,
             "cover_file": "cover.jpg",
             "tracks": [],
-            "album_tags": {
-                "artist": "Quicksand",
-                "album": "Slip",
-                "year": "1993",
-                "genre": "",
-                "musicbrainz_albumid": None,
-            },
+            "album_tags": {"artist": "Quicksand", "album": "Slip", "year": "1993", "genre": "", "musicbrainz_albumid": None},
             "musicbrainz_albumid": None,
             "genres": [],
             "genre_profile": [],
         }
 
-        with (
-            patch(
-                "crate.api.browse_album.get_library_artist_by_slug", return_value=artist
-            ),
-            patch("crate.api.browse_album.get_library_albums", return_value=albums),
-            patch(
-                "crate.api.browse_album.api_album", return_value=album_payload
-            ) as mock_api_album,
-        ):
+        with patch("crate.api.browse_album.get_library_artist_by_slug", return_value=artist), \
+             patch("crate.api.browse_album.get_library_albums", return_value=albums), \
+             patch("crate.api.browse_album.api_album", return_value=album_payload) as mock_api_album:
             resp = test_app.get("/api/artist-slugs/quicksand/albums/slip")
 
         assert resp.status_code == 200
         assert resp.json()["name"] == "Slip"
         assert resp.json()["entity_uid"] == "123e4567-e89b-12d3-a456-426614174014"
-        assert (
-            resp.json()["artist_entity_uid"] == "123e4567-e89b-12d3-a456-426614174005"
-        )
+        assert resp.json()["artist_entity_uid"] == "123e4567-e89b-12d3-a456-426614174005"
         mock_api_album.assert_called_once_with(ANY, "Quicksand", "Slip")
-
-    def test_get_album_by_artist_slug_accepts_year_suffixed_stored_slug(
-        self, test_app
-    ):
-        artist = {"id": 72, "slug": "dredg", "name": "Dredg"}
-        albums = [
-            {
-                "id": 760,
-                "slug": "dredg-el-cielo-2002",
-                "artist": "Dredg",
-                "name": "El Cielo",
-            },
-        ]
-        album_payload = {
-            "id": 760,
-            "entity_uid": UUID("5ca26714-27f6-5c46-b6eb-5975bc991bcc"),
-            "slug": "dredg-el-cielo-2002",
-            "artist_id": 72,
-            "artist_entity_uid": UUID("f872f4db-dd23-5b40-b3d9-a9be4816b5fb"),
-            "artist_slug": "dredg",
-            "artist": "Dredg",
-            "name": "El Cielo",
-            "display_name": "El Cielo",
-            "path": "Dredg/El Cielo",
-            "track_count": 16,
-            "total_size_mb": 376,
-            "total_length_sec": 3445,
-            "has_cover": True,
-            "cover_file": "cover.jpg",
-            "tracks": [],
-            "album_tags": {"artist": "Dredg", "album": "El Cielo", "year": "2002"},
-            "musicbrainz_albumid": None,
-            "genres": [],
-            "genre_profile": [],
-        }
-
-        with (
-            patch(
-                "crate.api.browse_album.get_library_artist_by_slug", return_value=artist
-            ),
-            patch("crate.api.browse_album.get_library_albums", return_value=albums),
-            patch(
-                "crate.api.browse_album.api_album", return_value=album_payload
-            ) as mock_api_album,
-        ):
-            resp = test_app.get("/api/artist-slugs/dredg/albums/el-cielo-2002")
-
-        assert resp.status_code == 200
-        assert resp.json()["name"] == "El Cielo"
-        mock_api_album.assert_called_once_with(ANY, "Dredg", "El Cielo")
-
-    def test_get_album_by_artist_slug_accepts_artist_prefixed_title_slug(
-        self, test_app
-    ):
-        artist = {"id": 12203, "slug": "lip-critic", "name": "Lip Critic"}
-        albums = [
-            {
-                "id": 112117,
-                "slug": "lip-critic-lip-critic-ii",
-                "artist": "Lip Critic",
-                "name": "Lip Critic II",
-            },
-        ]
-        album_payload = {
-            "id": 112117,
-            "entity_uid": UUID("56cfcdb0-4906-54a1-ba50-f387c35977b3"),
-            "slug": "lip-critic-lip-critic-ii",
-            "artist_id": 12203,
-            "artist_entity_uid": UUID("990073e3-4168-5043-a638-44f15728860e"),
-            "artist_slug": "lip-critic",
-            "artist": "Lip Critic",
-            "name": "Lip Critic II",
-            "display_name": "Lip Critic II",
-            "path": "Lip Critic/Lip Critic II",
-            "track_count": 9,
-            "total_size_mb": 164,
-            "total_length_sec": 0,
-            "has_cover": True,
-            "cover_file": "cover.jpg",
-            "tracks": [],
-            "album_tags": {
-                "artist": "Lip Critic",
-                "album": "Lip Critic II",
-                "year": "2020",
-            },
-            "musicbrainz_albumid": None,
-            "genres": [],
-            "genre_profile": [],
-        }
-
-        with (
-            patch(
-                "crate.api.browse_album.get_library_artist_by_slug", return_value=artist
-            ),
-            patch("crate.api.browse_album.get_library_albums", return_value=albums),
-            patch(
-                "crate.api.browse_album.api_album", return_value=album_payload
-            ) as mock_api_album,
-        ):
-            resp = test_app.get("/api/artist-slugs/lip-critic/albums/ii")
-
-        assert resp.status_code == 200
-        assert resp.json()["name"] == "Lip Critic II"
-        mock_api_album.assert_called_once_with(ANY, "Lip Critic", "Lip Critic II")
-
-    def test_album_track_tags_coerce_null_year_to_blank_date(self):
-        from crate.api.browse_album import _track_tags
-
-        tags = _track_tags(
-            {
-                "title": "Same Ol' Road",
-                "artist": "dredg",
-                "album": "El Cielo",
-                "albumartist": None,
-                "track_number": 2,
-                "disc_number": None,
-                "year": None,
-                "genre": None,
-                "musicbrainz_albumid": None,
-                "musicbrainz_trackid": None,
-            }
-        )
-
-        assert tags["date"] == ""
-        assert tags["albumartist"] == ""
-        assert tags["tracknumber"] == "2"
-        assert tags["genre"] == ""
 
 
 class TestStatsAPI:
     def test_get_stats_reads_from_ops_snapshot(self, test_app):
         snapshot_payload = {
-            "snapshot": {
-                "scope": "ops",
-                "subject_key": "dashboard",
-                "version": 3,
-                "stale": False,
-                "generation_ms": 12,
-            },
+            "snapshot": {"scope": "ops", "subject_key": "dashboard", "version": 3, "stale": False, "generation_ms": 12},
             "stats": {
-                "artists": 100,
-                "albums": 500,
-                "tracks": 5000,
-                "formats": {"flac": 4000, "mp3": 1000},
-                "total_size_gb": 1024,
-                "last_scan": None,
-                "pending_imports": 7,
-                "pending_tasks": 2,
-                "total_duration_hours": 320.4,
-                "avg_bitrate": 914,
-                "top_genres": [{"name": "post-hardcore", "count": 42}],
-                "recent_albums": [],
-                "analyzed_tracks": 4900,
-                "avg_album_duration_min": 41.2,
-                "avg_tracks_per_album": 10.0,
+            "artists": 100,
+            "albums": 500,
+            "tracks": 5000,
+            "formats": {"flac": 4000, "mp3": 1000},
+            "total_size_gb": 1024,
+            "last_scan": None,
+            "pending_imports": 7,
+            "pending_tasks": 2,
+            "total_duration_hours": 320.4,
+            "avg_bitrate": 914,
+            "top_genres": [{"name": "post-hardcore", "count": 42}],
+            "recent_albums": [],
+            "analyzed_tracks": 4900,
+            "avg_album_duration_min": 41.2,
+            "avg_tracks_per_album": 10.0,
             },
         }
-        with (
-            patch("crate.api.analytics._has_library_data", return_value=True),
-            patch(
-                "crate.api.analytics.get_cached_ops_snapshot",
-                return_value=snapshot_payload,
-            ),
-        ):
+        with patch("crate.api.analytics._has_library_data", return_value=True), \
+             patch("crate.api.analytics.get_cached_ops_snapshot", return_value=snapshot_payload):
             resp = test_app.get("/api/stats")
             assert resp.status_code == 200
             assert resp.json()["pending_imports"] == 7
 
-    def test_get_stats_returns_empty_snapshot_shape_without_filesystem_scan(
-        self, test_app
-    ):
-        with (
-            patch("crate.api.analytics.get_cached_ops_snapshot", return_value={}),
-            patch("crate.api.analytics.count_import_queue_items", return_value=0),
-            patch("crate.api.analytics.list_tasks", return_value=[]),
-            patch(
-                "crate.api.analytics.library_path",
-                side_effect=AssertionError("filesystem scan should not run"),
-            ),
-        ):
+    def test_get_stats_returns_empty_snapshot_shape_without_filesystem_scan(self, test_app):
+        with patch("crate.api.analytics.get_cached_ops_snapshot", return_value={}), \
+             patch("crate.api.analytics.count_import_queue_items", return_value=0), \
+             patch("crate.api.analytics.list_tasks", return_value=[]), \
+             patch("crate.api.analytics.library_path", side_effect=AssertionError("filesystem scan should not run")):
             resp = test_app.get("/api/stats")
 
         assert resp.status_code == 200
@@ -888,13 +545,8 @@ class TestStatsAPI:
 
 class TestTimelineAPI:
     def test_timeline_returns_empty_without_filesystem_scan(self, test_app):
-        with (
-            patch("crate.api.analytics._has_library_data", return_value=False),
-            patch(
-                "crate.api.analytics.library_path",
-                side_effect=AssertionError("filesystem scan should not run"),
-            ),
-        ):
+        with patch("crate.api.analytics._has_library_data", return_value=False), \
+             patch("crate.api.analytics.library_path", side_effect=AssertionError("filesystem scan should not run")):
             resp = test_app.get("/api/timeline")
 
         assert resp.status_code == 200
@@ -916,19 +568,14 @@ class TestTimelineAPI:
             }
         ]
 
-        with (
-            patch("crate.api.analytics._has_library_data", return_value=True),
-            patch("crate.api.analytics.get_timeline_albums", return_value=rows),
-        ):
+        with patch("crate.api.analytics._has_library_data", return_value=True), \
+             patch("crate.api.analytics.get_timeline_albums", return_value=rows):
             resp = test_app.get("/api/timeline")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["1997"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174005"
-        assert (
-            data["1997"][0]["artist_entity_uid"]
-            == "123e4567-e89b-12d3-a456-426614174001"
-        )
+        assert data["1997"][0]["artist_entity_uid"] == "123e4567-e89b-12d3-a456-426614174001"
 
 
 class TestSearchAPI:
@@ -940,102 +587,37 @@ class TestSearchAPI:
         assert data["albums"] == []
 
     def test_search_from_db(self, test_app):
-        mock_scope = _make_mock_session(
-            fetchall_side_effects=[
-                [
-                    {
-                        "id": 1,
-                        "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174001"),
-                        "slug": "radiohead",
-                        "name": "Radiohead",
-                        "album_count": 9,
-                        "has_photo": 1,
-                    }
-                ],
-                [
-                    {
-                        "id": 5,
-                        "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174002"),
-                        "slug": "ok-computer",
-                        "artist": "Radiohead",
-                        "name": "OK Computer",
-                        "year": "1997",
-                        "has_cover": 1,
-                        "artist_id": 1,
-                        "artist_entity_uid": UUID(
-                            "123e4567-e89b-12d3-a456-426614174001"
-                        ),
-                        "artist_slug": "radiohead",
-                    }
-                ],
-                [
-                    {
-                        "id": 9,
-                        "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174000"),
-                        "storage_id": "legacy-storage",
-                        "slug": "paranoid-android",
-                        "title": "Paranoid Android",
-                        "artist": "Radiohead",
-                        "album_id": 5,
-                        "album_entity_uid": UUID(
-                            "123e4567-e89b-12d3-a456-426614174002"
-                        ),
-                        "album_slug": "ok-computer",
-                        "album": "OK Computer",
-                        "artist_id": 1,
-                        "artist_entity_uid": UUID(
-                            "123e4567-e89b-12d3-a456-426614174001"
-                        ),
-                        "artist_slug": "radiohead",
-                        "path": "/music/Radiohead/OK Computer/02 - Paranoid Android.flac",
-                        "duration": 387.0,
-                    }
-                ],
-            ]
-        )
+        mock_scope = _make_mock_session(fetchall_side_effects=[
+            [{"id": 1, "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174001"), "slug": "radiohead", "name": "Radiohead", "album_count": 9, "has_photo": 1}],
+            [{"id": 5, "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174002"), "slug": "ok-computer", "artist": "Radiohead", "name": "OK Computer",
+              "year": "1997", "has_cover": 1, "artist_id": 1, "artist_entity_uid": UUID("123e4567-e89b-12d3-a456-426614174001"), "artist_slug": "radiohead"}],
+            [{"id": 9, "entity_uid": UUID("123e4567-e89b-12d3-a456-426614174000"), "storage_id": "legacy-storage",
+              "slug": "paranoid-android", "title": "Paranoid Android", "artist": "Radiohead", "album_id": 5,
+              "album_entity_uid": UUID("123e4567-e89b-12d3-a456-426614174002"), "album_slug": "ok-computer",
+              "album": "OK Computer", "artist_id": 1, "artist_entity_uid": UUID("123e4567-e89b-12d3-a456-426614174001"), "artist_slug": "radiohead",
+              "path": "/music/Radiohead/OK Computer/02 - Paranoid Android.flac", "duration": 387.0}],
+        ])
 
-        with (
-            patch("crate.api.browse_media.has_library_data", return_value=True),
-            patch("crate.db.queries.browse_media_search.read_scope", mock_scope),
-        ):
+        with patch("crate.api.browse_media.has_library_data", return_value=True), \
+             patch("crate.db.queries.browse_media_search.read_scope", mock_scope):
             resp = test_app.get("/api/search?q=radio")
             assert resp.status_code == 200
             data = resp.json()
             assert len(data["artists"]) == 1
             assert data["artists"][0]["name"] == "Radiohead"
-            assert (
-                data["artists"][0]["entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174001"
-            )
-            assert (
-                data["albums"][0]["entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174002"
-            )
-            assert (
-                data["albums"][0]["artist_entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174001"
-            )
-            assert (
-                data["tracks"][0]["entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174000"
-            )
-            assert (
-                data["tracks"][0]["album_entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174002"
-            )
-            assert (
-                data["tracks"][0]["artist_entity_uid"]
-                == "123e4567-e89b-12d3-a456-426614174001"
-            )
+            assert data["artists"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174001"
+            assert data["albums"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174002"
+            assert data["albums"][0]["artist_entity_uid"] == "123e4567-e89b-12d3-a456-426614174001"
+            assert data["tracks"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
+            assert data["tracks"][0]["album_entity_uid"] == "123e4567-e89b-12d3-a456-426614174002"
+            assert data["tracks"][0]["artist_entity_uid"] == "123e4567-e89b-12d3-a456-426614174001"
             assert "storage_id" not in data["tracks"][0]
 
 
 class TestScanAPI:
     def test_start_scan(self, test_app):
-        with (
-            patch("crate.api.scanner.list_tasks", return_value=[]),
-            patch("crate.api.scanner.create_task", return_value="abc123"),
-        ):
+        with patch("crate.api.scanner.list_tasks", return_value=[]), \
+             patch("crate.api.scanner.create_task", return_value="abc123"):
             resp = test_app.post("/api/scan", json={})
             assert resp.status_code == 200
             data = resp.json()
@@ -1048,12 +630,8 @@ class TestScanAPI:
             assert resp.status_code == 409
 
     def test_start_scan_with_only(self, test_app):
-        with (
-            patch("crate.api.scanner.list_tasks", return_value=[]),
-            patch(
-                "crate.api.scanner.create_task", return_value="def456"
-            ) as mock_create,
-        ):
+        with patch("crate.api.scanner.list_tasks", return_value=[]), \
+             patch("crate.api.scanner.create_task", return_value="def456") as mock_create:
             resp = test_app.post("/api/scan", json={"only": "naming"})
             assert resp.status_code == 200
             mock_create.assert_called_once_with("scan", {"only": "naming"})
@@ -1078,12 +656,10 @@ class TestScanAPI:
             assert data["running_tasks"] == 2
 
     def test_status_falls_back_when_runtime_snapshot_missing(self, test_app):
-        with (
-            patch("crate.api.scanner.get_public_status_snapshot", return_value=None),
-            patch("crate.api.scanner.list_tasks", return_value=[]),
-            patch("crate.api.scanner.get_latest_scan", return_value=None),
-            patch("crate.api.scanner.count_import_queue_items", return_value=9),
-        ):
+        with patch("crate.api.scanner.get_public_status_snapshot", return_value=None), \
+             patch("crate.api.scanner.list_tasks", return_value=[]), \
+             patch("crate.api.scanner.get_latest_scan", return_value=None), \
+             patch("crate.api.scanner.count_import_queue_items", return_value=9):
             resp = test_app.get("/api/status")
             assert resp.status_code == 200
             data = resp.json()
@@ -1092,12 +668,10 @@ class TestScanAPI:
             assert data["running_tasks"] == 0
 
     def test_status_exposes_persisted_pending_imports(self, test_app):
-        with (
-            patch("crate.api.scanner.list_tasks", return_value=[]),
-            patch("crate.api.scanner.get_latest_scan", return_value=None),
-            patch("crate.api.scanner.count_import_queue_items", return_value=9),
-            patch("crate.api.scanner.get_public_status_snapshot", return_value=None),
-        ):
+        with patch("crate.api.scanner.list_tasks", return_value=[]), \
+             patch("crate.api.scanner.get_latest_scan", return_value=None), \
+             patch("crate.api.scanner.count_import_queue_items", return_value=9), \
+             patch("crate.api.scanner.get_public_status_snapshot", return_value=None):
             resp = test_app.get("/api/status")
             assert resp.status_code == 200
             data = resp.json()
@@ -1127,33 +701,21 @@ class TestImportsAPI:
             assert resp.json() == pending
 
     def test_imports_import_queues_worker_task(self, test_app):
-        with patch(
-            "crate.api.imports.create_task", return_value="task-import-1"
-        ) as mock_create:
+        with patch("crate.api.imports.create_task", return_value="task-import-1") as mock_create:
             resp = test_app.post(
                 "/api/imports/import",
-                json={
-                    "source_path": "/music/.imports/tidal/A/B",
-                    "artist": "A",
-                    "album": "B",
-                },
+                json={"source_path": "/music/.imports/tidal/A/B", "artist": "A", "album": "B"},
             )
             assert resp.status_code == 200
             assert resp.json()["task_id"] == "task-import-1"
             assert resp.json()["status"] == "queued"
             mock_create.assert_called_once_with(
                 "import_queue_item",
-                {
-                    "source_path": "/music/.imports/tidal/A/B",
-                    "artist": "A",
-                    "album": "B",
-                },
+                {"source_path": "/music/.imports/tidal/A/B", "artist": "A", "album": "B"},
             )
 
     def test_imports_import_all_queues_worker_task(self, test_app):
-        with patch(
-            "crate.api.imports.create_task", return_value="task-import-all"
-        ) as mock_create:
+        with patch("crate.api.imports.create_task", return_value="task-import-all") as mock_create:
             resp = test_app.post("/api/imports/import-all")
             assert resp.status_code == 200
             assert resp.json()["task_id"] == "task-import-all"
@@ -1161,9 +723,7 @@ class TestImportsAPI:
             mock_create.assert_called_once_with("import_queue_all", {})
 
     def test_imports_remove_queues_worker_task(self, test_app):
-        with patch(
-            "crate.api.imports.create_task", return_value="task-remove-1"
-        ) as mock_create:
+        with patch("crate.api.imports.create_task", return_value="task-remove-1") as mock_create:
             resp = test_app.post(
                 "/api/imports/remove",
                 json={"source_path": "/music/.imports/tidal/A/B"},
@@ -1180,26 +740,10 @@ class TestImportsAPI:
 class TestGenresAPI:
     def test_get_invalid_taxonomy_nodes_summary(self, test_app):
         rows = [
-            {
-                "id": 1,
-                "slug": "wikidata",
-                "name": "wikidata",
-                "alias_count": 2,
-                "edge_count": 3,
-                "reason": "external-section-marker",
-            },
-            {
-                "id": 2,
-                "slug": "q123",
-                "name": "Q123",
-                "alias_count": 0,
-                "edge_count": 1,
-                "reason": "wikidata-entity-id",
-            },
+            {"id": 1, "slug": "wikidata", "name": "wikidata", "alias_count": 2, "edge_count": 3, "reason": "external-section-marker"},
+            {"id": 2, "slug": "q123", "name": "Q123", "alias_count": 0, "edge_count": 1, "reason": "wikidata-entity-id"},
         ]
-        with patch(
-            "crate.api.genres.list_invalid_genre_taxonomy_nodes", return_value=rows
-        ):
+        with patch("crate.api.genres.list_invalid_genre_taxonomy_nodes", return_value=rows):
             resp = test_app.get("/api/genres/taxonomy/invalid?limit=1")
             assert resp.status_code == 200
             data = resp.json()
@@ -1210,12 +754,8 @@ class TestGenresAPI:
             assert data["items"][0]["slug"] == "wikidata"
 
     def test_cleanup_invalid_taxonomy_nodes_starts_task(self, test_app):
-        with (
-            patch("crate.api.genres.list_tasks", side_effect=[[], []]),
-            patch(
-                "crate.api.genres.create_task", return_value="cleanup123"
-            ) as mock_create,
-        ):
+        with patch("crate.api.genres.list_tasks", side_effect=[[], []]), \
+             patch("crate.api.genres.create_task", return_value="cleanup123") as mock_create:
             resp = test_app.post("/api/genres/taxonomy/cleanup-invalid")
             assert resp.status_code == 200
             data = resp.json()
@@ -1225,13 +765,8 @@ class TestGenresAPI:
             mock_create.assert_called_once_with("cleanup_invalid_genre_taxonomy", {})
 
     def test_cleanup_invalid_taxonomy_nodes_deduplicates_running_task(self, test_app):
-        with (
-            patch(
-                "crate.api.genres.list_tasks",
-                side_effect=[[{"id": "running123", "status": "running"}]],
-            ),
-            patch("crate.api.genres.create_task") as mock_create,
-        ):
+        with patch("crate.api.genres.list_tasks", side_effect=[[{"id": "running123", "status": "running"}]]), \
+             patch("crate.api.genres.create_task") as mock_create:
             resp = test_app.post("/api/genres/taxonomy/cleanup-invalid")
             assert resp.status_code == 200
             data = resp.json()
@@ -1260,35 +795,18 @@ class TestOfflineAPI:
         }
         album = {"id": 14, "slug": "quicksand-distant-populations"}
 
-        with (
-            patch(
-                "crate.api.offline.get_library_track_by_storage_id", return_value=track
-            ),
-            patch("crate.api.offline.get_library_album_by_id", return_value=album),
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
-            resp = test_app.get(
-                "/api/offline/tracks/by-storage/track-storage-24/manifest"
-            )
+        with patch("crate.api.offline.get_library_track_by_storage_id", return_value=track), \
+             patch("crate.api.offline.get_library_album_by_id", return_value=album), \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
+            resp = test_app.get("/api/offline/tracks/by-storage/track-storage-24/manifest")
             assert resp.status_code == 200
             data = resp.json()
             assert data["kind"] == "track"
             assert data["id"] == "track-storage-24"
-            assert (
-                data["tracks"][0]["stream_url"]
-                == "/api/tracks/by-storage/track-storage-24/stream"
-            )
-            assert (
-                data["tracks"][0]["download_url"]
-                == "/api/tracks/by-storage/track-storage-24/download"
-            )
+            assert data["tracks"][0]["stream_url"] == "/api/tracks/by-storage/track-storage-24/stream"
+            assert data["tracks"][0]["download_url"] == "/api/tracks/by-storage/track-storage-24/download"
 
-    def test_get_track_manifest_by_storage_prefers_entity_uid_when_available(
-        self, test_app
-    ):
+    def test_get_track_manifest_by_storage_prefers_entity_uid_when_available(self, test_app):
         track = {
             "id": 24,
             "entity_uid": "123e4567-e89b-12d3-a456-426614174000",
@@ -1307,25 +825,12 @@ class TestOfflineAPI:
         }
         album = {"id": 14, "slug": "quicksand-distant-populations"}
 
-        with (
-            patch(
-                "crate.api.offline.get_library_track_by_storage_id", return_value=track
-            ),
-            patch("crate.api.offline.get_library_album_by_id", return_value=album),
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
-            resp = test_app.get(
-                "/api/offline/tracks/by-storage/track-storage-24/manifest",
-                follow_redirects=False,
-            )
+        with patch("crate.api.offline.get_library_track_by_storage_id", return_value=track), \
+             patch("crate.api.offline.get_library_album_by_id", return_value=album), \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
+            resp = test_app.get("/api/offline/tracks/by-storage/track-storage-24/manifest", follow_redirects=False)
             assert resp.status_code == 307
-            assert (
-                resp.headers["location"]
-                == "/api/offline/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/manifest"
-            )
+            assert resp.headers["location"] == "/api/offline/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/manifest"
 
     def test_get_track_manifest_by_path(self, test_app):
         track = {
@@ -1338,20 +843,10 @@ class TestOfflineAPI:
             "size": 4_096,
         }
 
-        with (
-            patch("crate.api.offline.get_library_track_by_path", return_value=track),
-            patch(
-                "crate.api.offline.get_library_album_by_id",
-                return_value={"id": 14, "slug": "quicksand-distant-populations"},
-            ),
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
-            resp = test_app.get(
-                "/api/offline/tracks/by-path/music/Quicksand/Distant Populations/01 Omission.flac/manifest"
-            )
+        with patch("crate.api.offline.get_library_track_by_path", return_value=track), \
+             patch("crate.api.offline.get_library_album_by_id", return_value={"id": 14, "slug": "quicksand-distant-populations"}), \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
+            resp = test_app.get("/api/offline/tracks/by-path/music/Quicksand/Distant Populations/01 Omission.flac/manifest")
             assert resp.status_code == 200
             assert "storage_id" not in resp.json()["tracks"][0]
 
@@ -1387,14 +882,9 @@ class TestOfflineAPI:
             },
         ]
 
-        with (
-            patch("crate.api.offline.get_library_album_by_id", return_value=album),
-            patch("crate.api.offline.get_library_tracks", return_value=tracks),
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
+        with patch("crate.api.offline.get_library_album_by_id", return_value=album), \
+             patch("crate.api.offline.get_library_tracks", return_value=tracks), \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
             resp = test_app.get("/api/offline/albums/14/manifest")
             assert resp.status_code == 200
             data = resp.json()
@@ -1467,19 +957,11 @@ class TestOfflineAPI:
             },
         }
 
-        with (
-            patch("crate.api.offline.get_playlist", return_value=playlist),
-            patch("crate.api.offline.can_view_playlist", return_value=True),
-            patch("crate.api.offline.get_playlist_tracks", return_value=tracks),
-            patch(
-                "crate.api.offline.get_library_tracks_by_storage_ids",
-                return_value=library_tracks,
-            ) as mock_batch,
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
+        with patch("crate.api.offline.get_playlist", return_value=playlist), \
+             patch("crate.api.offline.can_view_playlist", return_value=True), \
+             patch("crate.api.offline.get_playlist_tracks", return_value=tracks), \
+             patch("crate.api.offline.get_library_tracks_by_storage_ids", return_value=library_tracks) as mock_batch, \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
             resp = test_app.get("/api/offline/playlists/52/manifest")
             assert resp.status_code == 200
             data = resp.json()
@@ -1488,9 +970,7 @@ class TestOfflineAPI:
             assert data["total_bytes"] == 25_000
             mock_batch.assert_called_once_with(["track-storage-24", "track-storage-25"])
 
-    def test_get_playlist_manifest_prefers_entity_uid_over_legacy_storage_lookup(
-        self, test_app
-    ):
+    def test_get_playlist_manifest_prefers_entity_uid_over_legacy_storage_lookup(self, test_app):
         playlist = {
             "id": 52,
             "name": "Post-hardcore forever",
@@ -1523,22 +1003,12 @@ class TestOfflineAPI:
             "updated_at": "2026-04-18T10:00:00",
         }
 
-        with (
-            patch("crate.api.offline.get_playlist", return_value=playlist),
-            patch("crate.api.offline.can_view_playlist", return_value=True),
-            patch("crate.api.offline.get_playlist_tracks", return_value=tracks),
-            patch(
-                "crate.api.offline.get_library_tracks_by_entity_uids",
-                return_value={entity_uid: library_track},
-            ) as mock_entity_batch,
-            patch(
-                "crate.api.offline.get_library_tracks_by_storage_ids", return_value={}
-            ) as mock_storage_batch,
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
+        with patch("crate.api.offline.get_playlist", return_value=playlist), \
+             patch("crate.api.offline.can_view_playlist", return_value=True), \
+             patch("crate.api.offline.get_playlist_tracks", return_value=tracks), \
+             patch("crate.api.offline.get_library_tracks_by_entity_uids", return_value={entity_uid: library_track}) as mock_entity_batch, \
+             patch("crate.api.offline.get_library_tracks_by_storage_ids", return_value={}) as mock_storage_batch, \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
             resp = test_app.get("/api/offline/playlists/52/manifest")
             assert resp.status_code == 200
             data = resp.json()
@@ -1562,37 +1032,23 @@ class TestOfflineAPI:
         }
         album = {"id": 14, "slug": "quicksand-distant-populations"}
 
-        with (
-            patch(
-                "crate.api.offline.get_library_track_by_entity_uid", return_value=track
-            ),
-            patch("crate.api.offline.get_library_album_by_id", return_value=album),
-            patch(
-                "crate.api.offline.get_library_artist",
-                return_value={"id": 7, "slug": "quicksand"},
-            ),
-        ):
-            resp = test_app.get(
-                "/api/offline/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/manifest"
-            )
+        with patch("crate.api.offline.get_library_track_by_entity_uid", return_value=track), \
+             patch("crate.api.offline.get_library_album_by_id", return_value=album), \
+             patch("crate.api.offline.get_library_artist", return_value={"id": 7, "slug": "quicksand"}):
+            resp = test_app.get("/api/offline/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/manifest")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["id"] == "123e4567-e89b-12d3-a456-426614174000"
         assert data["tracks"][0]["entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
         assert "storage_id" not in data["tracks"][0]
-        assert (
-            data["tracks"][0]["stream_url"]
-            == "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/stream"
-        )
+        assert data["tracks"][0]["stream_url"] == "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/stream"
 
 
 class TestSyncLibraryAPI:
     def test_sync_library(self, test_app):
-        with (
-            patch("crate.api.tasks.list_tasks", return_value=[]),
-            patch("crate.api.tasks.create_task", return_value="sync123"),
-        ):
+        with patch("crate.api.tasks.list_tasks", return_value=[]), \
+             patch("crate.api.tasks.create_task", return_value="sync123"):
             resp = test_app.post("/api/tasks/sync-library")
             assert resp.status_code == 200
             data = resp.json()
@@ -1604,10 +1060,8 @@ class TestSyncLibraryAPI:
             assert resp.status_code == 409
 
     def test_backfill_track_fingerprints(self, test_app):
-        with (
-            patch("crate.api.tasks.list_tasks", return_value=[]),
-            patch("crate.api.tasks.create_task", return_value="fingerprints123"),
-        ):
+        with patch("crate.api.tasks.list_tasks", return_value=[]), \
+             patch("crate.api.tasks.create_task", return_value="fingerprints123"):
             resp = test_app.post("/api/tasks/backfill-track-fingerprints")
             assert resp.status_code == 200
             data = resp.json()
@@ -1627,9 +1081,7 @@ class TestWorkerAPI:
                 "live": {
                     "engine": "dramatiq",
                     "running_tasks": [{"id": "r1", "type": "scan", "pool": "default"}],
-                    "pending_tasks": [
-                        {"id": "p1", "type": "library_sync", "pool": "default"}
-                    ],
+                    "pending_tasks": [{"id": "p1", "type": "library_sync", "pool": "default"}],
                 }
             },
         ):
@@ -1644,10 +1096,8 @@ class TestWorkerAPI:
             "library_sync": 1800,
             "enrich_artists": 86400,
         }
-        with (
-            patch("crate.api.tasks.get_schedules", return_value=mock_schedules),
-            patch("crate.api.tasks.get_setting", return_value=None),
-        ):
+        with patch("crate.api.tasks.get_schedules", return_value=mock_schedules), \
+             patch("crate.api.tasks.get_setting", return_value=None):
             resp = test_app.get("/api/worker/schedules")
             assert resp.status_code == 200
             data = resp.json()
@@ -1660,17 +1110,9 @@ class TestTasksAPI:
     def test_list_tasks(self, test_app):
         snapshot = {
             "history": [
-                {
-                    "id": "t1",
-                    "type": "scan",
-                    "status": "completed",
-                    "progress": "",
-                    "error": None,
-                    "result": {"issues": 5},
-                    "params": {},
-                    "created_at": "2024-01-01T00:00:00",
-                    "updated_at": "2024-01-01T00:01:00",
-                },
+                {"id": "t1", "type": "scan", "status": "completed", "progress": "",
+                 "error": None, "result": {"issues": 5}, "params": {},
+                 "created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:01:00"},
             ]
         }
         with patch("crate.api.tasks.get_cached_tasks_surface", return_value=snapshot):
@@ -1682,13 +1124,7 @@ class TestTasksAPI:
 
     def test_admin_tasks_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:tasks",
-                "subject_key": "surface:100",
-                "version": 2,
-                "stale": False,
-                "generation_ms": 8,
-            },
+            "snapshot": {"scope": "ops:tasks", "subject_key": "surface:100", "version": 2, "stale": False, "generation_ms": 8},
             "live": {
                 "engine": "dramatiq",
                 "running_tasks": [],
@@ -1714,15 +1150,10 @@ class TestTasksAPI:
 
     def test_get_task_detail(self, test_app):
         mock_task = {
-            "id": "t1",
-            "type": "scan",
-            "status": "running",
+            "id": "t1", "type": "scan", "status": "running",
             "progress": '{"scanner": "naming"}',
-            "error": None,
-            "result": None,
-            "params": {},
-            "created_at": "2024-01-01T00:00:00",
-            "updated_at": "2024-01-01T00:01:00",
+            "error": None, "result": None, "params": {},
+            "created_at": "2024-01-01T00:00:00", "updated_at": "2024-01-01T00:01:00",
         }
         with patch("crate.api.tasks.get_task", return_value=mock_task):
             resp = test_app.get("/api/tasks/t1")
@@ -1738,20 +1169,12 @@ class TestTasksAPI:
 
     def test_cancel_task(self, test_app):
         mock_task = {
-            "id": "t1",
-            "type": "scan",
-            "status": "pending",
-            "progress": "",
-            "error": None,
-            "result": None,
-            "params": {},
-            "created_at": "2024-01-01",
-            "updated_at": "2024-01-01",
+            "id": "t1", "type": "scan", "status": "pending",
+            "progress": "", "error": None, "result": None, "params": {},
+            "created_at": "2024-01-01", "updated_at": "2024-01-01",
         }
-        with (
-            patch("crate.api.tasks.get_task", return_value=mock_task),
-            patch("crate.api.tasks.update_task") as mock_update,
-        ):
+        with patch("crate.api.tasks.get_task", return_value=mock_task), \
+             patch("crate.api.tasks.update_task") as mock_update:
             resp = test_app.post("/api/tasks/t1/cancel")
             assert resp.status_code == 200
             mock_update.assert_called_once_with("t1", status="cancelled")
@@ -1772,17 +1195,9 @@ class TestPlaylistCurationAPI:
             "is_followed": True,
         }
 
-        with (
-            patch("crate.api.curation.list_system_playlists", return_value=[playlist]),
-            patch(
-                "crate.api.curation.get_playlist_followers_count",
-                side_effect=AssertionError("unexpected follower count lookup"),
-            ),
-            patch(
-                "crate.api.curation.is_playlist_followed",
-                side_effect=AssertionError("unexpected follow lookup"),
-            ),
-        ):
+        with patch("crate.api.curation.list_system_playlists", return_value=[playlist]), \
+             patch("crate.api.curation.get_playlist_followers_count", side_effect=AssertionError("unexpected follower count lookup")), \
+             patch("crate.api.curation.is_playlist_followed", side_effect=AssertionError("unexpected follow lookup")):
             resp = test_app.get("/api/curation/playlists")
 
         assert resp.status_code == 200
@@ -1804,9 +1219,7 @@ class TestPlaylistCurationAPI:
             "follower_count": 5,
         }
 
-        with patch(
-            "crate.api.me.get_followed_system_playlists", return_value=[playlist]
-        ):
+        with patch("crate.api.me.get_followed_system_playlists", return_value=[playlist]):
             resp = test_app.get("/api/me/followed-playlists")
 
         assert resp.status_code == 200
@@ -1828,16 +1241,8 @@ class TestPlaylistCurationAPI:
             "follower_count": 9,
         }
 
-        with (
-            patch(
-                "crate.api.system_playlists.list_system_playlists",
-                return_value=[playlist],
-            ),
-            patch(
-                "crate.api.system_playlists.get_playlist_followers_count",
-                side_effect=AssertionError("unexpected follower count lookup"),
-            ),
-        ):
+        with patch("crate.api.system_playlists.list_system_playlists", return_value=[playlist]), \
+             patch("crate.api.system_playlists.get_playlist_followers_count", side_effect=AssertionError("unexpected follower count lookup")):
             resp = test_app.get("/api/admin/system-playlists")
 
         assert resp.status_code == 200
@@ -1845,9 +1250,7 @@ class TestPlaylistCurationAPI:
         assert len(data) == 1
         assert data[0]["follower_count"] == 9
 
-    def test_admin_system_playlist_editor_snapshot_collapses_detail_and_history(
-        self, test_app
-    ):
+    def test_admin_system_playlist_editor_snapshot_collapses_detail_and_history(self, test_app):
         playlist = {
             "id": 23,
             "name": "Curated Mix",
@@ -1868,42 +1271,23 @@ class TestPlaylistCurationAPI:
             "last_generated_at": None,
             "smart_rules": {"match": "all", "rules": [], "limit": 50, "sort": "random"},
         }
-        tracks = [
-            {
-                "title": "Locust Reign",
-                "artist": "Converge",
-                "album": "Jane Doe",
-                "duration": 424,
-            }
-        ]
-        history = [
-            {
-                "id": 3,
-                "started_at": "2026-04-23T10:00:00+00:00",
-                "completed_at": None,
-                "status": "running",
-                "track_count": None,
-                "duration_sec": None,
-                "error": None,
-                "triggered_by": "manual",
-                "rule_snapshot": {"match": "all"},
-            }
-        ]
+        tracks = [{"title": "Locust Reign", "artist": "Converge", "album": "Jane Doe", "duration": 424}]
+        history = [{
+            "id": 3,
+            "started_at": "2026-04-23T10:00:00+00:00",
+            "completed_at": None,
+            "status": "running",
+            "track_count": None,
+            "duration_sec": None,
+            "error": None,
+            "triggered_by": "manual",
+            "rule_snapshot": {"match": "all"},
+        }]
 
-        with (
-            patch("crate.api.system_playlists.get_playlist", return_value=playlist),
-            patch(
-                "crate.api.system_playlists.get_playlist_tracks", return_value=tracks
-            ),
-            patch(
-                "crate.api.system_playlists.get_generation_history",
-                return_value=history,
-            ),
-            patch(
-                "crate.api.system_playlists.get_playlist_followers_count",
-                side_effect=AssertionError("unexpected follower count lookup"),
-            ),
-        ):
+        with patch("crate.api.system_playlists.get_playlist", return_value=playlist), \
+             patch("crate.api.system_playlists.get_playlist_tracks", return_value=tracks), \
+             patch("crate.api.system_playlists.get_generation_history", return_value=history), \
+             patch("crate.api.system_playlists.get_playlist_followers_count", side_effect=AssertionError("unexpected follower count lookup")):
             resp = test_app.get("/api/admin/system-playlists/23/editor-snapshot")
 
         assert resp.status_code == 200
@@ -1916,43 +1300,32 @@ class TestPlaylistCurationAPI:
 
 class TestAcquisitionAPI:
     def test_acquisition_snapshot_collapses_tidal_and_soulseek_state(self, test_app):
-        tidal_queue = [
-            {
-                "id": 7,
-                "tidal_url": "https://tidal.com/album/7",
-                "tidal_id": "7",
-                "content_type": "album",
-                "title": "Jane Doe",
-                "artist": "Converge",
-                "status": "queued",
-                "source": "search",
-                "quality": "max",
-                "cover_url": None,
-                "created_at": "2026-04-23T10:00:00+00:00",
-            }
-        ]
-        slsk_downloads = [
-            {
-                "directory": "music/C/Converge - Jane Doe",
-                "filename": "01 - Concubine.flac",
-                "fullPath": "music/C/Converge - Jane Doe/01 - Concubine.flac",
-                "state": "downloading",
-                "percentComplete": 42,
-                "username": "peer42",
-                "averageSpeed": 2048,
-            }
-        ]
+        tidal_queue = [{
+            "id": 7,
+            "tidal_url": "https://tidal.com/album/7",
+            "tidal_id": "7",
+            "content_type": "album",
+            "title": "Jane Doe",
+            "artist": "Converge",
+            "status": "queued",
+            "source": "search",
+            "quality": "max",
+            "cover_url": None,
+            "created_at": "2026-04-23T10:00:00+00:00",
+        }]
+        slsk_downloads = [{
+            "directory": "music/C/Converge - Jane Doe",
+            "filename": "01 - Concubine.flac",
+            "fullPath": "music/C/Converge - Jane Doe/01 - Concubine.flac",
+            "state": "downloading",
+            "percentComplete": 42,
+            "username": "peer42",
+            "averageSpeed": 2048,
+        }]
 
-        with (
-            patch("crate.api.acquisition.tidal.is_authenticated", return_value=True),
-            patch(
-                "crate.api.acquisition.get_tidal_downloads", return_value=tidal_queue
-            ),
-            patch(
-                "crate.api.acquisition.soulseek.get_downloads",
-                return_value=slsk_downloads,
-            ),
-        ):
+        with patch("crate.api.acquisition.tidal.is_authenticated", return_value=True), \
+             patch("crate.api.acquisition.get_tidal_downloads", return_value=tidal_queue), \
+             patch("crate.api.acquisition.soulseek.get_downloads", return_value=slsk_downloads):
             resp = test_app.get("/api/acquisition/snapshot")
 
         assert resp.status_code == 200
@@ -1963,26 +1336,24 @@ class TestAcquisitionAPI:
         assert data["soulseek_queue"][0]["progress"] == 42
 
     def test_new_releases_snapshot_collapses_release_radar_state(self, test_app):
-        releases = [
-            {
-                "id": 11,
-                "artist_name": "Converge",
-                "album_title": "Axe to Fall",
-                "status": "detected",
-                "tidal_id": "11",
-                "tidal_url": "https://tidal.com/album/11",
-                "cover_url": "https://cdn.example/11.jpg",
-                "year": "2009",
-                "tracks": 13,
-                "quality": "max",
-                "release_date": "2026-04-25",
-                "release_type": "album",
-                "artist_id": 7,
-                "artist_slug": "converge",
-                "album_id": 19,
-                "album_slug": "axe-to-fall",
-            }
-        ]
+        releases = [{
+            "id": 11,
+            "artist_name": "Converge",
+            "album_title": "Axe to Fall",
+            "status": "detected",
+            "tidal_id": "11",
+            "tidal_url": "https://tidal.com/album/11",
+            "cover_url": "https://cdn.example/11.jpg",
+            "year": "2009",
+            "tracks": 13,
+            "quality": "max",
+            "release_date": "2026-04-25",
+            "release_type": "album",
+            "artist_id": 7,
+            "artist_slug": "converge",
+            "album_id": 19,
+            "album_slug": "axe-to-fall",
+        }]
 
         with patch("crate.api.acquisition.get_new_releases", return_value=releases):
             resp = test_app.get("/api/acquisition/new-releases/snapshot")
@@ -2028,13 +1399,8 @@ class TestHomeEndpointCaching:
             "tracks": [],
         }
 
-        with (
-            patch("crate.api.me.get_cache", return_value=cached_mix),
-            patch(
-                "crate.api.me.get_home_playlist",
-                side_effect=AssertionError("unexpected playlist rebuild"),
-            ),
-        ):
+        with patch("crate.api.me.get_cache", return_value=cached_mix), \
+             patch("crate.api.me.get_home_playlist", side_effect=AssertionError("unexpected playlist rebuild")):
             resp = test_app.get("/api/me/home/mixes/daily-discovery")
 
         assert resp.status_code == 200
@@ -2050,13 +1416,8 @@ class TestHomeEndpointCaching:
             "items": [],
         }
 
-        with (
-            patch("crate.api.me.get_cache", return_value=cached_section),
-            patch(
-                "crate.api.me.get_home_section",
-                side_effect=AssertionError("unexpected section rebuild"),
-            ),
-        ):
+        with patch("crate.api.me.get_cache", return_value=cached_section), \
+             patch("crate.api.me.get_home_section", side_effect=AssertionError("unexpected section rebuild")):
             resp = test_app.get("/api/me/home/sections/custom-mixes")
 
         assert resp.status_code == 200
@@ -2082,18 +1443,10 @@ class TestShowsAPI:
         ]
         refs = {"converge": {"id": 7, "slug": "converge"}}
 
-        with (
-            patch("crate.api.browse_artist.db_get_shows", return_value=shows),
-            patch(
-                "crate.api.browse_artist.get_all_artist_genre_map",
-                return_value={"Converge": ["metalcore"]},
-            ),
-            patch("crate.api.browse_artist._lookup_artist_refs", return_value=refs),
-            patch(
-                "crate.api.browse_artist._show_lineup_artists",
-                return_value=[{"name": "Converge", "id": 7, "slug": "converge"}],
-            ),
-        ):
+        with patch("crate.api.browse_artist.db_get_shows", return_value=shows), \
+             patch("crate.api.browse_artist.get_all_artist_genre_map", return_value={"Converge": ["metalcore"]}), \
+             patch("crate.api.browse_artist._lookup_artist_refs", return_value=refs), \
+             patch("crate.api.browse_artist._show_lineup_artists", return_value=[{"name": "Converge", "id": 7, "slug": "converge"}]):
             resp = test_app.get("/api/shows/cached?limit=5")
 
         assert resp.status_code == 200
@@ -2105,13 +1458,7 @@ class TestShowsAPI:
 class TestAdminLogsAPI:
     def test_admin_logs_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:logs",
-                "subject_key": "surface:100",
-                "version": 1,
-                "stale": False,
-                "generation_ms": 4,
-            },
+            "snapshot": {"scope": "ops:logs", "subject_key": "surface:100", "version": 1, "stale": False, "generation_ms": 4},
             "logs": [
                 {
                     "id": 1,
@@ -2133,9 +1480,7 @@ class TestAdminLogsAPI:
             ],
         }
 
-        with patch(
-            "crate.api.admin_metrics.get_cached_logs_surface", return_value=snapshot
-        ):
+        with patch("crate.api.admin_metrics.get_cached_logs_surface", return_value=snapshot):
             resp = test_app.get("/api/admin/logs-snapshot")
 
         assert resp.status_code == 200
@@ -2160,14 +1505,12 @@ class TestAdminMetricsAPI:
             recent_calls.append(name)
             return []
 
-        with (
-            patch("crate.metrics.query_summaries", side_effect=fake_query_summaries),
-            patch("crate.metrics.query_recent", side_effect=fake_query_recent),
-            patch("crate.db.cache_store.get_cache", return_value=None),
-            patch("crate.db.cache_store.set_cache"),
-            patch("crate.api.admin_metrics._build_metrics_system", return_value={}),
-            patch("crate.api.admin_metrics._list_running_tasks", return_value=[]),
-        ):
+        with patch("crate.metrics.query_summaries", side_effect=fake_query_summaries), \
+             patch("crate.metrics.query_recent", side_effect=fake_query_recent), \
+             patch("crate.db.cache_store.get_cache", return_value=None), \
+             patch("crate.db.cache_store.set_cache"), \
+             patch("crate.api.admin_metrics._build_metrics_system", return_value={}), \
+             patch("crate.api.admin_metrics._list_running_tasks", return_value=[]):
             resp = test_app.get("/api/admin/metrics/dashboard?period=minute&minutes=5")
 
         assert resp.status_code == 200
@@ -2191,9 +1534,7 @@ class TestAdminMetricsAPI:
             return []
 
         with patch("crate.metrics.query_recent", side_effect=fake_query_recent):
-            resp = test_app.get(
-                "/api/admin/metrics/timeseries?name=api.latency&period=minute&minutes=5"
-            )
+            resp = test_app.get("/api/admin/metrics/timeseries?name=api.latency&period=minute&minutes=5")
 
         assert resp.status_code == 200
         assert calls == ["api.request.latency"]
@@ -2204,74 +1545,40 @@ class TestHealthAPI:
     def test_album_metadata_tasks_accept_entity_uid_scope(self, test_app):
         album_uid = "11111111-2222-4333-8444-555555555555"
 
-        with patch(
-            "crate.api.management.create_task", return_value="task-lyrics"
-        ) as mock_create_task:
-            resp = test_app.post(
-                "/api/manage/sync-lyrics",
-                json={"album_entity_uid": album_uid, "limit": 1},
-            )
+        with patch("crate.api.management.create_task", return_value="task-lyrics") as mock_create_task:
+            resp = test_app.post("/api/manage/sync-lyrics", json={"album_entity_uid": album_uid, "limit": 1})
 
         assert resp.status_code == 200
         assert resp.json()["task_id"] == "task-lyrics"
         mock_create_task.assert_called_once_with(
             "sync_lyrics",
-            {
-                "album_entity_uid": album_uid,
-                "force": False,
-                "limit": 1,
-                "delay_seconds": 0.2,
-            },
+            {"album_entity_uid": album_uid, "force": False, "limit": 1, "delay_seconds": 0.2},
         )
 
-        with patch(
-            "crate.api.management.create_task", return_value="task-metadata"
-        ) as mock_create_task:
+        with patch("crate.api.management.create_task", return_value="task-metadata") as mock_create_task:
             resp = test_app.post(
                 "/api/manage/portable-metadata",
-                json={
-                    "album_entity_uid": album_uid,
-                    "write_audio_tags": True,
-                    "write_sidecars": True,
-                    "limit": 1,
-                },
+                json={"album_entity_uid": album_uid, "write_audio_tags": True, "write_sidecars": True, "limit": 1},
             )
 
         assert resp.status_code == 200
         assert resp.json()["task_id"] == "task-metadata"
         mock_create_task.assert_called_once_with(
             "write_portable_metadata",
-            {
-                "album_entity_uid": album_uid,
-                "write_audio_tags": True,
-                "write_sidecars": True,
-                "limit": 1,
-            },
+            {"album_entity_uid": album_uid, "write_audio_tags": True, "write_sidecars": True, "limit": 1},
         )
 
-        with patch(
-            "crate.api.management.create_task", return_value="task-export"
-        ) as mock_create_task:
+        with patch("crate.api.management.create_task", return_value="task-export") as mock_create_task:
             resp = test_app.post(
                 "/api/manage/portable-metadata/export-rich",
-                json={
-                    "album_entity_uid": album_uid,
-                    "include_audio": False,
-                    "write_rich_tags": False,
-                    "limit": 1,
-                },
+                json={"album_entity_uid": album_uid, "include_audio": False, "write_rich_tags": False, "limit": 1},
             )
 
         assert resp.status_code == 200
         assert resp.json()["task_id"] == "task-export"
         mock_create_task.assert_called_once_with(
             "export_rich_metadata",
-            {
-                "album_entity_uid": album_uid,
-                "include_audio": False,
-                "write_rich_tags": False,
-                "limit": 1,
-            },
+            {"album_entity_uid": album_uid, "include_audio": False, "write_rich_tags": False, "limit": 1},
         )
 
     def test_repair_catalog_endpoint(self, test_app):
@@ -2336,11 +1643,7 @@ class TestHealthAPI:
                     "message": "Would delete loose duplicate album folder for Birds In Row/UGLY",
                     "fs_write": True,
                     "details": {"reason": "identical track list"},
-                    "issue": {
-                        "id": 7,
-                        "check": "duplicate_albums",
-                        "details": {"artist": "Birds In Row"},
-                    },
+                    "issue": {"id": 7, "check": "duplicate_albums", "details": {"artist": "Birds In Row"}},
                 }
             ],
             "total": 1,
@@ -2350,12 +1653,8 @@ class TestHealthAPI:
             "generated_at": "2026-04-30T10:00:00+00:00",
         }
 
-        with patch(
-            "crate.api.management._build_repair_preview", return_value=preview
-        ) as mock_preview:
-            resp = test_app.post(
-                "/api/manage/repair-preview", json={"issues": [{"id": 7}]}
-            )
+        with patch("crate.api.management._build_repair_preview", return_value=preview) as mock_preview:
+            resp = test_app.post("/api/manage/repair-preview", json={"issues": [{"id": 7}]})
 
         assert resp.status_code == 200
         assert resp.json()["items"][0]["check_type"] == "duplicate_albums"
@@ -2374,26 +1673,18 @@ class TestHealthAPI:
             "generated_at": "2026-04-30T10:00:00+00:00",
         }
 
-        with (
-            patch("crate.api.management._build_repair_preview", return_value=preview),
-            patch("crate.api.management.create_task") as mock_create_task,
-        ):
+        with patch("crate.api.management._build_repair_preview", return_value=preview), \
+             patch("crate.api.management.create_task") as mock_create_task:
             resp = test_app.post(
                 "/api/manage/repair-issues",
-                json={
-                    "issues": [{"id": 7}],
-                    "dry_run": False,
-                    "plan_version": "repair-preview:stale",
-                },
+                json={"issues": [{"id": 7}], "dry_run": False, "plan_version": "repair-preview:stale"},
             )
 
         assert resp.status_code == 409
         assert "stale" in resp.json()["detail"].lower()
         mock_create_task.assert_not_called()
 
-    def test_repair_specific_issues_requires_confirmation_for_risky_items(
-        self, test_app
-    ):
+    def test_repair_specific_issues_requires_confirmation_for_risky_items(self, test_app):
         preview = {
             "items": [
                 {
@@ -2417,11 +1708,7 @@ class TestHealthAPI:
                     "message": "Would delete loose duplicate album folder for Birds In Row/UGLY",
                     "fs_write": True,
                     "details": {"reason": "identical track list"},
-                    "issue": {
-                        "id": 7,
-                        "check": "duplicate_albums",
-                        "details": {"artist": "Birds In Row"},
-                    },
+                    "issue": {"id": 7, "check": "duplicate_albums", "details": {"artist": "Birds In Row"}},
                 }
             ],
             "total": 1,
@@ -2431,10 +1718,8 @@ class TestHealthAPI:
             "generated_at": "2026-04-30T10:00:00+00:00",
         }
 
-        with (
-            patch("crate.api.management._build_repair_preview", return_value=preview),
-            patch("crate.api.management.create_task") as mock_create_task,
-        ):
+        with patch("crate.api.management._build_repair_preview", return_value=preview), \
+             patch("crate.api.management.create_task") as mock_create_task:
             resp = test_app.post(
                 "/api/manage/repair-issues",
                 json={
@@ -2451,18 +1736,9 @@ class TestHealthAPI:
         mock_create_task.assert_not_called()
 
     def test_fix_artist_by_entity_uid_enqueues_task(self, test_app):
-        with (
-            patch(
-                "crate.api.management.artist_name_from_entity_uid",
-                return_value="Terror",
-            ),
-            patch(
-                "crate.api.management.create_task", return_value="task-fix-1"
-            ) as mock_create_task,
-        ):
-            resp = test_app.post(
-                "/api/manage/artists/by-entity/30a0374c-54dc-5f41-b1ed-95c7fd4ec386/fix"
-            )
+        with patch("crate.api.management.artist_name_from_entity_uid", return_value="Terror"), \
+             patch("crate.api.management.create_task", return_value="task-fix-1") as mock_create_task:
+            resp = test_app.post("/api/manage/artists/by-entity/30a0374c-54dc-5f41-b1ed-95c7fd4ec386/fix")
 
         assert resp.status_code == 200
         assert resp.json()["task_id"] == "task-fix-1"
@@ -2483,13 +1759,8 @@ class TestHealthAPI:
                     "target": "Birds In Row",
                     "message": "Would consolidate 1 album directory into canonical entity_uid layout",
                     "fs_write": True,
-                    "details": {
-                        "target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa"
-                    },
-                    "issue": {
-                        "check": "artist_layout_fix",
-                        "details": {"artist": "Birds In Row"},
-                    },
+                    "details": {"target_artist_dir": "/music/695179a0-3863-50c2-9302-61f5cf144daa"},
+                    "issue": {"check": "artist_layout_fix", "details": {"artist": "Birds In Row"}},
                 }
             ],
             "total": 1,
@@ -2516,25 +1787,11 @@ class TestHealthAPI:
             "skipped_foreign": 0,
             "preview_errors": [],
         }
-        with (
-            patch(
-                "crate.api.management.artist_name_from_entity_uid",
-                return_value="Birds In Row",
-            ),
-            patch(
-                "crate.api.management._build_repair_preview", return_value=preview
-            ) as mock_preview,
-            patch(
-                "crate.api.management._build_artist_fix_preview",
-                return_value=fix_preview,
-            ) as mock_fix_preview,
-            patch(
-                "crate.api.management.get_artist_issues", return_value=[]
-            ) as mock_get_issues,
-        ):
-            resp = test_app.get(
-                "/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/repair-plan"
-            )
+        with patch("crate.api.management.artist_name_from_entity_uid", return_value="Birds In Row"), \
+             patch("crate.api.management._build_repair_preview", return_value=preview) as mock_preview, \
+             patch("crate.api.management._build_artist_fix_preview", return_value=fix_preview) as mock_fix_preview, \
+             patch("crate.api.management.get_artist_issues", return_value=[]) as mock_get_issues:
+            resp = test_app.get("/api/manage/artists/by-entity/695179a0-3863-50c2-9302-61f5cf144daa/repair-plan")
 
         assert resp.status_code == 200
         assert resp.json()["artist"] == "Birds In Row"
@@ -2591,27 +1848,13 @@ class TestHealthAPI:
             "check_type": "artist_layout_fix",
             "details_json": {"artist": "Quicksand"},
         }
-        with (
-            patch(
-                "crate.api.management.artist_name_from_entity_uid",
-                return_value="Quicksand",
-            ),
-            patch(
-                "crate.api.management._build_repair_preview", return_value=preview
-            ) as mock_preview,
-            patch(
-                "crate.api.management._build_artist_fix_preview",
-                return_value=fix_preview,
-            ),
-            patch("crate.api.management.get_artist_issues", return_value=[stale_issue]),
-            patch("crate.api.management.resolve_issue") as mock_resolve_issue,
-            patch(
-                "crate.api.management.publish_health_surface_signal"
-            ) as mock_publish_health,
-        ):
-            resp = test_app.get(
-                "/api/manage/artists/by-entity/b81635c8-3132-57d2-8d22-920251dc2627/repair-plan"
-            )
+        with patch("crate.api.management.artist_name_from_entity_uid", return_value="Quicksand"), \
+             patch("crate.api.management._build_repair_preview", return_value=preview) as mock_preview, \
+             patch("crate.api.management._build_artist_fix_preview", return_value=fix_preview), \
+             patch("crate.api.management.get_artist_issues", return_value=[stale_issue]), \
+             patch("crate.api.management.resolve_issue") as mock_resolve_issue, \
+             patch("crate.api.management.publish_health_surface_signal") as mock_publish_health:
+            resp = test_app.get("/api/manage/artists/by-entity/b81635c8-3132-57d2-8d22-920251dc2627/repair-plan")
 
         assert resp.status_code == 200
         assert resp.json()["items"] == []
@@ -2622,13 +1865,7 @@ class TestHealthAPI:
 
     def test_health_issues_reads_from_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:health",
-                "subject_key": "surface:all:500",
-                "version": 1,
-                "stale": False,
-                "generation_ms": 5,
-            },
+            "snapshot": {"scope": "ops:health", "subject_key": "surface:all:500", "version": 1, "stale": False, "generation_ms": 5},
             "issues": [
                 {
                     "id": 7,
@@ -2646,9 +1883,7 @@ class TestHealthAPI:
             "filter": None,
         }
 
-        with patch(
-            "crate.api.management.get_cached_health_surface", return_value=snapshot
-        ):
+        with patch("crate.api.management.get_cached_health_surface", return_value=snapshot):
             resp = test_app.get("/api/manage/health-issues")
 
         assert resp.status_code == 200
@@ -2658,22 +1893,14 @@ class TestHealthAPI:
 
     def test_admin_health_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:health",
-                "subject_key": "surface:all:500",
-                "version": 2,
-                "stale": False,
-                "generation_ms": 9,
-            },
+            "snapshot": {"scope": "ops:health", "subject_key": "surface:all:500", "version": 2, "stale": False, "generation_ms": 9},
             "issues": [],
             "counts": {},
             "total": 0,
             "filter": None,
         }
 
-        with patch(
-            "crate.api.management.get_cached_health_surface", return_value=snapshot
-        ):
+        with patch("crate.api.management.get_cached_health_surface", return_value=snapshot):
             resp = test_app.get("/api/admin/health-snapshot")
 
         assert resp.status_code == 200
@@ -2683,13 +1910,7 @@ class TestHealthAPI:
 class TestStackAPI:
     def test_stack_status_reads_from_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:stack",
-                "subject_key": "global",
-                "version": 3,
-                "stale": False,
-                "generation_ms": 11,
-            },
+            "snapshot": {"scope": "ops:stack", "subject_key": "global", "version": 3, "stale": False, "generation_ms": 11},
             "stack": {
                 "available": True,
                 "total": 2,
@@ -2717,13 +1938,7 @@ class TestStackAPI:
 
     def test_admin_stack_snapshot(self, test_app):
         snapshot = {
-            "snapshot": {
-                "scope": "ops:stack",
-                "subject_key": "global",
-                "version": 4,
-                "stale": False,
-                "generation_ms": 7,
-            },
+            "snapshot": {"scope": "ops:stack", "subject_key": "global", "version": 4, "stale": False, "generation_ms": 7},
             "stack": {
                 "available": True,
                 "total": 1,
@@ -2753,53 +1968,17 @@ class TestSocialProfilePage:
             "friends_count": 3,
         }
         relation = {"following": True, "followed_by": False, "is_friend": False}
-        affinity = {
-            "affinity_score": 87,
-            "affinity_band": "high",
-            "affinity_reasons": ["shared artists"],
-        }
-        playlists = [
-            {
-                "id": 11,
-                "name": "Public Mix",
-                "visibility": "public",
-                "is_collaborative": False,
-                "track_count": 4,
-                "total_duration": 900,
-            }
-        ]
-        followers = [
-            {
-                "id": 1,
-                "username": "sam",
-                "display_name": "Sam",
-                "avatar": None,
-                "followed_at": "2026-02-01T00:00:00Z",
-            }
-        ]
-        following = [
-            {
-                "id": 2,
-                "username": "lee",
-                "display_name": "Lee",
-                "avatar": None,
-                "followed_at": "2026-02-02T00:00:00Z",
-            }
-        ]
+        affinity = {"affinity_score": 87, "affinity_band": "high", "affinity_reasons": ["shared artists"]}
+        playlists = [{"id": 11, "name": "Public Mix", "visibility": "public", "is_collaborative": False, "track_count": 4, "total_duration": 900}]
+        followers = [{"id": 1, "username": "sam", "display_name": "Sam", "avatar": None, "followed_at": "2026-02-01T00:00:00Z"}]
+        following = [{"id": 2, "username": "lee", "display_name": "Lee", "avatar": None, "followed_at": "2026-02-02T00:00:00Z"}]
 
-        with (
-            patch(
-                "crate.api.social.get_public_user_profile_by_username",
-                return_value=profile,
-            ),
-            patch(
-                "crate.api.social.get_public_playlists_for_user", return_value=playlists
-            ),
-            patch("crate.api.social.get_relationship_state", return_value=relation),
-            patch("crate.api.social.get_affinity", return_value=affinity),
-            patch("crate.api.social.get_followers", return_value=followers),
-            patch("crate.api.social.get_following", return_value=following),
-        ):
+        with patch("crate.api.social.get_public_user_profile_by_username", return_value=profile), \
+             patch("crate.api.social.get_public_playlists_for_user", return_value=playlists), \
+             patch("crate.api.social.get_relationship_state", return_value=relation), \
+             patch("crate.api.social.get_affinity", return_value=affinity), \
+             patch("crate.api.social.get_followers", return_value=followers), \
+             patch("crate.api.social.get_following", return_value=following):
             resp = test_app.get("/api/users/jane/page")
 
         assert resp.status_code == 200
@@ -2813,29 +1992,11 @@ class TestSocialProfilePage:
 
 class TestLibraryPlaylistsPage:
     def test_playlists_page_bundles_personal_and_curated(self, test_app):
-        playlists = [
-            {
-                "id": 1,
-                "name": "Personal",
-                "track_count": 5,
-                "is_smart": False,
-                "total_duration": 1000,
-            }
-        ]
-        followed = [
-            {
-                "id": 2,
-                "name": "Crate Picks",
-                "track_count": 9,
-                "is_smart": True,
-                "follower_count": 10,
-            }
-        ]
+        playlists = [{"id": 1, "name": "Personal", "track_count": 5, "is_smart": False, "total_duration": 1000}]
+        followed = [{"id": 2, "name": "Crate Picks", "track_count": 9, "is_smart": True, "follower_count": 10}]
 
-        with (
-            patch("crate.api.me.get_playlists", return_value=playlists),
-            patch("crate.api.me.get_followed_system_playlists", return_value=followed),
-        ):
+        with patch("crate.api.me.get_playlists", return_value=playlists), \
+             patch("crate.api.me.get_followed_system_playlists", return_value=followed):
             resp = test_app.get("/api/me/playlists-page")
 
         assert resp.status_code == 200
@@ -2851,12 +2012,8 @@ def test_resolve_track_genre_prefers_artist_canonical_over_album_raw_tag():
     album_rows = [{"name": "x-unknown-core", "slug": "x-unknown-core", "weight": 1.0}]
     artist_rows = [{"name": "Post-Hardcore", "slug": "post-hardcore", "weight": 0.82}]
 
-    with (
-        patch("crate.api.browse_media.get_track_album_genres", return_value=album_rows),
-        patch(
-            "crate.api.browse_media.get_track_artist_genres", return_value=artist_rows
-        ),
-    ):
+    with patch("crate.api.browse_media.get_track_album_genres", return_value=album_rows), \
+         patch("crate.api.browse_media.get_track_artist_genres", return_value=artist_rows):
         result = browse_media._resolve_track_genre(91)
 
     assert result is not None
@@ -2868,16 +2025,10 @@ def test_resolve_track_genre_keeps_album_canonical_when_available():
     from crate.api import browse_media
 
     album_rows = [{"name": "Shoegaze", "slug": "shoegaze", "weight": 0.91}]
-    artist_rows = [
-        {"name": "Alternative Rock", "slug": "alternative-rock", "weight": 0.95}
-    ]
+    artist_rows = [{"name": "Alternative Rock", "slug": "alternative-rock", "weight": 0.95}]
 
-    with (
-        patch("crate.api.browse_media.get_track_album_genres", return_value=album_rows),
-        patch(
-            "crate.api.browse_media.get_track_artist_genres", return_value=artist_rows
-        ),
-    ):
+    with patch("crate.api.browse_media.get_track_album_genres", return_value=album_rows), \
+         patch("crate.api.browse_media.get_track_artist_genres", return_value=artist_rows):
         result = browse_media._resolve_track_genre(92)
 
     assert result is not None
@@ -2914,12 +2065,8 @@ def test_track_info_by_entity_uid_endpoint(test_app):
         "rating": 4,
     }
 
-    with patch(
-        "crate.api.browse_media.get_track_info_cols_by_entity_uid", return_value=row
-    ):
-        resp = test_app.get(
-            "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info"
-        )
+    with patch("crate.api.browse_media.get_track_info_cols_by_entity_uid", return_value=row):
+        resp = test_app.get("/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -2957,20 +2104,11 @@ def test_track_info_by_storage_id_endpoint_prefers_entity_uid_lookup(test_app):
         "rating": 4,
     }
 
-    with patch(
-        "crate.api.browse_media.get_track_info_cols_by_storage_id",
-        return_value={"entity_uid": storage_row["entity_uid"]},
-    ):
-        resp = test_app.get(
-            "/api/tracks/by-storage/123e4567-e89b-12d3-a456-426614174001/info",
-            follow_redirects=False,
-        )
+    with patch("crate.api.browse_media.get_track_info_cols_by_storage_id", return_value={"entity_uid": storage_row["entity_uid"]}):
+        resp = test_app.get("/api/tracks/by-storage/123e4567-e89b-12d3-a456-426614174001/info", follow_redirects=False)
 
     assert resp.status_code == 307
-    assert (
-        resp.headers["location"]
-        == "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info"
-    )
+    assert resp.headers["location"] == "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info"
 
 
 def test_track_info_by_path_endpoint(test_app):
@@ -3003,9 +2141,7 @@ def test_track_info_by_path_endpoint(test_app):
     }
 
     with patch("crate.api.browse_media.get_track_info_cols_by_path", return_value=row):
-        resp = test_app.get(
-            "/api/track-info/Quicksand/Distant%20Populations/Dine%20Alone.flac"
-        )
+        resp = test_app.get("/api/track-info/Quicksand/Distant%20Populations/Dine%20Alone.flac")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -3043,28 +2179,16 @@ def test_track_info_backfills_missing_quality_from_audio_file(test_app):
         "rating": 4,
     }
 
-    with (
-        patch(
-            "crate.api.browse_media.get_track_info_cols_by_entity_uid", return_value=row
-        ),
-        patch(
-            "crate.api.browse_media.safe_path",
-            return_value=Path("/music/Artist/Album/Track.flac"),
-        ),
-        patch("pathlib.Path.is_file", return_value=True),
-        patch(
-            "crate.api.browse_media.read_audio_quality",
-            return_value={
-                "duration": 240.0,
-                "bitrate": 900000,
-                "sample_rate": 44100,
-                "bit_depth": 16,
-            },
-        ),
-    ):
-        resp = test_app.get(
-            "/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info"
-        )
+    with patch("crate.api.browse_media.get_track_info_cols_by_entity_uid", return_value=row), \
+         patch("crate.api.browse_media.safe_path", return_value=Path("/music/Artist/Album/Track.flac")), \
+         patch("pathlib.Path.is_file", return_value=True), \
+         patch("crate.api.browse_media.read_audio_quality", return_value={
+             "duration": 240.0,
+             "bitrate": 900000,
+             "sample_rate": 44100,
+             "bit_depth": 16,
+         }):
+        resp = test_app.get("/api/tracks/by-entity/123e4567-e89b-12d3-a456-426614174000/info")
 
     assert resp.status_code == 200
     data = resp.json()

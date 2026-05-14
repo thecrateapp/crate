@@ -3,6 +3,7 @@
    Roboto) for a native feel. */
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";
+@source ".";
 @source "../../shared/ui";
 
 @custom-variant dark (&:is(.dark *));
