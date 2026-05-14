@@ -12,10 +12,11 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from typing import Any, Mapping
 
 from crate.db.cache_store import delete_cache, set_cache
 from crate.db.events import emit_task_event
-from crate.task_progress import TaskProgress, emit_item_event, emit_progress, entity_label
+from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.db.jobs.migration import (
     get_album_tracks,
     get_all_artists_for_migration,
@@ -37,11 +38,11 @@ from crate.worker_handlers import TaskHandler, is_cancelled
 log = logging.getLogger(__name__)
 
 
-def _uid(record: dict | None) -> str:
+def _uid(record: Mapping[str, Any] | None) -> str:
     return str(entity_uid_for(record, "entity_uid") or "")
 
 
-def _is_already_migrated_artist(artist: dict) -> bool:
+def _is_already_migrated_artist(artist: Mapping[str, Any]) -> bool:
     """Check if an artist is fully migrated: folder_name is UUID AND all albums are in V2 paths."""
     folder = artist.get("folder_name") or ""
     if not looks_like_entity_uid(folder):
@@ -55,7 +56,7 @@ def _is_already_migrated_artist(artist: dict) -> bool:
     return all(artist_uid in (a.get("path") or "") for a in albums)
 
 
-def _is_already_migrated_album(album: dict) -> bool:
+def _is_already_migrated_album(album: Mapping[str, Any]) -> bool:
     """Check if an album path already uses V2 layout (UUID-based segments)."""
     path = album.get("path") or ""
     parts = Path(path).parts
@@ -70,8 +71,8 @@ def _is_already_migrated_album(album: dict) -> bool:
 
 def _migrate_album(
     lib: Path,
-    artist: dict,
-    album: dict,
+    artist: Mapping[str, Any],
+    album: Mapping[str, Any],
     target_artist_dir: Path,
 ) -> dict:
     """Migrate a single album to V2 layout.
@@ -87,8 +88,15 @@ def _migrate_album(
 
     target_album_dir = target_artist_dir / album_entity_uid
 
-    if target_album_dir.exists() and old_album_path.resolve() == target_album_dir.resolve():
-        return {"status": "skipped", "reason": "already_at_target", "album_id": album_id}
+    if (
+        target_album_dir.exists()
+        and old_album_path.resolve() == target_album_dir.resolve()
+    ):
+        return {
+            "status": "skipped",
+            "reason": "already_at_target",
+            "album_id": album_id,
+        }
 
     # Move all tracks to V2 filenames
     target_album_dir.mkdir(parents=True, exist_ok=True)
@@ -105,14 +113,20 @@ def _migrate_album(
 
         if not old_track_path.is_file():
             # Track file might already have been moved or doesn't exist
-            new_candidate = target_album_dir / f"{track_entity_uid}{old_track_path.suffix.lower()}"
+            new_candidate = (
+                target_album_dir / f"{track_entity_uid}{old_track_path.suffix.lower()}"
+            )
             if new_candidate.is_file():
                 # Already moved — just update DB
                 update_track_path(track_id, str(new_candidate), new_candidate.name)
                 tracks_moved += 1
                 continue
             tracks_failed += 1
-            log.warning("Track file missing during migration: %s (id=%d)", old_track_path, track_id)
+            log.warning(
+                "Track file missing during migration: %s (id=%d)",
+                old_track_path,
+                track_id,
+            )
             continue
 
         new_filename = f"{track_entity_uid}{old_track_path.suffix.lower()}"
@@ -126,7 +140,12 @@ def _migrate_album(
                 shutil.move(str(old_track_path), str(new_track_path))
             except Exception:
                 tracks_failed += 1
-                log.warning("Failed to move track %s -> %s", old_track_path, new_track_path, exc_info=True)
+                log.warning(
+                    "Failed to move track %s -> %s",
+                    old_track_path,
+                    new_track_path,
+                    exc_info=True,
+                )
                 continue
 
         # Update DB path for this track
@@ -184,8 +203,7 @@ def _rmtree_if_no_audio(path: Path):
     if not path.is_dir():
         return
     has_audio = any(
-        f.suffix.lower() in AUDIO_EXTS
-        for f in path.rglob("*") if f.is_file()
+        f.suffix.lower() in AUDIO_EXTS for f in path.rglob("*") if f.is_file()
     )
     if not has_audio:
         shutil.rmtree(str(path), ignore_errors=True)
@@ -254,18 +272,25 @@ def _album_root_for_path(album_path: Path) -> Path:
 
 def _album_dir_has_audio(album_dir: Path) -> bool:
     try:
-        return any(p.is_file() and p.suffix.lower() in {".flac", ".mp3", ".m4a", ".ogg", ".opus"} for p in album_dir.rglob("*"))
+        return any(
+            p.is_file()
+            and p.suffix.lower() in {".flac", ".mp3", ".m4a", ".ogg", ".opus"}
+            for p in album_dir.rglob("*")
+        )
     except OSError:
         return False
 
 
 def _artist_dir_has_album_audio(artist_dir: Path) -> bool:
-    return any(_album_dir_has_audio(album_dir) for album_dir in _iter_album_candidate_dirs(artist_dir))
+    return any(
+        _album_dir_has_audio(album_dir)
+        for album_dir in _iter_album_candidate_dirs(artist_dir)
+    )
 
 
 def _discover_artist_candidate_dirs(
     lib: Path,
-    artist: dict,
+    artist: Mapping[str, Any],
     artist_name: str,
     target_artist_dir: Path,
     *,
@@ -301,11 +326,18 @@ def _discover_artist_candidate_dirs(
     if _artist_dir_has_album_audio(target_artist_dir):
         return candidate_dirs
 
-    if any(candidate != target_artist_dir and _artist_dir_has_album_audio(candidate) for candidate in candidate_dirs):
+    if any(
+        candidate != target_artist_dir and _artist_dir_has_album_audio(candidate)
+        for candidate in candidate_dirs
+    ):
         return candidate_dirs
 
     for top_level_dir in sorted(lib.iterdir()):
-        if not top_level_dir.is_dir() or top_level_dir.name.startswith(".") or top_level_dir in candidate_dirs:
+        if (
+            not top_level_dir.is_dir()
+            or top_level_dir.name.startswith(".")
+            or top_level_dir in candidate_dirs
+        ):
             continue
         for album_dir in _iter_album_candidate_dirs(top_level_dir):
             if not _album_dir_has_audio(album_dir):
@@ -321,7 +353,9 @@ def _discover_artist_candidate_dirs(
     return candidate_dirs
 
 
-def _resolve_fix_album_target(lib: Path, artist: dict, artist_name: str, album_name: str) -> Path:
+def _resolve_fix_album_target(
+    lib: Path, artist: Mapping[str, Any], artist_name: str, album_name: str
+) -> Path:
     artist_entity_uid = _uid(artist)
     if not artist_entity_uid:
         raise RuntimeError(f"Artist {artist_name} has no entity_uid")
@@ -340,7 +374,9 @@ def _resolve_fix_album_target(lib: Path, artist: dict, artist_name: str, album_n
     return managed_album_dir(lib, artist_entity_uid, album_uid)
 
 
-def build_artist_layout_fix_issue(preview: dict, *, issue_id: int | None = None) -> dict | None:
+def build_artist_layout_fix_issue(
+    preview: dict, *, issue_id: int | None = None
+) -> dict | None:
     if str(preview.get("status") or "") != "needs_fix":
         return None
 
@@ -371,7 +407,11 @@ def build_artist_layout_fix_issue(preview: dict, *, issue_id: int | None = None)
     return issue
 
 
-def preview_fix_artist(lib: Path, artist: dict, config: dict | None = None) -> dict:
+def preview_fix_artist(
+    lib: Path,
+    artist: Mapping[str, Any],
+    config: Mapping[str, Any] | None = None,
+) -> dict:
     artist_name = artist["name"]
     artist_entity_uid = _uid(artist)
     if not artist_entity_uid:
@@ -405,7 +445,9 @@ def preview_fix_artist(lib: Path, artist: dict, config: dict | None = None) -> d
             "target_artist_dir": str(target_artist_dir),
             "album_moves": [],
             "artist_files": [],
-            "folder_name_mismatch": bool((artist.get("folder_name") or "") != artist_entity_uid),
+            "folder_name_mismatch": bool(
+                (artist.get("folder_name") or "") != artist_entity_uid
+            ),
         }
 
     album_moves: list[dict[str, str]] = []
@@ -425,21 +467,29 @@ def preview_fix_artist(lib: Path, artist: dict, config: dict | None = None) -> d
 
         for album_dir in _iter_album_candidate_dirs(candidate_dir):
             try:
-                inferred_artist, inferred_album = infer_album_identity(album_dir, fallback_artist=artist_name)
-                if inferred_artist and not _same_artist_name(inferred_artist, artist_name):
+                inferred_artist, inferred_album = infer_album_identity(
+                    album_dir, fallback_artist=artist_name
+                )
+                if inferred_artist and not _same_artist_name(
+                    inferred_artist, artist_name
+                ):
                     skipped_foreign += 1
                     continue
 
-                target_album_dir = _resolve_fix_album_target(lib, artist, artist_name, inferred_album)
+                target_album_dir = _resolve_fix_album_target(
+                    lib, artist, artist_name, inferred_album
+                )
                 if album_dir.resolve() == target_album_dir.resolve():
                     skipped_existing += 1
                     continue
 
-                album_moves.append({
-                    "album": inferred_album,
-                    "source": str(album_dir),
-                    "target": str(target_album_dir),
-                })
+                album_moves.append(
+                    {
+                        "album": inferred_album,
+                        "source": str(album_dir),
+                        "target": str(target_album_dir),
+                    }
+                )
             except Exception as exc:
                 preview_errors.append({"album_dir": str(album_dir), "error": str(exc)})
 
@@ -481,9 +531,9 @@ def preview_fix_artist(lib: Path, artist: dict, config: dict | None = None) -> d
 
 def _fix_artist(
     lib: Path,
-    artist: dict,
+    artist: Mapping[str, Any],
     task_id: str,
-    config: dict,
+    config: Mapping[str, Any],
 ) -> dict:
     artist_name = artist["name"]
     artist_entity_uid = _uid(artist)
@@ -502,7 +552,9 @@ def _fix_artist(
             "candidate_dirs": preview.get("candidate_dirs", []),
         }
     if preview.get("status") != "needs_fix":
-        raise RuntimeError(str(preview.get("message") or f"Unable to fix {artist_name}"))
+        raise RuntimeError(
+            str(preview.get("message") or f"Unable to fix {artist_name}")
+        )
 
     target_artist_dir = Path(str(preview.get("target_artist_dir")))
     candidate_dirs = [Path(path) for path in preview.get("candidate_dirs", [])]
@@ -519,17 +571,23 @@ def _fix_artist(
     try:
         update_artist_folder_name(artist_name, artist_entity_uid)
         target_artist_dir.mkdir(parents=True, exist_ok=True)
-        emit_task_event(task_id, "info", {
-            "message": f"Fixing {artist_name} from {len(candidate_dirs)} candidate director{'' if len(candidate_dirs) == 1 else 'ies'}",
-            "candidate_dirs": [str(path) for path in candidate_dirs],
-        })
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Fixing {artist_name} from {len(candidate_dirs)} candidate director{'' if len(candidate_dirs) == 1 else 'ies'}",
+                "candidate_dirs": [str(path) for path in candidate_dirs],
+            },
+        )
 
         for candidate_dir in candidate_dirs:
             if is_cancelled(task_id):
                 break
 
             if candidate_dir != target_artist_dir:
-                moved_artist_files += _move_artist_level_files(candidate_dir, target_artist_dir)
+                moved_artist_files += _move_artist_level_files(
+                    candidate_dir, target_artist_dir
+                )
 
             if candidate_dir == target_artist_dir:
                 continue
@@ -539,16 +597,26 @@ def _fix_artist(
                     break
 
                 try:
-                    inferred_artist, inferred_album = infer_album_identity(album_dir, fallback_artist=artist_name)
-                    if inferred_artist and not _same_artist_name(inferred_artist, artist_name):
+                    inferred_artist, inferred_album = infer_album_identity(
+                        album_dir, fallback_artist=artist_name
+                    )
+                    if inferred_artist and not _same_artist_name(
+                        inferred_artist, artist_name
+                    ):
                         skipped_albums += 1
-                        emit_task_event(task_id, "info", {
-                            "message": f"Skipped foreign album dir {album_dir.name} while fixing {artist_name}",
-                            "album_dir": str(album_dir),
-                        })
+                        emit_task_event(
+                            task_id,
+                            "info",
+                            {
+                                "message": f"Skipped foreign album dir {album_dir.name} while fixing {artist_name}",
+                                "album_dir": str(album_dir),
+                            },
+                        )
                         continue
 
-                    target_album_dir = _resolve_fix_album_target(lib, artist, artist_name, inferred_album)
+                    target_album_dir = _resolve_fix_album_target(
+                        lib, artist, artist_name, inferred_album
+                    )
                     if album_dir.resolve() == target_album_dir.resolve():
                         skipped_albums += 1
                         continue
@@ -563,7 +631,12 @@ def _fix_artist(
                     fixed_albums += 1
                 except Exception:
                     failed_albums += 1
-                    log.warning("Failed to consolidate album dir %s for %s", album_dir, artist_name, exc_info=True)
+                    log.warning(
+                        "Failed to consolidate album dir %s for %s",
+                        album_dir,
+                        artist_name,
+                        exc_info=True,
+                    )
 
             before_cleanup = candidate_dir.exists()
             _rmtree_if_no_audio(candidate_dir)
@@ -576,9 +649,11 @@ def _fix_artist(
                 cleaned_dirs += 1
 
         if not _artist_dir_has_album_audio(target_artist_dir):
-            raise RuntimeError(f"No album audio directories found for {artist_name} after consolidation")
+            raise RuntimeError(
+                f"No album audio directories found for {artist_name} after consolidation"
+            )
 
-        sync = LibrarySync(config)
+        sync = LibrarySync(dict(config))
         synced_tracks = sync.sync_artist_dirs(artist_name, [target_artist_dir])
         update_artist_folder_name(artist_name, artist_entity_uid)
 
@@ -602,7 +677,7 @@ def _fix_artist(
 
 def _migrate_artist(
     lib: Path,
-    artist: dict,
+    artist: Mapping[str, Any],
     task_id: str,
 ) -> dict:
     """Migrate all albums for a single artist to V2 layout."""
@@ -648,7 +723,10 @@ def _migrate_artist(
     # Move artist-level files (artist.jpg, background.jpg) to new dir
     old_folder = artist.get("folder_name") or artist_name
     old_artist_dir = lib / old_folder
-    if old_artist_dir.is_dir() and old_artist_dir.resolve() != target_artist_dir.resolve():
+    if (
+        old_artist_dir.is_dir()
+        and old_artist_dir.resolve() != target_artist_dir.resolve()
+    ):
         target_artist_dir.mkdir(parents=True, exist_ok=True)
         for item in old_artist_dir.iterdir():
             if item.is_file():
@@ -711,7 +789,11 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
 
     p = TaskProgress(phase="migrating", phase_count=2, total=total)
 
-    emit_task_event(task_id, "info", {"message": f"Starting V2 storage migration for {total} artists"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Starting V2 storage migration for {total} artists"},
+    )
 
     for i, artist in enumerate(artists):
         if is_cancelled(task_id):
@@ -734,18 +816,26 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
             if result["status"] == "migrated":
                 migrated += 1
                 total_tracks += result.get("tracks_moved", 0)
-                emit_task_event(task_id, "info", {
-                    "message": f"Migrated {artist_name}: {result.get('albums_migrated', 0)} albums, {result.get('tracks_moved', 0)} tracks",
-                })
+                emit_task_event(
+                    task_id,
+                    "info",
+                    {
+                        "message": f"Migrated {artist_name}: {result.get('albums_migrated', 0)} albums, {result.get('tracks_moved', 0)} tracks",
+                    },
+                )
             else:
                 skipped += 1
         except Exception:
             failed += 1
             log.warning("Migration failed for artist %s", artist_name, exc_info=True)
-            emit_task_event(task_id, "info", {
-                "message": f"Failed to migrate {artist_name}",
-                "error": True,
-            })
+            emit_task_event(
+                task_id,
+                "info",
+                {
+                    "message": f"Failed to migrate {artist_name}",
+                    "error": True,
+                },
+            )
 
     # Verification pass
     emit_task_event(task_id, "info", {"message": "Running verification..."})
@@ -765,8 +855,10 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
                     continue
                 # This is a legacy name-based directory
                 has_audio = any(
-                    f.suffix.lower() in {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav"}
-                    for f in item.rglob("*") if f.is_file()
+                    f.suffix.lower()
+                    in {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav"}
+                    for f in item.rglob("*")
+                    if f.is_file()
                 )
                 if has_audio:
                     orphaned_dirs.append(item.name)
@@ -790,14 +882,22 @@ def _handle_migrate_storage_v2(task_id: str, params: dict, config: dict) -> dict
     }
 
     if orphaned_dirs:
-        emit_task_event(task_id, "info", {
-            "message": f"Migration complete with {len(orphaned_dirs)} orphaned legacy directories",
-            "orphaned": orphaned_dirs[:20],
-        })
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Migration complete with {len(orphaned_dirs)} orphaned legacy directories",
+                "orphaned": orphaned_dirs[:20],
+            },
+        )
     else:
-        emit_task_event(task_id, "info", {
-            "message": f"Migration complete: {migrated} artists, {total_tracks} tracks moved",
-        })
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Migration complete: {migrated} artists, {total_tracks} tracks moved",
+            },
+        )
 
     return summary
 
@@ -812,20 +912,28 @@ def _handle_fix_artist(task_id: str, params: dict, config: dict) -> dict:
     if not artist:
         raise RuntimeError(f"Artist not found: {artist_name}")
 
-    emit_task_event(task_id, "info", {
-        "message": f"Fixing artist {artist_name}",
-        "artist": artist_name,
-        "artist_entity_uid": _uid(artist),
-    })
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Fixing artist {artist_name}",
+            "artist": artist_name,
+            "artist_entity_uid": _uid(artist),
+        },
+    )
 
     result = _fix_artist(lib, artist, task_id, config)
-    emit_task_event(task_id, "info", {
-        "message": (
-            f"Fixed {artist_name}: {result.get('albums_fixed', 0)} albums consolidated, "
-            f"{result.get('synced_tracks', 0)} tracks synced"
-        ),
-        **result,
-    })
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Fixed {artist_name}: {result.get('albums_fixed', 0)} albums consolidated, "
+                f"{result.get('synced_tracks', 0)} tracks synced"
+            ),
+            **result,
+        },
+    )
     return result
 
 
@@ -857,13 +965,15 @@ def _handle_verify_storage_v2(task_id: str, params: dict, config: dict) -> dict:
         if track_path.is_file():
             ok_tracks += 1
         else:
-                missing_files.append({
+            missing_files.append(
+                {
                     "track_id": track["id"],
                     "entity_uid": str(track.get("entity_uid") or ""),
                     "path": track["path"],
                     "artist": track["artist"],
-                "title": track["title"],
-            })
+                    "title": track["title"],
+                }
+            )
 
     # Check for files on disk not in DB
     p_v.phase = "checking_filesystem"
@@ -884,9 +994,13 @@ def _handle_verify_storage_v2(task_id: str, params: dict, config: dict) -> dict:
     except Exception:
         log.debug("Filesystem scan for orphans failed", exc_info=True)
 
-    emit_task_event(task_id, "info", {
-        "message": f"Verification complete: {ok_tracks}/{total} tracks OK, {len(missing_files)} missing, {len(orphaned_files)} orphaned",
-    })
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Verification complete: {ok_tracks}/{total} tracks OK, {len(missing_files)} missing, {len(orphaned_files)} orphaned",
+        },
+    )
     return {
         "total_tracks": total,
         "ok": ok_tracks,

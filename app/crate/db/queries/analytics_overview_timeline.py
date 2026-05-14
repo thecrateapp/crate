@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_timeline_albums() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     a.id,
                     a.entity_uid::text AS entity_uid,
@@ -26,8 +27,11 @@ def get_timeline_albums() -> list[dict]:
                 WHERE a.year IS NOT NULL AND a.year != ''
                 ORDER BY a.year
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 

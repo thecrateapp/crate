@@ -98,9 +98,7 @@ def _search_release(artist: str, album: str) -> dict:
 
     try:
         time.sleep(1.1)
-        results = musicbrainzngs.search_releases(
-            artist=artist, release=album, limit=3
-        )
+        results = musicbrainzngs.search_releases(artist=artist, release=album, limit=3)
         releases = results.get("release-list", [])
 
         if not releases:

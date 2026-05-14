@@ -2,7 +2,10 @@ from unittest.mock import patch
 
 from sqlalchemy import text
 
-from crate.db.queries.lyrics import get_album_track_lyrics_status, list_tracks_for_lyrics
+from crate.db.queries.lyrics import (
+    get_album_track_lyrics_status,
+    list_tracks_for_lyrics,
+)
 from crate.db.repositories.lyrics import get_cached_lyrics, store_lyrics
 from crate.db.tx import transaction_scope
 from crate.lyrics import sync_lyrics_for_tracks
@@ -40,7 +43,9 @@ def test_api_lyrics_stores_not_found_miss(pg_db, test_app):
     class NotFoundResponse:
         status_code = 404
 
-    with patch("crate.lyrics.requests.get", return_value=NotFoundResponse()) as live_fetch:
+    with patch(
+        "crate.lyrics.requests.get", return_value=NotFoundResponse()
+    ) as live_fetch:
         response = test_app.get("/api/lyrics?artist=Rival%20Schools&title=Missing")
 
     assert response.status_code == 200
@@ -52,7 +57,9 @@ def test_api_lyrics_stores_not_found_miss(pg_db, test_app):
     assert cached["found"] is False
 
     with patch("crate.lyrics.requests.get") as second_live_fetch:
-        second_response = test_app.get("/api/lyrics?artist=Rival%20Schools&title=Missing")
+        second_response = test_app.get(
+            "/api/lyrics?artist=Rival%20Schools&title=Missing"
+        )
 
     assert second_response.status_code == 200
     assert second_response.json() == {"syncedLyrics": None, "plainLyrics": None}
@@ -75,8 +82,12 @@ def test_sync_lyrics_for_tracks_fetches_and_persists(pg_db):
     ]
 
     events: list[dict] = []
-    with patch("crate.lyrics.requests.get", return_value=LyricsResponse()) as live_fetch:
-        result = sync_lyrics_for_tracks(tracks, delay_seconds=0, progress_callback=events.append)
+    with patch(
+        "crate.lyrics.requests.get", return_value=LyricsResponse()
+    ) as live_fetch:
+        result = sync_lyrics_for_tracks(
+            tracks, delay_seconds=0, progress_callback=events.append
+        )
 
     assert result["found"] == 1
     live_fetch.assert_called_once()
@@ -94,7 +105,11 @@ def test_album_track_lyrics_status_reports_none_txt_and_synced(pg_db, tmp_path):
     album_dir.mkdir(parents=True)
 
     with transaction_scope() as session:
-        session.execute(text("INSERT INTO library_artists (name, updated_at) VALUES ('High Vis', NOW())"))
+        session.execute(
+            text(
+                "INSERT INTO library_artists (name, updated_at) VALUES ('High Vis', NOW())"
+            )
+        )
         album_id = session.execute(
             text(
                 """
@@ -125,7 +140,13 @@ def test_album_track_lyrics_status_reports_none_txt_and_synced(pg_db, tmp_path):
         ]
 
     store_lyrics("High Vis", "Plain", plain_lyrics="Plain lyric", track_id=track_ids[0])
-    store_lyrics("High Vis", "Synced", plain_lyrics="Synced lyric", synced_lyrics="[00:01.00]Synced", track_id=track_ids[1])
+    store_lyrics(
+        "High Vis",
+        "Synced",
+        plain_lyrics="Synced lyric",
+        synced_lyrics="[00:01.00]Synced",
+        track_id=track_ids[1],
+    )
 
     status = get_album_track_lyrics_status(album_id)
 
@@ -144,7 +165,11 @@ def test_list_tracks_for_lyrics_can_target_track_and_album_entity(pg_db, tmp_pat
     other_uid = "33333333-4444-4555-8666-777777777777"
 
     with transaction_scope() as session:
-        session.execute(text("INSERT INTO library_artists (name, updated_at) VALUES ('High Vis', NOW())"))
+        session.execute(
+            text(
+                "INSERT INTO library_artists (name, updated_at) VALUES ('High Vis', NOW())"
+            )
+        )
         album_id = session.execute(
             text(
                 """
@@ -163,7 +188,11 @@ def test_list_tracks_for_lyrics_can_target_track_and_album_entity(pg_db, tmp_pat
                 RETURNING id
                 """
             ),
-            {"album_id": album_id, "path": str(album_dir / "01 Drop Me Out.flac"), "uid": target_uid},
+            {
+                "album_id": album_id,
+                "path": str(album_dir / "01 Drop Me Out.flac"),
+                "uid": target_uid,
+            },
         ).scalar_one()
         session.execute(
             text(
@@ -196,7 +225,9 @@ def test_lyrics_track_event_payload_is_rich(monkeypatch):
     emitted: list[tuple[str, str, dict]] = []
     monkeypatch.setattr(
         "crate.worker_handlers.enrichment.emit_task_event",
-        lambda task_id, event_type, payload: emitted.append((task_id, event_type, payload)),
+        lambda task_id, event_type, payload: emitted.append(
+            (task_id, event_type, payload)
+        ),
     )
 
     _emit_lyrics_track_event(
@@ -240,11 +271,21 @@ def test_process_new_content_lyrics_step_runs_post_acquisition_sync(monkeypatch)
         captured["force"] = kwargs["force"]
         return {"tracks": 1, "found": 1, "missing": 0, "skipped": 0, "errors": 0}
 
-    monkeypatch.setattr("crate.worker_handlers.enrichment.get_library_tracks", lambda album_id: tracks)
-    monkeypatch.setattr("crate.worker_handlers.enrichment.emit_progress", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.enrichment.emit_task_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.enrichment.is_cancelled", lambda task_id: False)
-    monkeypatch.setattr("crate.lyrics.sync_lyrics_for_tracks", fake_sync_lyrics_for_tracks)
+    monkeypatch.setattr(
+        "crate.worker_handlers.enrichment.get_library_tracks", lambda album_id: tracks
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.enrichment.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.enrichment.emit_task_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.enrichment.is_cancelled", lambda task_id: False
+    )
+    monkeypatch.setattr(
+        "crate.lyrics.sync_lyrics_for_tracks", fake_sync_lyrics_for_tracks
+    )
 
     result = {"steps": {}}
     _process_new_content_lyrics(

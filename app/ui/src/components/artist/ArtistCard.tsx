@@ -55,10 +55,16 @@ export function ArtistCard({
       <div className="relative mx-auto mb-3 aspect-square w-full overflow-hidden rounded-md bg-white/5">
         {selectMode ? (
           <div className="absolute left-2 top-2 z-10">
-            <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
-              isSelected ? "border-primary bg-primary" : "border-white/40 bg-black/40"
-            }`}>
-              {isSelected ? <Check size={11} className="text-primary-foreground" /> : null}
+            <div
+              className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+                isSelected
+                  ? "border-primary bg-primary"
+                  : "border-white/40 bg-black/40"
+              }`}
+            >
+              {isSelected ? (
+                <Check size={11} className="text-primary-foreground" />
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -85,10 +91,16 @@ export function ArtistCard({
         )}
       </div>
 
-      <div className="truncate text-center text-sm font-medium text-foreground">{name}</div>
+      <div className="truncate text-center text-sm font-medium text-foreground">
+        {name}
+      </div>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-        {primary_format ? <CrateChip>{primary_format.replace(".", "").toUpperCase()}</CrateChip> : null}
-        <CrateChip>{albums} {albums === 1 ? "album" : "albums"}</CrateChip>
+        {primary_format ? (
+          <CrateChip>{primary_format.replace(".", "").toUpperCase()}</CrateChip>
+        ) : null}
+        <CrateChip>
+          {albums} {albums === 1 ? "album" : "albums"}
+        </CrateChip>
         <CrateChip>{tracks} tracks</CrateChip>
         <CrateChip>{formatSize(size_mb)}</CrateChip>
       </div>

@@ -1,4 +1,8 @@
-import { forwardRef, type ButtonHTMLAttributes, type ComponentPropsWithoutRef } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type ComponentPropsWithoutRef,
+} from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -16,22 +20,38 @@ export const AppPopover = forwardRef<HTMLDivElement, AppPopoverProps>(
     return (
       <div
         ref={ref}
-        className={cn(layer === "dropdown" ? APP_DROPDOWN_SURFACE : APP_POPOVER_SURFACE, className)}
+        className={cn(
+          layer === "dropdown" ? APP_DROPDOWN_SURFACE : APP_POPOVER_SURFACE,
+          className,
+        )}
         {...props}
       />
     );
   },
 );
 
-export function AppPopoverDivider({ className, ...props }: ComponentPropsWithoutRef<"div">) {
-  return <div className={cn("my-1 border-t border-[var(--idle-border)]", className)} {...props} />;
+export function AppPopoverDivider({
+  className,
+  ...props
+}: ComponentPropsWithoutRef<"div">) {
+  return (
+    <div
+      className={cn("my-1 border-t border-[var(--idle-border)]", className)}
+      {...props}
+    />
+  );
 }
 
 interface AppMenuButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   danger?: boolean;
 }
 
-export function AppMenuButton({ className, danger = false, type = "button", ...props }: AppMenuButtonProps) {
+export function AppMenuButton({
+  className,
+  danger = false,
+  type = "button",
+  ...props
+}: AppMenuButtonProps) {
   return (
     <button
       type={type}

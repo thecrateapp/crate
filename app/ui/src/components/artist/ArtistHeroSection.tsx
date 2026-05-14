@@ -1,10 +1,17 @@
 import { Link } from "react-router";
 
 import { ImageCropUpload } from "@/components/ImageCropUpload";
-import { GenrePillRow, type GenreProfileItem } from "@/components/genres/GenrePill";
+import {
+  GenrePillRow,
+  type GenreProfileItem,
+} from "@/components/genres/GenrePill";
 import { Button } from "@crate/ui/shadcn/button";
 import { CratePill } from "@crate/ui/primitives/CrateBadge";
-import { artistArtworkApiPath, artistBackgroundApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistArtworkApiPath,
+  artistBackgroundApiUrl,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 import { formatCompact, formatNumber, formatSize } from "@/lib/utils";
 import {
   Calendar,
@@ -111,20 +118,30 @@ export function ArtistHeroSection({
   onExportRichMetadata,
   onDelete,
 }: ArtistHeroSectionProps) {
-  const backgroundUrl = artistBackgroundApiUrl({ artistId, artistEntityUid, artistSlug, artistName }, { version: imageVersion });
-  const photoUrl = artistPhotoApiUrl({ artistId, artistEntityUid, artistSlug, artistName }, { version: imageVersion });
-  const backgroundSrc = `${backgroundUrl}?v=stable-hero-bg-v2${bgCacheBust ? `&t=${bgCacheBust}` : ""}`;
-  const photoSrc = `${photoUrl}?v=stable-hero-photo${photoCacheBust ? `&t=${photoCacheBust}` : ""}`;
+  const backgroundUrl = artistBackgroundApiUrl(
+    { artistId, artistEntityUid, artistSlug, artistName },
+    { version: imageVersion },
+  );
+  const photoUrl = artistPhotoApiUrl(
+    { artistId, artistEntityUid, artistSlug, artistName },
+    { version: imageVersion },
+  );
+  const backgroundSrc = `${backgroundUrl}?v=stable-hero-bg-v2${
+    bgCacheBust ? `&t=${bgCacheBust}` : ""
+  }`;
+  const photoSrc = `${photoUrl}?v=stable-hero-photo${
+    photoCacheBust ? `&t=${photoCacheBust}` : ""
+  }`;
 
   return (
-    <div
-      className="relative h-[420px] overflow-hidden -mx-4 md:-mx-8 md:h-[560px] group/hero"
-    >
+    <div className="relative h-[420px] overflow-hidden -mx-4 md:-mx-8 md:h-[560px] group/hero">
       <img
         key={bgCacheBust || "bg"}
         src={backgroundSrc}
         alt=""
-        className={`absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 transition-opacity duration-1000 ${bgLoaded ? "opacity-40" : "opacity-0"}`}
+        className={`absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 transition-opacity duration-1000 ${
+          bgLoaded ? "opacity-40" : "opacity-0"
+        }`}
         onLoad={onBackgroundLoad}
         onError={() => {}}
       />
@@ -139,7 +156,10 @@ export function ArtistHeroSection({
 
       {isAdmin ? (
         <ImageCropUpload
-          endpoint={artistArtworkApiPath({ artistId, artistEntityUid }, "upload-background")}
+          endpoint={artistArtworkApiPath(
+            { artistId, artistEntityUid },
+            "upload-background",
+          )}
           aspect={21 / 9}
           onUploaded={onBackgroundUploaded}
           label="Edit hero"
@@ -155,19 +175,30 @@ export function ArtistHeroSection({
                 key={photoCacheBust || "photo"}
                 src={photoSrc}
                 alt={artistName}
-                className={`w-full h-full object-cover transition-opacity duration-500 ${photoLoaded ? "opacity-100" : "opacity-0"}`}
+                className={`w-full h-full object-cover transition-opacity duration-500 ${
+                  photoLoaded ? "opacity-100" : "opacity-0"
+                }`}
                 onLoad={onPhotoLoad}
                 onError={onPhotoError}
               />
             ) : null}
             {(photoError || !photoLoaded) && (
-              <div className={`w-full h-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center ${photoLoaded && !photoError ? "hidden" : ""}`}>
-                <span className="text-5xl font-black text-white/40">{letter}</span>
+              <div
+                className={`w-full h-full bg-gradient-to-br from-primary/40 to-primary/20 flex items-center justify-center ${
+                  photoLoaded && !photoError ? "hidden" : ""
+                }`}
+              >
+                <span className="text-5xl font-black text-white/40">
+                  {letter}
+                </span>
               </div>
             )}
             {isAdmin ? (
               <ImageCropUpload
-                endpoint={artistArtworkApiPath({ artistId, artistEntityUid }, "upload-photo")}
+                endpoint={artistArtworkApiPath(
+                  { artistId, artistEntityUid },
+                  "upload-photo",
+                )}
                 aspect={1}
                 onUploaded={onPhotoUploaded}
                 className="absolute bottom-2 right-2 z-20 inline-flex items-center gap-1 rounded-md border border-white/15 bg-black/60 px-2 py-1.5 text-xs font-medium text-white/75 opacity-0 shadow-lg shadow-black/30 transition-all duration-200 group-hover/photo:translate-y-0 group-hover/photo:opacity-100 hover:bg-black/80 hover:text-white"
@@ -177,7 +208,12 @@ export function ArtistHeroSection({
 
           <div className="flex-1 min-w-0 pb-1">
             <div className="text-xs text-white/40 mb-2">
-              <Link to="/browse" className="hover:text-white/70 transition-colors">Browse</Link>
+              <Link
+                to="/browse"
+                className="hover:text-white/70 transition-colors"
+              >
+                Browse
+              </Link>
               <span className="mx-1.5">/</span>
               <span className="text-white/60">{artistName}</span>
             </div>
@@ -189,23 +225,45 @@ export function ArtistHeroSection({
             {(musicbrainz?.country || musicbrainz?.begin_date) && (
               <div className="hidden md:flex items-center gap-3 text-sm text-white/50 mb-2">
                 {musicbrainz?.country && (
-                  <span className="flex items-center gap-1"><MapPin size={13} />{musicbrainz.area ? `${musicbrainz.area}, ` : ""}{musicbrainz.country}</span>
+                  <span className="flex items-center gap-1">
+                    <MapPin size={13} />
+                    {musicbrainz.area ? `${musicbrainz.area}, ` : ""}
+                    {musicbrainz.country}
+                  </span>
                 )}
                 {musicbrainz?.begin_date && (
-                  <span className="flex items-center gap-1"><Calendar size={13} />Est. {musicbrainz.begin_date}</span>
+                  <span className="flex items-center gap-1">
+                    <Calendar size={13} />
+                    Est. {musicbrainz.begin_date}
+                  </span>
                 )}
                 {musicbrainz?.type && (
-                  <span className="flex items-center gap-1"><Users size={13} />{musicbrainz.type}</span>
+                  <span className="flex items-center gap-1">
+                    <Users size={13} />
+                    {musicbrainz.type}
+                  </span>
                 )}
               </div>
             )}
 
             <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-white/50 mb-2 flex-wrap">
-              <span className="flex items-center gap-1.5"><Disc3 size={14} />{albumCount} albums</span>
-              <span className="flex items-center gap-1.5"><Music size={14} />{formatNumber(totalTracks)} tracks</span>
-              <span className="flex items-center gap-1.5"><HardDrive size={14} />{formatSize(totalSizeMb)}</span>
+              <span className="flex items-center gap-1.5">
+                <Disc3 size={14} />
+                {albumCount} albums
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Music size={14} />
+                {formatNumber(totalTracks)} tracks
+              </span>
+              <span className="flex items-center gap-1.5">
+                <HardDrive size={14} />
+                {formatSize(totalSizeMb)}
+              </span>
               {(lastfmListeners ?? 0) > 0 && (
-                <span className="flex items-center gap-1.5"><Headphones size={14} />{formatCompact(lastfmListeners!)} listeners</span>
+                <span className="flex items-center gap-1.5">
+                  <Headphones size={14} />
+                  {formatCompact(lastfmListeners!)} listeners
+                </span>
               )}
             </div>
 
@@ -218,11 +276,20 @@ export function ArtistHeroSection({
               >
                 <Calendar size={13} />
                 <span className="font-medium">
-                  Next show: {new Date(upcomingShow.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  Next show:{" "}
+                  {new Date(upcomingShow.date).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </span>
                 <span className="text-orange-300/70">
                   {upcomingShow.venue}
-                  {upcomingShow.city ? ` — ${[upcomingShow.city, upcomingShow.country].filter(Boolean).join(", ")}` : ""}
+                  {upcomingShow.city
+                    ? ` — ${[upcomingShow.city, upcomingShow.country]
+                        .filter(Boolean)
+                        .join(", ")}`
+                    : ""}
                 </span>
               </a>
             )}
@@ -233,10 +300,15 @@ export function ArtistHeroSection({
                 <div className="w-[60px] h-1.5 bg-white/10 rounded-md overflow-hidden">
                   <div
                     className="h-full rounded-md"
-                    style={{ width: `${popularityScore}%`, background: "linear-gradient(90deg, #06b6d433, #06b6d4)" }}
+                    style={{
+                      width: `${popularityScore}%`,
+                      background: "linear-gradient(90deg, #06b6d433, #06b6d4)",
+                    }}
                   />
                 </div>
-                <span className="text-xs text-white/40">{popularityScore}%</span>
+                <span className="text-xs text-white/40">
+                  {popularityScore}%
+                </span>
               </div>
             )}
 
@@ -259,13 +331,13 @@ export function ArtistHeroSection({
                 disabled={enriching}
                 onClick={onEnrich}
               >
-                <RefreshCw size={14} className={`mr-1 ${enriching ? "animate-spin" : ""}`} /> {enriching ? "Enriching..." : "Enrich"}
+                <RefreshCw
+                  size={14}
+                  className={`mr-1 ${enriching ? "animate-spin" : ""}`}
+                />{" "}
+                {enriching ? "Enriching..." : "Enrich"}
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onAnalyze}
-              >
+              <Button size="sm" variant="outline" onClick={onAnalyze}>
                 <AudioWaveform size={14} className="mr-1" /> Analyze
               </Button>
               {isAdmin && onSyncLyrics ? (
@@ -320,7 +392,8 @@ export function ArtistHeroSection({
                   className="text-amber-400 hover:bg-amber-500/10"
                   onClick={onRepair}
                 >
-                  <Wrench size={14} className="mr-1" /> {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
+                  <Wrench size={14} className="mr-1" />{" "}
+                  {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
                 </Button>
               )}
               {isAdmin && (

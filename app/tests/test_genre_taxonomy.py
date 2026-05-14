@@ -16,9 +16,24 @@ from crate.genre_taxonomy_inference import infer_canonical_genre
 
 def test_summarize_taste_genres_normalizes_aliases() -> None:
     rows = [
-        {"genre_name": "Trash Metal", "play_count": 8, "complete_play_count": 5, "minutes_listened": 220},
-        {"genre_name": "thrash metal", "play_count": 4, "complete_play_count": 2, "minutes_listened": 90},
-        {"genre_name": "Hardcore", "play_count": 6, "complete_play_count": 4, "minutes_listened": 150},
+        {
+            "genre_name": "Trash Metal",
+            "play_count": 8,
+            "complete_play_count": 5,
+            "minutes_listened": 220,
+        },
+        {
+            "genre_name": "thrash metal",
+            "play_count": 4,
+            "complete_play_count": 2,
+            "minutes_listened": 90,
+        },
+        {
+            "genre_name": "Hardcore",
+            "play_count": 6,
+            "complete_play_count": 4,
+            "minutes_listened": 150,
+        },
     ]
 
     genres = summarize_taste_genres(rows, limit=4)
@@ -30,16 +45,44 @@ def test_summarize_taste_genres_normalizes_aliases() -> None:
 
 def test_choose_mix_seed_genres_prefers_one_seed_per_family_first() -> None:
     rows = [
-        {"genre_name": "thrash metal", "play_count": 9, "complete_play_count": 7, "minutes_listened": 300},
-        {"genre_name": "doom metal", "play_count": 8, "complete_play_count": 6, "minutes_listened": 260},
-        {"genre_name": "hardcore punk", "play_count": 7, "complete_play_count": 5, "minutes_listened": 210},
-        {"genre_name": "shoegaze", "play_count": 6, "complete_play_count": 4, "minutes_listened": 180},
+        {
+            "genre_name": "thrash metal",
+            "play_count": 9,
+            "complete_play_count": 7,
+            "minutes_listened": 300,
+        },
+        {
+            "genre_name": "doom metal",
+            "play_count": 8,
+            "complete_play_count": 6,
+            "minutes_listened": 260,
+        },
+        {
+            "genre_name": "hardcore punk",
+            "play_count": 7,
+            "complete_play_count": 5,
+            "minutes_listened": 210,
+        },
+        {
+            "genre_name": "shoegaze",
+            "play_count": 6,
+            "complete_play_count": 4,
+            "minutes_listened": 180,
+        },
     ]
 
     seeds = choose_mix_seed_genres(rows, limit=3)
 
-    assert [seed["slug"] for seed in seeds] == ["thrash-metal", "hardcore-punk", "shoegaze"]
-    assert [get_top_level_slug(seed["slug"]) for seed in seeds] == ["metal", "punk", "alternative"]
+    assert [seed["slug"] for seed in seeds] == [
+        "thrash-metal",
+        "hardcore-punk",
+        "shoegaze",
+    ]
+    assert [get_top_level_slug(seed["slug"]) for seed in seeds] == [
+        "metal",
+        "punk",
+        "alternative",
+    ]
 
 
 def test_related_genre_terms_expand_a_scene() -> None:
@@ -86,10 +129,30 @@ def test_funk_is_child_of_soul() -> None:
 
 def test_choose_mix_seeds_allows_distant_siblings_from_same_family() -> None:
     rows = [
-        {"genre_name": "thrash metal", "play_count": 10, "complete_play_count": 8, "minutes_listened": 350},
-        {"genre_name": "doom metal", "play_count": 9, "complete_play_count": 7, "minutes_listened": 300},
-        {"genre_name": "hardcore punk", "play_count": 7, "complete_play_count": 5, "minutes_listened": 210},
-        {"genre_name": "shoegaze", "play_count": 5, "complete_play_count": 3, "minutes_listened": 150},
+        {
+            "genre_name": "thrash metal",
+            "play_count": 10,
+            "complete_play_count": 8,
+            "minutes_listened": 350,
+        },
+        {
+            "genre_name": "doom metal",
+            "play_count": 9,
+            "complete_play_count": 7,
+            "minutes_listened": 300,
+        },
+        {
+            "genre_name": "hardcore punk",
+            "play_count": 7,
+            "complete_play_count": 5,
+            "minutes_listened": 210,
+        },
+        {
+            "genre_name": "shoegaze",
+            "play_count": 5,
+            "complete_play_count": 3,
+            "minutes_listened": 150,
+        },
     ]
 
     seeds = choose_mix_seed_genres(rows, limit=4)
@@ -155,7 +218,9 @@ def test_infer_canonical_genre_falls_back_to_family_when_needed() -> None:
     assert proposal["canonical_slug"] in {"techno", "house", "electronic"}
 
 
-def test_infer_canonical_genre_prefers_specific_runtime_child_over_generic_family() -> None:
+def test_infer_canonical_genre_prefers_specific_runtime_child_over_generic_family() -> (
+    None
+):
     import crate.genre_taxonomy as genre_taxonomy
 
     genre_taxonomy.invalidate_runtime_taxonomy_cache()

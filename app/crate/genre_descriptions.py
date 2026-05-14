@@ -72,20 +72,37 @@ def _throttle_musicbrainz() -> None:
         _MB_LAST_REQUEST_AT = time.monotonic()
 
 
-def _request_json(url: str, *, params: dict | None = None, timeout: int = 15, headers: dict[str, str] | None = None) -> dict | None:
+def _request_json(
+    url: str,
+    *,
+    params: dict | None = None,
+    timeout: int = 15,
+    headers: dict[str, str] | None = None,
+) -> dict | None:
     response = requests.get(url, params=params, timeout=timeout, headers=headers)
     response.raise_for_status()
     return response.json()
 
 
-def _request_text(url: str, *, params: dict | None = None, timeout: int = 15, headers: dict[str, str] | None = None) -> str:
+def _request_text(
+    url: str,
+    *,
+    params: dict | None = None,
+    timeout: int = 15,
+    headers: dict[str, str] | None = None,
+) -> str:
     response = requests.get(url, params=params, timeout=timeout, headers=headers)
     response.raise_for_status()
     return response.text
 
 
 def _parse_musicbrainz_genre_catalog(payload: dict) -> list[dict]:
-    rows = payload.get("genres") or payload.get("genre-list") or payload.get("genre_list") or []
+    rows = (
+        payload.get("genres")
+        or payload.get("genre-list")
+        or payload.get("genre_list")
+        or []
+    )
     parsed: list[dict] = []
     for row in rows:
         name = (row.get("name") or "").strip()
@@ -99,7 +116,9 @@ def _parse_musicbrainz_genre_catalog(payload: dict) -> list[dict]:
 def fetch_musicbrainz_genre_catalog(*, force: bool = False) -> list[dict]:
     from crate.db.cache_store import get_cache, set_cache
 
-    cached = None if force else get_cache(_MB_ALL_CACHE_KEY, max_age_seconds=_MB_ALL_TTL)
+    cached = (
+        None if force else get_cache(_MB_ALL_CACHE_KEY, max_age_seconds=_MB_ALL_TTL)
+    )
     if cached:
         return cached
 
@@ -109,11 +128,14 @@ def fetch_musicbrainz_genre_catalog(*, force: bool = False) -> list[dict]:
     total = None
     while total is None or offset < total:
         _throttle_musicbrainz()
-        payload = _request_json(
-            "https://musicbrainz.org/ws/2/genre/all",
-            params={"fmt": "json", "limit": limit, "offset": offset},
-            headers=_mb_headers(),
-        ) or {}
+        payload = (
+            _request_json(
+                "https://musicbrainz.org/ws/2/genre/all",
+                params={"fmt": "json", "limit": limit, "offset": offset},
+                headers=_mb_headers(),
+            )
+            or {}
+        )
         batch = _parse_musicbrainz_genre_catalog(payload)
         if not batch:
             break
@@ -186,7 +208,9 @@ def fetch_musicbrainz_genre_external_links(mbid: str, *, force: bool = False) ->
             page_html = _request_text(url, headers=_mb_headers())
         except Exception:
             continue
-        match = re.search(r"https?://www\.wikidata\.org/wiki/(Q\d+)", page_html, flags=re.IGNORECASE)
+        match = re.search(
+            r"https?://www\.wikidata\.org/wiki/(Q\d+)", page_html, flags=re.IGNORECASE
+        )
         if match:
             wikidata_url = f"https://www.wikidata.org/wiki/{match.group(1).upper()}"
             break
@@ -204,7 +228,11 @@ def _strip_musicbrainz_html_to_lines(html_text: str) -> list[str]:
     cleaned = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "\n", html_text or "")
     cleaned = re.sub(r"(?is)<style\b[^>]*>.*?</style>", "\n", cleaned)
     cleaned = re.sub(r"(?i)<br\s*/?>", "\n", cleaned)
-    cleaned = re.sub(r"(?i)</(p|div|li|ul|ol|h1|h2|h3|h4|section|article|table|tr|td|th)>", "\n", cleaned)
+    cleaned = re.sub(
+        r"(?i)</(p|div|li|ul|ol|h1|h2|h3|h4|section|article|table|tr|td|th)>",
+        "\n",
+        cleaned,
+    )
     cleaned = re.sub(r"(?i)<[^>]+>", "", cleaned)
     text = html.unescape(cleaned)
     lines: list[str] = []
@@ -259,7 +287,13 @@ def _parse_musicbrainz_genre_relationships(lines: list[str]) -> dict[str, list[s
             continue
         if not in_relationships:
             continue
-        if section_label in {"external links", "editing", "collections", "aliases", "associated tags"}:
+        if section_label in {
+            "external links",
+            "editing",
+            "collections",
+            "aliases",
+            "associated tags",
+        }:
             break
 
         label_match = re.match(
@@ -267,11 +301,12 @@ def _parse_musicbrainz_genre_relationships(lines: list[str]) -> dict[str, list[s
             normalized_lower,
         )
         if label_match:
-            current_label = label_match.group(1)
-            relationships.setdefault(current_label, [])
+            label = label_match.group(1)
+            current_label = label
+            relationships.setdefault(label, [])
             remainder = _normalize_musicbrainz_relation_name(label_match.group(2))
             if _is_valid_musicbrainz_relation_candidate(remainder):
-                relationships[current_label].append(remainder)
+                relationships[label].append(remainder)
             continue
 
         if current_label:
@@ -291,7 +326,9 @@ def _parse_musicbrainz_genre_relationships(lines: list[str]) -> dict[str, list[s
     return deduped
 
 
-def _map_musicbrainz_relationships(current_name: str, relationships: dict[str, list[str]]) -> list[dict]:
+def _map_musicbrainz_relationships(
+    current_name: str, relationships: dict[str, list[str]]
+) -> list[dict]:
     current = _normalize_musicbrainz_relation_name(current_name)
     edges: list[dict] = []
     seen: set[tuple[str, str, str]] = set()
@@ -305,7 +342,13 @@ def _map_musicbrainz_relationships(current_name: str, relationships: dict[str, l
         if key in seen:
             return
         seen.add(key)
-        edges.append({"source_name": source, "target_name": target, "relation_type": relation_type})
+        edges.append(
+            {
+                "source_name": source,
+                "target_name": target,
+                "relation_type": relation_type,
+            }
+        )
 
     for related_name in relationships.get("subgenre of", []):
         add_edge(current, related_name, "parent")
@@ -331,7 +374,10 @@ def fetch_musicbrainz_genre_page_details(mbid: str, *, force: bool = False) -> d
         return cached
 
     html_text = ""
-    for url in (f"https://musicbrainz.org/genre/{mbid}", f"https://musicbrainz.org/genre/{mbid}/details"):
+    for url in (
+        f"https://musicbrainz.org/genre/{mbid}",
+        f"https://musicbrainz.org/genre/{mbid}/details",
+    ):
         try:
             _throttle_musicbrainz()
             html_text = _request_text(url, headers=_mb_headers())
@@ -343,7 +389,9 @@ def fetch_musicbrainz_genre_page_details(mbid: str, *, force: bool = False) -> d
     lines = _strip_musicbrainz_html_to_lines(html_text)
     relationships = _parse_musicbrainz_genre_relationships(lines)
     wikidata_url = ""
-    match = re.search(r"https?://www\.wikidata\.org/wiki/(Q\d+)", html_text or "", flags=re.IGNORECASE)
+    match = re.search(
+        r"https?://www\.wikidata\.org/wiki/(Q\d+)", html_text or "", flags=re.IGNORECASE
+    )
     if match:
         wikidata_url = f"https://www.wikidata.org/wiki/{match.group(1).upper()}"
 
@@ -357,7 +405,9 @@ def fetch_musicbrainz_genre_page_details(mbid: str, *, force: bool = False) -> d
     return result
 
 
-def _pick_wikidata_description(payload: dict, languages: tuple[str, ...]) -> dict | None:
+def _pick_wikidata_description(
+    payload: dict, languages: tuple[str, ...]
+) -> dict | None:
     entities = payload.get("entities") or {}
     for entity in entities.values():
         descriptions = entity.get("descriptions") or {}
@@ -375,7 +425,9 @@ def _pick_wikidata_description(payload: dict, languages: tuple[str, ...]) -> dic
     return None
 
 
-def fetch_wikidata_description(entity_id: str, *, force: bool = False, languages: tuple[str, ...] = ("en", "es")) -> dict | None:
+def fetch_wikidata_description(
+    entity_id: str, *, force: bool = False, languages: tuple[str, ...] = ("en", "es")
+) -> dict | None:
     from crate.db.cache_store import get_cache, set_cache
 
     entity_id = (entity_id or "").strip().upper()
@@ -387,17 +439,23 @@ def fetch_wikidata_description(entity_id: str, *, force: bool = False, languages
     if cached:
         return cached
 
-    payload = _request_json(
-        "https://www.wikidata.org/w/api.php",
-        params={
-            "action": "wbgetentities",
-            "ids": entity_id,
-            "props": "descriptions",
-            "languages": "|".join(languages),
-            "format": "json",
-        },
-        headers={"User-Agent": "crate/1.0 (https://github.com/crate)", "Accept": "application/json"},
-    ) or {}
+    payload = (
+        _request_json(
+            "https://www.wikidata.org/w/api.php",
+            params={
+                "action": "wbgetentities",
+                "ids": entity_id,
+                "props": "descriptions",
+                "languages": "|".join(languages),
+                "format": "json",
+            },
+            headers={
+                "User-Agent": "crate/1.0 (https://github.com/crate)",
+                "Accept": "application/json",
+            },
+        )
+        or {}
+    )
     picked = _pick_wikidata_description(payload, languages)
     if not picked:
         return None
@@ -481,11 +539,15 @@ def enrich_genre_descriptions_batch(
             if not musicbrainz_mbid:
                 skipped += 1
                 if len(examples_skipped) < 8:
-                    examples_skipped.append({"slug": slug, "reason": "musicbrainz_match_missing"})
+                    examples_skipped.append(
+                        {"slug": slug, "reason": "musicbrainz_match_missing"}
+                    )
                 continue
 
             matched_musicbrainz += 1
-            links = fetch_musicbrainz_genre_external_links(musicbrainz_mbid, force=force)
+            links = fetch_musicbrainz_genre_external_links(
+                musicbrainz_mbid, force=force
+            )
             update_genre_external_metadata(
                 slug,
                 musicbrainz_mbid=musicbrainz_mbid,
@@ -493,25 +555,45 @@ def enrich_genre_descriptions_batch(
                 wikidata_url=links.get("wikidata_url"),
             )
 
-            wikidata_entity_id = (links.get("wikidata_entity_id") or node.get("wikidata_entity_id") or "").strip()
+            wikidata_entity_id = (
+                links.get("wikidata_entity_id") or node.get("wikidata_entity_id") or ""
+            ).strip()
             if not wikidata_entity_id:
                 skipped += 1
                 if len(examples_skipped) < 8:
-                    examples_skipped.append({"slug": slug, "reason": "wikidata_link_missing", "musicbrainz_mbid": musicbrainz_mbid})
+                    examples_skipped.append(
+                        {
+                            "slug": slug,
+                            "reason": "wikidata_link_missing",
+                            "musicbrainz_mbid": musicbrainz_mbid,
+                        }
+                    )
                 continue
 
             wikidata = fetch_wikidata_description(wikidata_entity_id, force=force)
             if not wikidata or not wikidata.get("description"):
                 skipped += 1
                 if len(examples_skipped) < 8:
-                    examples_skipped.append({"slug": slug, "reason": "wikidata_description_missing", "wikidata_entity_id": wikidata_entity_id})
+                    examples_skipped.append(
+                        {
+                            "slug": slug,
+                            "reason": "wikidata_description_missing",
+                            "wikidata_entity_id": wikidata_entity_id,
+                        }
+                    )
                 continue
 
             description = (wikidata.get("description") or "").strip()
             if _is_low_value_description(description):
                 skipped += 1
                 if len(examples_skipped) < 8:
-                    examples_skipped.append({"slug": slug, "reason": "wikidata_description_too_generic", "description": description})
+                    examples_skipped.append(
+                        {
+                            "slug": slug,
+                            "reason": "wikidata_description_too_generic",
+                            "description": description,
+                        }
+                    )
                 continue
 
             matched_wikidata += 1
@@ -543,12 +625,17 @@ def enrich_genre_descriptions_batch(
                         }
                     )
         except Exception as exc:
-            log.warning("Failed to enrich genre description for %s", slug, exc_info=True)
+            log.warning(
+                "Failed to enrich genre description for %s", slug, exc_info=True
+            )
             skipped += 1
             if len(examples_skipped) < 8:
-                examples_skipped.append({"slug": slug, "reason": "exception", "error": str(exc)})
+                examples_skipped.append(
+                    {"slug": slug, "reason": "exception", "error": str(exc)}
+                )
 
     from crate.db.genres import get_remaining_without_external_description
+
     remaining_without_external = get_remaining_without_external_description()
 
     return {
@@ -579,7 +666,9 @@ def sync_musicbrainz_genre_graph_batch(
         upsert_genre_taxonomy_node,
     )
 
-    targets = list_genre_taxonomy_nodes_for_musicbrainz_sync(limit=limit, focus_slug=focus_slug)
+    targets = list_genre_taxonomy_nodes_for_musicbrainz_sync(
+        limit=limit, focus_slug=focus_slug
+    )
     if not targets:
         reason = "no_targets"
         if focus_slug and not get_genre_taxonomy_node_id(focus_slug):
@@ -630,7 +719,9 @@ def sync_musicbrainz_genre_graph_batch(
             if not musicbrainz_mbid:
                 skipped += 1
                 if len(examples_skipped) < 8:
-                    examples_skipped.append({"slug": slug, "reason": "musicbrainz_match_missing"})
+                    examples_skipped.append(
+                        {"slug": slug, "reason": "musicbrainz_match_missing"}
+                    )
                 continue
 
             matched_musicbrainz += 1
@@ -644,7 +735,9 @@ def sync_musicbrainz_genre_graph_batch(
             if current_row:
                 touched_node_slugs.add(current_row["slug"])
 
-            details = fetch_musicbrainz_genre_page_details(musicbrainz_mbid, force=force)
+            details = fetch_musicbrainz_genre_page_details(
+                musicbrainz_mbid, force=force
+            )
             update_genre_external_metadata(
                 slug,
                 musicbrainz_mbid=musicbrainz_mbid,
@@ -652,7 +745,10 @@ def sync_musicbrainz_genre_graph_batch(
                 wikidata_url=details.get("wikidata_url"),
             )
 
-            relation_edges = _map_musicbrainz_relationships(current_row["name"] if current_row else name, details.get("relationships") or {})
+            relation_edges = _map_musicbrainz_relationships(
+                current_row["name"] if current_row else name,
+                details.get("relationships") or {},
+            )
             synced_here = 0
             for relation in relation_edges:
                 source_match = mb_index.get(_genre_lookup_key(relation["source_name"]))
@@ -671,10 +767,14 @@ def sync_musicbrainz_genre_graph_batch(
                     touched_node_slugs.add(source_row["slug"])
                 if target_row:
                     touched_node_slugs.add(target_row["slug"])
-                if source_row and target_row and upsert_genre_taxonomy_edge(
-                    source_row["slug"],
-                    target_row["slug"],
-                    relation_type=relation["relation_type"],
+                if (
+                    source_row
+                    and target_row
+                    and upsert_genre_taxonomy_edge(
+                        source_row["slug"],
+                        target_row["slug"],
+                        relation_type=relation["relation_type"],
+                    )
                 ):
                     synced_here += 1
                     edges_synced += 1
@@ -701,7 +801,9 @@ def sync_musicbrainz_genre_graph_batch(
             log.warning("Failed to sync MusicBrainz graph for %s", slug, exc_info=True)
             skipped += 1
             if len(examples_skipped) < 8:
-                examples_skipped.append({"slug": slug, "reason": "exception", "error": str(exc)})
+                examples_skipped.append(
+                    {"slug": slug, "reason": "exception", "error": str(exc)}
+                )
 
     return {
         "processed": total,

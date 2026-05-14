@@ -1,3 +1,4 @@
+# ruff: noqa: F401
 """Response-oriented Pydantic models for the HTTP API contract."""
 
 from crate.api.schemas.acquisition import (

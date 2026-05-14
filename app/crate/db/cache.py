@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from crate.db.cache_dir_mtimes import delete_dir_mtime, get_all_dir_mtimes, get_dir_mtime, set_dir_mtime
+from crate.db.cache_dir_mtimes import (
+    delete_dir_mtime,
+    get_all_dir_mtimes,
+    get_dir_mtime,
+    set_dir_mtime,
+)
 from crate.db.cache_musicbrainz import get_mb_cache, set_mb_cache
 from crate.db.cache_runtime import (
-    _get_redis,
+    get_redis,
     _MEM_MAX_SIZE,
     _MEM_TTL,
     _mem_cache,
@@ -25,7 +30,7 @@ from crate.db.cache_store import (
 
 
 __all__ = [
-    "_get_redis",
+    "get_redis",
     "_MEM_MAX_SIZE",
     "_MEM_TTL",
     "_mem_cache",

@@ -6,7 +6,6 @@ writes tags/photos back to /music, the watcher ignores those changes.
 
 import logging
 import threading
-import time
 from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler
@@ -97,7 +96,10 @@ class LibraryWatcher:
             return
         try:
             if get_cache(f"processing:{artist_name.lower()}"):
-                log.debug("Watcher: ignoring change during processing for %s (DB flag)", artist_name)
+                log.debug(
+                    "Watcher: ignoring change during processing for %s (DB flag)",
+                    artist_name,
+                )
                 return
         except Exception:
             pass
@@ -107,7 +109,9 @@ class LibraryWatcher:
             if key in self.debounce_timers:
                 self.debounce_timers[key].cancel()
             timer = threading.Timer(
-                self.debounce_seconds, self._sync_album, args=(album_dir, artist_name, is_new_file)
+                self.debounce_seconds,
+                self._sync_album,
+                args=(album_dir, artist_name, is_new_file),
             )
             timer.daemon = True
             timer.start()
@@ -130,7 +134,13 @@ class LibraryWatcher:
                 dedup_key=f"library-sync:album:{str(album_dir).lower()}",
             )
             if task_id:
-                log.info("Watcher: queued scoped library sync for %s/%s", artist_name, album_dir.name)
+                log.info(
+                    "Watcher: queued scoped library sync for %s/%s",
+                    artist_name,
+                    album_dir.name,
+                )
 
         except Exception:
-            log.exception("Watcher: failed to queue sync for %s/%s", artist_name, album_dir.name)
+            log.exception(
+                "Watcher: failed to queue sync for %s/%s", artist_name, album_dir.name
+            )

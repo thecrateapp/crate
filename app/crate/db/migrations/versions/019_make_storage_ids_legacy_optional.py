@@ -40,14 +40,26 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_lib_albums_storage_id")
     op.execute("DROP INDEX IF EXISTS idx_lib_artists_storage_id")
 
-    op.execute("UPDATE library_artists SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL")
-    op.execute("UPDATE library_albums SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL")
-    op.execute("UPDATE library_tracks SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL")
+    op.execute(
+        "UPDATE library_artists SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL"
+    )
+    op.execute(
+        "UPDATE library_albums SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL"
+    )
+    op.execute(
+        "UPDATE library_tracks SET storage_id = entity_uid WHERE storage_id IS NULL AND entity_uid IS NOT NULL"
+    )
 
     op.execute("ALTER TABLE library_artists ALTER COLUMN storage_id SET NOT NULL")
     op.execute("ALTER TABLE library_albums ALTER COLUMN storage_id SET NOT NULL")
     op.execute("ALTER TABLE library_tracks ALTER COLUMN storage_id SET NOT NULL")
 
-    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_storage_id ON library_artists(storage_id)")
-    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_albums_storage_id ON library_albums(storage_id)")
-    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_tracks_storage_id ON library_tracks(storage_id)")
+    op.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_storage_id ON library_artists(storage_id)"
+    )
+    op.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_albums_storage_id ON library_albums(storage_id)"
+    )
+    op.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_tracks_storage_id ON library_tracks(storage_id)"
+    )

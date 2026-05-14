@@ -1,6 +1,12 @@
 import { Loader2 } from "lucide-react";
 
-export function PullIndicator({ distance, refreshing }: { distance: number; refreshing: boolean }) {
+export function PullIndicator({
+  distance,
+  refreshing,
+}: {
+  distance: number;
+  refreshing: boolean;
+}) {
   if (distance <= 0 && !refreshing) return null;
   return (
     <div
@@ -12,7 +18,10 @@ export function PullIndicator({ distance, refreshing }: { distance: number; refr
       ) : (
         <div
           className="h-5 w-5 rounded-full border-2 border-primary/40 border-t-primary transition-transform"
-          style={{ transform: `rotate(${distance * 4}deg)`, opacity: Math.min(distance / 32, 1) }}
+          style={{
+            transform: `rotate(${distance * 4}deg)`,
+            opacity: Math.min(distance / 32, 1),
+          }}
         />
       )}
     </div>

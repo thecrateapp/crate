@@ -43,7 +43,9 @@ def create_acquisition_schema(cur) -> None:
             completed_at TIMESTAMPTZ
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tidal_downloads_status ON tidal_downloads(status)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tidal_downloads_status ON tidal_downloads(status)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tidal_monitored_artists (
@@ -89,8 +91,12 @@ def create_acquisition_schema(cur) -> None:
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shows_date ON shows(date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shows_artist ON shows(artist_name)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_shows_city ON shows(city)")
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_shows_lastfm_event ON shows(lastfm_event_id) WHERE lastfm_event_id IS NOT NULL")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_shows_scrape_city ON shows(scrape_city)")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_shows_lastfm_event ON shows(lastfm_event_id) WHERE lastfm_event_id IS NOT NULL"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shows_scrape_city ON shows(scrape_city)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_show_attendance (
@@ -101,8 +107,12 @@ def create_acquisition_schema(cur) -> None:
             UNIQUE(user_id, show_id)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_show_attendance_user ON user_show_attendance(user_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_show_attendance_show ON user_show_attendance(show_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_show_attendance_user ON user_show_attendance(user_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_show_attendance_show ON user_show_attendance(show_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_show_reminders (
@@ -115,5 +125,9 @@ def create_acquisition_schema(cur) -> None:
             UNIQUE(user_id, show_id, reminder_type)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_show_reminders_user ON user_show_reminders(user_id, show_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_show_reminders_type ON user_show_reminders(user_id, reminder_type)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_show_reminders_user ON user_show_reminders(user_id, show_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_show_reminders_type ON user_show_reminders(user_id, reminder_type)"
+    )

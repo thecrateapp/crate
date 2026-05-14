@@ -1,15 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router";
-import { AdminSelect, type AdminSelectOption } from "@/components/ui/AdminSelect";
+import {
+  AdminSelect,
+  type AdminSelectOption,
+} from "@/components/ui/AdminSelect";
 import { Button } from "@crate/ui/shadcn/button";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { api } from "@/lib/api";
-import { artistActionApiPath, artistManagementApiPath, artistPagePath } from "@/lib/library-routes";
+import {
+  artistActionApiPath,
+  artistManagementApiPath,
+  artistPagePath,
+} from "@/lib/library-routes";
 import { toast } from "sonner";
 import {
-  LayoutGrid, List, Loader2,
-  Check, SquareCheck, X, RefreshCw, BrainCircuit, Trash2,
+  LayoutGrid,
+  List,
+  Loader2,
+  Check,
+  SquareCheck,
+  X,
+  RefreshCw,
+  BrainCircuit,
+  Trash2,
 } from "lucide-react";
 import { ArtistCard } from "@/components/artist/ArtistCard";
 import { ArtistRow } from "@/components/artist/ArtistRow";
@@ -83,7 +97,7 @@ export function Browse() {
 
   function toggleSelect(artistId?: number) {
     if (artistId == null) return;
-    setSelected(prev => {
+    setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(artistId)) next.delete(artistId);
       else next.add(artistId);
@@ -92,7 +106,11 @@ export function Browse() {
   }
 
   function selectAll() {
-    setSelected(new Set(artists.map(a => a.id).filter((id): id is number => id != null)));
+    setSelected(
+      new Set(
+        artists.map((a) => a.id).filter((id): id is number => id != null),
+      ),
+    );
   }
 
   function clearSelection() {
@@ -103,11 +121,16 @@ export function Browse() {
   async function batchEnrich() {
     for (const artistId of selected) {
       const artist = artists.find((item) => item.id === artistId);
-      const endpoint = artistActionApiPath({ artistId, artistEntityUid: artist?.entity_uid }, "enrich");
+      const endpoint = artistActionApiPath(
+        { artistId, artistEntityUid: artist?.entity_uid },
+        "enrich",
+      );
       if (!endpoint) continue;
       try {
         await api(endpoint, "POST");
-      } catch { /* continue */ }
+      } catch {
+        /* continue */
+      }
     }
     toast.success(`Enrichment started for ${selected.size} artists`);
     clearSelection();
@@ -116,11 +139,16 @@ export function Browse() {
   async function batchAnalyze() {
     for (const artistId of selected) {
       const artist = artists.find((item) => item.id === artistId);
-      const endpoint = artistManagementApiPath({ artistId, artistEntityUid: artist?.entity_uid }, "reanalyze");
+      const endpoint = artistManagementApiPath(
+        { artistId, artistEntityUid: artist?.entity_uid },
+        "reanalyze",
+      );
       if (!endpoint) continue;
       try {
         await api(endpoint, "POST");
-      } catch { /* continue */ }
+      } catch {
+        /* continue */
+      }
     }
     toast.success(`Analysis started for ${selected.size} artists`);
     clearSelection();
@@ -132,7 +160,10 @@ export function Browse() {
 
     for (const artistId of selected) {
       const artist = artists.find((item) => item.id === artistId);
-      const endpoint = artistManagementApiPath({ artistId, artistEntityUid: artist?.entity_uid }, "delete");
+      const endpoint = artistManagementApiPath(
+        { artistId, artistEntityUid: artist?.entity_uid },
+        "delete",
+      );
       if (!endpoint) {
         failed += 1;
         continue;
@@ -151,7 +182,9 @@ export function Browse() {
         {
           description:
             failed > 0
-              ? `${failed} request${failed === 1 ? "" : "s"} failed. Check Tasks for progress.`
+              ? `${failed} request${
+                  failed === 1 ? "" : "s"
+                } failed. Check Tasks for progress.`
               : "The worker will delete them in the background. Check Tasks for progress.",
         },
       );
@@ -176,7 +209,8 @@ export function Browse() {
     [setSearchParams],
   );
 
-  const setView = (v: "grid" | "list") => setParam("view", v === "grid" ? "" : v);
+  const setView = (v: "grid" | "list") =>
+    setParam("view", v === "grid" ? "" : v);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -205,28 +239,34 @@ export function Browse() {
 
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchPage = useCallback((page: number, reset = false) => {
-    if (reset) setLoading(true);
-    else setLoadingMore(true);
-    const params = new URLSearchParams();
-    if (genre) params.set("genre", genre);
-    if (country) params.set("country", country);
-    if (decade) params.set("decade", decade);
-    if (format) params.set("format", format);
-    params.set("sort", sort);
-    params.set("page", String(page));
-    params.set("per_page", String(PER_PAGE));
-    params.set("view", view);
+  const fetchPage = useCallback(
+    (page: number, reset = false) => {
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      const params = new URLSearchParams();
+      if (genre) params.set("genre", genre);
+      if (country) params.set("country", country);
+      if (decade) params.set("decade", decade);
+      if (format) params.set("format", format);
+      params.set("sort", sort);
+      params.set("page", String(page));
+      params.set("per_page", String(PER_PAGE));
+      params.set("view", view);
 
-    api<PaginatedResponse>(`/api/artists?${params.toString()}`)
-      .then((data) => {
-        setArtists((prev) => reset ? data.items : [...prev, ...data.items]);
-        setTotal(data.total);
-        hasMoreRef.current = data.items.length >= PER_PAGE;
-      })
-      .catch(() => {})
-      .finally(() => { setLoading(false); setLoadingMore(false); });
-  }, [genre, country, decade, format, sort, view]);
+      api<PaginatedResponse>(`/api/artists?${params.toString()}`)
+        .then((data) => {
+          setArtists((prev) => (reset ? data.items : [...prev, ...data.items]));
+          setTotal(data.total);
+          hasMoreRef.current = data.items.length >= PER_PAGE;
+        })
+        .catch(() => {})
+        .finally(() => {
+          setLoading(false);
+          setLoadingMore(false);
+        });
+    },
+    [genre, country, decade, format, sort, view],
+  );
 
   // Infinite scroll: observe sentinel element
   useEffect(() => {
@@ -235,7 +275,12 @@ export function Browse() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && !loading && !loadingMore && hasMoreRef.current) {
+        if (
+          entries[0]?.isIntersecting &&
+          !loading &&
+          !loadingMore &&
+          hasMoreRef.current
+        ) {
           pageRef.current += 1;
           fetchPage(pageRef.current);
         }
@@ -246,28 +291,36 @@ export function Browse() {
     return () => observer.disconnect();
   }, [loading, loadingMore, fetchPage]);
 
-  const genreOptions: AdminSelectOption[] = (filters?.genres ?? []).map((option) => ({
-    value: option.name,
-    label: option.name,
-    count: option.count ?? option.cnt ?? 0,
-  }));
+  const genreOptions: AdminSelectOption[] = (filters?.genres ?? []).map(
+    (option) => ({
+      value: option.name,
+      label: option.name,
+      count: option.count ?? option.cnt ?? 0,
+    }),
+  );
 
-  const countryOptions: AdminSelectOption[] = (filters?.countries ?? []).map((option) => ({
-    value: option.name,
-    label: option.name,
-    count: option.count ?? option.cnt ?? 0,
-  }));
+  const countryOptions: AdminSelectOption[] = (filters?.countries ?? []).map(
+    (option) => ({
+      value: option.name,
+      label: option.name,
+      count: option.count ?? option.cnt ?? 0,
+    }),
+  );
 
-  const decadeOptions: AdminSelectOption[] = (filters?.decades ?? []).map((decadeValue) => ({
-    value: decadeValue,
-    label: decadeValue,
-  }));
+  const decadeOptions: AdminSelectOption[] = (filters?.decades ?? []).map(
+    (decadeValue) => ({
+      value: decadeValue,
+      label: decadeValue,
+    }),
+  );
 
-  const formatOptions: AdminSelectOption[] = (filters?.formats ?? []).map((option) => ({
-    value: option.name,
-    label: option.name,
-    count: option.count ?? option.cnt ?? 0,
-  }));
+  const formatOptions: AdminSelectOption[] = (filters?.formats ?? []).map(
+    (option) => ({
+      value: option.name,
+      label: option.name,
+      count: option.count ?? option.cnt ?? 0,
+    }),
+  );
 
   const sortOptions: AdminSelectOption[] = SORT_OPTIONS.map((option) => ({
     value: option.value,
@@ -321,9 +374,16 @@ export function Browse() {
         <Button
           size="sm"
           variant={selectMode ? "default" : "outline"}
-          onClick={() => { setSelectMode(!selectMode); if (selectMode) clearSelection(); }}
+          onClick={() => {
+            setSelectMode(!selectMode);
+            if (selectMode) clearSelection();
+          }}
         >
-          {selectMode ? <Check size={13} className="mr-1" /> : <SquareCheck size={13} className="mr-1" />}
+          {selectMode ? (
+            <Check size={13} className="mr-1" />
+          ) : (
+            <SquareCheck size={13} className="mr-1" />
+          )}
           {selectMode ? "Done" : "Select"}
         </Button>
 
@@ -380,7 +440,17 @@ export function Browse() {
               hasIssues={a.has_issues}
               selectMode={selectMode}
               isSelected={a.id != null ? selected.has(a.id) : false}
-              onClick={() => selectMode ? toggleSelect(a.id) : navigate(artistPagePath({ artistId: a.id, artistSlug: a.slug, artistName: a.name }))}
+              onClick={() =>
+                selectMode
+                  ? toggleSelect(a.id)
+                  : navigate(
+                      artistPagePath({
+                        artistId: a.id,
+                        artistSlug: a.slug,
+                        artistName: a.name,
+                      }),
+                    )
+              }
             />
           ))}
         </div>
@@ -400,7 +470,17 @@ export function Browse() {
               hasIssues={a.has_issues}
               selectMode={selectMode}
               isSelected={a.id != null ? selected.has(a.id) : false}
-              onClick={() => selectMode ? toggleSelect(a.id) : navigate(artistPagePath({ artistId: a.id, artistSlug: a.slug, artistName: a.name }))}
+              onClick={() =>
+                selectMode
+                  ? toggleSelect(a.id)
+                  : navigate(
+                      artistPagePath({
+                        artistId: a.id,
+                        artistSlug: a.slug,
+                        artistName: a.name,
+                      }),
+                    )
+              }
             />
           ))}
         </div>
@@ -408,7 +488,9 @@ export function Browse() {
 
       {/* Infinite scroll sentinel */}
       <div ref={sentinelRef} className="h-10 flex items-center justify-center">
-        {loadingMore && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+        {loadingMore && (
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        )}
         {!hasMoreRef.current && artists.length > 0 && (
           <span className="text-xs text-muted-foreground">{total} artists</span>
         )}
@@ -424,11 +506,18 @@ export function Browse() {
             <Button size="sm" variant="outline" onClick={batchAnalyze}>
               <BrainCircuit size={13} className="mr-1" /> Analyze
             </Button>
-            <Button size="sm" variant="outline" className="text-red-500 border-red-500/30" onClick={() => setShowBatchDelete(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-red-500 border-red-500/30"
+              onClick={() => setShowBatchDelete(true)}
+            >
               <Trash2 size={13} className="mr-1" /> Delete
             </Button>
           </div>
-          <Button size="sm" variant="ghost" onClick={selectAll}>Select All</Button>
+          <Button size="sm" variant="ghost" onClick={selectAll}>
+            Select All
+          </Button>
           <Button size="sm" variant="ghost" onClick={clearSelection}>
             <X size={13} /> Cancel
           </Button>

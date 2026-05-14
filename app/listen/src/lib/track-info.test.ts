@@ -30,7 +30,12 @@ describe("mergeTrackQualityParts", () => {
     expect(
       mergeTrackQualityParts(
         { format: "flac", bitrate: 1411, sampleRate: 44100, bitDepth: 16 },
-        { format: "flac", bitrate: 1411, sampleRate: undefined, bitDepth: undefined },
+        {
+          format: "flac",
+          bitrate: 1411,
+          sampleRate: undefined,
+          bitDepth: undefined,
+        },
       ),
     ).toEqual({
       format: "flac",

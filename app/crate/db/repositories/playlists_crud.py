@@ -7,4 +7,9 @@ from crate.db.repositories.playlists_duplicate import duplicate_playlist
 from crate.db.repositories.playlists_mutate import delete_playlist, update_playlist
 
 
-__all__ = ["create_playlist", "delete_playlist", "duplicate_playlist", "update_playlist"]
+__all__ = [
+    "create_playlist",
+    "delete_playlist",
+    "duplicate_playlist",
+    "update_playlist",
+]

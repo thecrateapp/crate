@@ -1,3 +1,5 @@
+//! Bliss vector analysis and similarity search using the bliss-audio library.
+
 use bliss_audio::decoder::symphonia::SymphoniaDecoder;
 use bliss_audio::decoder::Decoder as DecoderTrait;
 use serde::Serialize;
@@ -71,7 +73,10 @@ pub fn run_bliss(
     // Single file mode
     if let Some(file_path) = &file {
         let result = analyze_file(file_path);
-        println!("{}", serde_json::to_string(&result).unwrap_or_default());
+        match serde_json::to_string(&result) {
+            Ok(json) => println!("{}", json),
+            Err(err) => eprintln!("failed to serialize bliss result: {err}"),
+        }
         return;
     }
 
@@ -148,10 +153,10 @@ pub fn run_bliss(
                 source: source_path.to_string_lossy().to_string(),
                 similar: distances,
             };
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&result).unwrap_or_default()
-            );
+            match serde_json::to_string_pretty(&result) {
+                Ok(json) => println!("{}", json),
+                Err(err) => eprintln!("failed to serialize similar result: {err}"),
+            }
             return;
         }
 
@@ -161,7 +166,10 @@ pub fn run_bliss(
             analyzed,
             failed,
         };
-        println!("{}", serde_json::to_string(&batch).unwrap_or_default());
+        match serde_json::to_string(&batch) {
+            Ok(json) => println!("{}", json),
+            Err(err) => eprintln!("failed to serialize batch result: {err}"),
+        }
         return;
     }
 

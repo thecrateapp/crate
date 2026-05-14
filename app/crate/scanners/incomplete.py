@@ -84,7 +84,9 @@ class IncompleteScanner(BaseScanner):
                 self._report_progress(
                     "incomplete",
                     f"MB lookup {completed}/{len(unique_mbids)}",
-                    completed, len(unique_mbids), len(issues),
+                    completed,
+                    len(unique_mbids),
+                    len(issues),
                 )
 
         # Phase 3: compare and build issues
@@ -97,23 +99,25 @@ class IncompleteScanner(BaseScanner):
                 missing = expected - album.track_count
                 pct = round(album.track_count / expected * 100)
 
-                issues.append(Issue(
-                    type=IssueType.INCOMPLETE_ALBUM,
-                    severity=Severity.MEDIUM if pct >= 70 else Severity.HIGH,
-                    confidence=85,
-                    description=(
-                        f"[{album.artist}] \"{album.name}\" has {album.track_count}/{expected} tracks "
-                        f"({pct}% complete, {missing} missing)"
-                    ),
-                    paths=[album.path],
-                    suggestion=f"Missing {missing} tracks. Check MusicBrainz release {mbid}",
-                    details={
-                        "mbid": mbid,
-                        "expected": expected,
-                        "actual": album.track_count,
-                        "completeness_pct": pct,
-                    }
-                ))
+                issues.append(
+                    Issue(
+                        type=IssueType.INCOMPLETE_ALBUM,
+                        severity=Severity.MEDIUM if pct >= 70 else Severity.HIGH,
+                        confidence=85,
+                        description=(
+                            f'[{album.artist}] "{album.name}" has {album.track_count}/{expected} tracks '
+                            f"({pct}% complete, {missing} missing)"
+                        ),
+                        paths=[album.path],
+                        suggestion=f"Missing {missing} tracks. Check MusicBrainz release {mbid}",
+                        details={
+                            "mbid": mbid,
+                            "expected": expected,
+                            "actual": album.track_count,
+                            "completeness_pct": pct,
+                        },
+                    )
+                )
 
         return issues
 

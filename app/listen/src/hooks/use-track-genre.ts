@@ -97,7 +97,9 @@ export function useTrackGenre(track: Track | undefined): TrackGenreState {
         setState(next);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [track, track?.id, track?.entityUid, track?.libraryTrackId]);
 
   return state;

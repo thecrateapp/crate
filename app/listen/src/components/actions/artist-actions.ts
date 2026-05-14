@@ -1,5 +1,12 @@
 import { useMemo } from "react";
-import { Play, Radio, Share2, Shuffle, UserMinus, UserPlus } from "lucide-react";
+import {
+  Play,
+  Radio,
+  Share2,
+  Shuffle,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
@@ -15,7 +22,9 @@ import { artistPagePath } from "@/lib/library-routes";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 
-export function useArtistActionEntries(input: ArtistMenuData): ItemActionMenuEntry[] {
+export function useArtistActionEntries(
+  input: ArtistMenuData,
+): ItemActionMenuEntry[] {
   const { playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const following = isFollowing(input.artistId);
@@ -41,7 +50,10 @@ export function useArtistActionEntries(input: ArtistMenuData): ItemActionMenuEnt
               toast.info("No top tracks available for this artist yet");
               return;
             }
-            playAll(tracks, 0, { type: "queue", name: `${input.name} Top Tracks` });
+            playAll(tracks, 0, {
+              type: "queue",
+              name: `${input.name} Top Tracks`,
+            });
           } catch {
             toast.error("Failed to load top tracks");
           }
@@ -60,7 +72,10 @@ export function useArtistActionEntries(input: ArtistMenuData): ItemActionMenuEnt
               toast.info("No top tracks available for this artist yet");
               return;
             }
-            playAll(shuffleArray(tracks), 0, { type: "queue", name: `${input.name} Top Tracks` });
+            playAll(shuffleArray(tracks), 0, {
+              type: "queue",
+              name: `${input.name} Top Tracks`,
+            });
           } catch {
             toast.error("Failed to load top tracks");
           }
@@ -75,7 +90,9 @@ export function useArtistActionEntries(input: ArtistMenuData): ItemActionMenuEnt
         disabled: input.artistId == null,
         onSelect: async () => {
           await toggleArtistFollow(input.artistId ?? null);
-          toast.success(following ? `Unfollowed ${input.name}` : `Following ${input.name}`);
+          toast.success(
+            following ? `Unfollowed ${input.name}` : `Following ${input.name}`,
+          );
         },
       }),
       action({

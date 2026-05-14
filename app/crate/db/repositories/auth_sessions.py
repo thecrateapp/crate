@@ -46,7 +46,11 @@ def create_session(
                     AuthSession.revoked_at.is_(None),
                     AuthSession.expires_at > now,
                 )
-                .order_by(func.coalesce(AuthSession.last_seen_at, AuthSession.created_at).desc())
+                .order_by(
+                    func.coalesce(
+                        AuthSession.last_seen_at, AuthSession.created_at
+                    ).desc()
+                )
                 .limit(1)
             ).scalar_one_or_none()
             if reusable is not None:
@@ -86,20 +90,28 @@ def get_session(session_id: str) -> dict | None:
         return model_to_dict(auth_session) if auth_session is not None else None
 
 
-def list_sessions(user_id: int, *, include_revoked: bool = False, limit: int | None = 50) -> list[dict]:
+def list_sessions(
+    user_id: int, *, include_revoked: bool = False, limit: int | None = 50
+) -> list[dict]:
     now = datetime.now(timezone.utc)
     with read_scope() as session:
         stmt = select(AuthSession).where(AuthSession.user_id == user_id)
         if not include_revoked:
-            stmt = stmt.where(AuthSession.revoked_at.is_(None), AuthSession.expires_at > now)
-        stmt = stmt.order_by(func.coalesce(AuthSession.last_seen_at, AuthSession.created_at).desc())
+            stmt = stmt.where(
+                AuthSession.revoked_at.is_(None), AuthSession.expires_at > now
+            )
+        stmt = stmt.order_by(
+            func.coalesce(AuthSession.last_seen_at, AuthSession.created_at).desc()
+        )
         if limit is not None:
             stmt = stmt.limit(limit)
         rows = session.execute(stmt).scalars().all()
         sessions = [enrich_auth_session(model_to_dict(row), now=now) for row in rows]
         now_playing = get_cache(f"now_playing:{user_id}", max_age_seconds=90)
         if isinstance(now_playing, dict):
-            sessions = promote_now_playing_session(sessions, now_playing=now_playing, now=now)
+            sessions = promote_now_playing_session(
+                sessions, now_playing=now_playing, now=now
+            )
         return sessions
 
 
@@ -147,9 +159,13 @@ def revoke_session(session_id: str, *, session=None) -> bool:
         return _impl(s)
 
 
-def revoke_other_sessions(user_id: int, current_session_id: str | None = None, *, session=None) -> int:
+def revoke_other_sessions(
+    user_id: int, current_session_id: str | None = None, *, session=None
+) -> int:
     def _impl(s) -> int:
-        stmt = select(AuthSession).where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
+        stmt = select(AuthSession).where(
+            AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)
+        )
         if current_session_id:
             stmt = stmt.where(AuthSession.id != current_session_id)
         rows = s.execute(stmt).scalars().all()
@@ -186,7 +202,9 @@ def cleanup_expired_sessions(
     """
     if session is None:
         with transaction_scope() as s:
-            return cleanup_expired_sessions(max_age_days, stale_age_days=stale_age_days, session=s)
+            return cleanup_expired_sessions(
+                max_age_days, stale_age_days=stale_age_days, session=s
+            )
     now = datetime.now(timezone.utc)
     closed_cutoff = now - timedelta(days=max_age_days)
     stale_cutoff = now - timedelta(days=stale_age_days)
@@ -194,8 +212,10 @@ def cleanup_expired_sessions(
         delete(AuthSession).where(
             or_(
                 AuthSession.expires_at < closed_cutoff,
-                (AuthSession.revoked_at.is_not(None)) & (AuthSession.revoked_at < closed_cutoff),
-                func.coalesce(AuthSession.last_seen_at, AuthSession.created_at) < stale_cutoff,
+                (AuthSession.revoked_at.is_not(None))
+                & (AuthSession.revoked_at < closed_cutoff),
+                func.coalesce(AuthSession.last_seen_at, AuthSession.created_at)
+                < stale_cutoff,
             )
         )
     )
@@ -207,25 +227,39 @@ def cleanup_ended_jam_rooms(max_age_days: int = 30, *, session=None) -> int:
         with transaction_scope() as s:
             return cleanup_ended_jam_rooms(max_age_days, session=s)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT id
             FROM jam_rooms
             WHERE status = 'ended'
               AND ended_at < :cutoff
               AND COALESCE(is_permanent, false) = false
             """
-        ),
-        {"cutoff": cutoff},
-    ).mappings().all()
+            ),
+            {"cutoff": cutoff},
+        )
+        .mappings()
+        .all()
+    )
     room_ids = [row["id"] for row in rows]
     if not room_ids:
         return 0
-    session.execute(text("DELETE FROM jam_room_events WHERE room_id = ANY(:ids)"), {"ids": room_ids})
-    session.execute(text("DELETE FROM jam_room_invites WHERE room_id = ANY(:ids)"), {"ids": room_ids})
-    session.execute(text("DELETE FROM jam_room_members WHERE room_id = ANY(:ids)"), {"ids": room_ids})
-    session.execute(text("DELETE FROM jam_rooms WHERE id = ANY(:ids)"), {"ids": room_ids})
+    session.execute(
+        text("DELETE FROM jam_room_events WHERE room_id = ANY(:ids)"), {"ids": room_ids}
+    )
+    session.execute(
+        text("DELETE FROM jam_room_invites WHERE room_id = ANY(:ids)"),
+        {"ids": room_ids},
+    )
+    session.execute(
+        text("DELETE FROM jam_room_members WHERE room_id = ANY(:ids)"),
+        {"ids": room_ids},
+    )
+    session.execute(
+        text("DELETE FROM jam_rooms WHERE id = ANY(:ids)"), {"ids": room_ids}
+    )
     return len(room_ids)
 
 

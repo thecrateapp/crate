@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from crate.db.repositories.user_library_aggregates import recompute_user_listening_aggregates
+from crate.db.repositories.user_library_aggregates import (
+    recompute_user_listening_aggregates,
+)
 from crate.db.repositories.user_library_mutations import (
     follow_artist,
     like_track,

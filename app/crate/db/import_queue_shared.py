@@ -41,7 +41,8 @@ def payload_for_row(item: dict[str, Any], *, status: str) -> dict[str, Any]:
 
 
 def row_to_import_item(row: dict[str, Any]) -> dict[str, Any]:
-    payload = coerce_json(row.get("payload_json")) or {}
+    raw_payload = coerce_json(row.get("payload_json"))
+    payload = raw_payload if isinstance(raw_payload, dict) else {}
     payload.update(
         {
             "source": row.get("source") or payload.get("source") or "filesystem",

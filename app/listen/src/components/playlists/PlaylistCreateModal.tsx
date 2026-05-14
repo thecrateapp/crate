@@ -1,11 +1,37 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { GripVertical, ImagePlus, Loader2, Music2, Search, Upload, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
+import {
+  GripVertical,
+  ImagePlus,
+  Loader2,
+  Music2,
+  Search,
+  Upload,
+  X,
+} from "lucide-react";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
-import { AppModal, ModalBody, ModalCloseButton, ModalFooter, ModalHeader } from "@crate/ui/primitives/AppModal";
+import {
+  AppModal,
+  ModalBody,
+  ModalCloseButton,
+  ModalFooter,
+  ModalHeader,
+} from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { formatDuration } from "@/lib/utils";
@@ -60,12 +86,38 @@ function getTrackKey(track: PlaylistComposerTrack): string {
   return `${track.artist}:${track.album}:${track.title}`;
 }
 
-function SortableTrackItem({ track, onRemove }: { track: PlaylistComposerTrack; onRemove: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: getTrackKey(track) });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+function SortableTrackItem({
+  track,
+  onRemove,
+}: {
+  track: PlaylistComposerTrack;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: getTrackKey(track) });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center justify-between gap-2 px-3 py-2.5">
-      <button type="button" {...attributes} {...listeners} className="flex-shrink-0 cursor-grab text-white/20 hover:text-white/50 touch-none">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between gap-2 px-3 py-2.5"
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="flex-shrink-0 cursor-grab text-white/20 hover:text-white/50 touch-none"
+      >
         <GripVertical size={14} />
       </button>
       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -75,18 +127,26 @@ function SortableTrackItem({ track, onRemove }: { track: PlaylistComposerTrack; 
         <div className="min-w-0">
           <div className="truncate text-sm text-foreground">{track.title}</div>
           <div className="truncate text-xs text-muted-foreground">
-            {track.artist}{track.album ? ` · ${track.album}` : ""}{track.duration ? ` · ${formatDuration(track.duration)}` : ""}
+            {track.artist}
+            {track.album ? ` · ${track.album}` : ""}
+            {track.duration ? ` · ${formatDuration(track.duration)}` : ""}
           </div>
         </div>
       </div>
-      <button type="button" className="rounded-full p-1.5 text-muted-foreground hover:text-white hover:bg-white/5 transition-colors" onClick={onRemove}>
+      <button
+        type="button"
+        className="rounded-full p-1.5 text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
+        onClick={onRemove}
+      >
         <X size={14} />
       </button>
     </div>
   );
 }
 
-function mergeUniqueTracks(tracks: PlaylistComposerTrack[]): PlaylistComposerTrack[] {
+function mergeUniqueTracks(
+  tracks: PlaylistComposerTrack[],
+): PlaylistComposerTrack[] {
   const seen = new Set<string>();
   const result: PlaylistComposerTrack[] = [];
   for (const track of tracks) {
@@ -123,7 +183,9 @@ export function PlaylistCreateModal({
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<"public" | "private">(initialVisibility);
+  const [visibility, setVisibility] = useState<"public" | "private">(
+    initialVisibility,
+  );
   const [isCollaborative, setIsCollaborative] = useState(initialCollaborative);
   const [tracks, setTracks] = useState<PlaylistComposerTrack[]>(initialTracks);
   const [search, setSearch] = useState("");
@@ -147,7 +209,15 @@ export function PlaylistCreateModal({
     setResults([]);
     setTitleEditing(false);
     setDescriptionEditing(false);
-  }, [initialCollaborative, initialCoverDataUrl, initialDescription, initialName, initialTracks, initialVisibility, open]);
+  }, [
+    initialCollaborative,
+    initialCoverDataUrl,
+    initialDescription,
+    initialName,
+    initialTracks,
+    initialVisibility,
+    open,
+  ]);
 
   useEffect(() => {
     if (!open || !titleEditing) return;
@@ -157,7 +227,10 @@ export function PlaylistCreateModal({
 
   useEffect(() => {
     if (!open || !descriptionEditing) return;
-    const timer = window.setTimeout(() => descriptionInputRef.current?.focus(), 30);
+    const timer = window.setTimeout(
+      () => descriptionInputRef.current?.focus(),
+      30,
+    );
     return () => window.clearTimeout(timer);
   }, [descriptionEditing, open]);
 
@@ -174,7 +247,9 @@ export function PlaylistCreateModal({
     const timer = window.setTimeout(async () => {
       setSearching(true);
       try {
-        const response = await api<{ tracks: SearchTrackResult[] }>(`/api/search?q=${encodeURIComponent(query)}`);
+        const response = await api<{ tracks: SearchTrackResult[] }>(
+          `/api/search?q=${encodeURIComponent(query)}`,
+        );
         if (!cancelled) {
           setResults(response.tracks || []);
         }
@@ -233,7 +308,9 @@ export function PlaylistCreateModal({
 
   function removeTrack(track: PlaylistComposerTrack) {
     const keyToRemove = getTrackKey(track);
-    setTracks((current) => current.filter((item) => getTrackKey(item) !== keyToRemove));
+    setTracks((current) =>
+      current.filter((item) => getTrackKey(item) !== keyToRemove),
+    );
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -263,7 +340,9 @@ export function PlaylistCreateModal({
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[92vh]">
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">{modalTitle}</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              {modalTitle}
+            </h2>
             <p className="text-xs text-muted-foreground">{modalSubtitle}</p>
           </div>
           <ModalCloseButton onClick={onClose} disabled={submitting} />
@@ -360,21 +439,33 @@ export function PlaylistCreateModal({
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${visibility === "private" ? "bg-primary text-primary-foreground" : "bg-white/5 text-muted-foreground"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    visibility === "private"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white/5 text-muted-foreground"
+                  }`}
                   onClick={() => setVisibility("private")}
                 >
                   Private
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${visibility === "public" ? "bg-primary text-primary-foreground" : "bg-white/5 text-muted-foreground"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    visibility === "public"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white/5 text-muted-foreground"
+                  }`}
                   onClick={() => setVisibility("public")}
                 >
                   Public
                 </button>
                 <button
                   type="button"
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${isCollaborative ? "bg-primary text-primary-foreground" : "bg-white/5 text-muted-foreground"}`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isCollaborative
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-white/5 text-muted-foreground"
+                  }`}
                   onClick={() => setIsCollaborative((current) => !current)}
                 >
                   Collaborative
@@ -393,7 +484,9 @@ export function PlaylistCreateModal({
                 onChange={(event) => setSearch(event.target.value)}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
-              {searching ? <Loader2 size={14} className="text-primary animate-spin" /> : null}
+              {searching ? (
+                <Loader2 size={14} className="text-primary animate-spin" />
+              ) : null}
             </div>
 
             {search.trim().length >= 2 ? (
@@ -405,12 +498,12 @@ export function PlaylistCreateModal({
                         key={`${track.id}-${track.path}`}
                         type="button"
                         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
-                        onClick={() =>
-                          addTrack(toPlayableTrack(track))
-                        }
+                        onClick={() => addTrack(toPlayableTrack(track))}
                       >
                         <div className="min-w-0">
-                          <div className="truncate text-sm text-foreground">{track.title}</div>
+                          <div className="truncate text-sm text-foreground">
+                            {track.title}
+                          </div>
                           <div className="truncate text-xs text-muted-foreground">
                             {track.artist} · {track.album}
                           </div>
@@ -420,7 +513,9 @@ export function PlaylistCreateModal({
                     ))}
                   </div>
                 ) : (
-                  <div className="px-3 py-4 text-sm text-muted-foreground">No tracks found</div>
+                  <div className="px-3 py-4 text-sm text-muted-foreground">
+                    No tracks found
+                  </div>
                 )}
               </div>
             ) : null}
@@ -429,9 +524,13 @@ export function PlaylistCreateModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Tracks</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Tracks
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  {tracks.length > 0 ? `${tracks.length} selected` : "Add tracks now or later."}
+                  {tracks.length > 0
+                    ? `${tracks.length} selected`
+                    : "Add tracks now or later."}
                 </p>
               </div>
             </div>
@@ -439,16 +538,27 @@ export function PlaylistCreateModal({
             <div className="rounded-2xl border border-white/10 bg-white/5">
               <div className="max-h-64 overflow-y-auto py-1.5">
                 {tracks.length > 0 ? (
-                  <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={tracks.map(getTrackKey)} strategy={verticalListSortingStrategy}>
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={tracks.map(getTrackKey)}
+                      strategy={verticalListSortingStrategy}
+                    >
                       {tracks.map((track) => (
-                        <SortableTrackItem key={getTrackKey(track)} track={track} onRemove={() => removeTrack(track)} />
+                        <SortableTrackItem
+                          key={getTrackKey(track)}
+                          track={track}
+                          onRemove={() => removeTrack(track)}
+                        />
                       ))}
                     </SortableContext>
                   </DndContext>
                 ) : (
                   <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                    Start by searching for tracks or open this modal from an album or track menu.
+                    Start by searching for tracks or open this modal from an
+                    album or track menu.
                   </div>
                 )}
               </div>

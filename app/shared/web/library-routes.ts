@@ -2,9 +2,12 @@ import { encPath } from "./utils";
 
 function resolveAssetUrl(path: string) {
   if (typeof window === "undefined") return path;
-  const resolver = (window as Window & typeof globalThis & {
-    __crateResolveApiAssetUrl?: (nextPath: string) => string;
-  }).__crateResolveApiAssetUrl;
+  const resolver = (
+    window as Window &
+      typeof globalThis & {
+        __crateResolveApiAssetUrl?: (nextPath: string) => string;
+      }
+  ).__crateResolveApiAssetUrl;
   return typeof resolver === "function" ? resolver(path) : path;
 }
 
@@ -47,25 +50,21 @@ const albumAssetVersions = new Map<number, string>();
 let globalArtistAssetVersion: string | null = null;
 let globalAlbumAssetVersion: string | null = null;
 
-const RESERVED_ARTIST_CHILD_SLUGS = new Set([
-  "top-tracks",
-  "shows",
-  "radio",
-]);
+const RESERVED_ARTIST_CHILD_SLUGS = new Set(["top-tracks", "shows", "radio"]);
 
 function slugifySegment(value: string | null | undefined, fallback: string) {
   const normalized = (value || "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  const slug = normalized
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  const slug = normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || fallback;
 }
 
 function safeSlug(slug: string | null | undefined, fallback: string) {
-  return encPath(slugifySegment(slug && slug.trim() ? slug : fallback, fallback));
+  return encPath(
+    slugifySegment(slug && slug.trim() ? slug : fallback, fallback),
+  );
 }
 
 function encodeEntityUid(value: string | null | undefined) {
@@ -80,7 +79,8 @@ function resolveTrackLibraryId(input: TrackRouteInput) {
   if (input.libraryTrackId != null) return input.libraryTrackId;
   if (input.trackId != null) return input.trackId;
   if (typeof input.id === "number") return input.id;
-  if (typeof input.id === "string" && /^\d+$/.test(input.id)) return Number(input.id);
+  if (typeof input.id === "string" && /^\d+$/.test(input.id))
+    return Number(input.id);
   return null;
 }
 
@@ -120,9 +120,26 @@ function publicAlbumSlug(input: AlbumRouteInput) {
   }
   if (input.albumSlug && input.albumSlug.trim()) {
     const normalizedAlbumSlug = slugifySegment(input.albumSlug, "album");
-    const normalizedArtistSlug = input.artistSlug ? slugifySegment(input.artistSlug, "artist") : null;
-    if (normalizedArtistSlug && normalizedAlbumSlug.startsWith(`${normalizedArtistSlug}-`)) {
-      return normalizedAlbumSlug.slice(normalizedArtistSlug.length + 1);
+    const normalizedArtistSlug = input.artistSlug
+      ? slugifySegment(input.artistSlug, "artist")
+      : null;
+    const strippedArtistPrefix =
+      normalizedArtistSlug &&
+      normalizedAlbumSlug.startsWith(`${normalizedArtistSlug}-`)
+        ? normalizedAlbumSlug.slice(normalizedArtistSlug.length + 1)
+        : null;
+    if (
+      normalizedArtistSlug &&
+      strippedArtistPrefix?.startsWith(`${normalizedArtistSlug}-`)
+    ) {
+      return strippedArtistPrefix;
+    }
+    if (
+      normalizedArtistSlug &&
+      strippedArtistPrefix &&
+      !/^(?:[ivxlcdm]+|\d+)$/i.test(strippedArtistPrefix)
+    ) {
+      return strippedArtistPrefix;
     }
     return normalizedAlbumSlug;
   }
@@ -130,7 +147,9 @@ function publicAlbumSlug(input: AlbumRouteInput) {
 }
 
 export function isReservedArtistChildSlug(slug: string | null | undefined) {
-  return slug ? RESERVED_ARTIST_CHILD_SLUGS.has(slugifySegment(slug, "")) : false;
+  return slug
+    ? RESERVED_ARTIST_CHILD_SLUGS.has(slugifySegment(slug, ""))
+    : false;
 }
 
 function withAssetOptions(path: string, options?: ImageAssetOptions) {
@@ -138,7 +157,8 @@ function withAssetOptions(path: string, options?: ImageAssetOptions) {
   const params = new URLSearchParams();
   if (options.size != null) params.set("size", String(options.size));
   if (options.random) params.set("random", "1");
-  if (options.version != null && String(options.version).trim()) params.set("v", String(options.version));
+  if (options.version != null && String(options.version).trim())
+    params.set("v", String(options.version));
   if (options.format) params.set("format", options.format);
   const query = params.toString();
   return query ? `${path}?${query}` : path;
@@ -157,8 +177,16 @@ function resolveAssetVersion(
   return undefined;
 }
 
-export function recordAssetInvalidationScope(scope: string, version: string | number = Date.now()) {
-  if (scope === "library" || scope === "home" || scope === "shows" || scope === "upcoming") {
+export function recordAssetInvalidationScope(
+  scope: string,
+  version: string | number = Date.now(),
+) {
+  if (
+    scope === "library" ||
+    scope === "home" ||
+    scope === "shows" ||
+    scope === "upcoming"
+  ) {
     globalArtistAssetVersion = String(version);
     globalAlbumAssetVersion = String(version);
   }
@@ -183,7 +211,10 @@ export function artistPagePath(input: ArtistRouteInput) {
     return `/artists/${encPath(slug)}`;
   }
   if (input.artistId != null) {
-    return `/artists/${input.artistId}/${safeSlug(input.artistSlug, input.artistName || "artist")}`;
+    return `/artists/${input.artistId}/${safeSlug(
+      input.artistSlug,
+      input.artistName || "artist",
+    )}`;
   }
   return "/artists";
 }
@@ -194,7 +225,10 @@ export function artistTopTracksPath(input: ArtistRouteInput) {
     return `/artists/${encPath(slug)}/top-tracks`;
   }
   if (input.artistId != null) {
-    return `/artists/${input.artistId}/${safeSlug(input.artistSlug, input.artistName || "artist")}/top-tracks`;
+    return `/artists/${input.artistId}/${safeSlug(
+      input.artistSlug,
+      input.artistName || "artist",
+    )}/top-tracks`;
   }
   return "/artists";
 }
@@ -213,41 +247,73 @@ export function artistApiPath(input: ArtistRouteInput) {
       params.set("slug", input.artistSlug.trim());
     }
     const query = params.toString();
-    return query ? `/api/artists/${input.artistId}?${query}` : `/api/artists/${input.artistId}`;
+    return query
+      ? `/api/artists/${input.artistId}?${query}`
+      : `/api/artists/${input.artistId}`;
   }
   return "";
 }
 
-export function artistPhotoApiUrl(input: ArtistRouteInput, options?: ImageAssetOptions) {
+export function artistPhotoApiUrl(
+  input: ArtistRouteInput,
+  options?: ImageAssetOptions,
+) {
   if (input.artistId != null) {
-    const runtimeVersion = artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
+    const runtimeVersion =
+      artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
     return resolveAssetUrl(
-      withAssetOptions(`/api/artists/${input.artistId}/photo`, { ...options, version: resolveAssetVersion(options?.version, runtimeVersion) }),
+      withAssetOptions(`/api/artists/${input.artistId}/photo`, {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      }),
     );
   }
   if (input.artistEntityUid) {
     return resolveAssetUrl(
       withAssetOptions(
-        `/api/artists/by-entity/${encodeEntityUid(input.artistEntityUid)}/photo`,
-        { ...options, version: resolveAssetVersion(options?.version, globalArtistAssetVersion) },
+        `/api/artists/by-entity/${encodeEntityUid(
+          input.artistEntityUid,
+        )}/photo`,
+        {
+          ...options,
+          version: resolveAssetVersion(
+            options?.version,
+            globalArtistAssetVersion,
+          ),
+        },
       ),
     );
   }
   return "";
 }
 
-export function artistBackgroundApiUrl(input: ArtistRouteInput, options?: ImageAssetOptions) {
+export function artistBackgroundApiUrl(
+  input: ArtistRouteInput,
+  options?: ImageAssetOptions,
+) {
   if (input.artistId != null) {
-    const runtimeVersion = artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
+    const runtimeVersion =
+      artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion;
     return resolveAssetUrl(
-      withAssetOptions(`/api/artists/${input.artistId}/background`, { ...options, version: resolveAssetVersion(options?.version, runtimeVersion) }),
+      withAssetOptions(`/api/artists/${input.artistId}/background`, {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      }),
     );
   }
   if (input.artistEntityUid) {
     return resolveAssetUrl(
       withAssetOptions(
-        `/api/artists/by-entity/${encodeEntityUid(input.artistEntityUid)}/background`,
-        { ...options, version: resolveAssetVersion(options?.version, globalArtistAssetVersion) },
+        `/api/artists/by-entity/${encodeEntityUid(
+          input.artistEntityUid,
+        )}/background`,
+        {
+          ...options,
+          version: resolveAssetVersion(
+            options?.version,
+            globalArtistAssetVersion,
+          ),
+        },
       ),
     );
   }
@@ -265,7 +331,10 @@ export function albumPagePath(input: AlbumRouteInput) {
     return `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`;
   }
   if (input.albumId != null) {
-    return `/albums/${input.albumId}/${safeSlug(input.albumSlug, input.albumName || "album")}`;
+    return `/albums/${input.albumId}/${safeSlug(
+      input.albumSlug,
+      input.albumName || "album",
+    )}`;
   }
   return "/albums";
 }
@@ -279,7 +348,9 @@ export function albumApiPath(input: AlbumRouteInput) {
   });
   const albumSlug = publicAlbumSlug(input);
   if (artistSlug && albumSlug) {
-    return `/api/artist-slugs/${encPath(artistSlug)}/albums/${encPath(albumSlug)}`;
+    return `/api/artist-slugs/${encPath(artistSlug)}/albums/${encPath(
+      albumSlug,
+    )}`;
   }
   if (input.albumEntityUid) {
     return `/api/albums/by-entity/${encodeEntityUid(input.albumEntityUid)}`;
@@ -292,7 +363,9 @@ export function albumApiPath(input: AlbumRouteInput) {
 
 export function albumRelatedApiPath(input: AlbumRouteInput) {
   if (input.albumEntityUid) {
-    return `/api/albums/by-entity/${encodeEntityUid(input.albumEntityUid)}/related`;
+    return `/api/albums/by-entity/${encodeEntityUid(
+      input.albumEntityUid,
+    )}/related`;
   }
   if (input.albumId != null) {
     return `/api/albums/${input.albumId}/related`;
@@ -302,7 +375,8 @@ export function albumRelatedApiPath(input: AlbumRouteInput) {
 
 export function trackInfoApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/info`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/info`;
 
   const trackId = resolveTrackLibraryId(input);
   if (trackId != null) return `/api/tracks/${trackId}/info`;
@@ -315,7 +389,8 @@ export function trackInfoApiPath(input: TrackRouteInput) {
 
 export function trackPlaybackApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/playback`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/playback`;
 
   const trackId = resolveTrackLibraryId(input);
   if (trackId != null) return `/api/tracks/${trackId}/playback`;
@@ -325,7 +400,8 @@ export function trackPlaybackApiPath(input: TrackRouteInput) {
 
 export function trackEqFeaturesApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/eq-features`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/eq-features`;
 
   const trackId = resolveTrackLibraryId(input);
   if (trackId != null) return `/api/tracks/${trackId}/eq-features`;
@@ -335,7 +411,8 @@ export function trackEqFeaturesApiPath(input: TrackRouteInput) {
 
 export function trackGenreApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/genre`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/genre`;
 
   const trackId = resolveTrackLibraryId(input);
   if (trackId != null) return `/api/tracks/${trackId}/genre`;
@@ -345,7 +422,8 @@ export function trackGenreApiPath(input: TrackRouteInput) {
 
 export function trackStreamApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/stream`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/stream`;
 
   const trackId = resolveTrackLibraryId(input);
   if (trackId != null) return `/api/tracks/${trackId}/stream`;
@@ -358,7 +436,8 @@ export function trackStreamApiPath(input: TrackRouteInput) {
 
 export function trackDownloadApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/download`;
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/download`;
 
   const path = resolveTrackPath(input);
   if (path) return `/api/download/track/${encodeTrackPath(path)}`;
@@ -368,7 +447,8 @@ export function trackDownloadApiPath(input: TrackRouteInput) {
 
 export function albumDownloadApiPath(input: AlbumRouteInput) {
   const entityUid = resolveAlbumEntityUid(input);
-  if (entityUid) return `/api/albums/by-entity/${encodeEntityUid(entityUid)}/download`;
+  if (entityUid)
+    return `/api/albums/by-entity/${encodeEntityUid(entityUid)}/download`;
 
   const albumId = resolveAlbumLibraryId(input);
   if (albumId != null) return `/api/albums/${albumId}/download`;
@@ -378,23 +458,39 @@ export function albumDownloadApiPath(input: AlbumRouteInput) {
 
 export function trackOfflineManifestApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
-  if (entityUid) return `/api/offline/tracks/by-entity/${encodeEntityUid(entityUid)}/manifest`;
+  if (entityUid)
+    return `/api/offline/tracks/by-entity/${encodeEntityUid(
+      entityUid,
+    )}/manifest`;
 
   return "";
 }
 
-export function albumCoverApiUrl(input: AlbumRouteInput, options?: ImageAssetOptions) {
+export function albumCoverApiUrl(
+  input: AlbumRouteInput,
+  options?: ImageAssetOptions,
+) {
   if (input.albumId != null) {
-    const runtimeVersion = albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion;
+    const runtimeVersion =
+      albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion;
     return resolveAssetUrl(
-      withAssetOptions(`/api/albums/${input.albumId}/cover`, { ...options, version: resolveAssetVersion(options?.version, runtimeVersion) }),
+      withAssetOptions(`/api/albums/${input.albumId}/cover`, {
+        ...options,
+        version: resolveAssetVersion(options?.version, runtimeVersion),
+      }),
     );
   }
   if (input.albumEntityUid) {
     return resolveAssetUrl(
       withAssetOptions(
         `/api/albums/by-entity/${encodeEntityUid(input.albumEntityUid)}/cover`,
-        { ...options, version: resolveAssetVersion(options?.version, globalAlbumAssetVersion) },
+        {
+          ...options,
+          version: resolveAssetVersion(
+            options?.version,
+            globalAlbumAssetVersion,
+          ),
+        },
       ),
     );
   }

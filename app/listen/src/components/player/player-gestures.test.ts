@@ -13,12 +13,36 @@ describe("player gestures", () => {
   });
 
   it("detects intentional horizontal swipes", () => {
-    expect(getHorizontalPlayerSwipeAction({ deltaX: -42, deltaY: 6, viewportWidth: 390 })).toBe("next");
-    expect(getHorizontalPlayerSwipeAction({ deltaX: 42, deltaY: 6, viewportWidth: 390 })).toBe("previous");
+    expect(
+      getHorizontalPlayerSwipeAction({
+        deltaX: -42,
+        deltaY: 6,
+        viewportWidth: 390,
+      }),
+    ).toBe("next");
+    expect(
+      getHorizontalPlayerSwipeAction({
+        deltaX: 42,
+        deltaY: 6,
+        viewportWidth: 390,
+      }),
+    ).toBe("previous");
   });
 
   it("ignores short or vertical gestures", () => {
-    expect(getHorizontalPlayerSwipeAction({ deltaX: -24, deltaY: 0, viewportWidth: 390 })).toBeNull();
-    expect(getHorizontalPlayerSwipeAction({ deltaX: -42, deltaY: 30, viewportWidth: 390 })).toBeNull();
+    expect(
+      getHorizontalPlayerSwipeAction({
+        deltaX: -24,
+        deltaY: 0,
+        viewportWidth: 390,
+      }),
+    ).toBeNull();
+    expect(
+      getHorizontalPlayerSwipeAction({
+        deltaX: -42,
+        deltaY: 30,
+        viewportWidth: 390,
+      }),
+    ).toBeNull();
   });
 });

@@ -16,13 +16,21 @@ function tileStyle(i: number): React.CSSProperties {
   const hue = hues[i % hues.length]!;
   const patterns = [
     // soft dual-gradient
-    `linear-gradient(135deg, hsl(${hue}, 55%, 38%) 0%, hsl(${(hue + 30) % 360}, 60%, 18%) 100%)`,
+    `linear-gradient(135deg, hsl(${hue}, 55%, 38%) 0%, hsl(${
+      (hue + 30) % 360
+    }, 60%, 18%) 100%)`,
     // radial glow
-    `radial-gradient(circle at 30% 20%, hsl(${hue}, 60%, 48%) 0%, hsl(${(hue + 20) % 360}, 40%, 14%) 70%)`,
+    `radial-gradient(circle at 30% 20%, hsl(${hue}, 60%, 48%) 0%, hsl(${
+      (hue + 20) % 360
+    }, 40%, 14%) 70%)`,
     // striped
-    `linear-gradient(180deg, hsl(${hue}, 60%, 32%), hsl(${(hue + 200) % 360}, 45%, 18%))`,
+    `linear-gradient(180deg, hsl(${hue}, 60%, 32%), hsl(${
+      (hue + 200) % 360
+    }, 45%, 18%))`,
     // muted solid
-    `linear-gradient(160deg, hsl(${hue}, 40%, 28%), hsl(${(hue + 60) % 360}, 35%, 12%))`,
+    `linear-gradient(160deg, hsl(${hue}, 40%, 28%), hsl(${
+      (hue + 60) % 360
+    }, 35%, 12%))`,
   ];
   const pattern = patterns[i % patterns.length]!;
   return { background: pattern };

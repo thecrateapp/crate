@@ -1,3 +1,5 @@
+//! Progress and cancellation plumbing: Redis streams, JSONL files, and cancel keys.
+
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};

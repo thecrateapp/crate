@@ -39,6 +39,7 @@ def get_config() -> dict:
 def _get_ollama_url() -> str:
     try:
         from crate.db.cache_settings import get_setting
+
         return get_setting("llm_ollama_url", _OLLAMA_URL)
     except Exception:
         return _OLLAMA_URL
@@ -47,12 +48,14 @@ def _get_ollama_url() -> str:
 def _get_model() -> str:
     try:
         from crate.db.cache_settings import get_setting
+
         return get_setting("llm_model", os.environ.get("LLM_PROVIDER", _DEFAULT_MODEL))
     except Exception:
         return os.environ.get("LLM_PROVIDER", _DEFAULT_MODEL)
 
 
 # ── Direct Ollama API (no litellm dependency needed) ────────────
+
 
 def _ollama_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
     """Call Ollama HTTP API directly. No extra dependencies."""
@@ -71,7 +74,9 @@ def _ollama_chat(model: str, messages: list[dict], json_mode: bool = False) -> s
         data = resp.json()
         return data.get("message", {}).get("content", "")
     except requests.exceptions.ConnectionError:
-        raise RuntimeError(f"Cannot connect to Ollama at {_get_ollama_url()}. Is the container running?")
+        raise RuntimeError(
+            f"Cannot connect to Ollama at {_get_ollama_url()}. Is the container running?"
+        )
     except requests.exceptions.Timeout:
         raise RuntimeError("Ollama request timed out (120s)")
     except Exception as e:
@@ -82,6 +87,7 @@ def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> 
     """Call any provider via litellm (if installed)."""
     try:
         import litellm
+
         litellm.set_verbose = False
 
         kwargs: dict = {"model": model, "messages": messages}
@@ -94,12 +100,16 @@ def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> 
         response = litellm.completion(**kwargs)
         return response.choices[0].message.content or ""
     except ImportError:
-        raise RuntimeError("litellm not installed. Use 'pip install litellm' or switch to ollama provider.")
+        raise RuntimeError(
+            "litellm not installed. Use 'pip install litellm' or switch to ollama provider."
+        )
 
 
 def _gemini_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
     """Call Google Gemini API directly."""
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("AUDIOMUSE_GEMINI_API_KEY", "")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
+        "AUDIOMUSE_GEMINI_API_KEY", ""
+    )
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set")
 
@@ -143,6 +153,7 @@ def _chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
 
 # ── Public API ──────────────────────────────────────────────────
 
+
 def ask(prompt: str, *, system: str = "", model: str | None = None) -> str:
     """Ask an LLM a free-form question. Returns plain text."""
     m = model or _get_model()
@@ -171,7 +182,7 @@ def ask_structured(
     schema = response_model.model_json_schema()
     schema_str = json.dumps(schema, indent=2)
 
-    system_full = (system + "\n\n" if system else "")
+    system_full = system + "\n\n" if system else ""
     system_full += (
         f"You must respond with ONLY a valid JSON object matching this schema:\n"
         f"```json\n{schema_str}\n```\n"
@@ -211,5 +222,10 @@ def ask_structured(
                     return response_model.model_validate(flat)
             raise
     except (json.JSONDecodeError, Exception) as e:
-        log.warning("Failed to parse LLM response as %s: %s\nRaw: %s", response_model.__name__, e, raw[:200])
+        log.warning(
+            "Failed to parse LLM response as %s: %s\nRaw: %s",
+            response_model.__name__,
+            e,
+            raw[:200],
+        )
         raise ValueError(f"LLM returned invalid JSON: {e}") from e

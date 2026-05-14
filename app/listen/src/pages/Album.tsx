@@ -1,11 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
-import { AlertCircle, ArrowDownToLine, CheckCircle2, Clock, Disc, Heart, ListPlus, Loader2, MoreHorizontal, Play, Radio, Share2, Shuffle, User } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  CheckCircle2,
+  Clock,
+  Disc,
+  Heart,
+  ListPlus,
+  Loader2,
+  MoreHorizontal,
+  Play,
+  Radio,
+  Share2,
+  Shuffle,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { AppMenuButton, AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
+import {
+  AppMenuButton,
+  AppPopover,
+  AppPopoverDivider,
+} from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
-import { GenrePillRow, type GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
+import {
+  GenrePillRow,
+  type GenreProfileItem,
+} from "@crate/ui/domain/genres/GenrePill";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
@@ -24,8 +46,17 @@ import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackReferencePayload } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
-import { albumApiPath, albumCoverApiUrl, albumPagePath, artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
-import { buildAlbumPlayerTracks, buildAlbumQualityBadges } from "@/pages/album-model";
+import {
+  albumApiPath,
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
+import {
+  buildAlbumPlayerTracks,
+  buildAlbumQualityBadges,
+} from "@/pages/album-model";
 
 function albumGenreSlug(name: string) {
   return name
@@ -101,14 +132,23 @@ export function Album() {
     albumId: albumIdParam,
     artistSlug: routeArtistSlug,
     albumSlug: routeAlbumSlug,
-  } = useParams<{ albumId?: string; artistSlug?: string; albumSlug?: string }>();
+  } = useParams<{
+    albumId?: string;
+    artistSlug?: string;
+    albumSlug?: string;
+  }>();
   const navigate = useNavigate();
   const location = useLocation();
   const isDesktop = useIsDesktop();
   const { playAll, playNext } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
   const { isSaved, saveAlbum, unsaveAlbum } = useSavedAlbums();
-  const { supported: offlineSupported, getAlbumState, getAlbumRecord, toggleAlbumOffline } = useOffline();
+  const {
+    supported: offlineSupported,
+    getAlbumState,
+    getAlbumRecord,
+    toggleAlbumOffline,
+  } = useOffline();
   const [menuOpen, setMenuOpen] = useState(false);
   const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -119,13 +159,17 @@ export function Album() {
     routeAlbumId != null
       ? albumApiPath({ albumId: routeAlbumId })
       : routeArtistSlug && routeAlbumSlug
-        ? albumApiPath({ artistSlug: routeArtistSlug, albumSlug: routeAlbumSlug })
+        ? albumApiPath({
+            artistSlug: routeArtistSlug,
+            albumSlug: routeAlbumSlug,
+          })
         : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
   );
-  const { playlistOptions: playlists, ensurePlaylistOptionsLoaded } = useLazyPlaylistOptions();
+  const { playlistOptions: playlists, ensurePlaylistOptionsLoaded } =
+    useLazyPlaylistOptions();
 
   useDismissibleLayer({
     active: menuOpen || playlistPickerOpen,
@@ -148,7 +192,15 @@ export function Album() {
     if (location.pathname !== canonicalPath) {
       navigate(canonicalPath, { replace: true });
     }
-  }, [data?.artist, data?.artist_slug, data?.id, data?.name, data?.slug, location.pathname, navigate]);
+  }, [
+    data?.artist,
+    data?.artist_slug,
+    data?.id,
+    data?.name,
+    data?.slug,
+    location.pathname,
+    navigate,
+  ]);
 
   if (loading) {
     return (
@@ -191,16 +243,19 @@ export function Album() {
   const artistName = data.artist;
   const albumTracks = data.tracks;
   const year = data.album_tags?.year?.slice(0, 4);
-  const genre = data.genres.length > 0 ? data.genres.join(", ") : data.album_tags?.genre;
+  const genre =
+    data.genres.length > 0 ? data.genres.join(", ") : data.album_tags?.genre;
   const playerTracks: Track[] = buildAlbumPlayerTracks(data);
   const saved = isSaved(albumId);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
   const offlineBusy = isOfflineBusy(offlineState);
-  const offlineProgress =
-    offlineRecord?.trackCount
-      ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount}`
-      : null;
+  const offlineProgress = offlineRecord?.trackCount
+    ? `${Math.min(
+        offlineRecord.readyTrackCount || 0,
+        offlineRecord.trackCount,
+      )}/${offlineRecord.trackCount}`
+    : null;
   const offlineButtonLabel =
     offlineState === "ready"
       ? "Available offline"
@@ -214,7 +269,9 @@ export function Album() {
   const offlineStatusDetail =
     offlineState === "ready"
       ? offlineRecord?.trackCount
-        ? `${offlineRecord.trackCount} track${offlineRecord.trackCount === 1 ? "" : "s"} available offline`
+        ? `${offlineRecord.trackCount} track${
+            offlineRecord.trackCount === 1 ? "" : "s"
+          } available offline`
         : "Available offline"
       : offlineBusy && offlineProgress
         ? `${offlineProgress} tracks saved for offline`
@@ -234,7 +291,13 @@ export function Album() {
       playAll(playerTracks, startIndex, {
         type: "album",
         name: `${artistName} — ${displayName}`,
-        href: albumPagePath({ albumId, albumSlug: data.slug, artistSlug: data.artist_slug, artistName, albumName: displayName }),
+        href: albumPagePath({
+          albumId,
+          albumSlug: data.slug,
+          artistSlug: data.artist_slug,
+          artistName,
+          albumName: displayName,
+        }),
         radio: {
           seedType: "album",
           seedId: albumId,
@@ -255,7 +318,13 @@ export function Album() {
     playAll(shuffled, 0, {
       type: "album",
       name: `${artistName} — ${displayName}`,
-      href: albumPagePath({ albumId, albumSlug: data.slug, artistSlug: data.artist_slug, artistName, albumName: displayName }),
+      href: albumPagePath({
+        albumId,
+        albumSlug: data.slug,
+        artistSlug: data.artist_slug,
+        artistName,
+        albumName: displayName,
+      }),
       radio: {
         seedType: "album",
         seedId: albumId,
@@ -286,12 +355,22 @@ export function Album() {
     setMenuOpen(false);
   };
 
-  const shareUrl = `${window.location.origin}${albumPagePath({ albumId, albumSlug: data.slug, artistSlug: data.artist_slug, artistName, albumName: data.name })}`;
+  const shareUrl = `${window.location.origin}${albumPagePath({
+    albumId,
+    albumSlug: data.slug,
+    artistSlug: data.artist_slug,
+    artistName,
+    albumName: data.name,
+  })}`;
 
   async function handleShare() {
     try {
       if (navigator.share) {
-        await navigator.share({ title: `${artistName} - ${displayName}`, text: `${artistName} - ${displayName}`, url: shareUrl });
+        await navigator.share({
+          title: `${artistName} - ${displayName}`,
+          text: `${artistName} - ${displayName}`,
+          url: shareUrl,
+        });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         toast.success("Album link copied");
@@ -318,7 +397,11 @@ export function Album() {
   async function handleToggleOffline() {
     try {
       const result = await toggleAlbumOffline({ albumId, title: displayName });
-      toast.success(result === "removed" ? "Offline copy removed" : "Album available offline");
+      toast.success(
+        result === "removed"
+          ? "Offline copy removed"
+          : "Album available offline",
+      );
     } catch (error) {
       toast.error((error as Error).message || "Failed to update offline copy");
     }
@@ -339,7 +422,9 @@ export function Album() {
 
   async function handleAddToPlaylist(playlistId: number) {
     try {
-      await api(`/api/playlists/${playlistId}/tracks`, "POST", { tracks: playlistTracksPayload });
+      await api(`/api/playlists/${playlistId}/tracks`, "POST", {
+        tracks: playlistTracksPayload,
+      });
       toast.success("Album added to playlist");
       setMenuOpen(false);
       setPlaylistPickerOpen(false);
@@ -348,14 +433,19 @@ export function Album() {
     }
   }
 
-  async function handleAddTrackToPlaylist(playlistId: number, track: TrackRowData) {
+  async function handleAddTrackToPlaylist(
+    playlistId: number,
+    track: TrackRowData,
+  ) {
     try {
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
-        tracks: [toTrackReferencePayload({
-          ...track,
-          album: track.album || displayName,
-          duration: track.duration || 0,
-        })],
+        tracks: [
+          toTrackReferencePayload({
+            ...track,
+            album: track.album || displayName,
+            duration: track.duration || 0,
+          }),
+        ],
       });
       toast.success(`Added "${track.title}" to playlist`);
     } catch {
@@ -366,25 +456,27 @@ export function Album() {
   function handleCreatePlaylistFromAlbum() {
     openCreatePlaylist({
       name: displayName,
-      tracks: albumTracks.map((track) => toPlayableTrack({
-        id: track.id,
-        entity_uid: track.entity_uid,
-        title: track.tags.title || track.filename,
-        artist: artistName,
-        artist_entity_uid: data?.artist_entity_uid,
-        album: displayName,
-        album_entity_uid: data?.entity_uid,
-        duration: track.length_sec,
-        path: track.path,
-        library_track_id: track.id,
-        bpm: track.bpm,
-        audio_key: track.audio_key,
-        audio_scale: track.audio_scale,
-        energy: track.energy,
-        danceability: track.danceability,
-        valence: track.valence,
-        bliss_vector: track.bliss_vector,
-      })),
+      tracks: albumTracks.map((track) =>
+        toPlayableTrack({
+          id: track.id,
+          entity_uid: track.entity_uid,
+          title: track.tags.title || track.filename,
+          artist: artistName,
+          artist_entity_uid: data?.artist_entity_uid,
+          album: displayName,
+          album_entity_uid: data?.entity_uid,
+          duration: track.length_sec,
+          path: track.path,
+          library_track_id: track.id,
+          bpm: track.bpm,
+          audio_key: track.audio_key,
+          audio_scale: track.audio_scale,
+          energy: track.energy,
+          danceability: track.danceability,
+          valence: track.valence,
+          bliss_vector: track.bliss_vector,
+        }),
+      ),
     });
     setMenuOpen(false);
     setPlaylistPickerOpen(false);
@@ -392,11 +484,15 @@ export function Album() {
 
   function handleCreatePlaylistFromTrack(track: TrackRowData) {
     openCreatePlaylist({
-      tracks: [toPlayableTrack({
-        ...track,
-        album: track.album || displayName,
-        library_track_id: track.library_track_id ?? (typeof track.id === "number" ? track.id : undefined),
-      })],
+      tracks: [
+        toPlayableTrack({
+          ...track,
+          album: track.album || displayName,
+          library_track_id:
+            track.library_track_id ??
+            (typeof track.id === "number" ? track.id : undefined),
+        }),
+      ],
     });
   }
 
@@ -422,7 +518,9 @@ export function Album() {
             src={coverUrl}
             alt=""
             className="absolute inset-0 h-full w-full scale-[1.04] object-cover grayscale brightness-[0.42] contrast-110 opacity-35"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         ) : null}
         <div className="absolute inset-0 bg-black/32" />
@@ -444,7 +542,9 @@ export function Album() {
                     src={coverUrl}
                     alt={displayName}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
@@ -457,19 +557,30 @@ export function Album() {
             {/* Info */}
             <div className="flex min-w-0 flex-col justify-end text-left">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                <h1 className="max-w-4xl text-2xl font-bold text-foreground sm:text-4xl">{displayName}</h1>
+                <h1 className="max-w-4xl text-2xl font-bold text-foreground sm:text-4xl">
+                  {displayName}
+                </h1>
                 <OfflineBadge state={offlineState} />
               </div>
               <button
                 className="mb-3 inline-flex items-center gap-2 self-start text-sm text-muted-foreground transition-colors hover:text-primary"
-                onClick={() => navigate(artistPagePath({ artistId: data.artist_id, artistSlug: data.artist_slug }))}
+                onClick={() =>
+                  navigate(
+                    artistPagePath({
+                      artistId: data.artist_id,
+                      artistSlug: data.artist_slug,
+                    }),
+                  )
+                }
               >
                 <span className="h-6 w-6 flex-shrink-0 overflow-hidden rounded-full bg-white/5">
                   <img
                     src={artistPhotoUrl}
                     alt={data.artist}
                     className="h-full w-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
                   />
                 </span>
                 {data.artist}
@@ -477,10 +588,10 @@ export function Album() {
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {year && <span>{year}</span>}
-                {!data.genre_profile?.length && genre ? <span>{genre}</span> : null}
-                {data.track_count > 0 && (
-                  <span>{data.track_count} tracks</span>
-                )}
+                {!data.genre_profile?.length && genre ? (
+                  <span>{genre}</span>
+                ) : null}
+                {data.track_count > 0 && <span>{data.track_count} tracks</span>}
                 {data.total_length_sec > 0 && (
                   <span className="flex items-center gap-1">
                     <Clock size={11} />
@@ -488,7 +599,10 @@ export function Album() {
                   </span>
                 )}
                 {qualityBadges.map((badge) => (
-                  <QualityBadge key={`${badge.tier}-${badge.label}`} badge={badge} />
+                  <QualityBadge
+                    key={`${badge.tier}-${badge.label}`}
+                    badge={badge}
+                  />
                 ))}
               </div>
 
@@ -497,7 +611,13 @@ export function Album() {
                   items={data.genre_profile}
                   max={6}
                   className="mt-3"
-                  onSelect={(item) => navigate(`/explore?genre=${encodeURIComponent(item.slug || albumGenreSlug(item.name))}`)}
+                  onSelect={(item) =>
+                    navigate(
+                      `/explore?genre=${encodeURIComponent(
+                        item.slug || albumGenreSlug(item.name),
+                      )}`,
+                    )
+                  }
                 />
               ) : null}
             </div>
@@ -542,7 +662,11 @@ export function Album() {
             }`}
             onClick={handleToggleOffline}
             disabled={!offlineSupported || offlineBusy}
-            aria-label={offlineState === "ready" ? "Remove offline copy" : "Make available offline"}
+            aria-label={
+              offlineState === "ready"
+                ? "Remove offline copy"
+                : "Make available offline"
+            }
             title={offlineButtonLabel}
           >
             {offlineState === "ready" ? (
@@ -584,22 +708,46 @@ export function Album() {
                   playlists={playlists}
                   playlistPickerOpen={playlistPickerOpen}
                   onTogglePlaylistPicker={handleTogglePlaylistPicker}
-                  onPlay={() => { handlePlay(); setMenuOpen(false); }}
+                  onPlay={() => {
+                    handlePlay();
+                    setMenuOpen(false);
+                  }}
                   onPlayNext={handlePlayNextAlbum}
                   onCreatePlaylist={handleCreatePlaylistFromAlbum}
                   onAddToPlaylist={handleAddToPlaylist}
-                  onToggleSaved={async () => { await handleToggleSaved(); setMenuOpen(false); }}
+                  onToggleSaved={async () => {
+                    await handleToggleSaved();
+                    setMenuOpen(false);
+                  }}
                   offlineSupported={offlineSupported}
                   offlineState={offlineState}
                   offlineLabel={offlineButtonLabel}
-                  onToggleOffline={async () => { await handleToggleOffline(); setMenuOpen(false); }}
-                  onGoToArtist={() => { navigate(artistPagePath({ artistId: data.artist_id, artistSlug: data.artist_slug })); setMenuOpen(false); }}
-                  onShare={async () => { await handleShare(); setMenuOpen(false); }}
+                  onToggleOffline={async () => {
+                    await handleToggleOffline();
+                    setMenuOpen(false);
+                  }}
+                  onGoToArtist={() => {
+                    navigate(
+                      artistPagePath({
+                        artistId: data.artist_id,
+                        artistSlug: data.artist_slug,
+                      }),
+                    );
+                    setMenuOpen(false);
+                  }}
+                  onShare={async () => {
+                    await handleShare();
+                    setMenuOpen(false);
+                  }}
                 />
               </AppPopover>
             )}
             {menuOpen && !isDesktop && (
-              <AppModal open={menuOpen} onClose={() => setMenuOpen(false)} maxWidthClassName="sm:max-w-sm">
+              <AppModal
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                maxWidthClassName="sm:max-w-sm"
+              >
                 <ModalBody className="pb-4">
                   <AlbumMenuContent
                     data={data}
@@ -609,17 +757,37 @@ export function Album() {
                     playlists={playlists}
                     playlistPickerOpen={playlistPickerOpen}
                     onTogglePlaylistPicker={handleTogglePlaylistPicker}
-                    onPlay={() => { handlePlay(); setMenuOpen(false); }}
+                    onPlay={() => {
+                      handlePlay();
+                      setMenuOpen(false);
+                    }}
                     onPlayNext={handlePlayNextAlbum}
                     onCreatePlaylist={handleCreatePlaylistFromAlbum}
                     onAddToPlaylist={handleAddToPlaylist}
-                    onToggleSaved={async () => { await handleToggleSaved(); setMenuOpen(false); }}
+                    onToggleSaved={async () => {
+                      await handleToggleSaved();
+                      setMenuOpen(false);
+                    }}
                     offlineSupported={offlineSupported}
                     offlineState={offlineState}
                     offlineLabel={offlineButtonLabel}
-                    onToggleOffline={async () => { await handleToggleOffline(); setMenuOpen(false); }}
-                    onGoToArtist={() => { navigate(artistPagePath({ artistId: data.artist_id, artistSlug: data.artist_slug })); setMenuOpen(false); }}
-                    onShare={async () => { await handleShare(); setMenuOpen(false); }}
+                    onToggleOffline={async () => {
+                      await handleToggleOffline();
+                      setMenuOpen(false);
+                    }}
+                    onGoToArtist={() => {
+                      navigate(
+                        artistPagePath({
+                          artistId: data.artist_id,
+                          artistSlug: data.artist_slug,
+                        }),
+                      );
+                      setMenuOpen(false);
+                    }}
+                    onShare={async () => {
+                      await handleShare();
+                      setMenuOpen(false);
+                    }}
                   />
                 </ModalBody>
               </AppModal>
@@ -640,107 +808,121 @@ export function Album() {
 
       {/* Track List */}
       <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 pb-8">
-        {hasMultipleDiscs ? (
-          [...tracksByDisc.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([disc, tracks]) => (
-              <div key={disc} className="mb-4">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Disc size={12} />
-                  Disc {disc}
+        {hasMultipleDiscs
+          ? [...tracksByDisc.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([disc, tracks]) => (
+                <div key={disc} className="mb-4">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Disc size={12} />
+                    Disc {disc}
+                  </div>
+                  {tracks.map((t, idx) => (
+                    <TrackRow
+                      key={t.id}
+                      track={toTrackRowData({
+                        id: t.id,
+                        entity_uid: t.entity_uid,
+                        title: t.tags.title || t.filename,
+                        artist: data.artist,
+                        artist_id: data.artist_id,
+                        artist_entity_uid: data.artist_entity_uid,
+                        artist_slug: data.artist_slug,
+                        album: displayName,
+                        album_id: data.id,
+                        album_entity_uid: data.entity_uid,
+                        album_slug: data.slug,
+                        duration: t.length_sec,
+                        path: t.path,
+                        track_number: parseInt(t.tags.tracknumber) || idx + 1,
+                        format: t.format,
+                        bitrate: t.bitrate,
+                        sample_rate: t.sample_rate,
+                        bit_depth: t.bit_depth,
+                        bpm: t.bpm,
+                        audio_key: t.audio_key,
+                        audio_scale: t.audio_scale,
+                        energy: t.energy,
+                        danceability: t.danceability,
+                        valence: t.valence,
+                        bliss_vector: t.bliss_vector,
+                        library_track_id: t.id,
+                      })}
+                      index={parseInt(t.tags.tracknumber) || idx + 1}
+                      albumCover={coverUrl}
+                      playlistOptions={playlists ?? undefined}
+                      onAddToPlaylist={handleAddTrackToPlaylist}
+                      onCreatePlaylist={handleCreatePlaylistFromTrack}
+                      onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                      onPlayOverride={() => handlePlayTrack(t.id)}
+                    />
+                  ))}
                 </div>
-                {tracks.map((t, idx) => (
-                  <TrackRow
-                    key={t.id}
-                    track={toTrackRowData({
-                      id: t.id,
-                      entity_uid: t.entity_uid,
-                      title: t.tags.title || t.filename,
-                      artist: data.artist,
-                      artist_id: data.artist_id,
-                      artist_entity_uid: data.artist_entity_uid,
-                      artist_slug: data.artist_slug,
-                      album: displayName,
-                      album_id: data.id,
-                      album_entity_uid: data.entity_uid,
-                      album_slug: data.slug,
-                      duration: t.length_sec,
-                      path: t.path,
-                      track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                      format: t.format,
-                      bitrate: t.bitrate,
-                      sample_rate: t.sample_rate,
-                      bit_depth: t.bit_depth,
-                      bpm: t.bpm,
-                      audio_key: t.audio_key,
-                      audio_scale: t.audio_scale,
-                      energy: t.energy,
-                      danceability: t.danceability,
-                      valence: t.valence,
-                      bliss_vector: t.bliss_vector,
-                      library_track_id: t.id,
-                    })}
-                    index={parseInt(t.tags.tracknumber) || idx + 1}
-                    albumCover={coverUrl}
-                    playlistOptions={playlists ?? undefined}
-                    onAddToPlaylist={handleAddTrackToPlaylist}
-                    onCreatePlaylist={handleCreatePlaylistFromTrack}
-                    onActionMenuOpen={ensurePlaylistOptionsLoaded}
-                    onPlayOverride={() => handlePlayTrack(t.id)}
-                  />
-                ))}
-              </div>
-            ))
-        ) : (
-          data.tracks.map((t, idx) => (
-            <TrackRow
-              key={t.id}
-              track={toTrackRowData({
-                id: t.id,
-                entity_uid: t.entity_uid,
-                title: t.tags.title || t.filename,
-                artist: data.artist,
-                artist_id: data.artist_id,
-                artist_entity_uid: data.artist_entity_uid,
-                artist_slug: data.artist_slug,
-                album: displayName,
-                album_id: data.id,
-                album_entity_uid: data.entity_uid,
-                album_slug: data.slug,
-                duration: t.length_sec,
-                path: t.path,
-                track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                format: t.format,
-                bitrate: t.bitrate,
-                sample_rate: t.sample_rate,
-                bit_depth: t.bit_depth,
-                bpm: t.bpm,
-                audio_key: t.audio_key,
-                audio_scale: t.audio_scale,
-                energy: t.energy,
-                danceability: t.danceability,
-                valence: t.valence,
-                bliss_vector: t.bliss_vector,
-                library_track_id: t.id,
-              })}
-              index={parseInt(t.tags.tracknumber) || idx + 1}
-              albumCover={coverUrl}
-              playlistOptions={playlists ?? undefined}
-              onAddToPlaylist={handleAddTrackToPlaylist}
-              onCreatePlaylist={handleCreatePlaylistFromTrack}
-              onActionMenuOpen={ensurePlaylistOptionsLoaded}
-              onPlayOverride={() => handlePlayTrack(t.id)}
-            />
-          ))
-        )}
+              ))
+          : data.tracks.map((t, idx) => (
+              <TrackRow
+                key={t.id}
+                track={toTrackRowData({
+                  id: t.id,
+                  entity_uid: t.entity_uid,
+                  title: t.tags.title || t.filename,
+                  artist: data.artist,
+                  artist_id: data.artist_id,
+                  artist_entity_uid: data.artist_entity_uid,
+                  artist_slug: data.artist_slug,
+                  album: displayName,
+                  album_id: data.id,
+                  album_entity_uid: data.entity_uid,
+                  album_slug: data.slug,
+                  duration: t.length_sec,
+                  path: t.path,
+                  track_number: parseInt(t.tags.tracknumber) || idx + 1,
+                  format: t.format,
+                  bitrate: t.bitrate,
+                  sample_rate: t.sample_rate,
+                  bit_depth: t.bit_depth,
+                  bpm: t.bpm,
+                  audio_key: t.audio_key,
+                  audio_scale: t.audio_scale,
+                  energy: t.energy,
+                  danceability: t.danceability,
+                  valence: t.valence,
+                  bliss_vector: t.bliss_vector,
+                  library_track_id: t.id,
+                })}
+                index={parseInt(t.tags.tracknumber) || idx + 1}
+                albumCover={coverUrl}
+                playlistOptions={playlists ?? undefined}
+                onAddToPlaylist={handleAddTrackToPlaylist}
+                onCreatePlaylist={handleCreatePlaylistFromTrack}
+                onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                onPlayOverride={() => handlePlayTrack(t.id)}
+              />
+            ))}
       </div>
     </div>
   );
 }
 
 function AlbumMenuContent({
-  data, coverUrl, displayName, saved, playlists, playlistPickerOpen, onTogglePlaylistPicker,
-  onPlay, onPlayNext, onCreatePlaylist, onAddToPlaylist, onToggleSaved, offlineSupported, offlineState, offlineLabel, onToggleOffline, onGoToArtist, onShare,
+  data,
+  coverUrl,
+  displayName,
+  saved,
+  playlists,
+  playlistPickerOpen,
+  onTogglePlaylistPicker,
+  onPlay,
+  onPlayNext,
+  onCreatePlaylist,
+  onAddToPlaylist,
+  onToggleSaved,
+  offlineSupported,
+  offlineState,
+  offlineLabel,
+  onToggleOffline,
+  onGoToArtist,
+  onShare,
 }: {
   data: { has_cover: boolean; artist: string };
   coverUrl: string;
@@ -755,7 +937,13 @@ function AlbumMenuContent({
   onAddToPlaylist: (id: number) => void;
   onToggleSaved: () => void;
   offlineSupported: boolean;
-  offlineState: "idle" | "queued" | "downloading" | "syncing" | "ready" | "error";
+  offlineState:
+    | "idle"
+    | "queued"
+    | "downloading"
+    | "syncing"
+    | "ready"
+    | "error";
   offlineLabel: string;
   onToggleOffline: () => void;
   onGoToArtist: () => void;
@@ -766,7 +954,11 @@ function AlbumMenuContent({
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <div className="w-12 h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
           {data.has_cover ? (
-            <img src={coverUrl} alt={displayName} className="w-full h-full object-cover" />
+            <img
+              src={coverUrl}
+              alt={displayName}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Disc size={20} className="text-white/20" />
@@ -774,8 +966,12 @@ function AlbumMenuContent({
           )}
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-foreground truncate">{displayName}</div>
-          <div className="text-xs text-muted-foreground truncate">{data.artist}</div>
+          <div className="text-sm font-semibold text-foreground truncate">
+            {displayName}
+          </div>
+          <div className="text-xs text-muted-foreground truncate">
+            {data.artist}
+          </div>
         </div>
       </div>
       <div className="p-1.5">
@@ -785,28 +981,50 @@ function AlbumMenuContent({
         <AppMenuButton onClick={onPlayNext}>
           <ListPlus size={15} /> Play next
         </AppMenuButton>
-        <AppMenuButton className="justify-between" onClick={onTogglePlaylistPicker}>
-          <span className="flex items-center gap-3"><ListPlus size={15} /> Add to playlist</span>
-          <span className="text-white/40">{playlistPickerOpen ? "−" : "+"}</span>
+        <AppMenuButton
+          className="justify-between"
+          onClick={onTogglePlaylistPicker}
+        >
+          <span className="flex items-center gap-3">
+            <ListPlus size={15} /> Add to playlist
+          </span>
+          <span className="text-white/40">
+            {playlistPickerOpen ? "−" : "+"}
+          </span>
         </AppMenuButton>
         {playlistPickerOpen && (
           <div className="px-3 pb-2 space-y-1">
-            <button className="w-full text-left rounded-lg px-3 py-2 text-sm text-foreground hover:bg-white/5 transition-colors" onClick={onCreatePlaylist}>
+            <button
+              className="w-full text-left rounded-lg px-3 py-2 text-sm text-foreground hover:bg-white/5 transition-colors"
+              onClick={onCreatePlaylist}
+            >
               Add new playlist
             </button>
-            {playlists.length > 0 ? <AppPopoverDivider className="mx-1" /> : null}
+            {playlists.length > 0 ? (
+              <AppPopoverDivider className="mx-1" />
+            ) : null}
             {playlists.map((p) => (
-              <button key={p.id} className="w-full text-left rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors" onClick={() => onAddToPlaylist(p.id)}>
+              <button
+                key={p.id}
+                className="w-full text-left rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+                onClick={() => onAddToPlaylist(p.id)}
+              >
                 {p.name}
               </button>
             ))}
           </div>
         )}
         <AppMenuButton onClick={onToggleSaved}>
-          <Heart size={15} className={saved ? "fill-current text-primary" : ""} />
+          <Heart
+            size={15}
+            className={saved ? "fill-current text-primary" : ""}
+          />
           {saved ? "Remove from collection" : "Add to collection"}
         </AppMenuButton>
-        <AppMenuButton onClick={onToggleOffline} disabled={!offlineSupported || isOfflineBusy(offlineState)}>
+        <AppMenuButton
+          onClick={onToggleOffline}
+          disabled={!offlineSupported || isOfflineBusy(offlineState)}
+        >
           {offlineState === "ready" ? (
             <CheckCircle2 size={15} className="text-cyan-200" />
           ) : isOfflineBusy(offlineState) ? (

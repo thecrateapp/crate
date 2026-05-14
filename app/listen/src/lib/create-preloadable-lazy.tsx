@@ -27,7 +27,10 @@ function scheduleLazyImportRecovery(error: unknown): boolean {
     const key = `${LAZY_IMPORT_RECOVERY_KEY}:${window.location.pathname}`;
     const lastRecoveryAt = Number(window.sessionStorage.getItem(key) || "0");
     const now = Date.now();
-    if (Number.isFinite(lastRecoveryAt) && now - lastRecoveryAt < LAZY_IMPORT_RECOVERY_WINDOW_MS) {
+    if (
+      Number.isFinite(lastRecoveryAt) &&
+      now - lastRecoveryAt < LAZY_IMPORT_RECOVERY_WINDOW_MS
+    ) {
       return false;
     }
     window.sessionStorage.setItem(key, String(now));

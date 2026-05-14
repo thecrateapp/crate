@@ -96,7 +96,8 @@ createApiReference("#app", {
   title: "Crate API Reference",
   metaData: {
     title: "Crate API Reference",
-    description: "Standalone interactive API reference for Crate and its Subsonic compatibility layer.",
+    description:
+      "Standalone interactive API reference for Crate and its Subsonic compatibility layer.",
   },
   favicon: "/icons/logo.svg",
   layout: "modern",

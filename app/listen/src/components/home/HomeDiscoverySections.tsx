@@ -1,14 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Sparkles, Radio, Disc3, UserRound, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import {
+  Play,
+  Sparkles,
+  Radio,
+  Disc3,
+  UserRound,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+} from "lucide-react";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
-import { SectionHeader, SectionRail, useSectionRail } from "@/components/home/HomeSections";
+import {
+  SectionHeader,
+  SectionRail,
+  useSectionRail,
+} from "@/components/home/HomeSections";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import {
   albumCoverApiUrl,
@@ -30,7 +46,10 @@ import type {
   HomeSuggestedAlbum,
 } from "./home-model";
 
-const numberFormatter = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 const HERO_BACKGROUND_VERSION = "home-hero-bg-v2";
 
 function statValue(value: number): string {
@@ -69,7 +88,8 @@ const HISTORY_TONES = [
 ];
 
 function historyLabel(item: HomeListeningHistoryCard, index: number): string {
-  if (index === 0 && item.title === "My Most Listened") return "MY MOST LISTENED";
+  if (index === 0 && item.title === "My Most Listened")
+    return "MY MOST LISTENED";
   return item.period_label;
 }
 
@@ -78,57 +98,85 @@ function recentArtwork(item: HomeRecentItem): string | null {
     return null;
   }
   if (item.type === "artist") {
-    return artistPhotoApiUrl({
-      artistId: item.artist_id,
-      artistEntityUid: item.artist_entity_uid,
-      artistSlug: item.artist_slug,
-      artistName: item.artist_name,
-    }, { size: 192 }) || null;
+    return (
+      artistPhotoApiUrl(
+        {
+          artistId: item.artist_id,
+          artistEntityUid: item.artist_entity_uid,
+          artistSlug: item.artist_slug,
+          artistName: item.artist_name,
+        },
+        { size: 192 },
+      ) || null
+    );
   }
-  return albumCoverApiUrl({
-    albumId: item.album_id,
-    albumEntityUid: item.album_entity_uid,
-    artistEntityUid: item.artist_entity_uid,
-    albumSlug: item.album_slug,
-    artistName: item.artist_name,
-    albumName: item.album_name,
-  }, { size: 192 }) || null;
+  return (
+    albumCoverApiUrl(
+      {
+        albumId: item.album_id,
+        albumEntityUid: item.album_entity_uid,
+        artistEntityUid: item.artist_entity_uid,
+        albumSlug: item.album_slug,
+        artistName: item.artist_name,
+        albumName: item.album_name,
+      },
+      { size: 192 },
+    ) || null
+  );
 }
 
 function radioArtwork(station: HomeRadioStation): string | null {
   if (station.type === "album") {
-    return albumCoverApiUrl({
-      albumId: station.album_id,
-      albumEntityUid: station.album_entity_uid,
-      artistEntityUid: station.artist_entity_uid,
-      albumSlug: station.album_slug,
-      artistName: station.artist_name,
-      albumName: station.album_name,
-    }, { size: 256 }) || null;
+    return (
+      albumCoverApiUrl(
+        {
+          albumId: station.album_id,
+          albumEntityUid: station.album_entity_uid,
+          artistEntityUid: station.artist_entity_uid,
+          albumSlug: station.album_slug,
+          artistName: station.artist_name,
+          albumName: station.album_name,
+        },
+        { size: 256 },
+      ) || null
+    );
   }
-  return artistPhotoApiUrl({
-    artistId: station.artist_id,
-    artistEntityUid: station.artist_entity_uid,
-    artistSlug: station.artist_slug,
-    artistName: station.artist_name,
-  }, { size: 256 }) || null;
+  return (
+    artistPhotoApiUrl(
+      {
+        artistId: station.artist_id,
+        artistEntityUid: station.artist_entity_uid,
+        artistSlug: station.artist_slug,
+        artistName: station.artist_name,
+      },
+      { size: 256 },
+    ) || null
+  );
 }
 
 function heroBackgroundSrc(hero: HomeHeroArtist): string | undefined {
-  const backgroundUrl = artistBackgroundApiUrl({
-    artistId: hero.id,
-    artistSlug: hero.slug,
-    artistName: hero.name,
-  }, { size: 1280 });
+  const backgroundUrl = artistBackgroundApiUrl(
+    {
+      artistId: hero.id,
+      artistSlug: hero.slug,
+      artistName: hero.name,
+    },
+    { size: 1280 },
+  );
   return backgroundUrl
-    ? `${backgroundUrl}${backgroundUrl.includes("?") ? "&" : "?"}v=${HERO_BACKGROUND_VERSION}`
+    ? `${backgroundUrl}${
+        backgroundUrl.includes("?") ? "&" : "?"
+      }v=${HERO_BACKGROUND_VERSION}`
     : undefined;
 }
 
 function requestBackgroundWork(callback: () => void): () => void {
   if (typeof window === "undefined") return () => {};
   const idleWindow = window as Window & {
-    requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+    requestIdleCallback?: (
+      cb: () => void,
+      options?: { timeout: number },
+    ) => number;
     cancelIdleCallback?: (handle: number) => void;
   };
 
@@ -149,19 +197,31 @@ function sameSet(left: Set<string>, right: Set<string>): boolean {
   return true;
 }
 
-function useHeroBackgroundPreloader(heroes: HomeHeroArtist[], activeIndex: number): Set<string> {
+function useHeroBackgroundPreloader(
+  heroes: HomeHeroArtist[],
+  activeIndex: number,
+): Set<string> {
   const sources = useMemo(
-    () => heroes.map(heroBackgroundSrc).filter((src): src is string => Boolean(src)),
+    () =>
+      heroes
+        .map(heroBackgroundSrc)
+        .filter((src): src is string => Boolean(src)),
     [heroes],
   );
-  const [readySources, setReadySources] = useState<Set<string>>(() => new Set());
+  const [readySources, setReadySources] = useState<Set<string>>(
+    () => new Set(),
+  );
   const readyRef = useRef<Set<string>>(new Set());
   const inFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const allowed = new Set(sources);
-    readyRef.current = new Set([...readyRef.current].filter((src) => allowed.has(src)));
-    inFlightRef.current = new Set([...inFlightRef.current].filter((src) => allowed.has(src)));
+    readyRef.current = new Set(
+      [...readyRef.current].filter((src) => allowed.has(src)),
+    );
+    inFlightRef.current = new Set(
+      [...inFlightRef.current].filter((src) => allowed.has(src)),
+    );
     setReadySources((prev) => {
       const next = new Set([...prev].filter((src) => allowed.has(src)));
       return sameSet(prev, next) ? prev : next;
@@ -186,14 +246,17 @@ function useHeroBackgroundPreloader(heroes: HomeHeroArtist[], activeIndex: numbe
     };
 
     const loadSource = (src: string | undefined, priority: "high" | "low") => {
-      if (!src || readyRef.current.has(src) || inFlightRef.current.has(src)) return;
+      if (!src || readyRef.current.has(src) || inFlightRef.current.has(src))
+        return;
       inFlightRef.current.add(src);
       started.add(src);
 
       const img = new Image();
       img.decoding = "async";
       if ("fetchPriority" in img) {
-        (img as HTMLImageElement & { fetchPriority: "high" | "low" | "auto" }).fetchPriority = priority;
+        (
+          img as HTMLImageElement & { fetchPriority: "high" | "low" | "auto" }
+        ).fetchPriority = priority;
       }
       img.onload = () => {
         inFlightRef.current.delete(src);
@@ -205,9 +268,15 @@ function useHeroBackgroundPreloader(heroes: HomeHeroArtist[], activeIndex: numbe
       img.src = src;
     };
 
-    const current = sources[Math.max(0, Math.min(activeIndex, sources.length - 1))];
-    const next = sources.length > 1 ? sources[(activeIndex + 1) % sources.length] : undefined;
-    const immediate = new Set([current, next].filter((src): src is string => Boolean(src)));
+    const current =
+      sources[Math.max(0, Math.min(activeIndex, sources.length - 1))];
+    const next =
+      sources.length > 1
+        ? sources[(activeIndex + 1) % sources.length]
+        : undefined;
+    const immediate = new Set(
+      [current, next].filter((src): src is string => Boolean(src)),
+    );
 
     immediate.forEach((src) => loadSource(src, "high"));
 
@@ -260,10 +329,17 @@ export function HomeTasteHero({
   useEffect(() => {
     if (count <= 1) return;
     autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
-    return () => { if (autoRef.current) clearInterval(autoRef.current); };
+    return () => {
+      if (autoRef.current) clearInterval(autoRef.current);
+    };
   }, [count]);
 
-  const pause = () => { if (autoRef.current) { clearInterval(autoRef.current); autoRef.current = null; } };
+  const pause = () => {
+    if (autoRef.current) {
+      clearInterval(autoRef.current);
+      autoRef.current = null;
+    }
+  };
   const resume = () => {
     pause();
     if (count <= 1) return;
@@ -278,9 +354,15 @@ export function HomeTasteHero({
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     const start = touchRef.current;
-    if (!start) { resume(); return; }
+    if (!start) {
+      resume();
+      return;
+    }
     const endTouch = e.changedTouches[0];
-    if (!endTouch) { resume(); return; }
+    if (!endTouch) {
+      resume();
+      return;
+    }
     const dx = endTouch.clientX - start.x;
     const dt = Date.now() - start.t;
     if (Math.abs(dx) > 40 && dt < 500) {
@@ -294,24 +376,30 @@ export function HomeTasteHero({
 
   const slides = heroes.map((hero, i) => {
     const backgroundSrc = heroBackgroundSrc(hero);
-    const backgroundReady = Boolean(backgroundSrc && readyBackgrounds.has(backgroundSrc));
+    const backgroundReady = Boolean(
+      backgroundSrc && readyBackgrounds.has(backgroundSrc),
+    );
     const renderPreparedBackground =
-      i === idx ||
-      i === (idx + 1) % count ||
-      i === (idx - 1 + count) % count;
+      i === idx || i === (idx + 1) % count || i === (idx - 1 + count) % count;
 
     return (
       <div
         key={hero.id}
         className={cn(
           "transition-opacity duration-500 ease-in-out",
-          i === idx ? "relative z-10 opacity-100" : "pointer-events-none absolute inset-0 z-0 opacity-0",
+          i === idx
+            ? "relative z-10 opacity-100"
+            : "pointer-events-none absolute inset-0 z-0 opacity-0",
         )}
         aria-hidden={i !== idx}
       >
         <HeroSlide
           hero={hero}
-          backgroundSrc={backgroundReady && renderPreparedBackground ? backgroundSrc : undefined}
+          backgroundSrc={
+            backgroundReady && renderPreparedBackground
+              ? backgroundSrc
+              : undefined
+          }
           following={isFollowing(hero.id)}
           onOpenArtist={() => onOpenArtist(hero)}
           onPlay={() => onPlay(hero)}
@@ -337,14 +425,20 @@ export function HomeTasteHero({
       {count > 1 && (
         <>
           <button
-            onClick={() => { go(idx - 1); pause(); }}
+            onClick={() => {
+              go(idx - 1);
+              pause();
+            }}
             className="absolute left-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
             aria-label="Previous"
           >
             <ChevronLeft size={18} />
           </button>
           <button
-            onClick={() => { go(idx + 1); pause(); }}
+            onClick={() => {
+              go(idx + 1);
+              pause();
+            }}
             className="absolute right-3 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white/60 backdrop-blur-sm transition hover:bg-black/60 hover:text-white sm:top-1/2 sm:h-8 sm:w-8 sm:-translate-y-1/2"
             aria-label="Next"
           >
@@ -359,10 +453,15 @@ export function HomeTasteHero({
           {heroes.map((_, i) => (
             <button
               key={i}
-              onClick={() => { setIdx(i); pause(); }}
+              onClick={() => {
+                setIdx(i);
+                pause();
+              }}
               className={cn(
                 "h-1.5 rounded-full transition-all duration-300",
-                i === idx ? "w-6 bg-primary" : "w-1.5 bg-white/25 hover:bg-white/40",
+                i === idx
+                  ? "w-6 bg-primary"
+                  : "w-1.5 bg-white/25 hover:bg-white/40",
               )}
             />
           ))}
@@ -397,7 +496,12 @@ function HeroSlide({
       role="button"
       tabIndex={0}
       onClick={onOpenArtist}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenArtist(); } }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpenArtist();
+        }
+      }}
     >
       <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(6,10,14,0.98)_0%,rgba(10,16,22,0.96)_52%,rgba(4,9,13,0.98)_100%)]" />
       {backgroundSrc ? (
@@ -422,7 +526,12 @@ function HeroSlide({
             {genres && genres.length > 0 && (
               <div className="flex min-w-0 flex-wrap gap-1.5">
                 {genres.slice(0, 2).map((g) => (
-                  <span key={g} className="max-w-[42vw] truncate rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] text-white/50 sm:max-w-none">{g}</span>
+                  <span
+                    key={g}
+                    className="max-w-[42vw] truncate rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] text-white/50 sm:max-w-none"
+                  >
+                    {g}
+                  </span>
                 ))}
               </div>
             )}
@@ -445,7 +554,10 @@ function HeroSlide({
         <div className="flex flex-wrap gap-2.5">
           <button
             className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm"
-            onClick={(e) => { e.stopPropagation(); onPlay(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay();
+            }}
           >
             <Play size={15} fill="currentColor" />
             Play
@@ -455,13 +567,19 @@ function HeroSlide({
               "inline-flex min-h-11 items-center rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/[0.12] sm:min-h-0 sm:px-5 sm:py-2.5 sm:text-sm",
               following ? "text-primary" : "",
             )}
-            onClick={(e) => { e.stopPropagation(); onToggleFollow(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFollow();
+            }}
           >
             {following ? "Following" : "Follow"}
           </button>
           <button
             className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white sm:min-h-0 sm:py-2.5 sm:text-sm"
-            onClick={(e) => { e.stopPropagation(); onInfo(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onInfo();
+            }}
           >
             <Info size={14} />
             About
@@ -495,7 +613,13 @@ export function RecentEntityRow({
             className="h-full w-full rounded-xl"
           />
         ) : artworkUrl ? (
-          <img src={artworkUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          <img
+            src={artworkUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-white/5">
             {item.type === "artist" ? (
@@ -555,7 +679,10 @@ export function RecentlyPlayedSection({
       />
       <SectionRail railRef={rail.railRef} className="gap-0">
         {pages.map((pageItems, pageIndex) => (
-          <div key={`recent-page-${pageIndex}`} className="min-w-full snap-start">
+          <div
+            key={`recent-page-${pageIndex}`}
+            className="min-w-full snap-start"
+          >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {pageItems.map((item, index) => (
                 <RecentEntityRow
@@ -660,7 +787,10 @@ export function CustomMixCard({
       )}
     >
       <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
-        <MixArtwork item={item} className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]" />
+        <MixArtwork
+          item={item}
+          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+        />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button
             className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
@@ -669,15 +799,23 @@ export function CustomMixCard({
               onPlayMix(item);
             }}
           >
-            <Play size={18} fill="#0a0a0f" className="ml-0.5 text-primary-foreground" />
+            <Play
+              size={18}
+              fill="#0a0a0f"
+              className="ml-0.5 text-primary-foreground"
+            />
           </button>
         </div>
       </div>
-      <div className="truncate text-sm font-semibold text-foreground">{item.name}</div>
+      <div className="truncate text-sm font-semibold text-foreground">
+        {item.name}
+      </div>
       <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
         {mixArtistSummary(item)}
       </div>
-      <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/40">{item.track_count} tracks</div>
+      <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/40">
+        {item.track_count} tracks
+      </div>
       <ItemActionMenu
         actions={actions}
         open={actionMenu.open}
@@ -766,8 +904,12 @@ function ListeningHistoryCard({
         </div>
       </div>
       <div className="mt-3 space-y-1">
-        <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
-        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">{artists}</p>
+        <div className="truncate text-sm font-semibold text-foreground">
+          {item.title}
+        </div>
+        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+          {artists}
+        </p>
       </div>
     </button>
   );
@@ -795,7 +937,9 @@ export function SuggestedAlbumsSection({
       <SectionRail railRef={rail.railRef}>
         {albums.map((album) => (
           <AlbumCard
-            key={`${album.album_id ?? `${album.artist_name}-${album.album_name}`}`}
+            key={`${
+              album.album_id ?? `${album.artist_name}-${album.album_name}`
+            }`}
             artist={album.artist_name}
             album={album.album_name}
             albumId={album.album_id}
@@ -832,11 +976,16 @@ export function RecommendedTracksSection({
       />
       <SectionRail railRef={rail.railRef}>
         {pages.map((pageTracks, pageIndex) => (
-          <div key={`recommended-page-${pageIndex}`} className="min-w-full snap-start">
+          <div
+            key={`recommended-page-${pageIndex}`}
+            className="min-w-full snap-start"
+          >
             <div className="grid gap-2 xl:grid-cols-3">
               {pageTracks.map((track, index) => (
                 <TrackRow
-                  key={`${track.library_track_id ?? track.path ?? track.title}-${pageIndex}-${index}`}
+                  key={`${
+                    track.library_track_id ?? track.path ?? track.title
+                  }-${pageIndex}-${index}`}
                   track={track}
                   showArtist
                   showAlbum
@@ -875,15 +1024,21 @@ export function RadioStationCard({
     >
       <div
         className="aspect-square bg-cover bg-center transition-transform duration-300 group-hover:scale-[1.04]"
-        style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : undefined }}
+        style={{
+          backgroundImage: artworkUrl ? `url(${artworkUrl})` : undefined,
+        }}
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(6,8,12,0.92)_100%)]" />
       <div className="absolute left-3 top-3 rounded-full border border-primary/20 bg-primary/12 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary">
         <Radio size={11} className="inline-block" /> Station
       </div>
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <div className="truncate text-sm font-semibold text-white">{station.title}</div>
-        <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">{station.subtitle}</div>
+        <div className="truncate text-sm font-semibold text-white">
+          {station.title}
+        </div>
+        <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
+          {station.subtitle}
+        </div>
       </div>
     </button>
   );
@@ -913,7 +1068,9 @@ export function RadioStationsSection({
       <SectionRail railRef={rail.railRef}>
         {stations.map((station) => (
           <RadioStationCard
-            key={`${station.type}-${station.artist_id ?? station.album_id ?? station.title}`}
+            key={`${station.type}-${
+              station.artist_id ?? station.album_id ?? station.title
+            }`}
             station={station}
             onPlay={() => onPlayStation(station)}
           />
@@ -1005,7 +1162,10 @@ export function CoreTracksPlaylistCard({
       )}
     >
       <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
-        <CoreTracksArtwork item={item} className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]" />
+        <CoreTracksArtwork
+          item={item}
+          className="aspect-square rounded-3xl transition-transform group-hover:scale-[1.02]"
+        />
         <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
           <button
             className="flex h-10 w-10 translate-y-2 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all group-hover:translate-y-0 group-hover:opacity-100"
@@ -1014,11 +1174,17 @@ export function CoreTracksPlaylistCard({
               onPlayPlaylist(item);
             }}
           >
-            <Play size={18} fill="#0a0a0f" className="ml-0.5 text-primary-foreground" />
+            <Play
+              size={18}
+              fill="#0a0a0f"
+              className="ml-0.5 text-primary-foreground"
+            />
           </button>
         </div>
       </div>
-      <div className="truncate text-sm font-semibold text-foreground">{item.name}</div>
+      <div className="truncate text-sm font-semibold text-foreground">
+        {item.name}
+      </div>
       <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
         Core Tracks
       </div>

@@ -17,9 +17,16 @@ class TestRadioApiContracts:
             }
         ]
 
-        with patch("crate.api.radio.get_library_artist_by_id", return_value={"id": 7, "name": "Converge", "slug": "converge"}), \
-             patch("crate.api.radio.generate_artist_radio", return_value=tracks), \
-             patch("crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows):
+        with (
+            patch(
+                "crate.api.radio.get_library_artist_by_id",
+                return_value={"id": 7, "name": "Converge", "slug": "converge"},
+            ),
+            patch("crate.api.radio.generate_artist_radio", return_value=tracks),
+            patch(
+                "crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows
+            ),
+        ):
             resp = test_app.get("/api/artists/7/radio?limit=25")
 
         assert resp.status_code == 200
@@ -54,16 +61,26 @@ class TestRadioApiContracts:
             },
         ]
 
-        with patch("crate.api.radio._resolve_track_path", return_value="/music/Converge/Jane Doe/01 - Concubine.flac"), \
-             patch("crate.api.radio.generate_track_radio", return_value=tracks), \
-             patch("crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows):
+        with (
+            patch(
+                "crate.api.radio._resolve_track_path",
+                return_value="/music/Converge/Jane Doe/01 - Concubine.flac",
+            ),
+            patch("crate.api.radio.generate_track_radio", return_value=tracks),
+            patch(
+                "crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows
+            ),
+        ):
             resp = test_app.get("/api/radio/track?track_id=99&limit=50")
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["session"]["type"] == "track"
         assert data["session"]["seed"]["track_id"] == 99
-        assert data["session"]["seed"]["track_path"] == "Converge/Jane Doe/01 - Concubine.flac"
+        assert (
+            data["session"]["seed"]["track_path"]
+            == "Converge/Jane Doe/01 - Concubine.flac"
+        )
         assert data["tracks"][1]["artist"] == "Botch"
 
     def test_track_radio_accepts_entity_uid_and_returns_seed_identity(self, test_app):
@@ -81,18 +98,33 @@ class TestRadioApiContracts:
             },
         ]
 
-        with patch("crate.api.radio.get_cache", return_value=None), \
-             patch("crate.api.radio.set_cache"), \
-             patch("crate.api.radio._resolve_track_path", return_value="/music/Converge/Jane Doe/01 - Concubine.flac"), \
-             patch("crate.api.radio.generate_track_radio", return_value=tracks), \
-             patch("crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows):
-            resp = test_app.get("/api/radio/track?entity_uid=123e4567-e89b-12d3-a456-426614174000&limit=50")
+        with (
+            patch("crate.api.radio.get_cache", return_value=None),
+            patch("crate.api.radio.set_cache"),
+            patch(
+                "crate.api.radio._resolve_track_path",
+                return_value="/music/Converge/Jane Doe/01 - Concubine.flac",
+            ),
+            patch("crate.api.radio.generate_track_radio", return_value=tracks),
+            patch(
+                "crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows
+            ),
+        ):
+            resp = test_app.get(
+                "/api/radio/track?entity_uid=123e4567-e89b-12d3-a456-426614174000&limit=50"
+            )
 
         assert resp.status_code == 200
         data = resp.json()
-        assert data["session"]["seed"]["track_entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
+        assert (
+            data["session"]["seed"]["track_entity_uid"]
+            == "123e4567-e89b-12d3-a456-426614174000"
+        )
         assert "track_storage_id" not in data["session"]["seed"]
-        assert data["tracks"][0]["track_entity_uid"] == "123e4567-e89b-12d3-a456-426614174000"
+        assert (
+            data["tracks"][0]["track_entity_uid"]
+            == "123e4567-e89b-12d3-a456-426614174000"
+        )
         assert "track_storage_id" not in data["tracks"][0]
 
     def test_album_radio_returns_session_and_tracks(self, test_app):
@@ -108,12 +140,19 @@ class TestRadioApiContracts:
             }
         ]
 
-        with patch("crate.api.radio.get_album_for_radio", return_value={
-                "artist": "Converge",
-                "name": "Jane Doe",
-             }), \
-             patch("crate.api.radio.generate_album_radio", return_value=tracks), \
-             patch("crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows):
+        with (
+            patch(
+                "crate.api.radio.get_album_for_radio",
+                return_value={
+                    "artist": "Converge",
+                    "name": "Jane Doe",
+                },
+            ),
+            patch("crate.api.radio.generate_album_radio", return_value=tracks),
+            patch(
+                "crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows
+            ),
+        ):
             resp = test_app.get("/api/radio/album/5?limit=50")
 
         assert resp.status_code == 200
@@ -135,15 +174,22 @@ class TestRadioApiContracts:
             }
         ]
 
-        with patch("crate.api.radio.get_playlist_for_radio", return_value={
-                "id": 7,
-                "name": "Hardcore",
-                "scope": "system",
-                "user_id": None,
-                "is_active": True,
-             }), \
-             patch("crate.api.radio.generate_playlist_radio", return_value=tracks), \
-             patch("crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows):
+        with (
+            patch(
+                "crate.api.radio.get_playlist_for_radio",
+                return_value={
+                    "id": 7,
+                    "name": "Hardcore",
+                    "scope": "system",
+                    "user_id": None,
+                    "is_active": True,
+                },
+            ),
+            patch("crate.api.radio.generate_playlist_radio", return_value=tracks),
+            patch(
+                "crate.api.radio._enrich_radio_tracks", side_effect=lambda rows: rows
+            ),
+        ):
             resp = test_app.get("/api/radio/playlist/7?limit=50")
 
         assert resp.status_code == 200
@@ -153,18 +199,24 @@ class TestRadioApiContracts:
         assert data["tracks"][0]["title"] == "Jane Doe"
 
     def test_playlist_radio_hides_inactive_system_playlists(self, test_app):
-        with patch("crate.api.radio.get_playlist_for_radio", return_value={
+        with patch(
+            "crate.api.radio.get_playlist_for_radio",
+            return_value={
                 "id": 12,
                 "name": "Hidden Editorial",
                 "scope": "system",
                 "user_id": None,
                 "is_active": False,
-             }):
+            },
+        ):
             resp = test_app.get("/api/radio/playlist/12?limit=50")
 
         assert resp.status_code == 404
 
     def test_radio_endpoints_clamp_limit(self, test_app):
-        with patch("crate.api.radio.get_library_artist_by_id", return_value={"id": 7, "name": "Converge", "slug": "converge"}):
+        with patch(
+            "crate.api.radio.get_library_artist_by_id",
+            return_value={"id": 7, "name": "Converge", "slug": "converge"},
+        ):
             resp = test_app.get("/api/artists/7/radio?limit=101")
         assert resp.status_code == 422

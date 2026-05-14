@@ -9,9 +9,10 @@ def get_track_with_artist(session=None, track_path: str = "") -> dict | None:
     if not track_path:
         return None
     with bliss_session_scope(session) as active_session:
-        row = active_session.execute(
-            text(
-                """
+        row = (
+            active_session.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence, t.rating,
@@ -21,9 +22,12 @@ def get_track_with_artist(session=None, track_path: str = "") -> dict | None:
                 LEFT JOIN library_artists ar ON LOWER(a.artist) = LOWER(ar.name)
                 WHERE t.path = :track_path
                 """
-            ),
-            {"track_path": track_path},
-        ).mappings().first()
+                ),
+                {"track_path": track_path},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
@@ -37,9 +41,10 @@ def get_same_artist_tracks(
 ) -> list[dict]:
     with bliss_session_scope(session) as active_session:
         if artist_id is not None:
-            result = active_session.execute(
-                text(
-                    """
+            result = (
+                active_session.execute(
+                    text(
+                        """
                     SELECT
                         t.id AS track_id,
                         t.path,
@@ -63,13 +68,21 @@ def get_same_artist_tracks(
                     ORDER BY COALESCE(t.lastfm_playcount, 0) DESC, t.id
                     LIMIT :limit
                     """
-                ),
-                {"artist_id": artist_id, "exclude_path": exclude_path, "limit": limit},
-            ).mappings().all()
+                    ),
+                    {
+                        "artist_id": artist_id,
+                        "exclude_path": exclude_path,
+                        "limit": limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
         else:
-            result = active_session.execute(
-                text(
-                    """
+            result = (
+                active_session.execute(
+                    text(
+                        """
                     SELECT
                         t.id AS track_id,
                         t.path,
@@ -92,19 +105,29 @@ def get_same_artist_tracks(
                     ORDER BY COALESCE(t.lastfm_playcount, 0) DESC, t.id
                     LIMIT :limit
                     """
-                ),
-                {"artist_name": artist_name, "exclude_path": exclude_path, "limit": limit},
-            ).mappings().all()
+                    ),
+                    {
+                        "artist_name": artist_name,
+                        "exclude_path": exclude_path,
+                        "limit": limit,
+                    },
+                )
+                .mappings()
+                .all()
+            )
         return [dict(r) for r in result]
 
 
-def get_seed_tracks_by_paths(session=None, seed_paths: list[str] | None = None) -> list[dict]:
+def get_seed_tracks_by_paths(
+    session=None, seed_paths: list[str] | None = None
+) -> list[dict]:
     if not seed_paths:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 SELECT
                     t.id AS track_id,
                     t.path,
@@ -126,9 +149,12 @@ def get_seed_tracks_by_paths(session=None, seed_paths: list[str] | None = None) 
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE t.path = ANY(:seed_paths)
                 """
-            ),
-            {"seed_paths": seed_paths},
-        ).mappings().all()
+                ),
+                {"seed_paths": seed_paths},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 

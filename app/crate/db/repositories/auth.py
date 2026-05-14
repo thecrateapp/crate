@@ -6,7 +6,12 @@ from crate.db.repositories.auth_identities import (
     unlink_user_external_identity,
     upsert_user_external_identity,
 )
-from crate.db.repositories.auth_invites import consume_auth_invite, create_auth_invite, get_auth_invite, list_auth_invites
+from crate.db.repositories.auth_invites import (
+    consume_auth_invite,
+    create_auth_invite,
+    get_auth_invite,
+    list_auth_invites,
+)
 from crate.db.repositories.auth_sessions import (
     cleanup_ended_jam_rooms,
     cleanup_expired_sessions,

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from crate.db.repositories.streaming import _track_path_candidates
 from crate.streaming.service import _source_quality, prepare_playback, resolve_playback
 from crate.streaming.policy import bitrate_to_kbps, decide_delivery, normalize_policy
@@ -41,7 +43,10 @@ def test_balanced_passthroughs_reasonable_mobile_sources():
 
 
 def test_track_path_candidates_do_not_suffix_match(monkeypatch):
-    monkeypatch.setattr("crate.db.repositories.streaming.load_config", lambda: {"library_path": "/music"})
+    monkeypatch.setattr(
+        "crate.db.repositories.streaming.load_config",
+        lambda: {"library_path": "/music"},
+    )
 
     assert _track_path_candidates("Artist/Album/track.flac") == [
         "Artist/Album/track.flac",
@@ -50,12 +55,15 @@ def test_track_path_candidates_do_not_suffix_match(monkeypatch):
 
 
 def test_source_quality_backfills_missing_track_metadata(monkeypatch):
-    monkeypatch.setattr("crate.streaming.service.read_audio_quality", lambda _path: {
-        "duration": 240.0,
-        "bitrate": 900000,
-        "sample_rate": 44100,
-        "bit_depth": 16,
-    })
+    monkeypatch.setattr(
+        "crate.streaming.service.read_audio_quality",
+        lambda _path: {
+            "duration": 240.0,
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+    )
 
     quality = _source_quality(
         {"format": "flac", "bitrate": None, "sample_rate": None, "bit_depth": None},
@@ -68,7 +76,9 @@ def test_source_quality_backfills_missing_track_metadata(monkeypatch):
     assert quality["bit_depth"] == 16
 
 
-def test_prepare_playback_queues_variant_without_reading_source_quality(monkeypatch, tmp_path):
+def test_prepare_playback_queues_variant_without_reading_source_quality(
+    monkeypatch, tmp_path
+):
     library = tmp_path / "music"
     track_path = library / "Artist" / "Album" / "track.flac"
     track_path.parent.mkdir(parents=True)
@@ -89,8 +99,12 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(monkeypa
 
     monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
     monkeypatch.setattr("crate.streaming.service.read_audio_quality", fail_quality)
-    monkeypatch.setattr("crate.streaming.service.ensure_variant_record", fake_ensure_variant_record)
-    monkeypatch.setattr("crate.streaming.service.create_task_dedup", lambda *_args, **_kwargs: "task-1")
+    monkeypatch.setattr(
+        "crate.streaming.service.ensure_variant_record", fake_ensure_variant_record
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.create_task_dedup", lambda *_args, **_kwargs: "task-1"
+    )
     monkeypatch.setattr(
         "crate.streaming.service.mark_variant_task",
         lambda cache_key, task_id: marked.append((cache_key, task_id)),
@@ -119,7 +133,9 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(monkeypa
     assert len(marked[0][0]) == 64
 
 
-def test_resolve_playback_uses_db_quality_without_probing_request_path(monkeypatch, tmp_path):
+def test_resolve_playback_uses_db_quality_without_probing_request_path(
+    monkeypatch, tmp_path
+):
     library = tmp_path / "music"
     track_path = library / "Artist" / "Album" / "track.m4a"
     track_path.parent.mkdir(parents=True)
@@ -148,3 +164,42 @@ def test_resolve_playback_uses_db_quality_without_probing_request_path(monkeypat
     assert resolution.effective_policy == "original"
     assert resolution.source["bitrate"] == 192
     assert resolution.source["sample_rate"] == 44100
+
+
+def test_resolve_playback_falls_back_to_original_when_variant_metadata_fails(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "music"
+    track_path = library / "Artist" / "Album" / "track.flac"
+    track_path.parent.mkdir(parents=True)
+    track_path.write_bytes(b"fake flac")
+
+    def fail_ensure(_payload: dict) -> dict:
+        raise SQLAlchemyError("stream_variants unavailable")
+
+    def fail_enqueue(*_args, **_kwargs):
+        raise AssertionError("metadata failure should not enqueue a variant task")
+
+    monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
+    monkeypatch.setattr("crate.streaming.service.get_variant_by_cache_key", lambda _key: None)
+    monkeypatch.setattr("crate.streaming.service.ensure_variant_record", fail_ensure)
+    monkeypatch.setattr("crate.streaming.service.create_task_dedup", fail_enqueue)
+
+    resolution = resolve_playback(
+        {
+            "id": 1,
+            "entity_uid": None,
+            "path": str(track_path),
+            "format": "flac",
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+        "balanced",
+    )
+
+    assert resolution is not None
+    assert resolution.effective_policy == "original"
+    assert resolution.transcoded is False
+    assert resolution.preparing is False
+    assert resolution.delivery["reason"] == "variant_metadata_unavailable"

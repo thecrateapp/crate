@@ -14,6 +14,10 @@ from crate.db.queries.social import (
 from crate.db.tx import optional_scope
 
 
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def follow_user(follower_user_id: int, followed_user_id: int, *, session=None) -> bool:
     if follower_user_id == followed_user_id:
         return False
@@ -32,10 +36,12 @@ def follow_user(follower_user_id: int, followed_user_id: int, *, session=None) -
                 "now": datetime.now(timezone.utc).isoformat(),
             },
         )
-        return result.rowcount > 0
+        return _rowcount(result) > 0
 
 
-def unfollow_user(follower_user_id: int, followed_user_id: int, *, session=None) -> bool:
+def unfollow_user(
+    follower_user_id: int, followed_user_id: int, *, session=None
+) -> bool:
     with optional_scope(session) as s:
         result = s.execute(
             text(
@@ -46,7 +52,7 @@ def unfollow_user(follower_user_id: int, followed_user_id: int, *, session=None)
             ),
             {"follower": follower_user_id, "followed": followed_user_id},
         )
-        return result.rowcount > 0
+        return _rowcount(result) > 0
 
 
 def _store_affinity(
@@ -159,7 +165,9 @@ def get_affinity(user_a_id: int, user_b_id: int) -> dict:
         reasons = ["Limited overlap so far"]
 
     trimmed_reasons = reasons[:4]
-    _store_affinity(user_a_id, user_b_id, score=score, band=band, reasons=trimmed_reasons)
+    _store_affinity(
+        user_a_id, user_b_id, score=score, band=band, reasons=trimmed_reasons
+    )
     return {
         "affinity_score": score,
         "affinity_band": band,

@@ -49,4 +49,15 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
     },
   },
+  {
+    files: ["public/sw.js"],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: "script",
+      globals: {
+        ...globals.serviceworker,
+        ...globals.es2024,
+      },
+    },
+  },
 );

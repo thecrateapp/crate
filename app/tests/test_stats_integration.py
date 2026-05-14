@@ -1,7 +1,9 @@
 """Integration tests for stats and play events — real DB, no mocks."""
 
 import pytest
+from sqlalchemy import text
 
+from crate.db.tx import read_scope, transaction_scope
 from tests.conftest import PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
@@ -9,8 +11,17 @@ pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not availab
 TEST_USER_ID = 99999
 
 
-def _make_event(track, *, started_at, ended_at, played_seconds, duration=94.0,
-                was_skipped=False, was_completed=False, album_id=None):
+def _make_event(
+    track,
+    *,
+    started_at,
+    ended_at,
+    played_seconds,
+    duration=94.0,
+    was_skipped=False,
+    was_completed=False,
+    album_id=None,
+):
     completion = round(played_seconds / duration, 3) if duration else 0
     return dict(
         track_id=track["id"],
@@ -39,51 +50,99 @@ def _make_event(track, *, started_at, ended_at, played_seconds, duration=94.0,
 def stats_db(pg_db):
     """Set up library data for stats tests, clean up afterward."""
     # Ensure test user exists (FK constraint on user_play_events)
-    with pg_db.get_db_ctx() as cur:
-        cur.execute(
-            "INSERT INTO users (id, email, password_hash, role, created_at) VALUES (%s, %s, %s, %s, NOW()) ON CONFLICT (id) DO NOTHING",
-            (TEST_USER_ID, "testuser@test.com", "nohash", "user"),
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "INSERT INTO users (id, email, password_hash, role, created_at) VALUES (:id, :email, :password_hash, :role, NOW()) ON CONFLICT (id) DO NOTHING"
+            ),
+            {
+                "id": TEST_USER_ID,
+                "email": "testuser@test.com",
+                "password_hash": "nohash",
+                "role": "user",
+            },
         )
     pg_db.upsert_artist({"name": "Converge"})
     pg_db.upsert_artist({"name": "Botch"})
 
-    album_jd = pg_db.upsert_album({
-        "artist": "Converge", "name": "Jane Doe",
-        "path": "/music/Converge/Jane Doe",
-    })
-    album_petitioning = pg_db.upsert_album({
-        "artist": "Converge", "name": "Petitioning the Empty Sky",
-        "path": "/music/Converge/Petitioning the Empty Sky",
-    })
-    album_botch = pg_db.upsert_album({
-        "artist": "Botch", "name": "We Are the Romans",
-        "path": "/music/Botch/We Are the Romans",
-    })
+    album_jd = pg_db.upsert_album(
+        {
+            "artist": "Converge",
+            "name": "Jane Doe",
+            "path": "/music/Converge/Jane Doe",
+        }
+    )
+    album_petitioning = pg_db.upsert_album(
+        {
+            "artist": "Converge",
+            "name": "Petitioning the Empty Sky",
+            "path": "/music/Converge/Petitioning the Empty Sky",
+        }
+    )
+    album_botch = pg_db.upsert_album(
+        {
+            "artist": "Botch",
+            "name": "We Are the Romans",
+            "path": "/music/Botch/We Are the Romans",
+        }
+    )
 
-    pg_db.upsert_track({
-        "album_id": album_jd, "artist": "Converge", "album": "Jane Doe",
-        "filename": "01 - Concubine.flac", "title": "Concubine",
-        "track_number": 1, "format": "flac", "genre": "Metalcore",
-        "duration": 94.0, "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
-    })
-    pg_db.upsert_track({
-        "album_id": album_jd, "artist": "Converge", "album": "Jane Doe",
-        "filename": "02 - Fault and Fracture.flac", "title": "Fault and Fracture",
-        "track_number": 2, "format": "flac", "genre": "Metalcore",
-        "duration": 225.0, "path": "/music/Converge/Jane Doe/02 - Fault and Fracture.flac",
-    })
-    pg_db.upsert_track({
-        "album_id": album_petitioning, "artist": "Converge", "album": "Petitioning the Empty Sky",
-        "filename": "01 - Forsaken.flac", "title": "Forsaken",
-        "track_number": 1, "format": "flac", "genre": "Hardcore",
-        "duration": 180.0, "path": "/music/Converge/Petitioning the Empty Sky/01 - Forsaken.flac",
-    })
-    pg_db.upsert_track({
-        "album_id": album_botch, "artist": "Botch", "album": "We Are the Romans",
-        "filename": "01 - Hutton's Great Heat Engine.flac", "title": "Hutton's Great Heat Engine",
-        "track_number": 1, "format": "flac", "genre": "Mathcore",
-        "duration": 312.0, "path": "/music/Botch/We Are the Romans/01 - Hutton's Great Heat Engine.flac",
-    })
+    pg_db.upsert_track(
+        {
+            "album_id": album_jd,
+            "artist": "Converge",
+            "album": "Jane Doe",
+            "filename": "01 - Concubine.flac",
+            "title": "Concubine",
+            "track_number": 1,
+            "format": "flac",
+            "genre": "Metalcore",
+            "duration": 94.0,
+            "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_jd,
+            "artist": "Converge",
+            "album": "Jane Doe",
+            "filename": "02 - Fault and Fracture.flac",
+            "title": "Fault and Fracture",
+            "track_number": 2,
+            "format": "flac",
+            "genre": "Metalcore",
+            "duration": 225.0,
+            "path": "/music/Converge/Jane Doe/02 - Fault and Fracture.flac",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_petitioning,
+            "artist": "Converge",
+            "album": "Petitioning the Empty Sky",
+            "filename": "01 - Forsaken.flac",
+            "title": "Forsaken",
+            "track_number": 1,
+            "format": "flac",
+            "genre": "Hardcore",
+            "duration": 180.0,
+            "path": "/music/Converge/Petitioning the Empty Sky/01 - Forsaken.flac",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_botch,
+            "artist": "Botch",
+            "album": "We Are the Romans",
+            "filename": "01 - Hutton's Great Heat Engine.flac",
+            "title": "Hutton's Great Heat Engine",
+            "track_number": 1,
+            "format": "flac",
+            "genre": "Mathcore",
+            "duration": 312.0,
+            "path": "/music/Botch/We Are the Romans/01 - Hutton's Great Heat Engine.flac",
+        }
+    )
 
     tracks_jd = pg_db.get_library_tracks(album_jd)
     tracks_pet = pg_db.get_library_tracks(album_petitioning)
@@ -102,13 +161,19 @@ def stats_db(pg_db):
     yield pg_db, data
 
     # Cleanup test user data
-    with pg_db.get_db_ctx() as cur:
+    with transaction_scope() as session:
         for table in (
-            "user_play_events", "user_daily_listening",
-            "user_track_stats", "user_artist_stats",
-            "user_album_stats", "user_genre_stats",
+            "user_play_events",
+            "user_daily_listening",
+            "user_track_stats",
+            "user_artist_stats",
+            "user_album_stats",
+            "user_genre_stats",
         ):
-            cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (TEST_USER_ID,))
+            session.execute(
+                text(f"DELETE FROM {table} WHERE user_id = :user_id"),
+                {"user_id": TEST_USER_ID},
+            )
 
 
 class TestRecordPlayEvent:
@@ -116,12 +181,14 @@ class TestRecordPlayEvent:
         db, data = stats_db
         event_id = db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at="2026-04-01T10:00:00+00:00",
-                          ended_at="2026-04-01T10:01:34+00:00",
-                          played_seconds=94.0,
-                          was_completed=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
         )
         assert isinstance(event_id, int)
         assert event_id > 0
@@ -130,19 +197,26 @@ class TestRecordPlayEvent:
         db, data = stats_db
         event_id = db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at="2026-04-01T10:00:00+00:00",
-                          ended_at="2026-04-01T10:00:30+00:00",
-                          played_seconds=30.0,
-                          was_skipped=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:00:30+00:00",
+                played_seconds=30.0,
+                was_skipped=True,
+                album_id=data["album_jd"],
+            ),
         )
-        with db.get_db_ctx() as cur:
-            cur.execute(
-                "SELECT was_skipped, was_completed, track_entity_uid::text AS track_entity_uid FROM user_play_events WHERE id = %s",
-                (event_id,),
+        with read_scope() as session:
+            row = (
+                session.execute(
+                    text(
+                        "SELECT was_skipped, was_completed, track_entity_uid::text AS track_entity_uid FROM user_play_events WHERE id = :id"
+                    ),
+                    {"id": event_id},
+                )
+                .mappings()
+                .first()
             )
-            row = cur.fetchone()
         assert row["was_skipped"] is True
         assert row["was_completed"] is False
         assert row["track_entity_uid"] == data["concubine"]["entity_uid"]
@@ -153,25 +227,55 @@ class TestAggregatesAndOverview:
         """Insert a realistic spread of play events across multiple days/artists."""
         events = [
             # Day 1 (2026-04-01): 3 plays of Converge, 1 Botch
-            _make_event(data["concubine"], started_at="2026-04-01T10:00:00+00:00",
-                        ended_at="2026-04-01T10:01:34+00:00", played_seconds=94.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["fault"], started_at="2026-04-01T10:02:00+00:00",
-                        ended_at="2026-04-01T10:05:45+00:00", played_seconds=225.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["forsaken"], started_at="2026-04-01T10:06:00+00:00",
-                        ended_at="2026-04-01T10:07:00+00:00", played_seconds=60.0,
-                        was_skipped=True, album_id=data["album_petitioning"]),
-            _make_event(data["hutton"], started_at="2026-04-01T10:08:00+00:00",
-                        ended_at="2026-04-01T10:13:12+00:00", played_seconds=312.0,
-                        was_completed=True, album_id=data["album_botch"]),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["fault"],
+                started_at="2026-04-01T10:02:00+00:00",
+                ended_at="2026-04-01T10:05:45+00:00",
+                played_seconds=225.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["forsaken"],
+                started_at="2026-04-01T10:06:00+00:00",
+                ended_at="2026-04-01T10:07:00+00:00",
+                played_seconds=60.0,
+                was_skipped=True,
+                album_id=data["album_petitioning"],
+            ),
+            _make_event(
+                data["hutton"],
+                started_at="2026-04-01T10:08:00+00:00",
+                ended_at="2026-04-01T10:13:12+00:00",
+                played_seconds=312.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
             # Day 2 (2026-04-02): 2 more plays of Concubine
-            _make_event(data["concubine"], started_at="2026-04-02T09:00:00+00:00",
-                        ended_at="2026-04-02T09:01:34+00:00", played_seconds=94.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["concubine"], started_at="2026-04-02T09:05:00+00:00",
-                        ended_at="2026-04-02T09:05:20+00:00", played_seconds=20.0,
-                        was_skipped=True, album_id=data["album_jd"]),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-02T09:00:00+00:00",
+                ended_at="2026-04-02T09:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-02T09:05:00+00:00",
+                ended_at="2026-04-02T09:05:20+00:00",
+                played_seconds=20.0,
+                was_skipped=True,
+                album_id=data["album_jd"],
+            ),
         ]
         for ev in events:
             db.record_play_event(TEST_USER_ID, **ev)
@@ -182,6 +286,7 @@ class TestAggregatesAndOverview:
         self._seed_events(db, data)
 
         from crate.db.user_library import get_stats_overview
+
         overview = get_stats_overview(TEST_USER_ID, window="all_time")
 
         assert overview["window"] == "all_time"
@@ -198,6 +303,7 @@ class TestAggregatesAndOverview:
         self._seed_events(db, data)
 
         from crate.db.user_library import get_stats_overview
+
         overview = get_stats_overview(TEST_USER_ID, window="all_time")
 
         assert overview["top_artist"] is not None
@@ -209,12 +315,17 @@ class TestAggregatesAndOverview:
         db, data = stats_db
         self._seed_events(db, data)
 
-        with db.get_db_ctx() as cur:
-            cur.execute(
-                "SELECT * FROM user_daily_listening WHERE user_id = %s ORDER BY day",
-                (TEST_USER_ID,),
+        with read_scope() as session:
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT * FROM user_daily_listening WHERE user_id = :user_id ORDER BY day"
+                    ),
+                    {"user_id": TEST_USER_ID},
+                )
+                .mappings()
+                .all()
             )
-            rows = cur.fetchall()
 
         assert len(rows) == 2
 
@@ -234,26 +345,56 @@ class TestTopTracksAndArtists:
     def _seed_events(self, db, data):
         events = [
             # Concubine: 3 completed plays
-            _make_event(data["concubine"], started_at="2026-04-01T10:00:00+00:00",
-                        ended_at="2026-04-01T10:01:34+00:00", played_seconds=94.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["concubine"], started_at="2026-04-02T10:00:00+00:00",
-                        ended_at="2026-04-02T10:01:34+00:00", played_seconds=94.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["concubine"], started_at="2026-04-03T10:00:00+00:00",
-                        ended_at="2026-04-03T10:01:34+00:00", played_seconds=94.0,
-                        was_completed=True, album_id=data["album_jd"]),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-02T10:00:00+00:00",
+                ended_at="2026-04-02T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["concubine"],
+                started_at="2026-04-03T10:00:00+00:00",
+                ended_at="2026-04-03T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
             # Fault and Fracture: 2 plays
-            _make_event(data["fault"], started_at="2026-04-01T11:00:00+00:00",
-                        ended_at="2026-04-01T11:03:45+00:00", played_seconds=225.0,
-                        was_completed=True, album_id=data["album_jd"]),
-            _make_event(data["fault"], started_at="2026-04-02T11:00:00+00:00",
-                        ended_at="2026-04-02T11:03:45+00:00", played_seconds=225.0,
-                        was_completed=True, album_id=data["album_jd"]),
+            _make_event(
+                data["fault"],
+                started_at="2026-04-01T11:00:00+00:00",
+                ended_at="2026-04-01T11:03:45+00:00",
+                played_seconds=225.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+            _make_event(
+                data["fault"],
+                started_at="2026-04-02T11:00:00+00:00",
+                ended_at="2026-04-02T11:03:45+00:00",
+                played_seconds=225.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
             # Hutton: 1 play
-            _make_event(data["hutton"], started_at="2026-04-01T12:00:00+00:00",
-                        ended_at="2026-04-01T12:05:12+00:00", played_seconds=312.0,
-                        was_completed=True, album_id=data["album_botch"]),
+            _make_event(
+                data["hutton"],
+                started_at="2026-04-01T12:00:00+00:00",
+                ended_at="2026-04-01T12:05:12+00:00",
+                played_seconds=312.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
         ]
         for ev in events:
             db.record_play_event(TEST_USER_ID, **ev)
@@ -264,6 +405,7 @@ class TestTopTracksAndArtists:
         self._seed_events(db, data)
 
         from crate.db.user_library import get_top_tracks
+
         top = get_top_tracks(TEST_USER_ID, window="all_time", limit=10)
 
         assert len(top) == 3
@@ -279,6 +421,7 @@ class TestTopTracksAndArtists:
         self._seed_events(db, data)
 
         from crate.db.user_library import get_top_artists
+
         top = get_top_artists(TEST_USER_ID, window="all_time", limit=10)
 
         assert len(top) == 2
@@ -292,6 +435,7 @@ class TestTopTracksAndArtists:
         self._seed_events(db, data)
 
         from crate.db.user_library import get_top_tracks
+
         top = get_top_tracks(TEST_USER_ID, window="all_time", limit=1)
         assert len(top) == 1
         assert top[0]["title"] == "Concubine"
@@ -309,22 +453,26 @@ class TestWindowFiltering:
         # Old event: 60 days ago
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["hutton"],
-                          started_at=old_dt.isoformat(),
-                          ended_at=(old_dt + timedelta(minutes=5, seconds=12)).isoformat(),
-                          played_seconds=312.0,
-                          was_completed=True,
-                          album_id=data["album_botch"]),
+            **_make_event(
+                data["hutton"],
+                started_at=old_dt.isoformat(),
+                ended_at=(old_dt + timedelta(minutes=5, seconds=12)).isoformat(),
+                played_seconds=312.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
         )
         # Recent event: within 7d of now
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at=recent_dt.isoformat(),
-                          ended_at=(recent_dt + timedelta(minutes=1, seconds=34)).isoformat(),
-                          played_seconds=94.0,
-                          was_completed=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at=recent_dt.isoformat(),
+                ended_at=(recent_dt + timedelta(minutes=1, seconds=34)).isoformat(),
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
         )
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
@@ -353,26 +501,31 @@ class TestWindowFiltering:
         # Old event outside 30d
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["hutton"],
-                          started_at=old_dt.isoformat(),
-                          ended_at=(old_dt + timedelta(minutes=5, seconds=12)).isoformat(),
-                          played_seconds=312.0,
-                          was_completed=True,
-                          album_id=data["album_botch"]),
+            **_make_event(
+                data["hutton"],
+                started_at=old_dt.isoformat(),
+                ended_at=(old_dt + timedelta(minutes=5, seconds=12)).isoformat(),
+                played_seconds=312.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
         )
         # Recent event
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at=recent_dt.isoformat(),
-                          ended_at=(recent_dt + timedelta(minutes=1, seconds=34)).isoformat(),
-                          played_seconds=94.0,
-                          was_completed=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at=recent_dt.isoformat(),
+                ended_at=(recent_dt + timedelta(minutes=1, seconds=34)).isoformat(),
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
         )
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
         from crate.db.user_library import get_stats_overview
+
         overview = get_stats_overview(TEST_USER_ID, window="30d")
 
         # Only the recent event's day should count
@@ -386,6 +539,7 @@ class TestEdgeCases:
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
         from crate.db.user_library import get_stats_overview
+
         overview = get_stats_overview(TEST_USER_ID, window="all_time")
 
         assert overview["play_count"] == 0
@@ -400,22 +554,26 @@ class TestEdgeCases:
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
         from crate.db.user_library import get_top_tracks
+
         assert get_top_tracks(TEST_USER_ID, window="all_time") == []
 
     def test_single_play(self, stats_db):
         db, data = stats_db
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at="2026-04-01T10:00:00+00:00",
-                          ended_at="2026-04-01T10:01:34+00:00",
-                          played_seconds=94.0,
-                          was_completed=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
         )
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
         from crate.db.user_library import get_stats_overview, get_top_tracks
+
         overview = get_stats_overview(TEST_USER_ID, window="all_time")
         assert overview["play_count"] == 1
         assert overview["complete_play_count"] == 1
@@ -431,16 +589,19 @@ class TestEdgeCases:
         for i in range(3):
             db.record_play_event(
                 TEST_USER_ID,
-                **_make_event(data["concubine"],
-                              started_at=f"2026-04-01T1{i}:00:00+00:00",
-                              ended_at=f"2026-04-01T1{i}:00:15+00:00",
-                              played_seconds=15.0,
-                              was_skipped=True,
-                              album_id=data["album_jd"]),
+                **_make_event(
+                    data["concubine"],
+                    started_at=f"2026-04-01T1{i}:00:00+00:00",
+                    ended_at=f"2026-04-01T1{i}:00:15+00:00",
+                    played_seconds=15.0,
+                    was_skipped=True,
+                    album_id=data["album_jd"],
+                ),
             )
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
         from crate.db.user_library import get_stats_overview
+
         overview = get_stats_overview(TEST_USER_ID, window="all_time")
         assert overview["play_count"] == 3
         assert overview["complete_play_count"] == 0
@@ -451,21 +612,25 @@ class TestEdgeCases:
         db, data = stats_db
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["concubine"],
-                          started_at="2026-04-01T10:00:00+00:00",
-                          ended_at="2026-04-01T10:01:34+00:00",
-                          played_seconds=94.0,
-                          was_completed=True,
-                          album_id=data["album_jd"]),
+            **_make_event(
+                data["concubine"],
+                started_at="2026-04-01T10:00:00+00:00",
+                ended_at="2026-04-01T10:01:34+00:00",
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
         )
         db.record_play_event(
             TEST_USER_ID,
-            **_make_event(data["hutton"],
-                          started_at="2026-04-01T11:00:00+00:00",
-                          ended_at="2026-04-01T11:05:12+00:00",
-                          played_seconds=312.0,
-                          was_completed=True,
-                          album_id=data["album_botch"]),
+            **_make_event(
+                data["hutton"],
+                started_at="2026-04-01T11:00:00+00:00",
+                ended_at="2026-04-01T11:05:12+00:00",
+                played_seconds=312.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
         )
         db.recompute_user_listening_aggregates(TEST_USER_ID)
 
@@ -478,5 +643,6 @@ class TestEdgeCases:
 
     def test_invalid_window_raises(self, stats_db):
         from crate.db.user_library import get_stats_overview
+
         with pytest.raises(ValueError, match="Unsupported stats window"):
             get_stats_overview(TEST_USER_ID, window="banana")

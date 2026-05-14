@@ -9,7 +9,9 @@ def _write_file(path):
     path.write_bytes(b"test")
 
 
-def test_quality_report_detects_album_issues_without_rescanning_albums(tmp_path, monkeypatch):
+def test_quality_report_detects_album_issues_without_rescanning_albums(
+    tmp_path, monkeypatch
+):
     from crate.audio import get_audio_files as real_get_audio_files
     from crate import quality
 
@@ -83,7 +85,9 @@ def test_quality_report_marks_unreadable_files_as_corrupt(tmp_path, monkeypatch)
     broken_track = album_dir / "01 - To Our Friends In The Great White North.flac"
     _write_file(broken_track)
 
-    monkeypatch.setattr(quality, "read_tags", lambda filepath: {"album": filepath.parent.name})
+    monkeypatch.setattr(
+        quality, "read_tags", lambda filepath: {"album": filepath.parent.name}
+    )
     monkeypatch.setattr(quality.mutagen, "File", lambda filepath: None)
 
     report = quality.quality_report(tmp_path, {".flac"})

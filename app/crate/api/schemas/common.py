@@ -12,7 +12,9 @@ class ApiErrorResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     detail: str | None = Field(default=None, description="FastAPI-style error detail.")
-    error: str | None = Field(default=None, description="Legacy Crate error message field.")
+    error: str | None = Field(
+        default=None, description="Legacy Crate error message field."
+    )
 
 
 class OkResponse(BaseModel):
@@ -58,8 +60,16 @@ class IdentityFieldsMixin(BaseModel):
     def _prefer_entity_uid(self):
         values = self.__dict__
         fields = type(self).model_fields
-        if "entity_uid" in fields and "storage_id" in fields and values.get("entity_uid"):
+        if (
+            "entity_uid" in fields
+            and "storage_id" in fields
+            and values.get("entity_uid")
+        ):
             setattr(self, "storage_id", None)
-        if "track_entity_uid" in fields and "track_storage_id" in fields and values.get("track_entity_uid"):
+        if (
+            "track_entity_uid" in fields
+            and "track_storage_id" in fields
+            and values.get("track_entity_uid")
+        ):
             setattr(self, "track_storage_id", None)
         return self

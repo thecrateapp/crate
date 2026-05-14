@@ -51,18 +51,25 @@ export function Explore() {
   const genreSlug = searchParams.get("genre");
   const playlistCategory = searchParams.get("playlistCategory");
 
-  const { data: explorePage, loading, refetch } = useApi<ExplorePageData>("/api/browse/explore-page");
-  const { data: homeDiscovery, refetch: refetchHomeDiscovery } = useApi<HomeDiscoveryPayload>(
-    "/api/me/home/discovery",
-    "GET",
-    undefined,
-    { reactive: false, revalidateIfCached: "idle", idleRevalidateMs: 30_000 },
-  );
+  const {
+    data: explorePage,
+    loading,
+    refetch,
+  } = useApi<ExplorePageData>("/api/browse/explore-page");
+  const { data: homeDiscovery, refetch: refetchHomeDiscovery } =
+    useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
+      reactive: false,
+      revalidateIfCached: "idle",
+      idleRevalidateMs: 30_000,
+    });
   const filters = explorePage?.filters;
   const featuredPlaylists = explorePage?.playlists || [];
   const moods = explorePage?.moods || [];
   const recommendedTracks = useMemo(
-    () => (homeDiscovery?.recommended_tracks || []).map((track) => toTrackRowData(track)),
+    () =>
+      (homeDiscovery?.recommended_tracks || []).map((track) =>
+        toTrackRowData(track),
+      ),
     [homeDiscovery?.recommended_tracks],
   );
   const heroes = useMemo(() => {
@@ -117,13 +124,17 @@ export function Explore() {
   }
 
   async function loadHomePlaylist(playlistId: string) {
-    return api<HomeGeneratedPlaylistDetail>(`/api/me/home/playlists/${encodeURIComponent(playlistId)}`);
+    return api<HomeGeneratedPlaylistDetail>(
+      `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
+    );
   }
 
   async function handlePlayHomePlaylist(item: HomeGeneratedPlaylistSummary) {
     try {
       const playlist = await loadHomePlaylist(item.id);
-      const queue = (playlist.tracks || []).map((track) => toPlayableTrack(track));
+      const queue = (playlist.tracks || []).map((track) =>
+        toPlayableTrack(track),
+      );
       if (!queue.length) {
         toast.info("This playlist is still warming up");
         return;
@@ -141,7 +152,9 @@ export function Explore() {
   async function handleShuffleHomePlaylist(item: HomeGeneratedPlaylistSummary) {
     try {
       const playlist = await loadHomePlaylist(item.id);
-      const queue = (playlist.tracks || []).map((track) => toPlayableTrack(track));
+      const queue = (playlist.tracks || []).map((track) =>
+        toPlayableTrack(track),
+      );
       if (!queue.length) {
         toast.info("This playlist is still warming up");
         return;
@@ -182,8 +195,13 @@ export function Explore() {
 
   async function handleToggleFollow(playlistId: number, isFollowed: boolean) {
     try {
-      await api(`/api/curation/playlists/${playlistId}/follow`, isFollowed ? "DELETE" : "POST");
-      toast.success(isFollowed ? "Removed from your library" : "Added to your library");
+      await api(
+        `/api/curation/playlists/${playlistId}/follow`,
+        isFollowed ? "DELETE" : "POST",
+      );
+      toast.success(
+        isFollowed ? "Removed from your library" : "Added to your library",
+      );
       refetch();
     } catch {
       toast.error("Failed to update playlist");
@@ -193,13 +211,25 @@ export function Explore() {
   // Genre or decade detail view
   const decadeParam = searchParams.get("decade");
   if (genreSlug) {
-    return <GenreDetailView slug={genreSlug} onBack={() => setSearchParams({})} />;
+    return (
+      <GenreDetailView slug={genreSlug} onBack={() => setSearchParams({})} />
+    );
   }
   if (decadeParam) {
-    return <DecadeDetailView decade={decadeParam} onBack={() => setSearchParams({})} />;
+    return (
+      <DecadeDetailView
+        decade={decadeParam}
+        onBack={() => setSearchParams({})}
+      />
+    );
   }
   if (playlistCategory) {
-    return <PlaylistCategoryView category={playlistCategory} onBack={() => setSearchParams({})} />;
+    return (
+      <PlaylistCategoryView
+        category={playlistCategory}
+        onBack={() => setSearchParams({})}
+      />
+    );
   }
   return (
     <div className="space-y-6">
@@ -229,9 +259,7 @@ export function Explore() {
         }}
       />
       <div className="space-y-6">
-        {loading ? (
-          <ExploreLoadingState />
-        ) : null}
+        {loading ? <ExploreLoadingState /> : null}
 
         {filters ? (
           <>
@@ -245,12 +273,17 @@ export function Explore() {
                   <Radio size={19} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">Radio</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    Radio
+                  </div>
                   <div className="mt-0.5 text-[12px] text-white/50">
                     Infinite music shaped by your likes and dislikes
                   </div>
                 </div>
-                <ArrowRight size={16} className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                <ArrowRight
+                  size={16}
+                  className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary"
+                />
               </button>
               <button
                 onClick={() => navigate("/paths")}
@@ -260,12 +293,17 @@ export function Explore() {
                   <Route size={19} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">Music Paths</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    Music Paths
+                  </div>
                   <div className="mt-0.5 text-[12px] text-white/50">
                     Trace a route between artists, genres, or tracks
                   </div>
                 </div>
-                <ArrowRight size={16} className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                <ArrowRight
+                  size={16}
+                  className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary"
+                />
               </button>
             </div>
 
@@ -290,7 +328,11 @@ export function Explore() {
 
             <GenreExplorer
               genres={filters.genres}
-              onOpen={(genre) => setSearchParams({ genre: genre.toLowerCase().replace(/\s+/g, "-") })}
+              onOpen={(genre) =>
+                setSearchParams({
+                  genre: genre.toLowerCase().replace(/\s+/g, "-"),
+                })
+              }
             />
 
             {/* Decades */}
@@ -318,7 +360,9 @@ export function Explore() {
             {featuredPlaylists.length > 0 ? (
               <ExploreCratePlaylists
                 playlists={featuredPlaylists}
-                onOpen={(playlistId) => navigate(`/curation/playlist/${playlistId}`)}
+                onOpen={(playlistId) =>
+                  navigate(`/curation/playlist/${playlistId}`)
+                }
                 onPlay={handlePlayPlaylist}
                 onToggleFollow={handleToggleFollow}
               />
@@ -349,7 +393,10 @@ const MOOD_COLORS: Record<string, string> = {
   acoustic: "bg-amber-500/20 text-amber-300 border-amber-500/30",
 };
 
-interface MoodPreset { name: string; track_count: number; }
+interface MoodPreset {
+  name: string;
+  track_count: number;
+}
 
 interface ExplorePageData {
   filters: BrowseFilters;
@@ -405,12 +452,7 @@ function ExploreNewArrivals({
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
   if (!albums.length) return null;
-  return (
-    <SuggestedAlbumsSection
-      albums={albums}
-      onViewAll={onViewAll}
-    />
-  );
+  return <SuggestedAlbumsSection albums={albums} onViewAll={onViewAll} />;
 }
 
 function ExploreCratePlaylists({
@@ -443,14 +485,20 @@ function ExploreCratePlaylists({
             meta={[
               playlist.category || null,
               `${playlist.track_count} tracks`,
-              playlist.follower_count > 0 ? `${playlist.follower_count} followers` : null,
-            ].filter(Boolean).join(" · ")}
+              playlist.follower_count > 0
+                ? `${playlist.follower_count} followers`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             systemPlaylist
             crateManaged
             isFollowed={playlist.is_followed}
             href={`/curation/playlist/${playlist.id}`}
             onPlay={() => onPlay(playlist.id, playlist.name)}
-            onToggleFollow={() => onToggleFollow(playlist.id, playlist.is_followed)}
+            onToggleFollow={() =>
+              onToggleFollow(playlist.id, playlist.is_followed)
+            }
             onClick={() => onOpen(playlist.id)}
           />
         ))}
@@ -486,7 +534,9 @@ function GenreExplorer({
             <div
               className="absolute inset-0 opacity-70"
               style={{
-                background: `radial-gradient(circle at ${20 + (index % 4) * 18}% 20%, rgba(34, 211, 238, 0.22), transparent 34%), radial-gradient(circle at 85% 85%, rgba(255,255,255,0.08), transparent 36%)`,
+                background: `radial-gradient(circle at ${
+                  20 + (index % 4) * 18
+                }% 20%, rgba(34, 211, 238, 0.22), transparent 34%), radial-gradient(circle at 85% 85%, rgba(255,255,255,0.08), transparent 36%)`,
               }}
             />
             <div className="relative flex h-full flex-col justify-between gap-5">
@@ -494,11 +544,18 @@ function GenreExplorer({
                 <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
                   Scene
                 </span>
-                <Disc3 size={16} className="text-white/30 transition group-hover:text-primary" />
+                <Disc3
+                  size={16}
+                  className="text-white/30 transition group-hover:text-primary"
+                />
               </div>
               <div>
-                <div className="text-lg font-black leading-none tracking-[-0.04em] text-foreground">{genre.name}</div>
-                <div className="mt-2 text-xs text-muted-foreground">{genre.count} artists indexed</div>
+                <div className="text-lg font-black leading-none tracking-[-0.04em] text-foreground">
+                  {genre.name}
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {genre.count} artists indexed
+                </div>
               </div>
             </div>
           </button>
@@ -518,23 +575,27 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
       const w = window as unknown as Record<string, AudioContext>;
       if (!w.__crateAudioCtx) w.__crateAudioCtx = new AudioContext();
       if (w.__crateAudioCtx.state === "suspended") w.__crateAudioCtx.resume();
-    } catch { /* ok */ }
+    } catch {
+      /* ok */
+    }
     setLoadingMood(mood);
     try {
-      const data = await api<{ tracks: Array<{
-        id: number;
-        entity_uid?: string;
-        title: string;
-        artist: string;
-        artist_id?: number;
-        artist_entity_uid?: string;
-        artist_slug?: string;
-        album: string;
-        album_id?: number;
-        album_entity_uid?: string;
-        album_slug?: string;
-        path: string;
-      }> }>(`/api/browse/mood/${mood}?limit=50`);
+      const data = await api<{
+        tracks: Array<{
+          id: number;
+          entity_uid?: string;
+          title: string;
+          artist: string;
+          artist_id?: number;
+          artist_entity_uid?: string;
+          artist_slug?: string;
+          album: string;
+          album_id?: number;
+          album_entity_uid?: string;
+          album_slug?: string;
+          path: string;
+        }>;
+      }>(`/api/browse/mood/${mood}?limit=50`);
       if (data.tracks.length > 0) {
         playAll(
           data.tracks.map((t) =>
@@ -550,10 +611,15 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
             }),
           ),
           0,
-          { type: "playlist", name: `${mood.charAt(0).toUpperCase() + mood.slice(1)} Mix` },
+          {
+            type: "playlist",
+            name: `${mood.charAt(0).toUpperCase() + mood.slice(1)} Mix`,
+          },
         );
       } else {
-        toast.info("No tracks match this mood yet — analyze more of your library");
+        toast.info(
+          "No tracks match this mood yet — analyze more of your library",
+        );
       }
     } catch {
       toast.error("Failed to load mood tracks");
@@ -566,17 +632,26 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
 
   return (
     <div className="space-y-3">
-      <ExploreSectionHeader title="Browse by Mood" subtitle="Powered by audio analysis of your library." />
+      <ExploreSectionHeader
+        title="Browse by Mood"
+        subtitle="Powered by audio analysis of your library."
+      />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {moods.map((m) => (
           <button
             key={m.name}
             onClick={() => playMood(m.name)}
             disabled={loadingMood !== null}
-            className={`rounded-xl border px-4 py-3 text-left transition-colors ${MOOD_COLORS[m.name] || "bg-white/5 text-white/70 border-white/10"} active:scale-[0.98]`}
+            className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+              MOOD_COLORS[m.name] || "bg-white/5 text-white/70 border-white/10"
+            } active:scale-[0.98]`}
           >
-            <span className="text-sm font-medium capitalize">{loadingMood === m.name ? "Loading..." : m.name}</span>
-            <span className="block text-[10px] opacity-60 mt-0.5">{m.track_count} tracks</span>
+            <span className="text-sm font-medium capitalize">
+              {loadingMood === m.name ? "Loading..." : m.name}
+            </span>
+            <span className="block text-[10px] opacity-60 mt-0.5">
+              {m.track_count} tracks
+            </span>
           </button>
         ))}
       </div>

@@ -15,7 +15,10 @@ function isNumericIdSegment(value: string | undefined) {
 }
 
 export function ArtistChildRoute() {
-  const { artistSlug, albumSlug } = useParams<{ artistSlug?: string; albumSlug?: string }>();
+  const { artistSlug, albumSlug } = useParams<{
+    artistSlug?: string;
+    albumSlug?: string;
+  }>();
 
   if (!artistSlug || !albumSlug) {
     return <Navigate to="/artists" replace />;
@@ -34,5 +37,10 @@ export function ArtistChildRoute() {
 
 export function LegacyArtistTopTracksRedirect() {
   const { legacySlug } = useParams<{ legacySlug?: string }>();
-  return <Navigate to={artistTopTracksPath({ artistSlug: legacySlug || undefined })} replace />;
+  return (
+    <Navigate
+      to={artistTopTracksPath({ artistSlug: legacySlug || undefined })}
+      replace
+    />
+  );
 }

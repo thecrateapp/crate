@@ -1,6 +1,5 @@
 """Worker orchestrator — manages worker processes, scheduler, and watcher."""
 
-import json
 import logging
 import multiprocessing
 import os
@@ -11,9 +10,14 @@ import time
 from crate.config import load_config
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import set_cache
-from crate.db.core import init_db
+from crate.db.init_db import init_db
 from crate.db.queries.tasks import list_tasks
-from crate.db.repositories.tasks import claim_next_task, fail_or_retry_task, heartbeat_task, update_task
+from crate.db.repositories.tasks import (
+    claim_next_task,
+    fail_or_retry_task,
+    heartbeat_task,
+    update_task,
+)
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +61,7 @@ class Orchestrator:
         init_db()
 
         from crate.utils import init_musicbrainz
+
         init_musicbrainz()
 
         # Clean up orphaned tasks from previous crash
@@ -70,8 +75,12 @@ class Orchestrator:
         for _ in range(min_workers):
             self._spawn_worker()
 
-        log.info("Orchestrator started with %d workers (min=%d, max=%d)",
-                 len(self.workers), min_workers, self._get_max_workers())
+        log.info(
+            "Orchestrator started with %d workers (min=%d, max=%d)",
+            len(self.workers),
+            min_workers,
+            self._get_max_workers(),
+        )
 
         last_schedule_check = 0
         last_scale_check = 0
@@ -88,6 +97,7 @@ class Orchestrator:
                 last_schedule_check = now
                 try:
                     from crate.scheduler import check_and_create_scheduled_tasks
+
                     check_and_create_scheduled_tasks()
                 except Exception:
                     log.debug("Schedule check failed", exc_info=True)
@@ -97,6 +107,7 @@ class Orchestrator:
                 last_import_check = now
                 try:
                     from crate.importer import ImportQueue
+
                     queue = ImportQueue(load_config())
                     count = len(queue.refresh_pending_state())
                     set_cache("imports_pending", {"count": count})
@@ -168,8 +179,12 @@ class Orchestrator:
                 alive.append(wp)
             else:
                 exit_code = wp.process.exitcode
-                log.warning("Worker-%d (PID %s) died with exit code %s",
-                            wp.worker_id, wp.pid, exit_code)
+                log.warning(
+                    "Worker-%d (PID %s) died with exit code %s",
+                    wp.worker_id,
+                    wp.pid,
+                    exit_code,
+                )
                 wp.process.join(timeout=1)
 
         self.workers = alive
@@ -180,15 +195,12 @@ class Orchestrator:
 
     def _autoscale(self):
         """Scale workers based on queue depth."""
-        min_w = self._get_min_workers()
         max_w = self._get_max_workers()
         current = len(self.workers)
 
         try:
             pending = list_tasks(status="pending", limit=100)
-            running = list_tasks(status="running", limit=100)
             pending_count = len(pending)
-            running_count = len(running)
         except Exception:
             return
 
@@ -197,14 +209,17 @@ class Orchestrator:
             target = min(current + 1, max_w)
             for _ in range(target - current):
                 self._spawn_worker()
-            log.info("Scaled up to %d workers (pending=%d)", len(self.workers), pending_count)
+            log.info(
+                "Scaled up to %d workers (pending=%d)", len(self.workers), pending_count
+            )
 
     def _shutdown_workers(self):
         """Gracefully stop all workers."""
         for wp in self.workers:
             if wp.is_alive:
                 try:
-                    os.kill(wp.process.pid, signal.SIGTERM)
+                    if wp.process.pid is not None:
+                        os.kill(wp.process.pid, signal.SIGTERM)
                 except (OSError, ProcessLookupError):
                     pass
 
@@ -222,8 +237,12 @@ class Orchestrator:
         try:
             orphaned = list_tasks(status="running")
             for t in orphaned:
-                log.warning("Marking orphaned task %s (type=%s) as failed", t["id"], t["type"])
-                update_task(t["id"], status="failed", error="Orphaned: orchestrator restarted")
+                log.warning(
+                    "Marking orphaned task %s (type=%s) as failed", t["id"], t["type"]
+                )
+                update_task(
+                    t["id"], status="failed", error="Orphaned: orchestrator restarted"
+                )
         except Exception:
             log.warning("Failed to clean orphaned tasks", exc_info=True)
 
@@ -231,6 +250,7 @@ class Orchestrator:
         try:
             from crate.library_sync import LibrarySync
             from crate.library_watcher import LibraryWatcher
+
             sync = LibrarySync(self.config)
             watcher = LibraryWatcher(self.config, sync)
             watcher.start()
@@ -243,6 +263,7 @@ class Orchestrator:
     def _periodic_cleanup(self):
         try:
             from crate.db.events import cleanup_old_events, cleanup_old_tasks
+
             cleanup_old_events(max_age_hours=48)
             cleanup_old_tasks(max_age_days=7)
         except Exception:
@@ -253,29 +274,41 @@ class Orchestrator:
         Workers that die (OOM, crash) leave tasks in running state."""
         try:
             running = list_tasks(status="running")
-            now_ts = time.time()
             for t in running:
                 try:
                     from datetime import datetime, timezone
                     from crate.utils import to_datetime
+
                     updated = to_datetime(t["updated_at"])
                     if updated is None:
                         continue
                     age_sec = (datetime.now(timezone.utc) - updated).total_seconds()
                     if age_sec > 1800:  # 30 minutes
-                        log.warning("Marking zombie task %s (type=%s, age=%dm) as failed",
-                                   t["id"], t["type"], int(age_sec / 60))
-                        update_task(t["id"], status="failed", error="Zombie: no heartbeat for >30min")
+                        log.warning(
+                            "Marking zombie task %s (type=%s, age=%dm) as failed",
+                            t["id"],
+                            t["type"],
+                            int(age_sec / 60),
+                        )
+                        update_task(
+                            t["id"],
+                            status="failed",
+                            error="Zombie: no heartbeat for >30min",
+                        )
                 except Exception:
                     pass
         except Exception:
             pass
 
     def _get_min_workers(self) -> int:
-        return int(get_setting("min_workers", str(DEFAULT_MIN_WORKERS)) or DEFAULT_MIN_WORKERS)
+        return int(
+            get_setting("min_workers", str(DEFAULT_MIN_WORKERS)) or DEFAULT_MIN_WORKERS
+        )
 
     def _get_max_workers(self) -> int:
-        return int(get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS)
+        return int(
+            get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS
+        )
 
     def get_status(self) -> dict:
         """Get orchestrator status for API."""
@@ -296,7 +329,9 @@ class Orchestrator:
         }
 
 
-def _worker_process_entry(config: dict, worker_id: int, max_tasks: int, max_rss_mb: int):
+def _worker_process_entry(
+    config: dict, worker_id: int, max_tasks: int, max_rss_mb: int
+):
     """Entry point for a child worker process. Runs until recycle conditions met."""
     import resource
 
@@ -307,10 +342,12 @@ def _worker_process_entry(config: dict, worker_id: int, max_tasks: int, max_rss_
     wlog = logging.getLogger(f"worker-{worker_id}")
 
     # Each process needs its own DB pool (don't call init_db — orchestrator does that)
-    from crate.db.core import _reset_pool
-    _reset_pool()
+    from crate.db.engine import reset_engine
+
+    reset_engine()
 
     from crate.utils import init_musicbrainz
+
     init_musicbrainz()
 
     shutdown = False
@@ -324,7 +361,12 @@ def _worker_process_entry(config: dict, worker_id: int, max_tasks: int, max_rss_
 
     tasks_completed = 0
 
-    wlog.info("Started (PID %d, max_tasks=%d, max_rss=%dMB)", os.getpid(), max_tasks, max_rss_mb)
+    wlog.info(
+        "Started (PID %d, max_tasks=%d, max_rss=%dMB)",
+        os.getpid(),
+        max_tasks,
+        max_rss_mb,
+    )
 
     from crate.worker import TASK_HANDLERS, _is_cancelled
 
@@ -357,13 +399,17 @@ def _worker_process_entry(config: dict, worker_id: int, max_tasks: int, max_rss_
 
         wlog.info("Processing task %s (type=%s)", task_id, task_type)
         hb_stop = threading.Event()
-        hb_thread = threading.Thread(target=_heartbeat_until_stopped, args=(task_id, hb_stop), daemon=True)
+        hb_thread = threading.Thread(
+            target=_heartbeat_until_stopped, args=(task_id, hb_stop), daemon=True
+        )
         hb_thread.start()
 
         try:
             handler = TASK_HANDLERS.get(task_type)
             if not handler:
-                update_task(task_id, status="failed", error=f"Unknown task type: {task_type}")
+                update_task(
+                    task_id, status="failed", error=f"Unknown task type: {task_type}"
+                )
                 continue
 
             result = handler(task_id, params, config)
@@ -409,6 +455,12 @@ def _try_fan_in_parent(task: dict, task_type: str, task_id: str) -> None:
         return
     try:
         from crate.worker_handlers.analysis import _try_complete_parent
+
         _try_complete_parent(parent_id, task_type)
     except Exception:
-        log.warning("Fan-in check failed for parent %s after child %s", parent_id, task_id, exc_info=True)
+        log.warning(
+            "Fan-in check failed for parent %s after child %s",
+            parent_id,
+            task_id,
+            exc_info=True,
+        )

@@ -12,7 +12,11 @@ export function JamInvite() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    api<{ room: { id: string; name: string } }>(`/api/jam/rooms/invites/${token}/join`, "POST", {})
+    api<{ room: { id: string; name: string } }>(
+      `/api/jam/rooms/invites/${token}/join`,
+      "POST",
+      {},
+    )
       .then((response) => {
         if (cancelled) return;
         toast.success(`Joined ${response.room.name}`);
@@ -33,7 +37,9 @@ export function JamInvite() {
       <Loader2 size={22} className="animate-spin text-primary" />
       <div>
         <p className="text-lg font-medium text-foreground">Joining room…</p>
-        <p className="text-sm text-muted-foreground">We are validating the invite and adding you to the session.</p>
+        <p className="text-sm text-muted-foreground">
+          We are validating the invite and adding you to the session.
+        </p>
       </div>
     </div>
   );

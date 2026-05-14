@@ -7,7 +7,7 @@ import signal
 import threading
 import time
 
-from crate.db.core import init_db
+from crate.db.init_db import init_db
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +20,10 @@ def run_projector_loop(
     home_warm_interval_seconds: float = 600.0,
 ) -> None:
     """Consume domain events and warm UI snapshots until stopped."""
-    from crate.projector import process_domain_events, warm_recent_home_discovery_snapshots
+    from crate.projector import (
+        process_domain_events,
+        warm_recent_home_discovery_snapshots,
+    )
 
     interval = max(0.5, float(interval_seconds))
     batch_limit = max(1, min(int(limit), 1000))
@@ -42,7 +45,10 @@ def run_projector_loop(
                     last_home_warm = now
                     warmed = warm_recent_home_discovery_snapshots()
                     if warmed:
-                        log.info("Warmed home discovery snapshots for %d recent user(s)", warmed)
+                        log.info(
+                            "Warmed home discovery snapshots for %d recent user(s)",
+                            warmed,
+                        )
         except Exception:
             log.debug("Snapshot projector failed", exc_info=True)
         stop_event.wait(interval)

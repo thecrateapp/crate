@@ -10,11 +10,16 @@ import type {
 type MixLike = HomeGeneratedPlaylistSummary | HomeGeneratedPlaylistDetail;
 
 function tilePhoto(artist: HomeArtworkArtist): string | null {
-  return artistPhotoApiUrl({
-    artistId: artist.artist_id,
-    artistSlug: artist.artist_slug,
-    artistName: artist.artist_name,
-  }, { size: 256 }) || null;
+  return (
+    artistPhotoApiUrl(
+      {
+        artistId: artist.artist_id,
+        artistSlug: artist.artist_slug,
+        artistName: artist.artist_name,
+      },
+      { size: 256 },
+    ) || null
+  );
 }
 
 export function MixArtwork({
@@ -27,13 +32,21 @@ export function MixArtwork({
   const artists = item.artwork_artists?.slice(0, 4) || [];
 
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl bg-white/5", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl bg-white/5",
+        className,
+      )}
+    >
       <div className="grid h-full w-full grid-cols-2 grid-rows-2">
         {Array.from({ length: 4 }).map((_, index) => {
           const artist = artists[index];
           const photoUrl = artist ? tilePhoto(artist) : null;
           return (
-            <div key={`${artist?.artist_id ?? artist?.artist_name ?? index}`} className="relative overflow-hidden bg-[linear-gradient(145deg,rgba(30,16,22,0.96),rgba(10,12,16,1))]">
+            <div
+              key={`${artist?.artist_id ?? artist?.artist_name ?? index}`}
+              className="relative overflow-hidden bg-[linear-gradient(145deg,rgba(30,16,22,0.96),rgba(10,12,16,1))]"
+            >
               {photoUrl ? (
                 <img
                   src={photoUrl}

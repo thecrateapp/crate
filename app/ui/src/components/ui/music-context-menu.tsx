@@ -1,6 +1,10 @@
 import { useNavigate } from "react-router";
 import { api } from "@/lib/api";
-import { albumPagePath, artistActionApiPath, artistPagePath } from "@/lib/library-routes";
+import {
+  albumPagePath,
+  artistActionApiPath,
+  artistPagePath,
+} from "@/lib/library-routes";
 import { toast } from "sonner";
 import { Radar } from "lucide-react";
 import {
@@ -28,8 +32,6 @@ interface MusicContextMenuProps {
   onFindSimilar?: () => void;
 }
 
-
-
 export function MusicContextMenu({
   children,
   type,
@@ -50,7 +52,11 @@ export function MusicContextMenu({
       <ContextMenuContent className="w-48 bg-card border-border">
         {type !== "artist" && (
           <ContextMenuItem
-            onClick={() => navigate(artistPagePath({ artistId, artistSlug, artistName: artist }))}
+            onClick={() =>
+              navigate(
+                artistPagePath({ artistId, artistSlug, artistName: artist }),
+              )
+            }
             className="text-sm"
           >
             Go to Artist
@@ -58,7 +64,16 @@ export function MusicContextMenu({
         )}
         {type === "track" && album && (
           <ContextMenuItem
-            onClick={() => navigate(albumPagePath({ albumId, albumSlug, artistName: artist, albumName: album }))}
+            onClick={() =>
+              navigate(
+                albumPagePath({
+                  albumId,
+                  albumSlug,
+                  artistName: artist,
+                  albumName: album,
+                }),
+              )
+            }
             className="text-sm"
           >
             Open Album
@@ -66,7 +81,16 @@ export function MusicContextMenu({
         )}
         {type === "album" && album && (
           <ContextMenuItem
-            onClick={() => navigate(albumPagePath({ albumId, albumSlug, artistName: artist, albumName: album }))}
+            onClick={() =>
+              navigate(
+                albumPagePath({
+                  albumId,
+                  albumSlug,
+                  artistName: artist,
+                  albumName: album,
+                }),
+              )
+            }
             className="text-sm"
           >
             Open Album
@@ -86,7 +110,10 @@ export function MusicContextMenu({
             <ContextMenuItem
               onClick={async () => {
                 try {
-                  const endpoint = artistActionApiPath({ artistId, artistEntityUid }, "enrich");
+                  const endpoint = artistActionApiPath(
+                    { artistId, artistEntityUid },
+                    "enrich",
+                  );
                   if (!endpoint) throw new Error("artist reference missing");
                   await api(endpoint, "POST");
                   toast.success("Enrichment started");

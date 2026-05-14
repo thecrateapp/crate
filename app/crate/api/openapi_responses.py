@@ -1,23 +1,27 @@
 """Reusable OpenAPI response metadata."""
 
+from typing import Any, TypeAlias
+
 from crate.api.schemas.common import ApiErrorResponse
 
+OpenApiResponses: TypeAlias = dict[int | str, dict[str, Any]]
 
-def error_response(description: str) -> dict:
+
+def error_response(description: str) -> dict[str, Any]:
     return {
         "model": ApiErrorResponse,
         "description": description,
     }
 
 
-def merge_responses(*response_sets: dict[int, dict]) -> dict[int, dict]:
-    merged: dict[int, dict] = {}
+def merge_responses(*response_sets: OpenApiResponses) -> OpenApiResponses:
+    merged: OpenApiResponses = {}
     for response_set in response_sets:
         merged.update(response_set)
     return merged
 
 
-AUTH_ERROR_RESPONSES = {
+AUTH_ERROR_RESPONSES: OpenApiResponses = {
     401: error_response("Authentication is required."),
     403: error_response("You do not have permission to perform this action."),
 }

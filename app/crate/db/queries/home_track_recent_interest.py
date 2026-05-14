@@ -3,7 +3,9 @@ from __future__ import annotations
 from crate.db.queries.home_track_rows import _fetch_rows
 
 
-def get_recent_interest_track_rows(*, user_id: int, interest_artists_lower: list[str], limit: int = 240) -> list[dict]:
+def get_recent_interest_track_rows(
+    *, user_id: int, interest_artists_lower: list[str], limit: int = 240
+) -> list[dict]:
     if not interest_artists_lower:
         return []
     capped_artists = interest_artists_lower[:50]

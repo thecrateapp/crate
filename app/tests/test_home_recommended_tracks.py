@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from crate.db import home_builder_release_recommendations as recommendations
+import crate.db.home_builder_release_recommendations as recommendations
 
 
 def _track(track_id: int, *, artist: str = "Artist", album: str = "Album") -> dict:
@@ -21,7 +21,10 @@ def test_recommended_tracks_do_not_backfill_a_whole_album(monkeypatch):
     monkeypatch.setattr(
         recommendations,
         "track_candidates_for_album_ids",
-        lambda *_args, **_kwargs: [_track(track_id, artist="Terror", album="New Album") for track_id in range(1, 12)],
+        lambda *_args, **_kwargs: [
+            _track(track_id, artist="Terror", album="New Album")
+            for track_id in range(1, 12)
+        ],
     )
 
     rows = recommendations.build_recommended_tracks(

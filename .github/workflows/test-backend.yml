@@ -43,10 +43,16 @@ jobs:
           cache-dependency-path: app/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-test.txt
+        run: |
+          pip install -r requirements-test.txt
+          pip install pyright pytest-cov
         working-directory: app
 
-      - name: Run tests
+      - name: Type check
+        run: pyright
+        working-directory: .
+
+      - name: Run tests with coverage
         env:
           CRATE_POSTGRES_USER: crate
           CRATE_POSTGRES_PASSWORD: crate
@@ -61,5 +67,7 @@ jobs:
             --ignore=tests/test_stats_integration.py \
             --ignore=tests/test_user_stats_aggregates.py \
             --tb=short \
-            -q
+            -q \
+            --cov=crate \
+            --cov-report=term
         working-directory: app

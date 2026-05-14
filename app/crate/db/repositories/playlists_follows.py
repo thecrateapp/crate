@@ -12,14 +12,24 @@ from crate.db.repositories.playlists_shared import emit_playlist_domain_event
 from crate.db.tx import optional_scope
 
 
-def follow_playlist(user_id: int, playlist_id: int, *, session: Session | None = None) -> bool:
+def follow_playlist(
+    user_id: int, playlist_id: int, *, session: Session | None = None
+) -> bool:
     def _impl(s: Session) -> bool:
         playlist_exists = s.execute(
-            select(exists().where(Playlist.id == playlist_id, Playlist.scope == "system", Playlist.is_active.is_(True)))
+            select(
+                exists().where(
+                    Playlist.id == playlist_id,
+                    Playlist.scope == "system",
+                    Playlist.is_active.is_(True),
+                )
+            )
         ).scalar_one()
         if not playlist_exists:
             return False
-        existing = s.get(UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id})
+        existing = s.get(
+            UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id}
+        )
         if existing is not None:
             return False
         s.add(
@@ -41,9 +51,13 @@ def follow_playlist(user_id: int, playlist_id: int, *, session: Session | None =
         return _impl(s)
 
 
-def unfollow_playlist(user_id: int, playlist_id: int, *, session: Session | None = None) -> bool:
+def unfollow_playlist(
+    user_id: int, playlist_id: int, *, session: Session | None = None
+) -> bool:
     def _impl(s: Session) -> bool:
-        existing = s.get(UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id})
+        existing = s.get(
+            UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id}
+        )
         if existing is None:
             return False
         s.delete(existing)
@@ -91,7 +105,9 @@ def add_playlist_member(
         return _impl(s)
 
 
-def remove_playlist_member(playlist_id: int, user_id: int, *, session: Session | None = None) -> bool:
+def remove_playlist_member(
+    playlist_id: int, user_id: int, *, session: Session | None = None
+) -> bool:
     def _impl(s: Session) -> bool:
         member = s.get(PlaylistMember, {"playlist_id": playlist_id, "user_id": user_id})
         if member is None:
@@ -103,4 +119,9 @@ def remove_playlist_member(playlist_id: int, user_id: int, *, session: Session |
         return _impl(s)
 
 
-__all__ = ["add_playlist_member", "follow_playlist", "remove_playlist_member", "unfollow_playlist"]
+__all__ = [
+    "add_playlist_member",
+    "follow_playlist",
+    "remove_playlist_member",
+    "unfollow_playlist",
+]

@@ -4,7 +4,10 @@ import { toast } from "sonner";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
-import { hasPlayableTrackReference, toPlayableTrack } from "@/lib/playable-track";
+import {
+  hasPlayableTrackReference,
+  toPlayableTrack,
+} from "@/lib/playable-track";
 import { fetchTrackRadio } from "@/lib/radio";
 import { formatDuration } from "@/lib/utils";
 
@@ -50,7 +53,8 @@ export function SuggestedTab() {
     )
       .then((data) => setTracks(data.tracks || []))
       .catch((error) => {
-        if (controller.signal.aborted || (error as Error).name === "AbortError") return;
+        if (controller.signal.aborted || (error as Error).name === "AbortError")
+          return;
         setTracks([]);
       })
       .finally(() => {
@@ -107,10 +111,18 @@ export function SuggestedTab() {
       <div className="mb-3 px-1">
         <button
           onClick={handleStartTrackRadio}
-          disabled={startingRadio || !currentTrack || !hasPlayableTrackReference(currentTrack)}
+          disabled={
+            startingRadio ||
+            !currentTrack ||
+            !hasPlayableTrackReference(currentTrack)
+          }
           className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/80 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {startingRadio ? <Loader2 size={12} className="animate-spin" /> : <Star size={12} />}
+          {startingRadio ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Star size={12} />
+          )}
           Start track radio
         </button>
       </div>
@@ -139,7 +151,9 @@ export function SuggestedTab() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[10px] tabular-nums text-white/40">{formatDuration(track.duration)}</span>
+            <span className="text-[10px] tabular-nums text-white/40">
+              {formatDuration(track.duration)}
+            </span>
             <div className="h-1 w-12 overflow-hidden rounded-full bg-white/5">
               <div
                 className="h-full rounded-full bg-primary/60"

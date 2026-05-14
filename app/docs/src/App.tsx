@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { BrowserRouter, Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from "react-router";
+import {
+  BrowserRouter,
+  Link,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useParams,
+} from "react-router";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,7 +23,14 @@ import {
 } from "lucide-react";
 
 import { MarkdownArticle } from "@/components/MarkdownArticle";
-import { docsBySection, getAdjacentDocs, getDoc, sectionMeta, type DocEntry, type DocSection } from "@/content";
+import {
+  docsBySection,
+  getAdjacentDocs,
+  getDoc,
+  sectionMeta,
+  type DocEntry,
+  type DocSection,
+} from "@/content";
 import { cn } from "@/lib/utils";
 
 function Header({ onMenu }: { onMenu: () => void }) {
@@ -37,8 +53,12 @@ function Header({ onMenu }: { onMenu: () => void }) {
         <Link to="/" className="flex items-center gap-3">
           <img src="/icons/logo.svg" alt="Crate" className="h-9 w-9 shrink-0" />
           <div>
-            <div className="text-sm font-semibold tracking-[0.12em] text-cyan-300 uppercase">Crate Docs</div>
-            <div className="text-xs text-white/45">Technical architecture and product internals</div>
+            <div className="text-sm font-semibold tracking-[0.12em] text-cyan-300 uppercase">
+              Crate Docs
+            </div>
+            <div className="text-xs text-white/45">
+              Technical architecture and product internals
+            </div>
           </div>
         </Link>
         <nav className="ml-auto hidden items-center gap-1 lg:flex">
@@ -50,7 +70,9 @@ function Header({ onMenu }: { onMenu: () => void }) {
               className={({ isActive }) =>
                 cn(
                   "rounded-full px-3 py-2 text-sm transition",
-                  isActive ? "bg-cyan-400/12 text-cyan-200" : "text-white/55 hover:bg-white/6 hover:text-white",
+                  isActive
+                    ? "bg-cyan-400/12 text-cyan-200"
+                    : "text-white/55 hover:bg-white/6 hover:text-white",
                 )
               }
             >
@@ -85,8 +107,12 @@ function Sidebar({
     const q = query.trim().toLowerCase();
     if (!q) return docsBySection;
     return {
-      technical: docsBySection.technical.filter((doc) => `${doc.title} ${doc.summary}`.toLowerCase().includes(q)),
-      reference: docsBySection.reference.filter((doc) => `${doc.title} ${doc.summary}`.toLowerCase().includes(q)),
+      technical: docsBySection.technical.filter((doc) =>
+        `${doc.title} ${doc.summary}`.toLowerCase().includes(q),
+      ),
+      reference: docsBySection.reference.filter((doc) =>
+        `${doc.title} ${doc.summary}`.toLowerCase().includes(q),
+      ),
     };
   }, [query]);
 
@@ -106,9 +132,14 @@ function Sidebar({
         )}
       >
         <div className="mb-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">Navigation</div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
+            Navigation
+          </div>
           <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+            />
             <input
               ref={searchRef}
               value={query}
@@ -141,12 +172,18 @@ function Sidebar({
                       className={({ isActive }) =>
                         cn(
                           "block rounded-xl px-3 py-2.5 transition",
-                          isActive ? "bg-cyan-400/12 text-white" : "text-white/65 hover:bg-white/5 hover:text-white",
+                          isActive
+                            ? "bg-cyan-400/12 text-white"
+                            : "text-white/65 hover:bg-white/5 hover:text-white",
                         )
                       }
                     >
-                      <div className="text-sm font-medium leading-tight">{doc.title}</div>
-                      <div className="mt-1 line-clamp-2 text-xs text-white/38">{doc.summary}</div>
+                      <div className="text-sm font-medium leading-tight">
+                        {doc.title}
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-xs text-white/38">
+                        {doc.summary}
+                      </div>
                     </NavLink>
                   ))}
                 </div>
@@ -171,12 +208,14 @@ function HomePage() {
             Crate Documentation
           </div>
           <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            A self-hosted music platform built for people who still care about their library.
+            A self-hosted music platform built for people who still care about
+            their library.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-white/70 sm:text-lg">
-            Crate manages, enriches, and streams your personal music collection. These docs
-            describe how every subsystem works — the ingestion pipeline, audio analysis,
-            playback engine, API surface, and the frontends that sit on top.
+            Crate manages, enriches, and streams your personal music collection.
+            These docs describe how every subsystem works — the ingestion
+            pipeline, audio analysis, playback engine, API surface, and the
+            frontends that sit on top.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             {firstTechnical ? (
@@ -205,12 +244,19 @@ function HomePage() {
         {(Object.keys(sectionMeta) as DocSection[]).map((section) => {
           const entry = docsBySection[section][0];
           return (
-            <div key={section} className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6">
+            <div
+              key={section}
+              className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6"
+            >
               <div className="mb-3 flex items-center gap-2 text-cyan-300">
                 <SectionIcon section={section} />
-                <span className="text-sm font-semibold uppercase tracking-[0.14em]">{sectionMeta[section].label}</span>
+                <span className="text-sm font-semibold uppercase tracking-[0.14em]">
+                  {sectionMeta[section].label}
+                </span>
               </div>
-              <p className="text-sm leading-6 text-white/65">{sectionMeta[section].description}</p>
+              <p className="text-sm leading-6 text-white/65">
+                {sectionMeta[section].description}
+              </p>
               {entry ? (
                 <Link
                   to={`/${section}`}
@@ -240,11 +286,18 @@ function HomePage() {
               <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
                 Step {index + 1}
               </div>
-              <div className="text-xl font-semibold text-white">{doc.title}</div>
-              <p className="mt-2 text-sm leading-6 text-white/58">{doc.summary}</p>
+              <div className="text-xl font-semibold text-white">
+                {doc.title}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-white/58">
+                {doc.summary}
+              </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
                 Read document
-                <ArrowRight size={16} className="transition group-hover:translate-x-1" />
+                <ArrowRight
+                  size={16}
+                  className="transition group-hover:translate-x-1"
+                />
               </div>
             </Link>
           ))}
@@ -256,7 +309,8 @@ function HomePage() {
 
 function SectionPage() {
   const { section } = useParams();
-  if (!section || !(section in docsBySection)) return <Navigate to="/" replace />;
+  if (!section || !(section in docsBySection))
+    return <Navigate to="/" replace />;
   const typedSection = section as DocSection;
   const entries = docsBySection[typedSection];
   const meta = sectionMeta[typedSection];
@@ -268,9 +322,15 @@ function SectionPage() {
           <SectionIcon section={typedSection} />
           {meta.label}
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{meta.label} documentation</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-white/62 sm:text-base">{meta.description}</p>
-        <div className="mt-4 text-xs uppercase tracking-[0.16em] text-white/35">{entries.length} documents in this section</div>
+        <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          {meta.label} documentation
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-white/62 sm:text-base">
+          {meta.description}
+        </p>
+        <div className="mt-4 text-xs uppercase tracking-[0.16em] text-white/35">
+          {entries.length} documents in this section
+        </div>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -280,12 +340,19 @@ function SectionPage() {
             to={doc.route}
             className="group rounded-[24px] border border-white/8 bg-white/[0.03] p-6 transition hover:border-cyan-400/25 hover:bg-white/[0.05]"
           >
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">{meta.label}</div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+              {meta.label}
+            </div>
             <div className="text-xl font-semibold text-white">{doc.title}</div>
-            <p className="mt-2 text-sm leading-6 text-white/58">{doc.summary}</p>
+            <p className="mt-2 text-sm leading-6 text-white/58">
+              {doc.summary}
+            </p>
             <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
               Read document
-              <ArrowRight size={16} className="transition group-hover:translate-x-1" />
+              <ArrowRight
+                size={16}
+                className="transition group-hover:translate-x-1"
+              />
             </div>
           </Link>
         ))}
@@ -299,7 +366,9 @@ function TableOfContents({ doc }: { doc: DocEntry }) {
   return (
     <aside className="hidden xl:block">
       <div className="sticky top-24 rounded-[24px] border border-white/8 bg-white/[0.03] p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">On this page</div>
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">
+          On this page
+        </div>
         <nav className="space-y-2">
           {doc.headings.map((heading) => (
             <a
@@ -343,21 +412,33 @@ function DocPage() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {adjacent.previous ? (
-            <Link to={adjacent.previous.route} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25">
+            <Link
+              to={adjacent.previous.route}
+              className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25"
+            >
               <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/40">
                 <ArrowLeft size={14} />
                 Previous
               </div>
-              <div className="text-base font-medium text-white">{adjacent.previous.title}</div>
+              <div className="text-base font-medium text-white">
+                {adjacent.previous.title}
+              </div>
             </Link>
-          ) : <div />}
+          ) : (
+            <div />
+          )}
           {adjacent.next ? (
-            <Link to={adjacent.next.route} className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25">
+            <Link
+              to={adjacent.next.route}
+              className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25"
+            >
               <div className="mb-2 flex items-center justify-end gap-2 text-xs uppercase tracking-[0.16em] text-white/40">
                 Next
                 <ArrowRight size={14} />
               </div>
-              <div className="text-base font-medium text-white">{adjacent.next.title}</div>
+              <div className="text-base font-medium text-white">
+                {adjacent.next.title}
+              </div>
             </Link>
           ) : null}
         </div>
@@ -371,8 +452,12 @@ function DocPage() {
 function NotFoundPage() {
   return (
     <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-10 text-center">
-      <div className="text-sm uppercase tracking-[0.18em] text-white/35">Not found</div>
-      <h1 className="mt-3 text-3xl font-semibold text-white">This documentation page does not exist.</h1>
+      <div className="text-sm uppercase tracking-[0.18em] text-white/35">
+        Not found
+      </div>
+      <h1 className="mt-3 text-3xl font-semibold text-white">
+        This documentation page does not exist.
+      </h1>
       <Link
         to="/"
         className="mt-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-200"
@@ -426,7 +511,8 @@ function AppShell() {
       if (event.key !== "/") return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable)
+        return;
       event.preventDefault();
       searchRef.current?.focus();
       searchRef.current?.select();

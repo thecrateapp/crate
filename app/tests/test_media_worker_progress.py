@@ -77,8 +77,11 @@ def test_bridge_media_worker_events_to_task_progress(monkeypatch):
     events = []
 
     monkeypatch.setattr(media_progress, "_group_created", False)
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
-    monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda task_id: {"id": task_id, "status": "running"})
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
+    monkeypatch.setattr(
+        "crate.db.queries.tasks.get_task",
+        lambda task_id: {"id": task_id, "status": "running"},
+    )
     monkeypatch.setattr(
         "crate.db.repositories.tasks.update_task",
         lambda task_id, **kwargs: updates.append((task_id, kwargs)),
@@ -88,10 +91,18 @@ def test_bridge_media_worker_events_to_task_progress(monkeypatch):
         lambda task_id, event_type, data: events.append((task_id, event_type, data)),
     )
 
-    stats = media_progress.bridge_media_worker_task_events(limit=10, consumer_name="test")
+    stats = media_progress.bridge_media_worker_task_events(
+        limit=10, consumer_name="test"
+    )
 
     assert stats == {"read": 1, "bridged": 1, "ignored": 0}
-    assert fake_redis.acked == [("crate:media-worker:events", "crate-media-worker-task-bridge", "1777977153295-0")]
+    assert fake_redis.acked == [
+        (
+            "crate:media-worker:events",
+            "crate-media-worker-task-bridge",
+            "1777977153295-0",
+        )
+    ]
     assert updates[0][0] == "task-1"
     progress = json.loads(updates[0][1]["progress"])
     assert progress["phase"] == "writing_package"
@@ -111,24 +122,30 @@ def test_bridge_ignores_non_task_media_worker_jobs(monkeypatch):
                 {
                     "job_id": "download-cache-key",
                     "event": "finished",
-                    "payload_json": json.dumps({"job_id": "download-cache-key", "event": "finished"}),
+                    "payload_json": json.dumps(
+                        {"job_id": "download-cache-key", "event": "finished"}
+                    ),
                 },
             )
         ]
     )
     monkeypatch.setattr(media_progress, "_group_created", False)
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
     monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda task_id: None)
 
-    stats = media_progress.bridge_media_worker_task_events(limit=10, consumer_name="test")
+    stats = media_progress.bridge_media_worker_task_events(
+        limit=10, consumer_name="test"
+    )
 
     assert stats == {"read": 1, "bridged": 0, "ignored": 1}
-    assert fake_redis.acked == [("crate:media-worker:events", "crate-media-worker-task-bridge", "1-0")]
+    assert fake_redis.acked == [
+        ("crate:media-worker:events", "crate-media-worker-task-bridge", "1-0")
+    ]
 
 
 def test_cancel_media_worker_job_sets_global_cancel_key(monkeypatch):
     fake_redis = FakeRedis()
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
 
     assert media_progress.cancel_media_worker_job("task-2", ttl_seconds=30) is True
 
@@ -144,7 +161,7 @@ def test_get_media_worker_job_decodes_payload(monkeypatch):
             }
         }
     )
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
 
     job = media_progress.get_media_worker_job("job-1")
 
@@ -154,7 +171,7 @@ def test_get_media_worker_job_decodes_payload(monkeypatch):
 
 def test_media_worker_slot_lease_uses_first_free_slot(monkeypatch):
     fake_redis = FakeRedis()
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
     monkeypatch.setenv("CRATE_MEDIA_WORKER_MAX_ACTIVE", "2")
 
     lease = media_progress.acquire_media_worker_slot("job-1", ttl_seconds=45)
@@ -171,7 +188,7 @@ def test_media_worker_slot_lease_uses_first_free_slot(monkeypatch):
 def test_media_worker_slot_lease_refuses_when_full(monkeypatch):
     fake_redis = FakeRedis()
     fake_redis.values["crate:media-worker:slot:0"] = "busy"
-    monkeypatch.setattr(media_progress, "_get_redis", lambda: fake_redis)
+    monkeypatch.setattr(media_progress, "get_redis", lambda: fake_redis)
     monkeypatch.setenv("CRATE_MEDIA_WORKER_MAX_ACTIVE", "1")
 
     lease = media_progress.acquire_media_worker_slot("job-2", ttl_seconds=45)

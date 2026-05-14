@@ -13,15 +13,23 @@ from crate.db.jobs.analysis_shared import (
 from crate.db.tx import transaction_scope
 
 
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def get_albums_needing_popularity(artist_name: str) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT id, name, tag_album FROM library_albums "
-                "WHERE artist = :artist AND lastfm_listeners IS NULL"
-            ),
-            {"artist": artist_name},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, name, tag_album FROM library_albums "
+                    "WHERE artist = :artist AND lastfm_listeners IS NULL"
+                ),
+                {"artist": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
@@ -38,15 +46,19 @@ def update_album_popularity(album_id: int, listeners: int, playcount: int) -> No
 
 def get_tracks_needing_popularity(artist_name: str, limit: int = 50) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT t.id, t.title FROM library_tracks t "
-                "JOIN library_albums a ON t.album_id = a.id "
-                "WHERE a.artist = :artist AND t.lastfm_listeners IS NULL "
-                "AND t.title IS NOT NULL AND t.title != '' LIMIT :lim"
-            ),
-            {"artist": artist_name, "lim": limit},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT t.id, t.title FROM library_tracks t "
+                    "JOIN library_albums a ON t.album_id = a.id "
+                    "WHERE a.artist = :artist AND t.lastfm_listeners IS NULL "
+                    "AND t.title IS NOT NULL AND t.title != '' LIMIT :lim"
+                ),
+                {"artist": artist_name, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
@@ -70,12 +82,24 @@ def requeue_tracks(
     scope: str | None = None,
     pipelines: list[str] | None = None,
 ) -> int:
+    """Requeue tracks for analysis/bliss pipeline reprocessing.
+
+    The ``set_clause`` is constructed internally by the caller
+    (``worker_handlers/analysis.py``) from hardcoded column assignments
+    such as ``analysis_state = 'pending'``.  It is not derived from
+    user input and therefore does not use SQL parameter binding.
+    """
     with transaction_scope() as session:
         if track_id:
-            result = session.execute(text(f"UPDATE library_tracks SET {set_clause} WHERE id = :id"), {"id": track_id})
+            result = session.execute(
+                text(f"UPDATE library_tracks SET {set_clause} WHERE id = :id"),
+                {"id": track_id},
+            )
         elif album_id:
             result = session.execute(
-                text(f"UPDATE library_tracks SET {set_clause} WHERE album_id = :album_id"),
+                text(
+                    f"UPDATE library_tracks SET {set_clause} WHERE album_id = :album_id"
+                ),
                 {"album_id": album_id},
             )
         elif artist and album_name:
@@ -99,7 +123,8 @@ def requeue_tracks(
         else:
             return 0
 
-        if result.rowcount and pipelines:
+        changed = _rowcount(result)
+        if changed and pipelines:
             filters = requeue_filter_clauses(
                 track_id=track_id,
                 album_id=album_id,
@@ -143,11 +168,16 @@ def requeue_tracks(
                             completed_at = NULL
                         """
                     ),
-                    {"pipeline": pipeline, **requeue_filter_params(track_id, album_id, artist, album_name)},
+                    {
+                        "pipeline": pipeline,
+                        **requeue_filter_params(track_id, album_id, artist, album_name),
+                    },
                 )
-                append_pipeline_event(session, pipeline=pipeline, track_id=track_id, state="pending")
+                append_pipeline_event(
+                    session, pipeline=pipeline, track_id=track_id, state="pending"
+                )
             mark_ops_snapshot_dirty(session)
-        return int(result.rowcount or 0)
+        return changed
 
 
 __all__ = [

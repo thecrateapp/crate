@@ -7,7 +7,13 @@ interface OAuthButtonsProps {
   returnTo?: string | null;
 }
 
-const fetchProviders = () => api<Record<string, { enabled: boolean; configured: boolean; login_url: string | null }>>("/api/auth/providers");
+const fetchProviders = () =>
+  api<
+    Record<
+      string,
+      { enabled: boolean; configured: boolean; login_url: string | null }
+    >
+  >("/api/auth/providers");
 
 export function OAuthButtons({ returnTo }: OAuthButtonsProps) {
   const handleNavigate = useCallback((loginUrl: string, rt: string | null) => {

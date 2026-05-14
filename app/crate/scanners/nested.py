@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from crate.models import Issue, IssueType, Severity
 from crate.scanners.base import BaseScanner
@@ -29,7 +28,11 @@ class NestedLibraryScanner(BaseScanner):
                     continue
                 # Check if sub has album-like directories with audio files
                 has_albums = any(
-                    any(f.suffix.lower() in self.extensions for f in album.iterdir() if f.is_file())
+                    any(
+                        f.suffix.lower() in self.extensions
+                        for f in album.iterdir()
+                        if f.is_file()
+                    )
                     for album in sub.iterdir()
                     if album.is_dir()
                 )
@@ -40,19 +43,21 @@ class NestedLibraryScanner(BaseScanner):
 
             # If the directory contains many artist-like subdirs, it's a nested library
             if artist_count >= 10:
-                issues.append(Issue(
-                    type=IssueType.NESTED_LIBRARY,
-                    severity=Severity.CRITICAL,
-                    confidence=98,
-                    description=f"Nested library found: {entry.name}/ contains {artist_count} artists",
-                    paths=[entry],
-                    suggestion=f"Move contents of {entry.name}/ up to library root, merging with existing artists",
-                    details={
-                        "nested_path": str(entry),
-                        "artist_count": artist_count,
-                        "sample_artists": sample_artists,
-                    }
-                ))
+                issues.append(
+                    Issue(
+                        type=IssueType.NESTED_LIBRARY,
+                        severity=Severity.CRITICAL,
+                        confidence=98,
+                        description=f"Nested library found: {entry.name}/ contains {artist_count} artists",
+                        paths=[entry],
+                        suggestion=f"Move contents of {entry.name}/ up to library root, merging with existing artists",
+                        details={
+                            "nested_path": str(entry),
+                            "artist_count": artist_count,
+                            "sample_artists": sample_artists,
+                        },
+                    )
+                )
 
             done += 1
             self._report_progress("nested", entry.name, done, total, len(issues))

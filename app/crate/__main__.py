@@ -36,18 +36,25 @@ def main():
     sub = parser.add_subparsers(dest="command")
 
     scan_cmd = sub.add_parser("scan", help="Scan library for issues")
-    scan_cmd.add_argument("--only", help="Run specific scanner", choices=[
-        "nested", "duplicates", "incomplete", "mergeable", "naming"
-    ])
+    scan_cmd.add_argument(
+        "--only",
+        help="Run specific scanner",
+        choices=["nested", "duplicates", "incomplete", "mergeable", "naming"],
+    )
 
     fix_cmd = sub.add_parser("fix", help="Fix issues found in scan")
-    fix_cmd.add_argument("--dry-run", action="store_true", default=True,
-                         help="Show what would be done (default)")
-    fix_cmd.add_argument("--apply", action="store_true",
-                         help="Actually apply fixes")
-    fix_cmd.add_argument("--only", help="Fix specific issue type", choices=[
-        "nested", "duplicates", "incomplete", "mergeable", "naming"
-    ])
+    fix_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Show what would be done (default)",
+    )
+    fix_cmd.add_argument("--apply", action="store_true", help="Actually apply fixes")
+    fix_cmd.add_argument(
+        "--only",
+        help="Fix specific issue type",
+        choices=["nested", "duplicates", "incomplete", "mergeable", "naming"],
+    )
 
     sub.add_parser("daemon", help="Run as daemon (watchdog + scheduled scans)")
     sub.add_parser("report", help="Generate library health report")
@@ -60,18 +67,39 @@ def main():
     api_cmd.add_argument("--port", type=int, default=8585)
     api_cmd.add_argument("--host", default="0.0.0.0")
 
-    worker_cmd = sub.add_parser("worker", help="Run Dramatiq workers + scheduler/watcher")
-    worker_cmd.add_argument("--processes", type=int, default=_env_int("CRATE_WORKER_PROCESSES", 2), help="Number of Dramatiq worker processes")
+    worker_cmd = sub.add_parser(
+        "worker", help="Run Dramatiq workers + scheduler/watcher"
+    )
+    worker_cmd.add_argument(
+        "--processes",
+        type=int,
+        default=_env_int("CRATE_WORKER_PROCESSES", 2),
+        help="Number of Dramatiq worker processes",
+    )
     worker_cmd.add_argument(
         "--queues",
         default=os.environ.get("CRATE_WORKER_QUEUES", "fast,heavy,default,maintenance"),
         help="Comma-separated Dramatiq queues to consume",
     )
-    worker_cmd.add_argument("--no-service-loop", action="store_true", help="Disable scheduler/watcher/zombie cleanup loop")
-    worker_cmd.add_argument("--no-daemons", action="store_true", help="Disable analysis/bliss background daemons")
-    worker_cmd.add_argument("--no-projector", action="store_true", help="Disable snapshot projector loop")
-    worker_cmd.add_argument("--no-telegram", action="store_true", help="Disable Telegram bot loop")
-    worker_cmd.add_argument("--legacy", action="store_true", help="Use legacy orchestrator (pre-Dramatiq)")
+    worker_cmd.add_argument(
+        "--no-service-loop",
+        action="store_true",
+        help="Disable scheduler/watcher/zombie cleanup loop",
+    )
+    worker_cmd.add_argument(
+        "--no-daemons",
+        action="store_true",
+        help="Disable analysis/bliss background daemons",
+    )
+    worker_cmd.add_argument(
+        "--no-projector", action="store_true", help="Disable snapshot projector loop"
+    )
+    worker_cmd.add_argument(
+        "--no-telegram", action="store_true", help="Disable Telegram bot loop"
+    )
+    worker_cmd.add_argument(
+        "--legacy", action="store_true", help="Use legacy orchestrator (pre-Dramatiq)"
+    )
 
     projector_cmd = sub.add_parser("projector", help="Run snapshot projector loop")
     projector_cmd.add_argument(
@@ -129,6 +157,7 @@ def main():
 
     elif args.command in ("web", "api"):
         import uvicorn
+
         uvicorn.run(
             "crate.api:create_app",
             factory=True,
@@ -141,6 +170,7 @@ def main():
     elif args.command == "worker":
         if args.legacy:
             from crate.orchestrator import Orchestrator
+
             orch = Orchestrator(config)
             orch.run()
         else:
@@ -151,6 +181,7 @@ def main():
             config["worker_projector"] = not args.no_projector
             config["worker_telegram"] = not args.no_telegram
             from crate.worker import run_worker
+
             run_worker(config)
 
     elif args.command == "projector":

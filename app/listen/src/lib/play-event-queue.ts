@@ -91,7 +91,11 @@ export function enqueueEvent(endpoint: string, payload: unknown): void {
  * Returns counts for observability. Skipped if another flush is in
  * flight (concurrent calls coalesce).
  */
-export async function flushQueue(): Promise<{ sent: number; failed: number; dropped: number }> {
+export async function flushQueue(): Promise<{
+  sent: number;
+  failed: number;
+  dropped: number;
+}> {
   if (flushInFlight) return { sent: 0, failed: 0, dropped: 0 };
   flushInFlight = true;
   try {
@@ -148,7 +152,9 @@ export async function flushQueue(): Promise<{ sent: number; failed: number; drop
         remaining.push({
           ...event,
           attempts,
-          nextRetryAt: new Date(Date.now() + backoffFor(attempts)).toISOString(),
+          nextRetryAt: new Date(
+            Date.now() + backoffFor(attempts),
+          ).toISOString(),
         });
       }
     }
@@ -184,7 +190,10 @@ export function clearQueue(): void {
  *
  * Fire-and-forget; never throws.
  */
-export async function postWithRetry(endpoint: string, payload: unknown): Promise<void> {
+export async function postWithRetry(
+  endpoint: string,
+  payload: unknown,
+): Promise<void> {
   try {
     const response = await apiFetch(endpoint, {
       method: "POST",
@@ -195,7 +204,11 @@ export async function postWithRetry(endpoint: string, payload: unknown): Promise
     if (response.ok || response.status === 204) return;
 
     // 4xx non-401 → request is shaped wrong / resource invalid; don't retry.
-    if (response.status >= 400 && response.status < 500 && response.status !== 401) {
+    if (
+      response.status >= 400 &&
+      response.status < 500 &&
+      response.status !== 401
+    ) {
       console.warn(`[${endpoint}] rejected ${response.status}`, payload);
       return;
     }

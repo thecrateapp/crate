@@ -1,9 +1,19 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, ArrowRight, Server, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  ArrowRight,
+  Server,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 
 import { ApiError } from "@/lib/api";
-import { addServer, normaliseServerUrl, setCurrentServerId } from "@/lib/server-store";
+import {
+  addServer,
+  normaliseServerUrl,
+  setCurrentServerId,
+} from "@/lib/server-store";
 
 /**
  * First-run setup for Capacitor builds. Lets the user point the app at
@@ -42,7 +52,10 @@ async function probe(url: string): Promise<ProbeState> {
     const hasKnownField =
       "invite_only" in data || "google" in data || "apple" in data;
     if (!hasKnownField) return { status: "not-crate" };
-    return { status: "ok", inviteOnly: Boolean((data as { invite_only?: boolean }).invite_only) };
+    return {
+      status: "ok",
+      inviteOnly: Boolean((data as { invite_only?: boolean }).invite_only),
+    };
   } catch (err) {
     if (err instanceof ApiError) {
       return { status: "error", message: err.message };
@@ -82,9 +95,12 @@ export function ServerSetup() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-2">
           <img src="/icons/logo.svg" alt="Crate" className="mb-2 h-16 w-16" />
-          <h1 className="text-2xl font-bold text-white">Connect to a Crate server</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Connect to a Crate server
+          </h1>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            Point the app at your Crate instance. You can add more later from Settings.
+            Point the app at your Crate instance. You can add more later from
+            Settings.
           </p>
         </div>
 
@@ -128,7 +144,10 @@ export function ServerSetup() {
           ) : (
             <>
               Continue
-              <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+              <ArrowRight
+                size={16}
+                className="transition group-hover:translate-x-0.5"
+              />
             </>
           )}
         </button>

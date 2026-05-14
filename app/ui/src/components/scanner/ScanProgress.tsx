@@ -24,7 +24,13 @@ const SCANNER_NAMES: Record<string, string> = {
   incomplete: "Incomplete",
 };
 
-const ALL_SCANNERS = ["nested", "naming", "duplicates", "mergeable", "incomplete"];
+const ALL_SCANNERS = [
+  "nested",
+  "naming",
+  "duplicates",
+  "mergeable",
+  "incomplete",
+];
 
 const ISSUE_COLORS: Record<string, string> = {
   nested_library: "text-red-400 border-red-400/40",
@@ -47,9 +53,10 @@ interface ScanProgressProps {
 }
 
 export function ScanProgress({ progress }: ScanProgressProps) {
-  const percent = progress.artists_total > 0
-    ? Math.round((progress.artists_done / progress.artists_total) * 100)
-    : 0;
+  const percent =
+    progress.artists_total > 0
+      ? Math.round((progress.artists_done / progress.artists_total) * 100)
+      : 0;
 
   const startRef = useRef<number>(Date.now());
   const [now, setNow] = useState(Date.now);
@@ -61,7 +68,8 @@ export function ScanProgress({ progress }: ScanProgressProps) {
 
   const elapsedSec = (now - startRef.current) / 1000;
   const rate = elapsedSec > 0 ? progress.artists_done / elapsedSec : 0;
-  const remaining = rate > 0 ? (progress.artists_total - progress.artists_done) / rate : 0;
+  const remaining =
+    rate > 0 ? (progress.artists_total - progress.artists_done) / rate : 0;
   const remainingMin = Math.ceil(remaining / 60);
 
   const doneScanners = new Set(progress.scanners_done);
@@ -73,7 +81,8 @@ export function ScanProgress({ progress }: ScanProgressProps) {
       <div>
         <Progress value={percent} className="h-2.5" />
         <p className="text-sm text-muted-foreground mt-1.5">
-          Scanning artist {progress.artists_done}/{progress.artists_total} ({percent}%)
+          Scanning artist {progress.artists_done}/{progress.artists_total} (
+          {percent}%)
         </p>
       </div>
 
@@ -87,8 +96,10 @@ export function ScanProgress({ progress }: ScanProgressProps) {
               key={id}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all",
-                isDone && "border-l-2 border-l-green-500 border-green-500/30 text-green-400 bg-green-500/5",
-                isRunning && "border-l-2 border-l-blue-500 border-blue-500/30 text-blue-400 bg-blue-500/5",
+                isDone &&
+                  "border-l-2 border-l-green-500 border-green-500/30 text-green-400 bg-green-500/5",
+                isRunning &&
+                  "border-l-2 border-l-blue-500 border-blue-500/30 text-blue-400 bg-blue-500/5",
                 !isDone && !isRunning && "border-border text-muted-foreground",
               )}
             >
@@ -114,7 +125,9 @@ export function ScanProgress({ progress }: ScanProgressProps) {
             variant="outline"
             className={cn(
               "text-xs",
-              count > 0 ? ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40" : "text-muted-foreground border-border",
+              count > 0
+                ? ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40"
+                : "text-muted-foreground border-border",
             )}
           >
             {ISSUE_LABELS[type] ?? type.replace(/_/g, " ")}: {count}

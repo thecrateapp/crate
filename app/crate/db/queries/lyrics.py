@@ -19,9 +19,10 @@ def list_tracks_for_lyrics(
 ) -> list[dict[str, Any]]:
     safe_limit = min(max(int(limit or 500), 1), 5000)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     lt.id,
                     lt.entity_uid,
@@ -78,25 +79,29 @@ def list_tracks_for_lyrics(
                     lt.id
                 LIMIT :limit
                 """
-            ),
-            {
-                "artist": artist,
-                "album_id": album_id,
-                "album_entity_uid": album_entity_uid,
-                "track_id": track_id,
-                "track_entity_uid": track_entity_uid,
-                "only_missing": only_missing,
-                "limit": safe_limit,
-            },
-        ).mappings().all()
+                ),
+                {
+                    "artist": artist,
+                    "album_id": album_id,
+                    "album_entity_uid": album_entity_uid,
+                    "track_id": track_id,
+                    "track_entity_uid": track_entity_uid,
+                    "only_missing": only_missing,
+                    "limit": safe_limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_album_track_lyrics_status(album_id: int) -> dict[int, dict[str, Any]]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     lt.id AS track_id,
                     lt.entity_uid AS track_entity_uid,
@@ -135,9 +140,12 @@ def get_album_track_lyrics_status(album_id: int) -> dict[int, dict[str, Any]]:
                 ) lyr ON TRUE
                 WHERE lt.album_id = :album_id
                 """
-            ),
-            {"album_id": album_id},
-        ).mappings().all()
+                ),
+                {"album_id": album_id},
+            )
+            .mappings()
+            .all()
+        )
 
     return {
         int(row["track_id"]): {

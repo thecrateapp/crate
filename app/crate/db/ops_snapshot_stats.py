@@ -21,10 +21,14 @@ def _get_imports_pending_count() -> int:
     return count_import_queue_items(status="pending")
 
 
-def _top_genres_from_distribution(genres: dict[str, int], *, limit: int = 10) -> list[dict]:
+def _top_genres_from_distribution(
+    genres: dict[str, int], *, limit: int = 10
+) -> list[dict]:
     return [
         {"name": name, "count": count}
-        for name, count in sorted(genres.items(), key=lambda item: item[1], reverse=True)[:limit]
+        for name, count in sorted(
+            genres.items(), key=lambda item: item[1], reverse=True
+        )[:limit]
     ]
 
 
@@ -44,7 +48,11 @@ def build_stats_payload(
         pending_imports = _get_imports_pending_count()
     if worker_live is None:
         worker_live = get_worker_live_state()
-    pending_tasks = int(worker_live.get("pending_count") or 0) if worker_live else len(list_tasks(status="pending"))
+    pending_tasks = (
+        int(worker_live.get("pending_count") or 0)
+        if worker_live
+        else len(list_tasks(status="pending"))
+    )
     summary = summary or get_overview_stat_summary()
     track_distributions = track_distributions or get_track_distribution_summary()
 
@@ -69,13 +77,17 @@ def build_stats_payload(
         "albums": stats["albums"],
         "tracks": stats["tracks"],
         "formats": stats.get("formats") or track_distributions.get("formats", {}),
-        "total_size_gb": round(stats["total_size"] / (1024**3), 2) if stats["total_size"] else 0,
+        "total_size_gb": round(stats["total_size"] / (1024**3), 2)
+        if stats["total_size"]
+        else 0,
         "last_scan": scan["scanned_at"] if scan else None,
         "pending_imports": pending_imports,
         "pending_tasks": pending_tasks,
         "total_duration_hours": summary["duration_hours"],
         "avg_bitrate": summary["avg_bitrate"],
-        "top_genres": _top_genres_from_distribution(track_distributions.get("genres", {})),
+        "top_genres": _top_genres_from_distribution(
+            track_distributions.get("genres", {})
+        ),
         "recent_albums": recent_albums,
         "analyzed_tracks": summary["analyzed_tracks"],
         "avg_album_duration_min": summary["avg_album_duration_min"],

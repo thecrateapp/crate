@@ -15,7 +15,10 @@ def get_music_path(path_id: int, user_id: int) -> dict | None:
 
 
 def list_music_paths(user_id: int) -> list[dict]:
-    return [serialize_music_path_row(dict(row), include_tracks=False) for row in list_music_path_rows(user_id)]
+    return [
+        serialize_music_path_row(dict(row), include_tracks=False)
+        for row in list_music_path_rows(user_id)
+    ]
 
 
 def delete_music_path(path_id: int, user_id: int) -> bool:

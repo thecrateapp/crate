@@ -20,26 +20,33 @@ export function consumePendingOAuthNext(): string | null {
   }
 }
 
-export function getOAuthCallbackPayload(
-  search: string | URLSearchParams,
-): { token: string | null; refreshToken: string | null; next: string } {
-  const params = typeof search === "string" ? new URLSearchParams(search) : search;
+export function getOAuthCallbackPayload(search: string | URLSearchParams): {
+  token: string | null;
+  accessExpiresAt: string | null;
+  refreshToken: string | null;
+  next: string;
+} {
+  const params =
+    typeof search === "string" ? new URLSearchParams(search) : search;
   return {
     token: params.get("token"),
+    accessExpiresAt: params.get("access_expires_at"),
     refreshToken: params.get("refresh_token"),
     next: params.get("next") || "/",
   };
 }
 
-export function persistOAuthCallbackPayload(
-  search: string | URLSearchParams,
-): { handled: boolean; next: string } {
-  const { token, refreshToken, next } = getOAuthCallbackPayload(search);
+export function persistOAuthCallbackPayload(search: string | URLSearchParams): {
+  handled: boolean;
+  next: string;
+} {
+  const { token, accessExpiresAt, refreshToken, next } =
+    getOAuthCallbackPayload(search);
   if (!token) {
     return { handled: false, next };
   }
 
-  setAuthTokens(token, refreshToken ?? undefined);
+  setAuthTokens(token, refreshToken ?? undefined, accessExpiresAt ?? undefined);
   storePendingOAuthNext(next);
   return { handled: true, next };
 }
@@ -50,12 +57,11 @@ export async function consumeOAuthCallbackUrl(
   try {
     const parsed = new URL(url);
     const isCustomSchemeCallback =
-      parsed.protocol === "cratemusic:"
-      && parsed.hostname === "oauth"
-      && parsed.pathname === "/callback";
+      parsed.protocol === "cratemusic:" &&
+      parsed.hostname === "oauth" &&
+      parsed.pathname === "/callback";
     const isUniversalLinkCallback =
-      parsed.protocol === "https:"
-      && parsed.pathname === "/auth/callback";
+      parsed.protocol === "https:" && parsed.pathname === "/auth/callback";
 
     if (!isCustomSchemeCallback && !isUniversalLinkCallback) {
       return { handled: false, next: "/" };

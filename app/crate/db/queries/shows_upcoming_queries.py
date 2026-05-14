@@ -26,11 +26,21 @@ def get_upcoming_shows(
     if country:
         conditions.append("LOWER(country_code) = LOWER(:country)")
         params["country"] = country
+        # conditions are hardcoded strings built internally above;
+        # they contain no user input — only parameter placeholders.
     with read_scope() as session:
-        rows = session.execute(
-            text(f"SELECT * FROM shows WHERE {' AND '.join(conditions)} ORDER BY date ASC LIMIT :lim"),
-            params,
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT * FROM shows WHERE "
+                    + " AND ".join(conditions)
+                    + " ORDER BY date ASC LIMIT :lim"
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return dedupe_show_rows([dict(row) for row in rows])[:limit]
 
 
@@ -48,9 +58,10 @@ def get_upcoming_shows_near(
     lon_max = longitude + delta * 1.5
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT *,
                     CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN
                         6371 * acos(
@@ -71,18 +82,21 @@ def get_upcoming_shows_near(
                 ORDER BY date ASC
                 LIMIT :lim
                 """
-            ),
-            {
-                "lat": latitude,
-                "lon": longitude,
-                "today": today,
-                "lat_min": lat_min,
-                "lat_max": lat_max,
-                "lon_min": lon_min,
-                "lon_max": lon_max,
-                "lim": limit * 3,
-            },
-        ).mappings().all()
+                ),
+                {
+                    "lat": latitude,
+                    "lon": longitude,
+                    "today": today,
+                    "lat_min": lat_min,
+                    "lat_max": lat_max,
+                    "lon_min": lon_min,
+                    "lon_max": lon_max,
+                    "lim": limit * 3,
+                },
+            )
+            .mappings()
+            .all()
+        )
 
     result: list[dict] = []
     for row in rows:
@@ -99,23 +113,39 @@ def get_upcoming_shows_near(
 
 def get_all_shows(limit: int = 500) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text("SELECT * FROM shows ORDER BY date DESC LIMIT :lim"),
-            {"lim": limit},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text("SELECT * FROM shows ORDER BY date DESC LIMIT :lim"),
+                {"lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_upcoming_show_counts() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE")
-        ).mappings().first()
-        show_count = row["c"]
-        row = session.execute(
-            text("SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE AND (source = 'lastfm' OR source = 'both')")
-        ).mappings().first()
-        lastfm_count = row["c"]
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE"
+                )
+            )
+            .mappings()
+            .first()
+        )
+        show_count = int(row["c"] or 0) if row is not None else 0
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*)::INTEGER AS c FROM shows WHERE date >= CURRENT_DATE AND (source = 'lastfm' OR source = 'both')"
+                )
+            )
+            .mappings()
+            .first()
+        )
+        lastfm_count = int(row["c"] or 0) if row is not None else 0
     return {"show_count": show_count, "lastfm_count": lastfm_count}
 
 

@@ -86,9 +86,14 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
     likedTracksRequestRef.current = controller;
     setLoading(true);
     try {
-      const tracks = await api<LikedTrack[]>("/api/me/likes?limit=1000", "GET", undefined, {
-        signal: controller.signal,
-      });
+      const tracks = await api<LikedTrack[]>(
+        "/api/me/likes?limit=1000",
+        "GET",
+        undefined,
+        {
+          signal: controller.signal,
+        },
+      );
       setLikedTracks(Array.isArray(tracks) ? tracks : []);
     } catch (error) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
@@ -131,90 +136,117 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
     return { ids, entityUids, paths };
   }, [likedTracks]);
 
-  const isLiked = useCallback((
-    trackId?: number | null,
-    trackEntityUid?: string | null,
-    trackPath?: string | null,
-  ) => {
-    if (trackId != null && likedIndex.ids.has(trackId)) return true;
-    if (trackEntityUid && likedIndex.entityUids.has(trackEntityUid)) return true;
-    for (const key of getComparableKeys(trackPath)) {
-      if (likedIndex.paths.has(key)) return true;
-    }
-    return false;
-  }, [likedIndex]);
+  const isLiked = useCallback(
+    (
+      trackId?: number | null,
+      trackEntityUid?: string | null,
+      trackPath?: string | null,
+    ) => {
+      if (trackId != null && likedIndex.ids.has(trackId)) return true;
+      if (trackEntityUid && likedIndex.entityUids.has(trackEntityUid))
+        return true;
+      for (const key of getComparableKeys(trackPath)) {
+        if (likedIndex.paths.has(key)) return true;
+      }
+      return false;
+    },
+    [likedIndex],
+  );
 
-  const likeTrack = useCallback(async (
-    trackId?: number | null,
-    trackEntityUid?: string | null,
-    trackPath?: string | null,
-  ) => {
-    if (trackId == null && !trackEntityUid && !trackPath) return false;
-    const ref = toTrackReferencePayload({
-      id: trackId,
-      entity_uid: trackEntityUid,
-      path: trackPath,
-    });
-    await api("/api/me/likes", "POST", {
-      track_id: ref.track_id,
-      track_entity_uid: ref.entity_uid,
-      track_path: ref.path,
-    });
-    await refetch();
-    return true;
-  }, [refetch]);
+  const likeTrack = useCallback(
+    async (
+      trackId?: number | null,
+      trackEntityUid?: string | null,
+      trackPath?: string | null,
+    ) => {
+      if (trackId == null && !trackEntityUid && !trackPath) return false;
+      const ref = toTrackReferencePayload({
+        id: trackId,
+        entity_uid: trackEntityUid,
+        path: trackPath,
+      });
+      await api("/api/me/likes", "POST", {
+        track_id: ref.track_id,
+        track_entity_uid: ref.entity_uid,
+        track_path: ref.path,
+      });
+      await refetch();
+      return true;
+    },
+    [refetch],
+  );
 
-  const unlikeTrack = useCallback(async (
-    trackId?: number | null,
-    trackEntityUid?: string | null,
-    trackPath?: string | null,
-  ) => {
-    if (trackId == null && !trackEntityUid && !trackPath) return false;
-    const ref = toTrackReferencePayload({
-      id: trackId,
-      entity_uid: trackEntityUid,
-      path: trackPath,
-    });
-    await api("/api/me/likes", "DELETE", {
-      track_id: ref.track_id,
-      track_entity_uid: ref.entity_uid,
-      track_path: ref.path,
-    });
-    setLikedTracks((prev) =>
-      prev.filter((track) => {
-        if (trackId != null && track.track_id === trackId) return false;
-        if (trackEntityUid && track.track_entity_uid === trackEntityUid) return false;
-        const trackKeys = new Set([
-          ...getComparableKeys(track.path),
-          ...getComparableKeys(track.relative_path),
-        ]);
-        return !getComparableKeys(trackPath).some((key) => trackKeys.has(key));
-      }),
-    );
-    return true;
-  }, []);
+  const unlikeTrack = useCallback(
+    async (
+      trackId?: number | null,
+      trackEntityUid?: string | null,
+      trackPath?: string | null,
+    ) => {
+      if (trackId == null && !trackEntityUid && !trackPath) return false;
+      const ref = toTrackReferencePayload({
+        id: trackId,
+        entity_uid: trackEntityUid,
+        path: trackPath,
+      });
+      await api("/api/me/likes", "DELETE", {
+        track_id: ref.track_id,
+        track_entity_uid: ref.entity_uid,
+        track_path: ref.path,
+      });
+      setLikedTracks((prev) =>
+        prev.filter((track) => {
+          if (trackId != null && track.track_id === trackId) return false;
+          if (trackEntityUid && track.track_entity_uid === trackEntityUid)
+            return false;
+          const trackKeys = new Set([
+            ...getComparableKeys(track.path),
+            ...getComparableKeys(track.relative_path),
+          ]);
+          return !getComparableKeys(trackPath).some((key) =>
+            trackKeys.has(key),
+          );
+        }),
+      );
+      return true;
+    },
+    [],
+  );
 
-  const toggleTrackLike = useCallback(async (
-    trackId?: number | null,
-    trackEntityUid?: string | null,
-    trackPath?: string | null,
-  ) => {
-    if (trackId == null && !trackEntityUid && !trackPath) return false;
-    if (isLiked(trackId, trackEntityUid, trackPath)) {
-      return unlikeTrack(trackId, trackEntityUid, trackPath);
-    }
-    return likeTrack(trackId, trackEntityUid, trackPath);
-  }, [isLiked, likeTrack, unlikeTrack]);
+  const toggleTrackLike = useCallback(
+    async (
+      trackId?: number | null,
+      trackEntityUid?: string | null,
+      trackPath?: string | null,
+    ) => {
+      if (trackId == null && !trackEntityUid && !trackPath) return false;
+      if (isLiked(trackId, trackEntityUid, trackPath)) {
+        return unlikeTrack(trackId, trackEntityUid, trackPath);
+      }
+      return likeTrack(trackId, trackEntityUid, trackPath);
+    },
+    [isLiked, likeTrack, unlikeTrack],
+  );
 
-  const value = useMemo<LikedTracksContextValue>(() => ({
-    likedTracks,
-    loading,
-    isLiked,
-    likeTrack,
-    unlikeTrack,
-    toggleTrackLike,
-    refetch,
-  }), [likedTracks, loading, isLiked, likeTrack, unlikeTrack, toggleTrackLike, refetch]);
+  const value = useMemo<LikedTracksContextValue>(
+    () => ({
+      likedTracks,
+      loading,
+      isLiked,
+      likeTrack,
+      unlikeTrack,
+      toggleTrackLike,
+      refetch,
+    }),
+    [
+      likedTracks,
+      loading,
+      isLiked,
+      likeTrack,
+      unlikeTrack,
+      toggleTrackLike,
+      refetch,
+    ],
+  );
 
   return (
     <LikedTracksContext.Provider value={value}>
@@ -225,6 +257,7 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
 
 export function useLikedTracks() {
   const ctx = useContext(LikedTracksContext);
-  if (!ctx) throw new Error("useLikedTracks must be used within LikedTracksProvider");
+  if (!ctx)
+    throw new Error("useLikedTracks must be used within LikedTracksProvider");
   return ctx;
 }

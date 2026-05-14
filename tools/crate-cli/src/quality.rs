@@ -1,3 +1,5 @@
+//! Quick quality probe: format, bitrate, sample rate, duration, and channel count.
+
 use lofty::file::AudioFile;
 use rayon::prelude::*;
 use serde::Serialize;

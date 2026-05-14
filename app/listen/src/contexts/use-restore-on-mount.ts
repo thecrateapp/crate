@@ -135,7 +135,13 @@ export function useRestoreOnMount({
         commitIsBuffering(false);
       }
     }, AUTOPLAY_TIMEOUT_MS);
-  }, [bufferingIntentRef, cancelRestoreAutoplay, commitIsBuffering, isPlayingRef, queueRef]);
+  }, [
+    bufferingIntentRef,
+    cancelRestoreAutoplay,
+    commitIsBuffering,
+    isPlayingRef,
+    queueRef,
+  ]);
 
   // One-shot restore of saved queue + cursor on first render.
   useEffect(() => {
@@ -179,7 +185,14 @@ export function useRestoreOnMount({
       commitCurrentTime(pendingRestoreTimeRef.current);
       markSeekPosition(pendingRestoreTimeRef.current);
     }
-  }, [buildEngineUrls, commitCurrentTime, markSeekPosition, pullFromEngine, pushToEngine, repeatRef]);
+  }, [
+    buildEngineUrls,
+    commitCurrentTime,
+    markSeekPosition,
+    pullFromEngine,
+    pushToEngine,
+    repeatRef,
+  ]);
 
   // Timer cleanup on unmount.
   useEffect(() => () => cancelRestoreAutoplay(), [cancelRestoreAutoplay]);

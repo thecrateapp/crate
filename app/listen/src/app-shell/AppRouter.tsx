@@ -22,13 +22,13 @@ export function AppRouter() {
       <Routes>
         {publicAppRoutes.map(renderRoute)}
         <Route
-          element={(
+          element={
             <ProtectedRoute>
               <AppProviders>
                 <Shell />
               </AppProviders>
             </ProtectedRoute>
-          )}
+          }
         >
           {protectedAppRoutes.map(renderRoute)}
         </Route>

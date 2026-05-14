@@ -5,7 +5,6 @@ Redis must use volatile-lru policy so cache keys (with TTL) can be evicted
 but Dramatiq queue keys (no TTL) are never lost.
 """
 
-import os
 import logging
 
 import dramatiq
@@ -19,11 +18,12 @@ from dramatiq.middleware import (
     TimeLimit,
 )
 
+from crate.config import get_redis_url
+
 log = logging.getLogger(__name__)
 
-_REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 # Switch to DB 1 for broker (DB 0 is cache)
-_BROKER_URL = _REDIS_URL.rsplit("/", 1)[0] + "/1"
+_BROKER_URL = get_redis_url().rsplit("/", 1)[0] + "/1"
 
 
 def get_broker() -> RedisBroker:

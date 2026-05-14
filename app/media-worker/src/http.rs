@@ -1,3 +1,6 @@
+//! Minimal HTTP server for the media worker. Handles album packaging, track artifact
+//! generation, and health checks over a plain TCP socket.
+
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};

@@ -32,7 +32,7 @@ def build_tidal_download_params(
     upgrade_album_id: int | None = None,
     new_release_id: int | None = None,
 ) -> dict:
-    params = {
+    params: dict[str, object] = {
         "url": url.strip(),
         "quality": quality,
         "entity_type": infer_tidal_entity_type(url, content_type),
@@ -51,7 +51,10 @@ def build_tidal_download_params(
 
 
 def tidal_download_dedup_key(params: dict) -> str:
-    entity_type = str(params.get("entity_type") or infer_tidal_entity_type(str(params.get("url") or ""))).lower()
+    entity_type = str(
+        params.get("entity_type")
+        or infer_tidal_entity_type(str(params.get("url") or ""))
+    ).lower()
     url = str(params.get("url") or "").strip().lower()
     quality = str(params.get("quality") or "max").strip().lower()
     artist = str(params.get("artist") or "").strip().lower()
@@ -69,7 +72,7 @@ def build_soulseek_download_params(
     find_alternate: bool = False,
     upgrade_album_id: int | None = None,
 ) -> dict:
-    params = {
+    params: dict[str, object] = {
         "username": (username or "unknown").strip(),
         "artist": artist.strip(),
         "album": album.strip(),

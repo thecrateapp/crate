@@ -83,7 +83,9 @@ def create_core_schema(cur) -> None:
             FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS settings (
@@ -99,7 +101,9 @@ def create_core_schema(cur) -> None:
             created_at TIMESTAMPTZ NOT NULL
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_mb_cache_created ON mb_cache(created_at)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mb_cache_created ON mb_cache(created_at)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS cache (
@@ -137,10 +141,18 @@ def create_core_schema(cur) -> None:
             completed_at TIMESTAMPTZ
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_track ON stream_variants(track_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_entity ON stream_variants(track_entity_uid)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_status ON stream_variants(status, updated_at)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_preset ON stream_variants(preset, status)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_track ON stream_variants(track_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_entity ON stream_variants(track_entity_uid)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_status ON stream_variants(status, updated_at)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_preset ON stream_variants(preset, status)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS dir_mtimes (
@@ -162,4 +174,6 @@ def create_core_schema(cur) -> None:
             task_id TEXT
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp DESC)"
+    )

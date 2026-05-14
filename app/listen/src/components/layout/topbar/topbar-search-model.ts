@@ -1,5 +1,10 @@
 import { type Track } from "@/contexts/PlayerContext";
-import { albumCoverApiUrl, albumPagePath, artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
 export interface SearchResult {
@@ -54,23 +59,35 @@ export function getTopBarSearchRecents(): string[] {
 export function addTopBarSearchRecent(term: string) {
   const recents = getTopBarSearchRecents().filter((recent) => recent !== term);
   recents.unshift(term);
-  localStorage.setItem(RECENTS_KEY, JSON.stringify(recents.slice(0, MAX_RECENTS)));
+  localStorage.setItem(
+    RECENTS_KEY,
+    JSON.stringify(recents.slice(0, MAX_RECENTS)),
+  );
 }
 
-export function flattenTopBarSearchResults(data: SearchResult): TopBarSearchItem[] {
+export function flattenTopBarSearchResults(
+  data: SearchResult,
+): TopBarSearchItem[] {
   const items: TopBarSearchItem[] = [];
 
   for (const artist of data.artists) {
     items.push({
       type: "artist",
       label: artist.name,
-      navigateTo: artistPagePath({ artistId: artist.id, artistSlug: artist.slug, artistName: artist.name }),
-      imageUrl: artistPhotoApiUrl({
+      navigateTo: artistPagePath({
         artistId: artist.id,
-        artistEntityUid: artist.entity_uid,
         artistSlug: artist.slug,
         artistName: artist.name,
-      }, { size: 128 }),
+      }),
+      imageUrl: artistPhotoApiUrl(
+        {
+          artistId: artist.id,
+          artistEntityUid: artist.entity_uid,
+          artistSlug: artist.slug,
+          artistName: artist.name,
+        },
+        { size: 128 },
+      ),
     });
   }
 
@@ -79,15 +96,23 @@ export function flattenTopBarSearchResults(data: SearchResult): TopBarSearchItem
       type: "album",
       label: album.name,
       sublabel: album.artist,
-      navigateTo: albumPagePath({ albumId: album.id, albumSlug: album.slug, artistName: album.artist, albumName: album.name }),
-      imageUrl: albumCoverApiUrl({
+      navigateTo: albumPagePath({
         albumId: album.id,
-        albumEntityUid: album.entity_uid,
-        artistEntityUid: album.artist_entity_uid,
         albumSlug: album.slug,
         artistName: album.artist,
         albumName: album.name,
-      }, { size: 128 }),
+      }),
+      imageUrl: albumCoverApiUrl(
+        {
+          albumId: album.id,
+          albumEntityUid: album.entity_uid,
+          artistEntityUid: album.artist_entity_uid,
+          albumSlug: album.slug,
+          artistName: album.artist,
+          albumName: album.name,
+        },
+        { size: 128 },
+      ),
     });
   }
 
@@ -96,14 +121,19 @@ export function flattenTopBarSearchResults(data: SearchResult): TopBarSearchItem
       type: "track",
       label: track.title,
       sublabel: `${track.artist} - ${track.album}`,
-      imageUrl: track.album ? albumCoverApiUrl({
-        albumId: track.album_id,
-        albumEntityUid: track.album_entity_uid,
-        artistEntityUid: track.artist_entity_uid,
-        albumSlug: track.album_slug,
-        artistName: track.artist,
-        albumName: track.album,
-      }, { size: 128 }) : undefined,
+      imageUrl: track.album
+        ? albumCoverApiUrl(
+            {
+              albumId: track.album_id,
+              albumEntityUid: track.album_entity_uid,
+              artistEntityUid: track.artist_entity_uid,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            },
+            { size: 128 },
+          )
+        : undefined,
       trackData: toPlayableTrack(track),
     });
   }

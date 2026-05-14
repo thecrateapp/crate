@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from crate.entity_ids import artist_entity_uid
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
 from crate.db.orm.library import LibraryArtist
-from crate.db.repositories.library_shared import allocate_unique_slug, coerce_uuid_or_none
+from crate.db.repositories.library_shared import (
+    allocate_unique_slug,
+    coerce_uuid_or_none,
+)
 from crate.db.tx import optional_scope
 from crate.slugs import build_artist_slug
 
@@ -24,12 +27,26 @@ def _select_existing_artist(
     requested_entity_uid,
     requested_mbid: str | None,
 ):
-    storage_match = LibraryArtist.storage_id == requested_storage_id if requested_storage_id is not None else false()
-    entity_match = LibraryArtist.entity_uid == requested_entity_uid if requested_entity_uid is not None else false()
+    storage_match = (
+        LibraryArtist.storage_id == requested_storage_id
+        if requested_storage_id is not None
+        else false()
+    )
+    entity_match = (
+        LibraryArtist.entity_uid == requested_entity_uid
+        if requested_entity_uid is not None
+        else false()
+    )
     folder_match = LibraryArtist.folder_name == folder_name if folder_name else false()
     name_match = func.lower(LibraryArtist.name) == func.lower(requested_name)
-    mbid_match = func.lower(LibraryArtist.mbid) == func.lower(requested_mbid) if requested_mbid else false()
-    identity_match = or_(mbid_match, name_match, folder_match, storage_match, entity_match)
+    mbid_match = (
+        func.lower(LibraryArtist.mbid) == func.lower(requested_mbid)
+        if requested_mbid
+        else false()
+    )
+    identity_match = or_(
+        mbid_match, name_match, folder_match, storage_match, entity_match
+    )
     priority = case(
         (mbid_match, 0),
         (entity_match, 1),
@@ -71,9 +88,15 @@ def _update_existing_artist(
     data: dict,
     now: datetime,
 ) -> str:
-    slug = existing_slug or allocate_unique_slug(session, LibraryArtist, build_artist_slug(canonical_name))
+    slug = existing_slug or allocate_unique_slug(
+        session, LibraryArtist, build_artist_slug(canonical_name)
+    )
     requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
-    entity_uid = existing_entity_uid or requested_entity_uid or artist_entity_uid(name=canonical_name, mbid=data.get("mbid"))
+    entity_uid = (
+        existing_entity_uid
+        or requested_entity_uid
+        or artist_entity_uid(name=canonical_name, mbid=data.get("mbid"))
+    )
     session.execute(
         update(LibraryArtist)
         .where(LibraryArtist.id == artist_id)
@@ -94,12 +117,38 @@ def _update_existing_artist(
             updated_at=now,
         )
     )
-    upsert_entity_identity_key(session, entity_type="artist", entity_uid=entity_uid, key_type="name", key_value=canonical_name, is_primary=True)
-    upsert_entity_identity_key(session, entity_type="artist", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+    upsert_entity_identity_key(
+        session,
+        entity_type="artist",
+        entity_uid=entity_uid,
+        key_type="name",
+        key_value=canonical_name,
+        is_primary=True,
+    )
+    upsert_entity_identity_key(
+        session,
+        entity_type="artist",
+        entity_uid=entity_uid,
+        key_type="slug",
+        key_value=slug,
+        is_primary=True,
+    )
     if data.get("mbid"):
-        upsert_entity_identity_key(session, entity_type="artist", entity_uid=entity_uid, key_type="mbid", key_value=data.get("mbid"))
+        upsert_entity_identity_key(
+            session,
+            entity_type="artist",
+            entity_uid=entity_uid,
+            key_type="mbid",
+            key_value=data.get("mbid"),
+        )
     if data.get("spotify_id"):
-        upsert_entity_identity_key(session, entity_type="artist", entity_uid=entity_uid, key_type="spotify_id", key_value=data.get("spotify_id"))
+        upsert_entity_identity_key(
+            session,
+            entity_type="artist",
+            entity_uid=entity_uid,
+            key_type="spotify_id",
+            key_value=data.get("spotify_id"),
+        )
     return canonical_name
 
 
@@ -120,7 +169,16 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             requested_mbid=requested_mbid,
         )
         if existing:
-            artist_id, canonical_name, existing_slug, existing_storage_id, existing_entity_uid, existing_folder_name, existing_mbid, existing_spotify_id = existing
+            (
+                artist_id,
+                canonical_name,
+                existing_slug,
+                existing_storage_id,
+                existing_entity_uid,
+                existing_folder_name,
+                existing_mbid,
+                existing_spotify_id,
+            ) = existing
             return _update_existing_artist(
                 s,
                 artist_id=int(artist_id),
@@ -138,7 +196,9 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             )
 
         slug = allocate_unique_slug(s, LibraryArtist, build_artist_slug(requested_name))
-        entity_uid = coerce_uuid_or_none(data.get("entity_uid")) or artist_entity_uid(name=requested_name, mbid=data.get("mbid"))
+        entity_uid = coerce_uuid_or_none(data.get("entity_uid")) or artist_entity_uid(
+            name=requested_name, mbid=data.get("mbid")
+        )
         insert_stmt = pg_insert(LibraryArtist).values(
             name=requested_name,
             storage_id=requested_storage_id,
@@ -159,12 +219,38 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
         try:
             with s.begin_nested():
                 s.execute(insert_stmt)
-                upsert_entity_identity_key(s, entity_type="artist", entity_uid=entity_uid, key_type="name", key_value=requested_name, is_primary=True)
-                upsert_entity_identity_key(s, entity_type="artist", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+                upsert_entity_identity_key(
+                    s,
+                    entity_type="artist",
+                    entity_uid=entity_uid,
+                    key_type="name",
+                    key_value=requested_name,
+                    is_primary=True,
+                )
+                upsert_entity_identity_key(
+                    s,
+                    entity_type="artist",
+                    entity_uid=entity_uid,
+                    key_type="slug",
+                    key_value=slug,
+                    is_primary=True,
+                )
                 if data.get("mbid"):
-                    upsert_entity_identity_key(s, entity_type="artist", entity_uid=entity_uid, key_type="mbid", key_value=data.get("mbid"))
+                    upsert_entity_identity_key(
+                        s,
+                        entity_type="artist",
+                        entity_uid=entity_uid,
+                        key_type="mbid",
+                        key_value=data.get("mbid"),
+                    )
                 if data.get("spotify_id"):
-                    upsert_entity_identity_key(s, entity_type="artist", entity_uid=entity_uid, key_type="spotify_id", key_value=data.get("spotify_id"))
+                    upsert_entity_identity_key(
+                        s,
+                        entity_type="artist",
+                        entity_uid=entity_uid,
+                        key_type="spotify_id",
+                        key_value=data.get("spotify_id"),
+                    )
         except IntegrityError:
             existing = _select_existing_artist(
                 s,
@@ -176,7 +262,16 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
             )
             if not existing:
                 raise
-            artist_id, canonical_name, existing_slug, existing_storage_id, existing_entity_uid, existing_folder_name, existing_mbid, existing_spotify_id = existing
+            (
+                artist_id,
+                canonical_name,
+                existing_slug,
+                existing_storage_id,
+                existing_entity_uid,
+                existing_folder_name,
+                existing_mbid,
+                existing_spotify_id,
+            ) = existing
             return _update_existing_artist(
                 s,
                 artist_id=int(artist_id),

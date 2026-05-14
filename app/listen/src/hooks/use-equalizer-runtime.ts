@@ -10,13 +10,17 @@ import {
   getEqualizerSnapshot,
   type EqualizerSnapshot,
 } from "@/lib/equalizer-prefs";
-import { androidNativeEngine, shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
+import {
+  androidNativeEngine,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
 import { setEqualizer as engineSetEqualizer } from "@/lib/gapless-player";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 
 const FLAT_GAINS: EqGains = new Array(EQ_BAND_COUNT).fill(0);
 export function useEqualizerSnapshotState() {
-  const [snapshot, setSnapshot] = useState<EqualizerSnapshot>(getEqualizerSnapshot);
+  const [snapshot, setSnapshot] =
+    useState<EqualizerSnapshot>(getEqualizerSnapshot);
 
   useEffect(() => {
     const sync = () => setSnapshot(getEqualizerSnapshot());
@@ -31,11 +35,19 @@ export function useEqualizerSnapshotState() {
   return [snapshot, setSnapshot] as const;
 }
 
-export function useResolvedEqualizer(snapshot: EqualizerSnapshot, currentTrack: Track | undefined) {
-  const featuresState = useEqFeatures(snapshot.adaptive ? currentTrack : undefined);
-  const features = featuresState.status === "ready" ? featuresState.features : null;
+export function useResolvedEqualizer(
+  snapshot: EqualizerSnapshot,
+  currentTrack: Track | undefined,
+) {
+  const featuresState = useEqFeatures(
+    snapshot.adaptive ? currentTrack : undefined,
+  );
+  const features =
+    featuresState.status === "ready" ? featuresState.features : null;
 
-  const genreState = useTrackGenre(snapshot.genreAdaptive ? currentTrack : undefined);
+  const genreState = useTrackGenre(
+    snapshot.genreAdaptive ? currentTrack : undefined,
+  );
   const trackGenre = genreState.status === "ready" ? genreState.genre : null;
 
   const effectiveGains: EqGains = useMemo(() => {
@@ -46,7 +58,13 @@ export function useResolvedEqualizer(snapshot: EqualizerSnapshot, currentTrack: 
       return preset.gains;
     }
     return snapshot.gains;
-  }, [features, snapshot.adaptive, snapshot.gains, snapshot.genreAdaptive, trackGenre]);
+  }, [
+    features,
+    snapshot.adaptive,
+    snapshot.gains,
+    snapshot.genreAdaptive,
+    trackGenre,
+  ]);
 
   return {
     effectiveGains,
@@ -64,11 +82,16 @@ export function useEqualizerRuntime(currentTrack: Track | undefined) {
   useEffect(() => {
     if (shouldUseAndroidNativePlayer()) {
       engineSetEqualizer(false, FLAT_GAINS);
-      void androidNativeEngine.setEq(snapshot.enabled, [...effectiveGains], 80).catch((error) => {
-        console.error("[native-player] failed to apply equalizer:", error);
-      });
+      void androidNativeEngine
+        .setEq(snapshot.enabled, [...effectiveGains], 80)
+        .catch((error) => {
+          console.error("[native-player] failed to apply equalizer:", error);
+        });
       return;
     }
-    engineSetEqualizer(canUseWebAudioEffects && snapshot.enabled, effectiveGains);
+    engineSetEqualizer(
+      canUseWebAudioEffects && snapshot.enabled,
+      effectiveGains,
+    );
   }, [effectiveGains, snapshot.enabled]);
 }

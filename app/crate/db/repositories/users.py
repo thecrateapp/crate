@@ -5,7 +5,6 @@ optional standalone mode.
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -15,11 +14,16 @@ from crate.db.tx import transaction_scope
 
 def get_user_by_id(user_id: int, *, session: Session | None = None) -> dict | None:
     """Fetch a user by primary key. Returns full row as dict."""
+
     def _impl(s: Session) -> dict | None:
-        row = s.execute(
-            text("SELECT * FROM users WHERE id = :id"),
-            {"id": user_id},
-        ).mappings().first()
+        row = (
+            s.execute(
+                text("SELECT * FROM users WHERE id = :id"),
+                {"id": user_id},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     if session is not None:
@@ -30,11 +34,16 @@ def get_user_by_id(user_id: int, *, session: Session | None = None) -> dict | No
 
 def get_user_by_email(email: str, *, session: Session | None = None) -> dict | None:
     """Fetch a user by email."""
+
     def _impl(s: Session) -> dict | None:
-        row = s.execute(
-            text("SELECT * FROM users WHERE email = :email"),
-            {"email": email},
-        ).mappings().first()
+        row = (
+            s.execute(
+                text("SELECT * FROM users WHERE email = :email"),
+                {"email": email},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     if session is not None:
@@ -43,13 +52,20 @@ def get_user_by_email(email: str, *, session: Session | None = None) -> dict | N
         return _impl(s)
 
 
-def get_user_by_username(username: str, *, session: Session | None = None) -> dict | None:
+def get_user_by_username(
+    username: str, *, session: Session | None = None
+) -> dict | None:
     """Fetch a user by username."""
+
     def _impl(s: Session) -> dict | None:
-        row = s.execute(
-            text("SELECT * FROM users WHERE username = :username"),
-            {"username": username},
-        ).mappings().first()
+        row = (
+            s.execute(
+                text("SELECT * FROM users WHERE username = :username"),
+                {"username": username},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     if session is not None:
@@ -106,8 +122,13 @@ def create_session_row(
 
 def count_users(*, session: Session | None = None) -> int:
     """Return total number of users."""
+
     def _impl(s: Session) -> int:
-        row = s.execute(text("SELECT COUNT(*)::INTEGER AS cnt FROM users")).mappings().first()
+        row = (
+            s.execute(text("SELECT COUNT(*)::INTEGER AS cnt FROM users"))
+            .mappings()
+            .first()
+        )
         return row["cnt"] if row else 0
 
     if session is not None:

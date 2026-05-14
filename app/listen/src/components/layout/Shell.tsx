@@ -1,9 +1,28 @@
-import { useState, useRef, useEffect, useMemo, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import {
-  Home, Compass, Rss, Library, Music, Disc, Heart, Users,
-  ListMusic, PanelLeftClose, PanelLeftOpen, ChevronRight, BarChart3, Zap, Loader2,
+  Home,
+  Compass,
+  Rss,
+  Library,
+  Music,
+  Disc,
+  Heart,
+  Users,
+  ListMusic,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronRight,
+  BarChart3,
+  Zap,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -19,7 +38,11 @@ const SIDEBAR_KEY = "listen-sidebar-expanded";
 const SIDEBAR_EVENT = "listen-sidebar-changed";
 
 function getStoredExpanded(): boolean {
-  try { return localStorage.getItem(SIDEBAR_KEY) !== "false"; } catch { return true; }
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) !== "false";
+  } catch {
+    return true;
+  }
 }
 
 // ── Sidebar ─────────────────────────────────────────────────────
@@ -31,7 +54,8 @@ function Sidebar() {
   const navigate = useNavigate();
   const { isPlaying, analyserVersion } = usePlayerState();
   const { playSource, currentTrack } = usePlayerActions();
-  const discoveryRadioActive = isPlaying && playSource?.radio?.seedType === "discovery";
+  const discoveryRadioActive =
+    isPlaying && playSource?.radio?.seedType === "discovery";
   const { frequenciesDb } = useAudioVisualizer(
     discoveryRadioActive,
     `sidebar:${currentTrack?.id ?? "none"}:${analyserVersion}`,
@@ -53,14 +77,19 @@ function Sidebar() {
     const next = !expanded;
     setExpanded(next);
     localStorage.setItem(SIDEBAR_KEY, String(next));
-    window.dispatchEvent(new CustomEvent(SIDEBAR_EVENT, { detail: { expanded: next } }));
+    window.dispatchEvent(
+      new CustomEvent(SIDEBAR_EVENT, { detail: { expanded: next } }),
+    );
   }
 
   // Close collection popup on outside click
   useEffect(() => {
     if (!collectionOpen) return;
     function handler(e: MouseEvent) {
-      if (collectionRef.current && !collectionRef.current.contains(e.target as Node)) {
+      if (
+        collectionRef.current &&
+        !collectionRef.current.contains(e.target as Node)
+      ) {
         setCollectionOpen(false);
       }
     }
@@ -77,9 +106,15 @@ function Sidebar() {
   }
 
   return (
-    <aside className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${w} flex flex-col border-r border-white/5 bg-app-surface transition-all duration-200`}>
+    <aside
+      className={`z-app-sidebar fixed top-0 left-0 bottom-0 ${w} flex flex-col border-r border-white/5 bg-app-surface transition-all duration-200`}
+    >
       {/* App icon / toggle */}
-      <div className={`flex items-center ${expanded ? "px-4 py-5 gap-3" : "justify-center py-5"}`}>
+      <div
+        className={`flex items-center ${
+          expanded ? "px-4 py-5 gap-3" : "justify-center py-5"
+        }`}
+      >
         {expanded ? (
           <>
             <div className="relative shrink-0">
@@ -87,7 +122,9 @@ function Sidebar() {
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-[-10px] rounded-[22px] bg-[radial-gradient(circle,rgba(34,211,238,0.34)_0%,rgba(45,212,191,0.18)_32%,rgba(14,165,233,0.08)_54%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
                 style={{
-                  opacity: discoveryRadioActive ? 0.22 + discoveryGlowStrength * 0.68 : 0,
+                  opacity: discoveryRadioActive
+                    ? 0.22 + discoveryGlowStrength * 0.68
+                    : 0,
                   filter: `blur(${12 + discoveryGlowStrength * 8}px)`,
                 }}
               />
@@ -97,28 +134,43 @@ function Sidebar() {
                 className="relative z-10 h-8 w-8 shrink-0 transition-[filter] duration-300"
                 style={{
                   filter: discoveryRadioActive
-                    ? `drop-shadow(0 0 ${10 + discoveryGlowStrength * 16}px rgba(34,211,238,${0.18 + discoveryGlowStrength * 0.24}))`
+                    ? `drop-shadow(0 0 ${
+                        10 + discoveryGlowStrength * 16
+                      }px rgba(34,211,238,${
+                        0.18 + discoveryGlowStrength * 0.24
+                      }))`
                     : "none",
                 }}
               />
             </div>
             <span
-              className={`text-sm font-bold flex-1 transition-[color,text-shadow] duration-300 ${discoveryRadioActive ? "text-cyan-50" : "text-white"}`}
+              className={`text-sm font-bold flex-1 transition-[color,text-shadow] duration-300 ${
+                discoveryRadioActive ? "text-cyan-50" : "text-white"
+              }`}
               style={{
                 textShadow: discoveryRadioActive
-                  ? `0 0 ${8 + discoveryGlowStrength * 10}px rgba(34,211,238,${0.12 + discoveryGlowStrength * 0.18})`
+                  ? `0 0 ${8 + discoveryGlowStrength * 10}px rgba(34,211,238,${
+                      0.12 + discoveryGlowStrength * 0.18
+                    })`
                   : "none",
               }}
             >
               Crate
             </span>
-            <button onClick={toggleExpanded} aria-label="Collapse sidebar" className="text-white/30 hover:text-white/60 transition-colors">
+            <button
+              onClick={toggleExpanded}
+              aria-label="Collapse sidebar"
+              className="text-white/30 hover:text-white/60 transition-colors"
+            >
               <PanelLeftClose size={18} />
             </button>
           </>
         ) : (
           <button
-            onClick={() => { toggleExpanded(); navigate("/"); }}
+            onClick={() => {
+              toggleExpanded();
+              navigate("/");
+            }}
             className="relative h-10 w-10 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors"
             aria-label="Expand sidebar"
           >
@@ -126,7 +178,9 @@ function Sidebar() {
               aria-hidden="true"
               className="pointer-events-none absolute inset-[-6px] rounded-[18px] bg-[radial-gradient(circle,rgba(34,211,238,0.32)_0%,rgba(45,212,191,0.14)_40%,transparent_72%)] blur-md transition-[opacity,filter] duration-300"
               style={{
-                opacity: discoveryRadioActive ? 0.2 + discoveryGlowStrength * 0.64 : 0,
+                opacity: discoveryRadioActive
+                  ? 0.2 + discoveryGlowStrength * 0.64
+                  : 0,
                 filter: `blur(${10 + discoveryGlowStrength * 7}px)`,
               }}
             />
@@ -136,7 +190,11 @@ function Sidebar() {
               className="relative z-10 h-6 w-6 transition-[filter] duration-300"
               style={{
                 filter: discoveryRadioActive
-                  ? `drop-shadow(0 0 ${8 + discoveryGlowStrength * 14}px rgba(34,211,238,${0.16 + discoveryGlowStrength * 0.22}))`
+                  ? `drop-shadow(0 0 ${
+                      8 + discoveryGlowStrength * 14
+                    }px rgba(34,211,238,${
+                      0.16 + discoveryGlowStrength * 0.22
+                    }))`
                   : "none",
               }}
             />
@@ -145,15 +203,20 @@ function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <nav className={`flex flex-col gap-1 ${expanded ? "px-3" : "items-center px-1"}`}>
+      <nav
+        className={`flex flex-col gap-1 ${
+          expanded ? "px-3" : "items-center px-1"
+        }`}
+      >
         {/* Home / Music */}
         <NavLink
           to="/"
           end
-
           title="Music"
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-lg transition-colors ${expanded ? "px-3 py-2" : "w-10 h-10 justify-center"} ${navClass(isActive)}`
+            `flex items-center gap-3 rounded-lg transition-colors ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${navClass(isActive)}`
           }
         >
           <Music size={20} />
@@ -163,10 +226,11 @@ function Sidebar() {
         {/* Explore */}
         <NavLink
           to="/explore"
-
           title="Explore"
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-lg transition-colors ${expanded ? "px-3 py-2" : "w-10 h-10 justify-center"} ${navClass(isActive)}`
+            `flex items-center gap-3 rounded-lg transition-colors ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${navClass(isActive)}`
           }
         >
           <Compass size={20} />
@@ -176,22 +240,26 @@ function Sidebar() {
         {/* Upcoming */}
         <NavLink
           to="/upcoming"
-
           title="Upcoming"
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-lg transition-colors ${expanded ? "px-3 py-2" : "w-10 h-10 justify-center"} ${navClass(isActive)}`
+            `flex items-center gap-3 rounded-lg transition-colors ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${navClass(isActive)}`
           }
         >
           <Rss size={20} />
-          {expanded && <span className="text-[13px] font-medium">Upcoming</span>}
+          {expanded && (
+            <span className="text-[13px] font-medium">Upcoming</span>
+          )}
         </NavLink>
 
         <NavLink
           to="/stats"
-
           title="Stats"
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-lg transition-colors ${expanded ? "px-3 py-2" : "w-10 h-10 justify-center"} ${navClass(isActive)}`
+            `flex items-center gap-3 rounded-lg transition-colors ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${navClass(isActive)}`
           }
         >
           <BarChart3 size={20} />
@@ -203,29 +271,61 @@ function Sidebar() {
           <button
             onClick={() => setCollectionOpen(!collectionOpen)}
             title="Collection"
-            className={`flex items-center gap-3 rounded-lg transition-colors w-full ${expanded ? "px-3 py-2" : "w-10 h-10 justify-center"} ${collectionOpen ? "bg-white/10 text-primary" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}
+            className={`flex items-center gap-3 rounded-lg transition-colors w-full ${
+              expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
+            } ${
+              collectionOpen
+                ? "bg-white/10 text-primary"
+                : "text-white/40 hover:text-white/70 hover:bg-white/5"
+            }`}
           >
             <Library size={20} />
             {expanded && (
               <>
-                <span className="text-[13px] font-medium flex-1 text-left">Collection</span>
-                <ChevronRight size={14} className={`transition-transform ${collectionOpen ? "rotate-90" : ""}`} />
+                <span className="text-[13px] font-medium flex-1 text-left">
+                  Collection
+                </span>
+                <ChevronRight
+                  size={14}
+                  className={`transition-transform ${
+                    collectionOpen ? "rotate-90" : ""
+                  }`}
+                />
               </>
             )}
           </button>
 
           {collectionOpen && (
-            <div className={`animate-submenu-in ${expanded ? "mt-1 ml-3 border-l border-white/5 pl-3" : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-white/10 bg-raised-surface py-2 shadow-2xl"}`}>
+            <div
+              className={`animate-submenu-in ${
+                expanded
+                  ? "mt-1 ml-3 border-l border-white/5 pl-3"
+                  : "absolute left-full top-0 ml-2 w-44 rounded-xl border border-white/10 bg-raised-surface py-2 shadow-2xl"
+              }`}
+            >
               {[
-                { to: "/library?tab=playlists", icon: ListMusic, label: "Playlists" },
+                {
+                  to: "/library?tab=playlists",
+                  icon: ListMusic,
+                  label: "Playlists",
+                },
                 { to: "/library?tab=albums", icon: Disc, label: "Albums" },
-                { to: "/library?tab=liked", icon: Heart, label: "Liked Tracks" },
+                {
+                  to: "/library?tab=liked",
+                  icon: Heart,
+                  label: "Liked Tracks",
+                },
                 { to: "/library?tab=artists", icon: Users, label: "Artists" },
               ].map(({ to, icon: Icon, label }) => (
                 <button
                   key={label}
-                  onClick={() => { navigate(to); setCollectionOpen(false); }}
-                  className={`flex items-center gap-3 rounded-lg transition-colors w-full text-left text-white/40 hover:text-white/70 hover:bg-white/5 ${expanded ? "px-3 py-1.5" : "px-4 py-2"}`}
+                  onClick={() => {
+                    navigate(to);
+                    setCollectionOpen(false);
+                  }}
+                  className={`flex items-center gap-3 rounded-lg transition-colors w-full text-left text-white/40 hover:text-white/70 hover:bg-white/5 ${
+                    expanded ? "px-3 py-1.5" : "px-4 py-2"
+                  }`}
                 >
                   <Icon size={16} />
                   <span className="text-[12px] font-medium">{label}</span>
@@ -239,7 +339,11 @@ function Sidebar() {
       {/* Bottom: collapse toggle (only in expanded mode) */}
       {!expanded && (
         <div className="mt-auto flex justify-center pb-4">
-          <button onClick={toggleExpanded} aria-label="Expand sidebar" className="text-white/20 hover:text-white/40 transition-colors">
+          <button
+            onClick={toggleExpanded}
+            aria-label="Expand sidebar"
+            className="text-white/20 hover:text-white/40 transition-colors"
+          >
             <PanelLeftOpen size={16} />
           </button>
         </div>
@@ -261,7 +365,10 @@ const DISCOVERY_LONG_PRESS_MS = 2400;
 const DISCOVERY_HOLD_CIRCUMFERENCE = 157;
 
 function hasOverlayHeader(pathname: string) {
-  if (/^\/artists\/[^/]+$/.test(pathname) || /^\/albums\/[^/]+\/[^/]+$/.test(pathname)) {
+  if (
+    /^\/artists\/[^/]+$/.test(pathname) ||
+    /^\/albums\/[^/]+\/[^/]+$/.test(pathname)
+  ) {
     return true;
   }
   const artistChildMatch = pathname.match(/^\/artists\/([^/]+)\/([^/]+)$/);
@@ -310,9 +417,11 @@ export function Shell() {
 
   const sidebarW = sidebarExpanded ? "ml-52" : "ml-14";
   const sidebarLeft = sidebarExpanded ? "left-52" : "left-14";
-  const discoveryRadioActive = isPlaying && playSource?.radio?.seedType === "discovery";
+  const discoveryRadioActive =
+    isPlaying && playSource?.radio?.seedType === "discovery";
   const discoveryLongPressRequired = hasTrack && !discoveryRadioActive;
-  const discoveryHoldDashOffset = DISCOVERY_HOLD_CIRCUMFERENCE * (1 - discoveryHoldProgress);
+  const discoveryHoldDashOffset =
+    DISCOVERY_HOLD_CIRCUMFERENCE * (1 - discoveryHoldProgress);
 
   function clearDiscoveryHold() {
     if (discoveryHoldTimerRef.current !== null) {
@@ -332,7 +441,9 @@ export function Shell() {
     const progress = Math.min(1, elapsed / DISCOVERY_LONG_PRESS_MS);
     setDiscoveryHoldProgress(progress);
     if (progress < 1) {
-      discoveryHoldFrameRef.current = window.requestAnimationFrame(() => animateDiscoveryHold(startedAt));
+      discoveryHoldFrameRef.current = window.requestAnimationFrame(() =>
+        animateDiscoveryHold(startedAt),
+      );
     }
   }
 
@@ -369,7 +480,9 @@ export function Shell() {
     void startDiscoveryRadioFromDock();
   }
 
-  function handleDiscoveryRadioPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+  function handleDiscoveryRadioPointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
     if (!discoveryLongPressRequired || startingDiscoveryRadio) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -377,7 +490,9 @@ export function Shell() {
     setDiscoveryHoldActive(true);
     setDiscoveryHoldProgress(0);
     const startedAt = performance.now();
-    discoveryHoldFrameRef.current = window.requestAnimationFrame(() => animateDiscoveryHold(startedAt));
+    discoveryHoldFrameRef.current = window.requestAnimationFrame(() =>
+      animateDiscoveryHold(startedAt),
+    );
     discoveryHoldTimerRef.current = window.setTimeout(() => {
       discoveryHoldTimerRef.current = null;
       if (discoveryHoldFrameRef.current !== null) {
@@ -404,7 +519,7 @@ export function Shell() {
   }, []);
 
   if (isDesktop) {
-      return (
+    return (
       <div className="flex min-h-screen bg-app-surface">
         <Sidebar />
 
@@ -414,8 +529,16 @@ export function Shell() {
           <TopBar />
         </div>
 
-        <main className={`relative z-0 flex-1 ${sidebarW} overflow-x-hidden transition-all duration-200 ${hasTrack ? "pb-[90px]" : ""}`}>
-          <div className={`mx-auto w-full max-w-[1560px] ${desktopContentPadClass} ${sidebarExpanded ? "px-6" : "px-10"} transition-all duration-200 ${headerOffsetClass}`}>
+        <main
+          className={`relative z-0 flex-1 ${sidebarW} overflow-x-hidden transition-all duration-200 ${
+            hasTrack ? "pb-[90px]" : ""
+          }`}
+        >
+          <div
+            className={`mx-auto w-full max-w-[1560px] ${desktopContentPadClass} ${
+              sidebarExpanded ? "px-6" : "px-10"
+            } transition-all duration-200 ${headerOffsetClass}`}
+          >
             <Outlet />
           </div>
         </main>
@@ -472,7 +595,8 @@ export function Shell() {
           hasTrack ? "rounded-b-[2rem] border-t-0" : "rounded-[2rem]"
         }`}
         style={{
-          bottom: "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset))",
+          bottom:
+            "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset))",
           left: "max(1rem, var(--listen-safe-left))",
           right: "max(1rem, var(--listen-safe-right))",
           height: "var(--listen-mobile-bottom-nav-content-height)",
@@ -483,13 +607,18 @@ export function Shell() {
             key={to}
             to={to}
             end={to === "/"}
-  
             className={({ isActive }) =>
-              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${isActive ? "bg-white/[0.07] text-primary" : "text-white/[0.42] hover:text-white/70"}`
+              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${
+                isActive
+                  ? "bg-white/[0.07] text-primary"
+                  : "text-white/[0.42] hover:text-white/70"
+              }`
             }
           >
             <Icon size={20} />
-            <span className="max-w-full truncate text-[9.5px] leading-none">{label}</span>
+            <span className="max-w-full truncate text-[9.5px] leading-none">
+              {label}
+            </span>
           </NavLink>
         ))}
         <button
@@ -501,7 +630,11 @@ export function Shell() {
                 ? "Hold to start Discovery Radio"
                 : "Start Discovery Radio"
           }
-          title={discoveryLongPressRequired ? "Hold to start Discovery Radio" : undefined}
+          title={
+            discoveryLongPressRequired
+              ? "Hold to start Discovery Radio"
+              : undefined
+          }
           onClick={() => void handleDiscoveryRadioTap()}
           onPointerDown={handleDiscoveryRadioPointerDown}
           onPointerUp={clearDiscoveryHold}
@@ -536,7 +669,13 @@ export function Shell() {
                   className="pointer-events-none absolute -inset-[7px] h-[58px] w-[58px] -rotate-90 overflow-visible"
                 >
                   <defs>
-                    <linearGradient id="discovery-hold-gradient" x1="0" y1="0" x2="1" y2="1">
+                    <linearGradient
+                      id="discovery-hold-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="1"
+                      y2="1"
+                    >
                       <stop offset="0%" stopColor="rgba(6,182,212,0.12)" />
                       <stop offset="58%" stopColor="rgba(34,211,238,0.72)" />
                       <stop offset="100%" stopColor="rgba(207,250,254,0.96)" />
@@ -586,11 +725,17 @@ export function Shell() {
             to={to}
             end={to === "/"}
             className={({ isActive }) =>
-              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${isActive ? "bg-white/[0.07] text-primary" : "text-white/[0.42] hover:text-white/70"}`
+              `flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-[1.35rem] px-1.5 py-1.5 transition-colors active:bg-white/[0.06] ${
+                isActive
+                  ? "bg-white/[0.07] text-primary"
+                  : "text-white/[0.42] hover:text-white/70"
+              }`
             }
           >
             <Icon size={20} />
-            <span className="max-w-full truncate text-[9.5px] leading-none">{label}</span>
+            <span className="max-w-full truncate text-[9.5px] leading-none">
+              {label}
+            </span>
           </NavLink>
         ))}
       </nav>

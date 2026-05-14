@@ -3,32 +3,40 @@
 from unittest.mock import patch
 
 import pytest
+from sqlalchemy import text
 
+from crate.db.tx import read_scope
 from tests.conftest import PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
 
 class TestUserListeningAggregates:
-    def test_recompute_user_listening_aggregates_populates_daily_and_entity_stats(self, pg_db):
+    def test_recompute_user_listening_aggregates_populates_daily_and_entity_stats(
+        self, pg_db
+    ):
         pg_db.upsert_artist({"name": "Converge"})
-        album_id = pg_db.upsert_album({
-            "artist": "Converge",
-            "name": "Jane Doe",
-            "path": "/music/Converge/Jane Doe",
-        })
-        pg_db.upsert_track({
-            "album_id": album_id,
-            "artist": "Converge",
-            "album": "Jane Doe",
-            "filename": "01 - Concubine.flac",
-            "title": "Concubine",
-            "track_number": 1,
-            "format": "flac",
-            "genre": "Metalcore",
-            "duration": 94.0,
-            "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
-        })
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "Converge",
+                "name": "Jane Doe",
+                "path": "/music/Converge/Jane Doe",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "Converge",
+                "album": "Jane Doe",
+                "filename": "01 - Concubine.flac",
+                "title": "Concubine",
+                "track_number": 1,
+                "format": "flac",
+                "genre": "Metalcore",
+                "duration": 94.0,
+                "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
+            }
+        )
 
         track = pg_db.get_library_tracks(album_id)[0]
 
@@ -58,19 +66,29 @@ class TestUserListeningAggregates:
         assert event_id is not None
         pg_db.recompute_user_listening_aggregates(1)
 
-        with pg_db.get_db_ctx() as cur:
-            cur.execute(
-                "SELECT track_entity_uid::text AS track_entity_uid FROM user_play_events WHERE id = %s",
-                (event_id,),
+        with read_scope() as session:
+            event_row = (
+                session.execute(
+                    text(
+                        "SELECT track_entity_uid::text AS track_entity_uid FROM user_play_events WHERE id = :id"
+                    ),
+                    {"id": event_id},
+                )
+                .mappings()
+                .first()
             )
-            event_row = cur.fetchone()
             assert event_row["track_entity_uid"] == track["entity_uid"]
 
-            cur.execute(
-                "SELECT * FROM user_daily_listening WHERE user_id = %s AND day = %s",
-                (1, "2026-04-01"),
+            daily = (
+                session.execute(
+                    text(
+                        "SELECT * FROM user_daily_listening WHERE user_id = :user_id AND day = :day"
+                    ),
+                    {"user_id": 1, "day": "2026-04-01"},
+                )
+                .mappings()
+                .first()
             )
-            daily = cur.fetchone()
             assert daily["play_count"] == 1
             assert daily["skip_count"] == 1
             assert daily["complete_play_count"] == 0
@@ -79,56 +97,79 @@ class TestUserListeningAggregates:
             assert daily["unique_artists"] == 1
             assert daily["unique_albums"] == 1
 
-            cur.execute(
-                """
-                SELECT artist_name, play_count, minutes_listened
-                FROM user_artist_stats
-                WHERE user_id = %s AND stat_window = 'all_time'
-                """,
-                (1,),
+            artist_stats = (
+                session.execute(
+                    text(
+                        """
+                    SELECT artist_name, play_count, minutes_listened
+                    FROM user_artist_stats
+                    WHERE user_id = :user_id AND stat_window = 'all_time'
+                    """
+                    ),
+                    {"user_id": 1},
+                )
+                .mappings()
+                .first()
             )
-            artist_stats = cur.fetchone()
             assert artist_stats["artist_name"] == "Converge"
             assert artist_stats["play_count"] == 1
 
-            cur.execute(
-                """
-                SELECT genre_name, play_count
-                FROM user_genre_stats
-                WHERE user_id = %s AND stat_window = 'all_time'
-                """,
-                (1,),
+            genre_stats = (
+                session.execute(
+                    text(
+                        """
+                    SELECT genre_name, play_count
+                    FROM user_genre_stats
+                    WHERE user_id = :user_id AND stat_window = 'all_time'
+                    """
+                    ),
+                    {"user_id": 1},
+                )
+                .mappings()
+                .first()
             )
-            genre_stats = cur.fetchone()
             assert genre_stats["genre_name"] == "Metalcore"
             assert genre_stats["play_count"] == 1
 
     def test_record_play_event_is_idempotent_per_user_client_event_id(self, pg_db):
         pg_db.upsert_artist({"name": "Converge"})
-        album_id = pg_db.upsert_album({
-            "artist": "Converge",
-            "name": "Jane Doe",
-            "path": "/music/Converge/Jane Doe",
-        })
-        pg_db.upsert_track({
-            "album_id": album_id,
-            "artist": "Converge",
-            "album": "Jane Doe",
-            "filename": "01 - Concubine.flac",
-            "title": "Concubine",
-            "track_number": 1,
-            "format": "flac",
-            "genre": "Metalcore",
-            "duration": 94.0,
-            "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
-        })
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "Converge",
+                "name": "Jane Doe",
+                "path": "/music/Converge/Jane Doe",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "Converge",
+                "album": "Jane Doe",
+                "filename": "01 - Concubine.flac",
+                "title": "Concubine",
+                "track_number": 1,
+                "format": "flac",
+                "genre": "Metalcore",
+                "duration": 94.0,
+                "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
+            }
+        )
 
         track = pg_db.get_library_tracks(album_id)[0]
 
-        with patch("crate.db.repositories.user_library_playback_writes.create_task_dedup") as mock_enqueue, \
-             patch("crate.db.repositories.user_library_playback_writes.get_cache", return_value=None), \
-             patch("crate.db.repositories.user_library_playback_writes.set_cache") as _mock_set_cache, \
-             patch("crate.actors.scrobble_play_event_actor.send") as mock_scrobble:
+        with (
+            patch(
+                "crate.db.repositories.user_library_playback_writes.create_task_dedup"
+            ) as mock_enqueue,
+            patch(
+                "crate.db.repositories.user_library_playback_writes.get_cache",
+                return_value=None,
+            ),
+            patch(
+                "crate.db.repositories.user_library_playback_writes.set_cache"
+            ) as _mock_set_cache,
+            patch("crate.actors.scrobble_play_event_actor.send") as mock_scrobble,
+        ):
             first_id = pg_db.record_play_event(
                 1,
                 client_event_id="evt-converge-001",
@@ -177,18 +218,25 @@ class TestUserListeningAggregates:
             )
 
         assert first_id == second_id
-        mock_enqueue.assert_called_once_with("refresh_user_listening_stats", {"user_id": 1})
+        mock_enqueue.assert_called_once_with(
+            "refresh_user_listening_stats", {"user_id": 1}
+        )
         mock_scrobble.assert_called_once()
 
-        with pg_db.get_db_ctx() as cur:
-            cur.execute(
-                """
-                SELECT COUNT(*) AS cnt
-                FROM user_play_events
-                WHERE user_id = %s AND client_event_id = %s
-                """,
-                (1, "evt-converge-001"),
+        with read_scope() as session:
+            row = (
+                session.execute(
+                    text(
+                        """
+                    SELECT COUNT(*) AS cnt
+                    FROM user_play_events
+                    WHERE user_id = :user_id AND client_event_id = :client_event_id
+                    """
+                    ),
+                    {"user_id": 1, "client_event_id": "evt-converge-001"},
+                )
+                .mappings()
+                .first()
             )
-            row = cur.fetchone()
 
         assert row["cnt"] == 1

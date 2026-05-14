@@ -1,12 +1,21 @@
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { Link } from "react-router";
 import {
-  CalendarCheck, CalendarPlus, ExternalLink, Loader2,
-  MapPin, Play, X,
+  CalendarCheck,
+  CalendarPlus,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  Play,
+  X,
 } from "lucide-react";
 
 import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
-import { artistBackgroundApiUrl, artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistBackgroundApiUrl,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 
 /** Hidden img that preloads the artist background into the browser cache */
 function PreloadBackground({ item }: { item: UpcomingItem }) {
@@ -55,14 +64,22 @@ export function UpcomingShowCollapsedView({
   onToggleAttendance,
 }: CollapsedViewProps) {
   const artistImageUrl =
-    artistPhotoApiUrl({ artistId: item.artist_id, artistSlug: item.artist_slug, artistName: item.artist })
-    || item.cover_url
-    || undefined;
+    artistPhotoApiUrl({
+      artistId: item.artist_id,
+      artistSlug: item.artist_slug,
+      artistName: item.artist,
+    }) ||
+    item.cover_url ||
+    undefined;
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;
-  const monthStr = d ? d.toLocaleDateString("en-US", { month: "short" }).toUpperCase() : "";
+  const monthStr = d
+    ? d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+    : "";
   const dayStr = d ? String(d.getDate()) : "";
-  const dowStr = d ? d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase() : "";
+  const dowStr = d
+    ? d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+    : "";
   const support = (item.lineup || []).slice(1);
 
   return (
@@ -77,7 +94,9 @@ export function UpcomingShowCollapsedView({
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         )}
       </div>
@@ -85,8 +104,15 @@ export function UpcomingShowCollapsedView({
       {/* Center info */}
       <div className="flex-1 min-w-0 px-3 py-2.5">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[13px] font-semibold text-foreground">{item.artist}</span>
-          {attending && <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-primary" title="Attending" />}
+          <span className="truncate text-[13px] font-semibold text-foreground">
+            {item.artist}
+          </span>
+          {attending && (
+            <span
+              className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-primary"
+              title="Attending"
+            />
+          )}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
           <MapPin size={10} className="flex-shrink-0 text-primary/60" />
@@ -108,15 +134,24 @@ export function UpcomingShowCollapsedView({
 
       {/* Date block */}
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">{monthStr}</span>
-        <span className="text-[20px] font-black leading-tight text-primary">{dayStr}</span>
-        <span className="text-[8px] font-medium leading-none text-white/40">{dowStr}</span>
+        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+          {monthStr}
+        </span>
+        <span className="text-[20px] font-black leading-tight text-primary">
+          {dayStr}
+        </span>
+        <span className="text-[8px] font-medium leading-none text-white/40">
+          {dowStr}
+        </span>
       </div>
 
       {/* Quick attendance + menu */}
       <div className="flex flex-shrink-0 flex-col items-center gap-1 pr-2">
         <button
-          onClick={(e) => { e.stopPropagation(); void onToggleAttendance(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            void onToggleAttendance();
+          }}
           disabled={!item.id || savingAttendance}
           title={attending ? "Attending" : "Mark as attending"}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/8 hover:text-white/60 disabled:opacity-30"
@@ -157,18 +192,31 @@ export function UpcomingShowExpandedView({
     artistName: item.artist,
   });
   const artistPhotoUrl =
-    artistPhotoApiUrl({ artistId: item.artist_id, artistSlug: item.artist_slug, artistName: item.artist })
-    || item.cover_url
-    || undefined;
+    artistPhotoApiUrl({
+      artistId: item.artist_id,
+      artistSlug: item.artist_slug,
+      artistName: item.artist,
+    }) ||
+    item.cover_url ||
+    undefined;
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;
   const dateLabel = d
-    ? d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+    ? d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
     : "";
   const timeLabel = item.time ? item.time.slice(0, 5) : "";
   const support = (item.lineup || []).slice(1);
-  const locationLabel = [item.city, item.region, item.country].filter(Boolean).join(", ");
-  const addressLabel = [item.address_line1, item.postal_code].filter(Boolean).join(" · ");
+  const locationLabel = [item.city, item.region, item.country]
+    .filter(Boolean)
+    .join(", ");
+  const addressLabel = [item.address_line1, item.postal_code]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="relative flex h-full flex-col">
@@ -179,7 +227,9 @@ export function UpcomingShowExpandedView({
             src={backgroundUrl}
             alt=""
             className="absolute inset-0 h-full w-full object-cover brightness-[0.4] saturate-[0.7]"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
@@ -187,7 +237,6 @@ export function UpcomingShowExpandedView({
 
       {/* Top section — close button, date, artist overlay */}
       <div className="relative h-[130px] flex-shrink-0">
-
         {/* Close */}
         <button
           onClick={onClose}
@@ -198,8 +247,12 @@ export function UpcomingShowExpandedView({
 
         {/* Date + time */}
         <div className="absolute top-2.5 right-3 z-10 text-right">
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">{dateLabel}</div>
-          {timeLabel && <div className="text-[10px] text-white/40">{timeLabel}</div>}
+          <div className="text-[10px] font-bold tracking-wide text-primary/70">
+            {dateLabel}
+          </div>
+          {timeLabel && (
+            <div className="text-[10px] text-white/40">{timeLabel}</div>
+          )}
         </div>
 
         {/* Artist + lineup overlay */}
@@ -210,12 +263,17 @@ export function UpcomingShowExpandedView({
                 src={artistPhotoUrl}
                 alt=""
                 className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
               />
             )}
             <div className="min-w-0">
               <Link
-                to={artistPagePath({ artistId: item.artist_id, artistSlug: item.artist_slug })}
+                to={artistPagePath({
+                  artistId: item.artist_id,
+                  artistSlug: item.artist_slug,
+                })}
                 className="block truncate text-sm font-bold text-white transition-colors hover:text-primary"
               >
                 {item.artist}
@@ -237,8 +295,12 @@ export function UpcomingShowExpandedView({
           <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
           <div className="min-w-0">
             <span className="font-medium text-white/70">{item.venue}</span>
-            {addressLabel && <span className="text-white/40"> · {addressLabel}</span>}
-            {locationLabel && <div className="text-white/40">{locationLabel}</div>}
+            {addressLabel && (
+              <span className="text-white/40"> · {addressLabel}</span>
+            )}
+            {locationLabel && (
+              <div className="text-white/40">{locationLabel}</div>
+            )}
           </div>
         </div>
 
@@ -259,7 +321,10 @@ export function UpcomingShowExpandedView({
         {/* Action buttons — 3 equal width */}
         <div className="mt-3 flex gap-2">
           <button
-            onClick={(e) => { e.stopPropagation(); void onToggleAttendance(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              void onToggleAttendance();
+            }}
             disabled={!item.id || savingAttendance}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border py-2.5 text-[11px] font-semibold transition-colors ${
               attending
@@ -281,19 +346,27 @@ export function UpcomingShowExpandedView({
             disabled={!item.probable_setlist?.length || playingSetlist}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-primary/20 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/8 disabled:opacity-25"
           >
-            {playingSetlist ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} className="fill-current" />}
+            {playingSetlist ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Play size={13} className="fill-current" />
+            )}
             Play Setlist
           </button>
           <a
             href={item.url || "#"}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => { if (!item.url) e.preventDefault(); }}
+            onClick={(e) => {
+              if (!item.url) e.preventDefault();
+            }}
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
           >
             <ExternalLink size={13} />
             Get Tickets
-            {item.status === "onsale" && <span className="h-[5px] w-[5px] rounded-full bg-green-400" />}
+            {item.status === "onsale" && (
+              <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
+            )}
           </a>
         </div>
       </div>

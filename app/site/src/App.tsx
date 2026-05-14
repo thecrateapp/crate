@@ -24,8 +24,7 @@ function StickyCTA() {
     const onScroll = () => {
       const scrolled = window.scrollY > 400;
       const nearBottom =
-        window.innerHeight + window.scrollY >=
-        document.body.offsetHeight - 200;
+        window.innerHeight + window.scrollY >= document.body.offsetHeight - 200;
       setVisible(scrolled && !nearBottom);
     };
     window.addEventListener("scroll", onScroll, { passive: true });

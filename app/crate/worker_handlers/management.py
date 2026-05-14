@@ -2,12 +2,17 @@ import logging
 import shutil
 from pathlib import Path
 
-from crate.task_progress import TaskProgress, emit_progress
 from crate.db.audit import log_audit, wipe_library_tables
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.cache_store import delete_cache, set_cache
 from crate.db.events import emit_task_event
 from crate.db.health import get_open_issues, resolve_issue
+from crate.db.jobs.management import (
+    apply_mbid_to_album,
+    find_album_path,
+    find_album_path_for_match,
+    rename_artist_in_db,
+)
 from crate.db.repositories.library import (
     delete_album as db_delete_album,
     delete_artist as db_delete_artist,
@@ -28,20 +33,13 @@ from crate.db.repositories.playlists import (
     update_playlist,
 )
 from crate.db.repositories.tasks import create_task
-
-
-def _escape_like(value: str) -> str:
-    """Escape SQL LIKE metacharacters and prepend wildcard for year-prefix matching."""
-    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    return f"% - {escaped}"
-
-from crate.db.jobs.management import (
-    apply_mbid_to_album,
-    find_album_path,
-    find_album_path_for_match,
-    rename_artist_in_db,
+from crate.task_progress import TaskProgress, emit_progress
+from crate.worker_handlers import (
+    DEFAULT_AUDIO_EXTENSIONS,
+    TaskHandler,
+    is_cancelled,
+    start_scan,
 )
-from crate.worker_handlers import DEFAULT_AUDIO_EXTENSIONS, TaskHandler, is_cancelled, start_scan
 
 log = logging.getLogger(__name__)
 
@@ -54,6 +52,12 @@ ENRICHMENT_CACHE_PREFIXES = (
     "nd:artist:",
     "spotify:artist:",
 )
+
+
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE metacharacters and prepend wildcard for year-prefix matching."""
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"% - {escaped}"
 
 
 def _mark_processing(artist_name: str):
@@ -76,9 +80,7 @@ def _handle_health_check(task_id: str, params: dict, config: dict) -> dict:
         emit_progress(task_id, p_hc)
 
     checker = LibraryHealthCheck(config)
-    report = checker.run(
-        progress_callback=_hc_progress
-    )
+    report = checker.run(progress_callback=_hc_progress)
     set_cache("health_report", report, ttl=3600)
     issue_count = len(report.get("issues", []))
     emit_task_event(
@@ -144,17 +146,28 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         def _repair_event(data: dict):
             level = str(data.get("level") or "info").lower()
             explicit_event_type = str(data.get("event_type") or "").strip().lower()
-            event_type = (
-                explicit_event_type
-                or ("warning" if level in {"warn", "warning"} else "error" if level == "error" else "info")
+            event_type = explicit_event_type or (
+                "warning"
+                if level in {"warn", "warning"}
+                else "error"
+                if level == "error"
+                else "info"
             )
-            payload = {k: v for k, v in data.items() if k not in {"level", "event_type"}}
+            payload = {
+                k: v for k, v in data.items() if k not in {"level", "event_type"}
+            }
             payload.setdefault("category", "repair")
             emit_task_event(task_id, event_type, payload)
             if dry_run or event_type != "item":
                 return
             outcome = str(payload.get("outcome") or "").strip().lower()
-            if outcome not in {"started", "applied", "skipped", "failed", "unsupported"}:
+            if outcome not in {
+                "started",
+                "applied",
+                "skipped",
+                "failed",
+                "unsupported",
+            }:
                 return
             append_domain_event(
                 f"library.repair.item.{outcome}",
@@ -184,11 +197,13 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         action_count = len(result.get("actions", []))
         resolved_ids = result.get("resolved_ids", [])
         repair_summary = result.get("summary") or {}
-        applied_check_types = sorted({
-            str(item.get("check_type"))
-            for item in result.get("item_results", [])
-            if item.get("outcome") == "applied" and item.get("check_type")
-        })
+        applied_check_types = sorted(
+            {
+                str(item.get("check_type"))
+                for item in result.get("item_results", [])
+                if item.get("outcome") == "applied" and item.get("check_type")
+            }
+        )
         global_revalidation_check_types = []
         artist_revalidation_check_types = []
         skipped_revalidation_check_types = []
@@ -197,7 +212,10 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
 
             for check_type in applied_check_types:
                 catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
-                if catalog_entry is not None and not catalog_entry.supports_global_scope:
+                if (
+                    catalog_entry is not None
+                    and not catalog_entry.supports_global_scope
+                ):
                     if check_type == "artist_layout_fix":
                         artist_revalidation_check_types.append(check_type)
                     else:
@@ -214,7 +232,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                 try:
                     resolve_issue(issue_id)
                 except Exception:
-                    log.debug("Failed to mark issue %s as resolved", issue_id, exc_info=True)
+                    log.debug(
+                        "Failed to mark issue %s as resolved", issue_id, exc_info=True
+                    )
             publish_health_surface_signal()
 
         # Collect unique artists that need re-enrichment from repair actions
@@ -242,7 +262,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     ):
                         enqueued_enrich += 1
                 except Exception:
-                    log.debug("Failed to queue enrichment for %s", artist, exc_info=True)
+                    log.debug(
+                        "Failed to queue enrichment for %s", artist, exc_info=True
+                    )
 
         if not dry_run and artist_revalidation_check_types and affected_artists:
             p_revalidate_artist = TaskProgress(phase="revalidate", phase_count=1)
@@ -250,7 +272,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
             def _revalidate_artist_progress(data):
                 p_revalidate_artist.done = data.get("done", p_revalidate_artist.done)
                 p_revalidate_artist.total = data.get("total", p_revalidate_artist.total)
-                p_revalidate_artist.item = data.get("artist") or data.get("check") or p_revalidate_artist.item
+                p_revalidate_artist.item = (
+                    data.get("artist") or data.get("check") or p_revalidate_artist.item
+                )
                 emit_progress(task_id, p_revalidate_artist)
 
             emit_task_event(
@@ -396,7 +420,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                     "issue_count": len(revalidation_result.get("issues", [])),
                     "summary": revalidation_result.get("summary", {}),
                     "duration_ms": revalidation_result.get("duration_ms"),
-                } if revalidation_result is not None else None,
+                }
+                if revalidation_result is not None
+                else None,
             },
         )
         if not dry_run:
@@ -416,7 +442,9 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
                         "issue_count": len(revalidation_result.get("issues", [])),
                         "summary": revalidation_result.get("summary", {}),
                         "duration_ms": revalidation_result.get("duration_ms"),
-                    } if revalidation_result is not None else None,
+                    }
+                    if revalidation_result is not None
+                    else None,
                 },
                 scope="ops",
                 subject_key=task_id,
@@ -584,8 +612,16 @@ def _handle_delete_artist(task_id: str, params: dict, config: dict) -> dict:
     for prefix in ENRICHMENT_CACHE_PREFIXES:
         delete_cache(f"{prefix}{name.lower()}")
 
-    emit_task_event(task_id, "info", {"message": f"Deleted artist: {name}", "mode": mode})
-    log_audit("delete_artist", "artist", name, details={"mode": mode, "folder": folder}, task_id=task_id)
+    emit_task_event(
+        task_id, "info", {"message": f"Deleted artist: {name}", "mode": mode}
+    )
+    log_audit(
+        "delete_artist",
+        "artist",
+        name,
+        details={"mode": mode, "folder": folder},
+        task_id=task_id,
+    )
 
     if mode == "full":
         start_scan()
@@ -629,7 +665,13 @@ def _handle_delete_album(task_id: str, params: dict, config: dict) -> dict:
         "info",
         {"message": f"Deleted album: {artist_name}/{album_name}", "mode": mode},
     )
-    log_audit("delete_album", "album", f"{artist_name}/{album_name}", details={"mode": mode}, task_id=task_id)
+    log_audit(
+        "delete_album",
+        "album",
+        f"{artist_name}/{album_name}",
+        details={"mode": mode},
+        task_id=task_id,
+    )
 
     if mode == "full":
         start_scan()
@@ -659,9 +701,13 @@ def _handle_move_artist(task_id: str, params: dict, config: dict) -> dict:
         import mutagen
 
         for audio_file in new_dir.rglob("*"):
-            if audio_file.is_file() and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS:
+            if (
+                audio_file.is_file()
+                and audio_file.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            ):
                 try:
-                    mf = mutagen.File(audio_file, easy=True)
+                    mutagen_file = getattr(mutagen, "File")
+                    mf = mutagen_file(audio_file, easy=True)
                     if mf is not None:
                         mf["albumartist"] = new_name
                         mf.save()
@@ -671,7 +717,9 @@ def _handle_move_artist(task_id: str, params: dict, config: dict) -> dict:
         log.warning("Retagging failed for %s", new_name, exc_info=True)
 
     emit_task_event(task_id, "info", {"message": f"Moved artist: {name} → {new_name}"})
-    log_audit("move_artist", "artist", name, details={"new_name": new_name}, task_id=task_id)
+    log_audit(
+        "move_artist", "artist", name, details={"new_name": new_name}, task_id=task_id
+    )
     start_scan()
 
     return {"moved": name, "new_name": new_name}
@@ -701,7 +749,13 @@ def _handle_rebuild_library(task_id: str, params: dict, config: dict) -> dict:
 
     result = _handle_library_pipeline(task_id, params, config)
 
-    log_audit("rebuild_library_complete", "database", "library", details=result, task_id=task_id)
+    log_audit(
+        "rebuild_library_complete",
+        "database",
+        "library",
+        details=result,
+        task_id=task_id,
+    )
     return result
 
 
@@ -725,7 +779,8 @@ def _handle_update_album_tags(task_id: str, params: dict, config: dict) -> dict:
 
     for track in tracks:
         try:
-            audio = mutagen.File(track, easy=True)
+            mutagen_file = getattr(mutagen, "File")
+            audio = mutagen_file(track, easy=True)
             if audio is None:
                 continue
             for key, value in album_fields.items():
@@ -754,7 +809,8 @@ def _handle_update_track_tags(task_id: str, params: dict, config: dict) -> dict:
         return {"error": "Track not found"}
 
     try:
-        audio = mutagen.File(track_path, easy=True)
+        mutagen_file = getattr(mutagen, "File")
+        audio = mutagen_file(track_path, easy=True)
         if audio is None:
             return {"error": "Cannot read file"}
         for key, value in tags.items():
@@ -799,7 +855,9 @@ def _handle_match_apply(task_id: str, params: dict, config: dict) -> dict:
     release = params.get("release", {})
 
     album_path_str = params.get("album_path", "")
-    album_dir = Path(album_path_str) if album_path_str else lib / artist_folder / album_folder
+    album_dir = (
+        Path(album_path_str) if album_path_str else lib / artist_folder / album_folder
+    )
     if not album_dir.is_dir():
         artist_dir = lib / artist_folder
         if artist_dir.is_dir():
@@ -814,19 +872,27 @@ def _handle_match_apply(task_id: str, params: dict, config: dict) -> dict:
 
     result = apply_match(album_dir, DEFAULT_AUDIO_EXTENSIONS, release)
     updated_count = result.get("updated", 0)
-    emit_task_event(task_id, "info", {"message": f"Applied MusicBrainz tags: {updated_count} tracks"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Applied MusicBrainz tags: {updated_count} tracks"},
+    )
 
     mbid = result.get("mbid")
     release_group_id = result.get("release_group_id")
     if mbid:
         try:
             album_db_path = str(album_dir)
-            album_db_path = find_album_path_for_match(artist_folder, album_folder, album_db_path, _escape_like)
+            album_db_path = find_album_path_for_match(
+                artist_folder, album_folder, album_db_path, _escape_like
+            )
 
             album_id = apply_mbid_to_album(mbid, album_db_path, release_group_id)
 
             if album_id:
-                emit_task_event(task_id, "info", {"message": f"Synced MBID {mbid[:8]}... to DB"})
+                emit_task_event(
+                    task_id, "info", {"message": f"Synced MBID {mbid[:8]}... to DB"}
+                )
             else:
                 log.warning("MBID update matched 0 rows for path=%s", album_db_path)
         except Exception as exc:
@@ -863,12 +929,19 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
     try:
         tracks = execute_smart_rules(rules)
+        if isinstance(tracks, int):
+            tracks = []
         track_dicts = [
-            {"track_path": t.get("path", ""), "track_id": t.get("id"),
-             "track_entity_uid": t.get("entity_uid"),
-             "track_storage_id": t.get("storage_id"),
-             "title": t.get("title", ""), "artist": t.get("artist", ""),
-             "album": t.get("album", ""), "duration": t.get("duration")}
+            {
+                "track_path": t.get("path", ""),
+                "track_id": t.get("id"),
+                "track_entity_uid": t.get("entity_uid"),
+                "track_storage_id": t.get("storage_id"),
+                "title": t.get("title", ""),
+                "artist": t.get("artist", ""),
+                "album": t.get("album", ""),
+                "duration": t.get("duration"),
+            }
             for t in tracks
         ]
         track_count = replace_playlist_tracks(playlist_id, track_dicts)
@@ -877,12 +950,17 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
 
         set_generation_status(playlist_id, "idle")
         log_generation_complete(log_id, track_count, total_duration)
-        emit_task_event(task_id, "info", {
-            "message": f"Generated {name}: {track_count} tracks, {total_duration // 60}m",
-        })
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Generated {name}: {track_count} tracks, {total_duration // 60}m",
+            },
+        )
 
         try:
             from crate.telegram import send_message
+
             send_message(
                 f"\U0001f3b6 Smart Playlist <b>{name}</b> regenerated\n"
                 f"{track_count} tracks \u00b7 {total_duration // 60}m\n"
@@ -896,24 +974,39 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
     except Exception as e:
         set_generation_status(playlist_id, "failed", str(e))
         log_generation_failed(log_id, str(e))
-        emit_task_event(task_id, "error", {"message": f"Generation failed for {name}: {str(e)[:200]}"})
+        emit_task_event(
+            task_id,
+            "error",
+            {"message": f"Generation failed for {name}: {str(e)[:200]}"},
+        )
         raise
 
 
-def _handle_refresh_system_smart_playlists(task_id: str, params: dict, config: dict) -> dict:
+def _handle_refresh_system_smart_playlists(
+    task_id: str, params: dict, config: dict
+) -> dict:
     """Scheduled daily refresh of eligible smart system playlists."""
     playlists = get_smart_playlists_for_refresh()
-    emit_task_event(task_id, "info", {"message": f"Found {len(playlists)} playlists eligible for refresh"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Found {len(playlists)} playlists eligible for refresh"},
+    )
 
     enqueued = 0
     for pl in playlists:
-        create_task("generate_system_playlist", {
-            "playlist_id": pl["id"],
-            "triggered_by": "scheduler",
-        })
+        create_task(
+            "generate_system_playlist",
+            {
+                "playlist_id": pl["id"],
+                "triggered_by": "scheduler",
+            },
+        )
         enqueued += 1
 
-    emit_task_event(task_id, "info", {"message": f"Enqueued {enqueued} playlist generation tasks"})
+    emit_task_event(
+        task_id, "info", {"message": f"Enqueued {enqueued} playlist generation tasks"}
+    )
     return {"eligible": len(playlists), "enqueued": enqueued}
 
 
@@ -922,7 +1015,7 @@ def _handle_persist_playlist_cover(task_id: str, params: dict, config: dict) -> 
     playlist_id = int(params.get("playlist_id", 0))
     redis_key = f"cover:staging:{playlist_id}"
 
-    r = _get_redis()
+    r = get_redis()
     if not r:
         return {"error": "Redis unavailable"}
 
@@ -945,12 +1038,17 @@ def _handle_persist_playlist_cover(task_id: str, params: dict, config: dict) -> 
 
     # Store the relative filename, not the absolute path — playlist_cover_abspath() resolves it
     update_playlist(playlist_id, cover_path=filename, cover_data_url=None)
-    emit_task_event(task_id, "info", {"message": f"Cover saved for playlist {playlist_id}"})
+    emit_task_event(
+        task_id, "info", {"message": f"Cover saved for playlist {playlist_id}"}
+    )
     return {"cover_path": filename}
 
 
 def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) -> dict:
-    from crate.db.queries.portable_metadata import get_portable_album_payload, list_portable_album_ids
+    from crate.db.queries.portable_metadata import (
+        get_portable_album_payload,
+        list_portable_album_ids,
+    )
     from crate.db.repositories.portable_metadata import mark_album_portable_metadata
     from crate.portable_metadata import write_album_portable_metadata
 
@@ -967,7 +1065,9 @@ def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) ->
         artist=artist,
         limit=limit,
     )
-    progress = TaskProgress(phase="portable_metadata", phase_count=1, total=len(album_ids))
+    progress = TaskProgress(
+        phase="portable_metadata", phase_count=1, total=len(album_ids)
+    )
     emit_progress(task_id, progress, force=True)
     emit_task_event(
         task_id,
@@ -984,7 +1084,9 @@ def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) ->
     tag_errors = 0
     for index, current_album_id in enumerate(album_ids, start=1):
         if is_cancelled(task_id):
-            emit_task_event(task_id, "warning", {"message": "Portable metadata task cancelled"})
+            emit_task_event(
+                task_id, "warning", {"message": "Portable metadata task cancelled"}
+            )
             break
 
         payload = get_portable_album_payload(current_album_id)
@@ -997,7 +1099,9 @@ def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) ->
             continue
 
         album = payload.get("album") or {}
-        progress.item = f"{album.get('artist', '')} - {album.get('name', '')}".strip(" -")
+        progress.item = f"{album.get('artist', '')} - {album.get('name', '')}".strip(
+            " -"
+        )
         try:
             result = write_album_portable_metadata(
                 payload,
@@ -1023,7 +1127,9 @@ def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) ->
             emit_task_event(
                 task_id,
                 "error",
-                {"message": f"Failed to write portable metadata for album {current_album_id}: {exc}"},
+                {
+                    "message": f"Failed to write portable metadata for album {current_album_id}: {exc}"
+                },
             )
 
         tag_errors += len(result.get("tag_errors") or [])
@@ -1052,15 +1158,21 @@ def _handle_write_portable_metadata(task_id: str, params: dict, config: dict) ->
     }
 
 
-def _handle_rehydrate_portable_metadata(task_id: str, params: dict, config: dict) -> dict:
+def _handle_rehydrate_portable_metadata(
+    task_id: str, params: dict, config: dict
+) -> dict:
     from crate.db.repositories.portable_metadata import rehydrate_album_payload
     from crate.portable_metadata import iter_album_sidecars, load_album_sidecar
 
     root_path = params.get("root_path") or config.get("library_path")
+    if not root_path:
+        return {"error": "Library path not configured"}
     limit = params.get("limit")
     safe_limit = int(limit) if limit is not None else None
-    sidecars = iter_album_sidecars(root_path, limit=safe_limit)
-    progress = TaskProgress(phase="rehydrate_portable_metadata", phase_count=1, total=len(sidecars))
+    sidecars = iter_album_sidecars(str(root_path), limit=safe_limit)
+    progress = TaskProgress(
+        phase="rehydrate_portable_metadata", phase_count=1, total=len(sidecars)
+    )
     emit_progress(task_id, progress, force=True)
     emit_task_event(
         task_id,
@@ -1077,7 +1189,11 @@ def _handle_rehydrate_portable_metadata(task_id: str, params: dict, config: dict
     errors: list[dict] = []
     for index, sidecar_path in enumerate(sidecars, start=1):
         if is_cancelled(task_id):
-            emit_task_event(task_id, "warning", {"message": "Portable metadata rehydrate task cancelled"})
+            emit_task_event(
+                task_id,
+                "warning",
+                {"message": "Portable metadata rehydrate task cancelled"},
+            )
             break
         progress.item = str(sidecar_path)
         try:
@@ -1120,7 +1236,10 @@ def _handle_rehydrate_portable_metadata(task_id: str, params: dict, config: dict
 def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> dict:
     from datetime import datetime
 
-    from crate.db.queries.portable_metadata import get_portable_album_payload, list_portable_album_ids
+    from crate.db.queries.portable_metadata import (
+        get_portable_album_payload,
+        list_portable_album_ids,
+    )
     from crate.db.repositories.portable_metadata import mark_album_rich_export
     from crate.portable_metadata import export_album_rich_metadata
 
@@ -1130,7 +1249,11 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
     limit = params.get("limit")
     include_audio = bool(params.get("include_audio", False))
     write_rich_tags = bool(params.get("write_rich_tags", True))
-    default_root = Path(config.get("data_path") or "/data") / "portable-exports" / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    default_root = (
+        Path(config.get("data_path") or "/data")
+        / "portable-exports"
+        / datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    )
     export_root = Path(str(params.get("export_root") or default_root))
 
     album_ids = list_portable_album_ids(
@@ -1139,7 +1262,9 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
         artist=artist,
         limit=limit,
     )
-    progress = TaskProgress(phase="export_rich_metadata", phase_count=1, total=len(album_ids))
+    progress = TaskProgress(
+        phase="export_rich_metadata", phase_count=1, total=len(album_ids)
+    )
     emit_progress(task_id, progress, force=True)
     emit_task_event(
         task_id,
@@ -1159,7 +1284,9 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
     results: list[dict] = []
     for index, current_album_id in enumerate(album_ids, start=1):
         if is_cancelled(task_id):
-            emit_task_event(task_id, "warning", {"message": "Rich metadata export task cancelled"})
+            emit_task_event(
+                task_id, "warning", {"message": "Rich metadata export task cancelled"}
+            )
             break
 
         payload = get_portable_album_payload(current_album_id)
@@ -1171,7 +1298,9 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
             continue
 
         album = payload.get("album") or {}
-        progress.item = f"{album.get('artist', '')} - {album.get('name', '')}".strip(" -")
+        progress.item = f"{album.get('artist', '')} - {album.get('name', '')}".strip(
+            " -"
+        )
         try:
             result = export_album_rich_metadata(
                 payload,
@@ -1197,7 +1326,9 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
             emit_task_event(
                 task_id,
                 "error",
-                {"message": f"Failed to export rich metadata for album {current_album_id}: {exc}"},
+                {
+                    "message": f"Failed to export rich metadata for album {current_album_id}: {exc}"
+                },
             )
         progress.done = index
         emit_progress(task_id, progress)

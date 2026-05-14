@@ -70,7 +70,9 @@ _ALLOWED_CACHE_IMPORTS = {
 
 
 def _python_files() -> list[Path]:
-    return sorted(path for path in CRATE_ROOT.rglob("*.py") if "__pycache__" not in path.parts)
+    return sorted(
+        path for path in CRATE_ROOT.rglob("*.py") if "__pycache__" not in path.parts
+    )
 
 
 def _relative(path: Path) -> str:
@@ -85,10 +87,17 @@ def test_runtime_does_not_import_crate_db_facade_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db import ") or stripped == "import crate.db" or stripped.startswith("import crate.db as "):
+            if (
+                stripped.startswith("from crate.db import ")
+                or stripped == "import crate.db"
+                or stripped.startswith("import crate.db as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import the deprecated crate.db facade:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import the deprecated crate.db facade:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_library_directly():
@@ -99,10 +108,17 @@ def test_runtime_does_not_import_crate_db_library_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.library import ") or stripped == "import crate.db.library" or stripped.startswith("import crate.db.library as "):
+            if (
+                stripped.startswith("from crate.db.library import ")
+                or stripped == "import crate.db.library"
+                or stripped.startswith("import crate.db.library as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.library outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.library outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_auth_directly():
@@ -113,10 +129,17 @@ def test_runtime_does_not_import_crate_db_auth_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.auth import ") or stripped == "import crate.db.auth" or stripped.startswith("import crate.db.auth as "):
+            if (
+                stripped.startswith("from crate.db.auth import ")
+                or stripped == "import crate.db.auth"
+                or stripped.startswith("import crate.db.auth as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.auth outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.auth outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_playlists_directly():
@@ -127,10 +150,17 @@ def test_runtime_does_not_import_crate_db_playlists_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.playlists import ") or stripped == "import crate.db.playlists" or stripped.startswith("import crate.db.playlists as "):
+            if (
+                stripped.startswith("from crate.db.playlists import ")
+                or stripped == "import crate.db.playlists"
+                or stripped.startswith("import crate.db.playlists as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.playlists outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.playlists outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_shows_directly():
@@ -141,10 +171,17 @@ def test_runtime_does_not_import_crate_db_shows_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.shows import ") or stripped == "import crate.db.shows" or stripped.startswith("import crate.db.shows as "):
+            if (
+                stripped.startswith("from crate.db.shows import ")
+                or stripped == "import crate.db.shows"
+                or stripped.startswith("import crate.db.shows as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.shows outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.shows outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_user_library_directly():
@@ -155,10 +192,17 @@ def test_runtime_does_not_import_crate_db_user_library_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.user_library import ") or stripped == "import crate.db.user_library" or stripped.startswith("import crate.db.user_library as "):
+            if (
+                stripped.startswith("from crate.db.user_library import ")
+                or stripped == "import crate.db.user_library"
+                or stripped.startswith("import crate.db.user_library as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.user_library outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.user_library outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_social_directly():
@@ -169,10 +213,17 @@ def test_runtime_does_not_import_crate_db_social_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.social import ") or stripped == "import crate.db.social" or stripped.startswith("import crate.db.social as "):
+            if (
+                stripped.startswith("from crate.db.social import ")
+                or stripped == "import crate.db.social"
+                or stripped.startswith("import crate.db.social as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.social outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.social outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_management_directly():
@@ -183,10 +234,17 @@ def test_runtime_does_not_import_crate_db_management_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.management import ") or stripped == "import crate.db.management" or stripped.startswith("import crate.db.management as "):
+            if (
+                stripped.startswith("from crate.db.management import ")
+                or stripped == "import crate.db.management"
+                or stripped.startswith("import crate.db.management as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.management outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.management outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_radio_directly():
@@ -197,10 +255,17 @@ def test_runtime_does_not_import_crate_db_radio_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.radio import ") or stripped == "import crate.db.radio" or stripped.startswith("import crate.db.radio as "):
+            if (
+                stripped.startswith("from crate.db.radio import ")
+                or stripped == "import crate.db.radio"
+                or stripped.startswith("import crate.db.radio as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.radio outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.radio outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_tasks_directly():
@@ -211,10 +276,17 @@ def test_runtime_does_not_import_crate_db_tasks_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.tasks import ") or stripped == "import crate.db.tasks" or stripped.startswith("import crate.db.tasks as "):
+            if (
+                stripped.startswith("from crate.db.tasks import ")
+                or stripped == "import crate.db.tasks"
+                or stripped.startswith("import crate.db.tasks as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.tasks outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.tasks outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_read_models_directly():
@@ -225,10 +297,17 @@ def test_runtime_does_not_import_crate_db_read_models_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.read_models import ") or stripped == "import crate.db.read_models" or stripped.startswith("import crate.db.read_models as "):
+            if (
+                stripped.startswith("from crate.db.read_models import ")
+                or stripped == "import crate.db.read_models"
+                or stripped.startswith("import crate.db.read_models as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.read_models outside its compat facade:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.read_models outside its compat facade:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_admin_surfaces_directly():
@@ -239,10 +318,17 @@ def test_runtime_does_not_import_crate_db_admin_surfaces_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.admin_surfaces import ") or stripped == "import crate.db.admin_surfaces" or stripped.startswith("import crate.db.admin_surfaces as "):
+            if (
+                stripped.startswith("from crate.db.admin_surfaces import ")
+                or stripped == "import crate.db.admin_surfaces"
+                or stripped.startswith("import crate.db.admin_surfaces as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.admin_surfaces outside its compat facade:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.admin_surfaces outside its compat facade:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_runtime_does_not_import_crate_db_cache_directly():
@@ -253,10 +339,17 @@ def test_runtime_does_not_import_crate_db_cache_directly():
             continue
         for line_no, line in enumerate(path.read_text().splitlines(), start=1):
             stripped = line.strip()
-            if stripped.startswith("from crate.db.cache import ") or stripped == "import crate.db.cache" or stripped.startswith("import crate.db.cache as "):
+            if (
+                stripped.startswith("from crate.db.cache import ")
+                or stripped == "import crate.db.cache"
+                or stripped.startswith("import crate.db.cache as ")
+            ):
                 offenders.append(f"{_relative(path)}:{line_no}: {stripped}")
 
-    assert offenders == [], "Runtime modules must not import crate.db.cache outside compat shims:\n" + "\n".join(offenders)
+    assert offenders == [], (
+        "Runtime modules must not import crate.db.cache outside compat shims:\n"
+        + "\n".join(offenders)
+    )
 
 
 def test_home_module_keeps_sql_in_query_layer():
@@ -399,8 +492,8 @@ def test_ops_snapshot_builders_facade_stays_thin():
     assert "read_scope" not in source
 
 
-def test_core_module_avoids_inline_alembic_and_provisioning_details():
-    source = (CRATE_ROOT / "db" / "core.py").read_text()
+def test_init_db_module_avoids_inline_alembic_and_provisioning_details():
+    source = (CRATE_ROOT / "db" / "init_db.py").read_text()
 
     assert "CREATE ROLE" not in source
     assert "CREATE DATABASE" not in source
@@ -468,7 +561,9 @@ def test_library_reads_facade_stays_thin():
 
 
 def test_library_catalog_reads_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "library_catalog_reads.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "library_catalog_reads.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -525,7 +620,9 @@ def test_playlists_writes_facade_stays_thin():
 
 
 def test_playlists_generation_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "playlists_generation.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "playlists_generation.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -535,7 +632,9 @@ def test_playlists_generation_facade_stays_thin():
 
 
 def test_playlists_rule_engine_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "playlists_rule_engine.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "playlists_rule_engine.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -585,7 +684,9 @@ def test_library_upserts_facade_stays_thin():
 
 
 def test_library_entity_upserts_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "library_entity_upserts.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "library_entity_upserts.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -605,7 +706,9 @@ def test_user_library_repository_facade_stays_thin():
 
 
 def test_user_library_mutations_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "user_library_mutations.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "user_library_mutations.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -625,7 +728,9 @@ def test_genres_repository_facade_stays_thin():
 
 
 def test_genres_taxonomy_writes_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "repositories" / "genres_taxonomy_writes.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "repositories" / "genres_taxonomy_writes.py"
+    ).read_text()
 
     assert "from sqlalchemy import" not in source
     assert "from sqlalchemy.orm import" not in source
@@ -773,7 +878,9 @@ def test_analytics_audio_insights_facade_stays_thin():
 
 
 def test_analytics_catalog_insights_facade_stays_thin():
-    source = (CRATE_ROOT / "db" / "queries" / "analytics_catalog_insights.py").read_text()
+    source = (
+        CRATE_ROOT / "db" / "queries" / "analytics_catalog_insights.py"
+    ).read_text()
 
     assert "transaction_scope" not in source
     assert "read_scope" not in source

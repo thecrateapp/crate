@@ -1,12 +1,12 @@
 """Typed models for library health/repair data."""
 
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
 class HealthIssue(BaseModel):
     """A detected library issue (duplicate, missing cover, etc.)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -24,6 +24,7 @@ class HealthIssue(BaseModel):
 
 class ScanResult(BaseModel):
     """Summary of a library scan."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int | None = None

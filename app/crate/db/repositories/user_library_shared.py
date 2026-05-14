@@ -45,17 +45,21 @@ def relative_track_path(track_path: str) -> str:
 @lru_cache(maxsize=1)
 def has_legacy_stream_id_column() -> bool:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT 1
                 FROM information_schema.columns
                 WHERE table_name = 'library_tracks'
                   AND column_name = 'navidrome_id'
                 LIMIT 1
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
     return row is not None
 
 
@@ -66,18 +70,26 @@ def resolve_track_id(
     track_path: str | None = None,
 ) -> int | None:
     if track_id is not None:
-        row = session.execute(
-            text("SELECT id FROM library_tracks WHERE id = :track_id"),
-            {"track_id": track_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT id FROM library_tracks WHERE id = :track_id"),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .first()
+        )
         if row:
             return row["id"]
 
     if track_entity_uid:
-        row = session.execute(
-            text("SELECT id FROM library_tracks WHERE entity_uid = :entity_uid"),
-            {"entity_uid": track_entity_uid},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT id FROM library_tracks WHERE entity_uid = :entity_uid"),
+                {"entity_uid": track_entity_uid},
+            )
+            .mappings()
+            .first()
+        )
         if row:
             return row["id"]
 
@@ -91,9 +103,10 @@ def resolve_track_id(
 
     should_match_external_id = "/" not in track_path and "\\" not in track_path
     if should_match_external_id and has_legacy_stream_id_column():
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id
                 FROM library_tracks
                 WHERE path = :track_path
@@ -108,21 +121,25 @@ def resolve_track_id(
                 END
                 LIMIT 1
                 """
-            ),
-            {
-                "track_path": track_path,
-                "absolute_candidate": absolute_candidate,
-                "music_candidate": music_candidate,
-                "navidrome_id": track_path,
-                "track_path2": track_path,
-                "absolute_candidate2": absolute_candidate,
-                "music_candidate2": music_candidate,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "track_path": track_path,
+                    "absolute_candidate": absolute_candidate,
+                    "music_candidate": music_candidate,
+                    "navidrome_id": track_path,
+                    "track_path2": track_path,
+                    "absolute_candidate2": absolute_candidate,
+                    "music_candidate2": music_candidate,
+                },
+            )
+            .mappings()
+            .first()
+        )
     else:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id
                 FROM library_tracks
                 WHERE path = :track_path
@@ -136,16 +153,19 @@ def resolve_track_id(
                 END
                 LIMIT 1
                 """
-            ),
-            {
-                "track_path": track_path,
-                "absolute_candidate": absolute_candidate,
-                "music_candidate": music_candidate,
-                "track_path2": track_path,
-                "absolute_candidate2": absolute_candidate,
-                "music_candidate2": music_candidate,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "track_path": track_path,
+                    "absolute_candidate": absolute_candidate,
+                    "music_candidate": music_candidate,
+                    "track_path2": track_path,
+                    "absolute_candidate2": absolute_candidate,
+                    "music_candidate2": music_candidate,
+                },
+            )
+            .mappings()
+            .first()
+        )
     return row["id"] if row else None
 
 
@@ -164,9 +184,10 @@ def resolve_track_reference(
     if resolved_track_id is None:
         return None
 
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT
                 id AS track_id,
                 entity_uid::text AS track_entity_uid,
@@ -175,9 +196,12 @@ def resolve_track_reference(
             WHERE id = :track_id
             LIMIT 1
             """
-        ),
-        {"track_id": resolved_track_id},
-    ).mappings().first()
+            ),
+            {"track_id": resolved_track_id},
+        )
+        .mappings()
+        .first()
+    )
     if row:
         return dict(row)
     return {
@@ -187,7 +211,9 @@ def resolve_track_reference(
     }
 
 
-def emit_user_domain_event(session, *, event_type: str, user_id: int, payload: dict | None = None) -> None:
+def emit_user_domain_event(
+    session, *, event_type: str, user_id: int, payload: dict | None = None
+) -> None:
     append_domain_event(
         event_type,
         {"user_id": user_id, **(payload or {})},

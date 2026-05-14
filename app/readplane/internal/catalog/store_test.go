@@ -1,6 +1,14 @@
 package catalog
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
+
+func TestMain(m *testing.M) {
+	LoadDefaultTaxonomy()
+	os.Exit(m.Run())
+}
 
 func TestPublicAlbumSlugStripsYearAndArtistPrefix(t *testing.T) {
 	got := publicAlbumSlug("2024 - High Vis - Guided Tour", "high-vis")

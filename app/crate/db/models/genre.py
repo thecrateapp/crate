@@ -4,7 +4,6 @@ Covers the ``genres`` table and the enriched detail shape returned by
 ``get_genre_detail()`` / ``get_all_genres()`` in ``db/genres.py``.
 """
 
-
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -15,6 +14,7 @@ class GenreRow(BaseModel):
 
     Matches the dict shape returned by ``get_all_genres()`` after annotation.
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -45,6 +45,7 @@ class GenreDetail(BaseModel):
 
     Extends ``GenreRow`` with lists of associated artists and albums.
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

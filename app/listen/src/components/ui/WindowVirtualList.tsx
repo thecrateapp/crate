@@ -1,4 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 
 interface WindowVirtualListProps<T> {
@@ -43,7 +49,9 @@ export function WindowVirtualList<T>({
     measure();
 
     const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
     resizeObserver?.observe(node);
     window.addEventListener("resize", measure, { passive: true });
 

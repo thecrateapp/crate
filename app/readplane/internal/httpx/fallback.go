@@ -8,12 +8,14 @@ import (
 	"strings"
 )
 
+// FallbackProxy forwards unmatched requests to the FastAPI backend.
 type FallbackProxy struct {
 	enabled bool
 	target  *url.URL
 	version string
 }
 
+// NewFallbackProxy creates a reverse-proxy fallback to the given base URL.
 func NewFallbackProxy(enabled bool, baseURL string, version string) (*FallbackProxy, error) {
 	baseURL = strings.TrimSpace(baseURL)
 	if !enabled {
@@ -29,10 +31,12 @@ func NewFallbackProxy(enabled bool, baseURL string, version string) (*FallbackPr
 	return &FallbackProxy{enabled: true, target: target, version: version}, nil
 }
 
+// Enabled reports whether the fallback proxy is configured and active.
 func (p *FallbackProxy) Enabled() bool {
 	return p != nil && p.enabled && p.target != nil
 }
 
+// ServeHTTP proxies the request when enabled and returns true if it handled the response.
 func (p *FallbackProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) bool {
 	if !p.Enabled() {
 		return false

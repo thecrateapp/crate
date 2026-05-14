@@ -13,9 +13,11 @@ breaks an endpoint, these tests catch it — even if unit tests with
 mocked DB still pass.
 """
 
-import json
-import pytest
+import os
+import tempfile
 from unittest.mock import patch
+
+import pytest
 
 from tests.conftest import PG_AVAILABLE
 
@@ -32,7 +34,6 @@ def api_client(pg_db):
     """
     from fastapi.testclient import TestClient
 
-    import tempfile, os
     test_lib = tempfile.mkdtemp(prefix="crate_test_lib_")
     # Expose lib path so tests can build matching filesystem paths
     os.environ["CRATE_TEST_LIB"] = test_lib
@@ -52,9 +53,12 @@ def api_client(pg_db):
             "name": "Test Admin",
         }
 
-    with patch("crate.api._deps.load_config", return_value=mock_config), \
-         patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_admin_resolve_user):
+    with (
+        patch("crate.api._deps.load_config", return_value=mock_config),
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_admin_resolve_user),
+    ):
         from crate.api import create_app
+
         app = create_app()
         with TestClient(app) as client:
             yield client
@@ -138,7 +142,9 @@ class TestUserEndpoints:
         ):
             assert key in data, f"Missing key: {key}"
 
-    def test_home_discovery_resolves_play_events_by_artist_title_when_track_path_cannot_resolve(self, api_client, pg_db):
+    def test_home_discovery_resolves_play_events_by_artist_title_when_track_path_cannot_resolve(
+        self, api_client, pg_db
+    ):
         artist_name = "Fallback Artist"
         album_name = "Fallback Album"
         track_title = "Fallback Track"
@@ -219,8 +225,11 @@ class TestUserEndpoints:
         assert album_items, data.get("recently_played", [])
         assert album_items[0]["album_id"] == album_id
 
-    def test_home_discovery_recently_played_canonicalizes_artist_case_from_library_album(self, api_client, pg_db):
+    def test_home_discovery_recently_played_canonicalizes_artist_case_from_library_album(
+        self, api_client, pg_db
+    ):
         import os
+
         test_lib = os.environ["CRATE_TEST_LIB"]
         canonical_artist = "Dredg"
         raw_artist = "dredg"
@@ -303,10 +312,15 @@ class TestUserEndpoints:
             and item.get("artist_name") == canonical_artist
             for item in artist_items
         ), artist_items
-        assert not any(item.get("artist_name") == raw_artist for item in artist_items), artist_items
+        assert not any(
+            item.get("artist_name") == raw_artist for item in artist_items
+        ), artist_items
 
-    def test_home_discovery_recently_played_prefers_canonical_albumartist_for_split_credit_tracks(self, api_client, pg_db):
+    def test_home_discovery_recently_played_prefers_canonical_albumartist_for_split_credit_tracks(
+        self, api_client, pg_db
+    ):
         import os
+
         test_lib = os.environ["CRATE_TEST_LIB"]
         canonical_artist = "Converge"
         raw_artist = "Chelsea Wolfe, Converge"
@@ -389,10 +403,15 @@ class TestUserEndpoints:
             and item.get("artist_name") == canonical_artist
             for item in artist_items
         ), artist_items
-        assert not any(item.get("artist_name") == raw_artist for item in artist_items), artist_items
+        assert not any(
+            item.get("artist_name") == raw_artist for item in artist_items
+        ), artist_items
 
-    def test_album_detail_serializes_track_storage_ids_as_strings(self, api_client, pg_db):
+    def test_album_detail_serializes_track_storage_ids_as_strings(
+        self, api_client, pg_db
+    ):
         import os
+
         test_lib = os.environ["CRATE_TEST_LIB"]
         artist_name = "Quicksand"
         album_name = "Distant Populations"
@@ -561,7 +580,9 @@ class TestSubsonicEndpoints:
 
         folders_resp = api_client.get("/rest/getMusicFolders", params=common)
         assert folders_resp.status_code == 200
-        folders = folders_resp.json()["subsonic-response"]["musicFolders"]["musicFolder"]
+        folders = folders_resp.json()["subsonic-response"]["musicFolders"][
+            "musicFolder"
+        ]
         assert folders[0]["name"] == "Music"
 
         artists_resp = api_client.get("/rest/getArtists", params=common)

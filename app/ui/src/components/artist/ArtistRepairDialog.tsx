@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Wrench, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  Wrench,
+  XCircle,
+} from "lucide-react";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -156,15 +163,23 @@ function issueDetailsSummary(details: RepairPlanItem["details"]) {
   const reason = details.reason;
   if (typeof reason === "string" && reason.trim()) return reason;
   const targetArtistDir = details.target_artist_dir;
-  if (typeof targetArtistDir === "string" && targetArtistDir.trim()) return targetArtistDir;
+  if (typeof targetArtistDir === "string" && targetArtistDir.trim())
+    return targetArtistDir;
   const canonicalDir = details.canonical_dir;
-  if (typeof canonicalDir === "string" && canonicalDir.trim()) return canonicalDir;
+  if (typeof canonicalDir === "string" && canonicalDir.trim())
+    return canonicalDir;
   const mergedInto = details.merged_into;
-  if (typeof mergedInto === "string" && mergedInto.trim()) return `Into ${mergedInto}`;
+  if (typeof mergedInto === "string" && mergedInto.trim())
+    return `Into ${mergedInto}`;
   return null;
 }
 
-function repairItemKey(item: Pick<RepairPlanItem, "issue_id" | "item_key" | "check_type" | "target" | "issue">) {
+function repairItemKey(
+  item: Pick<
+    RepairPlanItem,
+    "issue_id" | "item_key" | "check_type" | "target" | "issue"
+  >,
+) {
   if (item.item_key) return item.item_key;
   if (item.issue_id != null) return `issue:${item.issue_id}`;
   const details = item.issue?.details ?? item.issue?.details_json;
@@ -175,7 +190,12 @@ function repairItemKey(item: Pick<RepairPlanItem, "issue_id" | "item_key" | "che
   return `${item.check_type}:${item.target || artist || "item"}`;
 }
 
-function repairPlanItemId(item: Pick<RepairPlanItem, "plan_item_id" | "item_key" | "issue_id" | "check_type" | "target" | "issue">) {
+function repairPlanItemId(
+  item: Pick<
+    RepairPlanItem,
+    "plan_item_id" | "item_key" | "issue_id" | "check_type" | "target" | "issue"
+  >,
+) {
   return item.plan_item_id || repairItemKey(item);
 }
 
@@ -192,7 +212,9 @@ export function ArtistRepairDialog({
   const [runningAll, setRunningAll] = useState(false);
   const [runningItemKey, setRunningItemKey] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<ActiveTaskState | null>(null);
-  const [itemStates, setItemStates] = useState<Record<string, ItemRunState>>({});
+  const [itemStates, setItemStates] = useState<Record<string, ItemRunState>>(
+    {},
+  );
   const [selectedItemKeys, setSelectedItemKeys] = useState<string[]>([]);
   const [pendingRun, setPendingRun] = useState<PendingRepairRun | null>(null);
 
@@ -212,9 +234,13 @@ export function ArtistRepairDialog({
     try {
       const data = await api<ArtistRepairPlanResponse>(endpoint);
       setPlan(data);
-      const nextExecutableKeys = data.items.filter((item) => item.executable).map((item) => repairPlanItemId(item));
+      const nextExecutableKeys = data.items
+        .filter((item) => item.executable)
+        .map((item) => repairPlanItemId(item));
       setSelectedItemKeys((prev) => {
-        const preserved = prev.filter((itemKey) => nextExecutableKeys.includes(itemKey));
+        const preserved = prev.filter((itemKey) =>
+          nextExecutableKeys.includes(itemKey),
+        );
         return preserved.length > 0 ? preserved : nextExecutableKeys;
       });
       onIssueCountChange?.(data.total);
@@ -257,7 +283,11 @@ export function ArtistRepairDialog({
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as ActiveTaskState;
-      if (parsed && typeof parsed.id === "string" && Array.isArray(parsed.itemKeys)) {
+      if (
+        parsed &&
+        typeof parsed.id === "string" &&
+        Array.isArray(parsed.itemKeys)
+      ) {
         setActiveTask(parsed);
       }
     } catch {
@@ -279,7 +309,9 @@ export function ArtistRepairDialog({
     if (!pendingRun) return null;
     const risky = pendingRun.items.filter((item) => item.requires_confirmation);
     const destructive = risky.filter((item) => item.risk === "destructive");
-    const filesystem = risky.filter((item) => item.scope === "filesystem" || item.scope === "hybrid");
+    const filesystem = risky.filter(
+      (item) => item.scope === "filesystem" || item.scope === "hybrid",
+    );
     const labels = risky.map((item) => checkLabel(item.check_type));
     return {
       total: pendingRun.items.length,
@@ -295,9 +327,18 @@ export function ArtistRepairDialog({
     const lastEvent = events[events.length - 1];
     if (!lastEvent || lastEvent.type !== "item") return;
 
-    const itemKey = typeof lastEvent.data?.item_key === "string" ? lastEvent.data.item_key : null;
-    const outcome = typeof lastEvent.data?.outcome === "string" ? lastEvent.data.outcome : null;
-    const message = typeof lastEvent.data?.message === "string" ? lastEvent.data.message : null;
+    const itemKey =
+      typeof lastEvent.data?.item_key === "string"
+        ? lastEvent.data.item_key
+        : null;
+    const outcome =
+      typeof lastEvent.data?.outcome === "string"
+        ? lastEvent.data.outcome
+        : null;
+    const message =
+      typeof lastEvent.data?.message === "string"
+        ? lastEvent.data.message
+        : null;
     if (!itemKey || !outcome) return;
 
     let state: ItemRunState["state"] | null = null;
@@ -315,27 +356,37 @@ export function ArtistRepairDialog({
   useEffect(() => {
     if (!activeTask || !done) return;
 
-    const doneStatus = String(done.status || "").trim().toLowerCase();
+    const doneStatus = String(done.status || "")
+      .trim()
+      .toLowerCase();
     const latestMessageLooksSuccessful = Boolean(
-      latestEventMessage && /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(latestEventMessage),
+      latestEventMessage &&
+        /repair complete:|revalidation complete:|task completed|no open issues remaining/i.test(
+          latestEventMessage,
+        ),
     );
     const success =
       doneStatus === "completed" ||
-      (!done.error && (Boolean(done.result) || latestMessageLooksSuccessful) && doneStatus !== "failed" && doneStatus !== "cancelled");
+      (!done.error &&
+        (Boolean(done.result) || latestMessageLooksSuccessful) &&
+        doneStatus !== "failed" &&
+        doneStatus !== "cancelled");
     const errorMessage = done.error || latestEventMessage || "Task failed";
-    const revalidation = done.result?.revalidation as Record<string, unknown> | undefined;
+    const revalidation = done.result?.revalidation as
+      | Record<string, unknown>
+      | undefined;
     const remainingIssues = Number(revalidation?.issue_count ?? NaN);
     const successMessage =
       latestEventMessage ||
-      (
-        Number.isFinite(remainingIssues)
-          ? remainingIssues > 0
-            ? `Repair completed with ${remainingIssues} issue${remainingIssues === 1 ? "" : "s"} still open`
-            : "Repair completed with no open issues remaining"
-          : activeTask.kind === "repair_all"
-            ? "Repair batch completed"
-            : "Repair completed"
-      );
+      (Number.isFinite(remainingIssues)
+        ? remainingIssues > 0
+          ? `Repair completed with ${remainingIssues} issue${
+              remainingIssues === 1 ? "" : "s"
+            } still open`
+          : "Repair completed with no open issues remaining"
+        : activeTask.kind === "repair_all"
+          ? "Repair batch completed"
+          : "Repair completed");
     const nextState: ItemRunState = {
       state: success ? "success" : "error",
       message: success ? successMessage : errorMessage,
@@ -369,11 +420,18 @@ export function ArtistRepairDialog({
   }, [activeTask, done, latestEventMessage]);
 
   const executableItems = useMemo(
-    () => (plan?.items ?? []).filter((item) => item.executable && item.issue && item.supports_artist_scope !== false),
+    () =>
+      (plan?.items ?? []).filter(
+        (item) =>
+          item.executable && item.issue && item.supports_artist_scope !== false,
+      ),
     [plan?.items],
   );
   const selectedExecutableItems = useMemo(
-    () => executableItems.filter((item) => selectedItemKeys.includes(repairPlanItemId(item))),
+    () =>
+      executableItems.filter((item) =>
+        selectedItemKeys.includes(repairPlanItemId(item)),
+      ),
     [executableItems, selectedItemKeys],
   );
 
@@ -382,7 +440,8 @@ export function ArtistRepairDialog({
   }
 
   function runStateTone(runState: ItemRunState["state"]) {
-    if (runState === "success") return "border-emerald-500/20 bg-emerald-500/[0.08]";
+    if (runState === "success")
+      return "border-emerald-500/20 bg-emerald-500/[0.08]";
     if (runState === "error") return "border-red-500/20 bg-red-500/[0.08]";
     if (runState === "running") return "border-cyan-500/20 bg-cyan-500/[0.06]";
     return "border-white/8 bg-panel-surface/80";
@@ -412,7 +471,8 @@ export function ArtistRepairDialog({
       for (const itemKey of itemKeys) {
         next[itemKey] = {
           state: "running",
-          message: mode === "all" ? "Queued in repair batch…" : "Queued repair…",
+          message:
+            mode === "all" ? "Queued in repair batch…" : "Queued repair…",
         };
       }
       return next;
@@ -422,20 +482,33 @@ export function ArtistRepairDialog({
     else setRunningItemKey(itemKeys[0] ?? null);
 
     try {
-      const { task_id } = await api<{ task_id: string }>("/api/manage/repair-issues", "POST", {
-        dry_run: false,
-        issues,
-        plan_version: plan?.plan_version ?? null,
-        plan_item_ids: items.map((item) => repairPlanItemId(item)),
-        confirm_risky: items.some((item) => item.requires_confirmation),
+      const { task_id } = await api<{ task_id: string }>(
+        "/api/manage/repair-issues",
+        "POST",
+        {
+          dry_run: false,
+          issues,
+          plan_version: plan?.plan_version ?? null,
+          plan_item_ids: items.map((item) => repairPlanItemId(item)),
+          confirm_risky: items.some((item) => item.requires_confirmation),
+        },
+      );
+      setActiveTask({
+        id: task_id,
+        kind: mode === "all" ? "repair_all" : "repair_one",
+        itemKeys,
       });
-      setActiveTask({ id: task_id, kind: mode === "all" ? "repair_all" : "repair_one", itemKeys });
-      toast.success(mode === "all" ? `Queued ${issues.length} fixes` : "Queued repair");
+      toast.success(
+        mode === "all" ? `Queued ${issues.length} fixes` : "Queued repair",
+      );
     } catch {
       setItemStates((prev) => {
         const next = { ...prev };
         for (const itemKey of itemKeys) {
-          next[itemKey] = { state: "error", message: "Failed to queue artist repair" };
+          next[itemKey] = {
+            state: "error",
+            message: "Failed to queue artist repair",
+          };
         }
         return next;
       });
@@ -471,11 +544,12 @@ export function ArtistRepairDialog({
         onOpenChange(nextOpen);
       }}
     >
-        <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden sm:max-w-5xl">
+      <DialogContent className="flex max-h-[88vh] flex-col overflow-hidden sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Repair {artistName}</DialogTitle>
           <DialogDescription>
-            Preview the fixes Crate can execute for this artist, then run them one by one or all at once.
+            Preview the fixes Crate can execute for this artist, then run them
+            one by one or all at once.
           </DialogDescription>
         </DialogHeader>
 
@@ -486,9 +560,21 @@ export function ArtistRepairDialog({
               {plan?.executable ?? 0} executable
             </CrateChip>
             <CrateChip>{plan?.manual_only ?? 0} manual</CrateChip>
-            {executableItems.length ? <CrateChip>{selectedExecutableItems.length} selected</CrateChip> : null}
-            <Button size="sm" variant="outline" className="ml-auto gap-2" onClick={() => void loadPlan()} disabled={loading || runningAll || runningItemKey != null}>
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {executableItems.length ? (
+              <CrateChip>{selectedExecutableItems.length} selected</CrateChip>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              className="ml-auto gap-2"
+              onClick={() => void loadPlan()}
+              disabled={loading || runningAll || runningItemKey != null}
+            >
+              {loading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <RefreshCw size={14} />
+              )}
               Refresh plan
             </Button>
           </div>
@@ -500,7 +586,11 @@ export function ArtistRepairDialog({
                 variant="outline"
                 className="gap-2"
                 disabled={runningAll || runningItemKey != null}
-                onClick={() => setSelectedItemKeys(executableItems.map((item) => repairPlanItemId(item)))}
+                onClick={() =>
+                  setSelectedItemKeys(
+                    executableItems.map((item) => repairPlanItemId(item)),
+                  )
+                }
               >
                 <CheckCircle2 size={14} />
                 Select all auto
@@ -509,7 +599,11 @@ export function ArtistRepairDialog({
                 size="sm"
                 variant="outline"
                 className="gap-2"
-                disabled={!selectedItemKeys.length || runningAll || runningItemKey != null}
+                disabled={
+                  !selectedItemKeys.length ||
+                  runningAll ||
+                  runningItemKey != null
+                }
                 onClick={() => setSelectedItemKeys([])}
               >
                 <XCircle size={14} />
@@ -552,15 +646,22 @@ export function ArtistRepairDialog({
           ) : (
             <div className="space-y-3">
               {(plan?.items ?? []).map((item, index) => {
-                const severityTone = SEVERITY_TONES[item.severity || "low"] || SEVERITY_TONES.low;
+                const severityTone =
+                  SEVERITY_TONES[item.severity || "low"] || SEVERITY_TONES.low;
                 const detailsSummary = issueDetailsSummary(item.details);
                 const itemKey = repairItemKey(item);
                 const planItemId = repairPlanItemId(item);
-                const isRunning = runningItemKey != null && runningItemKey === itemKey;
+                const isRunning =
+                  runningItemKey != null && runningItemKey === itemKey;
                 const runState = repairStateForItem(item);
                 const isSelected = selectedItemKeys.includes(planItemId);
                 return (
-                  <div key={`${item.check_type}-${item.issue_id ?? index}`} className={`rounded-md border p-4 ${runStateTone(runState.state)}`}>
+                  <div
+                    key={`${item.check_type}-${item.issue_id ?? index}`}
+                    className={`rounded-md border p-4 ${runStateTone(
+                      runState.state,
+                    )}`}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         {item.executable ? (
@@ -575,44 +676,86 @@ export function ArtistRepairDialog({
                           </label>
                         ) : null}
                         <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <CratePill className={severityTone}>{item.severity || "low"}</CratePill>
-                          <CratePill>{checkLabel(item.check_type)}</CratePill>
-                          <CratePill className={item.executable ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100" : "border-white/10 bg-white/[0.04] text-white/50"}>
-                            {supportLabel(item.support)}
-                          </CratePill>
-                          {riskLabel(item.risk) ? (
-                            <CratePill className={RISK_TONES[item.risk || "caution"] || RISK_TONES.caution}>
-                              {riskLabel(item.risk)}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CratePill className={severityTone}>
+                              {item.severity || "low"}
                             </CratePill>
-                          ) : null}
-                          {scopeLabel(item.scope) ? (
-                            <CratePill className={SCOPE_TONES[item.scope || "hybrid"] || SCOPE_TONES.hybrid}>
-                              {scopeLabel(item.scope)}
+                            <CratePill>{checkLabel(item.check_type)}</CratePill>
+                            <CratePill
+                              className={
+                                item.executable
+                                  ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
+                                  : "border-white/10 bg-white/[0.04] text-white/50"
+                              }
+                            >
+                              {supportLabel(item.support)}
                             </CratePill>
+                            {riskLabel(item.risk) ? (
+                              <CratePill
+                                className={
+                                  RISK_TONES[item.risk || "caution"] ||
+                                  RISK_TONES.caution
+                                }
+                              >
+                                {riskLabel(item.risk)}
+                              </CratePill>
+                            ) : null}
+                            {scopeLabel(item.scope) ? (
+                              <CratePill
+                                className={
+                                  SCOPE_TONES[item.scope || "hybrid"] ||
+                                  SCOPE_TONES.hybrid
+                                }
+                              >
+                                {scopeLabel(item.scope)}
+                              </CratePill>
+                            ) : null}
+                            {item.fs_write ? (
+                              <CratePill className="border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100">
+                                Filesystem
+                              </CratePill>
+                            ) : null}
+                          </div>
+                          <div className="mt-2 text-sm font-medium text-white">
+                            {item.message ||
+                              item.description ||
+                              checkLabel(item.check_type)}
+                          </div>
+                          {item.target ? (
+                            <div className="mt-1 text-xs text-white/45">
+                              {item.target}
+                            </div>
                           ) : null}
-                          {item.fs_write ? <CratePill className="border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100">Filesystem</CratePill> : null}
-                        </div>
-                        <div className="mt-2 text-sm font-medium text-white">
-                          {item.message || item.description || checkLabel(item.check_type)}
-                        </div>
-                        {item.target ? <div className="mt-1 text-xs text-white/45">{item.target}</div> : null}
-                        {item.requires_confirmation ? (
-                          <div className="mt-2 text-xs text-amber-200/80">
-                            Review before applying: this fix can change existing library state.
-                          </div>
-                        ) : null}
-                        {!item.supports_artist_scope ? (
-                          <div className="mt-2 text-xs text-white/45">
-                            This repair is not available from the artist-level flow.
-                          </div>
-                        ) : null}
-                        {runState.message && runState.state !== "idle" ? (
-                          <div className={`mt-2 text-xs ${runState.state === "error" ? "text-red-200" : runState.state === "success" ? "text-emerald-200" : "text-cyan-100"}`}>
-                            {runState.message}
-                          </div>
-                        ) : null}
-                        {detailsSummary ? <div className="mt-2 text-xs text-white/40">{detailsSummary}</div> : null}
+                          {item.requires_confirmation ? (
+                            <div className="mt-2 text-xs text-amber-200/80">
+                              Review before applying: this fix can change
+                              existing library state.
+                            </div>
+                          ) : null}
+                          {!item.supports_artist_scope ? (
+                            <div className="mt-2 text-xs text-white/45">
+                              This repair is not available from the artist-level
+                              flow.
+                            </div>
+                          ) : null}
+                          {runState.message && runState.state !== "idle" ? (
+                            <div
+                              className={`mt-2 text-xs ${
+                                runState.state === "error"
+                                  ? "text-red-200"
+                                  : runState.state === "success"
+                                    ? "text-emerald-200"
+                                    : "text-cyan-100"
+                              }`}
+                            >
+                              {runState.message}
+                            </div>
+                          ) : null}
+                          {detailsSummary ? (
+                            <div className="mt-2 text-xs text-white/40">
+                              {detailsSummary}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
@@ -622,7 +765,11 @@ export function ArtistRepairDialog({
                             size="sm"
                             variant="outline"
                             className="gap-2"
-                            disabled={runningAll || runningItemKey != null || item.supports_artist_scope === false}
+                            disabled={
+                              runningAll ||
+                              runningItemKey != null ||
+                              item.supports_artist_scope === false
+                            }
                             onClick={() => void runRepair([item], "one")}
                           >
                             {isRunning || runState.state === "running" ? (
@@ -634,7 +781,11 @@ export function ArtistRepairDialog({
                             ) : (
                               <Wrench size={14} />
                             )}
-                            {runState.state === "success" ? "Fixed" : runState.state === "error" ? "Retry fix" : "Run fix"}
+                            {runState.state === "success"
+                              ? "Fixed"
+                              : runState.state === "error"
+                                ? "Retry fix"
+                                : "Run fix"}
                           </Button>
                         ) : (
                           <div className="inline-flex items-center gap-2 rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/45">
@@ -658,17 +809,25 @@ export function ArtistRepairDialog({
                 {loading && !plan
                   ? "Loading repair plan..."
                   : plan?.executable
-                    ? `${plan.executable} executable fix${plan.executable === 1 ? "" : "es"} ready`
+                    ? `${plan.executable} executable fix${
+                        plan.executable === 1 ? "" : "es"
+                      } ready`
                     : "No executable fixes available right now"}
               </div>
               {pendingRunSummary ? (
                 <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-3 text-xs text-amber-100">
-                  <div className="font-medium text-amber-50">Confirm risky repair</div>
+                  <div className="font-medium text-amber-50">
+                    Confirm risky repair
+                  </div>
                   <div className="mt-1 text-amber-100/85">
-                    This will run {pendingRunSummary.total} selected fix{pendingRunSummary.total === 1 ? "" : "es"} for {artistName}.{" "}
-                    {pendingRunSummary.risky} need confirmation, {pendingRunSummary.destructive} are destructive, and{" "}
+                    This will run {pendingRunSummary.total} selected fix
+                    {pendingRunSummary.total === 1 ? "" : "es"} for {artistName}
+                    . {pendingRunSummary.risky} need confirmation,{" "}
+                    {pendingRunSummary.destructive} are destructive, and{" "}
                     {pendingRunSummary.filesystem} touch the filesystem.
-                    {pendingRunSummary.labels.length ? ` Checks: ${pendingRunSummary.labels.join(", ")}.` : ""}
+                    {pendingRunSummary.labels.length
+                      ? ` Checks: ${pendingRunSummary.labels.join(", ")}.`
+                      : ""}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
@@ -700,10 +859,21 @@ export function ArtistRepairDialog({
               <Button
                 variant="outline"
                 className="gap-2"
-                disabled={!executableItems.length || executableItems.some((item) => item.supports_batch === false) || runningAll || runningItemKey != null}
+                disabled={
+                  !executableItems.length ||
+                  executableItems.some(
+                    (item) => item.supports_batch === false,
+                  ) ||
+                  runningAll ||
+                  runningItemKey != null
+                }
                 onClick={() => void runRepair(executableItems, "all")}
               >
-                {runningAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {runningAll ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <CheckCircle2 size={14} />
+                )}
                 Run all auto-fixable
               </Button>
               <Button
@@ -711,19 +881,31 @@ export function ArtistRepairDialog({
                 className="gap-2"
                 disabled={
                   !selectedExecutableItems.length ||
-                  (selectedExecutableItems.length > 1 && selectedExecutableItems.some((item) => item.supports_batch === false)) ||
+                  (selectedExecutableItems.length > 1 &&
+                    selectedExecutableItems.some(
+                      (item) => item.supports_batch === false,
+                    )) ||
                   runningAll ||
                   runningItemKey != null
                 }
-                onClick={() => void runRepair(selectedExecutableItems, selectedExecutableItems.length === 1 ? "one" : "all")}
+                onClick={() =>
+                  void runRepair(
+                    selectedExecutableItems,
+                    selectedExecutableItems.length === 1 ? "one" : "all",
+                  )
+                }
               >
-                {runningAll ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />}
+                {runningAll ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Wrench size={14} />
+                )}
                 Run selected
               </Button>
             </div>
           </div>
         </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

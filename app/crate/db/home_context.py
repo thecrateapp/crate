@@ -24,7 +24,9 @@ def _genre_stat_rows_from_names(names: list[str]) -> list[dict]:
     ]
 
 
-def _derive_home_genres(top_genres: list[dict], fallback_names: list[str], limit: int) -> tuple[list[str], list[dict]]:
+def _derive_home_genres(
+    top_genres: list[dict], fallback_names: list[str], limit: int
+) -> tuple[list[str], list[dict]]:
     genre_rows = [dict(row) for row in top_genres if row.get("genre_name")]
     taste_genres = summarize_taste_genres(genre_rows, limit=limit)
     mix_seed_genres = choose_mix_seed_genres(genre_rows, limit=limit)
@@ -59,9 +61,10 @@ def _load_home_context_rows(
     top_genre_limit: int,
 ) -> dict[str, list[dict]]:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 WITH followed AS (
                     SELECT
                         uf.artist_name,
@@ -154,14 +157,17 @@ def _load_home_context_rows(
                     COALESCE((SELECT jsonb_agg(to_jsonb(top_albums) ORDER BY top_albums.play_count DESC, top_albums.minutes_listened DESC, top_albums.last_played_at DESC) FROM top_albums), '[]'::jsonb) AS top_albums,
                     COALESCE((SELECT jsonb_agg(to_jsonb(top_genres) ORDER BY top_genres.play_count DESC, top_genres.minutes_listened DESC, top_genres.last_played_at DESC) FROM top_genres), '[]'::jsonb) AS top_genres
                 """
-            ),
-            {
-                "user_id": user_id,
-                "top_artist_limit": top_artist_limit,
-                "top_album_limit": top_album_limit,
-                "top_genre_limit": top_genre_limit,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "user_id": user_id,
+                    "top_artist_limit": top_artist_limit,
+                    "top_album_limit": top_album_limit,
+                    "top_genre_limit": top_genre_limit,
+                },
+            )
+            .mappings()
+            .first()
+        )
 
     data = dict(row or {})
     return {
@@ -192,14 +198,32 @@ def get_home_context(
     top_albums = rows["top_albums"]
     top_genres = rows["top_genres"]
 
-    followed_names_lower = [(row.get("artist_name") or "").lower() for row in followed if row.get("artist_name")]
-    top_artist_names_lower = [(row.get("artist_name") or "").lower() for row in top_artists if row.get("artist_name")]
-    interest_artists_lower = list(dict.fromkeys(top_artist_names_lower + followed_names_lower))
-    saved_album_ids = list({row["id"] for row in saved_albums if row.get("id") is not None})
-    top_genres_lower, mix_seed_genres = _derive_home_genres(top_genres, [], top_genre_limit)
+    followed_names_lower = [
+        (row.get("artist_name") or "").lower()
+        for row in followed
+        if row.get("artist_name")
+    ]
+    top_artist_names_lower = [
+        (row.get("artist_name") or "").lower()
+        for row in top_artists
+        if row.get("artist_name")
+    ]
+    interest_artists_lower = list(
+        dict.fromkeys(top_artist_names_lower + followed_names_lower)
+    )
+    saved_album_ids = list(
+        {row["id"] for row in saved_albums if row.get("id") is not None}
+    )
+    top_genres_lower, mix_seed_genres = _derive_home_genres(
+        top_genres, [], top_genre_limit
+    )
     if not top_genres_lower and not mix_seed_genres and followed_names_lower:
-        fallback_genre_names = get_followed_artist_genre_names(followed_names_lower, top_genre_limit)
-        top_genres_lower, mix_seed_genres = _derive_home_genres(top_genres, fallback_genre_names, top_genre_limit)
+        fallback_genre_names = get_followed_artist_genre_names(
+            followed_names_lower, top_genre_limit
+        )
+        top_genres_lower, mix_seed_genres = _derive_home_genres(
+            top_genres, fallback_genre_names, top_genre_limit
+        )
 
     return {
         "followed": followed,
@@ -223,7 +247,9 @@ def get_cached_home_context(
     top_album_limit: int = 12,
     top_genre_limit: int = 8,
 ) -> dict:
-    cache_key = f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+    cache_key = (
+        f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+    )
     return _get_or_compute_home_cache(
         cache_key,
         max_age_seconds=600,
@@ -258,7 +284,9 @@ def _cached_new_releases(limit: int = 250) -> list[dict]:
 def merged_artists_from_context(context: dict) -> list[dict]:
     top_artists = context["top_artists"]
     followed = context["followed"]
-    seen_artist_ids = {row.get("artist_id") for row in top_artists if row.get("artist_id") is not None}
+    seen_artist_ids = {
+        row.get("artist_id") for row in top_artists if row.get("artist_id") is not None
+    }
     merged = list(top_artists)
     for row in followed:
         aid = row.get("artist_id")

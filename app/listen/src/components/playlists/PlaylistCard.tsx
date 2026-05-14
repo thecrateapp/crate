@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { Heart, Loader2, Play } from "lucide-react";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn } from "@/lib/utils";
@@ -62,7 +68,10 @@ export function PlaylistCard({
         ? `${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState)
       : isOfflineBusy(offlineState) && offlineRecord?.trackCount
-        ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount} offline`
+        ? `${Math.min(
+            offlineRecord.readyTrackCount || 0,
+            offlineRecord.trackCount,
+          )}/${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState);
   const actions = usePlaylistActionEntries({
     playlistId,
@@ -149,9 +158,16 @@ export function PlaylistCard({
               }}
             >
               {playing ? (
-                <Loader2 size={18} className="animate-spin text-primary-foreground" />
+                <Loader2
+                  size={18}
+                  className="animate-spin text-primary-foreground"
+                />
               ) : (
-                <Play size={18} fill="#0a0a0f" className="ml-0.5 text-primary-foreground" />
+                <Play
+                  size={18}
+                  fill="#0a0a0f"
+                  className="ml-0.5 text-primary-foreground"
+                />
               )}
             </button>
           </div>
@@ -164,7 +180,11 @@ export function PlaylistCard({
         <OfflineBadge
           state={offlineState}
           compact
-          className={badge && !crateManaged ? "absolute left-2 top-8" : "absolute left-2 top-2"}
+          className={
+            badge && !crateManaged
+              ? "absolute left-2 top-8"
+              : "absolute left-2 top-2"
+          }
         />
       </div>
       <div className="truncate text-sm font-medium text-foreground">{name}</div>

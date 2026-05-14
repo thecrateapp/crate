@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from crate.audio import read_audio_quality
 from crate.api._deps import library_path, safe_path
@@ -25,6 +28,8 @@ from crate.db.repositories.streaming import (
     mark_variant_missing,
     mark_variant_task,
 )
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,18 +71,22 @@ def resolve_source_path(track: dict) -> Path | None:
     lib_str = str(lib)
     filepath = raw_path
     if filepath.startswith(lib_str):
-        filepath = filepath[len(lib_str):].lstrip("/")
+        filepath = filepath[len(lib_str) :].lstrip("/")
     elif filepath.startswith("/music/"):
-        filepath = filepath[len("/music/"):].lstrip("/")
+        filepath = filepath[len("/music/") :].lstrip("/")
     return safe_path(lib, filepath)
 
 
-def _source_quality(track: dict, source_path: Path, stat, *, probe_missing: bool = True) -> dict:
+def _source_quality(
+    track: dict, source_path: Path, stat, *, probe_missing: bool = True
+) -> dict:
     source_format = infer_format(track.get("format"), source_path)
     bitrate_kbps = bitrate_to_kbps(track.get("bitrate"))
     sample_rate = track.get("sample_rate")
     bit_depth = track.get("bit_depth")
-    if probe_missing and (bitrate_kbps is None or sample_rate is None or bit_depth is None):
+    if probe_missing and (
+        bitrate_kbps is None or sample_rate is None or bit_depth is None
+    ):
         quality = read_audio_quality(source_path)
         bitrate_kbps = bitrate_kbps or bitrate_to_kbps(quality.get("bitrate"))
         sample_rate = sample_rate or quality.get("sample_rate")
@@ -96,7 +105,9 @@ def _descriptor(track: dict, source_path: Path, decision: DeliveryDecision) -> d
     if decision.preset is None:
         raise ValueError("A transcode descriptor requires a delivery preset")
     stat = source_path.stat()
-    entity_uid = str(track.get("entity_uid")) if track.get("entity_uid") is not None else None
+    entity_uid = (
+        str(track.get("entity_uid")) if track.get("entity_uid") is not None else None
+    )
     identity = entity_uid or str(track.get("id") or source_path)
     source_format = infer_format(track.get("format"), source_path)
     source_sample_rate = int(track.get("sample_rate") or 0) or None
@@ -112,7 +123,9 @@ def _descriptor(track: dict, source_path: Path, decision: DeliveryDecision) -> d
         ]
     )
     cache_key = hashlib.sha256(key_material.encode("utf-8")).hexdigest()
-    relative_path = variant_relative_path(cache_key, decision.preset.policy, decision.preset.extension)
+    relative_path = variant_relative_path(
+        cache_key, decision.preset.policy, decision.preset.extension
+    )
     return {
         "id": uuid.uuid4().hex,
         "cache_key": cache_key,
@@ -137,13 +150,91 @@ def _descriptor(track: dict, source_path: Path, decision: DeliveryDecision) -> d
 def _variant_matches_descriptor(row: dict, descriptor: dict) -> bool:
     return (
         str(row.get("source_path") or "") == str(descriptor.get("source_path") or "")
-        and int(row.get("source_mtime_ns") or 0) == int(descriptor.get("source_mtime_ns") or 0)
+        and int(row.get("source_mtime_ns") or 0)
+        == int(descriptor.get("source_mtime_ns") or 0)
         and int(row.get("source_size") or 0) == int(descriptor.get("source_size") or 0)
-        and str(row.get("relative_path") or "") == str(descriptor.get("relative_path") or "")
+        and str(row.get("relative_path") or "")
+        == str(descriptor.get("relative_path") or "")
     )
 
 
-def _passthrough_resolution(track: dict, source_path: Path, requested_policy: str, reason: str) -> PlaybackResolution:
+def _variant_requires_write(row: dict | None, descriptor: dict) -> bool:
+    if row is None:
+        return True
+    if row.get("status") == "failed":
+        return True
+    return not _variant_matches_descriptor(row, descriptor)
+
+
+def _get_variant_by_cache_key_safely(cache_key: str) -> dict | None:
+    try:
+        return get_variant_by_cache_key(cache_key)
+    except SQLAlchemyError:
+        log.warning(
+            "Failed to read playback variant %s; falling back to original",
+            cache_key,
+            exc_info=True,
+        )
+        return None
+
+
+def _get_or_ensure_variant_record(descriptor: dict) -> dict | None:
+    cache_key = str(descriptor.get("cache_key") or "")
+    existing = _get_variant_by_cache_key_safely(cache_key)
+    if not _variant_requires_write(existing, descriptor):
+        return existing
+    try:
+        return ensure_variant_record(descriptor)
+    except SQLAlchemyError:
+        log.warning(
+            "Failed to ensure playback variant %s; falling back to original",
+            cache_key,
+            exc_info=True,
+        )
+        return (
+            existing
+            if existing and _variant_matches_descriptor(existing, descriptor)
+            else None
+        )
+
+
+def _mark_variant_missing_safely(cache_key: str) -> None:
+    try:
+        mark_variant_missing(cache_key)
+    except SQLAlchemyError:
+        log.warning(
+            "Failed to mark playback variant missing: %s", cache_key, exc_info=True
+        )
+
+
+def _mark_variant_task_safely(cache_key: str, task_id: str | None) -> None:
+    try:
+        mark_variant_task(cache_key, task_id)
+    except SQLAlchemyError:
+        log.warning(
+            "Failed to attach playback variant task: %s", cache_key, exc_info=True
+        )
+
+
+def _create_variant_task_safely(cache_key: str) -> str | None:
+    try:
+        return create_task_dedup(
+            "prepare_stream_variant",
+            {"cache_key": cache_key},
+            dedup_key=cache_key,
+        )
+    except SQLAlchemyError:
+        log.warning(
+            "Failed to enqueue playback variant task: %s",
+            cache_key,
+            exc_info=True,
+        )
+        return None
+
+
+def _passthrough_resolution(
+    track: dict, source_path: Path, requested_policy: str, reason: str
+) -> PlaybackResolution:
     stat = source_path.stat()
     source = _source_quality(track, source_path, stat, probe_missing=False)
     return PlaybackResolution(
@@ -162,24 +253,39 @@ def _passthrough_resolution(track: dict, source_path: Path, requested_policy: st
     )
 
 
-def resolve_playback(track: dict, requested_policy: str | None, *, enqueue: bool = True) -> PlaybackResolution | None:
+def resolve_playback(
+    track: dict, requested_policy: str | None, *, enqueue: bool = True
+) -> PlaybackResolution | None:
     source_path = resolve_source_path(track)
     if not source_path or not source_path.is_file():
         return None
 
     decision = decide_delivery(track, source_path, requested_policy)
     if decision.passthrough:
-        return _passthrough_resolution(track, source_path, decision.requested_policy, decision.reason)
+        return _passthrough_resolution(
+            track, source_path, decision.requested_policy, decision.reason
+        )
 
     descriptor = _descriptor(track, source_path, decision)
-    row = ensure_variant_record(descriptor)
+    row = _get_or_ensure_variant_record(descriptor)
+    if row is None:
+        return _passthrough_resolution(
+            track,
+            source_path,
+            decision.requested_policy,
+            "variant_metadata_unavailable",
+        )
     variant_path = resolve_data_file(row.get("relative_path"))
-    if row.get("status") == "ready" and not _variant_matches_descriptor(row, descriptor):
-        mark_variant_missing(row["cache_key"])
-        row = get_variant_by_cache_key(row["cache_key"]) or row
+    if row.get("status") == "ready" and not _variant_matches_descriptor(
+        row, descriptor
+    ):
+        _mark_variant_missing_safely(row["cache_key"])
+        row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
         variant_path = resolve_data_file(row.get("relative_path"))
     if row.get("status") == "ready" and variant_path and variant_path.is_file():
-        source = _source_quality(track, source_path, source_path.stat(), probe_missing=False)
+        source = _source_quality(
+            track, source_path, source_path.stat(), probe_missing=False
+        )
         delivery = {
             "format": row.get("delivery_format"),
             "codec": row.get("delivery_codec"),
@@ -205,21 +311,19 @@ def resolve_playback(track: dict, requested_policy: str | None, *, enqueue: bool
         )
 
     if row.get("status") == "ready":
-        mark_variant_missing(row["cache_key"])
-        row = get_variant_by_cache_key(row["cache_key"]) or row
+        _mark_variant_missing_safely(row["cache_key"])
+        row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
 
     task_id = row.get("task_id")
     if enqueue:
-        created_task_id = create_task_dedup(
-            "prepare_stream_variant",
-            {"cache_key": row["cache_key"]},
-            dedup_key=row["cache_key"],
-        )
+        created_task_id = _create_variant_task_safely(row["cache_key"])
         if created_task_id:
             task_id = created_task_id
-            mark_variant_task(row["cache_key"], task_id)
+            _mark_variant_task_safely(row["cache_key"], task_id)
 
-    fallback = _passthrough_resolution(track, source_path, decision.requested_policy, "variant_preparing")
+    fallback = _passthrough_resolution(
+        track, source_path, decision.requested_policy, "variant_preparing"
+    )
     return PlaybackResolution(
         requested_policy=decision.requested_policy,
         effective_policy=fallback.effective_policy,
@@ -245,7 +349,9 @@ def resolve_playback(track: dict, requested_policy: str | None, *, enqueue: bool
     )
 
 
-def prepare_playback(track: dict, requested_policy: str | None) -> PlaybackResolution | None:
+def prepare_playback(
+    track: dict, requested_policy: str | None
+) -> PlaybackResolution | None:
     source_path = resolve_source_path(track)
     if not source_path or not source_path.is_file():
         return None
@@ -268,11 +374,28 @@ def prepare_playback(track: dict, requested_policy: str | None) -> PlaybackResol
         )
 
     descriptor = _descriptor(track, source_path, decision)
-    row = ensure_variant_record(descriptor)
+    row = _get_or_ensure_variant_record(descriptor)
+    if row is None:
+        return PlaybackResolution(
+            requested_policy=decision.requested_policy,
+            effective_policy=ORIGINAL_POLICY,
+            file_path=source_path,
+            media_type=media_type_for_path(source_path),
+            source={},
+            delivery={"reason": "variant_metadata_unavailable"},
+            transcoded=False,
+            cache_hit=False,
+            preparing=False,
+            task_id=None,
+            variant_id=None,
+            variant_status=None,
+        )
     variant_path = resolve_data_file(row.get("relative_path"))
-    if row.get("status") == "ready" and not _variant_matches_descriptor(row, descriptor):
-        mark_variant_missing(row["cache_key"])
-        row = get_variant_by_cache_key(row["cache_key"]) or row
+    if row.get("status") == "ready" and not _variant_matches_descriptor(
+        row, descriptor
+    ):
+        _mark_variant_missing_safely(row["cache_key"])
+        row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
         variant_path = resolve_data_file(row.get("relative_path"))
     if row.get("status") == "ready" and variant_path and variant_path.is_file():
         return PlaybackResolution(
@@ -299,18 +422,14 @@ def prepare_playback(track: dict, requested_policy: str | None) -> PlaybackResol
         )
 
     if row.get("status") == "ready":
-        mark_variant_missing(row["cache_key"])
-        row = get_variant_by_cache_key(row["cache_key"]) or row
+        _mark_variant_missing_safely(row["cache_key"])
+        row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
 
     task_id = row.get("task_id")
-    created_task_id = create_task_dedup(
-        "prepare_stream_variant",
-        {"cache_key": row["cache_key"]},
-        dedup_key=row["cache_key"],
-    )
+    created_task_id = _create_variant_task_safely(row["cache_key"])
     if created_task_id:
         task_id = created_task_id
-        mark_variant_task(row["cache_key"], task_id)
+        _mark_variant_task_safely(row["cache_key"], task_id)
 
     return PlaybackResolution(
         requested_policy=decision.requested_policy,

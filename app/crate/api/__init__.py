@@ -9,7 +9,7 @@ from pathlib import Path
 
 from crate.api._deps import json_dumps
 from crate.api.openapi import custom_openapi, variant_openapi
-from crate.db.core import init_db
+from crate.db.init_db import init_db
 
 SECURITY_RESPONSE_HEADERS = {
     "X-Frame-Options": "DENY",
@@ -31,6 +31,7 @@ CORS_ALLOWED_HEADERS = [
     "X-Device-Fingerprint",
     "X-Device-Label",
     "X-Requested-With",
+    "X-Trace-ID",
 ]
 
 
@@ -43,6 +44,7 @@ class DateAwareJSONResponse(JSONResponse):
 async def lifespan(app: FastAPI):
     init_db()
     from crate.utils import init_musicbrainz
+
     init_musicbrainz()
     yield
 
@@ -60,7 +62,9 @@ def create_app() -> FastAPI:
     async def security_headers_middleware(request, call_next):
         response = await call_next(request)
         if not is_dev:
-            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
         for header, value in SECURITY_RESPONSE_HEADERS.items():
             response.headers.setdefault(header, value)
         return response
@@ -84,7 +88,20 @@ def create_app() -> FastAPI:
         return variant_openapi(
             app,
             "app-api",
-            include_tags={"auth", "me", "offline", "social", "jam", "browse", "playlists", "radio", "genres", "curation", "analytics", "lyrics"},
+            include_tags={
+                "auth",
+                "me",
+                "offline",
+                "social",
+                "jam",
+                "browse",
+                "playlists",
+                "radio",
+                "genres",
+                "curation",
+                "analytics",
+                "lyrics",
+            },
             title="Crate App & Listening API",
             summary="Authentication, personal library, browsing, playlists, radio, and listening surfaces.",
             description=(
@@ -98,7 +115,19 @@ def create_app() -> FastAPI:
         return variant_openapi(
             app,
             "collection-ops",
-            include_tags={"enrichment", "artwork", "metadata", "imports", "scanner", "organizer", "matcher", "duplicates", "batch", "acquisition", "tidal"},
+            include_tags={
+                "enrichment",
+                "artwork",
+                "metadata",
+                "imports",
+                "scanner",
+                "organizer",
+                "matcher",
+                "duplicates",
+                "batch",
+                "acquisition",
+                "tidal",
+            },
             title="Crate Collection Operations API",
             summary="Artwork, metadata, import, acquisition, and maintenance workflows for the library.",
             description=(
@@ -112,7 +141,16 @@ def create_app() -> FastAPI:
         return variant_openapi(
             app,
             "admin-system",
-            include_tags={"management", "settings", "tasks", "events", "stack", "setup", "admin", "admin-auth"},
+            include_tags={
+                "management",
+                "settings",
+                "tasks",
+                "events",
+                "stack",
+                "setup",
+                "admin",
+                "admin-auth",
+            },
             title="Crate Admin & System API",
             summary="Setup, administration, health, task orchestration, and system control.",
             description=(
@@ -155,9 +193,12 @@ def create_app() -> FastAPI:
         allowed_origins += [
             f"https://docs.{domain}",
             "https://docs.dev.cratemusic.app",
-            "http://localhost:3000", "http://localhost:5173",
-            "http://localhost:5174", "http://localhost:4173",
-            "http://127.0.0.1:4173", "http://localhost:8585",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://localhost:4173",
+            "http://127.0.0.1:4173",
+            "http://localhost:8585",
         ]
     app.add_middleware(
         CORSMiddleware,
@@ -170,9 +211,18 @@ def create_app() -> FastAPI:
     from crate.api.auth import AuthMiddleware
     from crate.api.cache_events import CacheInvalidationMiddleware
     from crate.api.metrics_middleware import MetricsMiddleware
+    from crate.api.trace_middleware import (
+        TraceMiddleware,
+        install_trace_id_log_record_factory,
+    )
+
+    app.add_middleware(TraceMiddleware)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+
+    # Ensure trace ID flows into all log records
+    install_trace_id_log_record_factory()
 
     from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
@@ -190,7 +240,10 @@ def create_app() -> FastAPI:
     from crate.api.tasks import router as tasks_router
     from crate.api.stack import router as stack_router
     from crate.api.enrichment import router as enrichment_router
-    from crate.api.management import router as management_router, admin_router as management_admin_router
+    from crate.api.management import (
+        router as management_router,
+        admin_router as management_admin_router,
+    )
     from crate.api.settings import router as settings_router
     from crate.api.playlists import router as playlists_router
     from crate.api.offline import router as offline_router
@@ -248,6 +301,7 @@ def create_app() -> FastAPI:
     app.include_router(stack_router)
     app.include_router(playback_admin_router)
     from crate.api.admin_metrics import router as admin_metrics_router
+
     app.include_router(admin_ops_router)
     app.include_router(admin_metrics_router)
 

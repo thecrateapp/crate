@@ -70,7 +70,9 @@ def compute_path(
             "energy": track.get("energy"),
             "danceability": track.get("danceability"),
             "valence": track.get("valence"),
-            "bliss_vector": list(track["bliss_vector"]) if track.get("bliss_vector") else None,
+            "bliss_vector": list(track["bliss_vector"])
+            if track.get("bliss_vector")
+            else None,
             "distance": round(track["distance"], 6),
         }
 
@@ -78,7 +80,9 @@ def compute_path(
     first = _find_anchor_track(origin_type, origin_value, origin_vec, set())
     if first:
         path_tracks.append(make_entry(first, 0, 0.0))
-        last_actual_vec = list(first["bliss_vector"]) if first.get("bliss_vector") else origin_vec
+        last_actual_vec = (
+            list(first["bliss_vector"]) if first.get("bliss_vector") else origin_vec
+        )
     else:
         last_actual_vec = origin_vec
 
@@ -86,7 +90,11 @@ def compute_path(
     for segment_index in range(num_segments):
         segment_start = chain[segment_index]
         segment_end = chain[segment_index + 1]
-        segment_steps = steps_per_segment if segment_index < num_segments - 1 else inner_steps - (global_step - 1)
+        segment_steps = (
+            steps_per_segment
+            if segment_index < num_segments - 1
+            else inner_steps - (global_step - 1)
+        )
 
         for local_step in range(segment_steps):
             t = (local_step + 1) / (segment_steps + 1)
@@ -108,7 +116,11 @@ def compute_path(
             )
             if track:
                 path_tracks.append(make_entry(track, global_step, global_progress))
-                last_actual_vec = list(track["bliss_vector"]) if track.get("bliss_vector") else last_actual_vec
+                last_actual_vec = (
+                    list(track["bliss_vector"])
+                    if track.get("bliss_vector")
+                    else last_actual_vec
+                )
 
             global_step += 1
 

@@ -16,7 +16,7 @@ import resource
 import signal
 import threading
 import time
-from datetime import datetime, timezone
+from typing import Any, NamedTuple, cast
 
 import dramatiq
 
@@ -27,8 +27,20 @@ log = logging.getLogger(__name__)
 
 MAX_RSS_MB = 1500  # 1.5 GB — matches previous worker recycling limit
 
+# ── Timing constants ──────────────────────────────────────────────
+HEARTBEAT_INTERVAL_SECONDS = 15
+DB_HEAVY_LOCK_TIMEOUT_SECONDS = 60
+DB_HEAVY_LOCK_RETRY_SECONDS = 5
+DB_HEAVY_LOCK_TTL_SECONDS = 7200  # 2h max
+DOWNLOAD_SLOT_TIMEOUT_SECONDS = 120
+DOWNLOAD_SEM_TTL_SECONDS = 14400  # 4h — matches tidal_download timeout
+DOWNLOAD_SEM_MAX = 2
+TASK_REQUEUE_DELAY_MS = 30_000
+TASK_REQUEUE_DELAY_LONG_MS = 3600_000  # 1h cap for deferred downloads
+DOWNLOAD_WINDOW_RETRY_MS = 300_000  # 5 min
+
 # ── Pool configuration ────────────────────────────────────────────
-# task_type → (queue, priority, time_limit_sec, max_retries)
+# task_type → TaskPoolConfig(queue, priority, time_limit_seconds, max_retries)
 #
 # Queues:
 #   fast    — I/O-bound: HTTP APIs, light DB
@@ -37,110 +49,136 @@ MAX_RSS_MB = 1500  # 1.5 GB — matches previous worker recycling limit
 #   maintenance — deferrable repair/sync/export work
 #   playback — interactive playback delivery and stream variant preparation
 
-TASK_POOL_CONFIG: dict[str, tuple[str, int, int, int]] = {
+
+class TaskPoolConfig(NamedTuple):
+    queue: str
+    priority: int
+    time_limit_seconds: int
+    max_retries: int
+
+
+TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # User-initiated (priority 0) — these should run ASAP
-    "tidal_download":       ("default", 0, 14400, 0),   # 4h — artist discographies in FLAC are huge
-    "soulseek_download":    ("default", 0, 7200, 2),    # 2h — soulseek transfers are slow
-    "delete_artist":        ("default", 0, 300, 0),
-    "delete_album":         ("default", 0, 300, 0),
-    "move_artist":          ("default", 0, 600, 0),
-    "update_album_tags":    ("default", 0, 300, 0),
-    "update_track_tags":    ("default", 0, 120, 0),
-    "match_apply":          ("default", 0, 300, 0),
-    "fetch_cover":          ("fast",    0, 120, 2),
-    "apply_cover":          ("fast",    0, 60, 0),
-    "fetch_album_cover":    ("fast",    0, 120, 1),
-    "upload_image":         ("default", 0, 60, 0),
-    "library_upload":       ("default", 0, 7200, 1),
-    "import_queue_item":    ("default", 0, 3600, 0),
-    "import_queue_all":     ("default", 0, 14400, 0),
-    "import_queue_remove":  ("default", 0, 300, 0),
-    "reset_enrichment":     ("fast",    1, 120, 0),
-    "refresh_user_listening_stats": ("fast", 1, 300, 0),
-
+    "tidal_download": TaskPoolConfig(
+        "default", 0, 14400, 0
+    ),  # 4h — artist discographies in FLAC are huge
+    "soulseek_download": TaskPoolConfig(
+        "default", 0, 7200, 2
+    ),  # 2h — soulseek transfers are slow
+    "delete_artist": TaskPoolConfig("default", 0, 300, 0),
+    "delete_album": TaskPoolConfig("default", 0, 300, 0),
+    "move_artist": TaskPoolConfig("default", 0, 600, 0),
+    "update_album_tags": TaskPoolConfig("default", 0, 300, 0),
+    "update_track_tags": TaskPoolConfig("default", 0, 120, 0),
+    "match_apply": TaskPoolConfig("default", 0, 300, 0),
+    "fetch_cover": TaskPoolConfig("fast", 0, 120, 2),
+    "apply_cover": TaskPoolConfig("fast", 0, 60, 0),
+    "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
+    "upload_image": TaskPoolConfig("default", 0, 60, 0),
+    "library_upload": TaskPoolConfig("default", 0, 7200, 1),
+    "import_queue_item": TaskPoolConfig("default", 0, 3600, 0),
+    "import_queue_all": TaskPoolConfig("default", 0, 14400, 0),
+    "import_queue_remove": TaskPoolConfig("default", 0, 300, 0),
+    "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
+    "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
     # New content processing (priority 1)
-    "process_new_content":  ("default", 1, 14400, 0),
-    "enrich_artist":        ("fast",    1, 180, 2),
-    "sync_lyrics":          ("fast",    2, 7200, 1),
-    "analyze_album_full":   ("fast",    1, 60, 0),  # just resets state for background daemon
-
+    "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
+    "enrich_artist": TaskPoolConfig("fast", 1, 180, 2),
+    "sync_lyrics": TaskPoolConfig("fast", 2, 7200, 1),
+    "analyze_album_full": TaskPoolConfig(
+        "fast", 1, 60, 0
+    ),  # just resets state for background daemon
     # Scheduled recurring (priority 2)
-    "library_sync":         ("maintenance", 2, 3600, 0),
-    "library_pipeline":     ("maintenance", 2, 7200, 0),
-    "health_check":         ("maintenance", 2, 1500, 0),
-    "repair":               ("maintenance", 2, 3600, 0),
-    "compute_analytics":    ("fast",    2, 600, 0),
-    "check_new_releases":   ("fast",    2, 600, 1),
-    "scan":                 ("maintenance", 2, 1800, 0),
-    "fix_issues":           ("maintenance", 2, 3600, 0),
-    "fetch_artist_covers":  ("fast",    2, 300, 1),
-    "batch_retag":          ("maintenance", 2, 3600, 0),
-    "batch_covers":         ("fast",    2, 3600, 0),
-    "wipe_library":         ("default", 2, 300, 0),
-    "rebuild_library":      ("default", 2, 14400, 0),
-    "resolve_duplicates":   ("default", 2, 600, 0),
-    "write_portable_metadata": ("maintenance", 2, 14400, 0),
-    "rehydrate_portable_metadata": ("maintenance", 2, 14400, 0),
-    "export_rich_metadata":  ("maintenance", 2, 28800, 0),
-
+    "library_sync": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
+    "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
+    "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "compute_analytics": TaskPoolConfig("fast", 2, 600, 0),
+    "check_new_releases": TaskPoolConfig("fast", 2, 600, 1),
+    "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
+    "fix_issues": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "fetch_artist_covers": TaskPoolConfig("fast", 2, 300, 1),
+    "batch_retag": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "batch_covers": TaskPoolConfig("fast", 2, 3600, 0),
+    "wipe_library": TaskPoolConfig("default", 2, 300, 0),
+    "rebuild_library": TaskPoolConfig("default", 2, 14400, 0),
+    "resolve_duplicates": TaskPoolConfig("default", 2, 600, 0),
+    "write_portable_metadata": TaskPoolConfig("maintenance", 2, 14400, 0),
+    "rehydrate_portable_metadata": TaskPoolConfig("maintenance", 2, 14400, 0),
+    "export_rich_metadata": TaskPoolConfig("maintenance", 2, 28800, 0),
     # Background batch (priority 3)
-    "enrich_artists":       ("fast",    3, 86400, 0),
-    "enrich_mbids":         ("fast",    3, 86400, 0),
-    "compute_popularity":   ("fast",    3, 3600, 0),
-    "compute_bliss":        ("fast",    3, 60, 0),   # just resets state for background daemon
-    "analyze_tracks":       ("fast",    2, 60, 0),   # just resets state for background daemon
-    "analyze_all":          ("fast",    3, 60, 0),    # just resets state for background daemon
-    "backfill_track_audio_fingerprints": ("heavy", 3, 14400, 0),
-    "index_genres":         ("fast",    3, 600, 0),
-    "infer_genre_taxonomy": ("fast",    3, 3600, 0),
-    "enrich_genre_descriptions": ("fast", 3, 3600, 0),
-    "sync_musicbrainz_genre_graph": ("fast", 3, 5400, 0),
-    "cleanup_invalid_genre_taxonomy": ("fast", 3, 900, 0),
-    "remux_m4a_dash":       ("fast",    3, 7200, 0),
-    "scan_missing_covers":  ("fast",    3, 3600, 0),
-    "fetch_artwork_all":    ("fast",    3, 3600, 0),
-    "backfill_similarities": ("fast",   3, 3600, 0),
-    "sync_shows":           ("fast",    3, 600, 1),
-    "cleanup_incomplete_downloads": ("default", 3, 600, 0),
-
+    "enrich_artists": TaskPoolConfig("fast", 3, 86400, 0),
+    "enrich_mbids": TaskPoolConfig("fast", 3, 86400, 0),
+    "compute_popularity": TaskPoolConfig("fast", 3, 3600, 0),
+    "compute_bliss": TaskPoolConfig(
+        "fast", 3, 60, 0
+    ),  # just resets state for background daemon
+    "analyze_tracks": TaskPoolConfig(
+        "fast", 2, 60, 0
+    ),  # just resets state for background daemon
+    "analyze_all": TaskPoolConfig(
+        "fast", 3, 60, 0
+    ),  # just resets state for background daemon
+    "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
+    "index_genres": TaskPoolConfig("fast", 3, 600, 0),
+    "infer_genre_taxonomy": TaskPoolConfig("fast", 3, 3600, 0),
+    "enrich_genre_descriptions": TaskPoolConfig("fast", 3, 3600, 0),
+    "sync_musicbrainz_genre_graph": TaskPoolConfig("fast", 3, 5400, 0),
+    "cleanup_invalid_genre_taxonomy": TaskPoolConfig("fast", 3, 900, 0),
+    "remux_m4a_dash": TaskPoolConfig("fast", 3, 7200, 0),
+    "scan_missing_covers": TaskPoolConfig("fast", 3, 3600, 0),
+    "fetch_artwork_all": TaskPoolConfig("fast", 3, 3600, 0),
+    "backfill_similarities": TaskPoolConfig("fast", 3, 3600, 0),
+    "sync_shows": TaskPoolConfig("fast", 3, 600, 1),
+    "cleanup_incomplete_downloads": TaskPoolConfig("default", 3, 600, 0),
     # Storage migration (priority 1 — user-initiated, long-running)
-    "migrate_storage_v2":   ("maintenance", 1, 14400, 0),  # deprecated legacy storage migration
-    "fix_artist":           ("maintenance", 1, 14400, 0),
-    "verify_storage_v2":    ("maintenance", 2, 3600, 0),   # deprecated legacy storage migration
-
+    "migrate_storage_v2": TaskPoolConfig(
+        "maintenance", 1, 14400, 0
+    ),  # deprecated legacy storage migration
+    "fix_artist": TaskPoolConfig("maintenance", 1, 14400, 0),
+    "verify_storage_v2": TaskPoolConfig(
+        "maintenance", 2, 3600, 0
+    ),  # deprecated legacy storage migration
     # Library completeness check
-    "compute_completeness": ("fast",    3, 3600, 0),
-
+    "compute_completeness": TaskPoolConfig("fast", 3, 3600, 0),
     # Playback delivery
-    "prepare_stream_variant": ("playback", 0, 1200, 1),
-
+    "prepare_stream_variant": TaskPoolConfig("playback", 0, 1200, 1),
     # Playlist generation
-    "generate_system_playlist":         ("fast", 1, 600, 0),
-    "refresh_system_smart_playlists":   ("fast", 3, 1800, 0),
-    "persist_playlist_cover":           ("fast", 0, 120, 1),
+    "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
+    "refresh_system_smart_playlists": TaskPoolConfig("fast", 3, 1800, 0),
+    "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
 }
 
 # DB-heavy tasks — only one at a time via Redis mutex
-DB_HEAVY_TASK_TYPES = frozenset({
-    "library_sync", "library_pipeline", "wipe_library",
-    "rebuild_library", "repair",
-    "migrate_storage_v2", "fix_artist",
-})
+DB_HEAVY_TASK_TYPES = frozenset(
+    {
+        "library_sync",
+        "library_pipeline",
+        "wipe_library",
+        "rebuild_library",
+        "repair",
+        "migrate_storage_v2",
+        "fix_artist",
+    }
+)
 
 
 # ── Heartbeat ─────────────────────────────────────────────────────
 
+
 def _heartbeat_loop(task_id: str, stop_event: threading.Event):
     """Background thread: updates heartbeat_at while task runs."""
     from crate.db.repositories.tasks import heartbeat_task
-    while not stop_event.wait(15):
+
+    while not stop_event.wait(HEARTBEAT_INTERVAL_SECONDS):
         try:
             heartbeat_task(task_id)
         except Exception:
-            pass
+            log.debug("Heartbeat failed for %s", task_id, exc_info=True)
 
 
 # ── Memory recycling ──────────────────────────────────────────────
+
 
 def _check_memory():
     """Exit if RSS exceeds limit. Dramatiq will restart the process."""
@@ -159,53 +197,67 @@ def _check_memory():
 
 _db_heavy_lock = threading.Lock()  # in-process lock
 _DB_HEAVY_REDIS_KEY = "crate:db_heavy_lock"
-_DB_HEAVY_LOCK_TTL = 7200  # 2h max
 
 
 def clear_db_heavy_lock():
     """Force-clear the DB-heavy lock for manual emergency recovery."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r:
             r.delete(_DB_HEAVY_REDIS_KEY)
     except Exception:
-        pass
+        log.warning("Failed to clear DB-heavy lock", exc_info=True)
 
 
-def _acquire_db_heavy_lock(task_id: str, timeout: int = 60) -> bool:
+def _acquire_db_heavy_lock(
+    task_id: str, timeout: int = DB_HEAVY_LOCK_TIMEOUT_SECONDS
+) -> bool:
     """Acquire a Redis-based mutex for DB-heavy tasks. Blocks up to timeout seconds."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if not r:
-            log.warning("Redis unavailable — DB-heavy lock cannot be acquired, proceeding without lock")
+            log.warning(
+                "Redis unavailable — DB-heavy lock cannot be acquired, proceeding without lock"
+            )
             return True  # no Redis → proceed with warning
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if r.set(_DB_HEAVY_REDIS_KEY, task_id, nx=True, ex=_DB_HEAVY_LOCK_TTL):
+            if r.set(
+                _DB_HEAVY_REDIS_KEY, task_id, nx=True, ex=DB_HEAVY_LOCK_TTL_SECONDS
+            ):
                 return True
-            time.sleep(5)
+            time.sleep(DB_HEAVY_LOCK_RETRY_SECONDS)
         return False
     except Exception:
-        log.warning("Failed to acquire DB-heavy lock, proceeding without lock", exc_info=True)
+        log.warning(
+            "Failed to acquire DB-heavy lock, proceeding without lock", exc_info=True
+        )
         return True
 
 
 def _release_db_heavy_lock(task_id: str):
     """Release the DB-heavy mutex. Uses Lua script for atomic check-and-delete."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r:
             # Atomic: only delete if we hold the lock
             r.eval(
                 "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-                1, _DB_HEAVY_REDIS_KEY, task_id,
+                1,
+                _DB_HEAVY_REDIS_KEY,
+                task_id,
             )
             log.debug("Released DB-heavy lock for task %s", task_id)
     except Exception:
-        log.warning("Failed to release DB-heavy lock for task %s", task_id, exc_info=True)
+        log.warning(
+            "Failed to release DB-heavy lock for task %s", task_id, exc_info=True
+        )
 
 
 # ── Download concurrency limiter ──────────────────────────────────
@@ -235,7 +287,7 @@ def _is_download_allowed() -> bool:
             return False
 
     # Active users check
-    max_users_str = get_setting("download_max_active_users", "0")
+    max_users_str = get_setting("download_max_active_users", "0") or "0"
     max_users = int(max_users_str) if max_users_str.isdigit() else 0
     if max_users > 0:
         active = _count_active_users()
@@ -243,7 +295,7 @@ def _is_download_allowed() -> bool:
             return False
 
     # Active streams check
-    max_streams_str = get_setting("download_max_active_streams", "0")
+    max_streams_str = get_setting("download_max_active_streams", "0") or "0"
     max_streams = int(max_streams_str) if max_streams_str.isdigit() else 0
     if max_streams > 0:
         streams = _count_active_streams()
@@ -255,10 +307,12 @@ def _is_download_allowed() -> bool:
 
 def _is_in_time_window() -> bool:
     from crate.db.cache_settings import get_setting
-    start_str = get_setting("download_window_start", "02:00")
-    end_str = get_setting("download_window_end", "07:00")
+
+    start_str = get_setting("download_window_start", "02:00") or "02:00"
+    end_str = get_setting("download_window_end", "07:00") or "07:00"
     try:
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc)
         hour, minute = map(int, start_str.split(":"))
         start_minutes = hour * 60 + minute
@@ -269,7 +323,7 @@ def _is_in_time_window() -> bool:
             return start_minutes <= current_minutes < end_minutes
         else:
             return current_minutes >= start_minutes or current_minutes < end_minutes
-    except Exception:
+    except (ValueError, TypeError):
         return True
 
 
@@ -285,6 +339,7 @@ def _count_active_users() -> int:
 
         return count_recent_active_users(window_minutes=5)
     except Exception:
+        log.debug("Active users count failed", exc_info=True)
         return 0
 
 
@@ -300,16 +355,19 @@ def _count_active_streams() -> int:
 
         return count_recent_streams(window_minutes=3)
     except Exception:
+        log.debug("Active streams count failed", exc_info=True)
         return 0
 
 
 def _ms_until_download_window() -> int:
     """Milliseconds until the next download window opens (or 5 min if user-gated)."""
     from crate.db.cache_settings import get_setting
+
     if get_setting("download_window_enabled", "false") == "true":
-        start_str = get_setting("download_window_start", "02:00")
+        start_str = get_setting("download_window_start", "02:00") or "02:00"
         try:
             from datetime import datetime, timezone, timedelta
+
             now = datetime.now(timezone.utc)
             hour, minute = map(int, start_str.split(":"))
             target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
@@ -317,10 +375,10 @@ def _ms_until_download_window() -> int:
                 target += timedelta(days=1)
             delta = target - now
             return int(delta.total_seconds() * 1000)
-        except Exception:
+        except (ValueError, TypeError):
             pass
     # If deferred by active users/streams, retry in 5 minutes
-    return 300_000
+    return DOWNLOAD_WINDOW_RETRY_MS
 
 
 def get_suggested_download_limits() -> dict:
@@ -346,7 +404,7 @@ def get_suggested_download_limits() -> dict:
 
     try:
         disk = shutil.disk_usage("/music")
-        disk_free_gb = disk.free / (1024 ** 3)
+        disk_free_gb = disk.free / (1024**3)
     except Exception:
         disk_free_gb = 100
 
@@ -372,23 +430,48 @@ def get_suggested_download_limits() -> dict:
             f"Max {suggested_download_slots} concurrent download(s)."
         ),
     }
+
+
 _DOWNLOAD_SEM_KEY = "crate:download_semaphore"
-_DOWNLOAD_SEM_MAX = 2
-_DOWNLOAD_SEM_TTL = 14400  # 4h — matches tidal_download timeout
+_DOWNLOAD_SLOT_ACQUIRE_SCRIPT = """
+if redis.call("SISMEMBER", KEYS[1], ARGV[1]) == 1 then
+    redis.call("EXPIRE", KEYS[1], tonumber(ARGV[3]))
+    return 1
+end
+local current = redis.call("SCARD", KEYS[1])
+if current < tonumber(ARGV[2]) then
+    redis.call("SADD", KEYS[1], ARGV[1])
+    redis.call("EXPIRE", KEYS[1], tonumber(ARGV[3]))
+    return 1
+end
+return 0
+"""
 
 
-def _acquire_download_slot(task_id: str, timeout: int = 120) -> bool:
+def _try_acquire_download_slot(redis_client, task_id: str) -> bool:
+    acquired = redis_client.eval(
+        _DOWNLOAD_SLOT_ACQUIRE_SCRIPT,
+        1,
+        _DOWNLOAD_SEM_KEY,
+        task_id,
+        DOWNLOAD_SEM_MAX,
+        DOWNLOAD_SEM_TTL_SECONDS,
+    )
+    return int(acquired or 0) == 1
+
+
+def _acquire_download_slot(
+    task_id: str, timeout: int = DOWNLOAD_SLOT_TIMEOUT_SECONDS
+) -> bool:
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if not r:
             return True
         deadline = time.time() + timeout
         while time.time() < deadline:
-            current = r.scard(_DOWNLOAD_SEM_KEY)
-            if current < _DOWNLOAD_SEM_MAX:
-                r.sadd(_DOWNLOAD_SEM_KEY, task_id)
-                r.expire(_DOWNLOAD_SEM_KEY, _DOWNLOAD_SEM_TTL)
+            if _try_acquire_download_slot(r, task_id):
                 return True
             time.sleep(10)
         return False
@@ -399,8 +482,9 @@ def _acquire_download_slot(task_id: str, timeout: int = 120) -> bool:
 
 def _release_download_slot(task_id: str):
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r:
             r.srem(_DOWNLOAD_SEM_KEY, task_id)
     except Exception:
@@ -410,15 +494,17 @@ def _release_download_slot(task_id: str):
 def clear_download_slots():
     """Force-clear the download semaphore for manual emergency recovery."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r:
             r.delete(_DOWNLOAD_SEM_KEY)
     except Exception:
-        pass
+        log.warning("Failed to clear download slots", exc_info=True)
 
 
 # ── Generic task executor ─────────────────────────────────────────
+
 
 def _execute_task(task_type: str, task_id: str):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
@@ -450,7 +536,10 @@ def _execute_task(task_type: str, task_id: str):
             task_type,
             resource_decision.reason,
         )
-        update_task(task_id, progress=f"Deferred by resource governor: {resource_decision.reason}")
+        update_task(
+            task_id,
+            progress=f"Deferred by resource governor: {resource_decision.reason}",
+        )
         actor = _actors.get(task_type)
         if actor:
             actor.send_with_options(
@@ -463,10 +552,14 @@ def _execute_task(task_type: str, task_id: str):
     is_db_heavy = task_type in DB_HEAVY_TASK_TYPES
     if is_db_heavy:
         if not _acquire_db_heavy_lock(task_id):
-            log.info("Task %s (%s) waiting for DB-heavy lock, re-enqueueing in 30s", task_id, task_type)
+            log.info(
+                "Task %s (%s) waiting for DB-heavy lock, re-enqueueing in 30s",
+                task_id,
+                task_type,
+            )
             actor = _actors.get(task_type)
             if actor:
-                actor.send_with_options(args=(task_id,), delay=30_000)
+                actor.send_with_options(args=(task_id,), delay=TASK_REQUEUE_DELAY_MS)
             return
 
     # Download deferral: time window + active user/stream limits
@@ -477,27 +570,43 @@ def _execute_task(task_type: str, task_id: str):
         active_streams = _count_active_streams()
         reason = []
         from crate.db.cache_settings import get_setting
-        if get_setting("download_window_enabled", "false") == "true" and not _is_in_time_window():
+
+        if (
+            get_setting("download_window_enabled", "false") == "true"
+            and not _is_in_time_window()
+        ):
             reason.append("outside download window")
         if active_users > 0:
             reason.append(f"{active_users} active user(s)")
         if active_streams > 0:
             reason.append(f"{active_streams} active stream(s)")
         reason_str = ", ".join(reason) or "conditions not met"
-        log.info("Task %s (%s) deferred: %s. Retrying in %dmin", task_id, task_type, reason_str, delay_ms // 60000)
+        log.info(
+            "Task %s (%s) deferred: %s. Retrying in %dmin",
+            task_id,
+            task_type,
+            reason_str,
+            delay_ms // 60000,
+        )
         update_task(task_id, progress=f"Deferred: {reason_str}")
         actor = _actors.get(task_type)
         if actor:
-            actor.send_with_options(args=(task_id,), delay=min(delay_ms, 3600_000))
+            actor.send_with_options(
+                args=(task_id,), delay=min(delay_ms, TASK_REQUEUE_DELAY_LONG_MS)
+            )
         return
 
     # Download concurrency limiter
     if is_download:
         if not _acquire_download_slot(task_id):
-            log.info("Task %s (%s) waiting for download slot, re-enqueueing in 30s", task_id, task_type)
+            log.info(
+                "Task %s (%s) waiting for download slot, re-enqueueing in 30s",
+                task_id,
+                task_type,
+            )
             actor = _actors.get(task_type)
             if actor:
-                actor.send_with_options(args=(task_id,), delay=30_000)
+                actor.send_with_options(args=(task_id,), delay=TASK_REQUEUE_DELAY_MS)
             return
 
     # Atomically claim the DB task row.  Dramatiq can redeliver a message or
@@ -507,10 +616,24 @@ def _execute_task(task_type: str, task_id: str):
     started = start_task(task_id, worker_id=worker_id)
     if not started:
         fresh = get_task(task_id)
-        if fresh and fresh.get("status") in {"completed", "failed", "cancelled", "running", "delegated", "completing"}:
-            log.info("Task %s (%s) is already %s; skipping duplicate message", task_id, task_type, fresh.get("status"))
+        if fresh and fresh.get("status") in {
+            "completed",
+            "failed",
+            "cancelled",
+            "running",
+            "delegated",
+            "completing",
+        }:
+            log.info(
+                "Task %s (%s) is already %s; skipping duplicate message",
+                task_id,
+                task_type,
+                fresh.get("status"),
+            )
         else:
-            log.warning("Task %s (%s) could not be started; skipping", task_id, task_type)
+            log.warning(
+                "Task %s (%s) could not be started; skipping", task_id, task_type
+            )
         if is_db_heavy:
             _release_db_heavy_lock(task_id)
         if is_download:
@@ -519,21 +642,25 @@ def _execute_task(task_type: str, task_id: str):
 
     # Start heartbeat
     import time as _time
+
     _task_start = _time.monotonic()
 
     hb_stop = threading.Event()
-    hb_thread = threading.Thread(target=_heartbeat_loop, args=(task_id, hb_stop), daemon=True)
+    hb_thread = threading.Thread(
+        target=_heartbeat_loop, args=(task_id, hb_stop), daemon=True
+    )
     hb_thread.start()
 
     # Record queue wait time (created → running)
     try:
         from crate.metrics import record
+
         created = task.get("created_at")
         if created and hasattr(created, "timestamp"):
             wait_sec = _time.time() - created.timestamp()
             record("worker.queue.wait", wait_sec, {"type": task_type})
     except Exception:
-        pass
+        log.debug("Queue wait recording failed", exc_info=True)
 
     try:
         config = load_config()
@@ -545,8 +672,20 @@ def _execute_task(task_type: str, task_id: str):
             # Coordinator dispatched sub-tasks — don't mark completed yet.
             # The last child to finish will complete this task.
             # Set status to 'delegated' so zombie cleanup doesn't kill it.
-            update_task(task_id, status="delegated", result={"chunks": result.get("chunks", 0), "artists": result.get("artists", 0)})
-            log.info("Task %s (%s) delegated to %d chunks", task_id, task_type, result.get("chunks", 0))
+            update_task(
+                task_id,
+                status="delegated",
+                result={
+                    "chunks": result.get("chunks", 0),
+                    "artists": result.get("artists", 0),
+                },
+            )
+            log.info(
+                "Task %s (%s) delegated to %d chunks",
+                task_id,
+                task_type,
+                result.get("chunks", 0),
+            )
         elif isinstance(result, dict) and result.get("error"):
             error = str(result.get("error") or "Task failed")[:500]
             update_task(task_id, status="failed", result=result, error=error)
@@ -554,37 +693,70 @@ def _execute_task(task_type: str, task_id: str):
             _try_fan_in_parent(task, task_type, task_id)
             try:
                 from crate.metrics import record as _record
-                _record("worker.task.duration", _time.monotonic() - _task_start, {"type": task_type, "status": "failed"})
+
+                _record(
+                    "worker.task.duration",
+                    _time.monotonic() - _task_start,
+                    {"type": task_type, "status": "failed"},
+                )
             except Exception:
-                pass
+                log.debug("Metrics recording failed", exc_info=True)
             try:
                 from crate.telegram import notify_task_failed
+
                 notify_task_failed(task_type, task_id, error[:300])
             except Exception:
-                pass
+                log.debug("Telegram notification failed", exc_info=True)
             try:
                 from crate.db.events import _publish_to_redis
-                _publish_to_redis(task_id, "task_done", {"type": "task_done", "status": "failed", "task_type": task_type, "error": error[:200]}, "")
+
+                _publish_to_redis(
+                    task_id,
+                    "task_done",
+                    {
+                        "type": "task_done",
+                        "status": "failed",
+                        "task_type": task_type,
+                        "error": error[:200],
+                    },
+                    "",
+                )
             except Exception:
-                pass
+                log.debug("Task event publish failed", exc_info=True)
         else:
             update_task(task_id, status="completed", result=result or {})
             log.info("Task %s (%s) completed", task_id, task_type)
             try:
                 from crate.metrics import record as _record
-                _record("worker.task.duration", _time.monotonic() - _task_start, {"type": task_type, "status": "completed"})
+
+                _record(
+                    "worker.task.duration",
+                    _time.monotonic() - _task_start,
+                    {"type": task_type, "status": "completed"},
+                )
             except Exception:
-                pass
+                log.debug("Metrics recording failed", exc_info=True)
             try:
                 from crate.telegram import notify_task_completed
+
                 notify_task_completed(task_type, task_id, result)
             except Exception:
-                pass
+                log.debug("Telegram notification failed", exc_info=True)
             try:
                 from crate.db.events import _publish_to_redis
-                _publish_to_redis(task_id, "task_done", {"type": "task_done", "status": "completed", "task_type": task_type}, "")
+
+                _publish_to_redis(
+                    task_id,
+                    "task_done",
+                    {
+                        "type": "task_done",
+                        "status": "completed",
+                        "task_type": task_type,
+                    },
+                    "",
+                )
             except Exception:
-                pass
+                log.debug("Task event publish failed", exc_info=True)
 
             _try_fan_in_parent(task, task_type, task_id)
 
@@ -592,9 +764,14 @@ def _execute_task(task_type: str, task_id: str):
         log.exception("Task %s (%s) failed", task_id, task_type)
         try:
             from crate.metrics import record as _record
-            _record("worker.task.duration", _time.monotonic() - _task_start, {"type": task_type, "status": "failed"})
+
+            _record(
+                "worker.task.duration",
+                _time.monotonic() - _task_start,
+                {"type": task_type, "status": "failed"},
+            )
         except Exception:
-            pass
+            log.debug("Metrics recording failed", exc_info=True)
         try:
             terminal_status = fail_or_retry_task(task_id, str(e)[:500])
             if terminal_status == "failed":
@@ -603,14 +780,26 @@ def _execute_task(task_type: str, task_id: str):
             log.error("Could not mark task %s as failed", task_id)
         try:
             from crate.telegram import notify_task_failed
+
             notify_task_failed(task_type, task_id, str(e)[:300])
         except Exception:
-            pass
+            log.debug("Telegram notification failed", exc_info=True)
         try:
             from crate.db.events import _publish_to_redis
-            _publish_to_redis(task_id, "task_done", {"type": "task_done", "status": "failed", "task_type": task_type, "error": str(e)[:200]}, "")
+
+            _publish_to_redis(
+                task_id,
+                "task_done",
+                {
+                    "type": "task_done",
+                    "status": "failed",
+                    "task_type": task_type,
+                    "error": str(e)[:200],
+                },
+                "",
+            )
         except Exception:
-            pass
+            log.debug("Task event publish failed", exc_info=True)
         raise  # let dramatiq handle retry logic
 
     except BaseException as e:
@@ -619,20 +808,38 @@ def _execute_task(task_type: str, task_id: str):
         log.exception("Task %s (%s) exceeded time limit", task_id, task_type)
         try:
             from crate.metrics import record as _record
-            _record("worker.task.duration", _time.monotonic() - _task_start, {"type": task_type, "status": "timeout"})
+
+            _record(
+                "worker.task.duration",
+                _time.monotonic() - _task_start,
+                {"type": task_type, "status": "timeout"},
+            )
         except Exception:
-            pass
+            log.debug("Metrics recording failed", exc_info=True)
         try:
-            terminal_status = fail_or_retry_task(task_id, f"Task exceeded time limit: {task_type}")
+            terminal_status = fail_or_retry_task(
+                task_id, f"Task exceeded time limit: {task_type}"
+            )
             if terminal_status == "failed":
                 _try_fan_in_parent(task, task_type, task_id)
         except Exception:
             log.error("Could not mark timed-out task %s as failed", task_id)
         try:
             from crate.db.events import _publish_to_redis
-            _publish_to_redis(task_id, "task_done", {"type": "task_done", "status": "failed", "task_type": task_type, "error": "time limit exceeded"}, "")
+
+            _publish_to_redis(
+                task_id,
+                "task_done",
+                {
+                    "type": "task_done",
+                    "status": "failed",
+                    "task_type": task_type,
+                    "error": "time limit exceeded",
+                },
+                "",
+            )
         except Exception:
-            pass
+            log.debug("Task event publish failed", exc_info=True)
         raise
 
     finally:
@@ -651,9 +858,15 @@ def _try_fan_in_parent(task: dict, task_type: str, task_id: str) -> None:
         return
     try:
         from crate.worker_handlers.analysis import _try_complete_parent
+
         _try_complete_parent(parent_id, task_type)
     except Exception:
-        log.warning("Fan-in check failed for parent %s after child %s", parent_id, task_id, exc_info=True)
+        log.warning(
+            "Fan-in check failed for parent %s after child %s",
+            parent_id,
+            task_id,
+            exc_info=True,
+        )
 
 
 # ── Dynamic actor registration ────────────────────────────────────
@@ -664,8 +877,10 @@ _actors: dict[str, dramatiq.Actor] = {}
 
 def _make_actor_fn(task_type: str):
     """Create a closure that calls _execute_task for a specific task type."""
+
     def actor_fn(task_id: str):
         _execute_task(task_type, task_id)
+
     actor_fn.__name__ = task_type
     actor_fn.__qualname__ = task_type
     return actor_fn
@@ -673,15 +888,16 @@ def _make_actor_fn(task_type: str):
 
 def _register_actors():
     """Register all task types as dramatiq actors."""
-    for task_type, (queue, priority, timeout_sec, max_retries) in TASK_POOL_CONFIG.items():
+    for task_type, config in TASK_POOL_CONFIG.items():
         fn = _make_actor_fn(task_type)
-        actor = dramatiq.actor(
+        dramatiq_actor = cast(Any, dramatiq.actor)
+        actor = dramatiq_actor(
             fn,
             actor_name=task_type,
-            queue_name=queue,
-            priority=priority,
-            max_retries=max_retries,
-            time_limit=timeout_sec * 1000,
+            queue_name=config.queue,
+            priority=config.priority,
+            max_retries=config.max_retries,
+            time_limit=config.time_limit_seconds * 1000,
             min_backoff=5_000,
             max_backoff=60_000,
         )
@@ -734,10 +950,10 @@ def dispatch_to_dramatiq(task_type: str, task_id: str):
 def get_queue_for_task(task_type: str) -> str:
     """Get the queue name for a task type."""
     config = TASK_POOL_CONFIG.get(task_type)
-    return config[0] if config else "default"
+    return config.queue if config else "default"
 
 
 def get_priority_for_task(task_type: str) -> int:
     """Get the default priority for a task type."""
     config = TASK_POOL_CONFIG.get(task_type)
-    return config[1] if config else 2
+    return config.priority if config else 2

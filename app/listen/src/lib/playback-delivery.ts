@@ -35,8 +35,10 @@ function trackRef(track: Track) {
 function runtimePrepareWindow(): number {
   if (typeof window === "undefined") return DESKTOP_PREPARE_WINDOW;
   const navigatorWithConnection = navigator as NavigatorWithConnection;
-  if (navigatorWithConnection.connection?.saveData) return SAVE_DATA_PREPARE_WINDOW;
-  if (window.matchMedia?.("(max-width: 767px)").matches) return MOBILE_PREPARE_WINDOW;
+  if (navigatorWithConnection.connection?.saveData)
+    return SAVE_DATA_PREPARE_WINDOW;
+  if (window.matchMedia?.("(max-width: 767px)").matches)
+    return MOBILE_PREPARE_WINDOW;
   return DESKTOP_PREPARE_WINDOW;
 }
 

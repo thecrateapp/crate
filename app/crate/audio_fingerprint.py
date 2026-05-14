@@ -24,7 +24,9 @@ def _ffmpeg_threads() -> str:
         return "1"
 
 
-def _compute_chromaprint(path: Path, *, timeout_seconds: int = 300) -> tuple[str, str] | None:
+def _compute_chromaprint(
+    path: Path, *, timeout_seconds: int = 300
+) -> tuple[str, str] | None:
     try:
         proc = subprocess.run(
             low_priority_command(["fpcalc", "-json", str(path)]),
@@ -56,7 +58,9 @@ def _compute_chromaprint(path: Path, *, timeout_seconds: int = 300) -> tuple[str
         return None
 
 
-def _compute_pcm16_md5(path: Path, *, timeout_seconds: int = 300) -> tuple[str, str] | None:
+def _compute_pcm16_md5(
+    path: Path, *, timeout_seconds: int = 300
+) -> tuple[str, str] | None:
     """Return a deterministic fingerprint of decoded PCM audio.
 
     The hash is computed over ffmpeg-decoded signed 16-bit PCM bytes, so it is
@@ -87,9 +91,13 @@ def _compute_pcm16_md5(path: Path, *, timeout_seconds: int = 300) -> tuple[str, 
     wrote_audio = False
     proc: subprocess.Popen[bytes] | None = None
     try:
-        proc = subprocess.Popen(low_priority_command(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        assert proc.stdout is not None
-        for chunk in iter(lambda: proc.stdout.read(1024 * 1024), b""):
+        proc = subprocess.Popen(
+            low_priority_command(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        stdout = proc.stdout
+        if stdout is None:
+            raise RuntimeError("ffmpeg did not expose stdout")
+        for chunk in iter(lambda: stdout.read(1024 * 1024), b""):
             if not chunk:
                 break
             wrote_audio = True
@@ -100,7 +108,11 @@ def _compute_pcm16_md5(path: Path, *, timeout_seconds: int = 300) -> tuple[str, 
         return_code = proc.wait(timeout=timeout_seconds)
         if return_code != 0 or not wrote_audio:
             if return_code != 0:
-                log.debug("ffmpeg fingerprint failed for %s: %s", path, stderr.decode("utf-8", "ignore"))
+                log.debug(
+                    "ffmpeg fingerprint failed for %s: %s",
+                    path,
+                    stderr.decode("utf-8", "ignore"),
+                )
             return None
         return f"{PCM16_MD5_V1}:{digest.hexdigest()}", PCM16_MD5_V1
     except Exception:
@@ -113,19 +125,27 @@ def _compute_pcm16_md5(path: Path, *, timeout_seconds: int = 300) -> tuple[str, 
         return None
 
 
-def compute_audio_fingerprint_with_source(path: str | Path, *, timeout_seconds: int = 300) -> tuple[str, str] | None:
+def compute_audio_fingerprint_with_source(
+    path: str | Path, *, timeout_seconds: int = 300
+) -> tuple[str, str] | None:
     source = Path(path)
     if not source.is_file():
         return None
 
-    return _compute_chromaprint(source, timeout_seconds=timeout_seconds) or _compute_pcm16_md5(
+    return _compute_chromaprint(
+        source, timeout_seconds=timeout_seconds
+    ) or _compute_pcm16_md5(
         source,
         timeout_seconds=timeout_seconds,
     )
 
 
-def compute_audio_fingerprint(path: str | Path, *, timeout_seconds: int = 300) -> str | None:
-    payload = compute_audio_fingerprint_with_source(path, timeout_seconds=timeout_seconds)
+def compute_audio_fingerprint(
+    path: str | Path, *, timeout_seconds: int = 300
+) -> str | None:
+    payload = compute_audio_fingerprint_with_source(
+        path, timeout_seconds=timeout_seconds
+    )
     return payload[0] if payload else None
 
 

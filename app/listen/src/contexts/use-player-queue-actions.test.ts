@@ -55,7 +55,9 @@ function createParams() {
     setShuffleState: vi.fn(),
     setRepeatState: vi.fn(),
     setVolumeState: vi.fn(),
-    buildEngineUrls: vi.fn((tracks: Track[]) => tracks.map((track) => track.path || track.id)),
+    buildEngineUrls: vi.fn((tracks: Track[]) =>
+      tracks.map((track) => track.path || track.id),
+    ),
     registerEngineTrack: vi.fn((track: Track) => track.path || track.id),
     unregisterEngineTrack: vi.fn(),
     resetEngineTrackMap: vi.fn(),

@@ -58,22 +58,33 @@ export function PlayerTrackIdentity({
       <div className="relative">
         {crossfadeTransition ? (
           <>
-            <div className="absolute inset-0" style={{ opacity: 1 - crossfadeProgress }}>
-              <h2 className={cn("truncate font-bold text-white", titleClassName)}>
+            <div
+              className="absolute inset-0"
+              style={{ opacity: 1 - crossfadeProgress }}
+            >
+              <h2
+                className={cn("truncate font-bold text-white", titleClassName)}
+              >
                 {crossfadeTransition.outgoing.title}
               </h2>
               {crossfadeTransition.outgoing.album ? (
-                <p className={cn("mt-1 truncate text-white/40", albumClassName)}>
+                <p
+                  className={cn("mt-1 truncate text-white/40", albumClassName)}
+                >
                   {crossfadeTransition.outgoing.album}
                 </p>
               ) : null}
             </div>
             <div style={{ opacity: crossfadeProgress }}>
-              <h2 className={cn("truncate font-bold text-white", titleClassName)}>
+              <h2
+                className={cn("truncate font-bold text-white", titleClassName)}
+              >
                 {crossfadeTransition.incoming.title}
               </h2>
               {crossfadeTransition.incoming.album ? (
-                <p className={cn("mt-1 truncate text-white/40", albumClassName)}>
+                <p
+                  className={cn("mt-1 truncate text-white/40", albumClassName)}
+                >
                   {crossfadeTransition.incoming.album}
                 </p>
               ) : null}
@@ -93,7 +104,9 @@ export function PlayerTrackIdentity({
         )}
       </div>
 
-      <div className={cn("mt-2 flex", center ? "justify-center" : "justify-start")}>
+      <div
+        className={cn("mt-2 flex", center ? "justify-center" : "justify-start")}
+      >
         <button
           onClick={onArtistClick}
           aria-label={`Go to ${currentTrack.artist}`}

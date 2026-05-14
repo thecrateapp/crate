@@ -3,8 +3,8 @@ import logging
 import subprocess
 from collections import Counter
 from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
+from typing import Any, Mapping
 
 import mutagen
 
@@ -29,7 +29,7 @@ from crate.db.jobs.sync import (
     get_tracks_by_album_id,
     merge_artist_into,
 )
-from crate.storage_layout import canonical_entity_uid, entity_uid_for, looks_like_entity_uid
+from crate.storage_layout import canonical_entity_uid, entity_uid_for
 from crate.utils import COVER_NAMES, PHOTO_NAMES, normalize_key, to_datetime
 
 log = logging.getLogger(__name__)
@@ -43,12 +43,17 @@ def _ffprobe_duration_bitrate(filepath: Path) -> tuple[float, int]:
     try:
         result = subprocess.run(
             [
-                "ffprobe", "-v", "quiet",
-                "-print_format", "json",
+                "ffprobe",
+                "-v",
+                "quiet",
+                "-print_format",
+                "json",
                 "-show_format",
                 str(filepath),
             ],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return 0.0, 0
@@ -85,11 +90,31 @@ def _path_keys(path: Path | str) -> set[str]:
     return keys
 
 
-def _read_audio_info_batch_native(album_dir: Path, extensions: set[str]) -> dict[str, tuple[float, int, int, int]]:
+def _album_formats(album: Mapping[str, Any]) -> list[str]:
+    formats = album.get("formats")
+    if isinstance(formats, list):
+        return [str(fmt) for fmt in formats if fmt]
+    if isinstance(formats, str) and formats:
+        try:
+            parsed = json.loads(formats)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(fmt) for fmt in parsed if fmt]
+        return [formats]
+    fmt = album.get("format")
+    return [str(fmt)] if fmt else []
+
+
+def _read_audio_info_batch_native(
+    album_dir: Path, extensions: set[str]
+) -> dict[str, tuple[float, int, int, int]]:
     try:
         from crate.crate_cli import run_quality
 
-        payload = run_quality(directory=str(album_dir), extensions=_audio_extension_arg(extensions))
+        payload = run_quality(
+            directory=str(album_dir), extensions=_audio_extension_arg(extensions)
+        )
     except Exception:
         log.debug("crate-cli quality batch failed for %s", album_dir, exc_info=True)
         return {}
@@ -121,7 +146,7 @@ def _native_info_for_path(
 def _read_audio_info(
     filepath: Path,
     fmt: str,
-    mf: mutagen.FileType | None = None,
+    mf: Any | None = None,
     native_info: tuple[float, int, int, int] | None = None,
 ) -> tuple[float, int, int, int]:
     """Read duration/bitrate/sample rate/bit depth, with ffprobe fallback for Tidal M4A."""
@@ -136,7 +161,7 @@ def _read_audio_info(
         )
         if needs_mutagen:
             try:
-                mf = mutagen.File(filepath)
+                mf = getattr(mutagen, "File")(filepath)
             except Exception:
                 mf = None
 
@@ -166,13 +191,19 @@ def _artist_sync_lock(artist_name: str):
     lock_key = f"library-sync:{artist_name.strip().lower()}"
     raw = get_engine().raw_connection()
     try:
-        with raw.cursor() as cursor:
+        cursor = raw.cursor()
+        try:
             cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", (lock_key,))
+        finally:
+            cursor.close()
         yield
     finally:
         try:
-            with raw.cursor() as cursor:
+            cursor = raw.cursor()
+            try:
                 cursor.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_key,))
+            finally:
+                cursor.close()
         finally:
             raw.close()
 
@@ -188,20 +219,26 @@ class LibrarySync:
     def __init__(self, config: dict):
         self.config = config
         self.library_path = Path(config["library_path"])
-        self.extensions = set(config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"]))
+        self.extensions = set(
+            config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
+        )
         self.exclude_dirs = set(config.get("exclude_dirs", []))
 
     def full_sync(self, progress_callback=None) -> dict:
         artists_added = 0
         artists_updated = 0
-        artists_removed = 0
         tracks_total = 0
         failed_artists: list[str] = []
 
-        artist_dirs = sorted([
-            d for d in self.library_path.iterdir()
-            if d.is_dir() and not d.name.startswith(".") and d.name not in self.exclude_dirs
-        ])
+        artist_dirs = sorted(
+            [
+                d
+                for d in self.library_path.iterdir()
+                if d.is_dir()
+                and not d.name.startswith(".")
+                and d.name not in self.exclude_dirs
+            ]
+        )
 
         # Group folders by canonical artist name (multiple folders may map to one artist)
         # Uses case-insensitive key to merge "At the Drive-In" / "At The Drive-In"
@@ -221,26 +258,37 @@ class LibrarySync:
         # Pre-fetch all existing artists to avoid N+1 queries
         all_existing, _ = get_library_artists(per_page=100000)
         existing_by_name = {a["name"].lower(): a for a in all_existing}
-        existing_by_folder = {(a.get("folder_name") or "").lower(): a for a in all_existing if a.get("folder_name")}
+        existing_by_folder = {
+            (a.get("folder_name") or "").lower(): a
+            for a in all_existing
+            if a.get("folder_name")
+        }
 
         for i, (artist_name, dirs) in enumerate(sorted(canonical_map.items())):
             try:
-                primary_dir = dirs[0]
-                folder_names = [d.name for d in dirs]
-                existing = existing_by_name.get(artist_name.lower()) or existing_by_folder.get(dirs[0].name.lower())
+                existing = existing_by_name.get(
+                    artist_name.lower()
+                ) or existing_by_folder.get(dirs[0].name.lower())
 
                 # Check if any folder has changed
                 max_mtime = max(d.stat().st_mtime for d in dirs)
-                if existing and existing.get("dir_mtime") and existing["dir_mtime"] >= max_mtime:
+                dir_mtime = existing.get("dir_mtime") if existing else None
+                if (
+                    existing
+                    and isinstance(dir_mtime, (int, float))
+                    and dir_mtime >= max_mtime
+                ):
                     tracks_total += existing.get("track_count", 0)
                     if progress_callback and i % 50 == 0:
-                        progress_callback({
-                            "phase": "sync",
-                            "artist": artist_name,
-                            "artists_done": i + 1,
-                            "artists_total": total_artists,
-                            "tracks_total": tracks_total,
-                        })
+                        progress_callback(
+                            {
+                                "phase": "sync",
+                                "artist": artist_name,
+                                "artists_done": i + 1,
+                                "artists_total": total_artists,
+                                "tracks_total": tracks_total,
+                            }
+                        )
                     continue
 
                 count = self.sync_artist_dirs(artist_name, dirs)
@@ -256,13 +304,15 @@ class LibrarySync:
                 failed_artists.append(artist_name)
 
             if progress_callback and i % 10 == 0:
-                progress_callback({
-                    "phase": "sync",
-                    "artist": artist_name,
-                    "artists_done": i + 1,
-                    "artists_total": total_artists,
-                    "tracks_total": tracks_total,
-                })
+                progress_callback(
+                    {
+                        "phase": "sync",
+                        "artist": artist_name,
+                        "artists_done": i + 1,
+                        "artists_total": total_artists,
+                        "tracks_total": tracks_total,
+                    }
+                )
 
         return {
             "artists_added": artists_added,
@@ -314,7 +364,57 @@ class LibrarySync:
         with _artist_sync_lock(artist_name):
             return self._sync_artist_dirs_unlocked(artist_name, artist_dirs)
 
-    def _sync_artist_dirs_unlocked(self, artist_name: str, artist_dirs: list[Path]) -> int:
+    def refresh_artist_summary(self, artist_name: str, artist_dirs: list[Path]) -> None:
+        with _artist_sync_lock(artist_name):
+            self._refresh_artist_summary_unlocked(artist_name, artist_dirs)
+
+    def _refresh_artist_summary_unlocked(
+        self, artist_name: str, artist_dirs: list[Path]
+    ) -> None:
+        if not artist_dirs:
+            return
+
+        primary_dir = artist_dirs[0]
+        primary_folder = primary_dir.name
+        existing = get_library_artist(artist_name)
+        canonical = existing["name"] if existing else artist_name
+
+        has_photo = int(
+            any((d / name).exists() for d in artist_dirs for name in PHOTO_NAMES)
+        )
+
+        all_albums = get_library_albums(canonical)
+        db_track_count = sum(a.get("track_count", 0) for a in all_albums)
+        db_total_size = sum(a.get("total_size", 0) for a in all_albums)
+        db_formats: Counter = Counter()
+        for album in all_albums:
+            for fmt in _album_formats(album):
+                db_formats[fmt] += 1
+
+        formats_list = sorted(db_formats.keys())
+        primary_format = db_formats.most_common(1)[0][0] if db_formats else None
+        dir_mtimes = [d.stat().st_mtime for d in artist_dirs if d.exists()]
+
+        upsert_artist(
+            {
+                "name": canonical,
+                "entity_uid": entity_uid_for(existing, "entity_uid")
+                if existing
+                else canonical_entity_uid(primary_folder),
+                "folder_name": primary_folder,
+                "album_count": len(all_albums),
+                "track_count": db_track_count,
+                "total_size": db_total_size,
+                "formats": formats_list,
+                "primary_format": primary_format,
+                "has_photo": has_photo,
+                "dir_mtime": max(dir_mtimes) if dir_mtimes else None,
+            }
+        )
+
+    def _sync_artist_dirs_unlocked(
+        self, artist_name: str, artist_dirs: list[Path]
+    ) -> int:
         """Sync one or more folders that all belong to the same canonical artist."""
         primary_dir = artist_dirs[0]
         primary_folder = primary_dir.name
@@ -324,16 +424,18 @@ class LibrarySync:
         if existing:
             artist_name = existing["name"]
         else:
-            artist_name = upsert_artist({
-                "name": artist_name,
-                "entity_uid": canonical_entity_uid(primary_folder),
-                "folder_name": primary_folder,
-                "album_count": 0,
-                "track_count": 0,
-                "total_size": 0,
-                "formats": [],
-                "dir_mtime": primary_dir.stat().st_mtime,
-            })
+            artist_name = upsert_artist(
+                {
+                    "name": artist_name,
+                    "entity_uid": canonical_entity_uid(primary_folder),
+                    "folder_name": primary_folder,
+                    "album_count": 0,
+                    "track_count": 0,
+                    "total_size": 0,
+                    "formats": [],
+                    "dir_mtime": primary_dir.stat().st_mtime,
+                }
+            )
 
         # Collect album dirs from ALL folders for this artist
         # Supports both 2-level (Artist/Album) and 3-level (Artist/Year/Album) structures
@@ -345,10 +447,15 @@ class LibrarySync:
                 # Check if this is a year subdirectory (contains album dirs, not audio files)
                 if sub.name.isdigit() and len(sub.name) == 4:
                     # Year directory — collect album dirs inside it
-                    album_dirs.extend(sorted([
-                        d for d in sub.iterdir()
-                        if d.is_dir() and not d.name.startswith(".")
-                    ]))
+                    album_dirs.extend(
+                        sorted(
+                            [
+                                d
+                                for d in sub.iterdir()
+                                if d.is_dir() and not d.name.startswith(".")
+                            ]
+                        )
+                    )
                 else:
                     album_dirs.append(sub)
 
@@ -364,14 +471,17 @@ class LibrarySync:
             try:
                 album_path = str(album_dir)
 
-                existing_album = next((a for a in existing_albums if a["path"] == album_path), None)
+                existing_album = next(
+                    (a for a in existing_albums if a["path"] == album_path), None
+                )
                 audio_files, tree_mtime = self._scan_album_tree(album_dir)
                 actual_track_count = len(audio_files)
 
+                dir_mtime = existing_album.get("dir_mtime") if existing_album else None
                 if (
                     existing_album
-                    and existing_album.get("dir_mtime")
-                    and existing_album["dir_mtime"] >= tree_mtime
+                    and isinstance(dir_mtime, (int, float))
+                    and dir_mtime >= tree_mtime
                     and existing_album.get("track_count", 0) == actual_track_count
                 ):
                     # Self-heal: the denormalized track_count on library_albums
@@ -414,36 +524,7 @@ class LibrarySync:
             for path in existing_paths - synced_paths:
                 delete_album(path)
 
-        # Detect artist photo (check all folders)
-        has_photo = int(any(
-            (d / name).exists() for d in artist_dirs for name in PHOTO_NAMES
-        ))
-
-        # Recalculate totals from ALL albums in DB
-        all_albums = get_library_albums(artist_name)
-        db_track_count = sum(a.get("track_count", 0) for a in all_albums)
-        db_total_size = sum(a.get("total_size", 0) for a in all_albums)
-        db_formats: Counter = Counter()
-        for a in all_albums:
-            fmt = a.get("format")
-            if fmt:
-                db_formats[fmt] += 1
-
-        formats_list = sorted(db_formats.keys())
-        primary_format = db_formats.most_common(1)[0][0] if db_formats else None
-
-        upsert_artist({
-            "name": artist_name,
-            "entity_uid": entity_uid_for(existing, "entity_uid") if existing else canonical_entity_uid(primary_folder),
-            "folder_name": primary_folder,
-            "album_count": len(all_albums),
-            "track_count": db_track_count,
-            "total_size": db_total_size,
-            "formats": formats_list,
-            "primary_format": primary_format,
-            "has_photo": has_photo,
-            "dir_mtime": max(d.stat().st_mtime for d in artist_dirs),
-        })
+        self._refresh_artist_summary_unlocked(artist_name, artist_dirs)
 
         return total_tracks
 
@@ -456,12 +537,23 @@ class LibrarySync:
         tree_mtime: float | None = None,
     ) -> dict:
         with _artist_sync_lock(artist_name):
-            return self._sync_album_unlocked(
+            result = self._sync_album_unlocked(
                 album_dir,
                 artist_name,
                 audio_files=audio_files,
                 tree_mtime=tree_mtime,
             )
+            try:
+                self._refresh_artist_summary_unlocked(
+                    artist_name, [_album_artist_root(album_dir)]
+                )
+            except Exception:
+                log.warning(
+                    "Failed to refresh artist summary after syncing %s",
+                    album_dir,
+                    exc_info=True,
+                )
+            return result
 
     def _sync_album_unlocked(
         self,
@@ -494,7 +586,11 @@ class LibrarySync:
         tag_album = None
         track_data_list = []
         album_entity_uid = canonical_entity_uid(album_dir.name)
-        native_info_by_path = _read_audio_info_batch_native(album_dir, self.extensions) if audio_files else {}
+        native_info_by_path = (
+            _read_audio_info_batch_native(album_dir, self.extensions)
+            if audio_files
+            else {}
+        )
 
         for f in audio_files:
             fpath = str(f)
@@ -520,9 +616,17 @@ class LibrarySync:
                             not duration
                             or bitrate in (None, 0)
                             or sample_rate in (None, 0)
-                            or (fmt in {"flac", "wav", "alac"} and bit_depth in (None, 0))
+                            or (
+                                fmt in {"flac", "wav", "alac"}
+                                and bit_depth in (None, 0)
+                            )
                         ):
-                            scanned_duration, scanned_bitrate, scanned_sample_rate, scanned_bit_depth = _read_audio_info(
+                            (
+                                scanned_duration,
+                                scanned_bitrate,
+                                scanned_sample_rate,
+                                scanned_bit_depth,
+                            ) = _read_audio_info(
                                 f,
                                 fmt,
                                 native_info=native_info,
@@ -540,29 +644,37 @@ class LibrarySync:
                             mb_albumid = existing["musicbrainz_albumid"]
                         if not tag_album and existing.get("album"):
                             tag_album = existing["album"]
-                        track_data_list.append({
-                            "artist": existing["artist"],
-                            "album": existing["album"],
-                            "entity_uid": entity_uid_for(existing, "entity_uid"),
-                            "filename": existing["filename"],
-                            "title": existing.get("title"),
-                            "track_number": existing.get("track_number"),
-                            "disc_number": existing.get("disc_number", 1),
-                            "format": fmt,
-                            "bitrate": bitrate,
-                            "sample_rate": sample_rate,
-                            "bit_depth": bit_depth,
-                            "duration": duration,
-                            "size": fstat.st_size,
-                            "year": existing.get("year"),
-                            "genre": existing.get("genre"),
-                            "albumartist": existing.get("albumartist"),
-                            "musicbrainz_albumid": existing.get("musicbrainz_albumid"),
-                            "musicbrainz_trackid": existing.get("musicbrainz_trackid"),
-                            "audio_fingerprint": existing.get("audio_fingerprint"),
-                            "audio_fingerprint_source": existing.get("audio_fingerprint_source"),
-                            "path": fpath,
-                        })
+                        track_data_list.append(
+                            {
+                                "artist": existing["artist"],
+                                "album": existing["album"],
+                                "entity_uid": entity_uid_for(existing, "entity_uid"),
+                                "filename": existing["filename"],
+                                "title": existing.get("title"),
+                                "track_number": existing.get("track_number"),
+                                "disc_number": existing.get("disc_number", 1),
+                                "format": fmt,
+                                "bitrate": bitrate,
+                                "sample_rate": sample_rate,
+                                "bit_depth": bit_depth,
+                                "duration": duration,
+                                "size": fstat.st_size,
+                                "year": existing.get("year"),
+                                "genre": existing.get("genre"),
+                                "albumartist": existing.get("albumartist"),
+                                "musicbrainz_albumid": existing.get(
+                                    "musicbrainz_albumid"
+                                ),
+                                "musicbrainz_trackid": existing.get(
+                                    "musicbrainz_trackid"
+                                ),
+                                "audio_fingerprint": existing.get("audio_fingerprint"),
+                                "audio_fingerprint_source": existing.get(
+                                    "audio_fingerprint_source"
+                                ),
+                                "path": fpath,
+                            }
+                        )
                         continue
                 except (ValueError, OSError, TypeError):
                     pass
@@ -571,7 +683,7 @@ class LibrarySync:
             mf = None
             if native_info is None:
                 try:
-                    mf = mutagen.File(f)
+                    mf = getattr(mutagen, "File")(f)
                 except Exception:
                     mf = None
 
@@ -586,7 +698,11 @@ class LibrarySync:
 
             tags = read_tags(f)
             if not year and tags.get("date"):
-                year = tags["date"][:4] if len(tags.get("date", "")) >= 4 else tags.get("date")
+                year = (
+                    tags["date"][:4]
+                    if len(tags.get("date", "")) >= 4
+                    else tags.get("date")
+                )
             if not genre:
                 genre = tags.get("genre")
             if not mb_albumid:
@@ -594,42 +710,51 @@ class LibrarySync:
             if not tag_album and tags.get("album"):
                 tag_album = tags["album"]
 
-            track_data_list.append({
-                "artist": tags.get("artist") or artist_name,
-                "album": tags.get("album") or album_dir.name,
-                "entity_uid": canonical_entity_uid(f.stem),
-                "filename": f.name,
-                "title": tags.get("title"),
-                "track_number": _parse_int(tags.get("tracknumber")),
-                "disc_number": _parse_int(tags.get("discnumber"), 1),
-                "format": fmt,
-                "bitrate": bitrate,
-                "sample_rate": sample_rate or None,
-                "bit_depth": bit_depth or None,
-                "duration": duration,
-                "size": fstat.st_size,
-                "year": tags.get("date", "")[:4] if tags.get("date") else None,
-                "genre": tags.get("genre"),
-                "albumartist": tags.get("albumartist"),
-                "musicbrainz_albumid": tags.get("musicbrainz_albumid"),
-                "musicbrainz_trackid": tags.get("musicbrainz_trackid"),
-                "audio_fingerprint": None,
-                "audio_fingerprint_source": None,
-                "path": fpath,
-            })
+            track_data_list.append(
+                {
+                    "artist": tags.get("artist") or artist_name,
+                    "album": tags.get("album") or album_dir.name,
+                    "entity_uid": canonical_entity_uid(f.stem),
+                    "filename": f.name,
+                    "title": tags.get("title"),
+                    "track_number": _parse_int(tags.get("tracknumber")),
+                    "disc_number": _parse_int(tags.get("discnumber"), 1),
+                    "format": fmt,
+                    "bitrate": bitrate,
+                    "sample_rate": sample_rate or None,
+                    "bit_depth": bit_depth or None,
+                    "duration": duration,
+                    "size": fstat.st_size,
+                    "year": tags.get("date", "")[:4] if tags.get("date") else None,
+                    "genre": tags.get("genre"),
+                    "albumartist": tags.get("albumartist"),
+                    "musicbrainz_albumid": tags.get("musicbrainz_albumid"),
+                    "musicbrainz_trackid": tags.get("musicbrainz_trackid"),
+                    "audio_fingerprint": None,
+                    "audio_fingerprint_source": None,
+                    "path": fpath,
+                }
+            )
 
-        album_name = tag_album or (track_data_list[0]["album"] if track_data_list else None) or album_dir.name
+        album_name = (
+            tag_album
+            or (track_data_list[0]["album"] if track_data_list else None)
+            or album_dir.name
+        )
 
         # Detect cover — check files on disk first, then embedded in audio
         has_cover = int(any((album_dir / name).exists() for name in COVER_NAMES))
         if not has_cover and audio_files:
             try:
-                first = mutagen.File(audio_files[0])
+                first = getattr(mutagen, "File")(audio_files[0])
                 if first:
                     if hasattr(first, "pictures") and first.pictures:
                         has_cover = 1
                     elif hasattr(first, "tags") and first.tags:
-                        if any(isinstance(k, str) and k.startswith("APIC") for k in first.tags):
+                        if any(
+                            isinstance(k, str) and k.startswith("APIC")
+                            for k in first.tags
+                        ):
                             has_cover = 1
                         # MP4/M4A embedded covers use the "covr" atom
                         elif "covr" in first.tags:
@@ -699,9 +824,17 @@ class LibrarySync:
                     native_payload_shadow["used_for_upsert"] = True
                     native_payload_used = True
             if native_payload_shadow and not native_payload_shadow.get("ok", False):
-                log.warning("Native album payload shadow mismatch for %s: %s", album_dir, native_payload_shadow)
+                log.warning(
+                    "Native album payload shadow mismatch for %s: %s",
+                    album_dir,
+                    native_payload_shadow,
+                )
         except Exception:
-            log.debug("Failed to run native album payload shadow compare for %s", album_dir, exc_info=True)
+            log.debug(
+                "Failed to run native album payload shadow compare for %s",
+                album_dir,
+                exc_info=True,
+            )
 
         _, _, synced_paths = upsert_scanned_album(
             artist_payload=artist_payload,
@@ -757,7 +890,9 @@ class LibrarySync:
             if len(artists) < 2:
                 continue
             # Sort: most albums first, then most tracks
-            artists.sort(key=lambda a: (a["album_count"], a["track_count"]), reverse=True)
+            artists.sort(
+                key=lambda a: (a["album_count"], a["track_count"]), reverse=True
+            )
             keep = artists[0]["name"]
             for other in artists[1:]:
                 discard = other["name"]
@@ -785,7 +920,10 @@ class LibrarySync:
                 if row["name"] in canonical_folders:
                     delete_artist(row["name"])
                     removed += 1
-                    log.info("Removed duplicate artist: %s (folder claimed by canonical entry)", row["name"])
+                    log.info(
+                        "Removed duplicate artist: %s (folder claimed by canonical entry)",
+                        row["name"],
+                    )
                     continue
                 # Also check if a folder with this name resolves to a canonical artist via tags
                 folder_dir = self.library_path / row["name"]
@@ -794,7 +932,11 @@ class LibrarySync:
                     if canonical != row["name"] and get_library_artist(canonical):
                         delete_artist(row["name"])
                         removed += 1
-                        log.info("Removed duplicate artist: %s (canonical name is %s)", row["name"], canonical)
+                        log.info(
+                            "Removed duplicate artist: %s (canonical name is %s)",
+                            row["name"],
+                            canonical,
+                        )
                         continue
 
             # Use folder_name to locate the directory; fall back to name for legacy rows

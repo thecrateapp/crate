@@ -71,7 +71,10 @@ from crate.db.repositories.library import (
     upsert_artist,
     upsert_track,
 )
-from crate.db.repositories.library_track_reads import get_library_track_by_storage_id, get_library_tracks_by_storage_ids
+from crate.db.repositories.library_track_reads import (
+    get_library_track_by_storage_id,
+    get_library_tracks_by_storage_ids,
+)
 from crate.db.repositories.genres import (
     cleanup_invalid_genre_taxonomy_nodes,
     get_or_create_genre,

@@ -5,7 +5,6 @@ Field names match the dict keys produced by the ``_row_to_lib_*`` helpers
 in ``db/library.py`` (e.g. ``formats`` instead of ``formats_json``).
 """
 
-
 from datetime import datetime
 from typing import Any
 
@@ -18,6 +17,7 @@ class ArtistRow(BaseModel):
     Returned by ``get_library_artist()``, ``get_library_artist_by_id()``, etc.
     The ``formats`` field is the deserialized ``formats_json`` column.
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int | None = None
@@ -69,6 +69,7 @@ class AlbumRow(BaseModel):
     Returned by ``get_library_album_by_id()``, ``get_library_album()``, etc.
     The ``formats`` field is the deserialized ``formats_json`` column.
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -104,6 +105,7 @@ class TrackRow(BaseModel):
     Returned by ``get_library_track_by_id()``, ``get_library_tracks()``, etc.
     The ``mood_json`` field is kept as-is (may be dict or None).
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -164,6 +166,7 @@ class TrackRow(BaseModel):
 
 class LibraryStats(BaseModel):
     """Aggregate library statistics from ``get_library_stats()``."""
+
     model_config = ConfigDict(from_attributes=True)
 
     artists: int = 0

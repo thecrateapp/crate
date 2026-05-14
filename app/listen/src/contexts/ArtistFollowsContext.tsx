@@ -29,7 +29,9 @@ interface ArtistFollowsContextValue {
   refetch: () => Promise<void>;
 }
 
-const ArtistFollowsContext = createContext<ArtistFollowsContextValue | null>(null);
+const ArtistFollowsContext = createContext<ArtistFollowsContextValue | null>(
+  null,
+);
 
 export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
   const [followedArtists, setFollowedArtists] = useState<FollowedArtist[]>([]);
@@ -43,9 +45,14 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
     setLoading(true);
 
     try {
-      const artists = await api<FollowedArtist[]>("/api/me/follows", "GET", undefined, {
-        signal: controller.signal,
-      });
+      const artists = await api<FollowedArtist[]>(
+        "/api/me/follows",
+        "GET",
+        undefined,
+        {
+          signal: controller.signal,
+        },
+      );
       setFollowedArtists(Array.isArray(artists) ? artists : []);
     } catch (error) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
@@ -76,14 +83,22 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const followedIds = useMemo(
-    () => new Set(followedArtists.flatMap((artist) => (artist.artist_id != null ? [artist.artist_id] : []))),
+    () =>
+      new Set(
+        followedArtists.flatMap((artist) =>
+          artist.artist_id != null ? [artist.artist_id] : [],
+        ),
+      ),
     [followedArtists],
   );
 
-  const isFollowing = useCallback((artistId?: number | null) => {
-    if (artistId == null) return false;
-    return followedIds.has(artistId);
-  }, [followedIds]);
+  const isFollowing = useCallback(
+    (artistId?: number | null) => {
+      if (artistId == null) return false;
+      return followedIds.has(artistId);
+    },
+    [followedIds],
+  );
 
   const followArtist = useCallback(async (artistId?: number | null) => {
     if (artistId == null) return false;
@@ -102,41 +117,62 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
       await api(`/api/me/follows/artists/${artistId}`, "POST");
       return true;
     } catch (error) {
-      setFollowedArtists((prev) => prev.filter((artist) => artist.artist_id !== artistId));
+      setFollowedArtists((prev) =>
+        prev.filter((artist) => artist.artist_id !== artistId),
+      );
       throw error;
     }
   }, []);
 
-  const unfollowArtist = useCallback(async (artistId?: number | null) => {
-    if (artistId == null) return false;
-    const previous = followedArtists;
-    setFollowedArtists((prev) => prev.filter((artist) => artist.artist_id !== artistId));
-    try {
-      await api(`/api/me/follows/artists/${artistId}`, "DELETE");
-      return true;
-    } catch (error) {
-      setFollowedArtists(previous);
-      throw error;
-    }
-  }, [followedArtists]);
+  const unfollowArtist = useCallback(
+    async (artistId?: number | null) => {
+      if (artistId == null) return false;
+      const previous = followedArtists;
+      setFollowedArtists((prev) =>
+        prev.filter((artist) => artist.artist_id !== artistId),
+      );
+      try {
+        await api(`/api/me/follows/artists/${artistId}`, "DELETE");
+        return true;
+      } catch (error) {
+        setFollowedArtists(previous);
+        throw error;
+      }
+    },
+    [followedArtists],
+  );
 
-  const toggleArtistFollow = useCallback(async (artistId?: number | null) => {
-    if (artistId == null) return false;
-    if (followedIds.has(artistId)) {
-      return unfollowArtist(artistId);
-    }
-    return followArtist(artistId);
-  }, [followArtist, followedIds, unfollowArtist]);
+  const toggleArtistFollow = useCallback(
+    async (artistId?: number | null) => {
+      if (artistId == null) return false;
+      if (followedIds.has(artistId)) {
+        return unfollowArtist(artistId);
+      }
+      return followArtist(artistId);
+    },
+    [followArtist, followedIds, unfollowArtist],
+  );
 
-  const value = useMemo<ArtistFollowsContextValue>(() => ({
-    followedArtists,
-    loading,
-    isFollowing,
-    followArtist,
-    unfollowArtist,
-    toggleArtistFollow,
-    refetch,
-  }), [followArtist, followedArtists, isFollowing, loading, refetch, toggleArtistFollow, unfollowArtist]);
+  const value = useMemo<ArtistFollowsContextValue>(
+    () => ({
+      followedArtists,
+      loading,
+      isFollowing,
+      followArtist,
+      unfollowArtist,
+      toggleArtistFollow,
+      refetch,
+    }),
+    [
+      followArtist,
+      followedArtists,
+      isFollowing,
+      loading,
+      refetch,
+      toggleArtistFollow,
+      unfollowArtist,
+    ],
+  );
 
   return (
     <ArtistFollowsContext.Provider value={value}>
@@ -147,6 +183,9 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
 
 export function useArtistFollows() {
   const ctx = useContext(ArtistFollowsContext);
-  if (!ctx) throw new Error("useArtistFollows must be used within ArtistFollowsProvider");
+  if (!ctx)
+    throw new Error(
+      "useArtistFollows must be used within ArtistFollowsProvider",
+    );
   return ctx;
 }

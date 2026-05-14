@@ -16,7 +16,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE genre_taxonomy_nodes ADD COLUMN IF NOT EXISTS eq_reasoning TEXT DEFAULT NULL")
+    op.execute(
+        "ALTER TABLE genre_taxonomy_nodes ADD COLUMN IF NOT EXISTS eq_reasoning TEXT DEFAULT NULL"
+    )
 
 
 def downgrade() -> None:

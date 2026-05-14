@@ -35,7 +35,10 @@ const PATHS: Path[] = [
     kicker: "Contributors",
     title: "Look around the code.",
     body: "The repo mixes Python, TypeScript, Go, and Rust. There is plenty to improve, and the project is more useful when more people can understand it.",
-    cta: { label: "Browse the source", href: "https://github.com/thecrateapp/crate" },
+    cta: {
+      label: "Browse the source",
+      href: "https://github.com/thecrateapp/crate",
+    },
   },
   {
     icon: MessageCircle,
@@ -51,7 +54,10 @@ const PATHS: Path[] = [
 
 export function GetInvolved() {
   return (
-    <section id="beta" className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32">
+    <section
+      id="beta"
+      className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32"
+    >
       <div className="mb-12 max-w-2xl">
         <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
           Join in
@@ -81,10 +87,15 @@ export function GetInvolved() {
               {kicker}
             </div>
             <h3 className="mt-1.5 text-xl font-semibold text-white">{title}</h3>
-            <p className="mt-3 text-[14.5px] leading-[1.65] text-white/60">{body}</p>
+            <p className="mt-3 text-[14.5px] leading-[1.65] text-white/60">
+              {body}
+            </p>
             <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-cyan-200">
               {cta.label}
-              <ArrowRight size={15} className="transition group-hover:translate-x-1" />
+              <ArrowRight
+                size={15}
+                className="transition group-hover:translate-x-1"
+              />
             </span>
           </a>
         ))}

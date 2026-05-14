@@ -44,7 +44,7 @@ class MergeableScanner(BaseScanner):
             norm_a = normalize_album_name(a.name)
             group = [a]
 
-            for b in albums[i + 1:]:
+            for b in albums[i + 1 :]:
                 if b.path in checked:
                     continue
 
@@ -82,26 +82,31 @@ class MergeableScanner(BaseScanner):
             best = max(group, key=lambda x: x.track_count)
             sources = [alb for alb in group if alb.path != best.path]
 
-            issues.append(Issue(
-                type=IssueType.MERGEABLE_ALBUM,
-                severity=Severity.HIGH,
-                confidence=90,
-                description=(
-                    f'[{a.artist}] "{a.name}" can be merged from {len(group)} partial albums '
-                    f"({total} tracks total: {merged_tracks})"
-                ),
-                paths=[alb.path for alb in group],
-                suggestion=(
-                    f'Merge tracks into "{best.name}" ({best.track_count} tracks), '
-                    f"absorbing {len(sources)} partial album(s)"
-                ),
-                details={
-                    "target": str(best.path),
-                    "sources": [str(s.path) for s in sources],
-                    "track_numbers": {str(alb.path): sorted(ts) for alb, ts in zip(group, track_sets)},
-                    "total_tracks": total,
-                }
-            ))
+            issues.append(
+                Issue(
+                    type=IssueType.MERGEABLE_ALBUM,
+                    severity=Severity.HIGH,
+                    confidence=90,
+                    description=(
+                        f'[{a.artist}] "{a.name}" can be merged from {len(group)} partial albums '
+                        f"({total} tracks total: {merged_tracks})"
+                    ),
+                    paths=[alb.path for alb in group],
+                    suggestion=(
+                        f'Merge tracks into "{best.name}" ({best.track_count} tracks), '
+                        f"absorbing {len(sources)} partial album(s)"
+                    ),
+                    details={
+                        "target": str(best.path),
+                        "sources": [str(s.path) for s in sources],
+                        "track_numbers": {
+                            str(alb.path): sorted(ts)
+                            for alb, ts in zip(group, track_sets)
+                        },
+                        "total_tracks": total,
+                    },
+                )
+            )
 
         return issues
 

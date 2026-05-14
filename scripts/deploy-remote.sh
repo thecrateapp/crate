@@ -67,6 +67,10 @@ env_value() {
 
 compose_has_service() {
   local service="$1"
+  if [[ -z "$(env_value REDIS_PASSWORD)" ]]; then
+    REDIS_PASSWORD="__crate_backup_placeholder__" dc config --services | grep -qx "$service"
+    return
+  fi
   dc config --services | grep -qx "$service"
 }
 
@@ -145,6 +149,10 @@ cmd_preflight() {
   test -f docker-compose.yaml
   test -f docker-compose.project.yaml
   test -f .env
+  if [[ -z "$(env_value REDIS_PASSWORD)" ]]; then
+    log "REDIS_PASSWORD is missing in .env"
+    return 1
+  fi
 
   puid="$(env_value PUID)"
   pgid="$(env_value PGID)"
@@ -176,6 +184,11 @@ cmd_backup() {
   done
 
   printf '%s\n' "$ROLLBACK_TAG" > "$BACKUP_DIR/rollback_tag"
+
+  if [[ ! -f docker-compose.yaml || ! -f docker-compose.project.yaml || ! -f .env ]]; then
+    log "No existing compose stack found to snapshot"
+    return 0
+  fi
 
   for service in "${PROJECT_SERVICES[@]}"; do
     if ! compose_has_service "$service"; then

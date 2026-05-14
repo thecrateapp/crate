@@ -29,7 +29,11 @@ function makeIcon(online: boolean, playing: boolean): L.DivIcon {
     iconAnchor: [12, 12],
     popupAnchor: [0, -14],
     html: `<div style="position:relative;width:24px;height:24px;display:flex;align-items:center;justify-content:center">
-      ${pulse ? `<div style="position:absolute;inset:-4px;border-radius:50%;background:${color};opacity:0.3;animation:userPulse 2s ease-in-out infinite"></div>` : ""}
+      ${
+        pulse
+          ? `<div style="position:absolute;inset:-4px;border-radius:50%;background:${color};opacity:0.3;animation:userPulse 2s ease-in-out infinite"></div>`
+          : ""
+      }
       <div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #0a0a14;box-shadow:0 0 8px ${color}40"></div>
     </div>`,
   });
@@ -44,7 +48,9 @@ function FitBounds({ users }: { users: MapUser[] }) {
     if (users.length === 1) {
       map.setView([users[0]!.latitude, users[0]!.longitude], 6);
     } else {
-      const bounds = L.latLngBounds(users.map((u) => [u.latitude, u.longitude]));
+      const bounds = L.latLngBounds(
+        users.map((u) => [u.latitude, u.longitude]),
+      );
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 8 });
     }
   }, [users, map]);
@@ -110,21 +116,35 @@ export function UserMap() {
               <div className="min-w-[200px] space-y-2.5 p-1">
                 <div className="flex items-center gap-3">
                   {user.avatar ? (
-                    <img src={user.avatar} alt="" className="h-10 w-10 rounded-full object-cover border border-white/10 shadow-md" />
+                    <img
+                      src={user.avatar}
+                      alt=""
+                      className="h-10 w-10 rounded-full object-cover border border-white/10 shadow-md"
+                    />
                   ) : (
                     <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-sm font-semibold text-white/60">
                       {(user.name || "?")[0]?.toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">{user.name}</div>
-                    <div className="text-[11px] text-white/45 truncate">{user.city}{user.city && user.country ? ", " : ""}{user.country}</div>
+                    <div className="text-sm font-semibold text-white truncate">
+                      {user.name}
+                    </div>
+                    <div className="text-[11px] text-white/45 truncate">
+                      {user.city}
+                      {user.city && user.country ? ", " : ""}
+                      {user.country}
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] ${
-                    user.online ? "border-green-500/30 bg-green-500/10 text-green-300" : "border-white/10 bg-white/5 text-white/40"
-                  }`}>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] ${
+                      user.online
+                        ? "border-green-500/30 bg-green-500/10 text-green-300"
+                        : "border-white/10 bg-white/5 text-white/40"
+                    }`}
+                  >
                     <Activity size={9} />
                     {user.online ? "Online" : "Offline"}
                   </span>
@@ -137,8 +157,12 @@ export function UserMap() {
                 </div>
                 {user.now_playing && (
                   <div className="border-t border-white/8 pt-1.5">
-                    <div className="text-[11px] text-white/70 truncate">{user.now_playing.title}</div>
-                    <div className="text-[10px] text-white/40 truncate">{user.now_playing.artist}</div>
+                    <div className="text-[11px] text-white/70 truncate">
+                      {user.now_playing.title}
+                    </div>
+                    <div className="text-[10px] text-white/40 truncate">
+                      {user.now_playing.artist}
+                    </div>
                   </div>
                 )}
               </div>

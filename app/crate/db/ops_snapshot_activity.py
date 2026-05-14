@@ -16,23 +16,33 @@ from crate.db.ops_runtime_views import (
 )
 from crate.db.queries.management import count_recent_active_users, count_recent_streams
 from crate.db.queries.shows import get_upcoming_shows
-from crate.db.queries.tasks import get_latest_scan, get_task_activity_snapshot, list_tasks
+from crate.db.queries.tasks import (
+    get_latest_scan,
+    get_task_activity_snapshot,
+    list_tasks,
+)
 
 
 def _get_imports_pending_count() -> int:
     return count_import_queue_items(status="pending")
 
 
-def build_live_activity_payload(worker_live: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_live_activity_payload(
+    worker_live: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     cached_live = worker_live if worker_live is not None else get_worker_live_state()
     if cached_live:
         return cached_live
 
-    activity = get_task_activity_snapshot(running_limit=100, pending_limit=100, recent_limit=10)
+    activity = get_task_activity_snapshot(
+        running_limit=100, pending_limit=100, recent_limit=10
+    )
     running = activity["running_tasks"]
     pending = activity["pending_tasks"]
     recent = activity["recent_tasks"]
-    max_workers = int(get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS)
+    max_workers = int(
+        get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS
+    )
     cached_status = get_cache("worker_status") or {}
     return {
         "engine": cached_status.get("engine", "dramatiq"),
@@ -105,7 +115,7 @@ def build_recent_activity_payload(
                 "created_at": task.get("created_at"),
                 "updated_at": task.get("updated_at"),
             }
-            for task in tasks
+            for task in (tasks or [])
         ],
         "pending_imports": pending_imports,
         "last_scan": scan["scanned_at"] if scan else None,

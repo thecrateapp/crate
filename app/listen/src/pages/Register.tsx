@@ -40,8 +40,23 @@ export function Register() {
     setError("");
     setLoading(true);
     try {
-      const res = await api<{ token?: string; refresh_token?: string | null }>("/api/auth/register", "POST", { email, password, name, invite_token: inviteToken });
-      if (res?.token) setAuthTokens(res.token, res.refresh_token ?? undefined);
+      const res = await api<{
+        token?: string;
+        access_expires_at?: string | null;
+        refresh_token?: string | null;
+      }>("/api/auth/register", "POST", {
+        email,
+        password,
+        name,
+        invite_token: inviteToken,
+      });
+      if (res?.token) {
+        setAuthTokens(
+          res.token,
+          res.refresh_token ?? undefined,
+          res.access_expires_at ?? undefined,
+        );
+      }
       await refetch();
       navigate(returnTo, { replace: true });
     } catch (err) {
@@ -70,19 +85,28 @@ export function Register() {
         </div>
 
         {inviteOnly ? (
-          <div className={`rounded-xl px-4 py-3 text-sm ${inviteToken ? "border border-cyan-400/20 bg-cyan-400/10 text-cyan-100" : "border border-amber-400/20 bg-amber-400/10 text-amber-200"}`}>
+          <div
+            className={`rounded-xl px-4 py-3 text-sm ${
+              inviteToken
+                ? "border border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
+                : "border border-amber-400/20 bg-amber-400/10 text-amber-200"
+            }`}
+          >
             {inviteToken
               ? "This invite will be applied when your account is created."
               : "This instance is invite-only right now. Open a valid invite link to continue."}
           </div>
         ) : null}
 
-        {error && (
-          <p className="text-sm text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
         <div>
-          <label htmlFor="reg-name" className="block text-sm text-white/60 mb-1">Name</label>
+          <label
+            htmlFor="reg-name"
+            className="block text-sm text-white/60 mb-1"
+          >
+            Name
+          </label>
           <input
             id="reg-name"
             type="text"
@@ -94,7 +118,12 @@ export function Register() {
           />
         </div>
         <div>
-          <label htmlFor="reg-email" className="block text-sm text-white/60 mb-1">Email</label>
+          <label
+            htmlFor="reg-email"
+            className="block text-sm text-white/60 mb-1"
+          >
+            Email
+          </label>
           <input
             id="reg-email"
             type="email"
@@ -106,16 +135,21 @@ export function Register() {
           />
         </div>
         <div>
-          <label htmlFor="reg-password" className="block text-sm text-white/60 mb-1">Password</label>
+          <label
+            htmlFor="reg-password"
+            className="block text-sm text-white/60 mb-1"
+          >
+            Password
+          </label>
           <input
             id="reg-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={8}
             className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50"
-            placeholder="Min 6 characters"
+            placeholder="Min 8 characters"
           />
         </div>
 
@@ -131,7 +165,12 @@ export function Register() {
 
         <p className="text-center text-sm text-white/40">
           Already have an account?{" "}
-          <Link to={`/login?return_to=${encodeURIComponent(returnTo)}`} className="text-primary hover:underline">Sign in</Link>
+          <Link
+            to={`/login?return_to=${encodeURIComponent(returnTo)}`}
+            className="text-primary hover:underline"
+          >
+            Sign in
+          </Link>
         </p>
       </form>
     </div>

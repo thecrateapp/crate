@@ -1,7 +1,7 @@
 import logging
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 from crate.audio_fingerprint import compute_audio_fingerprint_with_source
 from crate.db.cache_store import set_cache
@@ -24,14 +24,27 @@ from crate.db.repositories.library import (
     get_library_tracks,
     update_track_analysis,
 )
-from crate.db.queries.tasks import get_task
 from crate.db.repositories.tasks import create_task
-from crate.task_progress import TaskProgress, emit_item_event, emit_progress, entity_label
+from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
 
 CHUNK_SIZE = 10
+
+# Default / max limits for task parameters
+_DEFAULT_INFER_GENRE_TAXONOMY_LIMIT = 200
+_MAX_INFER_GENRE_TAXONOMY_LIMIT = 500
+_DEFAULT_ENRICH_GENRE_DESCRIPTIONS_LIMIT = 120
+_MAX_ENRICH_GENRE_DESCRIPTIONS_LIMIT = 500
+_DEFAULT_SYNC_MB_GENRE_GRAPH_LIMIT = 80
+_MAX_SYNC_MB_GENRE_GRAPH_LIMIT = 300
+_DEFAULT_BACKFILL_FINGERPRINT_LIMIT = 5000
+_MAX_BACKFILL_FINGERPRINT_LIMIT = 50_000
+
+# Concurrency / backpressure constants
+_POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
+_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 
 # Registry of post-processing functions for fan-out coordinators.
 # Keyed by the child task_type. Called once by the last chunk to complete.
@@ -89,11 +102,19 @@ def _handle_compute_analytics(task_id: str, params: dict, config: dict) -> dict:
     }
     set_cache("stats", stats, ttl=3600)
 
-    emit_task_event(task_id, "info", {"message": f"Analytics complete: {artists} artists, {albums} albums, {tracks} tracks"})
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Analytics complete: {artists} artists, {albums} albums, {tracks} tracks"
+        },
+    )
     return {"artists": artists, "albums": albums, "tracks": tracks}
 
 
-def _handle_refresh_user_listening_stats(task_id: str, params: dict, config: dict) -> dict:
+def _handle_refresh_user_listening_stats(
+    task_id: str, params: dict, config: dict
+) -> dict:
     from crate.db.domain_events import append_domain_event
     from crate.db.repositories.user_library import recompute_user_listening_aggregates
 
@@ -110,7 +131,9 @@ def _handle_refresh_user_listening_stats(task_id: str, params: dict, config: dic
         scope="user",
         subject_key=str(user_id),
     )
-    emit_task_event(task_id, "info", {"message": f"Listening stats refreshed for user {user_id}"})
+    emit_task_event(
+        task_id, "info", {"message": f"Listening stats refreshed for user {user_id}"}
+    )
     return {"ok": True, "user_id": user_id}
 
 
@@ -119,9 +142,15 @@ def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict
     artist = params.get("artist", "")
     album_name = params.get("album", "")
 
-    p = TaskProgress(phase="audio_analysis", phase_count=2, item=entity_label(artist=artist, album=album_name))
+    p = TaskProgress(
+        phase="audio_analysis",
+        phase_count=2,
+        item=entity_label(artist=artist, album=album_name),
+    )
     emit_progress(task_id, p, force=True)
-    analysis_result = _handle_analyze_tracks(task_id, {"artist": artist, "album": album_name}, config)
+    analysis_result = _handle_analyze_tracks(
+        task_id, {"artist": artist, "album": album_name}, config
+    )
 
     p.phase = "bliss"
     p.phase_index = 1
@@ -137,7 +166,7 @@ def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict
             album_path = album_data.get("path", "")
             if album_path and Path(album_path).is_dir():
                 vectors = analyze_directory(str(album_path))
-                if vectors:
+                if isinstance(vectors, dict) and vectors:
                     store_vectors(vectors)
                     bliss_count = len(vectors)
     else:
@@ -148,13 +177,17 @@ def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict
         artist_dir = lib / folder
         if artist_dir.is_dir():
             vectors = analyze_directory(str(artist_dir)) if is_available() else []
-            if vectors:
+            if isinstance(vectors, dict) and vectors:
                 store_vectors(vectors)
                 bliss_count = len(vectors)
 
-    emit_task_event(task_id, "info", {
-        "message": f"Album analysis complete: {artist} — {album_name} ({analysis_result.get('analyzed', 0)} analyzed, {bliss_count} bliss vectors)",
-    })
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Album analysis complete: {artist} — {album_name} ({analysis_result.get('analyzed', 0)} analyzed, {bliss_count} bliss vectors)",
+        },
+    )
     return {
         "analyzed": analysis_result.get("analyzed", 0),
         "failed": analysis_result.get("failed", 0),
@@ -201,7 +234,9 @@ def _handle_analyze_tracks(task_id: str, params: dict, config: dict) -> dict:
     else:
         all_artists, _total = get_library_artists(per_page=10000)
         need_names = get_artists_needing_analysis()
-        need_analysis = [artist_row for artist_row in all_artists if artist_row["name"] in need_names]
+        need_analysis = [
+            artist_row for artist_row in all_artists if artist_row["name"] in need_names
+        ]
 
         if len(need_analysis) > CHUNK_SIZE:
             emit_task_event(
@@ -209,13 +244,17 @@ def _handle_analyze_tracks(task_id: str, params: dict, config: dict) -> dict:
                 "info",
                 {"message": f"Splitting {len(need_analysis)} artists into chunks..."},
             )
-            return _chunk_coordinator(task_id, params, config, "analyze_all", _handle_analyze_tracks)
+            return _chunk_coordinator(
+                task_id, params, config, "analyze_all", _handle_analyze_tracks
+            )
 
         for artist_row in need_analysis:
             albums = get_library_albums(artist_row["name"])
             for album in albums:
                 tracks = get_library_tracks(album["id"])
-                tracks_to_analyze.extend((track["path"], track) for track in tracks if not track.get("bpm"))
+                tracks_to_analyze.extend(
+                    (track["path"], track) for track in tracks if not track.get("bpm")
+                )
 
     total = len(tracks_to_analyze)
     analyzed = 0
@@ -231,7 +270,9 @@ def _handle_analyze_tracks(task_id: str, params: dict, config: dict) -> dict:
         batch_paths = [path for path, _track in batch]
 
         p.done = batch_start
-        p.item = entity_label(title=batch[0][1].get("title", ""), path=batch[0][0])
+        p.item = entity_label(
+            title=str(batch[0][1].get("title") or ""), path=batch[0][0]
+        )
         emit_progress(task_id, p)
 
         try:
@@ -257,7 +298,9 @@ def _handle_analyze_tracks(task_id: str, params: dict, config: dict) -> dict:
                 else:
                     failed += 1
         except Exception:
-            log.warning("Batch analysis failed for %d tracks", len(batch), exc_info=True)
+            log.warning(
+                "Batch analysis failed for %d tracks", len(batch), exc_info=True
+            )
             for path, _track in batch:
                 try:
                     result = analyze_track(path)
@@ -293,7 +336,7 @@ def _chunk_coordinator(
     config: dict,
     chunk_task_type: str,
     chunk_handler: Callable[[str, dict, dict], dict],
-    filter_fn: Callable[[dict], bool] | None = None,
+    filter_fn: Callable[[Mapping[str, Any]], bool] | None = None,
 ) -> dict:
     """Fan-out: split artists into chunks, dispatch as parallel sub-tasks, return immediately.
 
@@ -318,10 +361,16 @@ def _chunk_coordinator(
 
     chunks = []
     for index in range(0, total, CHUNK_SIZE):
-        chunk_artists = [artist["name"] for artist in all_artists[index : index + CHUNK_SIZE]]
+        chunk_artists = [
+            artist["name"] for artist in all_artists[index : index + CHUNK_SIZE]
+        ]
         chunks.append(chunk_artists)
 
-    emit_task_event(task_id, "info", {"message": f"Dispatching {total} artists in {len(chunks)} parallel chunks"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Dispatching {total} artists in {len(chunks)} parallel chunks"},
+    )
 
     for index, chunk in enumerate(chunks):
         create_task(
@@ -348,7 +397,8 @@ def _try_complete_parent(parent_task_id: str, child_task_type: str = "") -> None
     status = check_siblings_complete(parent_task_id)
     if not status["all_done"]:
         p = TaskProgress(
-            phase="processing", phase_count=1,
+            phase="processing",
+            phase_count=1,
             total=status["total"],
             done=status["completed"] + status["failed"],
             errors=status["failed"],
@@ -371,11 +421,19 @@ def _try_complete_parent(parent_task_id: str, child_task_type: str = "") -> None
             if extra:
                 result.update(extra)
         except Exception:
-            log.warning("Finalization failed for parent %s", parent_task_id, exc_info=True)
+            log.warning(
+                "Finalization failed for parent %s", parent_task_id, exc_info=True
+            )
             result["finalization_error"] = True
 
     update_task(parent_task_id, status="completed", result=result)
-    emit_task_event(parent_task_id, "info", {"message": f"All {status['total']} chunks complete ({status['failed']} failed)"})
+    emit_task_event(
+        parent_task_id,
+        "info",
+        {
+            "message": f"All {status['total']} chunks complete ({status['failed']} failed)"
+        },
+    )
 
 
 def _handle_compute_bliss(task_id: str, params: dict, config: dict) -> dict:
@@ -427,13 +485,20 @@ def _handle_bliss_chunk(task_id: str, params: dict, config: dict) -> dict:
             store_vectors(vectors)
             analyzed += len(vectors)
 
-    emit_task_event(task_id, "info", {"message": f"Bliss chunk complete: {analyzed} vectors from {len(artists)} artists"})
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Bliss chunk complete: {analyzed} vectors from {len(artists)} artists"
+        },
+    )
     return {"analyzed": analyzed, "artists": len(artists)}
 
 
 def _popularity_finalize() -> dict | None:
     """Post-processing after all popularity chunks complete."""
     from crate.popularity import recompute_track_popularity_scores
+
     scored = recompute_track_popularity_scores()
     return {"tracks_scored": scored.get("tracks_scored", 0)}
 
@@ -447,7 +512,9 @@ def _handle_compute_popularity(task_id: str, params: dict, config: dict) -> dict
     if params.get("artists"):
         return _handle_popularity_chunk(task_id, params, config)
 
-    return _chunk_coordinator(task_id, params, config, "compute_popularity", _handle_popularity_chunk)
+    return _chunk_coordinator(
+        task_id, params, config, "compute_popularity", _handle_popularity_chunk
+    )
 
 
 def _handle_popularity_chunk(task_id: str, params: dict, config: dict) -> dict:
@@ -480,7 +547,9 @@ def _handle_popularity_chunk(task_id: str, params: dict, config: dict) -> dict:
         for album in albums:
             album_name = album.get("tag_album") or album["name"]
             album_name = re.sub(r"^\d{4}\s*-\s*", "", album_name)
-            data = _lastfm_get("album.getinfo", artist=artist_name, album=album_name, autocorrect="1")
+            data = _lastfm_get(
+                "album.getinfo", artist=artist_name, album=album_name, autocorrect="1"
+            )
             if data and "album" in data:
                 info = data["album"]
                 listeners = _parse_int(info.get("listeners", 0))
@@ -488,7 +557,7 @@ def _handle_popularity_chunk(task_id: str, params: dict, config: dict) -> dict:
                 if listeners > 0:
                     _db_update_album_popularity(album["id"], listeners, playcount)
                     albums_fetched += 1
-            time.sleep(0.25)
+            time.sleep(_POPULARITY_CHUNK_SLEEP_SECONDS)
 
         refresh_result = refresh_artist_track_popularity_signals(artist_name)
         lastfm_track_matches += int(refresh_result.get("lastfm_matches", 0))
@@ -499,13 +568,17 @@ def _handle_popularity_chunk(task_id: str, params: dict, config: dict) -> dict:
     except Exception:
         log.debug("Failed to normalize popularity scores", exc_info=True)
 
-    emit_task_event(task_id, "info", {
-        "message": (
-            f"Popularity chunk complete: {albums_fetched} albums, "
-            f"{lastfm_track_matches} Last.fm track matches, "
-            f"{spotify_track_matches} Spotify matches from {len(artists)} artists"
-        ),
-    })
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Popularity chunk complete: {albums_fetched} albums, "
+                f"{lastfm_track_matches} Last.fm track matches, "
+                f"{spotify_track_matches} Spotify matches from {len(artists)} artists"
+            ),
+        },
+    )
     return {
         "albums_fetched": albums_fetched,
         "lastfm_track_matches": lastfm_track_matches,
@@ -528,14 +601,22 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
     emit_task_event(task_id, "info", {"message": "Indexing genres..."})
     result = index_all_genres(progress_callback=_genre_progress)
     genre_count = result.get("total_genres", 0)
-    emit_task_event(task_id, "info", {"message": f"Genres indexed: {genre_count} genres"})
+    emit_task_event(
+        task_id, "info", {"message": f"Genres indexed: {genre_count} genres"}
+    )
     return result
 
 
 def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_taxonomy_inference import infer_genre_taxonomy_batch
 
-    limit = max(1, min(int(params.get("limit") or 200), 500))
+    limit = max(
+        1,
+        min(
+            int(params.get("limit") or _DEFAULT_INFER_GENRE_TAXONOMY_LIMIT),
+            _MAX_INFER_GENRE_TAXONOMY_LIMIT,
+        ),
+    )
     focus_slug = (params.get("focus_slug") or "").strip().lower() or None
     aggressive = bool(params.get("aggressive", True))
     include_external = bool(params.get("include_external", True))
@@ -583,7 +664,13 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
 def _handle_enrich_genre_descriptions(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_descriptions import enrich_genre_descriptions_batch
 
-    limit = max(1, min(int(params.get("limit") or 120), 500))
+    limit = max(
+        1,
+        min(
+            int(params.get("limit") or _DEFAULT_ENRICH_GENRE_DESCRIPTIONS_LIMIT),
+            _MAX_ENRICH_GENRE_DESCRIPTIONS_LIMIT,
+        ),
+    )
     focus_slug = (params.get("focus_slug") or "").strip().lower() or None
     force = bool(params.get("force", False))
 
@@ -625,10 +712,18 @@ def _handle_enrich_genre_descriptions(task_id: str, params: dict, config: dict) 
     return result
 
 
-def _handle_sync_musicbrainz_genre_graph(task_id: str, params: dict, config: dict) -> dict:
+def _handle_sync_musicbrainz_genre_graph(
+    task_id: str, params: dict, config: dict
+) -> dict:
     from crate.genre_descriptions import sync_musicbrainz_genre_graph_batch
 
-    limit = max(1, min(int(params.get("limit") or 80), 300))
+    limit = max(
+        1,
+        min(
+            int(params.get("limit") or _DEFAULT_SYNC_MB_GENRE_GRAPH_LIMIT),
+            _MAX_SYNC_MB_GENRE_GRAPH_LIMIT,
+        ),
+    )
     focus_slug = (params.get("focus_slug") or "").strip().lower() or None
     force = bool(params.get("force", False))
 
@@ -670,8 +765,12 @@ def _handle_sync_musicbrainz_genre_graph(task_id: str, params: dict, config: dic
     return result
 
 
-def _handle_cleanup_invalid_genre_taxonomy(task_id: str, params: dict, config: dict) -> dict:
-    emit_task_event(task_id, "info", {"message": "Removing invalid MusicBrainz taxonomy nodes..."})
+def _handle_cleanup_invalid_genre_taxonomy(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    emit_task_event(
+        task_id, "info", {"message": "Removing invalid MusicBrainz taxonomy nodes..."}
+    )
     result = cleanup_invalid_genre_taxonomy_nodes(dry_run=False)
     p = TaskProgress(
         phase="cleanup",
@@ -730,14 +829,26 @@ def _handle_requeue_analysis(task_id: str, params: dict, config: dict) -> dict:
     if count == 0 and not track_id and not album_id and not artist and scope != "all":
         return {"requeued": 0, "error": "No scope specified"}
 
-    log.info("Requeued %d tracks for %s (scope: %s)", count, what,
-             track_id or album_id or artist or scope)
+    log.info(
+        "Requeued %d tracks for %s (scope: %s)",
+        count,
+        what,
+        track_id or album_id or artist or scope,
+    )
     emit_task_event(task_id, "info", {"message": f"Requeued {count} tracks for {what}"})
     return {"requeued": count, "what": what}
 
 
-def _handle_backfill_track_audio_fingerprints(task_id: str, params: dict, config: dict) -> dict:
-    limit = max(1, min(int(params.get("limit") or 5000), 50_000))
+def _handle_backfill_track_audio_fingerprints(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    limit = max(
+        1,
+        min(
+            int(params.get("limit") or _DEFAULT_BACKFILL_FINGERPRINT_LIMIT),
+            _MAX_BACKFILL_FINGERPRINT_LIMIT,
+        ),
+    )
     tracks = list_tracks_missing_audio_fingerprints(
         limit=limit,
         track_id=int(params["track_id"]) if params.get("track_id") else None,
@@ -766,7 +877,9 @@ def _handle_backfill_track_audio_fingerprints(task_id: str, params: dict, config
 
     for index, track in enumerate(tracks, start=1):
         if is_cancelled(task_id):
-            emit_task_event(task_id, "warning", {"message": "Fingerprint backfill cancelled"})
+            emit_task_event(
+                task_id, "warning", {"message": "Fingerprint backfill cancelled"}
+            )
             break
 
         progress.done = index - 1
@@ -785,7 +898,7 @@ def _handle_backfill_track_audio_fingerprints(task_id: str, params: dict, config
             task_id=task_id,
             params=params,
             emit_event_fn=emit_task_event,
-            max_sleep_seconds=300,
+            max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
         ):
             break
 

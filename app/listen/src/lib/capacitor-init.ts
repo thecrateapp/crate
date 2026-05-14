@@ -11,30 +11,54 @@ let keyboardInitialized = false;
 
 function setViewportHeightVar() {
   if (typeof window === "undefined") return;
-  document.documentElement.style.setProperty("--listen-viewport-height", `${window.innerHeight}px`);
+  document.documentElement.style.setProperty(
+    "--listen-viewport-height",
+    `${window.innerHeight}px`,
+  );
 }
 
 function initViewportHeightFallback() {
-  if (viewportFallbackInitialized || !isIosRuntime || typeof window === "undefined") return;
+  if (
+    viewportFallbackInitialized ||
+    !isIosRuntime ||
+    typeof window === "undefined"
+  )
+    return;
   viewportFallbackInitialized = true;
   setViewportHeightVar();
   window.addEventListener("resize", setViewportHeightVar, { passive: true });
-  window.addEventListener("orientationchange", () => {
-    requestAnimationFrame(setViewportHeightVar);
-  }, { passive: true });
+  window.addEventListener(
+    "orientationchange",
+    () => {
+      requestAnimationFrame(setViewportHeightVar);
+    },
+    { passive: true },
+  );
 }
 
 function setKeyboardHeight(height: number) {
-  document.documentElement.style.setProperty("--listen-keyboard-height", `${Math.max(0, height)}px`);
+  document.documentElement.style.setProperty(
+    "--listen-keyboard-height",
+    `${Math.max(0, height)}px`,
+  );
   document.documentElement.toggleAttribute("data-keyboard-open", height > 0);
-  window.dispatchEvent(new CustomEvent("crate:keyboard-change", { detail: { height } }));
+  window.dispatchEvent(
+    new CustomEvent("crate:keyboard-change", { detail: { height } }),
+  );
 }
 
 function scrollFocusedInputIntoView() {
   const activeElement = document.activeElement;
   if (!(activeElement instanceof HTMLElement)) return;
-  if (!activeElement.matches("input, textarea, select, [contenteditable='true']")) return;
-  activeElement.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+  if (
+    !activeElement.matches("input, textarea, select, [contenteditable='true']")
+  )
+    return;
+  activeElement.scrollIntoView({
+    block: "center",
+    inline: "nearest",
+    behavior: "smooth",
+  });
 }
 
 async function initKeyboardHandling() {
@@ -76,7 +100,9 @@ export async function initCapacitor(): Promise<string | null> {
   }
 
   App.addListener("backButton", ({ canGoBack }) => {
-    const nativeBackEvent = new CustomEvent("crate:native-back", { cancelable: true });
+    const nativeBackEvent = new CustomEvent("crate:native-back", {
+      cancelable: true,
+    });
     window.dispatchEvent(nativeBackEvent);
     if (nativeBackEvent.defaultPrevented) return;
 
@@ -112,7 +138,10 @@ export async function initCapacitor(): Promise<string | null> {
   }
 
   Network.addListener("networkStatusChange", (status) => {
-    console.log("[capacitor] network:", status.connected ? "online" : "offline");
+    console.log(
+      "[capacitor] network:",
+      status.connected ? "online" : "offline",
+    );
     if (status.connected) {
       window.dispatchEvent(new CustomEvent("crate:network-restored"));
     }

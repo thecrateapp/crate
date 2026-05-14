@@ -31,8 +31,12 @@ def create_library_genres_schema(cur) -> None:
             PRIMARY KEY (album_id, genre_id)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_artist_genres_genre ON artist_genres(genre_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_album_genres_genre ON album_genres(genre_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artist_genres_genre ON artist_genres(genre_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_genres_genre ON album_genres(genre_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS genre_taxonomy_nodes (
@@ -70,9 +74,15 @@ def create_library_genres_schema(cur) -> None:
             PRIMARY KEY (source_genre_id, target_genre_id, relation_type)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_alias_genre_id ON genre_taxonomy_aliases(genre_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_edges_source ON genre_taxonomy_edges(source_genre_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_edges_target ON genre_taxonomy_edges(target_genre_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_alias_genre_id ON genre_taxonomy_aliases(genre_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_edges_source ON genre_taxonomy_edges(source_genre_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_edges_target ON genre_taxonomy_edges(target_genre_id)"
+    )
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_genre_taxonomy_nodes_entity_uid ON genre_taxonomy_nodes(entity_uid) WHERE entity_uid IS NOT NULL"
     )

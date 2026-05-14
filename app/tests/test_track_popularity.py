@@ -110,12 +110,15 @@ def test_refresh_artist_track_popularity_signals_matches_lastfm_and_spotify(pg_d
         },
     )
 
-    with patch(
-        "crate.popularity.get_lastfm_top_tracks",
-        return_value=[{"title": "Big Song", "listeners": 9000, "playcount": 50000}],
-    ), patch(
-        "crate.popularity.get_spotify_top_tracks",
-        return_value=[{"name": "Big Song", "popularity": 88}],
+    with (
+        patch(
+            "crate.popularity.get_lastfm_top_tracks",
+            return_value=[{"title": "Big Song", "listeners": 9000, "playcount": 50000}],
+        ),
+        patch(
+            "crate.popularity.get_spotify_top_tracks",
+            return_value=[{"name": "Big Song", "popularity": 88}],
+        ),
     ):
         result = refresh_artist_track_popularity_signals("Signal Artist")
 
@@ -135,7 +138,10 @@ def test_refresh_artist_track_popularity_signals_matches_lastfm_and_spotify(pg_d
 
 
 def test_recompute_track_popularity_scores_backfills_all_tracks(pg_db):
-    from crate.db.jobs.popularity import bulk_update_lastfm_top_track_signals, update_album_lastfm
+    from crate.db.jobs.popularity import (
+        bulk_update_lastfm_top_track_signals,
+        update_album_lastfm,
+    )
     from crate.popularity import recompute_track_popularity_scores
 
     seeded = _seed_artist_album_and_tracks(pg_db, "Score Artist")
@@ -175,12 +181,23 @@ def test_recompute_track_popularity_scores_backfills_all_tracks(pg_db):
     assert deep_cut["popularity_score"] > 0
     assert hidden_gem["popularity_score"] > 0
 
-    assert big_song["popularity_score"] > deep_cut["popularity_score"] > hidden_gem["popularity_score"]
-    assert big_song["popularity_confidence"] > deep_cut["popularity_confidence"] >= hidden_gem["popularity_confidence"]
+    assert (
+        big_song["popularity_score"]
+        > deep_cut["popularity_score"]
+        > hidden_gem["popularity_score"]
+    )
+    assert (
+        big_song["popularity_confidence"]
+        > deep_cut["popularity_confidence"]
+        >= hidden_gem["popularity_confidence"]
+    )
 
 
 def test_recompute_album_and_artist_popularity_scores_follow_track_signal(pg_db):
-    from crate.db.jobs.popularity import bulk_update_lastfm_top_track_signals, update_album_lastfm
+    from crate.db.jobs.popularity import (
+        bulk_update_lastfm_top_track_signals,
+        update_album_lastfm,
+    )
     from crate.popularity import (
         recompute_album_popularity_scores,
         recompute_artist_popularity_scores,

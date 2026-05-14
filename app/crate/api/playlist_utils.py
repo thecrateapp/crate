@@ -1,4 +1,3 @@
-from crate.db.repositories.playlists import execute_smart_rules
 from crate.playlist_covers import delete_playlist_cover, persist_playlist_cover_data
 
 

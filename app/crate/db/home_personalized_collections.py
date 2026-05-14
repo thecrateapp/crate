@@ -25,7 +25,9 @@ from crate.track_versions import dedupe_track_variants
 
 
 def get_home_mix(user_id: int, mix_id: str, limit: int = 40) -> dict | None:
-    context = get_cached_home_context(user_id, top_artist_limit=28, top_album_limit=12, top_genre_limit=8)
+    context = get_cached_home_context(
+        user_id, top_artist_limit=28, top_album_limit=12, top_genre_limit=8
+    )
     recent_releases = recent_releases_from_context(context)
 
     name, description, rows = _build_mix_rows(
@@ -72,7 +74,9 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
     if not artist:
         return None
 
-    rows = _build_artist_core_rows(user_id, artist_id=artist_id, artist_name=artist["name"], limit=limit)
+    rows = _build_artist_core_rows(
+        user_id, artist_id=artist_id, artist_name=artist["name"], limit=limit
+    )
     if not rows:
         return None
     rows = dedupe_track_variants(rows)
@@ -93,7 +97,15 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
 
 def get_home_hero(user_id: int) -> list[dict]:
     ctx = get_cached_home_context(user_id)
-    return _get_home_hero(user_id, ctx["followed_names_lower"], ctx["top_artist_names_lower"][:8], ctx["top_genres_lower"][:4])
+    return (
+        _get_home_hero(
+            user_id,
+            ctx["followed_names_lower"],
+            ctx["top_artist_names_lower"][:8],
+            ctx["top_genres_lower"][:4],
+        )
+        or []
+    )
 
 
 def get_home_recently_played(user_id: int) -> list[dict]:
@@ -131,7 +143,9 @@ def get_home_recommended_tracks(user_id: int) -> list[dict]:
 
 def get_home_radio_stations(user_id: int) -> list[dict]:
     ctx = get_cached_home_context(user_id)
-    return _build_radio_stations(merged_artists_from_context(ctx), ctx["top_albums"], 14)
+    return _build_radio_stations(
+        merged_artists_from_context(ctx), ctx["top_albums"], 14
+    )
 
 
 def get_home_favorite_artists(user_id: int) -> list[dict]:

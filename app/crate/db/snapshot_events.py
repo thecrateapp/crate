@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 
 SNAPSHOT_CHANNEL_ALL = "crate:sse:snapshot"
 
@@ -15,7 +15,7 @@ def snapshot_channel(scope: str, subject_key: str = "global") -> str:
 
 def publish_snapshot_update(scope: str, subject_key: str, version: int) -> None:
     try:
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if not redis_client:
             return
         payload = json.dumps(

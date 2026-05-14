@@ -32,12 +32,19 @@ def get_recent_playlist_rows_with_artwork(user_id: int, limit: int) -> list[dict
                     """
                 ),
                 {"user_id": user_id, "lim": limit},
-            ).mappings().all()
+            )
+            .mappings()
+            .all()
         ]
-        playlist_ids = [row["playlist_id"] for row in playlist_rows if row.get("playlist_id") is not None]
-        artwork_rows = session.execute(
-            text(
-                """
+        playlist_ids = [
+            row["playlist_id"]
+            for row in playlist_rows
+            if row.get("playlist_id") is not None
+        ]
+        artwork_rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     pt.playlist_id,
                     lt.artist,
@@ -79,9 +86,12 @@ def get_recent_playlist_rows_with_artwork(user_id: int, limit: int) -> list[dict
                 LEFT JOIN library_albums alb ON alb.id = lt.album_id
                 ORDER BY pt.playlist_id ASC, pt.position ASC
                 """
-            ),
-            {"playlist_ids": playlist_ids or [0]},
-        ).mappings().all()
+                ),
+                {"playlist_ids": playlist_ids or [0]},
+            )
+            .mappings()
+            .all()
+        )
 
     artwork_map: dict[int, list[dict]] = {}
     for row in artwork_rows:
@@ -94,13 +104,17 @@ def get_recent_playlist_rows_with_artwork(user_id: int, limit: int) -> list[dict
                 "artist": row.get("artist"),
                 "artist_id": row.get("artist_id"),
                 "artist_entity_uid": (
-                    str(row["artist_entity_uid"]) if row.get("artist_entity_uid") is not None else None
+                    str(row["artist_entity_uid"])
+                    if row.get("artist_entity_uid") is not None
+                    else None
                 ),
                 "artist_slug": row.get("artist_slug"),
                 "album": row.get("album"),
                 "album_id": row.get("album_id"),
                 "album_entity_uid": (
-                    str(row["album_entity_uid"]) if row.get("album_entity_uid") is not None else None
+                    str(row["album_entity_uid"])
+                    if row.get("album_entity_uid") is not None
+                    else None
                 ),
                 "album_slug": row.get("album_slug"),
             }

@@ -11,7 +11,11 @@ from crate.api.schemas.analytics import (
     AnalyticsOverviewResponse,
     StatsResponse,
 )
-from crate.api.schemas.common import IdentityFieldsMixin, SnapshotMetadataResponse, TaskEnqueueResponse
+from crate.api.schemas.common import (
+    IdentityFieldsMixin,
+    SnapshotMetadataResponse,
+    TaskEnqueueResponse,
+)
 from crate.api.schemas.management import AnalysisStatusResponse
 
 
@@ -57,7 +61,7 @@ class ScanRequest(BaseModel):
 
 
 class ScanStartResponse(TaskEnqueueResponse):
-    status: str
+    status: str = "queued"
     only: str | None = None
 
 
@@ -112,8 +116,12 @@ class AdminSseSurfaceResponse(BaseModel):
 
 class AdminEventingRuntimeResponse(BaseModel):
     redis_connected: bool = False
-    domain_events: AdminDomainEventRuntimeResponse = Field(default_factory=AdminDomainEventRuntimeResponse)
-    cache_invalidation: AdminCacheInvalidationRuntimeResponse = Field(default_factory=AdminCacheInvalidationRuntimeResponse)
+    domain_events: AdminDomainEventRuntimeResponse = Field(
+        default_factory=AdminDomainEventRuntimeResponse
+    )
+    cache_invalidation: AdminCacheInvalidationRuntimeResponse = Field(
+        default_factory=AdminCacheInvalidationRuntimeResponse
+    )
     sse_surfaces: list[AdminSseSurfaceResponse] = Field(default_factory=list)
 
 
@@ -128,7 +136,9 @@ class AdminOpsSnapshotResponse(BaseModel):
     health_counts: dict[str, int] = Field(default_factory=dict)
     upcoming_shows: list[dict[str, Any]] = Field(default_factory=list)
     runtime: AdminOpsRuntimeResponse = Field(default_factory=AdminOpsRuntimeResponse)
-    eventing: AdminEventingRuntimeResponse = Field(default_factory=AdminEventingRuntimeResponse)
+    eventing: AdminEventingRuntimeResponse = Field(
+        default_factory=AdminEventingRuntimeResponse
+    )
 
 
 class WorkerLogEntryResponse(BaseModel):

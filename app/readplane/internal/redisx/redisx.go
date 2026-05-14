@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Connect parses the Redis URL and returns a new redis.Client.
 func Connect(redisURL string) (*redis.Client, error) {
 	if redisURL == "" {
 		return nil, fmt.Errorf("REDIS_URL is required")
@@ -18,6 +19,7 @@ func Connect(redisURL string) (*redis.Client, error) {
 	return redis.NewClient(options), nil
 }
 
+// Ping verifies connectivity to Redis or returns an error.
 func Ping(ctx context.Context, client *redis.Client) error {
 	if client == nil {
 		return fmt.Errorf("redis client is nil")
@@ -25,6 +27,7 @@ func Ping(ctx context.Context, client *redis.Client) error {
 	return client.Ping(ctx).Err()
 }
 
+// SnapshotChannel builds the Redis pub/sub channel name for snapshot updates.
 func SnapshotChannel(scope string, subjectKey string) string {
 	if subjectKey == "" {
 		subjectKey = "global"

@@ -34,10 +34,26 @@ export function useMediaSession({
   prev: () => void;
   seek: (time: number) => void;
 }) {
-  const actionsRef = useRef({ pause, resume, next, prev, seek, currentTime, duration });
+  const actionsRef = useRef({
+    pause,
+    resume,
+    next,
+    prev,
+    seek,
+    currentTime,
+    duration,
+  });
 
   useEffect(() => {
-    actionsRef.current = { pause, resume, next, prev, seek, currentTime, duration };
+    actionsRef.current = {
+      pause,
+      resume,
+      next,
+      prev,
+      seek,
+      currentTime,
+      duration,
+    };
   }, [currentTime, duration, next, pause, prev, resume, seek]);
 
   useEffect(() => {
@@ -101,7 +117,13 @@ export function useMediaSession({
       album: currentTrack.album || "",
       artwork,
     });
-  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.album, currentTrack?.albumCover]);
+  }, [
+    currentTrack?.id,
+    currentTrack?.title,
+    currentTrack?.artist,
+    currentTrack?.album,
+    currentTrack?.albumCover,
+  ]);
 
   // Update playback state
   useEffect(() => {
@@ -165,17 +187,27 @@ export function useMediaSession({
       ["pause", () => actionsRef.current.pause()],
       ["previoustrack", () => actionsRef.current.prev()],
       ["nexttrack", () => actionsRef.current.next()],
-      ["seekto", (details) => {
-        if (details.seekTime != null) actionsRef.current.seek(details.seekTime);
-      }],
-      ["seekbackward", (details) => {
-        const { currentTime, seek } = actionsRef.current;
-        seek(Math.max(0, currentTime - (details.seekOffset || 10)));
-      }],
-      ["seekforward", (details) => {
-        const { currentTime, duration, seek } = actionsRef.current;
-        seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
-      }],
+      [
+        "seekto",
+        (details) => {
+          if (details.seekTime != null)
+            actionsRef.current.seek(details.seekTime);
+        },
+      ],
+      [
+        "seekbackward",
+        (details) => {
+          const { currentTime, seek } = actionsRef.current;
+          seek(Math.max(0, currentTime - (details.seekOffset || 10)));
+        },
+      ],
+      [
+        "seekforward",
+        (details) => {
+          const { currentTime, duration, seek } = actionsRef.current;
+          seek(Math.min(duration, currentTime + (details.seekOffset || 10)));
+        },
+      ],
     ];
 
     for (const [action, handler] of actions) {
@@ -190,7 +222,9 @@ export function useMediaSession({
       for (const [action] of actions) {
         try {
           navigator.mediaSession.setActionHandler(action, null);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     };
   }, []);

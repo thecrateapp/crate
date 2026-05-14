@@ -6,7 +6,12 @@ to keep the deprecated compat surface and older tests/scripts working while the
 backend migration finishes.
 """
 
-from crate.db.queries.tasks import get_latest_scan, get_task, list_child_tasks, list_tasks
+from crate.db.queries.tasks import (
+    get_latest_scan,
+    get_task,
+    list_child_tasks,
+    list_tasks,
+)
 from crate.db.repositories.tasks import (
     claim_next_task,
     check_siblings_complete,

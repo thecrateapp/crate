@@ -4,7 +4,11 @@ from fastapi.responses import JSONResponse
 
 from crate.api.auth import _require_auth
 from crate.api._deps import enrich_radio_tracks as _enrich_radio_tracks
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.radio import RadioResponse
 from crate.bliss import (
     generate_album_radio,
@@ -31,7 +35,9 @@ router = APIRouter(tags=["radio"])
 _RADIO_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
     {
-        404: error_response("The seed resource was not found or no radio data is available yet."),
+        404: error_response(
+            "The seed resource was not found or no radio data is available yet."
+        ),
         422: error_response("The route parameters failed validation."),
     },
 )
@@ -61,7 +67,9 @@ def _sanitize_radio_tracks(rows: list[dict]) -> list[dict]:
     return sanitized
 
 
-def _resolve_track_path(track_id: int = 0, path: str = "", storage_id: str = "", entity_uid: str = "") -> str | None:
+def _resolve_track_path(
+    track_id: int = 0, path: str = "", storage_id: str = "", entity_uid: str = ""
+) -> str | None:
     if track_id:
         return get_track_path_by_id(track_id)
 
@@ -82,7 +90,9 @@ def _resolve_track_path(track_id: int = 0, path: str = "", storage_id: str = "",
 _RADIO_CACHE_TTL = 300  # 5 minutes
 
 
-def api_artist_radio(request: Request, artist_id: int, limit: int = Query(50, ge=1, le=100)):
+def api_artist_radio(
+    request: Request, artist_id: int, limit: int = Query(50, ge=1, le=100)
+):
     user = _require_auth(request)
     effective_user_id = _effective_user_id(user)
     artist = get_library_artist_by_id(artist_id)
@@ -118,7 +128,9 @@ def api_artist_radio(request: Request, artist_id: int, limit: int = Query(50, ge
     summary="Build artist radio",
     deprecated=True,
 )
-def api_artist_radio_by_id(request: Request, artist_id: int, limit: int = Query(50, ge=1, le=100)):
+def api_artist_radio_by_id(
+    request: Request, artist_id: int, limit: int = Query(50, ge=1, le=100)
+):
     return api_artist_radio(request, artist_id, limit)
 
 
@@ -185,7 +197,9 @@ def api_track_radio(
     summary="Build album radio",
     deprecated=True,
 )
-def api_album_radio(request: Request, album_id: int, limit: int = Query(50, ge=1, le=100)):
+def api_album_radio(
+    request: Request, album_id: int, limit: int = Query(50, ge=1, le=100)
+):
     user = _require_auth(request)
     effective_user_id = _effective_user_id(user)
     row = get_album_for_radio(album_id)
@@ -225,7 +239,9 @@ def api_album_radio(request: Request, album_id: int, limit: int = Query(50, ge=1
     summary="Build playlist radio",
     deprecated=True,
 )
-def api_playlist_radio(request: Request, playlist_id: int, limit: int = Query(50, ge=1, le=100)):
+def api_playlist_radio(
+    request: Request, playlist_id: int, limit: int = Query(50, ge=1, le=100)
+):
     user = _require_auth(request)
     effective_user_id = _effective_user_id(user)
     row = get_playlist_for_radio(playlist_id)
@@ -245,7 +261,9 @@ def api_playlist_radio(request: Request, playlist_id: int, limit: int = Query(50
     if cached:
         return cached
 
-    tracks = generate_playlist_radio(playlist_id, limit=limit, user_id=effective_user_id)
+    tracks = generate_playlist_radio(
+        playlist_id, limit=limit, user_id=effective_user_id
+    )
     if not tracks:
         return JSONResponse({"error": "No radio data available yet"}, status_code=404)
 
@@ -272,21 +290,29 @@ def api_playlist_radio(request: Request, playlist_id: int, limit: int = Query(50
     summary="Build radio from a home playlist",
     deprecated=True,
 )
-def api_home_playlist_radio(request: Request, playlist_id: str, limit: int = Query(50, ge=1, le=100)):
+def api_home_playlist_radio(
+    request: Request, playlist_id: str, limit: int = Query(50, ge=1, le=100)
+):
     user = _require_auth(request)
     effective_user_id = _effective_user_id(user)
     from crate.db.home import get_home_playlist
 
-    playlist = get_home_playlist(effective_user_id or user["id"], playlist_id, limit=max(limit, 40))
+    playlist = get_home_playlist(
+        effective_user_id or user["id"], playlist_id, limit=max(limit, 40)
+    )
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
 
-    cache_key = f"radio:home-playlist:{effective_user_id or 'anon'}:{playlist_id}:{limit}"
+    cache_key = (
+        f"radio:home-playlist:{effective_user_id or 'anon'}:{playlist_id}:{limit}"
+    )
     cached = get_cache(cache_key, max_age_seconds=_RADIO_CACHE_TTL)
     if cached:
         return cached
 
-    tracks = generate_virtual_playlist_radio(playlist.get("tracks") or [], limit=limit, user_id=effective_user_id)
+    tracks = generate_virtual_playlist_radio(
+        playlist.get("tracks") or [], limit=limit, user_id=effective_user_id
+    )
     if not tracks:
         return JSONResponse({"error": "No radio data available yet"}, status_code=404)
 
@@ -334,6 +360,7 @@ class RadioFeedbackRequest(BaseModel):
 def api_radio_start(request: Request, body: RadioStartRequest):
     user = _require_auth(request)
     from crate.radio_engine import start_radio
+
     result = start_radio(
         user_id=user["id"],
         mode=body.mode,
@@ -342,7 +369,9 @@ def api_radio_start(request: Request, body: RadioStartRequest):
     )
     if not result:
         return JSONResponse(
-            {"error": "Could not start radio — seed may lack bliss vectors or not enough user data"},
+            {
+                "error": "Could not start radio — seed may lack bliss vectors or not enough user data"
+            },
             status_code=422,
         )
     return result
@@ -356,6 +385,7 @@ def api_radio_start(request: Request, body: RadioStartRequest):
 def api_radio_next(request: Request, body: RadioNextRequest):
     _require_auth(request)
     from crate.radio_engine import next_tracks
+
     result = next_tracks(body.session_id, body.count)
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
@@ -370,6 +400,7 @@ def api_radio_next(request: Request, body: RadioNextRequest):
 def api_radio_feedback(request: Request, body: RadioFeedbackRequest):
     _require_auth(request)
     from crate.radio_engine import radio_feedback
+
     result = radio_feedback(body.session_id, body.track_id, body.action)
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
@@ -384,6 +415,7 @@ def api_radio_feedback(request: Request, body: RadioFeedbackRequest):
 def api_radio_can_discover(request: Request):
     user = _require_auth(request)
     from crate.radio_engine import has_enough_data
+
     return {"available": has_enough_data(user["id"])}
 
 
@@ -395,6 +427,7 @@ def api_radio_can_discover(request: Request):
 def api_radio_end_session(request: Request, session_id: str):
     _require_auth(request)
     from crate.radio_engine import _delete_session
+
     if _delete_session(session_id):
         return {"status": "ended"}
     return JSONResponse({"error": "Session not found"}, status_code=404)

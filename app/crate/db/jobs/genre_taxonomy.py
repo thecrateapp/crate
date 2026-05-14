@@ -11,7 +11,9 @@ def _slugify_genre(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-")
 
 
-def assign_genre_alias_in_session(session, alias_value: str, canonical_slug: str) -> bool:
+def assign_genre_alias_in_session(
+    session, alias_value: str, canonical_slug: str
+) -> bool:
     alias_name = (alias_value or "").strip().lower()
     alias_slug = _slugify_genre(alias_name)
     canonical_slug = (canonical_slug or "").strip().lower()
@@ -23,28 +25,42 @@ def assign_genre_alias_in_session(session, alias_value: str, canonical_slug: str
         {"lock_key": f"genre-alias:{alias_name}"},
     )
 
-    node_row = session.execute(
-        text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
-        {"slug": canonical_slug},
-    ).mappings().first()
+    node_row = (
+        session.execute(
+            text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
+            {"slug": canonical_slug},
+        )
+        .mappings()
+        .first()
+    )
     if not node_row:
         return False
 
-    existing = session.execute(
-        text(
-            """
+    existing = (
+        session.execute(
+            text(
+                """
             SELECT alias_slug, genre_id
             FROM genre_taxonomy_aliases
             WHERE alias_name = :alias_name
             """
-        ),
-        {"alias_name": alias_name},
-    ).mappings().first()
-    if existing and existing["alias_slug"] == alias_slug and int(existing["genre_id"]) == int(node_row["id"]):
+            ),
+            {"alias_name": alias_name},
+        )
+        .mappings()
+        .first()
+    )
+    if (
+        existing
+        and existing["alias_slug"] == alias_slug
+        and int(existing["genre_id"]) == int(node_row["id"])
+    ):
         return True
 
     session.execute(
-        text("DELETE FROM genre_taxonomy_aliases WHERE alias_name = :alias_name AND alias_slug != :alias_slug"),
+        text(
+            "DELETE FROM genre_taxonomy_aliases WHERE alias_name = :alias_name AND alias_slug != :alias_slug"
+        ),
         {"alias_name": alias_name, "alias_slug": alias_slug},
     )
     session.execute(
@@ -57,7 +73,11 @@ def assign_genre_alias_in_session(session, alias_value: str, canonical_slug: str
                 genre_id = EXCLUDED.genre_id
             """
         ),
-        {"alias_slug": alias_slug, "alias_name": alias_name, "genre_id": node_row["id"]},
+        {
+            "alias_slug": alias_slug,
+            "alias_name": alias_name,
+            "genre_id": node_row["id"],
+        },
     )
     return True
 
@@ -71,9 +91,10 @@ def merge_duplicate_library_genres_in_session(session) -> list[dict]:
     session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext('library-genres-merge'))")
     )
-    duplicate_rows = session.execute(
-        text(
-            """
+    duplicate_rows = (
+        session.execute(
+            text(
+                """
             SELECT
                 lower(trim(name)) AS genre_key,
                 MIN(id)::INTEGER AS keep_id,
@@ -85,8 +106,11 @@ def merge_duplicate_library_genres_in_session(session) -> list[dict]:
             HAVING COUNT(*) > 1
             ORDER BY lower(trim(name))
             """
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     merged: list[dict] = []
     for row in duplicate_rows:
@@ -155,19 +179,33 @@ def merge_duplicate_library_genres() -> list[dict]:
 
 
 def seed_genre_taxonomy_definitions(session, definitions) -> None:
-    slugs_with_gains = [definition.slug for definition in definitions if definition.eq_gains is not None]
-    existing_count = session.execute(
-        text("SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes WHERE slug = ANY(:slugs)"),
-        {"slugs": [definition.slug for definition in definitions]},
-    ).mappings().first()["cnt"]
-    existing_gains_count = session.execute(
-        text(
-            "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes "
-            "WHERE slug = ANY(:slugs) AND eq_gains IS NOT NULL"
-        ),
-        {"slugs": slugs_with_gains},
-    ).mappings().first()["cnt"]
-    if existing_count == len(definitions) and existing_gains_count == len(slugs_with_gains):
+    slugs_with_gains = [
+        definition.slug for definition in definitions if definition.eq_gains is not None
+    ]
+    existing_count = (
+        session.execute(
+            text(
+                "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes WHERE slug = ANY(:slugs)"
+            ),
+            {"slugs": [definition.slug for definition in definitions]},
+        )
+        .mappings()
+        .first()["cnt"]
+    )
+    existing_gains_count = (
+        session.execute(
+            text(
+                "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes "
+                "WHERE slug = ANY(:slugs) AND eq_gains IS NOT NULL"
+            ),
+            {"slugs": slugs_with_gains},
+        )
+        .mappings()
+        .first()["cnt"]
+    )
+    if existing_count == len(definitions) and existing_gains_count == len(
+        slugs_with_gains
+    ):
         return
 
     for definition in definitions:
@@ -188,13 +226,17 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                 "name": definition.name,
                 "description": definition.description,
                 "is_top_level": definition.top_level,
-                "eq_gains": list(definition.eq_gains) if definition.eq_gains is not None else None,
+                "eq_gains": list(definition.eq_gains)
+                if definition.eq_gains is not None
+                else None,
             },
         )
 
     node_ids = {
         row["slug"]: row["id"]
-        for row in session.execute(text("SELECT id, slug FROM genre_taxonomy_nodes")).mappings().all()
+        for row in session.execute(text("SELECT id, slug FROM genre_taxonomy_nodes"))
+        .mappings()
+        .all()
     }
 
     for definition in definitions:
@@ -203,7 +245,11 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
             continue
         alias_entries: list[tuple[str, str]] = []
         seen_alias_slugs: set[str] = set()
-        for candidate_name in (definition.slug.replace("-", " "), definition.name, *definition.aliases):
+        for candidate_name in (
+            definition.slug.replace("-", " "),
+            definition.name,
+            *definition.aliases,
+        ):
             normalized_alias = (candidate_name or "").strip().lower()
             alias_slug = _slugify_genre(normalized_alias)
             if not normalized_alias or not alias_slug or alias_slug in seen_alias_slugs:
@@ -213,7 +259,9 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
 
         for alias_slug, alias_name in alias_entries:
             session.execute(
-                text("DELETE FROM genre_taxonomy_aliases WHERE alias_name = :alias_name AND alias_slug != :alias_slug"),
+                text(
+                    "DELETE FROM genre_taxonomy_aliases WHERE alias_name = :alias_name AND alias_slug != :alias_slug"
+                ),
                 {"alias_name": alias_name, "alias_slug": alias_slug},
             )
             session.execute(
@@ -226,7 +274,11 @@ def seed_genre_taxonomy_definitions(session, definitions) -> None:
                         genre_id = EXCLUDED.genre_id
                     """
                 ),
-                {"alias_slug": alias_slug, "alias_name": alias_name, "genre_id": genre_id},
+                {
+                    "alias_slug": alias_slug,
+                    "alias_name": alias_name,
+                    "genre_id": genre_id,
+                },
             )
 
     for definition in definitions:

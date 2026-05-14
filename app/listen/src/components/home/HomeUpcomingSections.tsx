@@ -1,6 +1,10 @@
 import { Calendar, Play, RadioTower, Sparkles } from "lucide-react";
 
-import type { HomeUpcomingInsight, HomeUpcomingItem, HomeUpcomingResponse } from "./home-model";
+import type {
+  HomeUpcomingInsight,
+  HomeUpcomingItem,
+  HomeUpcomingResponse,
+} from "./home-model";
 import { SectionHeader, UpcomingPreviewRow } from "./HomeSections";
 
 function formatUpcomingDate(date?: string): string | null {
@@ -59,7 +63,9 @@ export function HomeUpcomingSection({
           </div>
 
           <h2 className="mt-4 text-2xl font-bold text-foreground">
-            {nextUpcoming.type === "show" ? nextUpcoming.artist : nextUpcoming.title}
+            {nextUpcoming.type === "show"
+              ? nextUpcoming.artist
+              : nextUpcoming.title}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {nextUpcoming.type === "show"
@@ -70,17 +76,29 @@ export function HomeUpcomingSection({
           <div className="mt-4 flex flex-wrap gap-2">
             {nextUpcomingDate ? (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Date</div>
-                <div className="mt-1 text-sm font-semibold text-foreground">{nextUpcomingDate}</div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                  Date
+                </div>
+                <div className="mt-1 text-sm font-semibold text-foreground">
+                  {nextUpcomingDate}
+                </div>
               </div>
             ) : null}
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Shows</div>
-              <div className="mt-1 text-sm font-semibold text-foreground">{summary?.show_count ?? 0}</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Shows
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">
+                {summary?.show_count ?? 0}
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Releases</div>
-              <div className="mt-1 text-sm font-semibold text-foreground">{summary?.release_count ?? 0}</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Releases
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">
+                {summary?.release_count ?? 0}
+              </div>
             </div>
           </div>
 
@@ -147,7 +165,9 @@ export function HomeShowPrepSection({
                   <Sparkles size={12} />
                   {insightLabel(insight.type)}
                 </div>
-                <h3 className="mt-3 text-lg font-bold text-foreground">{insight.title}</h3>
+                <h3 className="mt-3 text-lg font-bold text-foreground">
+                  {insight.title}
+                </h3>
                 <p className="mt-1 text-sm text-white/60">{insight.subtitle}</p>
               </div>
               {insight.weight === "high" ? (
@@ -157,7 +177,9 @@ export function HomeShowPrepSection({
               ) : null}
             </div>
 
-            <p className="mt-4 text-sm leading-6 text-muted-foreground">{insight.message}</p>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">
+              {insight.message}
+            </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
               {insight.has_setlist ? (

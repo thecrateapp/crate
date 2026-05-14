@@ -24,7 +24,11 @@ import type {
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { fetchAlbumRadio, fetchArtistRadio, fetchHomePlaylistRadio } from "@/lib/radio";
+import {
+  fetchAlbumRadio,
+  fetchArtistRadio,
+  fetchHomePlaylistRadio,
+} from "@/lib/radio";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
@@ -70,7 +74,9 @@ export function HomeSection() {
   );
 
   async function loadHomePlaylist(playlistId: string) {
-    return api<HomeGeneratedPlaylistDetail>(`/api/me/home/playlists/${encodeURIComponent(playlistId)}`);
+    return api<HomeGeneratedPlaylistDetail>(
+      `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
+    );
   }
 
   async function playHomePlaylist(item: HomeGeneratedPlaylistSummary) {
@@ -128,7 +134,11 @@ export function HomeSection() {
   async function playRadioStation(station: HomeRadioStation) {
     try {
       if (station.type === "artist" && station.artist_id != null) {
-        const radio = await fetchArtistRadio(station.artist_id, station.artist_name, 50);
+        const radio = await fetchArtistRadio(
+          station.artist_id,
+          station.artist_name,
+          50,
+        );
         if (!radio.tracks.length) {
           toast.info("Artist radio is not available yet");
           return;
@@ -186,9 +196,12 @@ export function HomeSection() {
 
       {!data.items.length ? (
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-12 text-center">
-          <p className="text-sm font-medium text-foreground">Nothing ready here yet</p>
+          <p className="text-sm font-medium text-foreground">
+            Nothing ready here yet
+          </p>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Crate could not find enough playable, non-duplicated tracks for this section right now.
+            Crate could not find enough playable, non-duplicated tracks for this
+            section right now.
           </p>
         </div>
       ) : null}
@@ -225,7 +238,9 @@ export function HomeSection() {
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-7">
           {data.items.map((album) => (
             <AlbumCard
-              key={`${album.album_id ?? `${album.artist_name}-${album.album_name}`}`}
+              key={`${
+                album.album_id ?? `${album.artist_name}-${album.album_name}`
+              }`}
               artist={album.artist_name}
               album={album.album_name}
               albumId={album.album_id}
@@ -258,7 +273,9 @@ export function HomeSection() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {data.items.map((station) => (
             <RadioStationCard
-              key={`${station.type}-${station.artist_id ?? station.album_id ?? station.title}`}
+              key={`${station.type}-${
+                station.artist_id ?? station.album_id ?? station.title
+              }`}
               station={station}
               onPlay={() => playRadioStation(station)}
               layout="grid"
@@ -290,7 +307,9 @@ export function HomeSection() {
             <CoreTracksPlaylistCard
               key={item.id}
               item={item}
-              onOpenPlaylist={(playlist) => navigate(homePlaylistPath(playlist.id))}
+              onOpenPlaylist={(playlist) =>
+                navigate(homePlaylistPath(playlist.id))
+              }
               onPlayPlaylist={playHomePlaylist}
               onShufflePlaylist={shuffleHomePlaylist}
               onStartRadio={startHomePlaylistRadio}

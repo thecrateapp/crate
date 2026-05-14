@@ -8,12 +8,20 @@ PHOTO_NAMES = {"artist.jpg", "artist.png", "photo.jpg"}
 
 AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".ogg", ".opus"}
 
-COVER_NAMES = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png"]
+COVER_NAMES = [
+    "cover.jpg",
+    "cover.png",
+    "folder.jpg",
+    "folder.png",
+    "front.jpg",
+    "front.png",
+]
 
 
 def init_musicbrainz():
     """Set MusicBrainz user agent once."""
     import musicbrainzngs
+
     musicbrainzngs.set_useragent("crate", "1.0", "https://github.com/crate")
 
 
@@ -45,5 +53,7 @@ def to_datetime(value) -> datetime | None:
             parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             return None
-        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+        return (
+            parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+        )
     return None

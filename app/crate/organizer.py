@@ -2,10 +2,8 @@
 
 import logging
 import re
-import shutil
 from pathlib import Path
 
-import mutagen
 
 from crate.audio import get_audio_files, read_tags
 
@@ -20,7 +18,9 @@ PRESETS = {
 DEFAULT_PATTERN = PRESETS["standard"]
 
 
-def preview_organize(album_dir: Path, extensions: set[str], pattern: str = None) -> list[dict]:
+def preview_organize(
+    album_dir: Path, extensions: set[str], pattern: str | None = None
+) -> list[dict]:
     """Preview what renaming would look like for an album."""
     pattern = pattern or DEFAULT_PATTERN
     tracks = get_audio_files(album_dir, extensions)
@@ -33,16 +33,18 @@ def preview_organize(album_dir: Path, extensions: set[str], pattern: str = None)
         new_name = _format_filename(pattern, tags, track)
         new_name = _sanitize(new_name) + track.suffix.lower()
 
-        preview.append({
-            "current": track.name,
-            "proposed": new_name,
-            "changed": track.name != new_name,
-            "tags": {
-                "title": tags.get("title", ""),
-                "tracknumber": tags.get("tracknumber", ""),
-                "discnumber": tags.get("discnumber", "1"),
-            },
-        })
+        preview.append(
+            {
+                "current": track.name,
+                "proposed": new_name,
+                "changed": track.name != new_name,
+                "tags": {
+                    "title": tags.get("title", ""),
+                    "tracknumber": tags.get("tracknumber", ""),
+                    "discnumber": tags.get("discnumber", "1"),
+                },
+            }
+        )
 
     return preview
 
@@ -50,8 +52,8 @@ def preview_organize(album_dir: Path, extensions: set[str], pattern: str = None)
 def organize_album(
     album_dir: Path,
     extensions: set[str],
-    pattern: str = None,
-    rename_folder: str = None,
+    pattern: str | None = None,
+    rename_folder: str | None = None,
 ) -> dict:
     """Rename tracks in an album according to pattern. Optionally rename album folder."""
     pattern = pattern or DEFAULT_PATTERN
@@ -94,7 +96,9 @@ def organize_album(
     return result
 
 
-def suggest_folder_name(album_dir: Path, extensions: set[str], include_year: bool = False) -> str:
+def suggest_folder_name(
+    album_dir: Path, extensions: set[str], include_year: bool = False
+) -> str:
     """Suggest a clean folder name based on tags."""
     tracks = get_audio_files(album_dir, extensions)
     if not tracks:

@@ -22,7 +22,10 @@ import { VisualizerSettingsPanel } from "@/components/player/visualizer/Visualiz
 import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
-import { useCrossfadeAwareProgress, useCrossfadeProgress } from "@/hooks/use-crossfade-progress";
+import {
+  useCrossfadeAwareProgress,
+  useCrossfadeProgress,
+} from "@/hooks/use-crossfade-progress";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
@@ -44,7 +47,16 @@ const TABS: { id: TabId; label: string }[] = [
 export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const { currentTrack, currentTime, duration, isPlaying, isBuffering, volume, analyserVersion, crossfadeTransition } = usePlayer();
+  const {
+    currentTrack,
+    currentTime,
+    duration,
+    isPlaying,
+    isBuffering,
+    volume,
+    analyserVersion,
+    crossfadeTransition,
+  } = usePlayer();
   const { pause, resume, playSource, queue, seek } = usePlayerActions();
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   const { displayedTime, displayedDuration } = useCrossfadeAwareProgress(
@@ -55,7 +67,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const [tab, setTab] = useState<TabId>("queue");
   const [showVizSettings, setShowVizSettings] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
-  const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } = useResolvedPlayerArtist(currentTrack, queue);
+  const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } =
+    useResolvedPlayerArtist(currentTrack, queue);
   const sourceLabel = getPlaySourceLabel(playSource);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,11 +79,25 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const vizSettingsRef = useRef<HTMLDivElement>(null);
   const vizSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const vizRef = useRef<MusicVisualizer | null>(null);
-  const playbackState = useMemo(() => ({ isPlaying, volume }), [isPlaying, volume]);
-  const vizCfg = useVisualizerConfig(vizRef, currentTrack, open && isDesktop, crossfadeTransition);
+  const playbackState = useMemo(
+    () => ({ isPlaying, volume }),
+    [isPlaying, volume],
+  );
+  const vizCfg = useVisualizerConfig(
+    vizRef,
+    currentTrack,
+    open && isDesktop,
+    crossfadeTransition,
+  );
   const isCdMode = vizCfg.surfaceMode === "cd";
   const isVisualizerMode = vizCfg.surfaceMode === "visualizer";
-  const [canvasRect, setCanvasRect] = useState<{ top: number; left: number; width: number; height: number; referenceSize: number } | null>(null);
+  const [canvasRect, setCanvasRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    referenceSize: number;
+  } | null>(null);
   useMusicVisualizer(
     canvasRef,
     `${currentTrack?.id ?? "none"}:${analyserVersion}`,
@@ -114,7 +141,12 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
 
   useDismissibleLayer({
     active: showVizSettings || showEqualizer,
-    refs: [vizSettingsRef, vizSettingsButtonRef, equalizerRef, equalizerButtonRef],
+    refs: [
+      vizSettingsRef,
+      vizSettingsButtonRef,
+      equalizerRef,
+      equalizerButtonRef,
+    ],
     onDismiss: () => {
       setShowVizSettings(false);
       setShowEqualizer(false);
@@ -156,20 +188,27 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
 
   function goToArtist() {
     if (!resolvedArtist?.id) return;
-    navigate(artistPagePath({
-      artistId: resolvedArtist.id,
-      artistSlug: resolvedArtist.slug,
-      artistName: resolvedArtist.name,
-    }));
+    navigate(
+      artistPagePath({
+        artistId: resolvedArtist.id,
+        artistSlug: resolvedArtist.slug,
+        artistName: resolvedArtist.name,
+      }),
+    );
   }
 
   return (
     <div
       className={`z-app-extended-player fixed inset-0 flex bg-app-surface transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform ${
-        open ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-full opacity-0"
+        open
+          ? "translate-y-0 opacity-100"
+          : "pointer-events-none translate-y-full opacity-0"
       }`}
     >
-      <div ref={panelRef} className="relative flex w-1/2 flex-col items-center justify-center overflow-hidden bg-app-surface">
+      <div
+        ref={panelRef}
+        className="relative flex w-1/2 flex-col items-center justify-center overflow-hidden bg-app-surface"
+      >
         <div className="z-app-header absolute top-4 right-4 left-4 flex justify-between">
           <button
             onClick={closeWithFeedback}
@@ -220,18 +259,27 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         </div>
 
         {showVizSettings ? (
-          <AppPopover ref={vizSettingsRef} className="absolute top-14 right-4 w-56 p-4">
+          <AppPopover
+            ref={vizSettingsRef}
+            className="absolute top-14 right-4 w-56 p-4"
+          >
             <VisualizerSettingsPanel config={vizCfg} />
           </AppPopover>
         ) : null}
 
         {showEqualizer ? (
-          <AppPopover ref={equalizerRef} className="absolute top-14 right-4 w-[480px] max-w-[min(480px,calc(100%-2rem))] p-4">
+          <AppPopover
+            ref={equalizerRef}
+            className="absolute top-14 right-4 w-[480px] max-w-[min(480px,calc(100%-2rem))] p-4"
+          >
             <EqualizerPanel onClose={() => setShowEqualizer(false)} />
           </AppPopover>
         ) : null}
 
-        <div ref={coverRef} className="relative z-0 aspect-square w-[72%] max-w-[500px] shrink-0">
+        <div
+          ref={coverRef}
+          className="relative z-0 aspect-square w-[72%] max-w-[500px] shrink-0"
+        >
           {isCdMode ? (
             <SpinningDisc
               albumCover={currentTrack.albumCover}
@@ -257,7 +305,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
                       style={{
-                        filter: isVisualizerMode ? "grayscale(100%) brightness(0.35)" : "none",
+                        filter: isVisualizerMode
+                          ? "grayscale(100%) brightness(0.35)"
+                          : "none",
                         opacity: 1 - crossfadeProgress,
                       }}
                     />
@@ -268,7 +318,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                       alt=""
                       className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
                       style={{
-                        filter: isVisualizerMode ? "grayscale(100%) brightness(0.35)" : "none",
+                        filter: isVisualizerMode
+                          ? "grayscale(100%) brightness(0.35)"
+                          : "none",
                         opacity: crossfadeProgress,
                       }}
                     />
@@ -279,7 +331,11 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   src={currentTrack.albumCover}
                   alt=""
                   className="absolute inset-0 h-full w-full rounded-xl object-cover shadow-[0_28px_100px_rgba(0,0,0,0.75),0_10px_28px_rgba(0,0,0,0.45)]"
-                  style={{ filter: isVisualizerMode ? "grayscale(100%) brightness(0.35)" : "none" }}
+                  style={{
+                    filter: isVisualizerMode
+                      ? "grayscale(100%) brightness(0.35)"
+                      : "none",
+                  }}
                 />
               ) : (
                 <div className="absolute inset-0 rounded-xl bg-white/5 shadow-[0_28px_100px_rgba(0,0,0,0.75)]" />
@@ -291,15 +347,26 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         {/* WebGL canvas — slightly larger than the visualizer’s visual footprint,
             with extra room from the container to avoid clipping on big pulses. */}
         <div
-          className={`pointer-events-none absolute ${showVizSettings ? "z-30" : "z-10"} ${
-            isVisualizerMode && canvasRect ? "" : "hidden"
-          }`}
-          style={canvasRect ? { top: canvasRect.top, left: canvasRect.left, width: canvasRect.width, height: canvasRect.height } : undefined}
+          className={`pointer-events-none absolute ${
+            showVizSettings ? "z-30" : "z-10"
+          } ${isVisualizerMode && canvasRect ? "" : "hidden"}`}
+          style={
+            canvasRect
+              ? {
+                  top: canvasRect.top,
+                  left: canvasRect.left,
+                  width: canvasRect.width,
+                  height: canvasRect.height,
+                }
+              : undefined
+          }
         >
           <canvas
             ref={canvasRef}
             className="h-full w-full"
-            data-viz-reference-size={canvasRect ? String(canvasRect.referenceSize) : undefined}
+            data-viz-reference-size={
+              canvasRect ? String(canvasRect.referenceSize) : undefined
+            }
             style={{ background: "transparent" }}
           />
         </div>
@@ -317,7 +384,8 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
             titleClassName="text-xl leading-tight"
             albumClassName="text-sm"
           />
-          {vizCfg.trackVizProfile.hasAnalysis && vizCfg.trackVizProfile.summary ? (
+          {vizCfg.trackVizProfile.hasAnalysis &&
+          vizCfg.trackVizProfile.summary ? (
             <p className="mt-2 text-[10px] font-medium uppercase tracking-[0.22em] text-white/40">
               {vizCfg.trackVizProfile.summary}
             </p>
@@ -343,7 +411,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 setTab(item.id);
               }}
               className={`rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-colors ${
-                tab === item.id ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                tab === item.id
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/60"
               }`}
             >
               {item.label}
@@ -354,7 +424,9 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         <div className="flex flex-1 flex-col overflow-hidden px-5 pb-5">
           {tab === "queue" && <QueueTab />}
           {tab === "suggested" && <SuggestedTab />}
-          {tab === "lyrics" && <LyricsTab useAlbumPalette={vizCfg.useAlbumPalette} />}
+          {tab === "lyrics" && (
+            <LyricsTab useAlbumPalette={vizCfg.useAlbumPalette} />
+          )}
           {tab === "info" && <InfoTab />}
         </div>
       </div>

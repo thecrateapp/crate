@@ -35,7 +35,9 @@ class _FakePubSub:
     async def unsubscribe(self, channel: str) -> None:
         self.unsubscribed.append(channel)
 
-    async def get_message(self, ignore_subscribe_messages: bool = True, timeout: float = 0.0):
+    async def get_message(
+        self, ignore_subscribe_messages: bool = True, timeout: float = 0.0
+    ):
         del ignore_subscribe_messages, timeout
         if self.messages:
             return self.messages.pop(0)
@@ -78,11 +80,13 @@ def test_do_broadcast_only_appends_projector_relevant_invalidation_events(monkey
     appended: list[tuple[str, dict, str, str]] = []
 
     monkeypatch.setattr(cache_events, "_get_redis", lambda: fake_redis)
-    monkeypatch.setattr(cache_events, "_clear_backend_cache_for_scopes", lambda scopes: None)
+    monkeypatch.setattr(
+        cache_events, "_clear_backend_cache_for_scopes", lambda scopes: None
+    )
     monkeypatch.setattr(
         "crate.db.domain_events.append_domain_event",
-        lambda event_type, payload, scope=None, subject_key=None, session=None: appended.append(
-            (event_type, payload, scope or "", subject_key or "")
+        lambda event_type, payload, scope=None, subject_key=None, session=None: (
+            appended.append((event_type, payload, scope or "", subject_key or ""))
         ),
     )
 
@@ -99,8 +103,18 @@ def test_do_broadcast_only_appends_projector_relevant_invalidation_events(monkey
         cache_events._LIVE_CHANNEL,
     ]
     assert appended == [
-        ("ui.invalidate", {"scope": "library", "redis_event_id": 2}, "ui.invalidate", "library"),
-        ("ui.invalidate", {"scope": "home:user:7", "redis_event_id": 3}, "ui.invalidate", "home:user:7"),
+        (
+            "ui.invalidate",
+            {"scope": "library", "redis_event_id": 2},
+            "ui.invalidate",
+            "library",
+        ),
+        (
+            "ui.invalidate",
+            {"scope": "home:user:7", "redis_event_id": 3},
+            "ui.invalidate",
+            "home:user:7",
+        ),
     ]
 
 
@@ -119,7 +133,9 @@ def test_invalidation_stream_replays_events_and_switches_to_pubsub(monkeypatch):
         await fake_pubsub.subscribe(cache_events._LIVE_CHANNEL)
         return fake_redis, fake_pubsub
 
-    monkeypatch.setattr(cache_events, "_open_live_invalidation_pubsub", _open_live_invalidation_pubsub)
+    monkeypatch.setattr(
+        cache_events, "_open_live_invalidation_pubsub", _open_live_invalidation_pubsub
+    )
     monkeypatch.setattr(
         cache_events,
         "get_invalidation_events_since",
@@ -149,10 +165,15 @@ def test_artist_invalidation_clears_listen_artist_page_cache(monkeypatch):
     deleted_prefixes: list[str] = []
     marked: list[tuple[str | None, str | None]] = []
 
-    monkeypatch.setattr("crate.db.cache_store.delete_cache_prefix", lambda prefix: deleted_prefixes.append(prefix))
+    monkeypatch.setattr(
+        "crate.db.cache_store.delete_cache_prefix",
+        lambda prefix: deleted_prefixes.append(prefix),
+    )
     monkeypatch.setattr(
         "crate.db.ui_snapshot_store.mark_ui_snapshots_stale",
-        lambda scope=None, subject_key=None, scope_prefix=None: marked.append((scope or scope_prefix, subject_key)),
+        lambda scope=None, subject_key=None, scope_prefix=None: marked.append(
+            (scope or scope_prefix, subject_key)
+        ),
     )
 
     cache_events._clear_backend_cache_for_scopes(["artist:52"])

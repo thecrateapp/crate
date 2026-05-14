@@ -38,7 +38,9 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
   return (
     <div className="bg-card border border-border rounded-md p-4 mb-3 hover:border-primary transition-colors">
       <div className="flex items-center gap-4 mb-3">
-        <div className={`text-2xl font-bold w-12 text-center flex-shrink-0 ${scoreColor}`}>
+        <div
+          className={`text-2xl font-bold w-12 text-center flex-shrink-0 ${scoreColor}`}
+        >
           {sc}
         </div>
         <div className="flex-1">
@@ -49,7 +51,12 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
             {match.country ? `\u00B7 ${match.country}` : ""}
           </div>
         </div>
-        <Button size="sm" variant="outline" className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white" onClick={onApply}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+          onClick={onApply}
+        >
           Apply
         </Button>
       </div>

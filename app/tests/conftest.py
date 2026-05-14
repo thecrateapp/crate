@@ -22,6 +22,7 @@ import pytest
 
 try:
     import psycopg2
+
     _HAS_PSYCOPG2 = True
 except ImportError:
     _HAS_PSYCOPG2 = False
@@ -39,9 +40,17 @@ except ImportError:
 
 # Mock other optional deps that may not be installed locally
 for mod_name in (
-    "musicbrainzngs", "mutagen", "watchdog", "thefuzz", "thefuzz.fuzz",
-    "rich", "beets", "librosa", "soundfile",
-    "jwt", "bcrypt",
+    "musicbrainzngs",
+    "mutagen",
+    "watchdog",
+    "thefuzz",
+    "thefuzz.fuzz",
+    "rich",
+    "beets",
+    "librosa",
+    "soundfile",
+    "jwt",
+    "bcrypt",
 ):
     if mod_name not in sys.modules:
         try:
@@ -54,7 +63,7 @@ for mod_name in (
 # ── PostgreSQL availability (cascading strategy) ───────────────────
 
 PG_AVAILABLE = False
-_test_dsn = None   # type: str | None
+_test_dsn = None  # type: str | None
 _tc_container = None  # Testcontainers instance, kept alive for session
 TEST_DB_NAME = "crate_test"
 
@@ -86,14 +95,20 @@ def _try_env_pg() -> bool:
             admin_conn = psycopg2.connect(admin_dsn)
             admin_conn.autocommit = True
             with admin_conn.cursor() as c:
-                c.execute("SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB_NAME,))
+                c.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB_NAME,)
+                )
                 if not c.fetchone():
                     # TEST_DB_NAME is a constant ("crate_test") — safe to
                     # interpolate as an identifier. DDL params can't use %s.
                     from psycopg2 import sql as _sql
-                    c.execute(_sql.SQL("CREATE DATABASE {} OWNER {}").format(
-                        _sql.Identifier(TEST_DB_NAME), _sql.Identifier(user),
-                    ))
+
+                    c.execute(
+                        _sql.SQL("CREATE DATABASE {} OWNER {}").format(
+                            _sql.Identifier(TEST_DB_NAME),
+                            _sql.Identifier(user),
+                        )
+                    )
             admin_conn.close()
         except Exception:
             pass
@@ -178,6 +193,7 @@ atexit.register(_shutdown_tc)
 
 # ── Fixtures ───────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def pg_db():
     """Provide a clean test database with all tables created.
@@ -209,29 +225,18 @@ def pg_db():
     conn.close()
 
     import crate.db as db_mod
-    import crate.db.core as db_core
 
-    # Reset BOTH connection pools so init_db() and transaction_scope()
-    # create fresh ones pointing at the test database (crate_test).
-    if db_core._pool is not None:
-        with suppress(Exception):
-            db_core._pool.closeall()
-        db_core._pool = None
-
-    # Also reset the SQLAlchemy engine — it caches the DSN from first
+    # Reset the SQLAlchemy engine — it caches the DSN from first
     # creation. Without this, transaction_scope() would still talk to
     # the main database even though env says crate_test.
     from crate.db.engine import reset_engine
+
     reset_engine()
 
     db_mod.init_db()
     try:
         yield db_mod
     finally:
-        if db_core._pool is not None:
-            with suppress(Exception):
-                db_core._pool.closeall()
-            db_core._pool = None
         reset_engine()
         if original_admin_password is None:
             os.environ.pop("DEFAULT_ADMIN_PASSWORD", None)
@@ -264,11 +269,14 @@ def test_app():
             "name": "Test Admin",
         }
 
-    with patch("crate.api._deps.load_config", return_value=mock_config), \
-         patch("crate.db.init_db"), \
-         patch("crate.api.cache_events.broadcast_invalidation"), \
-         patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user):
+    with (
+        patch("crate.api._deps.load_config", return_value=mock_config),
+        patch("crate.db.init_db"),
+        patch("crate.api.cache_events.broadcast_invalidation"),
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user),
+    ):
         from crate.api import create_app
+
         app = create_app()
         client = TestClient(app)
         yield client

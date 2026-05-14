@@ -8,6 +8,10 @@ from sqlalchemy import text
 from crate.db.tx import transaction_scope
 
 
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def create_music_path_record(
     *,
     user_id: int,
@@ -23,9 +27,10 @@ def create_music_path_record(
     tracks: list[dict],
 ) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO music_paths
                     (user_id, name, origin_type, origin_value, origin_label,
                      dest_type, dest_value, dest_label, waypoints, step_count, tracks)
@@ -34,21 +39,24 @@ def create_music_path_record(
                      :dest_type, :dest_value, :dest_label, CAST(:waypoints AS jsonb), :step_count, CAST(:tracks AS jsonb))
                 RETURNING id, created_at
                 """
-            ),
-            {
-                "user_id": user_id,
-                "name": name,
-                "origin_type": origin_type,
-                "origin_value": origin_value,
-                "origin_label": origin_label,
-                "dest_type": dest_type,
-                "dest_value": dest_value,
-                "dest_label": dest_label,
-                "waypoints": json.dumps(waypoints),
-                "step_count": step_count,
-                "tracks": json.dumps(tracks),
-            },
-        ).mappings().first()
+                ),
+                {
+                    "user_id": user_id,
+                    "name": name,
+                    "origin_type": origin_type,
+                    "origin_value": origin_value,
+                    "origin_label": origin_label,
+                    "dest_type": dest_type,
+                    "dest_value": dest_value,
+                    "dest_label": dest_label,
+                    "waypoints": json.dumps(waypoints),
+                    "step_count": step_count,
+                    "tracks": json.dumps(tracks),
+                },
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
@@ -58,7 +66,7 @@ def delete_music_path(path_id: int, user_id: int) -> bool:
             text("DELETE FROM music_paths WHERE id = :id AND user_id = :user_id"),
             {"id": path_id, "user_id": user_id},
         )
-        return result.rowcount > 0
+        return _rowcount(result) > 0
 
 
 def update_music_path_tracks(path_id: int, user_id: int, tracks: list[dict]) -> bool:
@@ -78,7 +86,7 @@ def update_music_path_tracks(path_id: int, user_id: int, tracks: list[dict]) -> 
                 "now": datetime.now(timezone.utc),
             },
         )
-        return result.rowcount > 0
+        return _rowcount(result) > 0
 
 
 __all__ = [

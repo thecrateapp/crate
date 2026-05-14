@@ -12,17 +12,27 @@ from crate.db.repositories.playlists_shared import emit_playlist_domain_event
 from crate.db.tx import optional_scope
 
 
-def duplicate_playlist(playlist_id: int, *, session: Session | None = None) -> dict | None:
+def duplicate_playlist(
+    playlist_id: int, *, session: Session | None = None
+) -> dict | None:
     def impl(s: Session) -> dict | None:
-        row = s.execute(text("SELECT * FROM playlists WHERE id = :playlist_id"), {"playlist_id": playlist_id}).mappings().first()
+        row = (
+            s.execute(
+                text("SELECT * FROM playlists WHERE id = :playlist_id"),
+                {"playlist_id": playlist_id},
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             return None
 
         original = dict(row)
         now = datetime.now(timezone.utc).isoformat()
-        duplicated = s.execute(
-            text(
-                """
+        duplicated = (
+            s.execute(
+                text(
+                    """
                 INSERT INTO playlists (
                     name, description, scope, user_id, managed_by_user_id,
                     is_smart, generation_mode, smart_rules_json, is_curated, is_active,
@@ -37,26 +47,29 @@ def duplicate_playlist(playlist_id: int, *, session: Session | None = None) -> d
                 )
                 RETURNING id
                 """
-            ),
-            {
-                "name": f"{original.get('name', 'Playlist')} (Copy)",
-                "description": original.get("description"),
-                "scope": original.get("scope", "system"),
-                "user_id": original.get("user_id"),
-                "managed_by_user_id": original.get("managed_by_user_id"),
-                "is_smart": original.get("is_smart", False),
-                "generation_mode": original.get("generation_mode", "static"),
-                "smart_rules_json": original.get("smart_rules_json"),
-                "is_curated": original.get("is_curated", False),
-                "is_active": False,
-                "category": original.get("category"),
-                "featured_rank": None,
-                "visibility": original.get("visibility", "public"),
-                "auto_refresh_enabled": original.get("auto_refresh_enabled", True),
-                "created_at": now,
-                "updated_at": now,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "name": f"{original.get('name', 'Playlist')} (Copy)",
+                    "description": original.get("description"),
+                    "scope": original.get("scope", "system"),
+                    "user_id": original.get("user_id"),
+                    "managed_by_user_id": original.get("managed_by_user_id"),
+                    "is_smart": original.get("is_smart", False),
+                    "generation_mode": original.get("generation_mode", "static"),
+                    "smart_rules_json": original.get("smart_rules_json"),
+                    "is_curated": original.get("is_curated", False),
+                    "is_active": False,
+                    "category": original.get("category"),
+                    "featured_rank": None,
+                    "visibility": original.get("visibility", "public"),
+                    "auto_refresh_enabled": original.get("auto_refresh_enabled", True),
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+            .mappings()
+            .first()
+        )
         if not duplicated:
             return None
 

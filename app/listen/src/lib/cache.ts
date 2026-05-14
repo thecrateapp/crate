@@ -1,4 +1,4 @@
-import { apiSseUrl } from "@/lib/api";
+import { AUTH_TOKEN_EVENT, apiSseUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor";
 import { recordAssetInvalidationScope } from "@/lib/library-routes";
 import {
@@ -38,7 +38,10 @@ function _cancelPendingStorageWrite(url: string): void {
   const handle = pendingStorageWrites.get(url);
   if (handle == null) return;
   pendingStorageWrites.delete(url);
-  if (typeof handle === "number" && typeof globalThis.cancelIdleCallback === "function") {
+  if (
+    typeof handle === "number" &&
+    typeof globalThis.cancelIdleCallback === "function"
+  ) {
     globalThis.cancelIdleCallback(handle);
     return;
   }
@@ -86,14 +89,17 @@ export function scopesForUrl(url: string): string[] {
   const scopes: string[] = [];
 
   // Home — per-section scopes
-  if (url === "/api/me/home/discovery") return ["home", "library", "follows", "history", "likes"];
+  if (url === "/api/me/home/discovery")
+    return ["home", "library", "follows", "history", "likes"];
   if (url === "/api/me/home/hero") return ["home", "library", "follows"];
   if (url === "/api/me/home/recently-played") return ["home", "history"];
   if (url === "/api/me/home/mixes") return ["home", "library"];
   if (url === "/api/me/home/suggested-albums") return ["home", "library"];
-  if (url === "/api/me/home/recommended-tracks") return ["home", "library", "history"];
+  if (url === "/api/me/home/recommended-tracks")
+    return ["home", "library", "history"];
   if (url === "/api/me/home/radio-stations") return ["home", "follows"];
-  if (url === "/api/me/home/favorite-artists") return ["home", "follows", "history"];
+  if (url === "/api/me/home/favorite-artists")
+    return ["home", "follows", "history"];
   if (url === "/api/me/home/essentials") return ["home", "follows"];
   // Home sections (compat / other home endpoints)
   if (url.startsWith("/api/me/home")) {
@@ -105,7 +111,8 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/me/albums")) scopes.push("saved_albums");
   else if (url.startsWith("/api/me/history")) scopes.push("history");
   else if (url.startsWith("/api/me/stats")) scopes.push("history");
-  else if (url.startsWith("/api/me/upcoming")) scopes.push("upcoming", "follows", "library");
+  else if (url.startsWith("/api/me/upcoming"))
+    scopes.push("upcoming", "follows", "library");
   else if (url.startsWith("/api/me/shows")) scopes.push("shows");
   // Playlists
   else if (url.startsWith("/api/playlists")) {
@@ -120,15 +127,15 @@ export function scopesForUrl(url: string): string[] {
     const m = url.match(/^\/api\/artists\/(\d+)/);
     if (m) scopes.push(`artist:${m[1]}`);
     scopes.push("library", "follows");
-  }
-  else if (url.startsWith("/api/artist-slugs/")) scopes.push("library", "follows");
+  } else if (url.startsWith("/api/artist-slugs/"))
+    scopes.push("library", "follows");
   // Album detail
   else if (url.match(/^\/api\/albums\/\d+/)) {
     const m = url.match(/^\/api\/albums\/(\d+)/);
     if (m) scopes.push(`album:${m[1]}`);
     scopes.push("library");
-  }
-  else if (url.match(/^\/api\/artist-slugs\/[^/]+\/albums\//)) scopes.push("library");
+  } else if (url.match(/^\/api\/artist-slugs\/[^/]+\/albums\//))
+    scopes.push("library");
   // Artist/album listings
   else if (url.startsWith("/api/artists")) scopes.push("library");
   else if (url.startsWith("/api/albums")) scopes.push("library");
@@ -165,7 +172,9 @@ export function cacheGet<T>(url: string): T | null {
       memoryCache.set(url, parsed);
       return parsed.data;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return null;
 }
@@ -191,7 +200,11 @@ export function cacheInvalidate(scope: string): void {
   for (const key of keysToRemove) {
     _cancelPendingStorageWrite(key);
     memoryCache.delete(key);
-    try { localStorage.removeItem(`${STORAGE_KEY}:${key}`); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(`${STORAGE_KEY}:${key}`);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -202,9 +215,13 @@ export function cacheClear(): void {
   }
   memoryCache.clear();
   try {
-    const keys = Object.keys(localStorage).filter((k) => k.startsWith(STORAGE_KEY));
+    const keys = Object.keys(localStorage).filter((k) =>
+      k.startsWith(STORAGE_KEY),
+    );
     for (const k of keys) localStorage.removeItem(k);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function _evictOldest(count: number): void {
@@ -214,13 +231,18 @@ function _evictOldest(count: number): void {
   for (const [key] of entries) {
     _cancelPendingStorageWrite(key);
     memoryCache.delete(key);
-    try { localStorage.removeItem(`${STORAGE_KEY}:${key}`); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(`${STORAGE_KEY}:${key}`);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
 // ── SSE Listener ───────────────────────────────────────────────
 
 let eventSource: EventSource | null = null;
+let authTokenListener: (() => void) | null = null;
 const invalidationListeners = new Set<(scope: string) => void>();
 const CACHE_EVENTS_CHANNEL = "cache-invalidations";
 const CACHE_EVENTS_DEGRADE_AFTER_MS = 75_000;
@@ -231,11 +253,15 @@ export function onCacheInvalidation(fn: (scope: string) => void): () => void {
   return () => invalidationListeners.delete(fn);
 }
 
-export function onCacheReconnect(fn: (state: SseChannelState) => void): () => void {
+export function onCacheReconnect(
+  fn: (state: SseChannelState) => void,
+): () => void {
   return onSseReconnect(CACHE_EVENTS_CHANNEL, fn);
 }
 
-export function onCacheEventsHealthChange(fn: (state: SseChannelState) => void): () => void {
+export function onCacheEventsHealthChange(
+  fn: (state: SseChannelState) => void,
+): () => void {
   return onSseChannelState(CACHE_EVENTS_CHANNEL, fn);
 }
 
@@ -248,51 +274,71 @@ export function onCacheEventsHealthChange(fn: (state: SseChannelState) => void):
 export function connectCacheEvents(): () => void {
   if (eventSource) return () => {};
 
-  const url = apiSseUrl("/api/cache/events");
+  function open() {
+    const url = apiSseUrl("/api/cache/events");
 
-  try {
-    eventSource = new EventSource(url, { withCredentials: !isNative });
+    try {
+      eventSource = new EventSource(url, { withCredentials: !isNative });
 
-    eventSource.onopen = () => {
-      markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+      eventSource.onopen = () => {
+        markSseChannelOpen(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+      };
+
+      eventSource.onmessage = (event) => {
+        const scope = event.data?.trim();
+        if (!scope) return;
+        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+        recordAssetInvalidationScope(scope);
+        cacheInvalidate(scope);
+        for (const fn of invalidationListeners) {
+          try {
+            fn(scope);
+          } catch {
+            /* ignore listener errors */
+          }
+        }
+      };
+
+      eventSource.addEventListener("heartbeat", () => {
+        markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
       });
-    };
 
-    eventSource.onmessage = (event) => {
-      const scope = event.data?.trim();
-      if (!scope) return;
-      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-      });
-      recordAssetInvalidationScope(scope);
-      cacheInvalidate(scope);
-      for (const fn of invalidationListeners) {
-        try { fn(scope); } catch { /* ignore listener errors */ }
-      }
-    };
-
-    eventSource.addEventListener("heartbeat", () => {
-      markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-      });
-    });
-
-    eventSource.onerror = () => {
-      markSseChannelError(CACHE_EVENTS_CHANNEL, {
-        degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
-      });
-      // EventSource auto-reconnects with Last-Event-ID. Just log.
-      console.debug("[cache] SSE connection lost, reconnecting...");
-    };
-  } catch {
-    // EventSource not supported or blocked
+      eventSource.onerror = () => {
+        markSseChannelError(CACHE_EVENTS_CHANNEL, {
+          degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
+        });
+        // EventSource auto-reconnects with Last-Event-ID. Just log.
+        console.debug("[cache] SSE connection lost, reconnecting...");
+      };
+    } catch {
+      // EventSource not supported or blocked
+    }
   }
+
+  open();
+
+  authTokenListener = () => {
+    if (!isNative) return;
+    eventSource?.close();
+    eventSource = null;
+    open();
+  };
+  window.addEventListener(AUTH_TOKEN_EVENT, authTokenListener);
 
   return () => {
     markSseChannelClosed(CACHE_EVENTS_CHANNEL, {
       degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
     });
+    if (authTokenListener) {
+      window.removeEventListener(AUTH_TOKEN_EVENT, authTokenListener);
+      authTokenListener = null;
+    }
     eventSource?.close();
     eventSource = null;
   };

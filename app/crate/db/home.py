@@ -55,7 +55,9 @@ def _get_cached_home_context(
     top_album_limit: int = 12,
     top_genre_limit: int = 8,
 ) -> dict:
-    cache_key = f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+    cache_key = (
+        f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+    )
     return _get_or_compute_home_cache(
         cache_key,
         max_age_seconds=600,

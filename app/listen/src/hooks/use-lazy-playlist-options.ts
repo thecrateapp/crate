@@ -16,7 +16,11 @@ export function useLazyPlaylistOptions(initiallyEnabled = false) {
   }, []);
 
   const playlistOptions = useMemo(
-    () => (data ?? []).map((playlist) => ({ id: playlist.id, name: playlist.name })),
+    () =>
+      (data ?? []).map((playlist) => ({
+        id: playlist.id,
+        name: playlist.name,
+      })),
     [data],
   );
 

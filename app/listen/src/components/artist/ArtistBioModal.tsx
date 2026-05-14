@@ -1,17 +1,43 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { artistGenreSlug, type ArtistData, type ArtistInfo } from "@/components/artist/artist-model";
-import { AppModal, ModalBody, ModalCloseButton, ModalHeader } from "@crate/ui/primitives/AppModal";
+import {
+  artistGenreSlug,
+  type ArtistData,
+  type ArtistInfo,
+} from "@/components/artist/artist-model";
+import {
+  AppModal,
+  ModalBody,
+  ModalCloseButton,
+  ModalHeader,
+} from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 import { formatCompact } from "@/lib/utils";
 import { Globe, ChevronDown, ChevronUp } from "lucide-react";
 
-interface MBMember { name: string; attributes?: string[]; begin?: string; end?: string }
+interface MBMember {
+  name: string;
+  attributes?: string[];
+  begin?: string;
+  end?: string;
+}
 interface EnrichmentData {
-  lastfm?: { bio?: string; tags?: string[]; similar?: { name: string; match: number }[]; listeners?: number };
+  lastfm?: {
+    bio?: string;
+    tags?: string[];
+    similar?: { name: string; match: number }[];
+    listeners?: number;
+  };
   spotify?: { followers?: number; popularity?: number };
-  musicbrainz?: { country?: string; area?: string; begin_date?: string; type?: string; members?: MBMember[]; urls?: Record<string, string> };
+  musicbrainz?: {
+    country?: string;
+    area?: string;
+    begin_date?: string;
+    type?: string;
+    members?: MBMember[];
+    urls?: Record<string, string>;
+  };
 }
 
 interface ArtistBioModalProps {
@@ -25,10 +51,10 @@ interface ArtistBioModalProps {
 
 const LINK_LABELS: Record<string, string> = {
   "official homepage": "Website",
-  "discogs": "Discogs",
-  "wikidata": "Wikidata",
-  "bandcamp": "Bandcamp",
-  "youtube": "YouTube",
+  discogs: "Discogs",
+  wikidata: "Wikidata",
+  bandcamp: "Bandcamp",
+  youtube: "YouTube",
   "social network": "Social",
   "streaming music": "Streaming",
 };
@@ -61,12 +87,16 @@ export function ArtistBioModal({
 
   useEffect(() => {
     if (!open || !artist.id || enrichment) return;
-    api<EnrichmentData>(`/api/artists/${artist.id}/enrichment`).then(setEnrichment).catch(() => {});
+    api<EnrichmentData>(`/api/artists/${artist.id}/enrichment`)
+      .then(setEnrichment)
+      .catch(() => {});
   }, [open, artist.id, enrichment]);
 
   const mb = enrichment?.musicbrainz;
   const members = mb?.members?.filter((m) => m.name) ?? [];
-  const urls = mb?.urls ? Object.entries(mb.urls).map(([type, url]) => ({ type, url })) : [];
+  const urls = mb?.urls
+    ? Object.entries(mb.urls).map(([type, url]) => ({ type, url }))
+    : [];
   const listeners = artistInfo?.listeners ?? enrichment?.lastfm?.listeners ?? 0;
   const playcount = artistInfo?.playcount ?? 0;
   const spotifyFollowers = enrichment?.spotify?.followers ?? 0;
@@ -89,10 +119,16 @@ export function ArtistBioModal({
               />
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-foreground sm:text-2xl">{artist.name}</h2>
+              <h2 className="truncate text-xl font-bold text-foreground sm:text-2xl">
+                {artist.name}
+              </h2>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 {mb?.begin_date && <span>Since {mb.begin_date}</span>}
-                {mb?.country && <span>{mb.area ? `${mb.area}, ${mb.country}` : mb.country}</span>}
+                {mb?.country && (
+                  <span>
+                    {mb.area ? `${mb.area}, ${mb.country}` : mb.country}
+                  </span>
+                )}
               </div>
               {tags.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -101,7 +137,11 @@ export function ArtistBioModal({
                       key={tag}
                       className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-white/12 hover:text-white"
                       onClick={() => {
-                        navigate(`/explore?genre=${encodeURIComponent(artistGenreSlug(tag))}`);
+                        navigate(
+                          `/explore?genre=${encodeURIComponent(
+                            artistGenreSlug(tag),
+                          )}`,
+                        );
                         onClose();
                       }}
                     >
@@ -125,25 +165,33 @@ export function ArtistBioModal({
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {listeners > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">{formatCompact(listeners)}</div>
+                <div className="text-xl font-bold text-white/90">
+                  {formatCompact(listeners)}
+                </div>
                 <div className="text-[11px] text-white/40">listeners</div>
               </div>
             )}
             {playcount > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">{formatCompact(playcount)}</div>
+                <div className="text-xl font-bold text-white/90">
+                  {formatCompact(playcount)}
+                </div>
                 <div className="text-[11px] text-white/40">scrobbles</div>
               </div>
             )}
             {spotifyFollowers > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">{formatCompact(spotifyFollowers)}</div>
+                <div className="text-xl font-bold text-white/90">
+                  {formatCompact(spotifyFollowers)}
+                </div>
                 <div className="text-[11px] text-white/40">followers</div>
               </div>
             )}
             {spotifyPopularity > 0 && (
               <div>
-                <div className="text-xl font-bold text-white/90">{spotifyPopularity}%</div>
+                <div className="text-xl font-bold text-white/90">
+                  {spotifyPopularity}%
+                </div>
                 <div className="text-[11px] text-white/40">popularity</div>
               </div>
             )}
@@ -162,7 +210,15 @@ export function ArtistBioModal({
                 onClick={() => setBioExpanded(!bioExpanded)}
                 className="mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80"
               >
-                {bioExpanded ? <><ChevronUp size={12} /> Less</> : <><ChevronDown size={12} /> More</>}
+                {bioExpanded ? (
+                  <>
+                    <ChevronUp size={12} /> Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={12} /> More
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -171,17 +227,26 @@ export function ArtistBioModal({
         {/* Members */}
         {members.length > 0 && (
           <div>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">Members</h3>
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+              Members
+            </h3>
             <div className="space-y-1">
               {members.map((m, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+                <div
+                  key={i}
+                  className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0"
+                >
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-white/80">{m.name}</span>
                     {m.attributes && m.attributes.length > 0 && (
-                      <span className="text-[11px] text-white/30">{m.attributes.join(", ")}</span>
+                      <span className="text-[11px] text-white/30">
+                        {m.attributes.join(", ")}
+                      </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-white/25">{m.begin ?? "?"} - {m.end ?? "present"}</span>
+                  <span className="text-[11px] text-white/25">
+                    {m.begin ?? "?"} - {m.end ?? "present"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -190,9 +255,21 @@ export function ArtistBioModal({
 
         {/* Library stats */}
         <div className="flex gap-6 text-[11px] text-white/35">
-          <span><strong className="text-white/60">{artist.albums.length}</strong> albums</span>
-          <span><strong className="text-white/60">{artist.total_tracks}</strong> tracks</span>
-          <span><strong className="text-white/60">{artist.total_size_mb > 1024 ? `${(artist.total_size_mb / 1024).toFixed(1)} GB` : `${artist.total_size_mb} MB`}</strong></span>
+          <span>
+            <strong className="text-white/60">{artist.albums.length}</strong>{" "}
+            albums
+          </span>
+          <span>
+            <strong className="text-white/60">{artist.total_tracks}</strong>{" "}
+            tracks
+          </span>
+          <span>
+            <strong className="text-white/60">
+              {artist.total_size_mb > 1024
+                ? `${(artist.total_size_mb / 1024).toFixed(1)} GB`
+                : `${artist.total_size_mb} MB`}
+            </strong>
+          </span>
         </div>
 
         {/* External links */}

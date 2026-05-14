@@ -1,3 +1,5 @@
+//! Audio signal analysis: BPM, key/scale, loudness, energy, dynamic range, and spectral centroid.
+
 use rayon::prelude::*;
 use realfft::RealFftPlanner;
 use serde::Serialize;

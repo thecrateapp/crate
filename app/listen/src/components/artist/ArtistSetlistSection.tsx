@@ -65,8 +65,12 @@ export function ArtistSetlistModal({
           <div className="flex items-center gap-3">
             <ListMusic size={18} className="text-primary" />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Probable Setlist</h3>
-              <p className="text-[11px] text-muted-foreground">{artistName} · {setlist.length} songs</p>
+              <h3 className="text-sm font-semibold text-foreground">
+                Probable Setlist
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                {artistName} · {setlist.length} songs
+              </p>
             </div>
           </div>
           <button
@@ -88,7 +92,9 @@ export function ArtistSetlistModal({
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
-                <span className="block truncate text-sm text-foreground">{track.title}</span>
+                <span className="block truncate text-sm text-foreground">
+                  {track.title}
+                </span>
                 <div className="mt-1 flex items-center gap-2">
                   <div className="relative h-1 w-16 rounded-full bg-primary/15">
                     <div

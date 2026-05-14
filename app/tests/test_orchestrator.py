@@ -1,15 +1,12 @@
 """Tests for the process-based worker orchestrator."""
 
-from unittest.mock import patch, MagicMock, PropertyMock
-import multiprocessing
-import time
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 class TestWorkerProcess:
     def test_tracks_uptime(self):
         from crate.orchestrator import WorkerProcess
+
         mock_proc = MagicMock()
         mock_proc.pid = 12345
         mock_proc.is_alive.return_value = True
@@ -24,6 +21,7 @@ class TestWorkerProcess:
 class TestOrchestratorInit:
     def test_initial_state(self):
         from crate.orchestrator import Orchestrator
+
         config = {"library_path": "/tmp/fake"}
         orch = Orchestrator(config)
 
@@ -46,21 +44,30 @@ class TestCleanupOrphanedTasks:
         ]
 
         # _cleanup_orphaned_tasks uses module-level imports from crate.orchestrator.
-        with patch("crate.orchestrator.list_tasks", return_value=orphaned_tasks), \
-             patch("crate.orchestrator.update_task") as mock_update:
+        with (
+            patch("crate.orchestrator.list_tasks", return_value=orphaned_tasks),
+            patch("crate.orchestrator.update_task") as mock_update,
+        ):
             orch._cleanup_orphaned_tasks()
 
         assert mock_update.call_count == 2
-        mock_update.assert_any_call("abc123", status="failed", error="Orphaned: orchestrator restarted")
-        mock_update.assert_any_call("def456", status="failed", error="Orphaned: orchestrator restarted")
+        mock_update.assert_any_call(
+            "abc123", status="failed", error="Orphaned: orchestrator restarted"
+        )
+        mock_update.assert_any_call(
+            "def456", status="failed", error="Orphaned: orchestrator restarted"
+        )
 
     def test_handles_empty_orphaned_list(self):
         from crate.orchestrator import Orchestrator
+
         config = {"library_path": "/tmp/fake"}
         orch = Orchestrator(config)
 
-        with patch("crate.orchestrator.list_tasks", return_value=[]), \
-             patch("crate.orchestrator.update_task") as mock_update:
+        with (
+            patch("crate.orchestrator.list_tasks", return_value=[]),
+            patch("crate.orchestrator.update_task") as mock_update,
+        ):
             orch._cleanup_orphaned_tasks()
 
         mock_update.assert_not_called()
@@ -68,6 +75,7 @@ class TestCleanupOrphanedTasks:
     def test_handles_db_error_gracefully(self):
         """If DB is down, cleanup should not crash the orchestrator."""
         from crate.orchestrator import Orchestrator
+
         config = {"library_path": "/tmp/fake"}
         orch = Orchestrator(config)
 
@@ -103,8 +111,10 @@ class TestHealthCheck:
             orch.workers.append(new_wp)
             return new_wp
 
-        with patch.object(orch, "_get_min_workers", return_value=2), \
-             patch.object(orch, "_spawn_worker", side_effect=fake_spawn) as mock_spawn:
+        with (
+            patch.object(orch, "_get_min_workers", return_value=2),
+            patch.object(orch, "_spawn_worker", side_effect=fake_spawn) as mock_spawn,
+        ):
             orch._health_check()
 
         # Dead worker should be removed, new one spawned to meet min_workers
@@ -130,10 +140,12 @@ class TestAutoscale:
         pending = [{"id": f"t{i}"} for i in range(5)]
         running = [{"id": "r1"}]
 
-        with patch.object(orch, "_get_min_workers", return_value=2), \
-             patch.object(orch, "_get_max_workers", return_value=5), \
-             patch("crate.orchestrator.list_tasks", side_effect=[pending, running]), \
-             patch.object(orch, "_spawn_worker") as mock_spawn:
+        with (
+            patch.object(orch, "_get_min_workers", return_value=2),
+            patch.object(orch, "_get_max_workers", return_value=5),
+            patch("crate.orchestrator.list_tasks", side_effect=[pending, running]),
+            patch.object(orch, "_spawn_worker") as mock_spawn,
+        ):
             orch._autoscale()
 
         # Should spawn 1 additional worker
@@ -153,10 +165,12 @@ class TestAutoscale:
 
         pending = [{"id": f"t{i}"} for i in range(10)]
 
-        with patch.object(orch, "_get_min_workers", return_value=2), \
-             patch.object(orch, "_get_max_workers", return_value=3), \
-             patch("crate.orchestrator.list_tasks", side_effect=[pending, []]), \
-             patch.object(orch, "_spawn_worker") as mock_spawn:
+        with (
+            patch.object(orch, "_get_min_workers", return_value=2),
+            patch.object(orch, "_get_max_workers", return_value=3),
+            patch("crate.orchestrator.list_tasks", side_effect=[pending, []]),
+            patch.object(orch, "_spawn_worker") as mock_spawn,
+        ):
             orch._autoscale()
 
         mock_spawn.assert_not_called()
@@ -176,8 +190,10 @@ class TestGetStatus:
         wp.pid = 999
         orch.workers = [wp]
 
-        with patch.object(orch, "_get_min_workers", return_value=2), \
-             patch.object(orch, "_get_max_workers", return_value=5):
+        with (
+            patch.object(orch, "_get_min_workers", return_value=2),
+            patch.object(orch, "_get_max_workers", return_value=5),
+        ):
             status = orch.get_status()
 
         assert status["total_workers"] == 1

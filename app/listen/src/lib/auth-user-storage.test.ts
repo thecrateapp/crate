@@ -56,6 +56,10 @@ describe("auth user storage", () => {
 
     expect(storage.getStoredAuthUserId()).toBe("11");
     expect(localStorage.getItem("listen-auth-user-id")).toBeNull();
-    expect(localStorage.getItem("listen-auth-user-id:https%3A%2F%2Fapi-two.example.test")).toBe("11");
+    expect(
+      localStorage.getItem(
+        "listen-auth-user-id:https%3A%2F%2Fapi-two.example.test",
+      ),
+    ).toBe("11");
   });
 });

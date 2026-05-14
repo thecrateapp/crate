@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +65,9 @@ export function UpcomingShowCard({
   }, [expanded, measure]);
 
   const cardHeight = expanded
-    ? (measuredHeight > 0 ? measuredHeight : "auto")
+    ? measuredHeight > 0
+      ? measuredHeight
+      : "auto"
     : COLLAPSED_HEIGHT;
 
   return (

@@ -43,9 +43,15 @@ def upgrade() -> None:
         ON track_lyrics(provider, artist_key, title_key)
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_track ON track_lyrics(track_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_entity ON track_lyrics(track_entity_uid)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_updated ON track_lyrics(updated_at DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_track ON track_lyrics(track_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_entity ON track_lyrics(track_entity_uid)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_updated ON track_lyrics(updated_at DESC)"
+    )
 
 
 def downgrade() -> None:

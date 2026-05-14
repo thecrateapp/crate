@@ -8,8 +8,17 @@ from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_admin
-from crate.api._deps import album_names_from_entity_uid, album_names_from_id, artist_name_from_entity_uid, artist_name_from_id
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api._deps import (
+    album_names_from_entity_uid,
+    album_names_from_id,
+    artist_name_from_entity_uid,
+    artist_name_from_id,
+)
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.management import (
@@ -46,9 +55,19 @@ from crate.db.admin_health_surface import (
 )
 from crate.db.audit import get_audit_log
 from crate.db.cache_store import get_cache, set_cache
-from crate.db.health import dismiss_issue, get_artist_issues, get_issue_counts, get_open_issues, resolve_issue, resolve_issues_by_type
+from crate.db.health import (
+    dismiss_issue,
+    get_artist_issues,
+    get_open_issues,
+    resolve_issue,
+    resolve_issues_by_type,
+)
 from crate.db.ops_snapshot import get_cached_ops_snapshot
-from crate.db.queries.management import get_last_analyzed_track, get_last_bliss_track, get_storage_v2_status
+from crate.db.queries.management import (
+    get_last_analyzed_track,
+    get_last_bliss_track,
+    get_storage_v2_status,
+)
 from crate.db.repositories.library import get_library_artist
 from crate.db.repositories.tasks import create_task
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK, repair_catalog_payload
@@ -105,7 +124,11 @@ def _augment_artist_layout_issues(issues: list[dict], artist_name: str) -> list[
             continue
         normalized.append(issue)
 
-    if artist_fix_issue is None and existing_artist_fix_issue_id is not None and fix_preview.get("status") == "already_canonical":
+    if (
+        artist_fix_issue is None
+        and existing_artist_fix_issue_id is not None
+        and fix_preview.get("status") == "already_canonical"
+    ):
         resolve_issue(existing_artist_fix_issue_id)
         publish_health_surface_signal()
 
@@ -115,6 +138,7 @@ def _augment_artist_layout_issues(issues: list[dict], artist_name: str) -> list[
         normalized.append(artist_fix_issue)
 
     return normalized
+
 
 router = APIRouter(prefix="/api/manage", tags=["management"])
 admin_router = APIRouter(prefix="/api/admin", tags=["management"])
@@ -126,20 +150,26 @@ _MANAGEMENT_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
     {
         404: error_response("The requested management resource could not be found."),
-        409: error_response("The repair plan is stale or needs explicit confirmation before execution."),
+        409: error_response(
+            "The repair plan is stale or needs explicit confirmation before execution."
+        ),
         422: error_response("The request payload failed validation."),
     },
 )
 
 
-async def _health_stream(*, check_type: str | None = None, limit: int = 500) -> AsyncIterator[str]:
+async def _health_stream(
+    *, check_type: str | None = None, limit: int = 500
+) -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_health_surface(check_type=check_type, limit=limit))}\n\n"
     pubsub = None
     try:
         pubsub = await open_pubsub(HEALTH_SURFACE_STREAM_CHANNEL)
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(get_cached_health_surface(check_type=check_type, limit=limit))}\n\n"
                 heartbeat_counter = 0
@@ -163,7 +193,9 @@ async def _health_stream(*, check_type: str | None = None, limit: int = 500) -> 
     responses=AUTH_ERROR_RESPONSES,
     summary="Get the canonical admin health snapshot",
 )
-def api_admin_health_snapshot(request: Request, check_type: str = "", fresh: bool = False, limit: int = 500):
+def api_admin_health_snapshot(
+    request: Request, check_type: str = "", fresh: bool = False, limit: int = 500
+):
     _require_admin(request)
     normalized = check_type or None
     return get_cached_health_surface(check_type=normalized, limit=limit, fresh=fresh)
@@ -174,7 +206,9 @@ def api_admin_health_snapshot(request: Request, check_type: str = "", fresh: boo
     responses=AUTH_ERROR_RESPONSES,
     summary="Stream admin health snapshot updates",
 )
-async def api_admin_health_stream(request: Request, check_type: str = "", limit: int = 500):
+async def api_admin_health_stream(
+    request: Request, check_type: str = "", limit: int = 500
+):
     _require_admin(request)
     normalized = check_type or None
     safe_limit = min(max(limit, 1), 1000)
@@ -186,6 +220,7 @@ async def api_admin_health_stream(request: Request, check_type: str = "", limit:
 
 
 # ── Health Check & Repair ────────────────────────────────────────
+
 
 @router.post(
     "/health-check",
@@ -220,7 +255,11 @@ def get_health_report(request: Request):
     """Get persisted health issues from DB (survives restarts)."""
     _require_admin(request)
     snapshot = get_cached_health_surface()
-    return {"issues": snapshot.get("issues", []), "summary": snapshot.get("counts", {}), "total": snapshot.get("total", 0)}
+    return {
+        "issues": snapshot.get("issues", []),
+        "summary": snapshot.get("counts", {}),
+        "total": snapshot.get("total", 0),
+    }
 
 
 @router.get(
@@ -274,8 +313,11 @@ def api_dismiss_issue(request: Request, issue_id: int):
 )
 def run_repair(request: Request, body: RepairRequest):
     _require_admin(request)
-    task_id = create_task("repair", {"dry_run": body.dry_run, "auto_only": body.auto_only})
+    task_id = create_task(
+        "repair", {"dry_run": body.dry_run, "auto_only": body.auto_only}
+    )
     return {"task_id": task_id}
+
 
 @router.post(
     "/repair-issues",
@@ -288,7 +330,10 @@ def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     _require_admin(request)
     preview = _build_repair_preview(body.issues, auto_only=False)
     if body.plan_version and preview.get("plan_version") != body.plan_version:
-        raise HTTPException(status_code=409, detail="Repair plan is stale; refresh the preview and try again")
+        raise HTTPException(
+            status_code=409,
+            detail="Repair plan is stale; refresh the preview and try again",
+        )
     preview_items = preview.get("items") or []
     preview_plan_item_ids = {
         str(item.get("plan_item_id"))
@@ -300,21 +345,34 @@ def repair_specific_issues(request: Request, body: RepairIssuesRequest):
         for plan_item_id in body.plan_item_ids
         if str(plan_item_id).strip()
     }
-    if requested_plan_item_ids and not requested_plan_item_ids.issubset(preview_plan_item_ids):
-        raise HTTPException(status_code=409, detail="Repair selection no longer matches the current plan")
-    risky_items = [
-        item for item in preview_items
-        if item.get("requires_confirmation")
-    ]
+    if requested_plan_item_ids and not requested_plan_item_ids.issubset(
+        preview_plan_item_ids
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Repair selection no longer matches the current plan",
+        )
+    risky_items = [item for item in preview_items if item.get("requires_confirmation")]
     if risky_items and not body.confirm_risky:
-        raise HTTPException(status_code=409, detail="Repair execution requires explicit confirmation for risky fixes")
-    if len(preview_items) > 1 and any(item.get("supports_batch") is False for item in preview_items):
-        raise HTTPException(status_code=409, detail="This repair selection includes fixes that must be run one by one")
-    task_id = create_task("repair", {
-        "dry_run": body.dry_run,
-        "auto_only": False,
-        "issues": body.issues,
-    })
+        raise HTTPException(
+            status_code=409,
+            detail="Repair execution requires explicit confirmation for risky fixes",
+        )
+    if len(preview_items) > 1 and any(
+        item.get("supports_batch") is False for item in preview_items
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This repair selection includes fixes that must be run one by one",
+        )
+    task_id = create_task(
+        "repair",
+        {
+            "dry_run": body.dry_run,
+            "auto_only": False,
+            "issues": body.issues,
+        },
+    )
     return {"task_id": task_id}
 
 
@@ -354,25 +412,54 @@ def api_fix_type(request: Request, check_type: str):
     _require_admin(request)
     catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
     if catalog_entry is None:
-        return {"task_id": None, "fixable": 0, "allowed": False, "reason": "unknown_check_type"}
+        return {
+            "task_id": None,
+            "fixable": 0,
+            "allowed": False,
+            "reason": "unknown_check_type",
+        }
     if not catalog_entry.auto_fixable:
-        return {"task_id": None, "fixable": 0, "allowed": False, "reason": "not_auto_fixable"}
+        return {
+            "task_id": None,
+            "fixable": 0,
+            "allowed": False,
+            "reason": "not_auto_fixable",
+        }
     if not catalog_entry.supports_global_scope:
-        return {"task_id": None, "fixable": 0, "allowed": False, "reason": "global_scope_not_supported"}
+        return {
+            "task_id": None,
+            "fixable": 0,
+            "allowed": False,
+            "reason": "global_scope_not_supported",
+        }
     issues = get_open_issues(check_type=check_type)
     fixable = [i for i in issues if i.get("auto_fixable")]
     if not fixable:
-        return {"task_id": None, "fixable": 0, "allowed": True, "reason": "no_fixable_issues"}
-    task_id = create_task("repair", {
-        "dry_run": False,
-        "auto_only": False,
-        "issues": fixable,
-    })
+        return {
+            "task_id": None,
+            "fixable": 0,
+            "allowed": True,
+            "reason": "no_fixable_issues",
+        }
+    task_id = create_task(
+        "repair",
+        {
+            "dry_run": False,
+            "auto_only": False,
+            "issues": fixable,
+        },
+    )
     publish_health_surface_signal()
-    return {"task_id": task_id, "fixable": len(fixable), "allowed": True, "reason": None}
+    return {
+        "task_id": task_id,
+        "fixable": len(fixable),
+        "allowed": True,
+        "reason": None,
+    }
 
 
 # ── Per-Artist Health ────────────────────────────────────────────
+
 
 def get_artist_health_issues(request: Request, name: str):
     """Get open health issues for a specific artist."""
@@ -388,7 +475,9 @@ def repair_artist(request: Request, name: str):
     fixable = [i for i in issues if i.get("auto_fixable")]
     if not fixable:
         return {"task_id": None, "count": 0}
-    task_id = create_task("repair", {"dry_run": False, "auto_only": False, "issues": fixable})
+    task_id = create_task(
+        "repair", {"dry_run": False, "auto_only": False, "issues": fixable}
+    )
     return {"task_id": task_id, "count": len(fixable)}
 
 
@@ -499,6 +588,7 @@ def fix_artist_by_entity_uid(request: Request, artist_entity_uid: str):
 
 # ── Artist Management ────────────────────────────────────────────
 
+
 def delete_artist(request: Request, name: str, body: DeleteRequest):
     _require_admin(request)
     if body.mode not in ("db_only", "full"):
@@ -526,7 +616,9 @@ def delete_artist_by_id(request: Request, artist_id: int, body: DeleteRequest):
     responses=_MANAGEMENT_RESPONSES,
     summary="Queue deletion of an artist by entity UID",
 )
-def delete_artist_by_entity_uid(request: Request, artist_entity_uid: str, body: DeleteRequest):
+def delete_artist_by_entity_uid(
+    request: Request, artist_entity_uid: str, body: DeleteRequest
+):
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
@@ -569,7 +661,9 @@ def move_artist(request: Request, name: str, body: MoveRequest):
     _require_admin(request)
     if not body.new_name.strip():
         raise HTTPException(status_code=422, detail="new_name cannot be empty")
-    task_id = create_task("move_artist", {"name": name, "new_name": body.new_name.strip()})
+    task_id = create_task(
+        "move_artist", {"name": name, "new_name": body.new_name.strip()}
+    )
     return {"task_id": task_id}
 
 
@@ -592,7 +686,9 @@ def move_artist_by_id(request: Request, artist_id: int, body: MoveRequest):
     responses=_MANAGEMENT_RESPONSES,
     summary="Queue a move/rename for an artist by entity UID",
 )
-def move_artist_by_entity_uid(request: Request, artist_entity_uid: str, body: MoveRequest):
+def move_artist_by_entity_uid(
+    request: Request, artist_entity_uid: str, body: MoveRequest
+):
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
@@ -601,11 +697,14 @@ def move_artist_by_entity_uid(request: Request, artist_entity_uid: str, body: Mo
 
 # ── Album Management ────────────────────────────────────────────
 
+
 def delete_album(request: Request, artist: str, album: str, body: DeleteRequest):
     _require_admin(request)
     if body.mode not in ("db_only", "full"):
         raise HTTPException(status_code=422, detail="mode must be 'db_only' or 'full'")
-    task_id = create_task("delete_album", {"artist": artist, "album": album, "mode": body.mode})
+    task_id = create_task(
+        "delete_album", {"artist": artist, "album": album, "mode": body.mode}
+    )
     return {"task_id": task_id}
 
 
@@ -629,7 +728,9 @@ def delete_album_by_id(request: Request, album_id: int, body: DeleteRequest):
     responses=_MANAGEMENT_RESPONSES,
     summary="Queue deletion of an album by entity UID",
 )
-def delete_album_by_entity_uid(request: Request, album_entity_uid: str, body: DeleteRequest):
+def delete_album_by_entity_uid(
+    request: Request, album_entity_uid: str, body: DeleteRequest
+):
     album_names = album_names_from_entity_uid(album_entity_uid)
     if not album_names:
         raise HTTPException(status_code=404, detail="Album not found")
@@ -638,6 +739,7 @@ def delete_album_by_entity_uid(request: Request, album_entity_uid: str, body: De
 
 
 # ── Library Management ───────────────────────────────────────────
+
 
 @router.post(
     "/wipe",
@@ -717,6 +819,7 @@ def export_rich_metadata(request: Request, body: RichMetadataExportRequest):
 
 # ── Audio Analysis (background daemons) ─────────────────────────
 
+
 @router.get(
     "/analysis-status",
     response_model=AnalysisStatusResponse,
@@ -737,7 +840,11 @@ def analysis_status(request: Request):
     from crate.analysis_daemon import get_analysis_status
 
     status = get_analysis_status()
-    payload = {**status, "last_analyzed": get_last_analyzed_track(), "last_bliss": get_last_bliss_track()}
+    payload = {
+        **status,
+        "last_analyzed": get_last_analyzed_track(),
+        "last_bliss": get_last_bliss_track(),
+    }
     set_cache(_ANALYSIS_STATUS_CACHE_KEY, payload, ttl=_ANALYSIS_STATUS_TTL)
     return payload
 
@@ -821,6 +928,7 @@ def reanalyze_album_by_entity_uid(request: Request, album_entity_uid: str):
 
 # ── Bliss (song similarity) ──────────────────────────────────────
 
+
 @router.post(
     "/compute-bliss",
     response_model=TaskEnqueueResponse,
@@ -836,6 +944,7 @@ def compute_bliss(request: Request):
 
 # ── Popularity ───────────────────────────────────────────────────
 
+
 @router.post(
     "/compute-popularity",
     response_model=TaskEnqueueResponse,
@@ -849,6 +958,7 @@ def compute_popularity(request: Request):
 
 
 # ── MBID Enrichment ──────────────────────────────────────────────
+
 
 @router.post(
     "/enrich-mbids",
@@ -870,19 +980,23 @@ def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
 
 # ── Audit Log ────────────────────────────────────────────────────
 
+
 @router.get(
     "/audit-log",
     response_model=AuditLogResponse,
     responses=AUTH_ERROR_RESPONSES,
     summary="Read the audit log",
 )
-def read_audit_log(request: Request, limit: int = 100, offset: int = 0, action: str | None = None):
+def read_audit_log(
+    request: Request, limit: int = 100, offset: int = 0, action: str | None = None
+):
     _require_admin(request)
     entries, total = get_audit_log(limit=limit, offset=offset, action=action)
     return {"entries": entries, "total": total, "limit": limit, "offset": offset}
 
 
 # ── Storage Migration ───────────────────────────────────────────
+
 
 @router.post(
     "/migrate-storage-v2",

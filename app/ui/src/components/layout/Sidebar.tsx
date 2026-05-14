@@ -53,7 +53,12 @@ const navItems = [
   { to: "/browse", icon: Library, label: "Browse" },
   { to: "/discover", icon: Compass, label: "Discovery" },
   { section: "Tools" },
-  { to: "/health", icon: HeartPulse, label: "Library Health", badgeKey: "issue_count" as const },
+  {
+    to: "/health",
+    icon: HeartPulse,
+    label: "Library Health",
+    badgeKey: "issue_count" as const,
+  },
   { section: "Music" },
   { to: "/upcoming", icon: Calendar, label: "Upcoming" },
   { to: "/new-releases", icon: Sparkles, label: "New Releases" },
@@ -66,7 +71,13 @@ const navItems = [
   { section: "System" },
   { to: "/system", icon: Activity, label: "System Health", adminOnly: true },
   { to: "/analysis", icon: AudioWaveform, label: "Analysis", adminOnly: true },
-  { to: "/tasks", icon: ListTodo, label: "Tasks", badgeKey: "running_tasks" as const, adminOnly: true },
+  {
+    to: "/tasks",
+    icon: ListTodo,
+    label: "Tasks",
+    badgeKey: "running_tasks" as const,
+    adminOnly: true,
+  },
   { to: "/logs", icon: ScrollText, label: "Logs", adminOnly: true },
   { to: "/stack", icon: Server, label: "Stack", adminOnly: true },
   { to: "/users", icon: Users, label: "Users", adminOnly: true },
@@ -76,7 +87,9 @@ const navItems = [
 function emitSidebarExpanded(expanded: boolean) {
   try {
     localStorage.setItem(SIDEBAR_KEY, String(expanded));
-    window.dispatchEvent(new CustomEvent(SIDEBAR_EVENT, { detail: { expanded } }));
+    window.dispatchEvent(
+      new CustomEvent(SIDEBAR_EVENT, { detail: { expanded } }),
+    );
   } catch {
     // ignore persistence failures
   }
@@ -116,11 +129,20 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       )}
     >
       <div className="border-b border-white/6">
-        <div className={cn("flex h-16 items-center", expanded ? "gap-3 px-4" : "justify-center")}>
+        <div
+          className={cn(
+            "flex h-16 items-center",
+            expanded ? "gap-3 px-4" : "justify-center",
+          )}
+        >
           {expanded ? (
             <>
               <Link to="/" className="flex items-center gap-3 min-w-0">
-                <img src="/assets/logo.svg" alt="Crate" className="h-8 w-8 shrink-0" />
+                <img
+                  src="/assets/logo.svg"
+                  alt="Crate"
+                  className="h-8 w-8 shrink-0"
+                />
                 <div className="min-w-0 leading-tight">
                   <div className="text-sm font-bold text-white">Crate</div>
                   <div className="text-[11px] text-white/35">Admin console</div>
@@ -159,7 +181,10 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 {item.section}
               </div>
             ) : (
-              <div key={`${item.section}-${index}`} className="mx-4 my-3 border-t border-white/5" />
+              <div
+                key={`${item.section}-${index}`}
+                className="mx-4 my-3 border-t border-white/5"
+              />
             );
           }
 
@@ -168,10 +193,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           }
 
           const Icon = item.icon;
-          const badgeValue = "badgeKey" in item && item.badgeKey ? stats[item.badgeKey] : undefined;
+          const badgeValue =
+            "badgeKey" in item && item.badgeKey
+              ? stats[item.badgeKey]
+              : undefined;
 
           return (
-            <div key={item.to} className={cn("relative", expanded ? "px-3" : "px-2")}>
+            <div
+              key={item.to}
+              className={cn("relative", expanded ? "px-3" : "px-2")}
+            >
               <NavLink
                 to={item.to}
                 end={item.to === "/"}
@@ -180,15 +211,24 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 className={({ isActive }) =>
                   cn(
                     "group flex items-center gap-3 rounded-md transition-colors",
-                    expanded ? "px-3 py-2.5" : "mx-auto h-11 w-11 justify-center",
+                    expanded
+                      ? "px-3 py-2.5"
+                      : "mx-auto h-11 w-11 justify-center",
                     navClass(isActive),
                   )
                 }
               >
                 <Icon size={18} className="shrink-0" />
-                {expanded ? <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{item.label}</span> : null}
+                {expanded ? (
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                    {item.label}
+                  </span>
+                ) : null}
                 {expanded && badgeValue != null && badgeValue > 0 ? (
-                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                  <Badge
+                    variant="secondary"
+                    className="px-1.5 py-0 text-[10px]"
+                  >
                     {badgeValue}
                   </Badge>
                 ) : null}
@@ -208,18 +248,31 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <div className="mt-auto border-t border-white/6 p-3">
           {expanded ? (
             <div className="flex items-center gap-3 rounded-md border border-white/8 bg-white/[0.03] px-3 py-3">
-              <Link to={profileHref} className="flex min-w-0 flex-1 items-center gap-3" onClick={onNavigate}>
+              <Link
+                to={profileHref}
+                className="flex min-w-0 flex-1 items-center gap-3"
+                onClick={onNavigate}
+              >
                 {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-10 w-10 rounded-md object-cover" />
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    className="h-10 w-10 rounded-md object-cover"
+                  />
                 ) : (
                   <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/60">
                     <User size={16} />
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-white">{user.name}</div>
+                  <div className="truncate text-sm font-medium text-white">
+                    {user.name}
+                  </div>
                   <div className="mt-1">
-                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                    <Badge
+                      variant="secondary"
+                      className="px-1.5 py-0 text-[10px]"
+                    >
                       {user.role}
                     </Badge>
                   </div>
@@ -242,7 +295,11 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/70"
               >
                 {user.avatar ? (
-                  <img src={user.avatar} alt="" className="h-11 w-11 rounded-md object-cover" />
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    className="h-11 w-11 rounded-md object-cover"
+                  />
                 ) : (
                   <User size={16} />
                 )}

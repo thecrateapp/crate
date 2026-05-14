@@ -40,19 +40,23 @@ async function loadTrackInfo(url: string): Promise<TrackInfo> {
   const existing = inflightTrackInfo.get(url);
   if (existing) return existing;
 
-  const request = api<TrackInfo>(url).then((info) => {
-    trackInfoCache.set(url, { info, timestamp: Date.now() });
-    return info;
-  }).finally(() => {
-    inflightTrackInfo.delete(url);
-  });
+  const request = api<TrackInfo>(url)
+    .then((info) => {
+      trackInfoCache.set(url, { info, timestamp: Date.now() });
+      return info;
+    })
+    .finally(() => {
+      inflightTrackInfo.delete(url);
+    });
 
   inflightTrackInfo.set(url, request);
   return request;
 }
 
 export function useTrackInfo(
-  track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path"> | undefined,
+  track:
+    | Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">
+    | undefined,
   options: UseTrackInfoOptions = {},
 ): UseTrackInfoState {
   const { enabled = true } = options;
@@ -61,8 +65,12 @@ export function useTrackInfo(
     [enabled, track?.id, track?.entityUid, track?.libraryTrackId, track?.path],
   );
 
-  const [info, setInfo] = useState<TrackInfo | null>(() => (url ? getCachedTrackInfo(url) : null));
-  const [loading, setLoading] = useState(() => Boolean(url && !getCachedTrackInfo(url)));
+  const [info, setInfo] = useState<TrackInfo | null>(() =>
+    url ? getCachedTrackInfo(url) : null,
+  );
+  const [loading, setLoading] = useState(() =>
+    Boolean(url && !getCachedTrackInfo(url)),
+  );
 
   useEffect(() => {
     if (!enabled || !url) {

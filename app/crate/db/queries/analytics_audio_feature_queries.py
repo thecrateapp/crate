@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_insights_feature_coverage() -> list[dict]:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total,
                     SUM(CASE WHEN bpm IS NOT NULL THEN 1 ELSE 0 END) AS bpm,
@@ -22,8 +23,11 @@ def get_insights_feature_coverage() -> list[dict]:
                     SUM(CASE WHEN bliss_vector IS NOT NULL THEN 1 ELSE 0 END) AS bliss
                 FROM library_tracks
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     total = int((row or {}).get("total") or 0)
     features = [
@@ -36,14 +40,18 @@ def get_insights_feature_coverage() -> list[dict]:
         ("Mood", int((row or {}).get("mood") or 0)),
         ("Bliss", int((row or {}).get("bliss") or 0)),
     ]
-    return [{"feature": feature, "value": value, "total": total} for feature, value in features]
+    return [
+        {"feature": feature, "value": value, "total": total}
+        for feature, value in features
+    ]
 
 
 def get_insights_mood_distribution() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     expanded.mood,
                     ROUND(SUM(expanded.score)::numeric, 1) AS score
@@ -73,8 +81,11 @@ def get_insights_mood_distribution() -> list[dict]:
                 ORDER BY SUM(expanded.score) DESC, expanded.mood ASC
                 LIMIT 12
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
     return [
         {"mood": str(row.get("mood") or ""), "score": float(row.get("score") or 0.0)}

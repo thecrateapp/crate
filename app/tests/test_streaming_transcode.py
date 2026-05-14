@@ -20,8 +20,14 @@ def test_transcode_variant_specifies_mp4_muxer_for_tmp_output(monkeypatch, tmp_p
     failures: list[str] = []
 
     monkeypatch.setattr(transcode, "get_variant_by_cache_key", lambda cache_key: row)
-    monkeypatch.setattr(transcode, "resolve_data_file", lambda relative_path: output_path)
-    monkeypatch.setattr(transcode, "mark_variant_failed", lambda cache_key, error: failures.append(error))
+    monkeypatch.setattr(
+        transcode, "resolve_data_file", lambda relative_path: output_path
+    )
+    monkeypatch.setattr(
+        transcode,
+        "mark_variant_failed",
+        lambda cache_key, error: failures.append(error),
+    )
     monkeypatch.setattr(
         transcode,
         "mark_variant_ready",

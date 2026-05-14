@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from crate.api.auth import _require_admin
 from crate.api._deps import get_config
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.operations import (
     FixIssuesResponse,
     FixRequest,
@@ -126,7 +130,9 @@ def fix_issues(request: Request, body: FixRequest | None = None):
 
     latest = get_latest_scan()
     if not latest or not latest["issues"]:
-        return JSONResponse({"error": "No issues to fix. Run a scan first."}, status_code=400)
+        return JSONResponse(
+            {"error": "No issues to fix. Run a scan first."}, status_code=400
+        )
 
     config = get_config()
     threshold = config.get("confidence_threshold", 90)

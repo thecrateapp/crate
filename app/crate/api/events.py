@@ -31,7 +31,7 @@ _EVENT_SSE_RESPONSES = merge_responses(
                 "text/event-stream": {
                     "schema": {
                         "type": "string",
-                        "example": "data: {\"tasks\": []}\n\n",
+                        "example": 'data: {"tasks": []}\n\n',
                     }
                 }
             },
@@ -52,7 +52,9 @@ def _get_status_snapshot() -> dict:
     return {
         "tasks": [
             {
-                "id": t["id"], "type": t["type"], "status": t.get("status", "running"),
+                "id": t["id"],
+                "type": t["type"],
+                "status": t.get("status", "running"),
                 "label": t.get("label", ""),
                 "progress": t.get("progress") or {},
             }
@@ -111,8 +113,10 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
         events = get_task_events(task_id, after_id=0, limit=50)
         for event in events:
             payload = {
-                "id": event["id"], "type": event["event_type"],
-                "data": event["data"], "timestamp": event["created_at"],
+                "id": event["id"],
+                "type": event["event_type"],
+                "data": event["data"],
+                "timestamp": event["created_at"],
             }
             yield f"event: {event['event_type']}\ndata: {json_dumps(payload)}\n\n"
             last_event_id = event["id"]
@@ -148,8 +152,10 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
             events = get_task_events(task_id, after_id=last_event_id)
             for event in events:
                 payload = {
-                    "id": event["id"], "type": event["event_type"],
-                    "data": event["data"], "timestamp": event["created_at"],
+                    "id": event["id"],
+                    "type": event["event_type"],
+                    "data": event["data"],
+                    "timestamp": event["created_at"],
                 }
                 yield f"event: {event['event_type']}\ndata: {json_dumps(payload)}\n\n"
                 last_event_id = event["id"]
@@ -162,6 +168,7 @@ async def _task_stream_pubsub(task_id: str) -> AsyncIterator[str]:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────
+
 
 @router.get(
     "/api/events",

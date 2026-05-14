@@ -4,7 +4,10 @@ from sqlalchemy import text
 
 
 def recompute_user_daily_listening(session, user_id: int):
-    session.execute(text("DELETE FROM user_daily_listening WHERE user_id = :user_id"), {"user_id": user_id})
+    session.execute(
+        text("DELETE FROM user_daily_listening WHERE user_id = :user_id"),
+        {"user_id": user_id},
+    )
     session.execute(
         text(
             """

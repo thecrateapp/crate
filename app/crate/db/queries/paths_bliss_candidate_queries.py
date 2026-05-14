@@ -33,9 +33,10 @@ def find_anchor_track_row(
 
     with read_scope() as session:
         if endpoint_type == "track":
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
@@ -58,9 +59,12 @@ def find_anchor_track_row(
                       END
                     LIMIT 1
                     """
-                ),
-                {"track_ref": endpoint_value},
-            ).mappings().first()
+                    ),
+                    {"track_ref": endpoint_value},
+                )
+                .mappings()
+                .first()
+            )
             return _normalize_track_row(row)
 
         if endpoint_type == "artist":
@@ -93,9 +97,10 @@ def find_anchor_track_row(
         else:
             scope_clause = ""
 
-        row = session.execute(
-            text(
-                f"""
+        row = (
+            session.execute(
+                text(
+                    f"""
                 SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
                        t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
@@ -113,15 +118,19 @@ def find_anchor_track_row(
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
                 LIMIT 1
                 """
-            ),
-            params,
-        ).mappings().first()
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
 
         if not row:
             fallback_distance = array_distance_sql("t.bliss_vector")
-            row = session.execute(
-                text(
-                    f"""
+            row = (
+                session.execute(
+                    text(
+                        f"""
                     SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
@@ -139,9 +148,12 @@ def find_anchor_track_row(
                     ORDER BY {fallback_distance}
                     LIMIT 1
                     """
-                ),
-                params,
-            ).mappings().first()
+                    ),
+                    params,
+                )
+                .mappings()
+                .first()
+            )
 
     return _normalize_track_row(row)
 
@@ -162,9 +174,10 @@ def find_candidate_rows(
         params["exclude"] = list(exclude_ids)
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT t.id, t.entity_uid, t.title, a.artist,
                        a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
@@ -181,15 +194,19 @@ def find_candidate_rows(
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
                 LIMIT {int(limit)}
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
         if not rows:
             fallback_distance = array_distance_sql("t.bliss_vector")
-            rows = session.execute(
-                text(
-                    f"""
+            rows = (
+                session.execute(
+                    text(
+                        f"""
                     SELECT t.id, t.entity_uid, t.title, a.artist,
                            a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
@@ -206,11 +223,18 @@ def find_candidate_rows(
                     ORDER BY {fallback_distance}
                     LIMIT {int(limit)}
                     """
-                ),
-                params,
-            ).mappings().all()
+                    ),
+                    params,
+                )
+                .mappings()
+                .all()
+            )
 
-    return [_normalize_track_row(row) for row in rows]
+    return [
+        normalized
+        for row in rows
+        if (normalized := _normalize_track_row(row)) is not None
+    ]
 
 
 __all__ = [

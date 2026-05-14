@@ -11,7 +11,12 @@ export interface SleepTimerState {
   mode: SleepTimerMode | null;
 }
 
-export type SleepTimerMode = "15min" | "30min" | "45min" | "1hr" | "end_of_track";
+export type SleepTimerMode =
+  | "15min"
+  | "30min"
+  | "45min"
+  | "1hr"
+  | "end_of_track";
 
 const DURATIONS: Record<Exclude<SleepTimerMode, "end_of_track">, number> = {
   "15min": 15 * 60,
@@ -20,7 +25,11 @@ const DURATIONS: Record<Exclude<SleepTimerMode, "end_of_track">, number> = {
   "1hr": 60 * 60,
 };
 
-let _state: SleepTimerState = { active: false, remainingSeconds: 0, mode: null };
+let _state: SleepTimerState = {
+  active: false,
+  remainingSeconds: 0,
+  mode: null,
+};
 let _interval: ReturnType<typeof setInterval> | null = null;
 let _pauseFn: (() => void) | null = null;
 const _listeners = new Set<Listener>();
@@ -32,7 +41,9 @@ function _notify() {
 export function subscribeSleepTimer(fn: Listener): () => void {
   _listeners.add(fn);
   fn({ ..._state });
-  return () => { _listeners.delete(fn); };
+  return () => {
+    _listeners.delete(fn);
+  };
 }
 
 export function getSleepTimerState(): SleepTimerState {
@@ -64,7 +75,10 @@ export function startSleepTimer(mode: SleepTimerMode, pauseFn: () => void) {
 }
 
 export function cancelSleepTimer() {
-  if (_interval) { clearInterval(_interval); _interval = null; }
+  if (_interval) {
+    clearInterval(_interval);
+    _interval = null;
+  }
   _state = { active: false, remainingSeconds: 0, mode: null };
   _pauseFn = null;
   _notify();

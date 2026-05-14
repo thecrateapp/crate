@@ -110,14 +110,16 @@ def get_top_tracks(spotify_id: str, market: str = "ES") -> list[dict] | None:
 
     tracks = []
     for t in data.get("tracks", []):
-        tracks.append({
-            "name": t["name"],
-            "album": t.get("album", {}).get("name", ""),
-            "duration_ms": t.get("duration_ms", 0),
-            "popularity": t.get("popularity", 0),
-            "preview_url": t.get("preview_url"),
-            "id": t["id"],
-        })
+        tracks.append(
+            {
+                "name": t["name"],
+                "album": t.get("album", {}).get("name", ""),
+                "duration_ms": t.get("duration_ms", 0),
+                "popularity": t.get("popularity", 0),
+                "preview_url": t.get("preview_url"),
+                "id": t["id"],
+            }
+        )
 
     set_cache(cache_key, {"tracks": tracks})
     return tracks
@@ -135,13 +137,15 @@ def get_related_artists(spotify_id: str) -> list[dict] | None:
 
     artists = []
     for a in data.get("artists", []):
-        artists.append({
-            "name": a["name"],
-            "id": a["id"],
-            "images": a.get("images", []),
-            "genres": a.get("genres", []),
-            "popularity": a.get("popularity", 0),
-        })
+        artists.append(
+            {
+                "name": a["name"],
+                "id": a["id"],
+                "images": a.get("images", []),
+                "genres": a.get("genres", []),
+                "popularity": a.get("popularity", 0),
+            }
+        )
 
     set_cache(cache_key, {"artists": artists})
     return artists

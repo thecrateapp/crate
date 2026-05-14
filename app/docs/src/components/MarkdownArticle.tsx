@@ -23,7 +23,11 @@ export function MarkdownArticle({ markdown }: { markdown: string }) {
             return <h3 id={headingId(text)}>{children}</h3>;
           },
           a: ({ href, children }) => (
-            <a href={href} target={href?.startsWith("http") ? "_blank" : undefined} rel="noreferrer">
+            <a
+              href={href}
+              target={href?.startsWith("http") ? "_blank" : undefined}
+              rel="noreferrer"
+            >
               {children}
             </a>
           ),

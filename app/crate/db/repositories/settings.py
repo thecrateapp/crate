@@ -14,21 +14,26 @@ For backward compatibility, each function also works standalone
 callers one by one without a big bang.
 """
 
-from typing import Optional
-
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.tx import transaction_scope
 
 
-def get_setting(key: str, default: str | None = None, *, session: Session | None = None) -> str | None:
+def get_setting(
+    key: str, default: str | None = None, *, session: Session | None = None
+) -> str | None:
     """Read a setting value by key. Returns ``default`` if not found."""
+
     def _impl(s: Session) -> str | None:
-        row = s.execute(
-            text("SELECT value FROM settings WHERE key = :key"),
-            {"key": key},
-        ).mappings().first()
+        row = (
+            s.execute(
+                text("SELECT value FROM settings WHERE key = :key"),
+                {"key": key},
+            )
+            .mappings()
+            .first()
+        )
         return row["value"] if row else default
 
     if session is not None:
@@ -39,6 +44,7 @@ def get_setting(key: str, default: str | None = None, *, session: Session | None
 
 def set_setting(key: str, value: str | None, *, session: Session | None = None) -> None:
     """Upsert a setting. Passing ``value=None`` stores NULL."""
+
     def _impl(s: Session) -> None:
         s.execute(
             text(
@@ -57,6 +63,7 @@ def set_setting(key: str, value: str | None, *, session: Session | None = None) 
 
 def get_all_settings(*, session: Session | None = None) -> dict[str, str | None]:
     """Return all settings as a {key: value} dict."""
+
     def _impl(s: Session) -> dict[str, str | None]:
         rows = s.execute(text("SELECT key, value FROM settings")).mappings().all()
         return {row["key"]: row["value"] for row in rows}

@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 
-import { ItemActionMenu, ItemActionMenuButton, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
@@ -13,8 +17,14 @@ interface PlayerTrackMenuProps {
   className?: string;
 }
 
-export function PlayerTrackMenu({ currentTrack, className }: PlayerTrackMenuProps) {
-  const menuTrack = useMemo(() => trackToMenuData(currentTrack), [currentTrack]);
+export function PlayerTrackMenu({
+  currentTrack,
+  className,
+}: PlayerTrackMenuProps) {
+  const menuTrack = useMemo(
+    () => trackToMenuData(currentTrack),
+    [currentTrack],
+  );
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: currentTrack.albumCover,

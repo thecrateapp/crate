@@ -8,7 +8,6 @@ import hashlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
 
 import requests
 
@@ -19,6 +18,7 @@ LISTENBRAINZ_API_URL = "https://api.listenbrainz.org/1/submit-listens"
 
 
 # ── Last.fm ─────────────────────────────────────────────────────
+
 
 def lastfm_scrobble(
     *,
@@ -60,7 +60,9 @@ def lastfm_scrobble(
                 return True
             log.warning("Last.fm scrobble rejected: %s", data)
         else:
-            log.warning("Last.fm scrobble failed (%d): %s", resp.status_code, resp.text[:200])
+            log.warning(
+                "Last.fm scrobble failed (%d): %s", resp.status_code, resp.text[:200]
+            )
     except Exception:
         log.warning("Last.fm scrobble error", exc_info=True)
     return False
@@ -123,6 +125,7 @@ def lastfm_get_session(api_key: str, api_secret: str, auth_token: str) -> str | 
 
 # ── ListenBrainz ────────────────────────────────────────────────
 
+
 def listenbrainz_scrobble(
     *,
     token: str,
@@ -138,14 +141,16 @@ def listenbrainz_scrobble(
     ts = timestamp or int(time.time())
     payload = {
         "listen_type": "single",
-        "payload": [{
-            "listened_at": ts,
-            "track_metadata": {
-                "artist_name": artist,
-                "track_name": track,
-                **({"release_name": album} if album else {}),
-            },
-        }],
+        "payload": [
+            {
+                "listened_at": ts,
+                "track_metadata": {
+                    "artist_name": artist,
+                    "track_name": track,
+                    **({"release_name": album} if album else {}),
+                },
+            }
+        ],
     }
 
     try:
@@ -158,7 +163,9 @@ def listenbrainz_scrobble(
         if resp.status_code == 200:
             log.debug("ListenBrainz scrobble OK: %s - %s", artist, track)
             return True
-        log.warning("ListenBrainz scrobble failed (%d): %s", resp.status_code, resp.text[:200])
+        log.warning(
+            "ListenBrainz scrobble failed (%d): %s", resp.status_code, resp.text[:200]
+        )
     except Exception:
         log.warning("ListenBrainz scrobble error", exc_info=True)
     return False
@@ -177,13 +184,15 @@ def listenbrainz_now_playing(
 
     payload = {
         "listen_type": "playing_now",
-        "payload": [{
-            "track_metadata": {
-                "artist_name": artist,
-                "track_name": track,
-                **({"release_name": album} if album else {}),
-            },
-        }],
+        "payload": [
+            {
+                "track_metadata": {
+                    "artist_name": artist,
+                    "track_name": track,
+                    **({"release_name": album} if album else {}),
+                },
+            }
+        ],
     }
 
     try:
@@ -199,6 +208,7 @@ def listenbrainz_now_playing(
 
 
 # ── Dispatcher ──────────────────────────────────────────────────
+
 
 def scrobble_play_event(
     user_id: int,
@@ -222,7 +232,11 @@ def scrobble_play_event(
                 try:
                     metadata = json.loads(raw_meta)
                 except (json.JSONDecodeError, ValueError):
-                    log.warning("Corrupted metadata_json for user %s provider %s", user_id, provider)
+                    log.warning(
+                        "Corrupted metadata_json for user %s provider %s",
+                        user_id,
+                        provider,
+                    )
                     continue
             else:
                 metadata = raw_meta or {}

@@ -1,9 +1,9 @@
 """Tests for content hash change detection (_compute_dir_hash)."""
 
+import os
 import tempfile
+import time
 from pathlib import Path
-
-import pytest
 
 
 class TestComputeDirHash:
@@ -12,11 +12,13 @@ class TestComputeDirHash:
     def _compute(self, directory: Path) -> str:
         """Call compute_dir_hash forcing Python fallback (no Rust CLI in test)."""
         from unittest.mock import patch, MagicMock
+
         # Make crate_cli.is_available return False so Python fallback is used
         mock_cli = MagicMock()
         mock_cli.is_available.return_value = False
         with patch.dict("sys.modules", {"crate.crate_cli": mock_cli}):
             from crate.content import compute_dir_hash
+
             return compute_dir_hash(directory)
 
     def test_hash_deterministic(self):
@@ -85,7 +87,6 @@ class TestComputeDirHash:
     def test_hash_not_affected_by_mtime(self):
         """Hash uses filename + size, not mtime, so touching a file shouldn't change it."""
         with tempfile.TemporaryDirectory() as d:
-            import os, time
             f = Path(d) / "track.flac"
             f.write_bytes(b"\x00" * 100)
             h1 = self._compute(Path(d))
@@ -115,8 +116,13 @@ class TestShouldProcessArtist:
             artist_dir.mkdir()
             (artist_dir / "track.flac").write_bytes(b"\x00")
 
-            with patch("crate.content._get_library_artist", return_value={"folder_name": "NewBand", "content_hash": None}), \
-                 patch("crate.content.resolve_artist_dir", return_value=artist_dir):
+            with (
+                patch(
+                    "crate.content._get_library_artist",
+                    return_value={"folder_name": "NewBand", "content_hash": None},
+                ),
+                patch("crate.content.resolve_artist_dir", return_value=artist_dir),
+            ):
                 assert should_process_artist("NewBand", library_path=lib) is True
 
     def test_returns_false_when_hash_matches(self):
@@ -135,8 +141,16 @@ class TestShouldProcessArtist:
             with patch.dict("sys.modules", {"crate.crate_cli": mock_cli}):
                 current_hash = compute_dir_hash(artist_dir)
 
-            with patch("crate.content._get_library_artist", return_value={"folder_name": "SameBand", "content_hash": current_hash}), \
-                 patch("crate.content.resolve_artist_dir", return_value=artist_dir):
+            with (
+                patch(
+                    "crate.content._get_library_artist",
+                    return_value={
+                        "folder_name": "SameBand",
+                        "content_hash": current_hash,
+                    },
+                ),
+                patch("crate.content.resolve_artist_dir", return_value=artist_dir),
+            ):
                 assert should_process_artist("SameBand", library_path=lib) is False
 
     def test_returns_true_when_hash_differs(self):
@@ -149,8 +163,16 @@ class TestShouldProcessArtist:
             artist_dir.mkdir()
             (artist_dir / "track.flac").write_bytes(b"\x00" * 100)
 
-            with patch("crate.content._get_library_artist", return_value={"folder_name": "ChangedBand", "content_hash": "stale_old_hash"}), \
-                 patch("crate.content.resolve_artist_dir", return_value=artist_dir):
+            with (
+                patch(
+                    "crate.content._get_library_artist",
+                    return_value={
+                        "folder_name": "ChangedBand",
+                        "content_hash": "stale_old_hash",
+                    },
+                ),
+                patch("crate.content.resolve_artist_dir", return_value=artist_dir),
+            ):
                 assert should_process_artist("ChangedBand", library_path=lib) is True
 
     def test_returns_false_when_dir_missing(self):
@@ -159,8 +181,13 @@ class TestShouldProcessArtist:
         from crate.content import should_process_artist
 
         with tempfile.TemporaryDirectory() as lib:
-            with patch("crate.content._get_library_artist", return_value={"folder_name": "GhostBand", "content_hash": "x"}), \
-                 patch("crate.content.resolve_artist_dir", return_value=None):
+            with (
+                patch(
+                    "crate.content._get_library_artist",
+                    return_value={"folder_name": "GhostBand", "content_hash": "x"},
+                ),
+                patch("crate.content.resolve_artist_dir", return_value=None),
+            ):
                 assert should_process_artist("GhostBand", library_path=lib) is False
 
 
@@ -168,7 +195,10 @@ class TestQueueProcessNewContent:
     def test_force_and_non_force_share_same_artist_dedup_key(self, pg_db, monkeypatch):
         from crate.content import queue_process_new_content_if_needed
 
-        monkeypatch.setattr("crate.content.should_process_artist", lambda artist_name, library_path=None: True)
+        monkeypatch.setattr(
+            "crate.content.should_process_artist",
+            lambda artist_name, library_path=None: True,
+        )
 
         first = queue_process_new_content_if_needed("Terror", force=False)
         second = queue_process_new_content_if_needed("Terror", force=True)
@@ -183,7 +213,10 @@ class TestQueueProcessNewContent:
     def test_dedup_key_normalizes_case_and_whitespace(self, pg_db, monkeypatch):
         from crate.content import queue_process_new_content_if_needed
 
-        monkeypatch.setattr("crate.content.should_process_artist", lambda artist_name, library_path=None: True)
+        monkeypatch.setattr(
+            "crate.content.should_process_artist",
+            lambda artist_name, library_path=None: True,
+        )
 
         first = queue_process_new_content_if_needed(" Terror ")
         second = queue_process_new_content_if_needed("terror", force=True)
@@ -194,10 +227,15 @@ class TestQueueProcessNewContent:
         assert third is None
         assert len(pg_db.list_tasks(task_type="process_new_content")) == 1
 
-    def test_skip_if_unchanged_still_short_circuits_before_queueing(self, pg_db, monkeypatch):
+    def test_skip_if_unchanged_still_short_circuits_before_queueing(
+        self, pg_db, monkeypatch
+    ):
         from crate.content import queue_process_new_content_if_needed
 
-        monkeypatch.setattr("crate.content.should_process_artist", lambda artist_name, library_path=None: False)
+        monkeypatch.setattr(
+            "crate.content.should_process_artist",
+            lambda artist_name, library_path=None: False,
+        )
 
         created = queue_process_new_content_if_needed("Terror", force=False)
 

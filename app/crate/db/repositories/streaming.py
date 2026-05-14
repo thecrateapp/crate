@@ -6,23 +6,27 @@ from pathlib import Path
 from sqlalchemy import text
 
 from crate.config import load_config
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 
 
 def get_track_delivery_row_by_id(track_id: int) -> dict | None:
-    with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id, entity_uid, path, title, artist, album, format, bitrate,
                        sample_rate, bit_depth, duration, size
                 FROM library_tracks
                 WHERE id = :track_id
                 LIMIT 1
                 """
-            ),
-            {"track_id": track_id},
-        ).mappings().first()
+                ),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
@@ -31,19 +35,23 @@ def get_track_delivery_row_by_entity_uid(entity_uid: str) -> dict | None:
         normalized = str(uuid.UUID(str(entity_uid)))
     except Exception:
         return None
-    with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id, entity_uid, path, title, artist, album, format, bitrate,
                        sample_rate, bit_depth, duration, size
                 FROM library_tracks
                 WHERE entity_uid = CAST(:entity_uid AS uuid)
                 LIMIT 1
                 """
-            ),
-            {"entity_uid": normalized},
-        ).mappings().first()
+                ),
+                {"entity_uid": normalized},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
@@ -51,10 +59,11 @@ def get_track_delivery_row_by_path(filepath: str) -> dict | None:
     candidates = _track_path_candidates(filepath)
     if not candidates:
         return None
-    with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id, entity_uid, path, title, artist, album, format, bitrate,
                        sample_rate, bit_depth, duration, size
                 FROM library_tracks
@@ -62,9 +71,12 @@ def get_track_delivery_row_by_path(filepath: str) -> dict | None:
                 ORDER BY CASE WHEN path = :preferred_path THEN 0 ELSE 1 END
                 LIMIT 1
                 """
-            ),
-            {"paths": candidates, "preferred_path": filepath},
-        ).mappings().first()
+                ),
+                {"paths": candidates, "preferred_path": filepath},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
@@ -86,7 +98,7 @@ def _track_path_candidates(filepath: str) -> list[str]:
         library_root = "/music"
 
     if cleaned.startswith("/music/") and library_root != "/music":
-        add(str(Path(library_root) / cleaned[len("/music/"):]))
+        add(str(Path(library_root) / cleaned[len("/music/") :]))
     elif not cleaned.startswith("/"):
         add(str(Path(library_root) / cleaned.lstrip("/")))
 
@@ -94,28 +106,39 @@ def _track_path_candidates(filepath: str) -> list[str]:
 
 
 def get_variant_by_cache_key(cache_key: str) -> dict | None:
-    with transaction_scope() as session:
-        row = session.execute(
-            text("SELECT * FROM stream_variants WHERE cache_key = :cache_key LIMIT 1"),
-            {"cache_key": cache_key},
-        ).mappings().first()
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    "SELECT * FROM stream_variants WHERE cache_key = :cache_key LIMIT 1"
+                ),
+                {"cache_key": cache_key},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
 def get_variant_by_id(variant_id: str) -> dict | None:
-    with transaction_scope() as session:
-        row = session.execute(
-            text("SELECT * FROM stream_variants WHERE id = :variant_id LIMIT 1"),
-            {"variant_id": variant_id},
-        ).mappings().first()
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text("SELECT * FROM stream_variants WHERE id = :variant_id LIMIT 1"),
+                {"variant_id": variant_id},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 
 def ensure_variant_record(payload: dict) -> dict:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO stream_variants (
                     id, cache_key, track_id, track_entity_uid, source_path,
                     source_mtime_ns, source_size, source_format, source_bitrate,
@@ -179,9 +202,12 @@ def ensure_variant_record(payload: dict) -> dict:
                     END
                 RETURNING *
                 """
-            ),
-            payload,
-        ).mappings().one()
+                ),
+                payload,
+            )
+            .mappings()
+            .one()
+        )
         return dict(row)
 
 
@@ -216,11 +242,14 @@ def mark_variant_running(cache_key: str, task_id: str | None) -> None:
         )
 
 
-def mark_variant_ready(cache_key: str, relative_path: str, byte_count: int) -> dict | None:
+def mark_variant_ready(
+    cache_key: str, relative_path: str, byte_count: int
+) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 UPDATE stream_variants
                 SET status = 'ready',
                     relative_path = :relative_path,
@@ -231,9 +260,16 @@ def mark_variant_ready(cache_key: str, relative_path: str, byte_count: int) -> d
                 WHERE cache_key = :cache_key
                 RETURNING *
                 """
-            ),
-            {"cache_key": cache_key, "relative_path": relative_path, "bytes": byte_count},
-        ).mappings().first()
+                ),
+                {
+                    "cache_key": cache_key,
+                    "relative_path": relative_path,
+                    "bytes": byte_count,
+                },
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
 

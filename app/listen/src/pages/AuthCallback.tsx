@@ -11,7 +11,9 @@ export function AuthCallback() {
   const awaitingAuthRef = useRef(false);
 
   useEffect(() => {
-    const { handled, next } = persistOAuthCallbackPayload(window.location.search);
+    const { handled, next } = persistOAuthCallbackPayload(
+      window.location.search,
+    );
     if (!handled) {
       navigate("/login", { replace: true });
       return;

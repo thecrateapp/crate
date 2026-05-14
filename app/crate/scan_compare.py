@@ -88,17 +88,24 @@ def discover_python_audio_files(root: Path, extensions: str) -> list[Path]:
         and _album_structure(root, path) is not None
     )
 
+    album_structure_by_path = {
+        path: structure
+        for path in candidates
+        if (structure := _album_structure(root, path)) is not None
+    }
     albums_with_flac = {
         album_path
-        for path in candidates
+        for path, (_album, album_path) in album_structure_by_path.items()
         if path.suffix.lower() == ".flac"
-        for _album, album_path in [_album_structure(root, path)]
     }
 
     return [
         path
         for path in candidates
-        if not (path.suffix.lower() == ".m4a" and _album_structure(root, path)[1] in albums_with_flac)
+        if not (
+            path.suffix.lower() == ".m4a"
+            and album_structure_by_path[path][1] in albums_with_flac
+        )
     ]
 
 
@@ -240,8 +247,12 @@ def build_rust_index(root: Path, payload: dict[str, Any]) -> dict[str, dict[str,
                     "disc_number": tags.get("disc_number"),
                     "year": _empty_to_none(tags.get("year")),
                     "genre": _empty_to_none(tags.get("genre")),
-                    "musicbrainz_track_id": _empty_to_none(tags.get("musicbrainz_track_id")),
-                    "musicbrainz_album_id": _empty_to_none(tags.get("musicbrainz_album_id")),
+                    "musicbrainz_track_id": _empty_to_none(
+                        tags.get("musicbrainz_track_id")
+                    ),
+                    "musicbrainz_album_id": _empty_to_none(
+                        tags.get("musicbrainz_album_id")
+                    ),
                     "duration_ms": tags.get("duration_ms"),
                     "format": tags.get("format"),
                     "bitrate": tags.get("bitrate"),

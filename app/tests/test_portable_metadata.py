@@ -47,7 +47,12 @@ def test_write_album_sidecar_includes_lyrics_and_artwork(tmp_path):
                 "path": str(album_dir / "01 Noah.flac"),
                 "title": "Noah",
                 "audio_fingerprint": "fp",
-                "lyrics": {"provider": "lrclib", "found": True, "synced": "[00:01.00]Noah", "plain": "Noah"},
+                "lyrics": {
+                    "provider": "lrclib",
+                    "found": True,
+                    "synced": "[00:01.00]Noah",
+                    "plain": "Noah",
+                },
             }
         ],
     }
@@ -73,7 +78,9 @@ def test_write_track_identity_tags_uses_mapping_tags(tmp_path, monkeypatch):
         assert path == track_path
         captured.update(tags)
 
-    monkeypatch.setattr("crate.portable_metadata._write_mapping_tags", fake_write_mapping)
+    monkeypatch.setattr(
+        "crate.portable_metadata._write_mapping_tags", fake_write_mapping
+    )
 
     result = write_track_identity_tags(
         track_path,
@@ -110,7 +117,9 @@ def test_write_track_rich_tags_embeds_lyrics_and_artwork(tmp_path, monkeypatch):
         return True
 
     monkeypatch.setattr("crate.portable_metadata._write_tags_for_path", fake_write_tags)
-    monkeypatch.setattr("crate.portable_metadata._embed_artwork_for_path", fake_embed_artwork)
+    monkeypatch.setattr(
+        "crate.portable_metadata._embed_artwork_for_path", fake_embed_artwork
+    )
 
     result = write_track_rich_tags(
         track_path,
@@ -166,7 +175,9 @@ def test_download_cache_registers_worker_written_artifact(tmp_path, monkeypatch)
     artifact.parent.mkdir(parents=True)
     artifact.write_bytes(b"zip")
 
-    cached = register_cached_download("album", "c" * 64, "C.zip", artifact, metadata={"engine": "crate-media-worker"})
+    cached = register_cached_download(
+        "album", "c" * 64, "C.zip", artifact, metadata={"engine": "crate-media-worker"}
+    )
 
     assert cached is not None
     assert cached.path == artifact
@@ -184,7 +195,12 @@ def test_media_worker_album_job_includes_rich_track_payload(tmp_path):
     job = _album_package_job(
         {
             "artist": {"entity_uid": "artist-uid", "name": "Artist"},
-            "album": {"entity_uid": "album-uid", "name": "Album", "path": str(album_dir), "artwork_files": ["cover.jpg"]},
+            "album": {
+                "entity_uid": "album-uid",
+                "name": "Album",
+                "path": str(album_dir),
+                "artwork_files": ["cover.jpg"],
+            },
             "tracks": [
                 {
                     "entity_uid": "track-uid",
@@ -254,7 +270,9 @@ def test_media_worker_track_job_includes_rich_track_payload(tmp_path):
     assert job["artwork_path"] == str(artwork_path)
 
 
-def test_portable_album_payload_contains_cached_lyrics_analysis_and_bliss(pg_db, tmp_path):
+def test_portable_album_payload_contains_cached_lyrics_analysis_and_bliss(
+    pg_db, tmp_path
+):
     artist_uid = "11111111-1111-4111-8111-111111111111"
     album_uid = "22222222-2222-4222-8222-222222222222"
     track_uid = "33333333-3333-4333-8333-333333333333"
@@ -367,9 +385,19 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
                 "album": "United By Fate",
                 "audio_fingerprint": "fp-rival",
                 "audio_fingerprint_source": "chromaprint-v1",
-                "analysis": {"bpm": 120.0, "audio_key": "G", "energy": 0.8, "updated_at": None},
+                "analysis": {
+                    "bpm": 120.0,
+                    "audio_key": "G",
+                    "energy": 0.8,
+                    "updated_at": None,
+                },
                 "bliss": {"vector": [0.2] * 20, "computed_at": None},
-                "lyrics": {"provider": "lrclib", "found": True, "plain": "Travel", "synced": None},
+                "lyrics": {
+                    "provider": "lrclib",
+                    "found": True,
+                    "plain": "Travel",
+                    "synced": None,
+                },
             }
         ],
     }
@@ -381,19 +409,25 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
 
     assert result["tracks"] == 1
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT lt.title, lt.audio_fingerprint, taf.bpm, tbe.bliss_vector
                 FROM library_tracks lt
                 LEFT JOIN track_analysis_features taf ON taf.track_id = lt.id
                 LEFT JOIN track_bliss_embeddings tbe ON tbe.track_id = lt.id
                 WHERE lt.path = :path
                 """
-            ),
-            {"path": str(track_path)},
-        ).mappings().first()
-        lyrics = session.execute(text("SELECT plain_lyrics FROM track_lyrics LIMIT 1")).scalar_one()
+                ),
+                {"path": str(track_path)},
+            )
+            .mappings()
+            .first()
+        )
+        lyrics = session.execute(
+            text("SELECT plain_lyrics FROM track_lyrics LIMIT 1")
+        ).scalar_one()
 
     assert row["title"] == "Travel By Telephone"
     assert row["audio_fingerprint"] == "fp-rival"
@@ -402,7 +436,9 @@ def test_rehydrate_album_payload_restores_catalog_features_and_lyrics(pg_db, tmp
     assert lyrics == "Travel"
 
 
-def test_export_album_rich_metadata_copies_audio_and_writes_sidecar(tmp_path, monkeypatch):
+def test_export_album_rich_metadata_copies_audio_and_writes_sidecar(
+    tmp_path, monkeypatch
+):
     source_dir = tmp_path / "source" / "High Vis" / "Blending"
     source_dir.mkdir(parents=True)
     source_track = source_dir / "01 Talk For Hours.flac"
@@ -463,7 +499,9 @@ def test_album_download_uses_rich_export_package(pg_db, tmp_path, monkeypatch):
 
     with transaction_scope() as session:
         session.execute(
-            text("INSERT INTO library_artists (name, entity_uid, updated_at) VALUES ('High Vis', CAST(:uid AS uuid), NOW())"),
+            text(
+                "INSERT INTO library_artists (name, entity_uid, updated_at) VALUES ('High Vis', CAST(:uid AS uuid), NOW())"
+            ),
             {"uid": artist_uid},
         )
         album_id = session.execute(
@@ -489,14 +527,23 @@ def test_album_download_uses_rich_export_package(pg_db, tmp_path, monkeypatch):
     captured: list[dict] = []
     cache_dir = tmp_path / "download-cache"
     monkeypatch.setenv("CRATE_DOWNLOAD_CACHE_DIR", str(cache_dir))
-    monkeypatch.setattr("crate.api.browse_album._require_auth", lambda request: {"id": 1})
+    monkeypatch.setattr(
+        "crate.api.browse_album._require_auth", lambda request: {"id": 1}
+    )
     monkeypatch.setattr("crate.api.browse_album.library_path", lambda: tmp_path)
     monkeypatch.setattr("crate.api.browse_album.extensions", lambda: {".flac"})
-    monkeypatch.setattr("crate.api.browse_album.find_album_dir", lambda *args, **kwargs: album_dir)
-    monkeypatch.setattr("crate.api.browse_album.find_album_row", lambda *args, **kwargs: {"id": album_id})
+    monkeypatch.setattr(
+        "crate.api.browse_album.find_album_dir", lambda *args, **kwargs: album_dir
+    )
+    monkeypatch.setattr(
+        "crate.api.browse_album.find_album_row",
+        lambda *args, **kwargs: {"id": album_id},
+    )
     monkeypatch.setattr(
         "crate.portable_metadata.write_track_rich_tags",
-        lambda path, **kwargs: captured.append({"path": Path(path), **kwargs}) or {"written": True},
+        lambda path, **kwargs: (
+            captured.append({"path": Path(path), **kwargs}) or {"written": True}
+        ),
     )
 
     response = browse_album.api_download_album(MagicMock(), "High Vis", "Blending")
@@ -511,7 +558,9 @@ def test_album_download_uses_rich_export_package(pg_db, tmp_path, monkeypatch):
         assert sidecar["tracks"][0]["entity_uid"] == track_uid
         assert captured[0]["path"].name == "01 Talk For Hours.flac"
         assert captured[0]["artwork_path"] == album_dir / "cover.jpg"
-        second_response = browse_album.api_download_album(MagicMock(), "High Vis", "Blending")
+        second_response = browse_album.api_download_album(
+            MagicMock(), "High Vis", "Blending"
+        )
         assert Path(second_response.path) == zip_path
         assert len(captured) == 1
     finally:
@@ -532,7 +581,9 @@ def test_track_download_returns_enriched_temp_copy(pg_db, tmp_path, monkeypatch)
 
     with transaction_scope() as session:
         session.execute(
-            text("INSERT INTO library_artists (name, entity_uid, updated_at) VALUES ('High Vis', CAST(:uid AS uuid), NOW())"),
+            text(
+                "INSERT INTO library_artists (name, entity_uid, updated_at) VALUES ('High Vis', CAST(:uid AS uuid), NOW())"
+            ),
             {"uid": artist_uid},
         )
         album_id = session.execute(
@@ -559,21 +610,29 @@ def test_track_download_returns_enriched_temp_copy(pg_db, tmp_path, monkeypatch)
     captured: list[dict] = []
     cache_dir = tmp_path / "download-cache"
     monkeypatch.setenv("CRATE_DOWNLOAD_CACHE_DIR", str(cache_dir))
-    monkeypatch.setattr("crate.api.browse_media._require_auth", lambda request: {"id": 1})
+    monkeypatch.setattr(
+        "crate.api.browse_media._require_auth", lambda request: {"id": 1}
+    )
     monkeypatch.setattr("crate.api.browse_media.library_path", lambda: library_dir)
     monkeypatch.setattr(
         "crate.portable_metadata.write_track_rich_tags",
-        lambda path, **kwargs: captured.append({"path": Path(path), **kwargs}) or {"written": True},
+        lambda path, **kwargs: (
+            captured.append({"path": Path(path), **kwargs}) or {"written": True}
+        ),
     )
 
-    response = browse_media._download_track(MagicMock(), "High Vis/Blending/01 Talk For Hours.flac")
+    response = browse_media._download_track(
+        MagicMock(), "High Vis/Blending/01 Talk For Hours.flac"
+    )
     download_path = Path(response.path)
     try:
         assert download_path != track_path
         assert download_path.read_bytes() == b"fake-audio"
         assert captured[0]["path"].name == download_path.name
         assert captured[0]["artwork_path"] == album_dir / "cover.jpg"
-        second_response = browse_media._download_track(MagicMock(), "High Vis/Blending/01 Talk For Hours.flac")
+        second_response = browse_media._download_track(
+            MagicMock(), "High Vis/Blending/01 Talk For Hours.flac"
+        )
         assert Path(second_response.path) == download_path
         assert len(captured) == 1
     finally:

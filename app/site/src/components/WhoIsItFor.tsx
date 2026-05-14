@@ -39,17 +39,15 @@ export function WhoIsItFor() {
           A few people this might suit.
         </h2>
         <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-          Crate is not for everyone, and that is fine. It makes the most sense when
-          owning the library matters more than having the easiest possible setup.
+          Crate is not for everyone, and that is fine. It makes the most sense
+          when owning the library matters more than having the easiest possible
+          setup.
         </p>
       </div>
 
       <div className="grid gap-10 md:grid-cols-3">
         {AUDIENCES.map(({ icon: Icon, kicker, title, body }) => (
-          <article
-            key={kicker}
-            className="group border-t border-white/10 pt-6"
-          >
+          <article key={kicker} className="group border-t border-white/10 pt-6">
             <div className="mb-5 text-cyan-300">
               <Icon size={19} />
             </div>
@@ -59,7 +57,9 @@ export function WhoIsItFor() {
             <h3 className="mt-2 text-[17px] font-semibold leading-[1.45] text-white">
               {title}
             </h3>
-            <p className="mt-3 text-[14.5px] leading-[1.65] text-white/60">{body}</p>
+            <p className="mt-3 text-[14.5px] leading-[1.65] text-white/60">
+              {body}
+            </p>
           </article>
         ))}
       </div>

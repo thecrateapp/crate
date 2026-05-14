@@ -17,7 +17,19 @@ log = logging.getLogger(__name__)
 TaskHandler = Callable[[str, dict, dict], dict]
 
 # Audio file extensions recognized across all handlers
-DEFAULT_AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav", ".wma", ".aac", ".alac", ".aif", ".aiff"}
+DEFAULT_AUDIO_EXTENSIONS = {
+    ".flac",
+    ".mp3",
+    ".m4a",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".wma",
+    ".aac",
+    ".alac",
+    ".aif",
+    ".aiff",
+}
 
 
 def audio_extensions() -> set[str]:
@@ -46,9 +58,14 @@ def compute_dir_hash(directory: Path, extensions: set[str] | None = None) -> str
 
 # Enrichment cache key prefixes (used by enrichment + management handlers)
 ENRICHMENT_CACHE_PREFIXES = (
-    "enrichment:", "lastfm:artist:", "fanart:artist:",
-    "fanart:bg:", "fanart:all:", "deezer:artist_img:",
-    "spotify:artist:", "mb:artist:",
+    "enrichment:",
+    "lastfm:artist:",
+    "fanart:artist:",
+    "fanart:bg:",
+    "fanart:all:",
+    "deezer:artist_img:",
+    "spotify:artist:",
+    "mb:artist:",
 )
 
 # Processing guard for content pipeline
@@ -71,6 +88,7 @@ def start_scan():
     """Queue a library scan task. Used by handlers after filesystem changes."""
     try:
         from crate.db.repositories.tasks import create_task_dedup
+
         create_task_dedup("scan")
     except Exception:
         log.debug("Failed to queue scan task", exc_info=True)

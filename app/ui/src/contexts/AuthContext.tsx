@@ -66,7 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       if (!force && now - lastHeartbeatAtRef.current < 55_000) return;
       lastHeartbeatAtRef.current = now;
-      await api("/api/auth/heartbeat", "POST", { app_id: "admin-web" }).catch(() => {});
+      await api("/api/auth/heartbeat", "POST", { app_id: "admin-web" }).catch(
+        () => {},
+      );
     }
 
     const timer = window.setInterval(() => {

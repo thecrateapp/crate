@@ -41,30 +41,45 @@ async function loadTrackPlayback(url: string): Promise<PlaybackResolution> {
   const existing = inflightTrackPlayback.get(url);
   if (existing) return existing;
 
-  const request = api<PlaybackResolution>(url).then((resolution) => {
-    trackPlaybackCache.set(url, { resolution, timestamp: Date.now() });
-    return resolution;
-  }).finally(() => {
-    inflightTrackPlayback.delete(url);
-  });
+  const request = api<PlaybackResolution>(url)
+    .then((resolution) => {
+      trackPlaybackCache.set(url, { resolution, timestamp: Date.now() });
+      return resolution;
+    })
+    .finally(() => {
+      inflightTrackPlayback.delete(url);
+    });
 
   inflightTrackPlayback.set(url, request);
   return request;
 }
 
 export function useTrackPlayback(
-  track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path"> | undefined,
+  track:
+    | Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">
+    | undefined,
   policy: PlaybackDeliveryPolicy,
   options: UseTrackPlaybackOptions = {},
 ): UseTrackPlaybackState {
   const { enabled = true } = options;
   const url = useMemo(
     () => (enabled && track ? resolveTrackPlaybackUrl(track, policy) : null),
-    [enabled, policy, track?.id, track?.entityUid, track?.libraryTrackId, track?.path],
+    [
+      enabled,
+      policy,
+      track?.id,
+      track?.entityUid,
+      track?.libraryTrackId,
+      track?.path,
+    ],
   );
 
-  const [resolution, setResolution] = useState<PlaybackResolution | null>(() => (url ? getCachedTrackPlayback(url) : null));
-  const [loading, setLoading] = useState(() => Boolean(url && !getCachedTrackPlayback(url)));
+  const [resolution, setResolution] = useState<PlaybackResolution | null>(() =>
+    url ? getCachedTrackPlayback(url) : null,
+  );
+  const [loading, setLoading] = useState(() =>
+    Boolean(url && !getCachedTrackPlayback(url)),
+  );
 
   useEffect(() => {
     if (!enabled || !url) {

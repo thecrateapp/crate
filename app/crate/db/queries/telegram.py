@@ -4,9 +4,10 @@ from sqlalchemy import text
 
 def get_library_status_summary() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     (SELECT COUNT(*)::INTEGER FROM library_artists) AS artists,
                     (SELECT COUNT(*)::INTEGER FROM library_albums) AS albums,
@@ -15,23 +16,31 @@ def get_library_status_summary() -> dict:
                     (SELECT COUNT(*)::INTEGER FROM tasks WHERE status = 'running') AS running,
                     (SELECT COUNT(*)::INTEGER FROM tasks WHERE status = 'pending') AS pending
                 """
+                )
             )
-        ).mappings().first()
-    return dict(row) if row else {
-        "artists": 0,
-        "albums": 0,
-        "tracks": 0,
-        "size_bytes": 0,
-        "running": 0,
-        "pending": 0,
-    }
+            .mappings()
+            .first()
+        )
+    return (
+        dict(row)
+        if row
+        else {
+            "artists": 0,
+            "albums": 0,
+            "tracks": 0,
+            "size_bytes": 0,
+            "running": 0,
+            "pending": 0,
+        }
+    )
 
 
 def get_server_db_stats() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     pg_database_size(current_database())::BIGINT AS size_bytes,
                     (
@@ -40,16 +49,20 @@ def get_server_db_stats() -> dict:
                         WHERE state = 'active'
                     ) AS active_connections
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
     return dict(row) if row else {"size_bytes": 0, "active_connections": 0}
 
 
 def list_active_tasks(limit: int = 15) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT id, type, status, substring(progress for 120) AS progress,
                        created_at, updated_at
                 FROM tasks
@@ -57,17 +70,21 @@ def list_active_tasks(limit: int = 15) -> list[dict]:
                 ORDER BY status, created_at
                 LIMIT :lim
                 """
-            ),
-            {"lim": limit},
-        ).mappings().all()
+                ),
+                {"lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def list_recently_played(limit_minutes: int = 10) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     upe.user_id,
                     u.username,
@@ -85,17 +102,21 @@ def list_recently_played(limit_minutes: int = 10) -> list[dict]:
                 WHERE upe.ended_at > now() - (:minutes * INTERVAL '1 minute')
                 ORDER BY upe.ended_at DESC
                 """
-            ),
-            {"minutes": limit_minutes},
-        ).mappings().all()
+                ),
+                {"minutes": limit_minutes},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def list_recent_albums(limit: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT DISTINCT ON (a.id)
                     a.artist, a.name, a.year,
                     a.track_count, a.formats_json
@@ -103,24 +124,31 @@ def list_recent_albums(limit: int) -> list[dict]:
                 ORDER BY a.id DESC
                 LIMIT :lim
                 """
-            ),
-            {"lim": limit},
-        ).mappings().all()
+                ),
+                {"lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def find_active_task_by_prefix(task_id_prefix: str) -> dict | None:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id, type, status
                 FROM tasks
                 WHERE id LIKE :prefix
                   AND status IN ('running', 'pending')
                 LIMIT 1
                 """
-            ),
-            {"prefix": f"{task_id_prefix}%"},
-        ).mappings().first()
+                ),
+                {"prefix": f"{task_id_prefix}%"},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None

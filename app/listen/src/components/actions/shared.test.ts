@@ -10,7 +10,11 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import { buildTrackMenuPlayerTrack, fetchAlbumTracks, trackToMenuData } from "@/components/actions/shared";
+import {
+  buildTrackMenuPlayerTrack,
+  fetchAlbumTracks,
+  trackToMenuData,
+} from "@/components/actions/shared";
 
 describe("track action shared helpers", () => {
   it("builds a playable track preserving quality metadata and derived cover", () => {
@@ -31,39 +35,45 @@ describe("track action shared helpers", () => {
       bit_depth: null,
     });
 
-    expect(track).toEqual(expect.objectContaining({
-      id: "entity-12",
-      entityUid: "entity-12",
-      albumCover: expect.stringContaining("/api/albums/44/cover"),
-      format: "m4a",
-      bitrate: 320,
-      sampleRate: 44100,
-      bitDepth: null,
-    }));
+    expect(track).toEqual(
+      expect.objectContaining({
+        id: "entity-12",
+        entityUid: "entity-12",
+        albumCover: expect.stringContaining("/api/albums/44/cover"),
+        format: "m4a",
+        bitrate: 320,
+        sampleRate: 44100,
+        bitDepth: null,
+      }),
+    );
   });
 
   it("converts player tracks back to menu data without losing suggestion metadata", () => {
-    expect(trackToMenuData({
-      id: "entity-55",
-      entityUid: "entity-55",
-      title: "Track Two",
-      artist: "Artist",
-      album: "Album",
-      isSuggested: true,
-      suggestionSource: "playlist",
-      format: "flac",
-      bitrate: 1411,
-      sampleRate: 96000,
-      bitDepth: 24,
-    })).toEqual(expect.objectContaining({
-      entity_uid: "entity-55",
-      is_suggested: true,
-      suggestion_source: "playlist",
-      format: "flac",
-      bitrate: 1411,
-      sample_rate: 96000,
-      bit_depth: 24,
-    }));
+    expect(
+      trackToMenuData({
+        id: "entity-55",
+        entityUid: "entity-55",
+        title: "Track Two",
+        artist: "Artist",
+        album: "Album",
+        isSuggested: true,
+        suggestionSource: "playlist",
+        format: "flac",
+        bitrate: 1411,
+        sampleRate: 96000,
+        bitDepth: 24,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        entity_uid: "entity-55",
+        is_suggested: true,
+        suggestion_source: "playlist",
+        format: "flac",
+        bitrate: 1411,
+        sample_rate: 96000,
+        bit_depth: 24,
+      }),
+    );
   });
 
   it("maps fetched album tracks into playable tracks with quality fields", async () => {
@@ -71,18 +81,20 @@ describe("track action shared helpers", () => {
       artist: "Artist",
       name: "Album",
       display_name: "Album",
-      tracks: [{
-        id: 7,
-        entity_uid: "entity-7",
-        filename: "01-track.flac",
-        path: "/music/Artist/Album/01-track.flac",
-        length_sec: 211,
-        format: "flac",
-        bitrate: 1411,
-        sample_rate: 96000,
-        bit_depth: 24,
-        tags: { title: "Track Seven" },
-      }],
+      tracks: [
+        {
+          id: 7,
+          entity_uid: "entity-7",
+          filename: "01-track.flac",
+          path: "/music/Artist/Album/01-track.flac",
+          length_sec: 211,
+          format: "flac",
+          bitrate: 1411,
+          sample_rate: 96000,
+          bit_depth: 24,
+          tags: { title: "Track Seven" },
+        },
+      ],
     });
 
     const tracks = await fetchAlbumTracks({

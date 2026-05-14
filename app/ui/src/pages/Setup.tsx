@@ -4,8 +4,14 @@ import { Input } from "@crate/ui/shadcn/input";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import {
-  User, Key, Music, ArrowRight, Check,
-  Loader2, ExternalLink, Sparkles,
+  User,
+  Key,
+  Music,
+  ArrowRight,
+  Check,
+  Loader2,
+  ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 const STEPS = ["Account", "API Keys", "Library Scan", "Done"];
@@ -75,15 +81,23 @@ export function Setup() {
         <div className="flex items-center justify-center gap-2 mb-8">
           {STEPS.map((s, i) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-colors ${
-                i < step ? "bg-primary text-primary-foreground" :
-                i === step ? "bg-primary/20 text-primary border border-primary" :
-                "bg-muted text-muted-foreground"
-              }`}>
+              <div
+                className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-colors ${
+                  i < step
+                    ? "bg-primary text-primary-foreground"
+                    : i === step
+                      ? "bg-primary/20 text-primary border border-primary"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
                 {i < step ? <Check size={14} /> : i + 1}
               </div>
               {i < STEPS.length - 1 && (
-                <div className={`w-8 h-px ${i < step ? "bg-primary" : "bg-border"}`} />
+                <div
+                  className={`w-8 h-px ${
+                    i < step ? "bg-primary" : "bg-border"
+                  }`}
+                />
               )}
             </div>
           ))}
@@ -101,16 +115,34 @@ export function Setup() {
                 This will be your login to manage Crate.
               </p>
               <div className="space-y-3">
-                <Input placeholder="Name (optional)" value={name}
-                  onChange={e => setName(e.target.value)} />
-                <Input placeholder="Email" type="email" value={email}
-                  onChange={e => setEmail(e.target.value)} required />
-                <Input placeholder="Password" type="password" value={password}
-                  onChange={e => setPassword(e.target.value)} required />
+                <Input
+                  placeholder="Name (optional)"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <Input
+                  placeholder="Password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
-              <Button className="w-full mt-6" onClick={createAdmin}
-                disabled={creating || !email || !password}>
-                {creating ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+              <Button
+                className="w-full mt-6"
+                onClick={createAdmin}
+                disabled={creating || !email || !password}
+              >
+                {creating ? (
+                  <Loader2 size={14} className="animate-spin mr-2" />
+                ) : null}
                 Create Account <ArrowRight size={14} className="ml-2" />
               </Button>
             </div>
@@ -124,24 +156,63 @@ export function Setup() {
                 <h2 className="text-lg font-bold">API Keys</h2>
               </div>
               <p className="text-sm text-muted-foreground mb-6">
-                Optional — enable enrichment features. You can add these later in Settings.
+                Optional — enable enrichment features. You can add these later
+                in Settings.
               </p>
               <div className="space-y-3">
                 {[
-                  { key: "lastfm_apikey", label: "Last.fm API Key", desc: "Artist bios, similar artists", url: "https://www.last.fm/api/account/create" },
-                  { key: "ticketmaster_api_key", label: "Ticketmaster Key", desc: "Upcoming shows", url: "https://developer.ticketmaster.com/" },
-                  { key: "spotify_id", label: "Spotify Client ID", desc: "Artist images", url: "https://developer.spotify.com/dashboard" },
-                  { key: "spotify_secret", label: "Spotify Client Secret", desc: "", url: "" },
-                  { key: "fanart_api_key", label: "Fanart.tv Key", desc: "Artist backgrounds", url: "https://fanart.tv/get-an-api-key/" },
-                  { key: "setlistfm_api_key", label: "Setlist.fm Key", desc: "Concert setlists", url: "https://api.setlist.fm/docs/1.0/index.html" },
+                  {
+                    key: "lastfm_apikey",
+                    label: "Last.fm API Key",
+                    desc: "Artist bios, similar artists",
+                    url: "https://www.last.fm/api/account/create",
+                  },
+                  {
+                    key: "ticketmaster_api_key",
+                    label: "Ticketmaster Key",
+                    desc: "Upcoming shows",
+                    url: "https://developer.ticketmaster.com/",
+                  },
+                  {
+                    key: "spotify_id",
+                    label: "Spotify Client ID",
+                    desc: "Artist images",
+                    url: "https://developer.spotify.com/dashboard",
+                  },
+                  {
+                    key: "spotify_secret",
+                    label: "Spotify Client Secret",
+                    desc: "",
+                    url: "",
+                  },
+                  {
+                    key: "fanart_api_key",
+                    label: "Fanart.tv Key",
+                    desc: "Artist backgrounds",
+                    url: "https://fanart.tv/get-an-api-key/",
+                  },
+                  {
+                    key: "setlistfm_api_key",
+                    label: "Setlist.fm Key",
+                    desc: "Concert setlists",
+                    url: "https://api.setlist.fm/docs/1.0/index.html",
+                  },
                 ].map(({ key, label, desc, url }) => (
                   <div key={key}>
                     <div className="flex items-center gap-2 mb-1">
                       <label className="text-xs font-medium">{label}</label>
-                      {desc && <span className="text-[10px] text-muted-foreground">{desc}</span>}
+                      {desc && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {desc}
+                        </span>
+                      )}
                       {url && (
-                        <a href={url} target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] text-primary hover:underline ml-auto">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-primary hover:underline ml-auto"
+                        >
                           Get key <ExternalLink size={9} className="inline" />
                         </a>
                       )}
@@ -149,7 +220,9 @@ export function Setup() {
                     <Input
                       placeholder={`Enter ${label}...`}
                       value={(keys as any)[key]}
-                      onChange={e => setKeys(prev => ({ ...prev, [key]: e.target.value }))}
+                      onChange={(e) =>
+                        setKeys((prev) => ({ ...prev, [key]: e.target.value }))
+                      }
                     />
                   </div>
                 ))}
@@ -158,8 +231,14 @@ export function Setup() {
                 <Button variant="outline" onClick={() => setStep(2)}>
                   Skip for now
                 </Button>
-                <Button className="flex-1" onClick={saveKeys} disabled={savingKeys}>
-                  {savingKeys ? <Loader2 size={14} className="animate-spin mr-2" /> : null}
+                <Button
+                  className="flex-1"
+                  onClick={saveKeys}
+                  disabled={savingKeys}
+                >
+                  {savingKeys ? (
+                    <Loader2 size={14} className="animate-spin mr-2" />
+                  ) : null}
                   Save Keys <ArrowRight size={14} className="ml-2" />
                 </Button>
               </div>
@@ -172,15 +251,25 @@ export function Setup() {
               <Music size={40} className="text-primary mx-auto mb-4" />
               <h2 className="text-lg font-bold mb-2">Scan Your Library</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Crate will scan your music collection, read tags, and build your library database.
-                This runs in the background — you can start using Crate while it works.
+                Crate will scan your music collection, read tags, and build your
+                library database. This runs in the background — you can start
+                using Crate while it works.
               </p>
               <div className="flex gap-2 justify-center">
-                <Button variant="outline" onClick={() => { window.location.href = "/"; }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    window.location.href = "/";
+                  }}
+                >
                   Skip — I'll scan later
                 </Button>
                 <Button onClick={startScan} disabled={scanning}>
-                  {scanning ? <Loader2 size={14} className="animate-spin mr-2" /> : <Sparkles size={14} className="mr-2" />}
+                  {scanning ? (
+                    <Loader2 size={14} className="animate-spin mr-2" />
+                  ) : (
+                    <Sparkles size={14} className="mr-2" />
+                  )}
                   Start Scan
                 </Button>
               </div>
@@ -195,10 +284,15 @@ export function Setup() {
               </div>
               <h2 className="text-lg font-bold mb-2">You're all set!</h2>
               <p className="text-sm text-muted-foreground mb-6">
-                Crate is scanning your library in the background.
-                This may take a while depending on your collection size.
+                Crate is scanning your library in the background. This may take
+                a while depending on your collection size.
               </p>
-              <Button onClick={() => { window.location.href = "/"; }} className="w-full">
+              <Button
+                onClick={() => {
+                  window.location.href = "/";
+                }}
+                className="w-full"
+              >
                 Go to Dashboard <ArrowRight size={14} className="ml-2" />
               </Button>
             </div>

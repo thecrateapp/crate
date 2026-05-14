@@ -113,8 +113,12 @@ class WorkerPoolBreakdownResponse(BaseModel):
 
 
 class WorkerQueueBreakdownResponse(BaseModel):
-    running: WorkerPoolBreakdownResponse = Field(default_factory=WorkerPoolBreakdownResponse)
-    pending: WorkerPoolBreakdownResponse = Field(default_factory=WorkerPoolBreakdownResponse)
+    running: WorkerPoolBreakdownResponse = Field(
+        default_factory=WorkerPoolBreakdownResponse
+    )
+    pending: WorkerPoolBreakdownResponse = Field(
+        default_factory=WorkerPoolBreakdownResponse
+    )
 
 
 class DbHeavyGateResponse(BaseModel):
@@ -134,7 +138,9 @@ class ActivityLiveResponse(BaseModel):
     pending_tasks: list[RunningTaskResponse] = Field(default_factory=list)
     recent_tasks: list[RecentTaskSummaryResponse] = Field(default_factory=list)
     worker_slots: WorkerSlotsResponse
-    queue_breakdown: WorkerQueueBreakdownResponse = Field(default_factory=WorkerQueueBreakdownResponse)
+    queue_breakdown: WorkerQueueBreakdownResponse = Field(
+        default_factory=WorkerQueueBreakdownResponse
+    )
     db_heavy_gate: DbHeavyGateResponse = Field(default_factory=DbHeavyGateResponse)
     systems: ActivitySystemsResponse
 

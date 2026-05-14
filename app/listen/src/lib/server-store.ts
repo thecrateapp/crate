@@ -31,6 +31,8 @@ export interface ServerConfig {
   url: string;
   /** Bearer token for this server, or null if not logged in yet. */
   token: string | null;
+  /** ISO timestamp for the current access token expiry, when known. */
+  tokenExpiresAt: string | null;
   /** Long-lived refresh token for this server, or null when unavailable. */
   refreshToken: string | null;
 }
@@ -46,8 +48,11 @@ function safeJsonParse<T>(raw: string | null, fallback: T): T {
 }
 
 function generateId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-  return `srv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  if (typeof crypto !== "undefined" && crypto.randomUUID)
+    return crypto.randomUUID();
+  return `srv-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 /**
@@ -75,8 +80,12 @@ export function deriveLabel(url: string): string {
 export function getServers(): ServerConfig[] {
   if (!isNative) return [];
   try {
-    return safeJsonParse<ServerConfig[]>(localStorage.getItem(SERVERS_KEY), []).map((server) => ({
+    return safeJsonParse<ServerConfig[]>(
+      localStorage.getItem(SERVERS_KEY),
+      [],
+    ).map((server) => ({
       ...server,
+      tokenExpiresAt: server.tokenExpiresAt ?? null,
       refreshToken: server.refreshToken ?? null,
     }));
   } catch {
@@ -102,13 +111,17 @@ export function getCurrentServer(): ServerConfig | null {
 function writeServers(servers: ServerConfig[]): void {
   try {
     localStorage.setItem(SERVERS_KEY, JSON.stringify(servers));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function dispatchChange(): void {
   try {
     window.dispatchEvent(new CustomEvent(SERVER_STORE_EVENT));
-  } catch { /* ignore (SSR) */ }
+  } catch {
+    /* ignore (SSR) */
+  }
 }
 
 export function addServer(url: string, label?: string): ServerConfig {
@@ -122,6 +135,7 @@ export function addServer(url: string, label?: string): ServerConfig {
     label: (label || deriveLabel(normalised)).trim() || deriveLabel(normalised),
     url: normalised,
     token: null,
+    tokenExpiresAt: null,
     refreshToken: null,
   };
   writeServers([...getServers(), server]);
@@ -137,7 +151,9 @@ export function removeServer(id: string): void {
       // Fall back to the first remaining server, or no active server.
       if (servers[0]) localStorage.setItem(CURRENT_KEY, servers[0].id);
       else localStorage.removeItem(CURRENT_KEY);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   dispatchChange();
 }
@@ -147,37 +163,62 @@ export function setCurrentServerId(id: string | null): void {
     if (id) localStorage.setItem(CURRENT_KEY, id);
     else localStorage.removeItem(CURRENT_KEY);
     dispatchChange();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
-export function setCurrentServerToken(token: string | null): void {
+export function setCurrentServerToken(
+  token: string | null,
+  tokenExpiresAt?: string | null,
+): void {
   const id = getCurrentServerId();
   if (!id) return;
-  const servers = getServers().map((s) => (s.id === id ? { ...s, token } : s));
-  writeServers(servers);
-  dispatchChange();
-}
-
-export function setCurrentServerRefreshToken(refreshToken: string | null): void {
-  const id = getCurrentServerId();
-  if (!id) return;
-  const servers = getServers().map((s) => (s.id === id ? { ...s, refreshToken } : s));
-  writeServers(servers);
-  dispatchChange();
-}
-
-export function setCurrentServerAuthTokens(token: string | null, refreshToken?: string | null): void {
-  const id = getCurrentServerId();
-  if (!id) return;
-  const servers = getServers().map((s) => (
+  const servers = getServers().map((s) =>
     s.id === id
       ? {
           ...s,
           token,
-          refreshToken: refreshToken === undefined ? s.refreshToken : refreshToken,
+          tokenExpiresAt:
+            tokenExpiresAt === undefined ? s.tokenExpiresAt : tokenExpiresAt,
         }
-      : s
-  ));
+      : s,
+  );
+  writeServers(servers);
+  dispatchChange();
+}
+
+export function setCurrentServerRefreshToken(
+  refreshToken: string | null,
+): void {
+  const id = getCurrentServerId();
+  if (!id) return;
+  const servers = getServers().map((s) =>
+    s.id === id ? { ...s, refreshToken } : s,
+  );
+  writeServers(servers);
+  dispatchChange();
+}
+
+export function setCurrentServerAuthTokens(
+  token: string | null,
+  refreshToken?: string | null,
+  tokenExpiresAt?: string | null,
+): void {
+  const id = getCurrentServerId();
+  if (!id) return;
+  const servers = getServers().map((s) =>
+    s.id === id
+      ? {
+          ...s,
+          token,
+          tokenExpiresAt:
+            tokenExpiresAt === undefined ? s.tokenExpiresAt : tokenExpiresAt,
+          refreshToken:
+            refreshToken === undefined ? s.refreshToken : refreshToken,
+        }
+      : s,
+  );
   writeServers(servers);
   dispatchChange();
 }
@@ -185,7 +226,9 @@ export function setCurrentServerAuthTokens(token: string | null, refreshToken?: 
 export function updateServerLabel(id: string, label: string): void {
   const trimmed = label.trim();
   if (!trimmed) return;
-  const servers = getServers().map((s) => (s.id === id ? { ...s, label: trimmed } : s));
+  const servers = getServers().map((s) =>
+    s.id === id ? { ...s, label: trimmed } : s,
+  );
   writeServers(servers);
   dispatchChange();
 }
@@ -204,12 +247,21 @@ export function migrateLegacyToken(defaultUrl: string): void {
     if (!legacyToken || !defaultUrl) return;
     const seeded = addServer(defaultUrl);
     const patched = getServers().map((s) =>
-      s.id === seeded.id ? { ...s, token: legacyToken, refreshToken: null } : s,
+      s.id === seeded.id
+        ? {
+            ...s,
+            token: legacyToken,
+            tokenExpiresAt: null,
+            refreshToken: null,
+          }
+        : s,
     );
     writeServers(patched);
     setCurrentServerId(seeded.id);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function seedDefaultServer(defaultUrl: string): void {

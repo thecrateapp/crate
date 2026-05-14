@@ -1,18 +1,13 @@
-import {
-  useCallback,
-  useContext,
-  type ReactNode,
-} from "react";
+import { useCallback, useContext, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { api, setAuthToken } from "@/lib/api";
-import {
-  AuthContext,
-} from "@/contexts/auth-context";
+import { AuthContext } from "@/contexts/auth-context";
 import { clearAuthRuntime } from "@/contexts/auth-runtime";
 import { useAuthHeartbeat } from "@/contexts/use-auth-heartbeat";
 import { useAuthOAuthSync } from "@/contexts/use-auth-oauth-sync";
 import { useAuthSession } from "@/contexts/use-auth-session";
+import { useAuthTokenRefresh } from "@/contexts/use-auth-token-refresh";
 import { useListenWarmup } from "@/hooks/use-listen-warmup";
 
 export function useAuth() {
@@ -28,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, refetch, setUser } = useAuthSession();
 
   useAuthOAuthSync({ navigate, refetch });
+  useAuthTokenRefresh(user);
   useAuthHeartbeat(user);
   useListenWarmup(user);
 

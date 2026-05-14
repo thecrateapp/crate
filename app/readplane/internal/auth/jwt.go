@@ -17,6 +17,7 @@ var (
 	ErrExpiredToken = errors.New("expired token")
 )
 
+// JWTPayload holds the claims extracted from a Crate session JWT.
 type JWTPayload struct {
 	UserID    int64   `json:"user_id"`
 	Email     string  `json:"email"`
@@ -32,6 +33,7 @@ type jwtHeader struct {
 	Type      string `json:"typ"`
 }
 
+// VerifyHS256 validates an HS256-signed JWT and returns its payload claims.
 func VerifyHS256(token string, secret string, now time.Time) (JWTPayload, error) {
 	if strings.TrimSpace(token) == "" {
 		return JWTPayload{}, ErrMissingToken

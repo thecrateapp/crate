@@ -8,6 +8,7 @@ description: Python backend patterns for FastAPI, SQLAlchemy 2.0, async, and tes
 Expert-level Python patterns for FastAPI, SQLAlchemy 2.0, and async programming.
 
 This project uses a hybrid DB strategy:
+
 - **SQLAlchemy ORM** (`db/orm/`) for simple CRUD domains (users, sessions, settings, tidal, genres, health, releases)
 - **SQLAlchemy Core / `text()`** (`db/queries/`, `db/jobs/`) for complex queries (analytics, browse, bliss, task claiming)
 - **Alembic** for schema migrations (`db/migrations/`)

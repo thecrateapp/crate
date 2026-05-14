@@ -18,8 +18,12 @@ function mkParam() {
   const param = {
     value: 0,
     cancelScheduledValues: vi.fn(),
-    setValueAtTime: vi.fn((v: number) => { param.value = v; }),
-    linearRampToValueAtTime: vi.fn((v: number) => { param.value = v; }),
+    setValueAtTime: vi.fn((v: number) => {
+      param.value = v;
+    }),
+    linearRampToValueAtTime: vi.fn((v: number) => {
+      param.value = v;
+    }),
   };
   return param;
 }
@@ -54,7 +58,8 @@ describe("createEqChain", () => {
   it("configures each filter as peaking with the band's frequency", () => {
     const ctx = mkContext();
     createEqChain(ctx);
-    const calls = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results;
+    const calls = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock
+      .results;
     calls.forEach((result, i) => {
       const filter = result.value as ReturnType<typeof mkFilter>;
       expect(filter.type).toBe("peaking");
@@ -66,9 +71,9 @@ describe("createEqChain", () => {
   it("chains filters in series (f0 → f1 → f2 → ...)", () => {
     const ctx = mkContext();
     createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     for (let i = 0; i < filters.length - 1; i++) {
       expect(filters[i]!.connect).toHaveBeenCalledWith(filters[i + 1]);
     }
@@ -79,9 +84,9 @@ describe("createEqChain", () => {
   it("setGain clamps values outside the allowed range", () => {
     const ctx = mkContext();
     const chain = createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     chain.setGain(0, 999);
     expect(filters[0]!.gain.value).toBe(EQ_GAIN_MAX);
     chain.setGain(1, -999);
@@ -93,9 +98,9 @@ describe("createEqChain", () => {
   it("setGains applies every value and pads missing entries as 0", () => {
     const ctx = mkContext();
     const chain = createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     chain.setGains(EQ_PRESETS.rock!);
     filters.forEach((f, i) => {
       expect(f.gain.value).toBe(EQ_PRESETS.rock![i]);
@@ -119,17 +124,18 @@ describe("createEqChain", () => {
   it("setGain schedules a linear ramp rather than hard-setting value", () => {
     const ctx = mkContext();
     const chain = createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     chain.setGain(0, 3);
     // Every gain mutation goes through the scheduler so the change
     // ramps instead of clicking.
     expect(filters[0]!.gain.cancelScheduledValues).toHaveBeenCalled();
     expect(filters[0]!.gain.setValueAtTime).toHaveBeenCalled();
     expect(filters[0]!.gain.linearRampToValueAtTime).toHaveBeenCalled();
-    const rampArgs = (filters[0]!.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>)
-      .mock.calls[0]!;
+    const rampArgs = (
+      filters[0]!.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>
+    ).mock.calls[0]!;
     expect(rampArgs[0]).toBe(3); // target dB
     // Default ramp window is 80 ms → 0.08 seconds from now (currentTime = 0).
     expect(rampArgs[1]).toBeCloseTo(0.08, 5);
@@ -138,9 +144,9 @@ describe("createEqChain", () => {
   it("setGain with rampMs: 0 snaps immediately", () => {
     const ctx = mkContext();
     const chain = createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     chain.setGain(0, 3, 0);
     expect(filters[0]!.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
     // setValueAtTime is called twice: once to anchor from current
@@ -152,9 +158,9 @@ describe("createEqChain", () => {
   it("dispose disconnects every filter", () => {
     const ctx = mkContext();
     const chain = createEqChain(ctx);
-    const filters = (ctx.createBiquadFilter as ReturnType<typeof vi.fn>).mock.results.map(
-      (r) => r.value as ReturnType<typeof mkFilter>,
-    );
+    const filters = (
+      ctx.createBiquadFilter as ReturnType<typeof vi.fn>
+    ).mock.results.map((r) => r.value as ReturnType<typeof mkFilter>);
     chain.dispose();
     for (const f of filters) {
       expect(f.disconnect).toHaveBeenCalled();
@@ -192,11 +198,8 @@ describe("equalizer-prefs round-trip", () => {
   afterEach(() => localStorage.clear());
 
   it("persists and restores preset selection", async () => {
-    const {
-      getEqualizerSnapshot,
-      applyEqualizerPreset,
-      setEqualizerEnabled,
-    } = await import("./equalizer-prefs");
+    const { getEqualizerSnapshot, applyEqualizerPreset, setEqualizerEnabled } =
+      await import("./equalizer-prefs");
 
     setEqualizerEnabled(true);
     applyEqualizerPreset("rock");
@@ -208,10 +211,9 @@ describe("equalizer-prefs round-trip", () => {
   });
 
   it("custom gains mark preset as 'custom'", async () => {
-    const {
-      getEqualizerSnapshot,
-      setCustomEqualizerGains,
-    } = await import("./equalizer-prefs");
+    const { getEqualizerSnapshot, setCustomEqualizerGains } = await import(
+      "./equalizer-prefs"
+    );
 
     const custom = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     setCustomEqualizerGains(custom);

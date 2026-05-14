@@ -2,8 +2,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERVER_USER="${SERVER_USER:-root}"
-SERVER_HOST="${SERVER_HOST:-104.152.210.73}"
+SERVER_USER="${SERVER_USER:-crate}"
+SERVER_HOST="${SERVER_HOST:-95.216.3.27}"
 SERVER_PATH="${SERVER_PATH:-/home/crate/crate}"
 REMOTE="${SERVER_USER}@${SERVER_HOST}"
 DEPLOY_ID="${DEPLOY_ID:-$(date -u +%Y%m%d-%H%M%S)}"
@@ -176,6 +176,9 @@ local_preflight() {
   require_command tar
 
   test -f "$ROOT_DIR/.env" || fail ".env not found"
+  if [[ -z "$(env_file_value "$ROOT_DIR/.env" REDIS_PASSWORD)" ]]; then
+    fail "REDIS_PASSWORD must be set in .env before deploying"
+  fi
 
   resolve_image_tag
   prepare_payload
@@ -237,11 +240,11 @@ main() {
   scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
   ssh_remote "chmod +x '$REMOTE_SCRIPT_PATH'"
 
-  remote_deploy preflight
   remote_deploy backup
   trap rollback_on_error EXIT
 
   sync_config
+  remote_deploy preflight
   remote_deploy config
   remote_deploy pull
   remote_deploy up

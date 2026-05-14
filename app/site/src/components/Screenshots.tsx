@@ -39,70 +39,80 @@ const LISTEN_SHOTS: ScreenshotItem[] = [
     id: "home",
     title: "Personal Home",
     kicker: "Listen",
-    description: "Recommended artists, recently played music, custom mixes, and new albums in one calm listening surface.",
+    description:
+      "Recommended artists, recently played music, custom mixes, and new albums in one calm listening surface.",
     src: "/showcase/listen/home.webp",
   },
   {
     id: "player",
     title: "Fullscreen Player",
     kicker: "Playback",
-    description: "Queue, playback quality, audio profile, visualizer controls, and now-playing context without leaving the music.",
+    description:
+      "Queue, playback quality, audio profile, visualizer controls, and now-playing context without leaving the music.",
     src: "/showcase/listen/player.webp",
   },
   {
     id: "album",
     title: "Album View",
     kicker: "Library",
-    description: "A focused album page with quality badges, tags, actions, and an uncluttered track list.",
+    description:
+      "A focused album page with quality badges, tags, actions, and an uncluttered track list.",
     src: "/showcase/listen/album.webp",
   },
   {
     id: "artist",
     title: "Artist Profile",
     kicker: "Library",
-    description: "Artist pages bring together discography, context, and playback in a way that still feels fast to browse.",
+    description:
+      "Artist pages bring together discography, context, and playback in a way that still feels fast to browse.",
     src: "/showcase/listen/artist.webp",
   },
   {
     id: "explore",
     title: "Explore",
     kicker: "Discovery",
-    description: "Editorial playlists, generated routes, genres, decades, and audio-analysis moods for library-first discovery.",
+    description:
+      "Editorial playlists, generated routes, genres, decades, and audio-analysis moods for library-first discovery.",
     src: "/showcase/listen/explore.webp",
   },
   {
     id: "home-search",
     title: "Search Overlay",
     kicker: "Find",
-    description: "Fast search over the local catalog, designed to feel native in the listening app.",
+    description:
+      "Fast search over the local catalog, designed to feel native in the listening app.",
     src: "/showcase/listen/home-search.webp",
   },
   {
     id: "stats",
     title: "Listening Stats",
     kicker: "Activity",
-    description: "Personal listening history and taste signals, separate from the admin surface.",
+    description:
+      "Personal listening history and taste signals, separate from the admin surface.",
     src: "/showcase/listen/stats.webp",
   },
   {
     id: "upcoming",
     title: "Upcoming Releases",
     kicker: "Radar",
-    description: "Release tracking for artists already in the library, surfaced where listeners can actually use it.",
+    description:
+      "Release tracking for artists already in the library, surfaced where listeners can actually use it.",
     src: "/showcase/listen/upcoming.webp",
   },
   {
     id: "collection-albums",
     title: "Album Collection",
     kicker: "Collection",
-    description: "Dense album browsing with enough cover art to feel musical and enough restraint to stay useful.",
+    description:
+      "Dense album browsing with enough cover art to feel musical and enough restraint to stay useful.",
     src: "/showcase/listen/collection-albums.webp",
   },
   {
     id: "collection-artists",
     title: "Artist Collection",
     kicker: "Collection",
-    description: "Artist-first navigation for people who think about music as scenes, catalogs, and relationships.",
+    description:
+      "Artist-first navigation for people who think about music as scenes, catalogs, and relationships.",
     src: "/showcase/listen/collection-artists.webp",
   },
 ];
@@ -112,161 +122,184 @@ const ADMIN_SHOTS: ScreenshotItem[] = [
     id: "dashboard",
     title: "Operations Dashboard",
     kicker: "Admin",
-    description: "The first-glance control room for health, pipeline state, recent failures, and worker pressure.",
+    description:
+      "The first-glance control room for health, pipeline state, recent failures, and worker pressure.",
     src: "/showcase/admin/dashboard.webp",
   },
   {
     id: "album-view",
     title: "Album Intelligence",
     kicker: "Catalog",
-    description: "Album metadata, audio profile, quality, lyrics state, variants, and per-track operational actions.",
+    description:
+      "Album metadata, audio profile, quality, lyrics state, variants, and per-track operational actions.",
     src: "/showcase/admin/album-view.webp",
   },
   {
     id: "artist-view",
     title: "Artist Overview",
     kicker: "Catalog",
-    description: "Artist identity, popularity, genres, upcoming shows, enrichment, metadata, and export controls.",
+    description:
+      "Artist identity, popularity, genres, upcoming shows, enrichment, metadata, and export controls.",
     src: "/showcase/admin/artist-view.webp",
   },
   {
     id: "artist-discography",
     title: "Artist Discography",
     kicker: "Catalog",
-    description: "A full artist catalog view for owned albums, missing releases, and acquisition opportunities.",
+    description:
+      "A full artist catalog view for owned albums, missing releases, and acquisition opportunities.",
     src: "/showcase/admin/artist-discography.webp",
   },
   {
     id: "artist-network",
     title: "Artist Network",
     kicker: "Graph",
-    description: "Similarity and relationship exploration for moving through scenes instead of flat lists.",
+    description:
+      "Similarity and relationship exploration for moving through scenes instead of flat lists.",
     src: "/showcase/admin/artist-network.webp",
   },
   {
     id: "artist-stats",
     title: "Artist Stats",
     kicker: "Analytics",
-    description: "Depth, popularity, catalog shape, audio analysis, and operational completeness at artist level.",
+    description:
+      "Depth, popularity, catalog shape, audio analysis, and operational completeness at artist level.",
     src: "/showcase/admin/artist-stats.webp",
   },
   {
     id: "browse",
     title: "Library Browse",
     kicker: "Catalog",
-    description: "High-density catalog navigation across artists, albums, formats, and library state.",
+    description:
+      "High-density catalog navigation across artists, albums, formats, and library state.",
     src: "/showcase/admin/browse.webp",
   },
   {
     id: "discovery",
     title: "Discovery Console",
     kicker: "Curation",
-    description: "Operational discovery tools for playlists, recommendations, and generated library surfaces.",
+    description:
+      "Operational discovery tools for playlists, recommendations, and generated library surfaces.",
     src: "/showcase/admin/discovery.webp",
   },
   {
     id: "acquistion-tidal",
     title: "Tidal Acquisition",
     kicker: "Acquisition",
-    description: "Search external catalogs, compare owned copies, and pull better versions into Crate.",
+    description:
+      "Search external catalogs, compare owned copies, and pull better versions into Crate.",
     src: "/showcase/admin/acquistion-tidal.webp",
   },
   {
     id: "library-health",
     title: "Library Health",
     kicker: "Repair",
-    description: "Find broken layouts, missing metadata, duplicate issues, and risky catalog drift.",
+    description:
+      "Find broken layouts, missing metadata, duplicate issues, and risky catalog drift.",
     src: "/showcase/admin/library-health.webp",
   },
   {
     id: "analysis",
     title: "Analysis Pipeline",
     kicker: "Audio",
-    description: "Visibility into analysis coverage, fingerprints, Bliss vectors, lyrics, and portable metadata.",
+    description:
+      "Visibility into analysis coverage, fingerprints, Bliss vectors, lyrics, and portable metadata.",
     src: "/showcase/admin/analysis.webp",
   },
   {
     id: "system-health",
     title: "System Health",
     kicker: "Runtime",
-    description: "API latency, error rate, cache state, playback transcoding, worker slots, and resource pressure.",
+    description:
+      "API latency, error rate, cache state, playback transcoding, worker slots, and resource pressure.",
     src: "/showcase/admin/system-health.webp",
   },
   {
     id: "system-metrics",
     title: "System Metrics",
     kicker: "Runtime",
-    description: "Historical metrics and runtime signals for understanding why the system feels fast or slow.",
+    description:
+      "Historical metrics and runtime signals for understanding why the system feels fast or slow.",
     src: "/showcase/admin/system-metrics.webp",
   },
   {
     id: "tasks",
     title: "Task Queue",
     kicker: "Workers",
-    description: "Explicit and background work with queue visibility, progress, failures, and retry controls.",
+    description:
+      "Explicit and background work with queue visibility, progress, failures, and retry controls.",
     src: "/showcase/admin/tasks.webp",
   },
   {
     id: "stack",
     title: "Stack Services",
     kicker: "Infra",
-    description: "A live map of containers, ports, health, and service state for the self-hosted stack.",
+    description:
+      "A live map of containers, ports, health, and service state for the self-hosted stack.",
     src: "/showcase/admin/stack.webp",
   },
   {
     id: "collection-insigths",
     title: "Collection Insights",
     kicker: "Analytics",
-    description: "Catalog-level rollups for depth, format, duration, popularity, and analysis completeness.",
+    description:
+      "Catalog-level rollups for depth, format, duration, popularity, and analysis completeness.",
     src: "/showcase/admin/collection-insigths.webp",
   },
   {
     id: "genres",
     title: "Genre Workspace",
     kicker: "Taxonomy",
-    description: "Genre cleanup and taxonomy operations across the full library.",
+    description:
+      "Genre cleanup and taxonomy operations across the full library.",
     src: "/showcase/admin/genres.webp",
   },
   {
     id: "genre",
     title: "Genre Detail",
     kicker: "Taxonomy",
-    description: "A single genre view with albums, artists, tracks, and local context.",
+    description:
+      "A single genre view with albums, artists, tracks, and local context.",
     src: "/showcase/admin/genre.webp",
   },
   {
     id: "genre-tree",
     title: "Genre Tree",
     kicker: "Taxonomy",
-    description: "Hierarchical genre mapping for turning messy tags into useful navigation.",
+    description:
+      "Hierarchical genre mapping for turning messy tags into useful navigation.",
     src: "/showcase/admin/genre-tree.webp",
   },
   {
     id: "genre-eq-preset",
     title: "Genre EQ Preset",
     kicker: "Audio",
-    description: "Audio presets and genre-aware playback tuning generated from the library context.",
+    description:
+      "Audio presets and genre-aware playback tuning generated from the library context.",
     src: "/showcase/admin/genre-eq-preset.webp",
   },
   {
     id: "new-releases",
     title: "New Releases",
     kicker: "Radar",
-    description: "Upcoming and recent releases from artists Crate already knows you care about.",
+    description:
+      "Upcoming and recent releases from artists Crate already knows you care about.",
     src: "/showcase/admin/new-releases.webp",
   },
   {
     id: "users",
     title: "Users",
     kicker: "Accounts",
-    description: "Admin visibility into users, roles, sessions, and account state.",
+    description:
+      "Admin visibility into users, roles, sessions, and account state.",
     src: "/showcase/admin/users.webp",
   },
   {
     id: "settings",
     title: "Settings",
     kicker: "Config",
-    description: "Instance-level settings for providers, acquisition, integrations, and runtime behavior.",
+    description:
+      "Instance-level settings for providers, acquisition, integrations, and runtime behavior.",
     src: "/showcase/admin/settings.webp",
   },
 ];
@@ -296,7 +329,12 @@ const SURFACE_COPY: Record<
   },
 };
 
-const QUICK_JUMPS: Array<{ label: string; surface: Surface; index: number; icon: typeof Smartphone }> = [
+const QUICK_JUMPS: Array<{
+  label: string;
+  surface: Surface;
+  index: number;
+  icon: typeof Smartphone;
+}> = [
   { label: "Home", surface: "listen", index: 0, icon: Library },
   { label: "Player", surface: "listen", index: 1, icon: Radio },
   { label: "Explore", surface: "listen", index: 4, icon: Waves },
@@ -355,7 +393,10 @@ export function Screenshots() {
   };
 
   return (
-    <section id="screenshots" className="relative mx-auto max-w-[1480px] scroll-mt-24 px-5 pb-36 pt-24 sm:px-8 sm:pb-40 sm:pt-32">
+    <section
+      id="screenshots"
+      className="relative mx-auto max-w-[1480px] scroll-mt-24 px-5 pb-36 pt-24 sm:px-8 sm:pb-40 sm:pt-32"
+    >
       <div className="mb-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
@@ -365,8 +406,8 @@ export function Screenshots() {
             What it looks like right now.
           </h2>
           <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-            These are captures from the current Listen and Admin apps. They will change,
-            but they give a fair sense of where Crate is today.
+            These are captures from the current Listen and Admin apps. They will
+            change, but they give a fair sense of where Crate is today.
           </p>
         </div>
 
@@ -387,7 +428,9 @@ export function Screenshots() {
               >
                 <Icon size={16} />
                 {SURFACE_COPY[item].label}
-                <span className={active ? "text-[#041319]/60" : "text-white/30"}>
+                <span
+                  className={active ? "text-[#041319]/60" : "text-white/30"}
+                >
                   {SCREENSHOTS[item].length}
                 </span>
               </button>
@@ -404,7 +447,9 @@ export function Screenshots() {
               src={current.src}
               alt={`${current.title} screenshot in ${SURFACE_COPY[surface].label}`}
               className="block max-h-[860px] w-full object-contain object-center [filter:drop-shadow(0_26px_34px_rgba(6,182,212,0.14))]"
-              fetchPriority={index === 0 && surface === "listen" ? "high" : "auto"}
+              fetchPriority={
+                index === 0 && surface === "listen" ? "high" : "auto"
+              }
             />
 
             <button
@@ -440,7 +485,9 @@ export function Screenshots() {
 
             <div className="mt-8">
               <div className="mb-3 flex items-center justify-between text-[12px] text-white/35">
-                <span>{index + 1} of {shots.length}</span>
+                <span>
+                  {index + 1} of {shots.length}
+                </span>
                 <span>{SURFACE_COPY[surface].description}</span>
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-white/8">
@@ -453,7 +500,9 @@ export function Screenshots() {
 
             <div className="mt-8 grid gap-2">
               {visibleShots.map((shot) => {
-                const shotIndex = shots.findIndex((item) => item.id === shot.id);
+                const shotIndex = shots.findIndex(
+                  (item) => item.id === shot.id,
+                );
                 const active = shot.id === current.id;
                 return (
                   <button
@@ -473,7 +522,9 @@ export function Screenshots() {
                       className="h-10 w-16 rounded-sm object-cover opacity-80 transition group-hover:opacity-100"
                     />
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{shot.title}</span>
+                      <span className="block truncate text-sm font-semibold">
+                        {shot.title}
+                      </span>
                       <span className="block truncate text-[11px] uppercase tracking-[0.16em] text-white/35">
                         {shot.kicker}
                       </span>

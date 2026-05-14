@@ -33,7 +33,9 @@ def print_report(issues: list[Issue]):
         return
 
     # Summary
-    console.print(f"\n[bold]Library Health Report[/bold] — {len(issues)} issues found\n")
+    console.print(
+        f"\n[bold]Library Health Report[/bold] — {len(issues)} issues found\n"
+    )
 
     by_type = {}
     for issue in issues:
@@ -48,7 +50,9 @@ def print_report(issues: list[Issue]):
 
     # Details
     for issue_type, items in by_type.items():
-        console.print(f"\n[bold cyan]── {TYPE_LABELS.get(issue_type, issue_type.value)} ──[/bold cyan]")
+        console.print(
+            f"\n[bold cyan]── {TYPE_LABELS.get(issue_type, issue_type.value)} ──[/bold cyan]"
+        )
 
         table = Table(show_header=True, show_lines=True, expand=True)
         table.add_column("Sev", width=4)

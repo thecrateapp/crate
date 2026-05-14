@@ -11,7 +11,7 @@ Supports single-track and batch analysis for throughput optimization.
 import logging
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 _BACKEND = "none"
 _BACKEND_CHECKED = False
 
+
 def _detect_backend():
     global _BACKEND, _BACKEND_CHECKED
     if _BACKEND_CHECKED:
@@ -29,27 +30,30 @@ def _detect_backend():
     _BACKEND_CHECKED = True
     try:
         import essentia.standard  # noqa: F401
+
         _BACKEND = "essentia"
         log.info("Audio analysis backend: Essentia")
     except ImportError:
         try:
             import librosa  # noqa: F401
+
             _BACKEND = "librosa"
             log.info("Audio analysis backend: librosa")
         except ImportError:
             log.warning("No audio analysis backend available")
 
+
 _MODEL_DIR = Path("/app/models")
 
 PANNS_BATCH_SIZE = 4
-PANNS_DURATION = 30   # seconds — enough for genre classification
+PANNS_DURATION = 30  # seconds — enough for genre classification
 SIGNAL_DURATION = 120  # seconds — for BPM/key accuracy
-FRAME_STEP = 4         # analyze every Nth frame for spectral features
+FRAME_STEP = 4  # analyze every Nth frame for spectral features
 
 # ── PANNs CNN14 (lazy singleton) ──────────────────────────────────
 
-_panns_tagger = None
-_panns_lb_to_ix = None
+_panns_tagger: Any | None = None
+_panns_lb_to_ix: dict[str, int] | None = None
 _panns_checked = False
 _panns_ok = False
 
@@ -63,8 +67,10 @@ def _panns_available() -> bool:
     _panns_checked = True
     try:
         import torch  # noqa: F401
+
         _setup_panns_paths()
         from panns_inference import AudioTagging  # noqa: F401
+
         _panns_ok = True
     except (ImportError, Exception):
         _panns_ok = False
@@ -74,11 +80,13 @@ def _panns_available() -> bool:
 
 def _setup_panns_paths():
     import os
+
     panns_dir = str(_PANNS_DATA_DIR)
     labels_csv = os.path.join(panns_dir, "class_labels_indices.csv")
     if os.path.isfile(labels_csv):
         import csv
         import panns_inference.config as pcfg
+
         pcfg.labels_csv_path = labels_csv
         with open(labels_csv, "r") as f:
             reader = csv.reader(f, delimiter=",")
@@ -92,9 +100,9 @@ def _setup_panns_paths():
         pcfg.ix_to_id = {i: id_ for i, id_ in enumerate(pcfg.ids)}
 
 
-def _get_panns():
+def _get_panns() -> tuple[Any, dict[str, int]]:
     global _panns_tagger, _panns_lb_to_ix
-    if _panns_tagger is not None:
+    if _panns_tagger is not None and _panns_lb_to_ix is not None:
         return _panns_tagger, _panns_lb_to_ix
 
     import io
@@ -113,7 +121,7 @@ def _get_panns():
     finally:
         sys.stdout = old_stdout
 
-    _panns_lb_to_ix = lb_to_ix
+    _panns_lb_to_ix = dict(lb_to_ix)
     log.info("PANNs CNN14 loaded (%d AudioSet classes)", len(labels))
     return _panns_tagger, _panns_lb_to_ix
 
@@ -122,57 +130,105 @@ def _get_panns():
 
 _LABEL_GROUPS = {
     "energy_high": {
-        "Heavy metal": 1.5, "Punk rock": 1.2, "Rock music": 0.8,
-        "Exciting music": 1.0, "Angry music": 1.2, "Drum kit": 0.6,
-        "Electric guitar": 0.5, "Scary music": 0.4, "Drum": 0.4,
-        "Rock and roll": 0.4, "Psychedelic rock": 0.3,
+        "Heavy metal": 1.5,
+        "Punk rock": 1.2,
+        "Rock music": 0.8,
+        "Exciting music": 1.0,
+        "Angry music": 1.2,
+        "Drum kit": 0.6,
+        "Electric guitar": 0.5,
+        "Scary music": 0.4,
+        "Drum": 0.4,
+        "Rock and roll": 0.4,
+        "Psychedelic rock": 0.3,
     },
     "energy_low": {
-        "Ambient music": 1.5, "Classical music": 0.8, "Lullaby": 1.2,
-        "Tender music": 1.0, "Silence": 2.0,
+        "Ambient music": 1.5,
+        "Classical music": 0.8,
+        "Lullaby": 1.2,
+        "Tender music": 1.0,
+        "Silence": 2.0,
     },
     "dance": {
-        "Dance music": 1.5, "Electronic dance music": 1.2, "Techno": 1.0,
-        "House music": 1.0, "Disco": 1.2, "Drum and bass": 0.8,
-        "Funk": 0.8, "Reggae": 0.6, "Soul music": 0.5,
-        "Hip hop music": 0.6, "Electronica": 0.5,
+        "Dance music": 1.5,
+        "Electronic dance music": 1.2,
+        "Techno": 1.0,
+        "House music": 1.0,
+        "Disco": 1.2,
+        "Drum and bass": 0.8,
+        "Funk": 0.8,
+        "Reggae": 0.6,
+        "Soul music": 0.5,
+        "Hip hop music": 0.6,
+        "Electronica": 0.5,
     },
     "aggressive": {
-        "Heavy metal": 2.0, "Punk rock": 1.2, "Angry music": 2.0,
-        "Screaming": 1.5, "Growling": 1.5, "Scary music": 0.8,
-        "Drum kit": 0.5, "Drum": 0.3, "Cacophony": 1.0,
-        "Rock music": 0.4, "Exciting music": 0.3,
+        "Heavy metal": 2.0,
+        "Punk rock": 1.2,
+        "Angry music": 2.0,
+        "Screaming": 1.5,
+        "Growling": 1.5,
+        "Scary music": 0.8,
+        "Drum kit": 0.5,
+        "Drum": 0.3,
+        "Cacophony": 1.0,
+        "Rock music": 0.4,
+        "Exciting music": 0.3,
     },
     "happy": {
-        "Happy music": 2.0, "Exciting music": 0.5,
-        "Disco": 0.3, "Funk": 0.3,
+        "Happy music": 2.0,
+        "Exciting music": 0.5,
+        "Disco": 0.3,
+        "Funk": 0.3,
     },
     "sad": {
-        "Sad music": 2.0, "Tender music": 0.5, "Lullaby": 0.3,
+        "Sad music": 2.0,
+        "Tender music": 0.5,
+        "Lullaby": 0.3,
     },
     "relaxed": {
-        "Ambient music": 1.5, "Lullaby": 1.0, "Tender music": 0.8,
+        "Ambient music": 1.5,
+        "Lullaby": 1.0,
+        "Tender music": 0.8,
         "Classical music": 0.5,
     },
     "acoustic_inst": {
-        "Acoustic guitar": 1.2, "Piano": 1.0, "Violin, fiddle": 0.8,
-        "Classical music": 0.5, "Blues": 0.3,
+        "Acoustic guitar": 1.2,
+        "Piano": 1.0,
+        "Violin, fiddle": 0.8,
+        "Classical music": 0.5,
+        "Blues": 0.3,
     },
     "electronic_inst": {
-        "Electronic music": 1.2, "Synthesizer": 1.0, "Drum machine": 0.8,
-        "Techno": 0.6, "Electronica": 0.5, "Electronic dance music": 0.4,
+        "Electronic music": 1.2,
+        "Synthesizer": 1.0,
+        "Drum machine": 0.8,
+        "Techno": 0.6,
+        "Electronica": 0.5,
+        "Electronic dance music": 0.4,
     },
     "vocal": {
-        "Singing": 1.0, "Male singing": 0.5, "Female singing": 0.5,
-        "Rapping": 0.8, "Choir": 0.6, "Speech": 0.3,
+        "Singing": 1.0,
+        "Male singing": 0.5,
+        "Female singing": 0.5,
+        "Rapping": 0.8,
+        "Choir": 0.6,
+        "Speech": 0.3,
     },
     "party": {
-        "Dance music": 1.2, "Electronic dance music": 1.0, "Disco": 1.0,
-        "Funk": 0.8, "Hip hop music": 0.6, "Happy music": 0.5,
+        "Dance music": 1.2,
+        "Electronic dance music": 1.0,
+        "Disco": 1.0,
+        "Funk": 0.8,
+        "Hip hop music": 0.6,
+        "Happy music": 0.5,
     },
     "dark": {
-        "Scary music": 1.5, "Sad music": 0.8, "Angry music": 0.8,
-        "Heavy metal": 0.8, "Cacophony": 0.5,
+        "Scary music": 1.5,
+        "Sad music": 0.8,
+        "Angry music": 0.8,
+        "Heavy metal": 0.8,
+        "Cacophony": 0.5,
     },
 }
 
@@ -188,6 +244,7 @@ def _weighted_sum(probs: np.ndarray, group: dict, lb_to_ix: dict) -> float:
 
 # ── Main entry points ─────────────────────────────────────────────
 
+
 def analyze_track(filepath: Union[str, Path]) -> dict:
     """Analyze a single audio track. Tries Rust CLI first, falls back to Python.
     If Rust CLI returns partial results (missing danceability/valence/mood),
@@ -195,7 +252,10 @@ def analyze_track(filepath: Union[str, Path]) -> dict:
     rust = _analyze_rust(str(filepath))
     if rust:
         # Check if advanced metrics are missing — Rust CLI only does signal-level analysis
-        has_advanced = any(rust.get(k) is not None for k in ("danceability", "valence", "mood", "acousticness"))
+        has_advanced = any(
+            rust.get(k) is not None
+            for k in ("danceability", "valence", "mood", "acousticness")
+        )
         if not has_advanced:
             _detect_backend()
             supplement = None
@@ -205,8 +265,14 @@ def analyze_track(filepath: Union[str, Path]) -> dict:
                 supplement = _analyze_librosa(str(filepath))
             if supplement:
                 # Merge: keep Rust values for basic metrics, add Python values for advanced
-                for key in ("danceability", "valence", "acousticness", "instrumentalness",
-                            "mood", "spectral_complexity"):
+                for key in (
+                    "danceability",
+                    "valence",
+                    "acousticness",
+                    "instrumentalness",
+                    "mood",
+                    "spectral_complexity",
+                ):
                     if rust.get(key) is None and supplement.get(key) is not None:
                         rust[key] = supplement[key]
         return rust
@@ -224,6 +290,7 @@ def _normalize_centroid(hz: float | None) -> float | None:
     if hz is None:
         return None
     import math
+
     return round(min(1.0, math.log1p(hz) / math.log1p(4000)), 3)
 
 
@@ -236,8 +303,13 @@ def analyze_batch(filepaths: list) -> list:
         _detect_backend()
         if _BACKEND != "none":
             needs_supplement = [
-                i for i, r in enumerate(rust)
-                if r and not any(r.get(k) is not None for k in ("danceability", "valence", "mood", "acousticness"))
+                i
+                for i, r in enumerate(rust)
+                if r
+                and not any(
+                    r.get(k) is not None
+                    for k in ("danceability", "valence", "mood", "acousticness")
+                )
             ]
             if needs_supplement:
                 supplement_paths = [filepaths[i] for i in needs_supplement]
@@ -247,12 +319,21 @@ def analyze_batch(filepaths: list) -> list:
                 elif _BACKEND == "librosa":
                     supplements = [_analyze_librosa(str(fp)) for fp in supplement_paths]
                 if supplements:
-                    _ADVANCED_KEYS = ("danceability", "valence", "acousticness", "instrumentalness",
-                                      "mood", "spectral_complexity")
+                    _ADVANCED_KEYS = (
+                        "danceability",
+                        "valence",
+                        "acousticness",
+                        "instrumentalness",
+                        "mood",
+                        "spectral_complexity",
+                    )
                     for idx, sup in zip(needs_supplement, supplements):
                         if sup:
                             for key in _ADVANCED_KEYS:
-                                if rust[idx].get(key) is None and sup.get(key) is not None:
+                                if (
+                                    rust[idx].get(key) is None
+                                    and sup.get(key) is not None
+                                ):
                                     rust[idx][key] = sup[key]
         return rust
     _detect_backend()
@@ -265,6 +346,7 @@ def _analyze_rust(filepath: str) -> dict | None:
     """Try analyzing with crate-cli. Returns result dict or None to fall back."""
     try:
         from crate.crate_cli import run_analyze, is_available, has_subcommands
+
         if not is_available() or not has_subcommands():
             return None
         data = run_analyze(file=filepath)
@@ -294,11 +376,13 @@ def _analyze_rust_batch(filepaths: list) -> list | None:
         return []
     try:
         from crate.crate_cli import run_analyze, is_available, has_subcommands
+
         if not is_available() or not has_subcommands():
             return None
         # crate-cli analyze --dir needs a common directory
         # For batch, analyze the parent directory and filter results
         from pathlib import Path as P
+
         dirs = {str(P(fp).parent) for fp in filepaths}
         if len(dirs) == 1:
             dirpath = dirs.pop()
@@ -310,15 +394,24 @@ def _analyze_rust_batch(filepaths: list) -> list | None:
             for fp in filepaths:
                 t = path_map.get(str(fp))
                 if t:
-                    results.append({
-                        "bpm": t.get("bpm"), "key": t.get("key"), "scale": t.get("scale"),
-                        "energy": t.get("energy"), "loudness": t.get("loudness"),
-                        "dynamic_range": t.get("dynamic_range"),
-                        "spectral_complexity": _normalize_centroid(t.get("spectral_centroid")),
-                        "mood": t.get("mood"), "danceability": t.get("danceability"),
-                        "valence": t.get("valence"), "acousticness": t.get("acousticness"),
-                        "instrumentalness": t.get("instrumentalness"),
-                    })
+                    results.append(
+                        {
+                            "bpm": t.get("bpm"),
+                            "key": t.get("key"),
+                            "scale": t.get("scale"),
+                            "energy": t.get("energy"),
+                            "loudness": t.get("loudness"),
+                            "dynamic_range": t.get("dynamic_range"),
+                            "spectral_complexity": _normalize_centroid(
+                                t.get("spectral_centroid")
+                            ),
+                            "mood": t.get("mood"),
+                            "danceability": t.get("danceability"),
+                            "valence": t.get("valence"),
+                            "acousticness": t.get("acousticness"),
+                            "instrumentalness": t.get("instrumentalness"),
+                        }
+                    )
                 else:
                     results.append(_empty_result())
             return results
@@ -330,14 +423,23 @@ def _analyze_rust_batch(filepaths: list) -> list | None:
 
 def _empty_result() -> dict:
     return {
-        "bpm": None, "key": None, "scale": None, "energy": None, "mood": None,
-        "danceability": None, "valence": None, "acousticness": None,
-        "instrumentalness": None, "loudness": None, "dynamic_range": None,
+        "bpm": None,
+        "key": None,
+        "scale": None,
+        "energy": None,
+        "mood": None,
+        "danceability": None,
+        "valence": None,
+        "acousticness": None,
+        "instrumentalness": None,
+        "loudness": None,
+        "dynamic_range": None,
         "spectral_complexity": None,
     }
 
 
 # ── Essentia single-track ────────────────────────────────────────
+
 
 def _analyze_essentia(filepath: str) -> dict:
     from essentia.standard import MonoLoader
@@ -347,7 +449,7 @@ def _analyze_essentia(filepath: str) -> dict:
         audio_44k = MonoLoader(filename=filepath, sampleRate=44100)()
         if len(audio_44k) < 44100 * 2:
             return result
-        audio_44k = audio_44k[:44100 * SIGNAL_DURATION]
+        audio_44k = audio_44k[: 44100 * SIGNAL_DURATION]
 
         _extract_signal_features(audio_44k, result, filepath)
 
@@ -369,6 +471,7 @@ def _analyze_essentia(filepath: str) -> dict:
 
 # ── Essentia batched ──────────────────────────────────────────────
 
+
 def _analyze_batch_essentia(filepaths: list) -> list:
     """Batch analysis: signal features sequentially, PANNs in batches."""
     from essentia.standard import MonoLoader
@@ -384,7 +487,7 @@ def _analyze_batch_essentia(filepaths: list) -> list:
             if len(audio_44k) < 44100 * 2:
                 items.append((fp, None, None, result))
                 continue
-            audio_44k = audio_44k[:44100 * SIGNAL_DURATION]
+            audio_44k = audio_44k[: 44100 * SIGNAL_DURATION]
             _extract_signal_features(audio_44k, result, str(fp))
 
             audio_32k = None
@@ -415,17 +518,20 @@ def _batch_panns_inference(items: list):
     tagger, lb_to_ix = _get_panns()
 
     # Group valid items into batches
-    valid = [(i, fp, a44, a32, r) for i, (fp, a44, a32, r) in enumerate(items)
-             if a32 is not None]
+    valid = [
+        (i, fp, a44, a32, r)
+        for i, (fp, a44, a32, r) in enumerate(items)
+        if a32 is not None
+    ]
 
     for batch_start in range(0, len(valid), PANNS_BATCH_SIZE):
-        batch = valid[batch_start:batch_start + PANNS_BATCH_SIZE]
+        batch = valid[batch_start : batch_start + PANNS_BATCH_SIZE]
 
         # Pad all to same length and stack
         max_len = max(len(a32) for _, _, _, a32, _ in batch)
         audio_batch = np.zeros((len(batch), max_len), dtype=np.float32)
         for j, (_, _, _, a32, _) in enumerate(batch):
-            audio_batch[j, :len(a32)] = a32
+            audio_batch[j, : len(a32)] = a32
 
         # Batched CNN14 inference
         clipwise_output, _ = tagger.inference(audio_batch)
@@ -443,11 +549,14 @@ def _batch_panns_inference(items: list):
 
 # ── Signal feature extraction ────────────────────────────────────
 
+
 def _extract_signal_features(audio: np.ndarray, result: dict, filepath: str = ""):
     """Extract BPM, key, loudness, dynamic range from audio signal."""
     from essentia.standard import (
-        RhythmExtractor2013, KeyExtractor,
-        DynamicComplexity, LoudnessEBUR128,
+        RhythmExtractor2013,
+        KeyExtractor,
+        DynamicComplexity,
+        LoudnessEBUR128,
     )
 
     # BPM
@@ -475,7 +584,7 @@ def _extract_signal_features(audio: np.ndarray, result: dict, filepath: str = ""
 
     if result["loudness"] is None:
         try:
-            rms = float(np.sqrt(np.mean(audio ** 2)))
+            rms = float(np.sqrt(np.mean(audio**2)))
             if rms > 1e-10:
                 result["loudness"] = round(20 * np.log10(rms), 1)
         except Exception:
@@ -491,8 +600,10 @@ def _extract_signal_features(audio: np.ndarray, result: dict, filepath: str = ""
 
 # ── Audio resampling ──────────────────────────────────────────────
 
-def _resample(audio: np.ndarray, orig_sr: int, target_sr: int,
-              max_duration: int) -> np.ndarray:
+
+def _resample(
+    audio: np.ndarray, orig_sr: int, target_sr: int, max_duration: int
+) -> np.ndarray:
     """Resample audio to target sample rate, truncated to max_duration."""
     # Truncate first (faster than resampling full signal)
     max_samples_orig = orig_sr * max_duration
@@ -508,8 +619,10 @@ def _resample(audio: np.ndarray, orig_sr: int, target_sr: int,
 
 # ── Hybrid analysis (PANNs + signal) ─────────────────────────────
 
-def _analyze_hybrid_from_arrays(audio_44k: np.ndarray, audio_32k: np.ndarray,
-                                result: dict):
+
+def _analyze_hybrid_from_arrays(
+    audio_44k: np.ndarray, audio_32k: np.ndarray, result: dict
+):
     """Single-track hybrid: run PANNs + compute features."""
     tagger, lb_to_ix = _get_panns()
     audio_batch = audio_32k[np.newaxis, :]
@@ -518,12 +631,18 @@ def _analyze_hybrid_from_arrays(audio_44k: np.ndarray, audio_32k: np.ndarray,
     _apply_hybrid_from_probs(audio_44k, probs, lb_to_ix, result)
 
 
-def _apply_hybrid_from_probs(audio_44k: np.ndarray, probs: np.ndarray,
-                             lb_to_ix: dict, result: dict):
+def _apply_hybrid_from_probs(
+    audio_44k: np.ndarray, probs: np.ndarray, lb_to_ix: dict, result: dict
+):
     """Compute hybrid features from PANNs probs + Essentia signal features."""
     from essentia.standard import (
-        Danceability, Energy, SpectralCentroidTime,
-        Spectrum, SpectralComplexity, MFCC, FrameGenerator, Windowing,
+        Danceability,
+        Energy,
+        Spectrum,
+        SpectralComplexity,
+        MFCC,
+        FrameGenerator,
+        Windowing,
     )
 
     def ws(group: str) -> float:
@@ -553,27 +672,33 @@ def _apply_hybrid_from_probs(audio_44k: np.ndarray, probs: np.ndarray,
     e_high = ws("energy_high")
     e_low = ws("energy_low")
     energy_panns = e_high / (e_high + e_low + 0.1)
-    result["energy"] = round(max(0.0, min(1.0,
-        energy_panns * 0.5 + energy_signal * 0.5)), 3)
+    result["energy"] = round(
+        max(0.0, min(1.0, energy_panns * 0.5 + energy_signal * 0.5)), 3
+    )
 
     # Danceability: PANNs + signal rhythm
     dance_panns = ws("dance") / 1.2
-    result["danceability"] = round(max(0.0, min(1.0,
-        dance_panns * 0.4 + dance_signal * 0.6)), 3)
+    result["danceability"] = round(
+        max(0.0, min(1.0, dance_panns * 0.4 + dance_signal * 0.6)), 3
+    )
 
     # Valence: key/tempo heuristic + PANNs modifier
-    valence_signal = mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_signal) * 0.25
+    valence_signal = (
+        mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_signal) * 0.25
+    )
     happy_s = ws("happy")
     sad_s = ws("sad")
-    valence_panns = happy_s / (happy_s + sad_s + 0.05) if (happy_s + sad_s) > 0.01 else 0.5
-    result["valence"] = round(max(0.0, min(1.0,
-        valence_signal * 0.6 + valence_panns * 0.4)), 3)
+    valence_panns = (
+        happy_s / (happy_s + sad_s + 0.05) if (happy_s + sad_s) > 0.01 else 0.5
+    )
+    result["valence"] = round(
+        max(0.0, min(1.0, valence_signal * 0.6 + valence_panns * 0.4)), 3
+    )
 
     # Acousticness: PANNs acoustic vs electronic
     ac_s = ws("acoustic_inst")
     el_s = ws("electronic_inst")
-    result["acousticness"] = round(max(0.0, min(1.0,
-        ac_s / (ac_s + el_s + 0.1))), 3)
+    result["acousticness"] = round(max(0.0, min(1.0, ac_s / (ac_s + el_s + 0.1))), 3)
 
     # Instrumentalness: PANNs vocal detection + MFCC blend
     vocal_s = ws("vocal")
@@ -606,7 +731,8 @@ def _apply_hybrid_from_probs(audio_44k: np.ndarray, probs: np.ndarray,
         complexities = [sc_algo(spectrum_algo(windowing(f))) for f in sampled]
         if complexities:
             result["spectral_complexity"] = round(
-                min(1.0, float(np.mean(complexities)) / 80), 3)
+                min(1.0, float(np.mean(complexities)) / 80), 3
+            )
     except Exception:
         pass
 
@@ -619,14 +745,48 @@ def _apply_hybrid_from_probs(audio_44k: np.ndarray, probs: np.ndarray,
     result["mood"] = {
         "aggressive": round(min(1.0, ws("aggressive") / 0.8), 3),
         "dark": round(min(1.0, ws("dark") / 0.5), 3),
-        "happy": round(max(0.0, min(1.0,
-            valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25)), 3),
-        "sad": round(max(0.0, min(1.0,
-            (1 - valence) * 0.4 + (1 - energy_norm) * 0.3 + (0.7 if is_minor else 0.2) * 0.3)), 3),
-        "relaxed": round(max(0.0, min(1.0,
-            (1 - energy_norm) * 0.4 + acoustic * 0.3 + (1 - tempo_norm) * 0.3)), 3),
-        "party": round(max(0.0, min(1.0,
-            dance * 0.35 + tempo_norm * 0.25 + energy_norm * 0.2 + valence * 0.2)), 3),
+        "happy": round(
+            max(
+                0.0,
+                min(1.0, valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25),
+            ),
+            3,
+        ),
+        "sad": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - valence) * 0.4
+                    + (1 - energy_norm) * 0.3
+                    + (0.7 if is_minor else 0.2) * 0.3,
+                ),
+            ),
+            3,
+        ),
+        "relaxed": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - energy_norm) * 0.4 + acoustic * 0.3 + (1 - tempo_norm) * 0.3,
+                ),
+            ),
+            3,
+        ),
+        "party": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    dance * 0.35
+                    + tempo_norm * 0.25
+                    + energy_norm * 0.2
+                    + valence * 0.2,
+                ),
+            ),
+            3,
+        ),
         "electronic": round(min(1.0, el_s / 0.8), 3),
         "acoustic": round(min(1.0, ac_s / 0.8), 3),
     }
@@ -634,10 +794,18 @@ def _apply_hybrid_from_probs(audio_44k: np.ndarray, probs: np.ndarray,
 
 # ── Essentia heuristic fallback ──────────────────────────────────
 
+
 def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
     from essentia.standard import (
-        Danceability, Energy, SpectralCentroidTime, ZeroCrossingRate,
-        Spectrum, SpectralComplexity, MFCC, FrameGenerator, Windowing,
+        Danceability,
+        Energy,
+        SpectralCentroidTime,
+        ZeroCrossingRate,
+        Spectrum,
+        SpectralComplexity,
+        MFCC,
+        FrameGenerator,
+        Windowing,
     )
 
     tempo_val = result["bpm"] or 120.0
@@ -655,8 +823,9 @@ def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
 
         try:
             danceability_val, _ = Danceability()(audio)
-            result["danceability"] = round(max(0.0, min(1.0,
-                float(danceability_val) / 2.0)), 3)
+            result["danceability"] = round(
+                max(0.0, min(1.0, float(danceability_val) / 2.0)), 3
+            )
         except Exception:
             pass
 
@@ -671,20 +840,38 @@ def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
         tempo_norm = min(1.0, tempo_val / 200)
 
         mode_weight = 0.65 if result.get("scale") == "major" else 0.2
-        result["valence"] = round(max(0.0, min(1.0,
-            mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_norm) * 0.25)), 3)
+        result["valence"] = round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_norm) * 0.25,
+                ),
+            ),
+            3,
+        )
 
-        result["acousticness"] = round(max(0.0, min(1.0,
-            1.0 - centroid_norm * 0.4 - zcr_norm * 0.3 - energy_norm * 0.3)), 3)
+        result["acousticness"] = round(
+            max(
+                0.0,
+                min(
+                    1.0, 1.0 - centroid_norm * 0.4 - zcr_norm * 0.3 - energy_norm * 0.3
+                ),
+            ),
+            3,
+        )
 
         try:
             windowing = Windowing(type="hann")
             spectrum_algo = Spectrum()
             sc_algo = SpectralComplexity()
-            complexities = [sc_algo(spectrum_algo(windowing(f))) for f in sampled_frames]
+            complexities = [
+                sc_algo(spectrum_algo(windowing(f))) for f in sampled_frames
+            ]
             if complexities:
                 result["spectral_complexity"] = round(
-                    min(1.0, float(np.mean(complexities)) / 80), 3)
+                    min(1.0, float(np.mean(complexities)) / 80), 3
+                )
         except Exception:
             pass
 
@@ -692,12 +879,15 @@ def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
             windowing = Windowing(type="hann")
             spectrum_algo = Spectrum()
             mfcc_algo = MFCC(numberCoefficients=13)
-            mfcc_values = [mfcc_algo(spectrum_algo(windowing(f)))[1] for f in sampled_frames]
+            mfcc_values = [
+                mfcc_algo(spectrum_algo(windowing(f)))[1] for f in sampled_frames
+            ]
             if mfcc_values:
                 mfcc_arr = np.array(mfcc_values)
                 vocal_energy = float(np.mean(np.std(mfcc_arr[:, 2:6], axis=0)))
                 result["instrumentalness"] = round(
-                    max(0.0, min(1.0, 1.0 - vocal_energy / 30)), 3)
+                    max(0.0, min(1.0, 1.0 - vocal_energy / 30)), 3
+                )
         except Exception:
             pass
 
@@ -707,28 +897,109 @@ def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
         acoustic = result.get("acousticness") or 0.5
 
         result["mood"] = {
-            "aggressive": round(max(0.0, min(1.0,
-                energy_norm * 0.45 + zcr_norm * 0.2 + centroid_norm * 0.2 + (1 - valence) * 0.15)), 3),
-            "dark": round(max(0.0, min(1.0,
-                (1 - valence) * 0.4 + energy_norm * 0.2 + (0.7 if is_minor else 0.2) * 0.4)), 3),
-            "happy": round(max(0.0, min(1.0,
-                valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25)), 3),
-            "sad": round(max(0.0, min(1.0,
-                (1 - valence) * 0.4 + (1 - energy_norm) * 0.3 + (0.7 if is_minor else 0.2) * 0.3)), 3),
-            "relaxed": round(max(0.0, min(1.0,
-                (1 - energy_norm) * 0.4 + acoustic * 0.3 + (1 - tempo_norm) * 0.3)), 3),
-            "party": round(max(0.0, min(1.0,
-                dance * 0.35 + tempo_norm * 0.25 + energy_norm * 0.2 + valence * 0.2)), 3),
-            "electronic": round(max(0.0, min(1.0,
-                (1 - acoustic) * 0.4 + centroid_norm * 0.3 + (1 - zcr_norm) * 0.3)), 3),
-            "acoustic": round(max(0.0, min(1.0,
-                acoustic * 0.5 + (1 - centroid_norm) * 0.25 + (1 - energy_norm) * 0.25)), 3),
+            "aggressive": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        energy_norm * 0.45
+                        + zcr_norm * 0.2
+                        + centroid_norm * 0.2
+                        + (1 - valence) * 0.15,
+                    ),
+                ),
+                3,
+            ),
+            "dark": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        (1 - valence) * 0.4
+                        + energy_norm * 0.2
+                        + (0.7 if is_minor else 0.2) * 0.4,
+                    ),
+                ),
+                3,
+            ),
+            "happy": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25,
+                    ),
+                ),
+                3,
+            ),
+            "sad": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        (1 - valence) * 0.4
+                        + (1 - energy_norm) * 0.3
+                        + (0.7 if is_minor else 0.2) * 0.3,
+                    ),
+                ),
+                3,
+            ),
+            "relaxed": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        (1 - energy_norm) * 0.4
+                        + acoustic * 0.3
+                        + (1 - tempo_norm) * 0.3,
+                    ),
+                ),
+                3,
+            ),
+            "party": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        dance * 0.35
+                        + tempo_norm * 0.25
+                        + energy_norm * 0.2
+                        + valence * 0.2,
+                    ),
+                ),
+                3,
+            ),
+            "electronic": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        (1 - acoustic) * 0.4
+                        + centroid_norm * 0.3
+                        + (1 - zcr_norm) * 0.3,
+                    ),
+                ),
+                3,
+            ),
+            "acoustic": round(
+                max(
+                    0.0,
+                    min(
+                        1.0,
+                        acoustic * 0.5
+                        + (1 - centroid_norm) * 0.25
+                        + (1 - energy_norm) * 0.25,
+                    ),
+                ),
+                3,
+            ),
         }
     except Exception:
         log.debug("Heuristic features failed", exc_info=True)
 
 
 # ── Librosa backend (ARM/dev fallback) ────────────────────────────
+
 
 def _analyze_librosa(filepath: str) -> dict:
     import librosa
@@ -772,14 +1043,18 @@ def _analyze_librosa(filepath: str) -> dict:
                     message=r".*sunau was removed in Python 3\.13.*",
                     category=DeprecationWarning,
                 )
-                y, sr = librosa.load(filepath, sr=22050, mono=True, duration=SIGNAL_DURATION)
+                y, sr = librosa.load(
+                    filepath, sr=22050, mono=True, duration=SIGNAL_DURATION
+                )
         if len(y) < sr * 2:
             return result
 
         rms_frames = librosa.feature.rms(y=y)[0]
         mean_rms = float(np.mean(rms_frames))
         chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
-        spectral_centroid = float(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)))
+        spectral_centroid = float(
+            np.mean(librosa.feature.spectral_centroid(y=y, sr=sr))
+        )
         spectral_rolloff = float(np.mean(librosa.feature.spectral_rolloff(y=y, sr=sr)))
         zero_crossing = float(np.mean(librosa.feature.zero_crossing_rate(y=y)))
         spectral_flatness = float(np.mean(librosa.feature.spectral_flatness(y=y)))
@@ -804,12 +1079,26 @@ def _analyze_librosa(filepath: str) -> dict:
 
         try:
             chroma_mean = np.mean(chroma, axis=1)
-            major_profile = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09,
-                                      2.52, 5.19, 2.39, 3.66, 2.29, 2.88])
-            minor_profile = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53,
-                                      2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
-            key_names = ["C", "C#", "D", "D#", "E", "F",
-                         "F#", "G", "G#", "A", "A#", "B"]
+            major_profile = np.array(
+                [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+            )
+            minor_profile = np.array(
+                [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
+            )
+            key_names = [
+                "C",
+                "C#",
+                "D",
+                "D#",
+                "E",
+                "F",
+                "F#",
+                "G",
+                "G#",
+                "A",
+                "A#",
+                "B",
+            ]
             best_corr, best_key, best_scale = -1, "C", "major"
             for i in range(12):
                 rotated = np.roll(chroma_mean, -i)
@@ -841,7 +1130,8 @@ def _analyze_librosa(filepath: str) -> dict:
                 rms_low = float(np.percentile(rms_nonzero, 10))
                 if rms_low > 1e-10:
                     result["dynamic_range"] = round(
-                        float(20 * np.log10(rms_high / rms_low)), 3)
+                        float(20 * np.log10(rms_high / rms_low)), 3
+                    )
         except Exception:
             pass
 
@@ -851,26 +1141,43 @@ def _analyze_librosa(filepath: str) -> dict:
             regularity = max(0.0, 1.0 - float(np.std(onset_env)) / onset_mean)
             beat_strength = min(1.0, onset_mean / 10.0)
             result["danceability"] = round(
-                min(1.0, regularity * 0.4 + beat_strength * 0.3 + tempo_score * 0.3), 3)
+                min(1.0, regularity * 0.4 + beat_strength * 0.3 + tempo_score * 0.3), 3
+            )
         except Exception:
             pass
 
         mode_weight = 0.65 if result.get("scale") == "major" else 0.2
-        result["valence"] = round(max(0.0, min(1.0,
-            mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_norm) * 0.25)), 3)
-        result["acousticness"] = round(max(0.0, min(1.0,
-            1.0 - rolloff_norm * 0.4 - zcr_norm * 0.3 - energy_norm * 0.3)), 3)
+        result["valence"] = round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    mode_weight * 0.5 + tempo_norm * 0.25 + (1.0 - energy_norm) * 0.25,
+                ),
+            ),
+            3,
+        )
+        result["acousticness"] = round(
+            max(
+                0.0,
+                min(1.0, 1.0 - rolloff_norm * 0.4 - zcr_norm * 0.3 - energy_norm * 0.3),
+            ),
+            3,
+        )
         result["instrumentalness"] = round(min(1.0, spectral_flatness * 10), 3)
 
         try:
             chroma_norm_arr = chroma / (np.sum(chroma, axis=0, keepdims=True) + 1e-8)
             entropy = -np.sum(chroma_norm_arr * np.log2(chroma_norm_arr + 1e-8), axis=0)
             result["spectral_complexity"] = round(
-                min(1.0, float(np.mean(entropy)) / np.log2(12)), 3)
+                min(1.0, float(np.mean(entropy)) / np.log2(12)), 3
+            )
         except Exception:
             pass
 
-        _librosa_mood_heuristic(result, energy_norm, zcr_norm, centroid_norm, tempo_norm)
+        _librosa_mood_heuristic(
+            result, energy_norm, zcr_norm, centroid_norm, tempo_norm
+        )
     except Exception:
         log.warning("Librosa analysis failed for %s", filepath, exc_info=True)
 
@@ -885,26 +1192,100 @@ def _librosa_mood_heuristic(result, energy_norm, zcr_norm, centroid_norm, tempo_
     acoustic = result.get("acousticness") or 0.5
 
     result["mood"] = {
-        "aggressive": round(max(0.0, min(1.0,
-            energy_norm * 0.45 + zcr_norm * 0.2 + centroid_norm * 0.2 + (1 - valence) * 0.15)), 3),
-        "dark": round(max(0.0, min(1.0,
-            (1 - valence) * 0.4 + energy_norm * 0.2 + (0.7 if is_minor else 0.2) * 0.4)), 3),
-        "happy": round(max(0.0, min(1.0,
-            valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25)), 3),
-        "sad": round(max(0.0, min(1.0,
-            (1 - valence) * 0.4 + (1 - energy_norm) * 0.3 + (0.7 if is_minor else 0.2) * 0.3)), 3),
-        "relaxed": round(max(0.0, min(1.0,
-            (1 - energy_norm) * 0.4 + acoustic * 0.3 + (1 - tempo_norm) * 0.3)), 3),
-        "party": round(max(0.0, min(1.0,
-            dance * 0.35 + tempo_norm * 0.25 + energy_norm * 0.2 + valence * 0.2)), 3),
-        "electronic": round(max(0.0, min(1.0,
-            (1 - acoustic) * 0.4 + centroid_norm * 0.3 + (1 - zcr_norm) * 0.3)), 3),
-        "acoustic": round(max(0.0, min(1.0,
-            acoustic * 0.5 + (1 - centroid_norm) * 0.25 + (1 - energy_norm) * 0.25)), 3),
+        "aggressive": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    energy_norm * 0.45
+                    + zcr_norm * 0.2
+                    + centroid_norm * 0.2
+                    + (1 - valence) * 0.15,
+                ),
+            ),
+            3,
+        ),
+        "dark": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - valence) * 0.4
+                    + energy_norm * 0.2
+                    + (0.7 if is_minor else 0.2) * 0.4,
+                ),
+            ),
+            3,
+        ),
+        "happy": round(
+            max(
+                0.0,
+                min(1.0, valence * 0.5 + tempo_norm * 0.25 + (1 - energy_norm) * 0.25),
+            ),
+            3,
+        ),
+        "sad": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - valence) * 0.4
+                    + (1 - energy_norm) * 0.3
+                    + (0.7 if is_minor else 0.2) * 0.3,
+                ),
+            ),
+            3,
+        ),
+        "relaxed": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - energy_norm) * 0.4 + acoustic * 0.3 + (1 - tempo_norm) * 0.3,
+                ),
+            ),
+            3,
+        ),
+        "party": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    dance * 0.35
+                    + tempo_norm * 0.25
+                    + energy_norm * 0.2
+                    + valence * 0.2,
+                ),
+            ),
+            3,
+        ),
+        "electronic": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (1 - acoustic) * 0.4 + centroid_norm * 0.3 + (1 - zcr_norm) * 0.3,
+                ),
+            ),
+            3,
+        ),
+        "acoustic": round(
+            max(
+                0.0,
+                min(
+                    1.0,
+                    acoustic * 0.5
+                    + (1 - centroid_norm) * 0.25
+                    + (1 - energy_norm) * 0.25,
+                ),
+            ),
+            3,
+        ),
     }
 
 
 # ── Helpers ───────────────────────────────────────────────────────
+
 
 def _ensure_native_floats(result: dict):
     for k, v in result.items():

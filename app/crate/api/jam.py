@@ -7,11 +7,22 @@ import logging
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.encoders import jsonable_encoder
 
 from crate.api.auth import COOKIE_NAME, COOKIE_NAME_LISTEN, _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.redis_sse import close_pubsub, get_async_redis, open_pubsub
 from crate.api.schemas.jam import (
     JamInviteCreateRequest,
@@ -101,7 +112,9 @@ class _LocalJamHub:
             if not peers:
                 self._rooms.pop(room_id, None)
 
-    async def broadcast(self, room_id: str, payload: dict, *, fallback_only: bool = False) -> None:
+    async def broadcast(
+        self, room_id: str, payload: dict, *, fallback_only: bool = False
+    ) -> None:
         async with self._lock:
             peers = list(self._rooms.get(room_id, set()))
         for peer in peers:
@@ -109,14 +122,21 @@ class _LocalJamHub:
                 continue
             try:
                 await peer.send_json(payload)
-            except Exception:
+            except (RuntimeError, ConnectionResetError, BrokenPipeError):
+                log.debug(
+                    "Broadcast send failed for peer in room %s", room_id, exc_info=True
+                )
                 await self.disconnect(room_id, peer)
 
-    async def close_room(self, room_id: str, *, code: int = 4409, reason: str = "Room closed") -> None:
+    async def close_room(
+        self, room_id: str, *, code: int = 4409, reason: str = "Room closed"
+    ) -> None:
         async with self._lock:
             peers = list(self._rooms.pop(room_id, set()))
         for peer in peers:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(
+                RuntimeError, ConnectionResetError, BrokenPipeError
+            ):
                 await peer.close(code=code, reason=reason)
 
 
@@ -146,26 +166,36 @@ async def _broadcast_to_room(room_id: str, payload: dict) -> None:
         await redis.publish(_room_channel(room_id), json.dumps(_json_payload(payload)))
         await _local_hub.broadcast(room_id, payload, fallback_only=True)
         return
-    except Exception:
-        log.exception("Failed to publish jam room event for room %s; using local fallback", room_id)
+    except (ConnectionError, RuntimeError):
+        log.exception(
+            "Failed to publish jam room event for room %s; using local fallback",
+            room_id,
+        )
     await _local_hub.broadcast(room_id, payload)
 
 
-async def _set_sync_clock(room_id: str, *, track: dict | None, position_ms: float, playing: bool) -> dict:
+async def _set_sync_clock(
+    room_id: str, *, track: dict | None, position_ms: float, playing: bool
+) -> dict:
     """Store the authoritative playback clock for a room."""
-    clock = _json_payload({
-        "track": track,
-        "position_ms": position_ms,
-        "playing": playing,
-        "clock_started_at": datetime.now(timezone.utc).timestamp(),
-    })
+    clock = _json_payload(
+        {
+            "track": track,
+            "position_ms": position_ms,
+            "playing": playing,
+            "clock_started_at": datetime.now(timezone.utc).timestamp(),
+        }
+    )
     async with _sync_clocks_lock:
         _sync_clocks[room_id] = clock
     try:
         redis = get_async_redis()
         await redis.set(_sync_clock_key(room_id), json.dumps(clock))
-    except Exception:
-        log.exception("Failed to persist jam sync clock for room %s; using local fallback", room_id)
+    except (ConnectionError, RuntimeError):
+        log.exception(
+            "Failed to persist jam sync clock for room %s; using local fallback",
+            room_id,
+        )
     return clock
 
 
@@ -179,8 +209,10 @@ async def _get_sync_clock(room_id: str) -> dict | None:
             async with _sync_clocks_lock:
                 _sync_clocks[room_id] = clock
             return clock
-    except Exception:
-        log.exception("Failed to read jam sync clock for room %s; using local fallback", room_id)
+    except (ConnectionError, RuntimeError):
+        log.exception(
+            "Failed to read jam sync clock for room %s; using local fallback", room_id
+        )
     async with _sync_clocks_lock:
         return _sync_clocks.get(room_id)
 
@@ -192,7 +224,7 @@ async def _clear_sync_clock(room_id: str) -> None:
     try:
         redis = get_async_redis()
         await redis.delete(_sync_clock_key(room_id))
-    except Exception:
+    except (ConnectionError, RuntimeError):
         log.exception("Failed to clear jam sync clock for room %s", room_id)
 
 
@@ -200,7 +232,9 @@ async def _compute_expected_position(clock: dict) -> float:
     """Compute the expected playback position based on the clock."""
     if not clock.get("playing"):
         return clock["position_ms"]
-    elapsed = (datetime.now(timezone.utc).timestamp() - clock["clock_started_at"]) * 1000
+    elapsed = (
+        datetime.now(timezone.utc).timestamp() - clock["clock_started_at"]
+    ) * 1000
     return clock["position_ms"] + elapsed
 
 
@@ -267,8 +301,10 @@ async def _acquire_heartbeat_lock(room_id: str, owner: str) -> bool:
     key = f"crate:jam:heartbeat:{room_id}"
     try:
         redis = get_async_redis()
-        return bool(await redis.set(key, owner, nx=True, ex=_HEARTBEAT_LOCK_TTL_SECONDS))
-    except Exception:
+        return bool(
+            await redis.set(key, owner, nx=True, ex=_HEARTBEAT_LOCK_TTL_SECONDS)
+        )
+    except (ConnectionError, RuntimeError):
         log.exception("Failed to acquire Redis jam heartbeat lock for room %s", room_id)
     async with _local_heartbeat_lock:
         if room_id in _local_heartbeat_owners:
@@ -286,7 +322,7 @@ async def _renew_heartbeat_lock(room_id: str, owner: str) -> bool:
             return False
         await redis.expire(key, _HEARTBEAT_LOCK_TTL_SECONDS)
         return True
-    except Exception:
+    except (ConnectionError, RuntimeError):
         log.exception("Failed to renew Redis jam heartbeat lock for room %s", room_id)
     async with _local_heartbeat_lock:
         return _local_heartbeat_owners.get(room_id) == owner
@@ -299,7 +335,7 @@ async def _release_heartbeat_lock(room_id: str, owner: str) -> None:
         current_owner = await redis.get(key)
         if current_owner == owner:
             await redis.delete(key)
-    except Exception:
+    except (ConnectionError, RuntimeError):
         log.exception("Failed to release Redis jam heartbeat lock for room %s", room_id)
     async with _local_heartbeat_lock:
         if _local_heartbeat_owners.get(room_id) == owner:
@@ -352,7 +388,11 @@ async def get_room(request: Request, room_id: str):
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     member = get_jam_room_member(room_id, user["id"])
-    if not member and room.get("visibility") == "public" and (room.get("status") == "active" or room.get("is_permanent")):
+    if (
+        not member
+        and room.get("visibility") == "public"
+        and (room.get("status") == "active" or room.get("is_permanent"))
+    ):
         room = _reactivate_permanent_room_if_needed(room)
         upsert_jam_room_member(room_id, user["id"], role="collab")
         event = append_jam_room_event(room_id, "join", {"role": "collab"}, user["id"])
@@ -387,7 +427,9 @@ async def update_room(request: Request, room_id: str, body: JamRoomUpdateRequest
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     if room["host_user_id"] != user["id"]:
-        raise HTTPException(status_code=403, detail="Only the host can update this room")
+        raise HTTPException(
+            status_code=403, detail="Only the host can update this room"
+        )
     if room.get("status") != "active":
         if room.get("is_permanent"):
             room = _reactivate_permanent_room_if_needed(room)
@@ -402,7 +444,9 @@ async def update_room(request: Request, room_id: str, body: JamRoomUpdateRequest
         name=name,
         visibility=body.visibility,
         is_permanent=body.is_permanent,
-        description=_normalise_room_description(body.description) if "description" in body.model_fields_set else None,
+        description=_normalise_room_description(body.description)
+        if "description" in body.model_fields_set
+        else None,
         description_provided="description" in body.model_fields_set,
         tags=_normalise_room_tags(body.tags) if body.tags is not None else None,
     )
@@ -530,7 +574,9 @@ async def join_room_by_invite(request: Request, token: str, body: JamInviteJoinR
     existing_member = get_jam_room_member(str(invite["room_id"]), user["id"])
     role = existing_member["role"] if existing_member else "collab"
     upsert_jam_room_member(str(invite["room_id"]), user["id"], role=role)
-    event = append_jam_room_event(str(invite["room_id"]), "join", {"role": role}, user["id"])
+    event = append_jam_room_event(
+        str(invite["room_id"]), "join", {"role": role}, user["id"]
+    )
     updated = get_jam_room(str(invite["room_id"])) or room
     serialized = _serialize_room(updated)
     await _broadcast_to_room(
@@ -568,7 +614,9 @@ async def end_room(request: Request, room_id: str):
     updated = update_jam_room_state(room_id, status="ended", ended_at=ended_at)
     if not updated:
         raise HTTPException(status_code=404, detail="Room not found")
-    event = append_jam_room_event(room_id, "room_ended", {"ended_at": ended_at}, user["id"])
+    event = append_jam_room_event(
+        room_id, "room_ended", {"ended_at": ended_at}, user["id"]
+    )
     await _clear_sync_clock(room_id)
     await _broadcast_to_room(
         room_id,
@@ -595,7 +643,9 @@ async def delete_room(request: Request, room_id: str):
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     if room["host_user_id"] != user["id"]:
-        raise HTTPException(status_code=403, detail="Only the host can delete this room")
+        raise HTTPException(
+            status_code=403, detail="Only the host can delete this room"
+        )
 
     await _clear_sync_clock(room_id)
     await _broadcast_to_room(
@@ -646,12 +696,14 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
     try:
         pubsub = await open_pubsub(_room_channel(room_id))
         peer.distributed = True
-    except Exception:
+    except (ConnectionError, RuntimeError):
         log.exception("Failed to open Redis pubsub for room %s", room_id)
-        await peer.send_json({
-            "type": "warning",
-            "detail": "Room sync is running in local fallback mode",
-        })
+        await peer.send_json(
+            {
+                "type": "warning",
+                "detail": "Room sync is running in local fallback mode",
+            }
+        )
     touch_jam_room_member(room_id, user_id)
     await peer.send_json({"type": "state_sync", "room": _serialize_room(room)})
 
@@ -659,13 +711,15 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
         clock = await _get_sync_clock(room_id)
         if clock:
             expected_position = await _compute_expected_position(clock)
-            await peer.send_json({
-                "type": "sync_clock",
-                "track": clock.get("track"),
-                "position_ms": expected_position,
-                "playing": clock.get("playing"),
-            })
-    except Exception:
+            await peer.send_json(
+                {
+                    "type": "sync_clock",
+                    "track": clock.get("track"),
+                    "position_ms": expected_position,
+                    "playing": clock.get("playing"),
+                }
+            )
+    except (RuntimeError, ConnectionResetError, BrokenPipeError):
         log.exception("Failed to send sync clock for room %s", room_id)
 
     await _broadcast_to_room(
@@ -707,7 +761,9 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
             return
         try:
             while True:
-                message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True, timeout=1.0
+                )
                 if message and message.get("type") == "message":
                     data_str = message.get("data")
                     if data_str and isinstance(data_str, str):
@@ -717,10 +773,15 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
                             if payload.get("type") in {"room_ended", "room_deleted"}:
                                 await peer.close(code=4409, reason="Room closed")
                                 break
-                        except Exception:
+                        except (RuntimeError, ConnectionResetError, BrokenPipeError):
+                            log.debug(
+                                "Redis listener send failed for room %s",
+                                room_id,
+                                exc_info=True,
+                            )
                             break
-        except Exception:
-            pass
+        except (ConnectionError, RuntimeError):
+            log.debug("Redis listener ended for room %s", room_id, exc_info=True)
 
     listener_task = asyncio.create_task(_redis_listener())
 
@@ -737,22 +798,41 @@ async def jam_room_ws(websocket: WebSocket, room_id: str):
                 await peer.send_json({"type": "pong"})
                 touch_jam_room_member(room_id, user_id)
                 continue
-            if event_type not in {"queue_add", "queue_remove", "queue_reorder", "play", "pause", "seek", "join", "presence"}:
+            if event_type not in {
+                "queue_add",
+                "queue_remove",
+                "queue_reorder",
+                "play",
+                "pause",
+                "seek",
+                "join",
+                "presence",
+            }:
                 continue
             touch_jam_room_member(room_id, user_id)
             role = member.get("role")
             if event_type in {"play", "pause", "seek"} and role != "host":
-                await peer.send_json({"type": "error", "detail": "Only the host can control playback"})
+                await peer.send_json(
+                    {"type": "error", "detail": "Only the host can control playback"}
+                )
                 continue
-            if event_type in {"queue_add", "queue_remove", "queue_reorder"} and role not in {"host", "collab"}:
-                await peer.send_json({"type": "error", "detail": "You cannot edit this queue"})
+            if event_type in {
+                "queue_add",
+                "queue_remove",
+                "queue_reorder",
+            } and role not in {"host", "collab"}:
+                await peer.send_json(
+                    {"type": "error", "detail": "You cannot edit this queue"}
+                )
                 continue
 
             if event_type in {"play", "pause", "seek"}:
                 track = data.get("track")
                 position_seconds = float(data.get("position", 0))
                 position_ms = position_seconds * 1000
-                playing = event_type == "play" or (event_type == "seek" and data.get("playing"))
+                playing = event_type == "play" or (
+                    event_type == "seek" and data.get("playing")
+                )
                 await _set_sync_clock(
                     room_id,
                     track=track,

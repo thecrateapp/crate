@@ -12,7 +12,11 @@ from typing import Any, Callable
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.genres import set_artist_genres
-from crate.db.repositories.library import get_library_artist, update_artist_enrichment, update_artist_has_photo
+from crate.db.repositories.library import (
+    get_library_artist,
+    update_artist_enrichment,
+    update_artist_has_photo,
+)
 from crate.db.similarities import bulk_upsert_similarities
 from crate.provider_rate_limits import wait_for_provider_slot
 
@@ -118,12 +122,16 @@ def _get_executor(worker_count: int) -> ThreadPoolExecutor:
         return executor
 
 
-def _execute_enrichment_fetcher(source: str, artist_name: str, fetcher: Callable[[], Any]) -> Any | None:
+def _execute_enrichment_fetcher(
+    source: str, artist_name: str, fetcher: Callable[[], Any]
+) -> Any | None:
     try:
         wait_for_provider_slot(source, _PROVIDER_MIN_INTERVAL_SECONDS.get(source, 0.0))
         payload = fetcher()
     except Exception:
-        log.debug("%s failed for %s", _provider_label(source), artist_name, exc_info=True)
+        log.debug(
+            "%s failed for %s", _provider_label(source), artist_name, exc_info=True
+        )
         return None
     return payload or None
 
@@ -148,7 +156,9 @@ def _run_enrichment_fetchers(
 
     executor = _get_executor(worker_count)
     future_map = {
-        executor.submit(_execute_enrichment_fetcher, source, artist_name, fetcher): source
+        executor.submit(
+            _execute_enrichment_fetcher, source, artist_name, fetcher
+        ): source
         for source, fetcher in fetchers.items()
     }
     for future in as_completed(future_map):
@@ -156,7 +166,9 @@ def _run_enrichment_fetchers(
         try:
             payload = future.result()
         except Exception:
-            log.debug("%s failed for %s", _provider_label(source), artist_name, exc_info=True)
+            log.debug(
+                "%s failed for %s", _provider_label(source), artist_name, exc_info=True
+            )
             continue
         if payload is not None:
             results[source] = payload
@@ -216,7 +228,9 @@ def _discogs_is_configured() -> bool:
     return bool(discogs_configured())
 
 
-def _collect_enrichment_payloads(name: str, *, max_workers: int, force: bool = False) -> dict[str, Any]:
+def _collect_enrichment_payloads(
+    name: str, *, max_workers: int, force: bool = False
+) -> dict[str, Any]:
     available_fetchers: dict[str, Callable[[], Any]] = {
         "lastfm": lambda: _fetch_lastfm_payload(name),
         "spotify": lambda: _fetch_spotify_payload(name),
@@ -245,7 +259,8 @@ def _collect_enrichment_payloads(name: str, *, max_workers: int, force: bool = F
 
 def _has_local_artist_photo(artist_dir: Path) -> bool:
     return artist_dir.is_dir() and any(
-        (artist_dir / photo_name).exists() for photo_name in ("artist.jpg", "artist.png", "photo.jpg")
+        (artist_dir / photo_name).exists()
+        for photo_name in ("artist.jpg", "artist.png", "photo.jpg")
     )
 
 
@@ -255,7 +270,7 @@ def _download_artist_photo(name: str, artist_dir: Path) -> bool:
 
     try:
         from crate.lastfm import get_best_artist_image
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         return False
 
     try:
@@ -284,6 +299,7 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
     if not force and db_artist and db_artist.get("enriched_at"):
         from datetime import datetime, timezone
         from crate.utils import to_datetime
+
         enriched = to_datetime(db_artist["enriched_at"])
         if enriched is not None:
             age_hours = (datetime.now(timezone.utc) - enriched).total_seconds() / 3600
@@ -295,8 +311,14 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
                 return {"artist": name, "skipped": True, "reason": "recently_enriched"}
 
     if force:
-        for prefix in ("enrichment:", "lastfm:artist:", "fanart:artist:",
-                        "fanart:bg:", "fanart:all:", "deezer:artist_img:"):
+        for prefix in (
+            "enrichment:",
+            "lastfm:artist:",
+            "fanart:artist:",
+            "fanart:bg:",
+            "fanart:all:",
+            "deezer:artist_img:",
+        ):
             delete_cache(f"{prefix}{name.lower()}")
         for source in _ENRICHMENT_FETCH_ORDER:
             delete_cache(_source_cache_key(source, name))
@@ -347,7 +369,9 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
 
         related_artists = spotify_payload.get("related_artists", [])
         if not persist_data.get("similar") and related_artists:
-            persist_data["similar"] = [{"name": artist["name"]} for artist in related_artists[:10]]
+            persist_data["similar"] = [
+                {"name": artist["name"]} for artist in related_artists[:10]
+            ]
 
     musicbrainz_payload = payloads.get("musicbrainz")
     if musicbrainz_payload:
@@ -384,7 +408,9 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
         if discogs_payload.get("discogs_members"):
             persist_data["discogs_members"] = discogs_payload["discogs_members"]
         if discogs_payload.get("discogs_url"):
-            persist_data.setdefault("urls", {})["discogs"] = discogs_payload["discogs_url"]
+            persist_data.setdefault("urls", {})["discogs"] = discogs_payload[
+                "discogs_url"
+            ]
 
     # ── Persist to cache ──
     if enrichment_data:
@@ -401,7 +427,7 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
         try:
             bulk_upsert_similarities(name, similar_list)
         except Exception:
-            log.debug("Failed to persist similarities for %s", name)
+            log.debug("Failed to persist similarities for %s", name, exc_info=True)
 
     # ── Update genre index ──
     tags = persist_data.get("tags", [])
@@ -416,7 +442,7 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
             if genres:
                 set_artist_genres(name, genres)
         except Exception:
-            log.debug("Failed to index genres for %s", name)
+            log.debug("Failed to index genres for %s", name, exc_info=True)
 
     # ── Download photo ──
     if not _has_local_artist_photo(artist_dir):

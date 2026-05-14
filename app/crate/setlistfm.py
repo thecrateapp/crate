@@ -75,7 +75,9 @@ def get_probable_setlist(artist_name: str, num_setlists: int = 30) -> list[dict]
     result = _predict_setlist(raw_setlists)
 
     if result:
-        set_cache(f"setlistfm:probable:{artist_name.lower()}", {"songs": result}, ttl=604800)
+        set_cache(
+            f"setlistfm:probable:{artist_name.lower()}", {"songs": result}, ttl=604800
+        )
     return result
 
 
@@ -101,13 +103,15 @@ def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[dict]:
                     if title:
                         songs.append(title)
             if songs:
-                setlists.append({
-                    "date": sl.get("eventDate", ""),
-                    "venue": sl.get("venue", {}).get("name", ""),
-                    "city": sl.get("venue", {}).get("city", {}).get("name", ""),
-                    "tour": sl.get("tour", {}).get("name", ""),
-                    "songs": songs,
-                })
+                setlists.append(
+                    {
+                        "date": sl.get("eventDate", ""),
+                        "venue": sl.get("venue", {}).get("name", ""),
+                        "city": sl.get("venue", {}).get("city", {}).get("name", ""),
+                        "tour": sl.get("tour", {}).get("name", ""),
+                        "songs": songs,
+                    }
+                )
 
     return setlists
 
@@ -158,25 +162,29 @@ def _predict_setlist(setlists: list[dict]) -> list[dict] | None:
             break
         for title, count in position_songs[pos].most_common():
             if title not in used_songs:
-                predicted.append({
-                    "title": title,
-                    "frequency": round(global_counts[title] / total_shows, 3),
-                    "play_count": global_counts[title],
-                    "last_played": last_played.get(title, ""),
-                    "position": pos + 1,
-                })
+                predicted.append(
+                    {
+                        "title": title,
+                        "frequency": round(global_counts[title] / total_shows, 3),
+                        "play_count": global_counts[title],
+                        "last_played": last_played.get(title, ""),
+                        "position": pos + 1,
+                    }
+                )
                 used_songs.add(title)
                 break
 
     # Pass 2: append remaining frequent songs that didn't win a position
     for title, count in global_counts.most_common():
         if title not in used_songs and count >= 2:
-            predicted.append({
-                "title": title,
-                "frequency": round(count / total_shows, 3),
-                "play_count": count,
-                "last_played": last_played.get(title, ""),
-            })
+            predicted.append(
+                {
+                    "title": title,
+                    "frequency": round(count / total_shows, 3),
+                    "play_count": count,
+                    "last_played": last_played.get(title, ""),
+                }
+            )
             used_songs.add(title)
 
     # Detect if there's an active tour

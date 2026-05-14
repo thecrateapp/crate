@@ -5,7 +5,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
-from crate.api.schemas.common import IdentityFieldsMixin, OkResponse, TaskEnqueueResponse
+from crate.api.schemas.common import (
+    IdentityFieldsMixin,
+    OkResponse,
+    TaskEnqueueResponse,
+)
 from crate.api.schemas.radio import RadioTrack
 
 
@@ -180,7 +184,9 @@ class DiscoverCompletenessArtistResponse(IdentityFieldsMixin):
     local_count: int = 0
     mb_count: int = 0
     pct: int = 0
-    missing: list[DiscoverCompletenessMissingAlbumResponse] = Field(default_factory=list)
+    missing: list[DiscoverCompletenessMissingAlbumResponse] = Field(
+        default_factory=list
+    )
 
 
 class DiscoverCompletenessResponse(RootModel[list[DiscoverCompletenessArtistResponse]]):

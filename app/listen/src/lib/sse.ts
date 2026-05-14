@@ -24,7 +24,10 @@ const reconnectListeners = new Map<string, Set<SseReconnectListener>>();
 
 let healthTimer: number | null = null;
 
-function createInitialState(name: string, degradeAfterMs = DEFAULT_DEGRADE_AFTER_MS): SseChannelState {
+function createInitialState(
+  name: string,
+  degradeAfterMs = DEFAULT_DEGRADE_AFTER_MS,
+): SseChannelState {
   return {
     name,
     connected: false,
@@ -66,7 +69,10 @@ function emitReconnect(state: SseChannelState): void {
   }
 }
 
-function ensureState(name: string, degradeAfterMs = DEFAULT_DEGRADE_AFTER_MS): SseChannelState {
+function ensureState(
+  name: string,
+  degradeAfterMs = DEFAULT_DEGRADE_AFTER_MS,
+): SseChannelState {
   const existing = channelStates.get(name);
   if (existing) {
     existing.degradeAfterMs = degradeAfterMs;
@@ -85,9 +91,10 @@ function ensureHealthMonitor(): void {
     for (const state of channelStates.values()) {
       if (!state.connected) continue;
       const lastActivityAt = state.lastEventAt ?? state.lastOpenAt;
-      const nextDegraded = lastActivityAt == null
-        ? true
-        : now - lastActivityAt > state.degradeAfterMs;
+      const nextDegraded =
+        lastActivityAt == null
+          ? true
+          : now - lastActivityAt > state.degradeAfterMs;
       if (nextDegraded !== state.degraded) {
         state.degraded = nextDegraded;
         emitState(state);
@@ -101,7 +108,10 @@ export function getSseChannelState(name: string): SseChannelState | null {
   return state ? cloneState(state) : null;
 }
 
-export function onSseChannelState(name: string, listener: SseChannelListener): () => void {
+export function onSseChannelState(
+  name: string,
+  listener: SseChannelListener,
+): () => void {
   const listeners = channelListeners.get(name) || new Set<SseChannelListener>();
   listeners.add(listener);
   channelListeners.set(name, listeners);
@@ -117,8 +127,12 @@ export function onSseChannelState(name: string, listener: SseChannelListener): (
   };
 }
 
-export function onSseReconnect(name: string, listener: SseReconnectListener): () => void {
-  const listeners = reconnectListeners.get(name) || new Set<SseReconnectListener>();
+export function onSseReconnect(
+  name: string,
+  listener: SseReconnectListener,
+): () => void {
+  const listeners =
+    reconnectListeners.get(name) || new Set<SseReconnectListener>();
   listeners.add(listener);
   reconnectListeners.set(name, listeners);
   return () => {

@@ -11,7 +11,9 @@ async function disableDevServiceWorker() {
 
   try {
     const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
+    await Promise.all(
+      registrations.map((registration) => registration.unregister()),
+    );
   } catch {
     // Ignore cleanup failures; the page can still boot without dev offline support.
   }
@@ -42,7 +44,11 @@ if (!isCapacitorBuild && !isNative) {
 initCapacitor();
 void primeOfflineRuntimeProfile();
 
-if (!isNative && typeof window !== "undefined" && "serviceWorker" in navigator) {
+if (
+  !isNative &&
+  typeof window !== "undefined" &&
+  "serviceWorker" in navigator
+) {
   if (import.meta.env.DEV) {
     void disableDevServiceWorker();
   } else {
@@ -59,7 +65,9 @@ createRoot(document.getElementById("root")!).render(
       theme="dark"
       position="bottom-center"
       richColors
-      mobileOffset={{ bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)" }}
+      mobileOffset={{
+        bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
+      }}
     />
   </BrowserRouter>,
 );

@@ -29,7 +29,7 @@ import shutil
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 from crate.audio import read_tags
 from crate.utils import AUDIO_EXTENSIONS
@@ -96,7 +96,7 @@ class AlbumComparison:
 @dataclass
 class DuplicateVerdict:
     action: str  # "delete_loose" | "merge_into_canonical" | "promote_loose" | "manual"
-    canonical_dir: Optional[Path]
+    canonical_dir: Path | None
     loose_dir: Path
     reason: str
     comparison: AlbumComparison
@@ -160,7 +160,9 @@ def _read_album_tracks(album_dir: Path) -> list[AlbumTrack]:
             size = f.stat().st_size
         except OSError:
             size = 0
-        tracks.append(AlbumTrack(path=f, title_key=title_key, size=size, raw_title=raw_title))
+        tracks.append(
+            AlbumTrack(path=f, title_key=title_key, size=size, raw_title=raw_title)
+        )
     return tracks
 
 
@@ -250,7 +252,9 @@ def classify_duplicate_album(loose_dir: Path, library_path: Path) -> DuplicateVe
         exact = 0 if _normalize_album_name(c.name) == loose_key else 1
         year_bucket = 0 if re.fullmatch(r"\d{4}", c.parent.name) else 1
         audio_count = sum(
-            1 for f in c.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
+            1
+            for f in c.iterdir()
+            if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
         )
         return (exact, year_bucket, -audio_count)
 
@@ -324,7 +328,9 @@ def classify_duplicate_album(loose_dir: Path, library_path: Path) -> DuplicateVe
     )
 
 
-def apply_duplicate_resolution(verdict: DuplicateVerdict, *, dry_run: bool = False) -> dict:
+def apply_duplicate_resolution(
+    verdict: DuplicateVerdict, *, dry_run: bool = False
+) -> dict:
     """Execute ``verdict`` on disk. Returns a dict describing what happened."""
     result: dict = {
         "action": verdict.action,

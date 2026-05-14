@@ -37,14 +37,17 @@ describe("android native engine flags", () => {
 
   it("uses the native player by default on Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { shouldUseAndroidNativePlayer } = await import("@/lib/android-native-engine");
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
   });
 
   it("allows Android native playback to be disabled as a kill switch", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { setAndroidNativePlayerEnabled, shouldUseAndroidNativePlayer } = await import("@/lib/android-native-engine");
+    const { setAndroidNativePlayerEnabled, shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     setAndroidNativePlayerEnabled(false);
 
@@ -57,15 +60,21 @@ describe("android native engine flags", () => {
 
   it("ignores the flag outside Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: false }));
-    const { shouldUseAndroidNativePlayer } = await import("@/lib/android-native-engine");
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
 
   it("keeps the native player disabled while web crossfade is active", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { setCrossfadeDurationPreference } = await import("@/lib/player-playback-prefs");
-    const { shouldUseAndroidNativePlayer } = await import("@/lib/android-native-engine");
+    const { setCrossfadeDurationPreference } = await import(
+      "@/lib/player-playback-prefs"
+    );
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     setCrossfadeDurationPreference(4);
 

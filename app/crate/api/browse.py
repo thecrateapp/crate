@@ -4,7 +4,6 @@ from crate.api.auth import _require_auth
 from crate.api.browse_album import router as album_router
 from crate.api.browse_artist import api_browse_filters, router as artist_router
 from crate.api.browse_media import api_browse_moods, router as media_router
-from crate.api.browse_shared import find_album_dir as _find_album_dir
 from crate.api.curation import curated_playlists
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.schemas import BrowseExplorePageResponse

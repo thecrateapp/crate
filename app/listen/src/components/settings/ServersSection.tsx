@@ -74,7 +74,8 @@ export function ServersSection() {
         <h2 className="text-sm font-semibold text-foreground">Servers</h2>
       </div>
       <p className="mb-4 text-[12px] text-muted-foreground">
-        Crate servers this app can talk to. Switching drops you back to the login screen for the new host.
+        Crate servers this app can talk to. Switching drops you back to the
+        login screen for the new host.
       </p>
 
       <div className="space-y-2">
@@ -96,7 +97,11 @@ export function ServersSection() {
                 disabled={isCurrent}
               >
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${isCurrent ? "text-cyan-100" : "text-white"}`}>
+                  <span
+                    className={`text-sm font-medium ${
+                      isCurrent ? "text-cyan-100" : "text-white"
+                    }`}
+                  >
                     {server.label}
                   </span>
                   {isCurrent ? (
@@ -106,7 +111,9 @@ export function ServersSection() {
                     </span>
                   ) : null}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{server.url}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {server.url}
+                </div>
               </button>
               <button
                 type="button"

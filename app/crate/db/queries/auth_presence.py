@@ -4,7 +4,11 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
-from crate.db.repositories.auth_shared import coerce_datetime, enrich_auth_session, promote_now_playing_session
+from crate.db.repositories.auth_shared import (
+    coerce_datetime,
+    enrich_auth_session,
+    promote_now_playing_session,
+)
 from crate.db.tx import read_scope
 
 
@@ -15,9 +19,10 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
     from crate.db.cache_store import get_cache
 
     with read_scope() as session:
-        session_rows = session.execute(
-            text(
-                """
+        session_rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     s.id,
                     s.user_id,
@@ -34,13 +39,17 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
                 WHERE s.user_id = ANY(:user_ids)
                 ORDER BY s.user_id, COALESCE(s.last_seen_at, s.created_at) DESC
                 """
-            ),
-            {"user_ids": user_ids},
-        ).mappings().all()
+                ),
+                {"user_ids": user_ids},
+            )
+            .mappings()
+            .all()
+        )
 
-        play_rows = session.execute(
-            text(
-                """
+        play_rows = (
+            session.execute(
+                text(
+                    """
                 SELECT DISTINCT ON (upe.user_id)
                     upe.user_id,
                     COALESCE(lt.id, upe.track_id) AS track_id,
@@ -63,9 +72,12 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
                 WHERE upe.user_id = ANY(:user_ids)
                 ORDER BY upe.user_id, upe.ended_at DESC
                 """
-            ),
-            {"user_ids": user_ids},
-        ).mappings().all()
+                ),
+                {"user_ids": user_ids},
+            )
+            .mappings()
+            .all()
+        )
 
     now_playing_rows: dict[int, dict] = {}
     for user_id in user_ids:
@@ -87,7 +99,9 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
         }
         for user_id in user_ids
     }
-    active_devices_by_user: dict[int, set[str]] = {user_id: set() for user_id in user_ids}
+    active_devices_by_user: dict[int, set[str]] = {
+        user_id: set() for user_id in user_ids
+    }
 
     sessions_by_user: dict[int, list[dict]] = {user_id: [] for user_id in user_ids}
     for row in session_rows:
@@ -97,12 +111,16 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
     for user_id, sessions in sessions_by_user.items():
         now_playing = now_playing_rows.get(user_id)
         if now_playing:
-            sessions = promote_now_playing_session(sessions, now_playing=now_playing, now=now)
+            sessions = promote_now_playing_session(
+                sessions, now_playing=now_playing, now=now
+            )
             sessions_by_user[user_id] = sessions
 
     for user_id, sessions in sessions_by_user.items():
         for enriched in sessions:
-            last_seen_at = coerce_datetime(enriched.get("last_seen_at")) or coerce_datetime(enriched.get("created_at"))
+            last_seen_at = coerce_datetime(
+                enriched.get("last_seen_at")
+            ) or coerce_datetime(enriched.get("created_at"))
 
             if last_seen_at and (
                 presence[user_id]["last_seen_at"] is None
@@ -139,7 +157,9 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
         )
         presence[user_id].update(
             {
-                "online_now": True if current_track else presence[user_id]["online_now"],
+                "online_now": True
+                if current_track
+                else presence[user_id]["online_now"],
                 "listening_now": current_track is not None,
                 "current_track": current_track,
                 "last_played_at": started_at,
@@ -154,7 +174,9 @@ def get_users_presence(user_ids: list[int]) -> dict[int, dict]:
         current_track = (
             {
                 "track_id": row.get("track_id"),
-                "track_entity_uid": str(row.get("track_entity_uid")) if row.get("track_entity_uid") is not None else None,
+                "track_entity_uid": str(row.get("track_entity_uid"))
+                if row.get("track_entity_uid") is not None
+                else None,
                 "title": row.get("title"),
                 "artist": row.get("artist"),
                 "artist_id": row.get("artist_id"),

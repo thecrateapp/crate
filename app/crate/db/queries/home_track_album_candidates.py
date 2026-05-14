@@ -3,7 +3,9 @@ from __future__ import annotations
 from crate.db.queries.home_track_rows import _fetch_rows
 
 
-def get_track_candidates_for_album_ids(*, user_id: int, album_ids: list[int], limit: int = 240) -> list[dict]:
+def get_track_candidates_for_album_ids(
+    *, user_id: int, album_ids: list[int], limit: int = 240
+) -> list[dict]:
     if not album_ids:
         return []
     capped_ids = album_ids[:30]

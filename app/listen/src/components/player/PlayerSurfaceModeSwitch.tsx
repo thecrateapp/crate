@@ -28,13 +28,16 @@ export function PlayerSurfaceModeSwitch({
 }: PlayerSurfaceModeSwitchProps) {
   const buttonClass = size === "md" ? "h-10 w-10" : "h-9 w-9";
   const iconSize = size === "md" ? 17 : 15;
-  const modes = allowVisualizer ? MODES : MODES.filter((item) => item.id !== "visualizer");
+  const modes = allowVisualizer
+    ? MODES
+    : MODES.filter((item) => item.id !== "visualizer");
 
   return (
     <div
       className={cn(
         "inline-flex items-center gap-1",
-        variant === "boxed" && "rounded-full border border-white/10 bg-black/30 p-1 backdrop-blur-sm",
+        variant === "boxed" &&
+          "rounded-full border border-white/10 bg-black/30 p-1 backdrop-blur-sm",
         className,
       )}
       role="tablist"

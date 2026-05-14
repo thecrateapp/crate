@@ -5,8 +5,9 @@ from crate.db.tx import transaction_scope
 
 def get_popularity_scales() -> dict:
     with transaction_scope() as session:
-        row = session.execute(
-            text("""
+        row = (
+            session.execute(
+                text("""
                 SELECT
                     COALESCE(
                         (SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY lastfm_playcount)
@@ -44,20 +45,29 @@ def get_popularity_scales() -> dict:
                         1
                     ) AS artist_followers_p95
             """)
-        ).mappings().first()
+            )
+            .mappings()
+            .first()
+        )
     return dict(row or {})
 
 
-def list_tracks_for_popularity_scoring(artist_names: list[str] | None = None) -> list[dict]:
+def list_tracks_for_popularity_scoring(
+    artist_names: list[str] | None = None,
+) -> list[dict]:
     params: dict[str, object] = {}
     where = ""
     if artist_names:
         params["artist_names"] = [name.lower() for name in artist_names]
         where = "WHERE LOWER(a.artist) = ANY(:artist_names)"
 
+        # 'where' is a hardcoded fragment built internally above;
+        # it contains no user input — only parameter placeholders.
     with transaction_scope() as session:
-        rows = session.execute(
-            text(f"""
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     t.id,
                     t.lastfm_listeners,
@@ -74,23 +84,35 @@ def list_tracks_for_popularity_scoring(artist_names: list[str] | None = None) ->
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON LOWER(ar.name) = LOWER(a.artist)
-                {where}
-            """),
-            params,
-        ).mappings().all()
+                """
+                    + where
+                    + """
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def list_albums_for_popularity_scoring(artist_names: list[str] | None = None) -> list[dict]:
+def list_albums_for_popularity_scoring(
+    artist_names: list[str] | None = None,
+) -> list[dict]:
     params: dict[str, object] = {}
     where = ""
     if artist_names:
         params["artist_names"] = [name.lower() for name in artist_names]
         where = "WHERE LOWER(a.artist) = ANY(:artist_names)"
 
+        # 'where' is a hardcoded fragment built internally above;
+        # it contains no user input — only parameter placeholders.
     with transaction_scope() as session:
-        rows = session.execute(
-            text(f"""
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     a.id,
                     a.lastfm_listeners,
@@ -105,7 +127,9 @@ def list_albums_for_popularity_scoring(artist_names: list[str] | None = None) ->
                 FROM library_albums a
                 LEFT JOIN library_artists ar ON LOWER(ar.name) = LOWER(a.artist)
                 LEFT JOIN library_tracks t ON t.album_id = a.id
-                {where}
+                """
+                    + where
+                    + """
                 GROUP BY
                     a.id,
                     a.lastfm_listeners,
@@ -114,22 +138,32 @@ def list_albums_for_popularity_scoring(artist_names: list[str] | None = None) ->
                     ar.lastfm_playcount,
                     ar.spotify_popularity,
                     ar.spotify_followers
-            """),
-            params,
-        ).mappings().all()
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def list_artists_for_popularity_scoring(artist_names: list[str] | None = None) -> list[dict]:
+def list_artists_for_popularity_scoring(
+    artist_names: list[str] | None = None,
+) -> list[dict]:
     params: dict[str, object] = {}
     where = ""
     if artist_names:
         params["artist_names"] = [name.lower() for name in artist_names]
         where = "WHERE LOWER(ar.name) = ANY(:artist_names)"
 
+        # 'where' is a hardcoded fragment built internally above;
+        # it contains no user input — only parameter placeholders.
     with transaction_scope() as session:
-        rows = session.execute(
-            text(f"""
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     ar.id,
                     ar.listeners AS artist_lastfm_listeners,
@@ -162,10 +196,16 @@ def list_artists_for_popularity_scoring(artist_names: list[str] | None = None) -
                     JOIN library_albums a ON a.id = t.album_id
                     GROUP BY LOWER(a.artist)
                 ) track_stats ON track_stats.artist_key = LOWER(ar.name)
-                {where}
-            """),
-            params,
-        ).mappings().all()
+                """
+                    + where
+                    + """
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 

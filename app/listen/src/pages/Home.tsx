@@ -1,4 +1,11 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router";
 import { Radio as RadioIcon, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -21,9 +28,7 @@ import {
   getHomeDateString,
   getHomeGreeting,
 } from "@/components/home/HomeSections";
-import {
-  HomeReplaySection,
-} from "@/components/home/HomePlaybackSections";
+import { HomeReplaySection } from "@/components/home/HomePlaybackSections";
 import {
   HomeShowPrepSection,
   HomeUpcomingSection,
@@ -45,9 +50,14 @@ import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { api, apiSseUrl } from "@/lib/api";
+import { AUTH_TOKEN_EVENT, api, apiSseUrl } from "@/lib/api";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
-import { fetchAlbumRadio, fetchArtistRadio, fetchHomePlaylistRadio, startShapedRadio } from "@/lib/radio";
+import {
+  fetchAlbumRadio,
+  fetchArtistRadio,
+  fetchHomePlaylistRadio,
+  startShapedRadio,
+} from "@/lib/radio";
 import { albumCoverApiUrl, artistPagePath } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import {
@@ -85,7 +95,9 @@ function homeSectionPath(sectionId: HomeSectionId): string {
   return `/home/section/${sectionId}`;
 }
 
-function snapshotVersion(payload: HomeDiscoveryPayload | null | undefined): number {
+function snapshotVersion(
+  payload: HomeDiscoveryPayload | null | undefined,
+): number {
   return Number(payload?.snapshot?.version || 0);
 }
 
@@ -106,18 +118,23 @@ export function Home() {
       revalidateIfCached: "idle",
       idleRevalidateMs: 12_000,
     });
-  const [liveDiscovery, setLiveDiscovery] = useState<HomeDiscoveryPayload | null>(null);
+  const [liveDiscovery, setLiveDiscovery] =
+    useState<HomeDiscoveryPayload | null>(null);
+  const [authTokenRevision, setAuthTokenRevision] = useState(0);
   const refreshingLiveDiscoveryRef = useRef(false);
   const lastDegradedRefreshAtRef = useRef(0);
 
-  const applyDiscoveryPayload = useCallback((next: HomeDiscoveryPayload | null) => {
-    if (!next) return;
-    startTransition(() => {
-      setLiveDiscovery((current) => (
-        snapshotVersion(next) >= snapshotVersion(current) ? next : current
-      ));
-    });
-  }, []);
+  const applyDiscoveryPayload = useCallback(
+    (next: HomeDiscoveryPayload | null) => {
+      if (!next) return;
+      startTransition(() => {
+        setLiveDiscovery((current) =>
+          snapshotVersion(next) >= snapshotVersion(current) ? next : current,
+        );
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (discovery) {
@@ -125,24 +142,43 @@ export function Home() {
     }
   }, [applyDiscoveryPayload, discovery]);
 
-  const refreshLiveDiscovery = useCallback(async (fresh = false) => {
-    if (refreshingLiveDiscoveryRef.current) return;
-    if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return;
-    refreshingLiveDiscoveryRef.current = true;
-    try {
-      const payload = await api<HomeDiscoveryPayload>(
-        fresh ? "/api/me/home/discovery?fresh=1" : "/api/me/home/discovery",
-      );
-      applyDiscoveryPayload(payload);
-    } catch {
-      // Keep the last good snapshot; the stream may still recover on its own.
-    } finally {
-      refreshingLiveDiscoveryRef.current = false;
-    }
-  }, [applyDiscoveryPayload]);
+  const refreshLiveDiscovery = useCallback(
+    async (fresh = false) => {
+      if (refreshingLiveDiscoveryRef.current) return;
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      )
+        return;
+      refreshingLiveDiscoveryRef.current = true;
+      try {
+        const payload = await api<HomeDiscoveryPayload>(
+          fresh ? "/api/me/home/discovery?fresh=1" : "/api/me/home/discovery",
+        );
+        applyDiscoveryPayload(payload);
+      } catch {
+        // Keep the last good snapshot; the stream may still recover on its own.
+      } finally {
+        refreshingLiveDiscoveryRef.current = false;
+      }
+    },
+    [applyDiscoveryPayload],
+  );
 
   useEffect(() => {
-    const source = new EventSource(apiSseUrl("/api/me/home/discovery-stream?initial=0"));
+    const onAuthTokenUpdated = () => {
+      setAuthTokenRevision((value) => value + 1);
+    };
+    window.addEventListener(AUTH_TOKEN_EVENT, onAuthTokenUpdated);
+    return () =>
+      window.removeEventListener(AUTH_TOKEN_EVENT, onAuthTokenUpdated);
+  }, []);
+
+  useEffect(() => {
+    const source = new EventSource(
+      apiSseUrl("/api/me/home/discovery-stream?initial=0"),
+    );
     source.onopen = () => {
       const { reconnected } = markSseChannelOpen(HOME_DISCOVERY_SSE_CHANNEL, {
         degradeAfterMs: HOME_DISCOVERY_DEGRADE_AFTER_MS,
@@ -178,15 +214,28 @@ export function Home() {
       });
       source.close();
     };
-  }, [applyDiscoveryPayload, refreshLiveDiscovery]);
+  }, [applyDiscoveryPayload, authTokenRevision, refreshLiveDiscovery]);
 
   useEffect(() => {
     return onSseChannelState(HOME_DISCOVERY_SSE_CHANNEL, (state) => {
       if (!state.degraded) return;
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      )
+        return;
       const now = Date.now();
-      if (now - lastDegradedRefreshAtRef.current < HOME_DISCOVERY_DEGRADED_REFRESH_MS) return;
+      if (
+        now - lastDegradedRefreshAtRef.current <
+        HOME_DISCOVERY_DEGRADED_REFRESH_MS
+      )
+        return;
       lastDegradedRefreshAtRef.current = now;
       void refreshLiveDiscovery();
     });
@@ -194,24 +243,43 @@ export function Home() {
 
   useEffect(() => {
     const maybeRecoverFromDegradedStream = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      )
+        return;
       const state = getSseChannelState(HOME_DISCOVERY_SSE_CHANNEL);
       if (!state?.degraded) return;
       void refreshLiveDiscovery();
     };
     window.addEventListener("online", maybeRecoverFromDegradedStream);
-    document.addEventListener("visibilitychange", maybeRecoverFromDegradedStream);
+    document.addEventListener(
+      "visibilitychange",
+      maybeRecoverFromDegradedStream,
+    );
     return () => {
       window.removeEventListener("online", maybeRecoverFromDegradedStream);
-      document.removeEventListener("visibilitychange", maybeRecoverFromDegradedStream);
+      document.removeEventListener(
+        "visibilitychange",
+        maybeRecoverFromDegradedStream,
+      );
     };
   }, [refreshLiveDiscovery]);
 
   const currentDiscovery = liveDiscovery ?? discovery;
   // Normalize: backend now returns array, old cache may still return single object
   const heroRaw = currentDiscovery?.hero ?? null;
-  const heroes: HomeHeroArtist[] = Array.isArray(heroRaw) ? heroRaw : heroRaw ? [heroRaw] : [];
+  const heroes: HomeHeroArtist[] = Array.isArray(heroRaw)
+    ? heroRaw
+    : heroRaw
+      ? [heroRaw]
+      : [];
   const recentGlobalArtists = currentDiscovery?.recent_global_artists || [];
   const upcoming = currentDiscovery?.upcoming;
   const replay = currentDiscovery?.replay as ReplayMix | undefined;
@@ -222,7 +290,11 @@ export function Home() {
     refetchDiscovery();
   }, [refetchDiscovery, refreshLiveDiscovery]);
 
-  const { handlers: pullHandlers, pullDistance, refreshing } = usePullToRefresh(onRefresh);
+  const {
+    handlers: pullHandlers,
+    pullDistance,
+    refreshing,
+  } = usePullToRefresh(onRefresh);
 
   const replayPreview = (replay?.items || []).slice(0, 4);
   const upcomingPreview = (upcoming?.items || [])
@@ -233,7 +305,9 @@ export function Home() {
 
   const recommendedTracks = useMemo(
     () =>
-      (currentDiscovery?.recommended_tracks || []).map((item) => toTrackRowData(item)),
+      (currentDiscovery?.recommended_tracks || []).map((item) =>
+        toTrackRowData(item),
+      ),
     [currentDiscovery?.recommended_tracks],
   );
 
@@ -278,7 +352,9 @@ export function Home() {
   }
 
   async function loadHomePlaylist(playlistId: string) {
-    return api<HomeGeneratedPlaylistDetail>(`/api/me/home/playlists/${encodeURIComponent(playlistId)}`);
+    return api<HomeGeneratedPlaylistDetail>(
+      `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
+    );
   }
 
   async function playHomePlaylist(item: HomeGeneratedPlaylistSummary) {
@@ -336,7 +412,11 @@ export function Home() {
   async function playRadioStation(station: HomeRadioStation) {
     try {
       if (station.type === "artist" && station.artist_id != null) {
-        const radio = await fetchArtistRadio(station.artist_id, station.artist_name, 50);
+        const radio = await fetchArtistRadio(
+          station.artist_id,
+          station.artist_name,
+          50,
+        );
         if (!radio.tracks.length) {
           toast.info("Artist radio is not available yet");
           return;
@@ -376,12 +456,18 @@ export function Home() {
   async function playInsightSetlist(insight: HomeUpcomingInsight) {
     try {
       if (!insight.artist_id) return;
-      const queue = await fetchPlayableSetlist({ artistId: insight.artist_id, artistName: insight.artist });
+      const queue = await fetchPlayableSetlist({
+        artistId: insight.artist_id,
+        artistName: insight.artist,
+      });
       if (!queue.length) {
         toast.info("No probable setlist tracks matched your library");
         return;
       }
-      playAll(queue, 0, { type: "playlist", name: `${insight.artist} Probable Setlist` });
+      playAll(queue, 0, {
+        type: "playlist",
+        name: `${insight.artist} Probable Setlist`,
+      });
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
         reminder_type: insight.type,
       });
@@ -434,8 +520,12 @@ export function Home() {
 
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">{getHomeGreeting()}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{getHomeDateString()}</p>
+          <h1 className="text-3xl font-bold text-foreground">
+            {getHomeGreeting()}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {getHomeDateString()}
+          </p>
         </div>
 
         {!isDesktop ? (
@@ -506,10 +596,16 @@ export function Home() {
         onViewAll={openHomeSection}
       />
 
-      <SuggestedAlbumsSection albums={currentDiscovery?.suggested_albums || []} onViewAll={openHomeSection} />
+      <SuggestedAlbumsSection
+        albums={currentDiscovery?.suggested_albums || []}
+        onViewAll={openHomeSection}
+      />
 
       {isDesktop ? (
-        <RecommendedTracksSection tracks={recommendedTracks} onViewAll={openHomeSection} />
+        <RecommendedTracksSection
+          tracks={recommendedTracks}
+          onViewAll={openHomeSection}
+        />
       ) : null}
 
       {isDesktop ? (
@@ -521,7 +617,10 @@ export function Home() {
       ) : null}
 
       {isDesktop ? (
-        <FavoriteArtistsSection artists={currentDiscovery?.favorite_artists || []} onViewAll={openHomeSection} />
+        <FavoriteArtistsSection
+          artists={currentDiscovery?.favorite_artists || []}
+          onViewAll={openHomeSection}
+        />
       ) : null}
 
       {isDesktop ? (
@@ -560,7 +659,9 @@ export function Home() {
             replayPreview={replayPreview}
             onOpenStats={() => navigate("/stats")}
             onPlayReplay={playReplayMix}
-            onPlayTrack={(item) => play(toPlayerTrack(item), { type: "track", name: item.title })}
+            onPlayTrack={(item) =>
+              play(toPlayerTrack(item), { type: "track", name: item.title })
+            }
           />
 
           <JustLandedSection

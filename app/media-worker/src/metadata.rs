@@ -1,3 +1,5 @@
+//! Rich metadata tag writer for Crate identity fields, lyrics, and analysis data.
+
 use std::fs;
 use std::path::Path;
 

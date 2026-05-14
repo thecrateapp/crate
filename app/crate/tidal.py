@@ -12,7 +12,7 @@ from pathlib import Path
 
 import requests
 
-from crate.db.cache_settings import get_setting, set_setting
+from crate.db.cache_settings import get_setting
 from crate.storage_import import (
     infer_album_identity,
     move_album_tree,
@@ -33,6 +33,7 @@ TIDDL_OUTPUT_TEMPLATE = (
 
 
 # ── Auth ─────────────────────────────────────────────────────────
+
 
 def _auth_file() -> Path:
     return Path(TIDDL_CONFIG_DIR) / "auth.json"
@@ -100,7 +101,12 @@ def ensure_auth() -> bool:
         resp = requests.get(
             "https://api.tidal.com/v2/search",
             headers={"Authorization": f"Bearer {token}"},
-            params={"query": "test", "type": "ARTISTS", "limit": 1, "countryCode": _configured_country_code()},
+            params={
+                "query": "test",
+                "type": "ARTISTS",
+                "limit": 1,
+                "countryCode": _configured_country_code(),
+            },
             timeout=5,
         )
         if resp.status_code == 401:
@@ -115,7 +121,9 @@ def refresh_token() -> bool:
     try:
         result = subprocess.run(
             ["tiddl", "auth", "refresh"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
             env={**os.environ, "HOME": TIDDL_HOME},
         )
         if result.returncode == 0:
@@ -152,11 +160,14 @@ def _refresh_token_with_raw_client() -> bool:
         log.warning("Raw Tidal token refresh returned no access token")
         return False
 
-    user = payload.get("user") if isinstance(payload.get("user"), dict) else {}
+    user_raw = payload.get("user")
+    user = user_raw if isinstance(user_raw, dict) else {}
     data["token"] = access_token
     data["refresh_token"] = payload.get("refresh_token") or refresh
     data["expires_at"] = int(time.time()) + int(payload.get("expires_in") or 0)
-    data["user_id"] = str(payload.get("user_id") or user.get("userId") or data.get("user_id") or "")
+    data["user_id"] = str(
+        payload.get("user_id") or user.get("userId") or data.get("user_id") or ""
+    )
     data["country_code"] = _configured_country_code()
     try:
         _save_auth_data(data)
@@ -184,6 +195,9 @@ def login_flow():
             text=True,
             env={**os.environ, "HOME": TIDDL_HOME},
         )
+        if proc.stdout is None:
+            yield "AUTH_ERROR: tiddl produced no stdout"
+            return
         for line in proc.stdout:
             line = line.rstrip()
             if line:
@@ -205,7 +219,9 @@ def logout() -> bool:
     try:
         result = subprocess.run(
             ["tiddl", "auth", "logout"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             env={**os.environ, "HOME": TIDDL_HOME},
         )
         return result.returncode == 0
@@ -232,7 +248,9 @@ def get_album_track_count(album_id: str) -> int | None:
     return None
 
 
-def get_artist_albums(artist_id: str, limit: int = 50, _retried: bool = False) -> list[dict]:
+def get_artist_albums(
+    artist_id: str, limit: int = 50, _retried: bool = False
+) -> list[dict]:
     """Get albums for a Tidal artist by ID (uses v1 API)."""
     token = get_auth_token()
     if not token:
@@ -241,7 +259,11 @@ def get_artist_albums(artist_id: str, limit: int = 50, _retried: bool = False) -
         resp = requests.get(
             f"https://api.tidal.com/v1/artists/{artist_id}/albums",
             headers={"Authorization": f"Bearer {token}"},
-            params={"countryCode": get_setting("tidal_country", "US"), "limit": limit, "offset": 0},
+            params={
+                "countryCode": get_setting("tidal_country", "US"),
+                "limit": limit,
+                "offset": 0,
+            },
             timeout=10,
         )
         if resp.status_code == 401:
@@ -251,7 +273,13 @@ def get_artist_albums(artist_id: str, limit: int = 50, _retried: bool = False) -
         if resp.status_code != 200:
             return []
         data = resp.json()
-        items = data.get("items", []) if isinstance(data, dict) else data if isinstance(data, list) else []
+        items = (
+            data.get("items", [])
+            if isinstance(data, dict)
+            else data
+            if isinstance(data, list)
+            else []
+        )
 
         def _artist_name(a: dict) -> str:
             artist = a.get("artist")
@@ -292,7 +320,11 @@ def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
         resp = requests.get(
             f"https://api.tidal.com/v1/albums/{album_id}/tracks",
             headers={"Authorization": f"Bearer {token}"},
-            params={"countryCode": get_setting("tidal_country", "US"), "limit": 100, "offset": 0},
+            params={
+                "countryCode": get_setting("tidal_country", "US"),
+                "limit": 100,
+                "offset": 0,
+            },
             timeout=10,
         )
         if resp.status_code == 401:
@@ -302,7 +334,13 @@ def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
         if resp.status_code != 200:
             return []
         data = resp.json()
-        items = data.get("items", []) if isinstance(data, dict) else data if isinstance(data, list) else []
+        items = (
+            data.get("items", [])
+            if isinstance(data, dict)
+            else data
+            if isinstance(data, list)
+            else []
+        )
 
         def _artist_name(t: dict) -> str:
             artist = t.get("artist")
@@ -340,7 +378,14 @@ def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
 
 # ── Search ───────────────────────────────────────────────────────
 
-def search(query: str, content_type: str = "all", limit: int = 20, offset: int = 0, _retried: bool = False) -> dict:
+
+def search(
+    query: str,
+    content_type: str = "all",
+    limit: int = 20,
+    offset: int = 0,
+    _retried: bool = False,
+) -> dict:
     """Search Tidal API. Returns albums, artists, tracks."""
     token = get_auth_token()
     if not token:
@@ -398,7 +443,9 @@ def search(query: str, content_type: str = "all", limit: int = 20, offset: int =
                 {
                     "id": str(a.get("id", "")),
                     "title": a.get("title", ""),
-                    "artist": a.get("artists", [{}])[0].get("name", "") if a.get("artists") else "",
+                    "artist": a.get("artists", [{}])[0].get("name", "")
+                    if a.get("artists")
+                    else "",
                     "year": (a.get("releaseDate") or "")[:4],
                     "tracks": a.get("numberOfTracks", 0),
                     "cover": _tidal_cover(a.get("cover")),
@@ -427,8 +474,12 @@ def search(query: str, content_type: str = "all", limit: int = 20, offset: int =
                 {
                     "id": str(t.get("id", "")),
                     "title": t.get("title", ""),
-                    "artist": t.get("artists", [{}])[0].get("name", "") if t.get("artists") else "",
-                    "album": t.get("album", {}).get("title", "") if isinstance(t.get("album"), dict) else "",
+                    "artist": t.get("artists", [{}])[0].get("name", "")
+                    if t.get("artists")
+                    else "",
+                    "album": t.get("album", {}).get("title", "")
+                    if isinstance(t.get("album"), dict)
+                    else "",
                     "duration": t.get("duration", 0),
                     "url": t.get("url") or f"https://tidal.com/track/{t.get('id', '')}",
                     "quality": t.get("mediaMetadata", {}).get("tags", []),
@@ -440,7 +491,9 @@ def search(query: str, content_type: str = "all", limit: int = 20, offset: int =
 
     except requests.exceptions.HTTPError as e:
         log.warning("Tidal search failed: %s", e)
-        return {"error": f"Tidal API error: {e.response.status_code if e.response else 'unknown'}"}
+        return {
+            "error": f"Tidal API error: {e.response.status_code if e.response else 'unknown'}"
+        }
     except Exception as e:
         log.warning("Tidal search failed: %s", e)
         return {"error": str(e)}
@@ -469,12 +522,19 @@ def _safe_library_segment(name: str) -> str:
 
 def _resolve_child_dir_name(parent: Path, raw_name: str) -> str:
     safe_name = _safe_library_segment(raw_name)
-    existing_dirs = [d.name for d in parent.iterdir() if d.is_dir()] if parent.exists() else []
+    existing_dirs = (
+        [d.name for d in parent.iterdir() if d.is_dir()] if parent.exists() else []
+    )
     if existing_dirs:
         normalized_matches = [
-            name for name in existing_dirs if _normalize_library_segment_key(name) == _normalize_library_segment_key(raw_name)
+            name
+            for name in existing_dirs
+            if _normalize_library_segment_key(name)
+            == _normalize_library_segment_key(raw_name)
         ]
-        visible_matches = [name for name in normalized_matches if not name.startswith(".")]
+        visible_matches = [
+            name for name in normalized_matches if not name.startswith(".")
+        ]
         if visible_matches:
             return visible_matches[0]
         if normalized_matches:
@@ -530,7 +590,9 @@ def inspect_download_tree(processing_dir: str | Path) -> dict:
         except OSError:
             pass
 
-        if filepath.name.startswith("tmp") and (size == 0 or _has_mp4_ftyp_header(filepath)):
+        if filepath.name.startswith("tmp") and (
+            size == 0 or _has_mp4_ftyp_header(filepath)
+        ):
             temp_artifact_files.append(rel_path)
             continue
 
@@ -556,8 +618,10 @@ def inspect_download_tree(processing_dir: str | Path) -> dict:
 
 # ── Download ─────────────────────────────────────────────────────
 
-def download(url: str, quality: str = "max", task_id: str = "",
-             progress_callback=None) -> dict:
+
+def download(
+    url: str, quality: str = "max", task_id: str = "", progress_callback=None
+) -> dict:
     """Download a Tidal URL (album, track, playlist) via tiddl.
 
     Returns {success, path, files, error}
@@ -565,15 +629,26 @@ def download(url: str, quality: str = "max", task_id: str = "",
     processing_dir = Path(PROCESSING_DIR) / task_id
     processing_dir.mkdir(parents=True, exist_ok=True)
 
-    quality_map = {"low": "low", "normal": "normal", "high": "high", "max": "max", "lossless": "max"}
+    quality_map = {
+        "low": "low",
+        "normal": "normal",
+        "high": "high",
+        "max": "max",
+        "lossless": "max",
+    }
     q = quality_map.get(quality, "max")
 
     cmd = [
-        "tiddl", "download",
-        "--path", str(processing_dir),
-        "-q", q,
-        "--output", TIDDL_OUTPUT_TEMPLATE,
-        "url", url,
+        "tiddl",
+        "download",
+        "--path",
+        str(processing_dir),
+        "-q",
+        q,
+        "--output",
+        TIDDL_OUTPUT_TEMPLATE,
+        "url",
+        url,
     ]
 
     log.info("Tidal download: %s (quality=%s)", url, q)
@@ -587,6 +662,12 @@ def download(url: str, quality: str = "max", task_id: str = "",
             text=True,
             env={**os.environ, "HOME": TIDDL_HOME},
         )
+        if proc.stdout is None:
+            return {
+                "success": False,
+                "error": "tiddl produced no stdout",
+                "path": str(processing_dir),
+            }
 
         output_lines = []
         tracks_downloaded = 0
@@ -600,34 +681,40 @@ def download(url: str, quality: str = "max", task_id: str = "",
                 if dl_match:
                     tracks_downloaded += 1
                     track_name = dl_match.group(1).strip()
-                    progress_callback({
-                        "phase": "downloading",
-                        "done": tracks_downloaded,
-                        "total": total_tracks or None,
-                        "track": track_name,
-                        "line": line,
-                    })
+                    progress_callback(
+                        {
+                            "phase": "downloading",
+                            "done": tracks_downloaded,
+                            "total": total_tracks or None,
+                            "track": track_name,
+                            "line": line,
+                        }
+                    )
                 # "Total downloads: N"
                 elif line.startswith("Total downloads:"):
                     total_match = re.search(r"Total downloads:\s*(\d+)", line)
                     if total_match:
                         total_tracks = int(total_match.group(1))
-                        progress_callback({
-                            "phase": "downloading",
-                            "done": tracks_downloaded,
-                            "total": total_tracks,
-                            "line": line,
-                        })
+                        progress_callback(
+                            {
+                                "phase": "downloading",
+                                "done": tracks_downloaded,
+                                "total": total_tracks,
+                                "line": line,
+                            }
+                        )
                 # N/M pattern (older tiddl versions)
                 else:
                     nm_match = re.search(r"(\d+)/(\d+)", line)
                     if nm_match:
-                        progress_callback({
-                            "phase": "downloading",
-                            "done": int(nm_match.group(1)),
-                            "total": int(nm_match.group(2)),
-                            "line": line,
-                        })
+                        progress_callback(
+                            {
+                                "phase": "downloading",
+                                "done": int(nm_match.group(1)),
+                                "total": int(nm_match.group(2)),
+                                "line": line,
+                            }
+                        )
                     elif line and not line.startswith("Auth token"):
                         progress_callback({"phase": "downloading", "line": line})
 
@@ -677,12 +764,18 @@ def download(url: str, quality: str = "max", task_id: str = "",
 
     except subprocess.TimeoutExpired:
         proc.kill()
-        return {"success": False, "error": "Download timed out (1h)", "path": str(processing_dir)}
+        return {
+            "success": False,
+            "error": "Download timed out (1h)",
+            "path": str(processing_dir),
+        }
     except Exception as e:
         return {"success": False, "error": str(e), "path": str(processing_dir)}
 
 
-def move_to_library_detailed(processing_path: str, library_path: str) -> list[dict[str, object]]:
+def move_to_library_detailed(
+    processing_path: str, library_path: str
+) -> list[dict[str, object]]:
     """Move downloaded files from processing dir to library.
 
     Returns one record per imported album-like target:
@@ -714,8 +807,12 @@ def move_to_library_detailed(processing_path: str, library_path: str) -> list[di
         album_items = [d for d in sorted(item.iterdir())]
         for album_item in album_items:
             if album_item.is_dir():
-                artist_name, album_name = infer_album_identity(album_item, fallback_artist=item.name)
-                _, target_album_dir, managed_track_names = resolve_import_album_target(dst, artist_name, album_name)
+                artist_name, album_name = infer_album_identity(
+                    album_item, fallback_artist=item.name
+                )
+                _, target_album_dir, managed_track_names = resolve_import_album_target(
+                    dst, artist_name, album_name
+                )
                 try:
                     moved = move_album_tree(
                         album_item,
@@ -740,8 +837,12 @@ def move_to_library_detailed(processing_path: str, library_path: str) -> list[di
                         exc_info=True,
                     )
             elif album_item.is_file():
-                artist_name, album_name = infer_album_identity(item, fallback_artist=item.name)
-                _, target_album_dir, managed_track_names = resolve_import_album_target(dst, artist_name, album_name)
+                artist_name, album_name = infer_album_identity(
+                    item, fallback_artist=item.name
+                )
+                _, target_album_dir, managed_track_names = resolve_import_album_target(
+                    dst, artist_name, album_name
+                )
                 target_album_dir.mkdir(parents=True, exist_ok=True)
                 dest_file = (
                     resolve_managed_track_destination(
@@ -759,11 +860,16 @@ def move_to_library_detailed(processing_path: str, library_path: str) -> list[di
                         dest_file.unlink()
                     shutil.move(str(album_item), str(dest_file))
                     key = (artist_name, album_name, str(target_album_dir))
+                    existing = imported_targets.get(key)
+                    moved_count = (
+                        existing.get("moved", 0) if existing is not None else 0
+                    )
                     imported_targets[key] = {
                         "artist": artist_name,
                         "album": album_name,
                         "path": str(target_album_dir),
-                        "moved": int(imported_targets.get(key, {}).get("moved", 0)) + 1,
+                        "moved": (moved_count if isinstance(moved_count, int) else 0)
+                        + 1,
                     }
                 except Exception:
                     log.warning(
@@ -786,4 +892,10 @@ def move_to_library_detailed(processing_path: str, library_path: str) -> list[di
 
 def move_to_library(processing_path: str, library_path: str) -> list[str]:
     """Backward-compatible artist summary wrapper for callers that only need artists."""
-    return sorted({str(item.get("artist", "")) for item in move_to_library_detailed(processing_path, library_path) if item.get("artist")})
+    return sorted(
+        {
+            str(item.get("artist", ""))
+            for item in move_to_library_detailed(processing_path, library_path)
+            if item.get("artist")
+        }
+    )

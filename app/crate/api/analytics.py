@@ -3,7 +3,11 @@ import re as _re
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.analytics import (
     ActivityLiveResponse,
     ActivityRecentResponse,
@@ -17,8 +21,13 @@ from crate.api.schemas.analytics import (
 )
 from crate.missing import find_missing_albums
 from crate.quality import quality_report
-from crate.audio import read_tags, get_audio_files
-from crate.api._deps import artist_name_from_entity_uid, artist_name_from_id, library_path, extensions, safe_path
+from crate.api._deps import (
+    artist_name_from_entity_uid,
+    artist_name_from_id,
+    library_path,
+    extensions,
+    safe_path,
+)
 from crate.db.import_queue_read_models import count_import_queue_items
 from crate.db.repositories.library import get_library_artist, get_library_track_count
 from crate.db.ops_snapshot import get_cached_ops_snapshot
@@ -114,6 +123,7 @@ def api_stats(request: Request):
         "avg_tracks_per_album": 0,
     }
 
+
 @router.get(
     "/api/activity/live",
     response_model=ActivityLiveResponse,
@@ -141,17 +151,19 @@ def api_timeline(request: Request):
     for r in rows:
         year = r["year"][:4] if r["year"] else ""
         if year and year.isdigit():
-            years.setdefault(year, []).append({
-                "id": r["id"],
-                "entity_uid": r.get("entity_uid"),
-                "slug": r["slug"],
-                "artist": r["artist"],
-                "artist_id": r["artist_id"],
-                "artist_entity_uid": r.get("artist_entity_uid"),
-                "artist_slug": r["artist_slug"],
-                "album": r["name"],
-                "tracks": r["track_count"],
-            })
+            years.setdefault(year, []).append(
+                {
+                    "id": r["id"],
+                    "entity_uid": r.get("entity_uid"),
+                    "slug": r["slug"],
+                    "artist": r["artist"],
+                    "artist_id": r["artist_id"],
+                    "artist_entity_uid": r.get("artist_entity_uid"),
+                    "artist_slug": r["artist_slug"],
+                    "album": r["name"],
+                    "tracks": r["track_count"],
+                }
+            )
 
     return {y: albums for y, albums in sorted(years.items())}
 
@@ -303,8 +315,15 @@ def api_insights(request: Request):
             "album": _strip_year_prefix(r["name"]),
             "artist": r["artist"],
             "listeners": r["lastfm_listeners"] or 0,
-            "popularity": r["popularity"] or (round((r["popularity_score"] or 0) * 100) if r.get("popularity_score") is not None else 0),
-            "popularity_score": round(r["popularity_score"], 4) if r.get("popularity_score") is not None else None,
+            "popularity": r["popularity"]
+            or (
+                round((r["popularity_score"] or 0) * 100)
+                if r.get("popularity_score") is not None
+                else 0
+            ),
+            "popularity_score": round(r["popularity_score"], 4)
+            if r.get("popularity_score") is not None
+            else None,
             "year": r["year"],
         }
         for r in raw_top_albums

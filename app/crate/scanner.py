@@ -24,9 +24,12 @@ SCANNER_MAP = dict(SCANNER_ORDER)
 
 
 class LibraryScanner:
-    def __init__(self, config: dict,
-                 progress_callback: Callable[[dict], None] | None = None,
-                 scanner_done_callback: Callable[[str, list[Issue]], None] | None = None):
+    def __init__(
+        self,
+        config: dict,
+        progress_callback: Callable[[dict], None] | None = None,
+        scanner_done_callback: Callable[[str, list[Issue]], None] | None = None,
+    ):
         self.config = config
         self.library_path = Path(config["library_path"])
         self.extensions = set(config.get("audio_extensions", [".flac", ".mp3", ".m4a"]))
@@ -49,7 +52,9 @@ class LibraryScanner:
 
             log.info("Running scanner: %s", name)
             scanner = scanner_cls(
-                self.library_path, self.extensions, scanner_config,
+                self.library_path,
+                self.extensions,
+                scanner_config,
                 progress_callback=self._progress_callback,
             )
             found = scanner.scan()

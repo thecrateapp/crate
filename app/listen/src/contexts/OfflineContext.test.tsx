@@ -22,14 +22,16 @@ const {
         readyTrackCount: 1,
         totalBytes: 1234,
         readyAssetKeys: ["storage-1"],
-        tracks: [{
-          entity_uid: "entity-1",
-          storage_id: "storage-1",
-          title: "Track One",
-          artist: "Artist",
-          stream_url: "/api/tracks/by-entity/entity-1/stream",
-          download_url: "/api/tracks/by-entity/entity-1/download",
-        }],
+        tracks: [
+          {
+            entity_uid: "entity-1",
+            storage_id: "storage-1",
+            title: "Track One",
+            artist: "Artist",
+            stream_url: "/api/tracks/by-entity/entity-1/stream",
+            download_url: "/api/tracks/by-entity/entity-1/download",
+          },
+        ],
       },
     },
   })),
@@ -46,14 +48,31 @@ vi.mock("@/lib/offline", () => ({
   deleteCachedTrackAsset: vi.fn(async () => {}),
   deriveOfflineProfileKey: vi.fn(() => "profile-1"),
   ensureOfflineStorageBudget: vi.fn(async () => {}),
-  getOfflineItemKey: (kind: string, entityId: string | number) => `${kind}:${entityId}`,
-  getOfflineTrackAssetKey: (track: string | { entity_uid?: string | null; storage_id?: string | null; entityUid?: string | null; storageId?: string | null }) => {
+  getOfflineItemKey: (kind: string, entityId: string | number) =>
+    `${kind}:${entityId}`,
+  getOfflineTrackAssetKey: (
+    track:
+      | string
+      | {
+          entity_uid?: string | null;
+          storage_id?: string | null;
+          entityUid?: string | null;
+          storageId?: string | null;
+        },
+  ) => {
     if (typeof track === "string") return track;
-    return track.entity_uid || track.entityUid || track.storage_id || track.storageId || null;
+    return (
+      track.entity_uid ||
+      track.entityUid ||
+      track.storage_id ||
+      track.storageId ||
+      null
+    );
   },
   hasCachedTrackAsset: vi.fn(async () => false),
   hydrateOfflineProfileState: hydrateOfflineProfileStateMock,
-  isOfflineBusy: (state: string) => ["queued", "downloading", "syncing"].includes(state),
+  isOfflineBusy: (state: string) =>
+    ["queued", "downloading", "syncing"].includes(state),
   isOfflineSupported: isOfflineSupportedMock,
   saveOfflineSnapshot: saveOfflineSnapshotMock,
   setActiveOfflineProfileKey: setActiveOfflineProfileKeyMock,
@@ -127,7 +146,9 @@ describe("OfflineProvider", () => {
     });
     expect(screen.getByText("ready")).toBeTruthy();
     expect(setActiveOfflineProfileKeyMock).toHaveBeenCalledWith("profile-1");
-    expect(syncOfflineProfileToServiceWorkerMock).toHaveBeenCalledWith("profile-1");
+    expect(syncOfflineProfileToServiceWorkerMock).toHaveBeenCalledWith(
+      "profile-1",
+    );
   });
 
   it("clears assets for the active profile when asked", async () => {

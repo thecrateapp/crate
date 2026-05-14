@@ -1,3 +1,5 @@
+//! Tag inspector and Crate identity tag writer for audio files.
+
 use serde::Serialize;
 use std::path::Path;
 use std::path::PathBuf;

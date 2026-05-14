@@ -133,7 +133,9 @@ def _vector_distance(candidate: dict, target: list[float]) -> float:
     if len(vector) != len(target) or not vector:
         return _coerce_float(candidate.get("distance")) or 1.0
 
-    dot = sum(float(vector[index]) * float(target[index]) for index in range(len(target)))
+    dot = sum(
+        float(vector[index]) * float(target[index]) for index in range(len(target))
+    )
     left_norm = sum(float(value) * float(value) for value in vector) ** 0.5
     right_norm = sum(float(value) * float(value) for value in target) ** 0.5
     if left_norm <= 0 or right_norm <= 0:
@@ -194,8 +196,7 @@ def _select_best_candidate_from_rows(
         return None
 
     scored_rows: list[tuple[dict, float]] = [
-        (dict(row), _vector_distance(dict(row), target))
-        for row in rows
+        (dict(row), _vector_distance(dict(row), target)) for row in rows
     ]
     max_dist = max(distance for _row, distance in scored_rows) or 1.0
     best: dict | None = None
@@ -213,12 +214,18 @@ def _select_best_candidate_from_rows(
             continue
 
         if recent_artists:
-            consecutive = sum(1 for recent_artist in reversed(recent_artists) if recent_artist == artist)
+            consecutive = sum(
+                1
+                for recent_artist in reversed(recent_artists)
+                if recent_artist == artist
+            )
             if consecutive >= _MAX_CONSECUTIVE_SAME_ARTIST:
                 continue
 
         bliss_norm = distance / max_dist
-        affinity = artist_affinity(artist, recent_artists + target_artists, sim_graph, member_graph)
+        affinity = artist_affinity(
+            artist, recent_artists + target_artists, sim_graph, member_graph
+        )
         overlap = genre_overlap(artist, target_artists, genre_map)
 
         score = (
@@ -241,7 +248,9 @@ def _select_best_candidate_from_rows(
             best["distance"] = distance
 
     if best:
-        best["bliss_vector"] = list(best["bliss_vector"]) if best.get("bliss_vector") else None
+        best["bliss_vector"] = (
+            list(best["bliss_vector"]) if best.get("bliss_vector") else None
+        )
 
     return best
 

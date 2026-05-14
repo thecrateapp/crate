@@ -13,7 +13,9 @@ class _FakeRedis:
         self.store: dict[str, str] = {}
         self.published: list[tuple[str, str]] = []
 
-    async def set(self, key: str, value: str, *, nx: bool = False, ex: int | None = None):
+    async def set(
+        self, key: str, value: str, *, nx: bool = False, ex: int | None = None
+    ):
         del ex
         if self.fail:
             raise RuntimeError("redis down")
@@ -86,8 +88,12 @@ class TestJamRoomCRUD:
         private_room = pg_db.create_jam_room(host["id"], "Invite Room")
         pg_db.upsert_jam_room_member(private_room["id"], guest["id"], role="collab")
 
-        guest_rooms = {room["id"]: room for room in pg_db.list_jam_rooms_for_user(guest["id"])}
-        outsider_rooms = {room["id"]: room for room in pg_db.list_jam_rooms_for_user(outsider["id"])}
+        guest_rooms = {
+            room["id"]: room for room in pg_db.list_jam_rooms_for_user(guest["id"])
+        }
+        outsider_rooms = {
+            room["id"]: room for room in pg_db.list_jam_rooms_for_user(outsider["id"])
+        }
 
         assert public_room["id"] in guest_rooms
         assert private_room["id"] in guest_rooms
@@ -120,7 +126,10 @@ class TestJamRoomCRUD:
 
         assert [room["id"] for room in post_punk_rooms] == [matching["id"]]
         assert [room["id"] for room in nineties_rooms] == [matching["id"]]
-        assert post_punk_rooms[0]["description"] == "Post-punk, cold wave and 90s guitar music."
+        assert (
+            post_punk_rooms[0]["description"]
+            == "Post-punk, cold wave and 90s guitar music."
+        )
         assert post_punk_rooms[0]["tags"] == ["post-punk", "90s"]
 
     def test_room_members_and_roles(self, pg_db):
@@ -137,7 +146,7 @@ class TestJamRoomCRUD:
 
     def test_invite_flow(self, pg_db):
         host = pg_db.create_user("invite-master@test.com")
-        guest = pg_db.create_user("invite-joiner@test.com")
+        pg_db.create_user("invite-joiner@test.com")
         room = pg_db.create_jam_room(host["id"], "Invite Room")
 
         invite = pg_db.create_jam_room_invite(room["id"], host["id"])
@@ -163,7 +172,9 @@ class TestJamSyncClock:
         track = {"id": "track-1", "title": "Dark Horse", "artist": "Converge"}
 
         before = datetime.now(timezone.utc).timestamp()
-        clock = asyncio.run(jam._set_sync_clock(room_id, track=track, position_ms=30000.0, playing=True))
+        clock = asyncio.run(
+            jam._set_sync_clock(room_id, track=track, position_ms=30000.0, playing=True)
+        )
         after = datetime.now(timezone.utc).timestamp()
 
         assert clock["track"] == track
@@ -180,7 +191,11 @@ class TestJamSyncClock:
         expected = asyncio.run(jam._compute_expected_position(stored))
         assert expected >= stored["position_ms"] + 40  # at least 40ms passed
 
-        asyncio.run(jam._set_sync_clock(room_id, track=track, position_ms=expected, playing=False))
+        asyncio.run(
+            jam._set_sync_clock(
+                room_id, track=track, position_ms=expected, playing=False
+            )
+        )
 
         paused = asyncio.run(jam._get_sync_clock(room_id))
         assert paused is not None
@@ -201,7 +216,11 @@ class TestJamSyncClock:
         monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis())
         room_id = "paused-room"
 
-        asyncio.run(jam._set_sync_clock(room_id, track={"id": "t-1"}, position_ms=45000.0, playing=False))
+        asyncio.run(
+            jam._set_sync_clock(
+                room_id, track={"id": "t-1"}, position_ms=45000.0, playing=False
+            )
+        )
         stored = asyncio.run(jam._get_sync_clock(room_id))
         assert stored is not None
         assert asyncio.run(jam._compute_expected_position(stored)) == 45000.0
@@ -214,7 +233,11 @@ class TestJamSyncClock:
         monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis())
         room_id = "play-room"
 
-        asyncio.run(jam._set_sync_clock(room_id, track={"id": "t-2"}, position_ms=10000.0, playing=True))
+        asyncio.run(
+            jam._set_sync_clock(
+                room_id, track={"id": "t-2"}, position_ms=10000.0, playing=True
+            )
+        )
         time.sleep(0.1)
 
         stored = asyncio.run(jam._get_sync_clock(room_id))
@@ -230,8 +253,16 @@ class TestJamSyncClock:
         monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis())
         room_id = "seek-room"
 
-        asyncio.run(jam._set_sync_clock(room_id, track={"id": "t-3"}, position_ms=60000.0, playing=True))
-        asyncio.run(jam._set_sync_clock(room_id, track={"id": "t-3"}, position_ms=120000.0, playing=True))
+        asyncio.run(
+            jam._set_sync_clock(
+                room_id, track={"id": "t-3"}, position_ms=60000.0, playing=True
+            )
+        )
+        asyncio.run(
+            jam._set_sync_clock(
+                room_id, track={"id": "t-3"}, position_ms=120000.0, playing=True
+            )
+        )
 
         stored = asyncio.run(jam._get_sync_clock(room_id))
         assert stored is not None
@@ -251,16 +282,26 @@ class TestJamEndToEnd:
         pg_db.upsert_jam_room_member(room["id"], guest["id"], role="collab")
 
         # Emit some events
-        pg_db.append_jam_room_event(room["id"], "queue_add", {
-            "track": {"id": "x", "title": "Song 1", "artist": "Artist 1"},
-            "index": 0,
-        }, guest["id"])
+        pg_db.append_jam_room_event(
+            room["id"],
+            "queue_add",
+            {
+                "track": {"id": "x", "title": "Song 1", "artist": "Artist 1"},
+                "index": 0,
+            },
+            guest["id"],
+        )
 
-        pg_db.append_jam_room_event(room["id"], "play", {
-            "track": {"id": "x", "title": "Song 1", "artist": "Artist 1"},
-            "position": 0,
-            "playing": True,
-        }, host["id"])
+        pg_db.append_jam_room_event(
+            room["id"],
+            "play",
+            {
+                "track": {"id": "x", "title": "Song 1", "artist": "Artist 1"},
+                "position": 0,
+                "playing": True,
+            },
+            host["id"],
+        )
 
         events = pg_db.list_jam_room_events(room["id"], limit=50)
         assert [event["event_type"] for event in events] == ["queue_add", "play"]
@@ -269,7 +310,9 @@ class TestJamEndToEnd:
 
         # End room
         ended_at = datetime.now(timezone.utc).isoformat()
-        updated = pg_db.update_jam_room_state(room["id"], status="ended", ended_at=ended_at)
+        updated = pg_db.update_jam_room_state(
+            room["id"], status="ended", ended_at=ended_at
+        )
         assert updated is not None
         assert updated["status"] == "ended"
 
@@ -287,9 +330,14 @@ class TestJamEndToEnd:
         )
         room = pg_db.create_jam_room(host["id"], "Profile Room")
 
-        event = pg_db.append_jam_room_event(room["id"], "queue_add", {
-            "track": {"id": "song-1", "title": "Song 1", "artist": "Artist 1"},
-        }, host["id"])
+        event = pg_db.append_jam_room_event(
+            room["id"],
+            "queue_add",
+            {
+                "track": {"id": "song-1", "title": "Song 1", "artist": "Artist 1"},
+            },
+            host["id"],
+        )
         events = pg_db.list_jam_room_events(room["id"], limit=10)
         members = pg_db.get_jam_room_members(room["id"])
 
@@ -326,7 +374,9 @@ class TestJamEndToEnd:
     def test_permanent_ended_rooms_stay_visible_and_reopenable(self, pg_db):
         host = pg_db.create_user("permanent-visible@test.com")
         outsider = pg_db.create_user("permanent-outsider@test.com")
-        private_room = pg_db.create_jam_room(host["id"], "Private Permanent", is_permanent=True)
+        private_room = pg_db.create_jam_room(
+            host["id"], "Private Permanent", is_permanent=True
+        )
         public_room = pg_db.create_jam_room(
             host["id"],
             "Public Permanent",
@@ -334,11 +384,19 @@ class TestJamEndToEnd:
             is_permanent=True,
         )
         ended_at = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
-        pg_db.update_jam_room_state(private_room["id"], status="ended", ended_at=ended_at)
-        pg_db.update_jam_room_state(public_room["id"], status="ended", ended_at=ended_at)
+        pg_db.update_jam_room_state(
+            private_room["id"], status="ended", ended_at=ended_at
+        )
+        pg_db.update_jam_room_state(
+            public_room["id"], status="ended", ended_at=ended_at
+        )
 
-        host_rooms = {room["id"]: room for room in pg_db.list_jam_rooms_for_user(host["id"])}
-        outsider_rooms = {room["id"]: room for room in pg_db.list_jam_rooms_for_user(outsider["id"])}
+        host_rooms = {
+            room["id"]: room for room in pg_db.list_jam_rooms_for_user(host["id"])
+        }
+        outsider_rooms = {
+            room["id"]: room for room in pg_db.list_jam_rooms_for_user(outsider["id"])
+        }
 
         assert host_rooms[private_room["id"]]["status"] == "ended"
         assert host_rooms[public_room["id"]]["status"] == "ended"
@@ -355,9 +413,14 @@ class TestJamEndToEnd:
         host = pg_db.create_user("room-delete@test.com")
         room = pg_db.create_jam_room(host["id"], "Disposable Room")
         invite = pg_db.create_jam_room_invite(room["id"], host["id"])
-        pg_db.append_jam_room_event(room["id"], "queue_add", {
-            "track": {"id": "song-1", "title": "Song 1", "artist": "Artist 1"},
-        }, host["id"])
+        pg_db.append_jam_room_event(
+            room["id"],
+            "queue_add",
+            {
+                "track": {"id": "song-1", "title": "Song 1", "artist": "Artist 1"},
+            },
+            host["id"],
+        )
 
         assert pg_db.delete_jam_room(room["id"]) is True
 
@@ -393,8 +456,16 @@ class TestJamSyncClockEdgeCases:
 
         monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis())
 
-        asyncio.run(jam._set_sync_clock("room-a", track={"id": "a"}, position_ms=1000.0, playing=True))
-        asyncio.run(jam._set_sync_clock("room-b", track={"id": "b"}, position_ms=5000.0, playing=False))
+        asyncio.run(
+            jam._set_sync_clock(
+                "room-a", track={"id": "a"}, position_ms=1000.0, playing=True
+            )
+        )
+        asyncio.run(
+            jam._set_sync_clock(
+                "room-b", track={"id": "b"}, position_ms=5000.0, playing=False
+            )
+        )
 
         clock_a = asyncio.run(jam._get_sync_clock("room-a"))
         clock_b = asyncio.run(jam._get_sync_clock("room-b"))
@@ -412,7 +483,11 @@ class TestJamSyncClockEdgeCases:
 
         monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis(fail=True))
 
-        asyncio.run(jam._set_sync_clock("fallback-room", track={"id": "x"}, position_ms=1200.0, playing=False))
+        asyncio.run(
+            jam._set_sync_clock(
+                "fallback-room", track={"id": "x"}, position_ms=1200.0, playing=False
+            )
+        )
         stored = asyncio.run(jam._get_sync_clock("fallback-room"))
 
         assert stored is not None
@@ -430,8 +505,18 @@ class TestJamWebSocketAuth:
             headers = {}
             cookies = {COOKIE_NAME_LISTEN: "valid-token"}
 
-        monkeypatch.setattr(jam, "verify_jwt", lambda token: {"user_id": 42, "sid": "session-1"} if token == "valid-token" else None)
-        monkeypatch.setattr(jam, "get_session", lambda session_id: {"id": session_id, "revoked_at": None})
+        monkeypatch.setattr(
+            jam,
+            "verify_jwt",
+            lambda token: (
+                {"user_id": 42, "sid": "session-1"} if token == "valid-token" else None
+            ),
+        )
+        monkeypatch.setattr(
+            jam,
+            "get_session",
+            lambda session_id: {"id": session_id, "revoked_at": None},
+        )
 
         assert jam._auth_ws(FakeWebSocket())["user_id"] == 42
 
@@ -445,8 +530,14 @@ class TestJamWebSocketAuth:
             headers = {}
             cookies = {COOKIE_NAME_LISTEN: "valid-token"}
 
-        monkeypatch.setattr(jam, "verify_jwt", lambda token: {"user_id": 42, "sid": "session-1"})
-        monkeypatch.setattr(jam, "get_session", lambda session_id: {"id": session_id, "revoked_at": "now"})
+        monkeypatch.setattr(
+            jam, "verify_jwt", lambda token: {"user_id": 42, "sid": "session-1"}
+        )
+        monkeypatch.setattr(
+            jam,
+            "get_session",
+            lambda session_id: {"id": session_id, "revoked_at": "now"},
+        )
 
         with pytest.raises(HTTPException):
             jam._auth_ws(FakeWebSocket())
@@ -459,12 +550,14 @@ class TestJamSerialization:
         room_id = uuid4()
         now = datetime.now(timezone.utc)
 
-        payload = jam._json_payload({
-            "room": {
-                "id": room_id,
-                "created_at": now,
-            },
-        })
+        payload = jam._json_payload(
+            {
+                "room": {
+                    "id": room_id,
+                    "created_at": now,
+                },
+            }
+        )
 
         assert payload == {
             "room": {
@@ -472,3 +565,103 @@ class TestJamSerialization:
                 "created_at": now.isoformat(),
             },
         }
+
+
+class TestJamResilience:
+    """Error paths for WebSocket and Redis must not crash the hub."""
+
+    def test_broadcast_skips_broken_peer(self):
+        """If send_json fails, the peer is removed so others keep receiving."""
+        import asyncio
+        from crate.api import jam
+
+        class BrokenWebSocket:
+            async def send_json(self, payload):
+                raise RuntimeError("socket closed")
+
+            async def send_text(self, payload):
+                pass
+
+            async def close(self, *, code, reason=""):
+                pass
+
+        class OKWebSocket:
+            sent: list[dict] = []
+
+            async def send_json(self, payload):
+                self.sent.append(payload)
+
+            async def send_text(self, payload):
+                pass
+
+            async def close(self, *, code, reason=""):
+                pass
+
+        broken_peer = jam._JamPeer(BrokenWebSocket())
+        ok_ws = OKWebSocket()
+        ok_peer = jam._JamPeer(ok_ws)
+
+        async def _test():
+            await jam._local_hub.connect("room-1", broken_peer)
+            await jam._local_hub.connect("room-1", ok_peer)
+            await jam._local_hub.broadcast("room-1", {"type": "test"})
+            peers = jam._local_hub._rooms.get("room-1", set())
+            assert broken_peer not in peers
+            assert ok_peer in peers
+            assert len(ok_ws.sent) == 1
+            await jam._local_hub.disconnect("room-1", ok_peer)
+
+        asyncio.run(_test())
+
+    def test_broadcast_to_room_fallback_when_redis_fails(self, monkeypatch):
+        """Redis publish failure must fall back to local broadcast without raising."""
+        import asyncio
+        from crate.api import jam
+
+        monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis(fail=True))
+
+        async def _test():
+            await jam._broadcast_to_room("room-fb", {"type": "test"})
+
+        asyncio.run(_test())
+
+    def test_close_room_suppresses_peer_errors(self):
+        """Closing a room must succeed even if individual peers are already dead."""
+        import asyncio
+        from crate.api import jam
+
+        class BrokenWebSocket:
+            async def close(self, *, code, reason=""):
+                raise RuntimeError("already closed")
+
+            async def send_json(self, payload):
+                pass
+
+            async def send_text(self, payload):
+                pass
+
+        peer = jam._JamPeer(BrokenWebSocket())
+
+        async def _test():
+            await jam._local_hub.connect("room-close", peer)
+            await jam._local_hub.close_room("room-close")
+            assert "room-close" not in jam._local_hub._rooms
+
+        asyncio.run(_test())
+
+    def test_heartbeat_lock_fallback_when_redis_fails(self, monkeypatch):
+        """Heartbeat lock operations must fall back to in-memory owners when Redis is down."""
+        import asyncio
+        from crate.api import jam
+
+        monkeypatch.setattr(jam, "get_async_redis", lambda: _FakeRedis(fail=True))
+
+        async def _test():
+            acquired = await jam._acquire_heartbeat_lock("room-hb", "owner-1")
+            assert acquired is True
+            renewed = await jam._renew_heartbeat_lock("room-hb", "owner-1")
+            assert renewed is True
+            await jam._release_heartbeat_lock("room-hb", "owner-1")
+            assert jam._local_heartbeat_owners.get("room-hb") is None
+
+        asyncio.run(_test())

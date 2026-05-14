@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { OpsPageHero, OpsPanel, OpsStatTile } from "@/components/admin/ops-surfaces";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+} from "@/components/admin/ops-surfaces";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
@@ -64,7 +68,14 @@ const SERVICE_URLS: Record<string, string> = {
   traefik: "https://traefik.lespedants.org",
 };
 
-const STATE_STYLES: Record<string, { chip: string; dot: string; tone: "default" | "success" | "warning" | "danger" }> = {
+const STATE_STYLES: Record<
+  string,
+  {
+    chip: string;
+    dot: string;
+    tone: "default" | "success" | "warning" | "danger";
+  }
+> = {
   running: {
     chip: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
     dot: "bg-emerald-400",
@@ -106,7 +117,9 @@ function displayImage(image: string) {
 }
 
 function formatLogTimestamp(line: string) {
-  const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^ ]*)\s*/);
+  const tsMatch = line.match(
+    /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^ ]*)\s*/,
+  );
   if (tsMatch?.[1]) {
     const date = new Date(tsMatch[1]);
     if (!Number.isNaN(date.getTime())) {
@@ -136,11 +149,13 @@ function formatLogTimestamp(line: string) {
 }
 
 function stateMeta(state: string) {
-  return STATE_STYLES[state] ?? {
-    chip: "border-white/10 bg-white/[0.04] text-white/60",
-    dot: "bg-white/35",
-    tone: "default" as const,
-  };
+  return (
+    STATE_STYLES[state] ?? {
+      chip: "border-white/10 bg-white/[0.04] text-white/60",
+      dot: "bg-white/35",
+      tone: "default" as const,
+    }
+  );
 }
 
 function StackLogLine({ line }: { line: string }) {
@@ -148,7 +163,11 @@ function StackLogLine({ line }: { line: string }) {
 
   return (
     <div className="flex gap-3 rounded-sm px-2 py-1 font-mono text-[11px] text-white/60 hover:bg-white/[0.03]">
-      {timestamp ? <span className="w-[78px] shrink-0 text-white/20 tabular-nums">{timestamp}</span> : null}
+      {timestamp ? (
+        <span className="w-[78px] shrink-0 text-white/20 tabular-nums">
+          {timestamp}
+        </span>
+      ) : null}
       <span className="min-w-0 flex-1 break-all">{line}</span>
     </div>
   );
@@ -184,18 +203,26 @@ function ServiceCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-base font-semibold tracking-tight text-white">{container.name}</span>
+              <span className="text-base font-semibold tracking-tight text-white">
+                {container.name}
+              </span>
               <CrateChip className={state.chip}>
                 <span className={cn("h-2 w-2 rounded-full", state.dot)} />
                 {container.state}
               </CrateChip>
               {hostname ? <CrateChip>{hostname}</CrateChip> : null}
             </div>
-            <div className="text-sm text-white/40">{displayImage(container.image)}</div>
+            <div className="text-sm text-white/40">
+              {displayImage(container.image)}
+            </div>
           </div>
 
           <div className="flex items-center gap-1">
-            <ActionIconButton variant="card" onClick={onToggleLogs} title={expanded ? "Hide logs" : "Show logs"}>
+            <ActionIconButton
+              variant="card"
+              onClick={onToggleLogs}
+              title={expanded ? "Hide logs" : "Show logs"}
+            >
               <ScrollText size={15} />
             </ActionIconButton>
             <ActionIconButton
@@ -205,7 +232,13 @@ function ServiceCard({
               disabled={busy}
               title={isRunning ? "Stop service" : "Start service"}
             >
-              {busy ? <Loader2 size={15} className="animate-spin" /> : isRunning ? <Square size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
+              {busy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : isRunning ? (
+                <Square size={15} fill="currentColor" />
+              ) : (
+                <Play size={15} fill="currentColor" />
+              )}
             </ActionIconButton>
             <ActionIconButton
               variant="card"
@@ -232,16 +265,30 @@ function ServiceCard({
 
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">Status</div>
-            <div className="mt-1 text-sm font-medium text-white/85">{container.status}</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+              Status
+            </div>
+            <div className="mt-1 text-sm font-medium text-white/85">
+              {container.status}
+            </div>
           </div>
           <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">Ports</div>
-            <div className="mt-1 text-sm font-medium text-white/85">{container.ports.length > 0 ? container.ports.join(", ") : "No exposed ports"}</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+              Ports
+            </div>
+            <div className="mt-1 text-sm font-medium text-white/85">
+              {container.ports.length > 0
+                ? container.ports.join(", ")
+                : "No exposed ports"}
+            </div>
           </div>
           <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">Public route</div>
-            <div className="mt-1 text-sm font-medium text-white/85">{hostname ?? "Internal only"}</div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
+              Public route
+            </div>
+            <div className="mt-1 text-sm font-medium text-white/85">
+              {hostname ?? "Internal only"}
+            </div>
           </div>
         </div>
       </div>
@@ -259,9 +306,15 @@ function ServiceCard({
             </div>
           ) : logs?.logs ? (
             <div className="max-h-[320px] overflow-y-auto rounded-sm border border-white/6 bg-black/20 py-2">
-              {logs.logs.split("\n").filter(Boolean).map((line, index) => (
-                <StackLogLine key={`${container.name}-${index}`} line={line} />
-              ))}
+              {logs.logs
+                .split("\n")
+                .filter(Boolean)
+                .map((line, index) => (
+                  <StackLogLine
+                    key={`${container.name}-${index}`}
+                    line={line}
+                  />
+                ))}
             </div>
           ) : (
             <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-6 text-sm text-white/35">
@@ -291,7 +344,11 @@ export function Stack() {
   const fetchSnapshot = useCallback(async (fresh = false, silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const response = await api<StackSnapshotData>(fresh ? "/api/admin/stack-snapshot?fresh=1" : "/api/admin/stack-snapshot");
+      const response = await api<StackSnapshotData>(
+        fresh
+          ? "/api/admin/stack-snapshot?fresh=1"
+          : "/api/admin/stack-snapshot",
+      );
       setSnapshot(response);
       setError(null);
     } catch {
@@ -321,7 +378,9 @@ export function Stack() {
 
     const connect = () => {
       if (closed) return;
-      stream = new EventSource("/api/admin/stack-stream", { withCredentials: true });
+      stream = new EventSource("/api/admin/stack-stream", {
+        withCredentials: true,
+      });
       stream.onmessage = (event) => {
         try {
           setSnapshot(JSON.parse(event.data) as StackSnapshotData);
@@ -398,7 +457,9 @@ export function Stack() {
     setExpandedLogs(name);
     setLogsLoading(true);
     try {
-      const response = await api<ContainerLogs>(`/api/stack/container/${name}/logs?tail=30`);
+      const response = await api<ContainerLogs>(
+        `/api/stack/container/${name}/logs?tail=30`,
+      );
       setLogs(response);
     } catch {
       setLogs({ name, logs: "" });
@@ -411,21 +472,28 @@ export function Stack() {
     const containers = data?.containers ?? [];
     const normalized = search.trim().toLowerCase();
 
-    return containers.filter((container) => {
-      if (filter === "running" && container.state !== "running") return false;
-      if (filter === "stopped" && container.state === "running") return false;
-      if (!normalized) return true;
-      const haystack = `${container.name} ${container.image} ${container.status} ${container.ports.join(" ")}`.toLowerCase();
-      return haystack.includes(normalized);
-    }).sort((a, b) => {
-      if (a.state === "running" && b.state !== "running") return -1;
-      if (a.state !== "running" && b.state === "running") return 1;
-      return a.name.localeCompare(b.name);
-    });
+    return containers
+      .filter((container) => {
+        if (filter === "running" && container.state !== "running") return false;
+        if (filter === "stopped" && container.state === "running") return false;
+        if (!normalized) return true;
+        const haystack = `${container.name} ${container.image} ${
+          container.status
+        } ${container.ports.join(" ")}`.toLowerCase();
+        return haystack.includes(normalized);
+      })
+      .sort((a, b) => {
+        if (a.state === "running" && b.state !== "running") return -1;
+        if (a.state !== "running" && b.state === "running") return 1;
+        return a.name.localeCompare(b.name);
+      });
   }, [data?.containers, filter, search]);
 
   const publicRoutes = useMemo(
-    () => (data?.containers ?? []).filter((container) => Boolean(getServiceUrl(container.name))).length,
+    () =>
+      (data?.containers ?? []).filter((container) =>
+        Boolean(getServiceUrl(container.name)),
+      ).length,
     [data?.containers],
   );
 
@@ -438,7 +506,9 @@ export function Stack() {
   }
 
   if (error && !data) {
-    return <ErrorState message={error} onRetry={() => void fetchSnapshot(true)} />;
+    return (
+      <ErrorState message={error} onRetry={() => void fetchSnapshot(true)} />
+    );
   }
 
   return (
@@ -448,15 +518,24 @@ export function Stack() {
         title="Stack"
         description="Managed Docker services, their runtime state, and the quickest path to logs or restart when the platform starts wobbling."
         actions={
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => void fetchSnapshot(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => void fetchSnapshot(true)}
+          >
             <RefreshCw size={14} />
             Refresh
           </Button>
         }
       >
-        <CratePill active icon={Server}>{data?.running ?? 0}/{data?.total ?? 0} running</CratePill>
+        <CratePill active icon={Server}>
+          {data?.running ?? 0}/{data?.total ?? 0} running
+        </CratePill>
         <CratePill icon={Wifi}>{publicRoutes} public routes</CratePill>
-        <CratePill>{data?.available ? "Docker available" : "Docker unavailable"}</CratePill>
+        <CratePill>
+          {data?.available ? "Docker available" : "Docker unavailable"}
+        </CratePill>
       </OpsPageHero>
 
       {!data?.available ? (
@@ -466,16 +545,48 @@ export function Stack() {
           description="The API container cannot see the Docker socket, so stack inspection and service controls are disabled."
         >
           <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-8 text-center text-sm text-white/35">
-            Mount <code className="rounded-sm bg-white/[0.05] px-1.5 py-0.5 text-white/65">/var/run/docker.sock</code> into the API container to restore stack operations.
+            Mount{" "}
+            <code className="rounded-sm bg-white/[0.05] px-1.5 py-0.5 text-white/65">
+              /var/run/docker.sock
+            </code>{" "}
+            into the API container to restore stack operations.
           </div>
         </OpsPanel>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <OpsStatTile icon={Server} label="Running services" value={(data?.running ?? 0).toLocaleString()} caption={`${data?.total ?? 0} managed containers`} tone={(data?.running ?? 0) > 0 ? "success" : "default"} />
-            <OpsStatTile icon={Square} label="Stopped services" value={((data?.total ?? 0) - (data?.running ?? 0)).toLocaleString()} caption="Exited or unavailable containers" tone={((data?.total ?? 0) - (data?.running ?? 0)) > 0 ? "warning" : "default"} />
-            <OpsStatTile icon={ExternalLink} label="Public routes" value={publicRoutes.toLocaleString()} caption="Services with an external URL shortcut" />
-            <OpsStatTile icon={Package} label="Visible services" value={filteredContainers.length.toLocaleString()} caption="Current filtered result set" />
+            <OpsStatTile
+              icon={Server}
+              label="Running services"
+              value={(data?.running ?? 0).toLocaleString()}
+              caption={`${data?.total ?? 0} managed containers`}
+              tone={(data?.running ?? 0) > 0 ? "success" : "default"}
+            />
+            <OpsStatTile
+              icon={Square}
+              label="Stopped services"
+              value={(
+                (data?.total ?? 0) - (data?.running ?? 0)
+              ).toLocaleString()}
+              caption="Exited or unavailable containers"
+              tone={
+                (data?.total ?? 0) - (data?.running ?? 0) > 0
+                  ? "warning"
+                  : "default"
+              }
+            />
+            <OpsStatTile
+              icon={ExternalLink}
+              label="Public routes"
+              value={publicRoutes.toLocaleString()}
+              caption="Services with an external URL shortcut"
+            />
+            <OpsStatTile
+              icon={Package}
+              label="Visible services"
+              value={filteredContainers.length.toLocaleString()}
+              caption="Current filtered result set"
+            />
           </div>
 
           <OpsPanel
@@ -485,7 +596,10 @@ export function Stack() {
           >
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="relative flex-1 min-w-[240px]">
-                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+                />
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -494,9 +608,24 @@ export function Stack() {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <CratePill active={filter === "all"} onClick={() => setFilter("all")}>All</CratePill>
-                <CratePill active={filter === "running"} onClick={() => setFilter("running")}>Running</CratePill>
-                <CratePill active={filter === "stopped"} onClick={() => setFilter("stopped")}>Stopped</CratePill>
+                <CratePill
+                  active={filter === "all"}
+                  onClick={() => setFilter("all")}
+                >
+                  All
+                </CratePill>
+                <CratePill
+                  active={filter === "running"}
+                  onClick={() => setFilter("running")}
+                >
+                  Running
+                </CratePill>
+                <CratePill
+                  active={filter === "stopped"}
+                  onClick={() => setFilter("stopped")}
+                >
+                  Stopped
+                </CratePill>
               </div>
             </div>
           </OpsPanel>
@@ -518,7 +647,9 @@ export function Stack() {
                     busy={restarting.has(container.name)}
                     onToggleLogs={() => toggleLogs(container.name)}
                     onRestart={() => setRestartTarget(container.name)}
-                    onToggleState={() => handleToggleState(container.name, container.state)}
+                    onToggleState={() =>
+                      handleToggleState(container.name, container.state)
+                    }
                   />
                 ))}
               </div>

@@ -41,17 +41,25 @@ def diff_shadow_enabled(config: dict | None = None) -> bool:
 def diff_skip_unchanged_enabled(config: dict | None = None) -> bool:
     if config and "native_scan_diff_skip_unchanged" in config:
         return bool(config.get("native_scan_diff_skip_unchanged"))
-    if config and str(config.get("native_scan_diff_source") or "").lower() in {"skip", "prefer", "native"}:
+    if config and str(config.get("native_scan_diff_source") or "").lower() in {
+        "skip",
+        "prefer",
+        "native",
+    }:
         return True
     source = os.environ.get("CRATE_NATIVE_SCAN_DIFF_SOURCE", "").strip().lower()
-    return source in {"skip", "prefer", "native"} or _env_enabled("CRATE_NATIVE_SCAN_DIFF_SKIP_UNCHANGED", False)
+    return source in {"skip", "prefer", "native"} or _env_enabled(
+        "CRATE_NATIVE_SCAN_DIFF_SKIP_UNCHANGED", False
+    )
 
 
 def diff_compare_enabled(config: dict | None = None) -> bool:
     return diff_shadow_enabled(config) or diff_skip_unchanged_enabled(config)
 
 
-def normalize_extensions(extensions: set[str] | list[str] | tuple[str, ...] | None) -> str:
+def normalize_extensions(
+    extensions: set[str] | list[str] | tuple[str, ...] | None,
+) -> str:
     values = extensions or DEFAULT_AUDIO_EXTENSIONS
     normalized = sorted(
         {
@@ -106,18 +114,24 @@ def discover_python_audio_paths(root: Path, extensions: str) -> set[str]:
         and _album_structure(root, path) is not None
     )
 
+    album_structure_by_path = {
+        path: structure
+        for path in candidates
+        if (structure := _album_structure(root, path)) is not None
+    }
     albums_with_flac = {
         album_path
-        for path in candidates
+        for path, (_album_name, album_path) in album_structure_by_path.items()
         if path.suffix.lower() == ".flac"
-        for _album_name, album_path in [_album_structure(root, path)]
-        if album_path is not None
     }
 
     selected = [
         path
         for path in candidates
-        if not (path.suffix.lower() == ".m4a" and _album_structure(root, path)[1] in albums_with_flac)
+        if not (
+            path.suffix.lower() == ".m4a"
+            and album_structure_by_path[path][1] in albums_with_flac
+        )
     ]
     return {path.resolve().relative_to(root.resolve()).as_posix() for path in selected}
 
@@ -195,7 +209,11 @@ def maybe_compare_native_scan_file_set(
         return compare_native_scan_file_set(root, extensions)
     except Exception:
         log.exception("Native scan shadow compare failed for %s", root)
-        return {"available": False, "root": str(root), "reason": "shadow compare failed"}
+        return {
+            "available": False,
+            "root": str(root),
+            "reason": "shadow compare failed",
+        }
 
 
 def _snapshot_dir(config: dict | None = None) -> Path:
@@ -254,7 +272,13 @@ def update_native_scan_diff_snapshot(
         }
 
     snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", dir=snapshot_path.parent, prefix=f".{snapshot_path.name}.", suffix=".current", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(
+        "w",
+        dir=snapshot_path.parent,
+        prefix=f".{snapshot_path.name}.",
+        suffix=".current",
+        delete=False,
+    ) as tmp:
         json.dump(native_payload, tmp, separators=(",", ":"), sort_keys=True)
         tmp.write("\n")
         current_path = Path(tmp.name)
@@ -334,10 +358,15 @@ def payload_shadow_enabled(config: dict | None = None) -> bool:
 def payload_prefer_enabled(config: dict | None = None) -> bool:
     if config and "native_scan_payload_prefer" in config:
         return bool(config.get("native_scan_payload_prefer"))
-    if config and str(config.get("native_scan_payload_source") or "").lower() in {"native", "prefer"}:
+    if config and str(config.get("native_scan_payload_source") or "").lower() in {
+        "native",
+        "prefer",
+    }:
         return True
     source = os.environ.get("CRATE_NATIVE_SCAN_PAYLOAD_SOURCE", "").strip().lower()
-    return source in {"native", "prefer"} or _env_enabled("CRATE_NATIVE_SCAN_PAYLOAD_PREFER", False)
+    return source in {"native", "prefer"} or _env_enabled(
+        "CRATE_NATIVE_SCAN_PAYLOAD_PREFER", False
+    )
 
 
 def payload_compare_enabled(config: dict | None = None) -> bool:
@@ -365,12 +394,18 @@ def _duration_from_ms(value: Any) -> float:
         return 0.0
 
 
-def _native_track_payload(track: dict[str, Any], fallback_artist: str, fallback_album: str) -> dict[str, Any]:
+def _native_track_payload(
+    track: dict[str, Any], fallback_artist: str, fallback_album: str
+) -> dict[str, Any]:
     path = Path(track.get("path") or "")
     tags = track.get("tags") or {}
     identity = tags.get("crate_identity") or {}
     crate_track_uid = identity.get("crate_track_uid")
-    artist = _empty_to_none(tags.get("artist")) or _empty_to_none(tags.get("album_artist")) or fallback_artist
+    artist = (
+        _empty_to_none(tags.get("artist"))
+        or _empty_to_none(tags.get("album_artist"))
+        or fallback_artist
+    )
     album = _empty_to_none(tags.get("album")) or fallback_album
     album_artist = _empty_to_none(tags.get("album_artist")) or artist
     return {
@@ -399,7 +434,9 @@ def _native_track_payload(track: dict[str, Any], fallback_artist: str, fallback_
     }
 
 
-def _select_native_album(album_dir: Path, payload: dict[str, Any]) -> dict[str, Any] | None:
+def _select_native_album(
+    album_dir: Path, payload: dict[str, Any]
+) -> dict[str, Any] | None:
     candidates: list[dict[str, Any]] = []
     for artist in payload.get("artists") or []:
         for album in artist.get("albums") or []:
@@ -426,10 +463,12 @@ def build_native_album_projection(
 
     fallback_album = native_album.get("name") or album_dir.name
     tracks = [
-        _native_track_payload(track, fallback_artist=artist_name, fallback_album=fallback_album)
+        _native_track_payload(
+            track, fallback_artist=artist_name, fallback_album=fallback_album
+        )
         for track in native_album.get("tracks") or []
     ]
-    formats = sorted({track.get("format") for track in tracks if track.get("format")})
+    formats = sorted(str(fmt) for track in tracks if (fmt := track.get("format")))
     total_duration = sum(float(track.get("duration") or 0) for track in tracks)
     total_size = sum(int(track.get("size") or 0) for track in tracks)
     tag_album = _first_present(tracks, "album")
@@ -446,7 +485,12 @@ def build_native_album_projection(
             "formats": formats,
             "year": _first_present(tracks, "year"),
             "genre": _first_present(tracks, "genre"),
-            "has_cover": int(bool(native_album.get("has_cover") or native_album.get("has_embedded_art"))),
+            "has_cover": int(
+                bool(
+                    native_album.get("has_cover")
+                    or native_album.get("has_embedded_art")
+                )
+            ),
             "musicbrainz_albumid": _first_present(tracks, "musicbrainz_albumid"),
             "tag_album": tag_album,
         },
@@ -472,12 +516,18 @@ def _display_path(album_dir: Path, path: Any) -> str:
         return str(path)
 
 
-def _values_match(field: str, python_value: Any, native_value: Any, *, track_count: int = 1) -> bool:
+def _values_match(
+    field: str, python_value: Any, native_value: Any, *, track_count: int = 1
+) -> bool:
     python_value = _empty_to_none(python_value)
     native_value = _empty_to_none(native_value)
     if python_value == native_value:
         return True
-    if field in {"duration", "total_duration"} and python_value is not None and native_value is not None:
+    if (
+        field in {"duration", "total_duration"}
+        and python_value is not None
+        and native_value is not None
+    ):
         tolerance = max(1.0, float(track_count)) if field == "total_duration" else 1.0
         return abs(float(python_value) - float(native_value)) <= tolerance
     if field == "bitrate" and python_value is not None and native_value is not None:
@@ -521,16 +571,22 @@ def compare_album_payloads(
             native_album_payload.get(field),
             track_count=int(python_album_payload.get("track_count") or 1),
         ):
-            album_field_diffs.append({
-                "field": field,
-                "python": python_album_payload.get(field),
-                "native": native_album_payload.get(field),
-            })
+            album_field_diffs.append(
+                {
+                    "field": field,
+                    "python": python_album_payload.get(field),
+                    "native": native_album_payload.get(field),
+                }
+            )
             if len(album_field_diffs) >= max_items:
                 break
 
-    python_by_path = {_track_path_key(track.get("path")): track for track in python_track_payloads}
-    native_by_path = {_track_path_key(track.get("path")): track for track in native_track_payloads}
+    python_by_path = {
+        _track_path_key(track.get("path")): track for track in python_track_payloads
+    }
+    native_by_path = {
+        _track_path_key(track.get("path")): track for track in native_track_payloads
+    }
     python_paths = set(python_by_path)
     native_paths = set(native_by_path)
 
@@ -560,23 +616,33 @@ def compare_album_payloads(
             if (
                 field == "bit_depth"
                 and native_track.get(field) is None
-                and _lossy_format(python_track.get("format") or native_track.get("format"))
+                and _lossy_format(
+                    python_track.get("format") or native_track.get("format")
+                )
             ):
                 continue
-            if not _values_match(field, python_track.get(field), native_track.get(field)):
-                track_field_diffs.append({
-                    "path": _display_path(album_dir, path),
-                    "field": field,
-                    "python": python_track.get(field),
-                    "native": native_track.get(field),
-                })
+            if not _values_match(
+                field, python_track.get(field), native_track.get(field)
+            ):
+                track_field_diffs.append(
+                    {
+                        "path": _display_path(album_dir, path),
+                        "field": field,
+                        "python": python_track.get(field),
+                        "native": native_track.get(field),
+                    }
+                )
                 if len(track_field_diffs) >= max_items:
                     break
         if len(track_field_diffs) >= max_items:
             break
 
-    missing = sorted(_display_path(album_dir, path) for path in python_paths - native_paths)
-    extra = sorted(_display_path(album_dir, path) for path in native_paths - python_paths)
+    missing = sorted(
+        _display_path(album_dir, path) for path in python_paths - native_paths
+    )
+    extra = sorted(
+        _display_path(album_dir, path) for path in native_paths - python_paths
+    )
     identity_overrides = [
         {
             "path": _display_path(album_dir, path),
@@ -586,7 +652,8 @@ def compare_album_payloads(
         for path in sorted(python_paths & native_paths)
         if native_by_path[path].get("_crate_identity_tagged")
         and native_by_path[path].get("entity_uid")
-        and native_by_path[path].get("entity_uid") != python_by_path[path].get("entity_uid")
+        and native_by_path[path].get("entity_uid")
+        != python_by_path[path].get("entity_uid")
     ]
 
     return {
@@ -603,7 +670,10 @@ def compare_album_payloads(
         "track_field_diffs": track_field_diffs,
         "native_identity_overrides": identity_overrides[:max_items],
         "native_identity_override_count": len(identity_overrides),
-        "ok": not missing and not extra and not album_field_diffs and not track_field_diffs,
+        "ok": not missing
+        and not extra
+        and not album_field_diffs
+        and not track_field_diffs,
     }
 
 
@@ -633,7 +703,9 @@ def _run_native_album_projection(
             "projection": None,
         }
 
-    native_projection = build_native_album_projection(album_dir, artist_name, native_payload)
+    native_projection = build_native_album_projection(
+        album_dir, artist_name, native_payload
+    )
     if not native_projection:
         return {
             "summary": {
@@ -679,10 +751,12 @@ def compare_native_album_payload(
         native_projection,
         max_items=max_items,
     )
-    summary.update({
-        "extensions": base_summary["extensions"],
-        "elapsed_ms": base_summary["elapsed_ms"],
-    })
+    summary.update(
+        {
+            "extensions": base_summary["extensions"],
+            "elapsed_ms": base_summary["elapsed_ms"],
+        }
+    )
     return summary
 
 
@@ -716,7 +790,10 @@ def adopt_native_album_projection(
         if field in python_album_payload:
             adopted_album[field] = python_album_payload[field]
 
-    adopted_tracks = [_public_track_payload(track) for track in native_projection.get("track_payloads") or []]
+    adopted_tracks = [
+        _public_track_payload(track)
+        for track in native_projection.get("track_payloads") or []
+    ]
     return adopted_album, adopted_tracks
 
 
@@ -741,10 +818,12 @@ def maybe_prepare_native_album_payload(
                 python_track_payloads,
                 native_projection,
             )
-            summary.update({
-                "extensions": result["summary"]["extensions"],
-                "elapsed_ms": result["summary"]["elapsed_ms"],
-            })
+            summary.update(
+                {
+                    "extensions": result["summary"]["extensions"],
+                    "elapsed_ms": result["summary"]["elapsed_ms"],
+                }
+            )
         return {
             "summary": summary,
             "projection": native_projection,
@@ -753,7 +832,11 @@ def maybe_prepare_native_album_payload(
     except Exception:
         log.exception("Native album payload prepare failed for %s", album_dir)
         return {
-            "summary": {"available": False, "root": str(album_dir), "reason": "payload prepare failed"},
+            "summary": {
+                "available": False,
+                "root": str(album_dir),
+                "reason": "payload prepare failed",
+            },
             "projection": None,
             "prefer": payload_prefer_enabled(config),
         }

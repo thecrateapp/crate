@@ -1,4 +1,4 @@
-import { gl } from '../globals';
+import { gl } from "../globals";
 
 abstract class Drawable {
   count: number = 0;

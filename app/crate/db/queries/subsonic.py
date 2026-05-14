@@ -7,7 +7,11 @@ from crate.db.queries.subsonic_artist_album_queries import (
     get_all_artists_sorted,
     get_artist_by_id,
 )
-from crate.db.queries.subsonic_search_queries import search_albums, search_artists, search_tracks
+from crate.db.queries.subsonic_search_queries import (
+    search_albums,
+    search_artists,
+    search_tracks,
+)
 from crate.db.queries.subsonic_track_queries import (
     get_random_tracks,
     get_track_basic,

@@ -3,7 +3,6 @@
 Covers the ``users``, ``sessions``, and ``auth_invites`` tables.
 """
 
-
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -11,6 +10,7 @@ from pydantic import BaseModel, ConfigDict
 
 class UserRow(BaseModel):
     """Full user record from the ``users`` table."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -29,6 +29,7 @@ class UserRow(BaseModel):
 
 class SessionRow(BaseModel):
     """Full session record from the ``sessions`` table."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -46,6 +47,7 @@ class SessionRow(BaseModel):
 
 class AuthInviteRow(BaseModel):
     """Auth invite record from the ``auth_invites`` table."""
+
     model_config = ConfigDict(from_attributes=True)
 
     token: str

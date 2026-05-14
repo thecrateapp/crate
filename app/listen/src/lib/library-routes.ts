@@ -19,7 +19,11 @@ import {
   isReservedArtistChildSlug as _isReservedArtistChildSlug,
   recordAssetInvalidationScope as _recordAssetInvalidationScope,
 } from "../../../shared/web/library-routes";
-export type { ArtistRouteInput, AlbumRouteInput, TrackRouteInput } from "../../../shared/web/library-routes";
+export type {
+  ArtistRouteInput,
+  AlbumRouteInput,
+  TrackRouteInput,
+} from "../../../shared/web/library-routes";
 
 import { getApiBase, getAuthToken } from "@/lib/api";
 
@@ -53,7 +57,12 @@ function withAssetAuth(path: string): string {
 type ImageOptions = Parameters<typeof _albumCoverApiUrl>[1];
 
 function preferModernImageFormat(options?: ImageOptions): ImageOptions {
-  if (!options || options.size == null || Object.prototype.hasOwnProperty.call(options, "format")) return options;
+  if (
+    !options ||
+    options.size == null ||
+    Object.prototype.hasOwnProperty.call(options, "format")
+  )
+    return options;
   return { ...options, format: "webp" };
 }
 
@@ -68,15 +77,21 @@ export const trackEqFeaturesApiPath = _trackEqFeaturesApiPath;
 export const trackGenreApiPath = _trackGenreApiPath;
 export const trackOfflineManifestApiPath = _trackOfflineManifestApiPath;
 
-export const artistPhotoApiUrl = authedUrl(((input, options) => (
-  _artistPhotoApiUrl(input, preferModernImageFormat(options))
-)) as typeof _artistPhotoApiUrl);
-export const artistBackgroundApiUrl = authedUrl(((input, options) => (
-  _artistBackgroundApiUrl(input, preferModernImageFormat(options))
-)) as typeof _artistBackgroundApiUrl);
-export const albumCoverApiUrl = authedUrl(((input, options) => (
-  _albumCoverApiUrl(input, preferModernImageFormat(options))
-)) as typeof _albumCoverApiUrl);
+export const artistPhotoApiUrl = authedUrl(((input, options) =>
+  _artistPhotoApiUrl(
+    input,
+    preferModernImageFormat(options),
+  )) as typeof _artistPhotoApiUrl);
+export const artistBackgroundApiUrl = authedUrl(((input, options) =>
+  _artistBackgroundApiUrl(
+    input,
+    preferModernImageFormat(options),
+  )) as typeof _artistBackgroundApiUrl);
+export const albumCoverApiUrl = authedUrl(((input, options) =>
+  _albumCoverApiUrl(
+    input,
+    preferModernImageFormat(options),
+  )) as typeof _albumCoverApiUrl);
 export const trackStreamApiPath = _trackStreamApiPath;
 export const trackDownloadApiPath = _trackDownloadApiPath;
 export const recordAssetInvalidationScope = _recordAssetInvalidationScope;

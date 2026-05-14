@@ -30,31 +30,40 @@ export function useTaskPoll() {
     }
   }, []);
 
-  const pollTask = useCallback((
-    taskId: string,
-    onComplete: (result?: Record<string, unknown>) => void,
-    onFailed?: (error?: string) => void,
-    _intervalMs = 3000,
-    timeoutMs = 120000,
-  ) => {
-    stopPolling(taskId);
-    const controller = new AbortController();
-    controllersRef.current.set(taskId, controller);
-    void waitForTask(taskId, timeoutMs, controller.signal)
-      .then((task: TaskResult) => {
-        stopPolling(taskId);
-        if (task.status === "completed") {
-          onComplete(task.result);
-        } else if (task.status === "failed" || task.status === "cancelled") {
-          onFailed?.(task.error || (task.status === "cancelled" ? "Task was cancelled" : undefined));
-        }
-      })
-      .catch((error: Error) => {
-        stopPolling(taskId);
-        if (error.name === "AbortError") return;
-        onFailed?.("Timed out waiting for task completion");
-      });
-  }, [stopPolling]);
+  const pollTask = useCallback(
+    (
+      taskId: string,
+      onComplete: (result?: Record<string, unknown>) => void,
+      onFailed?: (error?: string) => void,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      _intervalMs = 3000,
+      timeoutMs = 120000,
+    ) => {
+      stopPolling(taskId);
+      const controller = new AbortController();
+      controllersRef.current.set(taskId, controller);
+      void waitForTask(taskId, timeoutMs, controller.signal)
+        .then((task: TaskResult) => {
+          stopPolling(taskId);
+          if (task.status === "completed") {
+            onComplete(task.result);
+          } else if (task.status === "failed" || task.status === "cancelled") {
+            onFailed?.(
+              task.error ||
+                (task.status === "cancelled"
+                  ? "Task was cancelled"
+                  : undefined),
+            );
+          }
+        })
+        .catch((error: Error) => {
+          stopPolling(taskId);
+          if (error.name === "AbortError") return;
+          onFailed?.("Timed out waiting for task completion");
+        });
+    },
+    [stopPolling],
+  );
 
   return { pollTask, stopPolling };
 }

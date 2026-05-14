@@ -16,29 +16,53 @@ It asks only for:
 
 - install directory
 - music library path
-- optional public domain
-- optional Cloudflare DNS token for HTTPS
+- access mode
+- public or local domain, depending on the mode
+- optional Cloudflare DNS token for HTTPS public installs
 - initial admin password
 
-If you skip the domain, Crate still starts on local ports:
+Supported access modes:
 
-| URL | App |
-|-----|-----|
-| `http://localhost:8580` | Admin dashboard |
-| `http://localhost:8581` | Listening app |
-| `http://localhost:8585/api/status` | API health |
+| Mode         | Use it when                                         | URLs                     |
+| ------------ | --------------------------------------------------- | ------------------------ |
+| `cloudflare` | You have a real domain and want HTTPS via Traefik   | `https://admin.<domain>` |
+| `hosts`      | You want a local domain without wildcard DNS        | `http://admin.<domain>`  |
+| `dnsmasq`    | You want local wildcard DNS such as `*.crate.local` | `http://admin.<domain>`  |
+| `ports`      | You only want direct localhost ports                | `http://localhost:8580`  |
+
+`dnsmasq` mode checks whether dnsmasq is installed and installs/configures it
+on supported Linux distros and macOS with Homebrew.
+
+Crate always starts on local ports too:
+
+| URL                                | App             |
+| ---------------------------------- | --------------- |
+| `http://localhost:8580`            | Admin dashboard |
+| `http://localhost:8581`            | Listening app   |
+| `http://localhost:8585/api/status` | API health      |
 
 For unattended installs:
 
 ```bash
 curl -fsSL https://cratemusic.app/install.sh \
   | CRATE_ASSUME_YES=1 \
+    CRATE_ACCESS_MODE=cloudflare \
     CRATE_INSTALL_DIR=/opt/crate \
     CRATE_MUSIC_DIR=/srv/music \
     CRATE_DOMAIN=example.com \
     CF_DNS_API_TOKEN=cloudflare-token \
     DEFAULT_ADMIN_PASSWORD=change-me \
     bash
+```
+
+Local-domain examples:
+
+```bash
+curl -fsSL https://cratemusic.app/install.sh \
+  | CRATE_ACCESS_MODE=hosts CRATE_DOMAIN=crate.local bash
+
+curl -fsSL https://cratemusic.app/install.sh \
+  | CRATE_ACCESS_MODE=dnsmasq CRATE_DOMAIN=crate.local bash
 ```
 
 Use `CRATE_SKIP_START=1` to generate files without starting Docker.
@@ -83,41 +107,41 @@ docker compose up -d
 
 This starts the core stack:
 
-| Service | Role |
-|---------|------|
-| **traefik** | Reverse proxy — automatic HTTPS via Let's Encrypt |
-| **crate-api** | FastAPI backend — library indexing, API, streaming |
-| **crate-readplane** | Go read plane — fast snapshot-backed reads and SSE relay |
-| **crate-worker** | Fast/default background jobs plus service loop |
-| **crate-projector** | Domain events → warmed snapshots/read models |
-| **crate-maintenance-worker** | Repair, sync, enrichment, and maintenance jobs |
-| **crate-analysis-worker** | Audio analysis, fingerprints, and bliss jobs |
-| **crate-playback-worker** | Playback prepare/transcode jobs |
-| **crate-media-worker** | Download package generation, ZIP64, progress/cancel |
-| **crate-ui** | Admin web app — manage, curate, analyze your library |
-| **crate-listen** | Listening app — playback, radio, discovery, social |
-| **crate-postgres** | PostgreSQL 15 with pgvector — all persistent data |
-| **crate-redis** | Redis 7 — cache, job broker, real-time SSE |
+| Service                      | Role                                                     |
+| ---------------------------- | -------------------------------------------------------- |
+| **traefik**                  | Reverse proxy — automatic HTTPS via Let's Encrypt        |
+| **crate-api**                | FastAPI backend — library indexing, API, streaming       |
+| **crate-readplane**          | Go read plane — fast snapshot-backed reads and SSE relay |
+| **crate-worker**             | Fast/default background jobs plus service loop           |
+| **crate-projector**          | Domain events → warmed snapshots/read models             |
+| **crate-maintenance-worker** | Repair, sync, enrichment, and maintenance jobs           |
+| **crate-analysis-worker**    | Audio analysis, fingerprints, and bliss jobs             |
+| **crate-playback-worker**    | Playback prepare/transcode jobs                          |
+| **crate-media-worker**       | Download package generation, ZIP64, progress/cancel      |
+| **crate-ui**                 | Admin web app — manage, curate, analyze your library     |
+| **crate-listen**             | Listening app — playback, radio, discovery, social       |
+| **crate-postgres**           | PostgreSQL 15 with pgvector — all persistent data        |
+| **crate-redis**              | Redis 7 — cache, job broker, real-time SSE               |
 
 ### Optional services
 
 These can be started later from the admin dashboard or manually:
 
-| Service | Role | How to enable |
-|---------|------|---------------|
-| **slskd** | Soulseek client — peer-to-peer music search and download | Included in compose, starts automatically. Configure `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD` in `.env` |
-| **proton-vpn** | VPN proxy for the worker — routes Soulseek traffic through ProtonVPN | Set `PROTONVPN_USER` and `PROTONVPN_PASS` in `.env`. Worker uses it as `SCRAPE_PROXY_URL` |
-| **ollama** | Local LLM inference — generates EQ presets, genre descriptions | Add to your compose or point `OLLAMA_URL` to an existing instance. Set `LLM_PROVIDER=ollama` in `.env` |
+| Service        | Role                                                                 | How to enable                                                                                                  |
+| -------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **slskd**      | Soulseek client — peer-to-peer music search and download             | Included in compose, starts automatically. Configure `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD` in `.env` |
+| **proton-vpn** | VPN proxy for the worker — routes Soulseek traffic through ProtonVPN | Set `PROTONVPN_USER` and `PROTONVPN_PASS` in `.env`. Worker uses it as `SCRAPE_PROXY_URL`                      |
+| **ollama**     | Local LLM inference — generates EQ presets, genre descriptions       | Add to your compose or point `OLLAMA_URL` to an existing instance. Set `LLM_PROVIDER=ollama` in `.env`         |
 
 If you prefer cloud LLMs instead of Ollama, set `LLM_PROVIDER` to `gemini/gemini-2.5-flash` (or any litellm-compatible provider) and provide the corresponding API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.).
 
 Your services will be available at:
 
-| URL | App |
-|-----|-----|
-| `https://admin.your-domain.com` | Admin dashboard |
-| `https://listen.your-domain.com` | Listening app |
-| `https://api.your-domain.com` | API (+ Subsonic at `/rest`) |
+| URL                              | App                         |
+| -------------------------------- | --------------------------- |
+| `https://admin.your-domain.com`  | Admin dashboard             |
+| `https://listen.your-domain.com` | Listening app               |
+| `https://api.your-domain.com`    | API (+ Subsonic at `/rest`) |
 
 ## 3. Run the setup wizard
 
@@ -131,13 +155,13 @@ Enter your name, email, and password. This is your administrator login.
 
 Crate enriches your library from multiple external sources. Each key is optional — skip any you don't need and add them later in Settings.
 
-| Service | What it unlocks | Get your key |
-|---------|----------------|--------------|
-| **Last.fm** | Artist bios, similar artists, tags, popularity | [last.fm/api](https://www.last.fm/api/account/create) |
-| **Ticketmaster** | Upcoming shows for library artists | [developer.ticketmaster.com](https://developer.ticketmaster.com/) |
-| **Spotify** | Artist images (Client ID + Secret) | [developer.spotify.com](https://developer.spotify.com/dashboard) |
-| **Fanart.tv** | High-quality artist backgrounds | [fanart.tv](https://fanart.tv/get-an-api-key/) |
-| **Setlist.fm** | Concert setlists and probable setlists | [api.setlist.fm](https://api.setlist.fm/docs/1.0/index.html) |
+| Service          | What it unlocks                                | Get your key                                                      |
+| ---------------- | ---------------------------------------------- | ----------------------------------------------------------------- |
+| **Last.fm**      | Artist bios, similar artists, tags, popularity | [last.fm/api](https://www.last.fm/api/account/create)             |
+| **Ticketmaster** | Upcoming shows for library artists             | [developer.ticketmaster.com](https://developer.ticketmaster.com/) |
+| **Spotify**      | Artist images (Client ID + Secret)             | [developer.spotify.com](https://developer.spotify.com/dashboard)  |
+| **Fanart.tv**    | High-quality artist backgrounds                | [fanart.tv](https://fanart.tv/get-an-api-key/)                    |
+| **Setlist.fm**   | Concert setlists and probable setlists         | [api.setlist.fm](https://api.setlist.fm/docs/1.0/index.html)      |
 
 ### Step 3 — Library Scan
 
@@ -167,15 +191,15 @@ Crate is Subsonic-compatible. Point any client at `https://api.your-domain.com/r
 
 After setup, Crate runs these background tasks on a schedule:
 
-| Task | Interval | What it does |
-|------|----------|-------------|
-| Artist enrichment | 24h | Bios, photos, similar artists, discographies |
-| Genre indexing | On new content | Maps tags to curated taxonomy (60+ canonical nodes) |
-| Audio analysis | Continuous | BPM, key, loudness, energy, mood, danceability |
-| Bliss vectors | Continuous | 20-float acoustic DNA for similarity radio and Music Paths |
-| Popularity | 24h | Last.fm listeners and playcount |
-| New releases | 12h | MusicBrainz release monitoring |
-| Shows | 24h | Ticketmaster upcoming shows |
+| Task              | Interval       | What it does                                               |
+| ----------------- | -------------- | ---------------------------------------------------------- |
+| Artist enrichment | 24h            | Bios, photos, similar artists, discographies               |
+| Genre indexing    | On new content | Maps tags to curated taxonomy (60+ canonical nodes)        |
+| Audio analysis    | Continuous     | BPM, key, loudness, energy, mood, danceability             |
+| Bliss vectors     | Continuous     | 20-float acoustic DNA for similarity radio and Music Paths |
+| Popularity        | 24h            | Last.fm listeners and playcount                            |
+| New releases      | 12h            | MusicBrainz release monitoring                             |
+| Shows             | 24h            | Ticketmaster upcoming shows                                |
 
 No manual intervention needed. Check progress at any time in the admin Tasks page.
 

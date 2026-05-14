@@ -8,7 +8,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Prevent iOS overscroll bounce revealing black background behind content */
-html, body {
+html,
+body {
   overscroll-behavior: none;
   background: #0a0a0f;
   min-height: var(--listen-viewport-height);
@@ -68,8 +69,17 @@ body {
 }
 
 /* Allow text selection in content areas */
-p, article, .selectable { -webkit-user-select: text; user-select: text; }
-input, textarea { -webkit-user-select: auto; user-select: auto; }
+p,
+article,
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+input,
+textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
 
 /* ── Listen-only: gradient backgrounds ── */
 :root {
@@ -87,26 +97,38 @@ input, textarea { -webkit-user-select: auto; user-select: auto; }
   --listen-keyboard-height: 0px;
   --listen-mobile-header-content-height: 4rem;
   --listen-mobile-header-gap: 1.5rem;
-  --listen-mobile-header-height: calc(var(--listen-safe-top) + var(--listen-mobile-header-content-height));
-  --listen-mobile-page-top: calc(var(--listen-mobile-header-height) + var(--listen-mobile-header-gap));
+  --listen-mobile-header-height: calc(
+    var(--listen-safe-top) + var(--listen-mobile-header-content-height)
+  );
+  --listen-mobile-page-top: calc(
+    var(--listen-mobile-header-height) + var(--listen-mobile-header-gap)
+  );
   --listen-mobile-bottom-dock-inset: 0.75rem;
   --listen-mobile-bottom-nav-content-height: 4.75rem;
   --listen-mobile-bottom-nav-height: calc(
-    var(--listen-safe-bottom) +
-    var(--listen-mobile-bottom-dock-inset) +
-    var(--listen-mobile-bottom-nav-content-height)
+    var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset) +
+      var(--listen-mobile-bottom-nav-content-height)
   );
   --listen-mobile-player-height: 4.125rem;
   --listen-mobile-player-gap: 0rem;
   --listen-mobile-bottom-chrome-height: calc(
-    var(--listen-mobile-bottom-nav-height) +
-    var(--listen-mobile-player-height) +
-    var(--listen-mobile-player-gap)
+    var(--listen-mobile-bottom-nav-height) + var(--listen-mobile-player-height) +
+      var(--listen-mobile-player-gap)
   );
-  --listen-mobile-bottom-clearance: calc(var(--listen-mobile-bottom-chrome-height) + var(--listen-keyboard-height) + 1rem);
-  --listen-mobile-bottom-clearance-no-player: calc(var(--listen-mobile-bottom-nav-height) + var(--listen-keyboard-height) + 1rem);
-  --listen-mobile-fullscreen-player-clearance: calc(var(--listen-safe-bottom) + 4rem);
-  --listen-mobile-fullscreen-scroll-clearance: calc(var(--listen-safe-bottom) + 2rem);
+  --listen-mobile-bottom-clearance: calc(
+    var(--listen-mobile-bottom-chrome-height) + var(--listen-keyboard-height) +
+      1rem
+  );
+  --listen-mobile-bottom-clearance-no-player: calc(
+    var(--listen-mobile-bottom-nav-height) + var(--listen-keyboard-height) +
+      1rem
+  );
+  --listen-mobile-fullscreen-player-clearance: calc(
+    var(--listen-safe-bottom) + 4rem
+  );
+  --listen-mobile-fullscreen-scroll-clearance: calc(
+    var(--listen-safe-bottom) + 2rem
+  );
   --listen-mobile-fullscreen-eq-top: calc(var(--listen-safe-top) + 5.25rem);
 }
 

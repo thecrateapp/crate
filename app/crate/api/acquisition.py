@@ -15,7 +15,11 @@ from crate import soulseek
 from crate import tidal
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_auth, _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.acquisition import (
     AcquisitionDownloadRequest,
     AcquisitionDownloadResponse,
@@ -39,8 +43,16 @@ from crate.acquisition_tasks import (
 )
 from crate.db.cache_settings import get_setting
 from crate.db.repositories.library import get_release_by_id
-from crate.db.releases import get_new_releases, mark_release_dismissed, mark_release_downloading
-from crate.db.repositories.tasks import create_task, create_task_dedup, find_active_task_by_type_params
+from crate.db.releases import (
+    get_new_releases,
+    mark_release_dismissed,
+    mark_release_downloading,
+)
+from crate.db.repositories.tasks import (
+    create_task,
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
 from crate.db.tidal import get_tidal_downloads
 
 log = logging.getLogger(__name__)
@@ -57,7 +69,15 @@ _ACQUISITION_RESPONSES = merge_responses(
 )
 
 ALLOWED_UPLOAD_EXTENSIONS = {
-    ".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".alac", ".zip",
+    ".flac",
+    ".mp3",
+    ".m4a",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".aac",
+    ".alac",
+    ".zip",
 }
 
 
@@ -69,7 +89,9 @@ def _get_soulseek_queue_items() -> list[dict]:
                 {
                     "source": "soulseek",
                     "artist": "",
-                    "album": item.get("directory", "").replace("\\", "/").split("/")[-1] if item.get("directory") else "",
+                    "album": item.get("directory", "").replace("\\", "/").split("/")[-1]
+                    if item.get("directory")
+                    else "",
                     "filename": item.get("filename", ""),
                     "fullPath": item.get("fullPath", ""),
                     "status": item.get("state", ""),
@@ -327,7 +349,11 @@ def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
             album=album,
         )
         task_params["tidal_id"] = tidal_id
-        task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+        task_id = create_task_dedup(
+            "tidal_download",
+            task_params,
+            dedup_key=tidal_download_dedup_key(task_params),
+        )
         if not task_id:
             task_id = find_active_task_by_type_params(
                 "tidal_download",
@@ -344,7 +370,9 @@ def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
         if not files:
             raise HTTPException(status_code=400, detail="files required")
 
-        file_names = [f.get("filename", "") if isinstance(f, dict) else f for f in files]
+        file_names = [
+            f.get("filename", "") if isinstance(f, dict) else f for f in files
+        ]
 
         # If explicitly asked to find alternate, skip original peer entirely
         upgrade_id = body.upgrade_album_id
@@ -361,8 +389,14 @@ def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
             )
 
         if find_alternate or not username:
-            task_params = _slsk_params(files=file_names, file_count=len(files), find_alternate=True)
-            task_id = create_task_dedup("soulseek_download", task_params, dedup_key=soulseek_download_dedup_key(task_params))
+            task_params = _slsk_params(
+                files=file_names, file_count=len(files), find_alternate=True
+            )
+            task_id = create_task_dedup(
+                "soulseek_download",
+                task_params,
+                dedup_key=soulseek_download_dedup_key(task_params),
+            )
             if not task_id:
                 task_id = find_active_task_by_type_params(
                     "soulseek_download",
@@ -376,8 +410,15 @@ def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
         enqueued = result.get("enqueued", [])
 
         if enqueued:
-            task_params = _slsk_params(files=[f.get("filename", "") for f in enqueued], file_count=len(enqueued))
-            task_id = create_task_dedup("soulseek_download", task_params, dedup_key=soulseek_download_dedup_key(task_params))
+            task_params = _slsk_params(
+                files=[f.get("filename", "") for f in enqueued],
+                file_count=len(enqueued),
+            )
+            task_id = create_task_dedup(
+                "soulseek_download",
+                task_params,
+                dedup_key=soulseek_download_dedup_key(task_params),
+            )
             if not task_id:
                 task_id = find_active_task_by_type_params(
                     "soulseek_download",
@@ -387,8 +428,14 @@ def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
             return {"task_id": task_id, "source": "soulseek", "enqueued": len(enqueued)}
 
         # Peer rejected — go straight to alternate search
-        task_params = _slsk_params(files=file_names, file_count=len(files), find_alternate=True)
-        task_id = create_task_dedup("soulseek_download", task_params, dedup_key=soulseek_download_dedup_key(task_params))
+        task_params = _slsk_params(
+            files=file_names, file_count=len(files), find_alternate=True
+        )
+        task_id = create_task_dedup(
+            "soulseek_download",
+            task_params,
+            dedup_key=soulseek_download_dedup_key(task_params),
+        )
         if not task_id:
             task_id = find_active_task_by_type_params(
                 "soulseek_download",
@@ -426,13 +473,16 @@ async def acquisition_upload(request: Request, files: list[UploadFile] = File(..
         (
             upload.filename or "unknown"
             for upload in files
-            if Path(upload.filename or "").suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS
+            if Path(upload.filename or "").suffix.lower()
+            not in ALLOWED_UPLOAD_EXTENSIONS
         ),
         None,
     )
     if invalid_name:
         shutil.rmtree(staging_dir, ignore_errors=True)
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {invalid_name}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported file type: {invalid_name}"
+        )
 
     try:
         for index, upload in enumerate(files, start=1):
@@ -470,7 +520,9 @@ async def acquisition_upload(request: Request, files: list[UploadFile] = File(..
             "staging_dir": str(staging_dir),
             "uploader_user_id": user["id"],
             "files": saved_files,
-            "source": "admin_upload" if user.get("role") == "admin" else "listen_upload",
+            "source": "admin_upload"
+            if user.get("role") == "admin"
+            else "listen_upload",
         },
     )
     return {
@@ -482,6 +534,7 @@ async def acquisition_upload(request: Request, files: list[UploadFile] = File(..
 
 
 # ── New Releases ──────────────────────────────────────────────────
+
 
 @router.get(
     "/new-releases",
@@ -540,7 +593,9 @@ def api_download_release(request: Request, release_id: int):
         album=release["album_title"],
         new_release_id=release_id,
     )
-    task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+    task_id = create_task_dedup(
+        "tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params)
+    )
     if not task_id:
         task_id = find_active_task_by_type_params(
             "tidal_download",

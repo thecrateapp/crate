@@ -52,10 +52,11 @@ describe("listen device helpers", () => {
   });
 
   it("labels Android native sessions", async () => {
-    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } = await loadDeviceHelpers({
-      native: true,
-      platform: "android",
-    });
+    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } =
+      await loadDeviceHelpers({
+        native: true,
+        platform: "android",
+      });
 
     expect(getListenDeviceType()).toBe("android");
     expect(getListenAppPlatform()).toBe("listen-android");
@@ -63,11 +64,14 @@ describe("listen device helpers", () => {
   });
 
   it("labels iPhone native sessions", async () => {
-    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } = await loadDeviceHelpers({
-      native: true,
-      platform: "ios",
-      navigatorPatch: { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" },
-    });
+    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } =
+      await loadDeviceHelpers({
+        native: true,
+        platform: "ios",
+        navigatorPatch: {
+          userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+        },
+      });
 
     expect(getListenDeviceType()).toBe("iphone");
     expect(getListenAppPlatform()).toBe("listen-ios");
@@ -75,15 +79,16 @@ describe("listen device helpers", () => {
   });
 
   it("detects iPad native sessions on modern iPadOS", async () => {
-    const { getListenDeviceLabel, getListenDeviceType } = await loadDeviceHelpers({
-      native: true,
-      platform: "ios",
-      navigatorPatch: {
-        maxTouchPoints: 5,
-        platform: "MacIntel",
-        userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-      },
-    });
+    const { getListenDeviceLabel, getListenDeviceType } =
+      await loadDeviceHelpers({
+        native: true,
+        platform: "ios",
+        navigatorPatch: {
+          maxTouchPoints: 5,
+          platform: "MacIntel",
+          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        },
+      });
 
     expect(getListenDeviceType()).toBe("ipad");
     expect(getListenDeviceLabel()).toBe("iPad (Listen)");

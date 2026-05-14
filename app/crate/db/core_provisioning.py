@@ -43,7 +43,9 @@ def ensure_database() -> None:
         cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (app_user,))
         if not cur.fetchone():
             cur.execute(
-                sql.SQL("CREATE ROLE {} WITH LOGIN PASSWORD %s").format(sql.Identifier(app_user)),
+                sql.SQL("CREATE ROLE {} WITH LOGIN PASSWORD %s").format(
+                    sql.Identifier(app_user)
+                ),
                 (app_pass,),
             )
             log.info("Created database role: %s", app_user)
@@ -68,7 +70,10 @@ def ensure_database() -> None:
         cur.close()
         conn.close()
     except Exception:
-        log.debug("Could not provision app database (superuser may not be available)", exc_info=True)
+        log.debug(
+            "Could not provision app database (superuser may not be available)",
+            exc_info=True,
+        )
 
 
 def ensure_optional_superuser_extension(extension_name: str) -> bool:
@@ -76,7 +81,10 @@ def ensure_optional_superuser_extension(extension_name: str) -> bool:
     su_user = os.environ.get("POSTGRES_SUPERUSER_USER")
     su_pass = os.environ.get("POSTGRES_SUPERUSER_PASSWORD")
     if not su_user:
-        log.info("Skipping optional extension %s: no superuser credentials configured", extension_name)
+        log.info(
+            "Skipping optional extension %s: no superuser credentials configured",
+            extension_name,
+        )
         return False
 
     _, _, host, port, app_db = get_pg_connection_settings()
@@ -98,7 +106,9 @@ def ensure_optional_superuser_extension(extension_name: str) -> bool:
             return True
 
         cur.execute(
-            sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(sql.Identifier(extension_name))
+            sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(
+                sql.Identifier(extension_name)
+            )
         )
         cur.close()
         conn.close()

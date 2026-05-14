@@ -45,6 +45,7 @@ SPOTIFY_RANK_MAX = 10
 
 def _api_key() -> str | None:
     import os
+
     return os.environ.get("LASTFM_APIKEY")
 
 
@@ -106,10 +107,19 @@ def _percent_score(value: int | float | None) -> float:
 
 def _artist_signal(row: dict, scales: dict) -> float:
     return (
-        0.35 * _log_norm(row.get("artist_lastfm_playcount"), scales.get("artist_playcount_p95"))
-        + 0.30 * _log_norm(row.get("artist_lastfm_listeners"), scales.get("artist_listeners_p95"))
+        0.35
+        * _log_norm(
+            row.get("artist_lastfm_playcount"), scales.get("artist_playcount_p95")
+        )
+        + 0.30
+        * _log_norm(
+            row.get("artist_lastfm_listeners"), scales.get("artist_listeners_p95")
+        )
         + 0.20 * _percent_score(row.get("artist_spotify_popularity"))
-        + 0.15 * _log_norm(row.get("artist_spotify_followers"), scales.get("artist_followers_p95"))
+        + 0.15
+        * _log_norm(
+            row.get("artist_spotify_followers"), scales.get("artist_followers_p95")
+        )
     )
 
 
@@ -122,7 +132,9 @@ def _build_title_index(tracks: list[dict]) -> dict[str, list[dict]]:
     return title_index
 
 
-def _match_remote_track_ids(title_index: dict[str, list[dict]], remote_title: str) -> list[int]:
+def _match_remote_track_ids(
+    title_index: dict[str, list[dict]], remote_title: str
+) -> list[int]:
     normalized = _normalize_track_title(remote_title)
     if not normalized:
         return []
@@ -168,7 +180,9 @@ def refresh_artist_track_popularity_signals(artist_name: str) -> dict:
     seen_lastfm_ids: set[int] = set()
     seen_spotify_ids: set[int] = set()
 
-    lastfm_top_tracks = get_lastfm_top_tracks(artist_name, limit=LASTFM_TOP_TRACK_LIMIT) or []
+    lastfm_top_tracks = (
+        get_lastfm_top_tracks(artist_name, limit=LASTFM_TOP_TRACK_LIMIT) or []
+    )
     for rank, item in enumerate(lastfm_top_tracks, start=1):
         matched_ids = _match_remote_track_ids(title_index, item.get("title", ""))
         if not matched_ids:
@@ -223,22 +237,23 @@ def recompute_track_popularity_scores(artist_names: list[str] | None = None) -> 
     updates: list[dict] = []
 
     for row in rows:
-        lastfm_track_signal = (
-            0.6 * _log_norm(row.get("lastfm_playcount"), scales.get("track_playcount_p95"))
-            + 0.4 * _log_norm(row.get("lastfm_listeners"), scales.get("track_listeners_p95"))
+        lastfm_track_signal = 0.6 * _log_norm(
+            row.get("lastfm_playcount"), scales.get("track_playcount_p95")
+        ) + 0.4 * _log_norm(
+            row.get("lastfm_listeners"), scales.get("track_listeners_p95")
         )
         lastfm_rank_signal = _rank_signal(row.get("lastfm_top_rank"), LASTFM_RANK_MAX)
 
         spotify_track_signal = 0.0
         if row.get("spotify_track_popularity") is not None:
-            spotify_track_signal = (
-                0.75 * max(0.0, min(1.0, float(row.get("spotify_track_popularity") or 0) / 100.0))
-                + 0.25 * _rank_signal(row.get("spotify_top_rank"), SPOTIFY_RANK_MAX)
-            )
+            spotify_track_signal = 0.75 * max(
+                0.0, min(1.0, float(row.get("spotify_track_popularity") or 0) / 100.0)
+            ) + 0.25 * _rank_signal(row.get("spotify_top_rank"), SPOTIFY_RANK_MAX)
 
-        album_signal = (
-            0.55 * _log_norm(row.get("album_lastfm_playcount"), scales.get("album_playcount_p95"))
-            + 0.45 * _log_norm(row.get("album_lastfm_listeners"), scales.get("album_listeners_p95"))
+        album_signal = 0.55 * _log_norm(
+            row.get("album_lastfm_playcount"), scales.get("album_playcount_p95")
+        ) + 0.45 * _log_norm(
+            row.get("album_lastfm_listeners"), scales.get("album_listeners_p95")
         )
 
         artist_signal = _artist_signal(row, scales)
@@ -294,14 +309,14 @@ def recompute_album_popularity_scores(artist_names: list[str] | None = None) -> 
     updates: list[dict] = []
 
     for row in rows:
-        album_signal = (
-            0.58 * _log_norm(row.get("lastfm_playcount"), scales.get("album_playcount_p95"))
-            + 0.42 * _log_norm(row.get("lastfm_listeners"), scales.get("album_listeners_p95"))
+        album_signal = 0.58 * _log_norm(
+            row.get("lastfm_playcount"), scales.get("album_playcount_p95")
+        ) + 0.42 * _log_norm(
+            row.get("lastfm_listeners"), scales.get("album_listeners_p95")
         )
-        track_signal = (
-            0.6 * max(0.0, float(row.get("max_track_popularity_score") or 0.0))
-            + 0.4 * max(0.0, float(row.get("avg_track_popularity_score") or 0.0))
-        )
+        track_signal = 0.6 * max(
+            0.0, float(row.get("max_track_popularity_score") or 0.0)
+        ) + 0.4 * max(0.0, float(row.get("avg_track_popularity_score") or 0.0))
         artist_signal = _artist_signal(row, scales)
 
         if album_signal > 0.0:
@@ -342,14 +357,12 @@ def recompute_artist_popularity_scores(artist_names: list[str] | None = None) ->
 
     for row in rows:
         artist_base_signal = _artist_signal(row, scales)
-        album_catalog_signal = (
-            0.58 * max(0.0, float(row.get("max_album_popularity_score") or 0.0))
-            + 0.42 * max(0.0, float(row.get("avg_album_popularity_score") or 0.0))
-        )
-        track_catalog_signal = (
-            0.58 * max(0.0, float(row.get("max_track_popularity_score") or 0.0))
-            + 0.42 * max(0.0, float(row.get("avg_track_popularity_score") or 0.0))
-        )
+        album_catalog_signal = 0.58 * max(
+            0.0, float(row.get("max_album_popularity_score") or 0.0)
+        ) + 0.42 * max(0.0, float(row.get("avg_album_popularity_score") or 0.0))
+        track_catalog_signal = 0.58 * max(
+            0.0, float(row.get("max_track_popularity_score") or 0.0)
+        ) + 0.42 * max(0.0, float(row.get("avg_track_popularity_score") or 0.0))
 
         if artist_base_signal > 0.0:
             raw_score = (
@@ -357,8 +370,12 @@ def recompute_artist_popularity_scores(artist_names: list[str] | None = None) ->
                 + 0.18 * album_catalog_signal
                 + 0.10 * track_catalog_signal
             )
-            has_lastfm = (row.get("artist_lastfm_listeners") or 0) > 0 or (row.get("artist_lastfm_playcount") or 0) > 0
-            has_spotify = (row.get("artist_spotify_popularity") or 0) > 0 or (row.get("artist_spotify_followers") or 0) > 0
+            has_lastfm = (row.get("artist_lastfm_listeners") or 0) > 0 or (
+                row.get("artist_lastfm_playcount") or 0
+            ) > 0
+            has_spotify = (row.get("artist_spotify_popularity") or 0) > 0 or (
+                row.get("artist_spotify_followers") or 0
+            ) > 0
             confidence = 0.95 if has_lastfm and has_spotify else 0.86
         elif album_catalog_signal > 0.0 or track_catalog_signal > 0.0:
             raw_score = 0.62 * album_catalog_signal + 0.38 * track_catalog_signal
@@ -400,7 +417,9 @@ def compute_popularity(progress_callback=None) -> dict:
         if progress_callback and index % 10 == 0:
             progress_callback({"phase": "albums", "done": index, "total": total_albums})
 
-        data = _lastfm_get("album.getinfo", artist=artist, album=album_name, autocorrect=1)
+        data = _lastfm_get(
+            "album.getinfo", artist=artist, album=album_name, autocorrect=1
+        )
         if data and "album" in data:
             info = data["album"]
             listeners = _parse_int(info.get("listeners", 0))
@@ -411,11 +430,15 @@ def compute_popularity(progress_callback=None) -> dict:
         time.sleep(0.25)
 
     all_artists, _total_artists = get_library_artists(per_page=10000)
-    artist_list = sorted({artist["name"] for artist in all_artists if artist.get("name")})
+    artist_list = sorted(
+        {artist["name"] for artist in all_artists if artist.get("name")}
+    )
     total_artists = len(artist_list)
     for index, artist_name in enumerate(artist_list):
         if progress_callback and index % 5 == 0:
-            progress_callback({"phase": "tracks", "done": index, "total": total_artists})
+            progress_callback(
+                {"phase": "tracks", "done": index, "total": total_artists}
+            )
         result = refresh_artist_track_popularity_signals(artist_name)
         lastfm_track_matches += result.get("lastfm_matches", 0)
         spotify_track_matches += result.get("spotify_matches", 0)

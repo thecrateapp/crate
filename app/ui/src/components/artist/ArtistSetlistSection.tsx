@@ -56,7 +56,10 @@ export function ArtistSetlistSection({
   }
 
   async function ensureTrackTitles() {
-    const endpoint = artistActionApiPath({ artistId, artistEntityUid }, "track-titles");
+    const endpoint = artistActionApiPath(
+      { artistId, artistEntityUid },
+      "track-titles",
+    );
     if (!endpoint) return [];
     if (allTrackTitles.length > 0) return allTrackTitles;
     try {
@@ -80,7 +83,11 @@ export function ArtistSetlistSection({
             <p className="text-xs text-white/40 mt-0.5">
               Based on {totalShows} recent concerts
               {lastShow && (
-                <> &middot; Last show: {lastShow.date} at {lastShow.venue}, {lastShow.city}</>
+                <>
+                  {" "}
+                  &middot; Last show: {lastShow.date} at {lastShow.venue},{" "}
+                  {lastShow.city}
+                </>
               )}
             </p>
           </div>
@@ -101,7 +108,9 @@ export function ArtistSetlistSection({
             return (
               <button
                 key={i}
-                className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-md hover:bg-white/5 transition-colors text-left group ${!isPlayable ? "opacity-50" : ""}`}
+                className={`w-full flex items-center gap-4 px-4 py-2.5 rounded-md hover:bg-white/5 transition-colors text-left group ${
+                  !isPlayable ? "opacity-50" : ""
+                }`}
                 onClick={() => {
                   if (libraryMatch) {
                     navigate(
@@ -122,12 +131,18 @@ export function ArtistSetlistSection({
               >
                 {isPlayable ? (
                   <>
-                    <span className="w-8 text-right text-sm text-white/30">{i + 1}</span>
+                    <span className="w-8 text-right text-sm text-white/30">
+                      {i + 1}
+                    </span>
                   </>
                 ) : (
-                  <span className="w-8 text-right text-sm text-white/20">{i + 1}</span>
+                  <span className="w-8 text-right text-sm text-white/20">
+                    {i + 1}
+                  </span>
                 )}
-                <span className="flex-1 text-sm text-white/90 truncate">{song.title}</span>
+                <span className="flex-1 text-sm text-white/90 truncate">
+                  {song.title}
+                </span>
                 <div className="w-28 flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-white/10 rounded-md overflow-hidden">
                     <div
@@ -138,10 +153,16 @@ export function ArtistSetlistSection({
                       }}
                     />
                   </div>
-                  <span className="text-xs text-white/40 w-8 text-right">{Math.round(song.frequency * 100)}%</span>
+                  <span className="text-xs text-white/40 w-8 text-right">
+                    {Math.round(song.frequency * 100)}%
+                  </span>
                 </div>
-                <span className="w-16 text-right text-xs text-white/40">{song.play_count}</span>
-                <span className="w-24 text-right text-xs text-white/30 hidden sm:block">{song.last_played ?? "-"}</span>
+                <span className="w-16 text-right text-xs text-white/40">
+                  {song.play_count}
+                </span>
+                <span className="w-24 text-right text-xs text-white/30 hidden sm:block">
+                  {song.last_played ?? "-"}
+                </span>
               </button>
             );
           })}

@@ -3,7 +3,10 @@ import { api } from "@/lib/api";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
-export async function fetchPlayableSetlist(input: { artistId?: number; artistName: string }): Promise<Track[]> {
+export async function fetchPlayableSetlist(input: {
+  artistId?: number;
+  artistName: string;
+}): Promise<Track[]> {
   if (input.artistId == null) {
     return [];
   }
@@ -33,9 +36,18 @@ export async function fetchPlayableSetlist(input: { artistId?: number; artistNam
   return (response.tracks || []).map((track) =>
     toPlayableTrack(track, {
       cover:
-        albumCoverApiUrl({ albumId: track.album_id, albumSlug: track.album_slug, artistName: track.artist, albumName: track.album })
-        || artistPhotoApiUrl({ artistId: track.artist_id, artistSlug: track.artist_slug, artistName: track.artist })
-        || undefined,
+        albumCoverApiUrl({
+          albumId: track.album_id,
+          albumSlug: track.album_slug,
+          artistName: track.artist,
+          albumName: track.album,
+        }) ||
+        artistPhotoApiUrl({
+          artistId: track.artist_id,
+          artistSlug: track.artist_slug,
+          artistName: track.artist,
+        }) ||
+        undefined,
     }),
   );
 }

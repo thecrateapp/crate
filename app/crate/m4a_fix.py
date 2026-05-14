@@ -24,7 +24,16 @@ from mutagen.flac import FLAC
 
 log = logging.getLogger(__name__)
 
-FINAL_AUDIO_SUFFIXES = {".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".aac", ".alac"}
+FINAL_AUDIO_SUFFIXES = {
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".aac",
+    ".alac",
+}
 MP4_LIKE_SUFFIXES = {".m4a", ".mp4", ".aac"}
 LOSSLESS_CODEC_NAMES = {"flac", "alac"}
 LOSSY_CODEC_NAMES = {"aac"}
@@ -159,7 +168,11 @@ def describe_tidal_artifact(filepath: Path) -> dict:
     if _has_mp4_ftyp_header(filepath):
         codec = _probe_audio_codec(filepath)
 
-        if suffix in MP4_LIKE_SUFFIXES and codec in LOSSLESS_CODEC_NAMES | LOSSY_CODEC_NAMES and not temp_name:
+        if (
+            suffix in MP4_LIKE_SUFFIXES
+            and codec in LOSSLESS_CODEC_NAMES | LOSSY_CODEC_NAMES
+            and not temp_name
+        ):
             return {
                 "kind": f"final_{codec}_mp4",
                 "codec": codec,
@@ -172,10 +185,20 @@ def describe_tidal_artifact(filepath: Path) -> dict:
                 "final_audio": True,
             }
 
-        prefix = "temp_" if temp_name else "invalid_flac_" if suffix == ".flac" else "misnamed_" if suffix not in MP4_LIKE_SUFFIXES else ""
+        prefix = (
+            "temp_"
+            if temp_name
+            else "invalid_flac_"
+            if suffix == ".flac"
+            else "misnamed_"
+            if suffix not in MP4_LIKE_SUFFIXES
+            else ""
+        )
         kind_suffix = f"{codec}_in_mp4" if codec else "mp4_container"
         suggested_suffix = ".flac" if codec == "flac" else ".m4a"
-        recoverable = not temp_name and (codec in LOSSLESS_CODEC_NAMES or codec in LOSSY_CODEC_NAMES)
+        recoverable = not temp_name and (
+            codec in LOSSLESS_CODEC_NAMES or codec in LOSSY_CODEC_NAMES
+        )
         return {
             "kind": f"{prefix}{kind_suffix}",
             "codec": codec,
@@ -255,7 +278,9 @@ def _choose_output_path(filepath: Path, suffix: str) -> Path:
     return filepath.with_name(f"{filepath.stem}.recovered999{suffix}")
 
 
-def _write_basic_flac_tags(flac_path: Path, source_name: str, *, artist: str = "", album: str = "") -> None:
+def _write_basic_flac_tags(
+    flac_path: Path, source_name: str, *, artist: str = "", album: str = ""
+) -> None:
     info = _parse_track_info_from_filename(source_name)
     try:
         audio = FLAC(flac_path)
@@ -273,7 +298,9 @@ def _write_basic_flac_tags(flac_path: Path, source_name: str, *, artist: str = "
         log.debug("Could not write FLAC tags to %s", flac_path, exc_info=True)
 
 
-def _write_basic_mp4_tags(m4a_path: Path, source_name: str, *, artist: str = "", album: str = "") -> None:
+def _write_basic_mp4_tags(
+    m4a_path: Path, source_name: str, *, artist: str = "", album: str = ""
+) -> None:
     if _looks_machine_generated_name(Path(source_name)):
         return
     try:
@@ -334,7 +361,14 @@ def cleanup_tidal_intermediates(
         for artifact in files:
             done += 1
             if progress_callback:
-                progress_callback({"phase": "cleaning", "done": done, "total": total, "file": artifact.name})
+                progress_callback(
+                    {
+                        "phase": "cleaning",
+                        "done": done,
+                        "total": total,
+                        "file": artifact.name,
+                    }
+                )
             try:
                 bytes_freed += artifact.stat().st_size
                 artifact.unlink()
@@ -342,7 +376,12 @@ def cleanup_tidal_intermediates(
             except Exception:
                 log.warning("Failed to delete artifact %s", artifact, exc_info=True)
 
-    return {"total": total, "deleted": deleted, "skipped": skipped, "bytes_freed": bytes_freed}
+    return {
+        "total": total,
+        "deleted": deleted,
+        "skipped": skipped,
+        "bytes_freed": bytes_freed,
+    }
 
 
 def remux_m4a_dash_to_flac(
@@ -366,8 +405,14 @@ def remux_m4a_dash_to_flac(
             text=True,
             timeout=120,
         )
-        if result.returncode != 0 or not tmp_path.is_file() or not _has_flac_header(tmp_path):
-            log.warning("ffmpeg remux failed for %s: %s", m4a_path, (result.stderr or "")[-500:])
+        if (
+            result.returncode != 0
+            or not tmp_path.is_file()
+            or not _has_flac_header(tmp_path)
+        ):
+            log.warning(
+                "ffmpeg remux failed for %s: %s", m4a_path, (result.stderr or "")[-500:]
+            )
             tmp_path.unlink(missing_ok=True)
             return None
         shutil.move(str(tmp_path), str(flac_path))
@@ -435,7 +480,13 @@ def repair_tidal_artifacts(
         info = describe_tidal_artifact(filepath)
         if progress_callback:
             progress_callback(
-                {"phase": "repairing", "done": idx, "total": len(files), "file": filepath.name, "kind": info["kind"]}
+                {
+                    "phase": "repairing",
+                    "done": idx,
+                    "total": len(files),
+                    "file": filepath.name,
+                    "kind": info["kind"],
+                }
             )
 
         if not info["suspicious"] or info["temp_name"]:
@@ -450,10 +501,14 @@ def repair_tidal_artifacts(
             target = _choose_output_path(filepath, ".flac")
             try:
                 shutil.move(str(filepath), str(target))
-                _write_basic_flac_tags(target, filepath.name, artist=artist, album=album)
+                _write_basic_flac_tags(
+                    target, filepath.name, artist=artist, album=album
+                )
                 summary["renamed_to_flac"] += 1
             except Exception:
-                log.warning("Failed to rename raw FLAC artifact %s", filepath, exc_info=True)
+                log.warning(
+                    "Failed to rename raw FLAC artifact %s", filepath, exc_info=True
+                )
                 _mark_unrecoverable(filepath)
             continue
 
@@ -479,12 +534,18 @@ def repair_tidal_artifacts(
                 try:
                     if target != filepath:
                         shutil.move(str(filepath), str(target))
-                    _write_basic_mp4_tags(target, filepath.name, artist=artist, album=album)
+                    _write_basic_mp4_tags(
+                        target, filepath.name, artist=artist, album=album
+                    )
                     if target != filepath:
                         summary["renamed_to_m4a"] += 1
                 except Exception:
-                    log.warning("Failed to normalize MP4 artifact %s", filepath, exc_info=True)
-                    _mark_unrecoverable(filepath, lossy=info["codec"] in LOSSY_CODEC_NAMES)
+                    log.warning(
+                        "Failed to normalize MP4 artifact %s", filepath, exc_info=True
+                    )
+                    _mark_unrecoverable(
+                        filepath, lossy=info["codec"] in LOSSY_CODEC_NAMES
+                    )
             else:
                 _mark_unrecoverable(filepath, lossy=info["codec"] in LOSSY_CODEC_NAMES)
             continue

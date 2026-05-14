@@ -8,7 +8,9 @@ def normalize_venue(name: str | None) -> str:
         return ""
     normalized = name.lower().strip()
     normalized = re.sub(r"^(the|la|el|le|les|los|das|die|den)\s+", "", normalized)
-    normalized = re.sub(r"\s*(sala|hall|venue|theatre|theater|arena|club|room)\s*", " ", normalized)
+    normalized = re.sub(
+        r"\s*(sala|hall|venue|theatre|theater|arena|club|room)\s*", " ", normalized
+    )
     normalized = re.sub(r"[^a-z0-9\s]", "", normalized)
     return re.sub(r"\s+", " ", normalized).strip()
 

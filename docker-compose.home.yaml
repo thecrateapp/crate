@@ -18,7 +18,7 @@ x-crate-env: &crate-env
   POSTGRES_SUPERUSER_DB: ${POSTGRES_SUPERUSER_DB:-crate}
   JWT_SECRET: ${JWT_SECRET:-change-me}
   DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin}
-  REDIS_URL: redis://crate-redis:6379/0
+  REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
   CRATE_METRICS_REDIS_TTL_SECONDS: ${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -97,19 +97,21 @@ services:
       traefik.docker.network: crate
       traefik.http.services.traefik.loadbalancer.server.port: 80
       traefik.http.routers.traefik-secure.rule: Host(`traefik.${DOMAIN:-localhost}`)
-      traefik.http.routers.traefik-secure.entryPoints: websecure
-      traefik.http.routers.traefik-secure.tls: true
-      traefik.http.routers.traefik-secure.tls.certresolver: letsencrypt
+      traefik.http.routers.traefik-secure.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.traefik-secure.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.traefik-secure.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
       traefik.http.routers.traefik-secure.service: api@internal
 
   crate-redis:
     image: redis:7-alpine
     container_name: crate-redis
     restart: unless-stopped
-    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru
+    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     mem_limit: 512m
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
       interval: 30s
       timeout: 5s
       retries: 3
@@ -162,7 +164,7 @@ services:
       TZ: ${TZ:-UTC}
       DATA_DIR: /data
       CRATE_MEDIA_WORKER_ADDR: 0.0.0.0:8687
-      REDIS_URL: redis://crate-redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
     volumes:
       - ${MUSIC_DIR}:/music:ro
       - ${DATA_DIR}/crate:/data
@@ -208,7 +210,13 @@ services:
     mem_reservation: 256m
     cpus: "1.0"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8585/api/status', timeout=5).read()"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8585/api/status', timeout=5).read()",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -216,11 +224,11 @@ services:
       traefik.enable: true
       traefik.docker.network: crate
       traefik.http.routers.crate-api.rule: Host(`api.${DOMAIN:-localhost}`)
-      traefik.http.routers.crate-api.entryPoints: websecure
+      traefik.http.routers.crate-api.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.routers.crate-api.middlewares: crate-api-compress@docker
       traefik.http.services.crate-api.loadbalancer.server.port: 8585
-      traefik.http.routers.crate-api.tls: true
-      traefik.http.routers.crate-api.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-api.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-api.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
       traefik.http.middlewares.crate-api-compress.compress: true
       traefik.http.middlewares.crate-api-compress.compress.encodings: gzip,br
       traefik.http.middlewares.crate-api-compress.compress.minResponseBodyBytes: 1024
@@ -239,7 +247,7 @@ services:
       CRATE_POSTGRES_DB: ${CRATE_POSTGRES_DB:-crate}
       CRATE_POSTGRES_HOST: crate-postgres
       CRATE_POSTGRES_PORT: 5432
-      REDIS_URL: redis://crate-redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-change-me}
       READPLANE_ENABLED: ${READPLANE_ENABLED:-true}
       READPLANE_ENABLE_SSE: ${READPLANE_ENABLE_SSE:-true}
@@ -270,7 +278,13 @@ services:
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
     environment:
-      <<: [*crate-env, *crate-enrichment-env, *worker-resource-env, *worker-native-env]
+      <<:
+        [
+          *crate-env,
+          *crate-enrichment-env,
+          *worker-resource-env,
+          *worker-native-env,
+        ]
       CRATE_RUNTIME: worker
       CRATE_LEGACY_POOL_MAXCONN: ${CRATE_WORKER_LEGACY_POOL_MAXCONN:-4}
       CRATE_SQLALCHEMY_POOL_SIZE: ${CRATE_WORKER_SQLALCHEMY_POOL_SIZE:-2}
@@ -290,7 +304,16 @@ services:
     mem_limit: 1536m
     mem_reservation: 512m
     cpus: "0.75"
-    command: ["worker", "--queues", "fast,default", "--processes", "${CRATE_WORKER_PROCESSES:-1}", "--no-daemons", "--no-projector"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "fast,default",
+        "--processes",
+        "${CRATE_WORKER_PROCESSES:-1}",
+        "--no-daemons",
+        "--no-projector",
+      ]
 
   crate-projector:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
@@ -346,7 +369,18 @@ services:
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "0.5"
-    command: ["worker", "--queues", "maintenance", "--processes", "${MAINTENANCE_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-daemons", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "maintenance",
+        "--processes",
+        "${MAINTENANCE_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   crate-analysis-worker:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
@@ -373,7 +407,17 @@ services:
     mem_limit: 2g
     mem_reservation: 768m
     cpus: "0.75"
-    command: ["worker", "--queues", "heavy", "--processes", "${ANALYSIS_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "heavy",
+        "--processes",
+        "${ANALYSIS_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   crate-playback-worker:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
@@ -401,7 +445,18 @@ services:
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "1.0"
-    command: ["worker", "--queues", "playback", "--processes", "${PLAYBACK_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-daemons", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "playback",
+        "--processes",
+        "${PLAYBACK_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   crate-ui:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}
@@ -418,10 +473,10 @@ services:
       traefik.enable: true
       traefik.docker.network: crate
       traefik.http.routers.admin.rule: Host(`admin.${DOMAIN:-localhost}`)
-      traefik.http.routers.admin.entryPoints: websecure
+      traefik.http.routers.admin.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.services.admin.loadbalancer.server.port: 80
-      traefik.http.routers.admin.tls: true
-      traefik.http.routers.admin.tls.certresolver: letsencrypt
+      traefik.http.routers.admin.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.admin.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
 
   crate-listen:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}
@@ -438,10 +493,10 @@ services:
       traefik.enable: true
       traefik.docker.network: crate
       traefik.http.routers.listen.rule: Host(`listen.${DOMAIN:-localhost}`)
-      traefik.http.routers.listen.entryPoints: websecure
+      traefik.http.routers.listen.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.services.listen.loadbalancer.server.port: 80
-      traefik.http.routers.listen.tls: true
-      traefik.http.routers.listen.tls.certresolver: letsencrypt
+      traefik.http.routers.listen.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.listen.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
       traefik.http.middlewares.crate-auth.forwardAuth.address: http://crate-api:8585/api/auth/verify
       traefik.http.middlewares.crate-auth.forwardAuth.trustForwardHeader: true
       traefik.http.middlewares.crate-auth.forwardAuth.authResponseHeaders: Remote-User,Remote-Name,Remote-Role

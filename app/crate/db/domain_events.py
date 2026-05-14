@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
+from crate.config import get_redis_url
 from crate.db.tx import register_after_commit
 
 log = logging.getLogger(__name__)
@@ -23,20 +23,19 @@ _SEQ_COUNTER_KEY = "crate:domain_events:seq"
 _MAX_LEN = 5000
 _BLOCK_MS = 1000
 
-_redis_client = None
+_redis_client: Any | None = None
 _group_created = False
 
 
-def _get_redis():
+def _get_redis() -> Any | None:
     global _redis_client
     if _redis_client is not None:
         return _redis_client
     try:
         import redis as _redis
 
-        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
         _redis_client = _redis.from_url(
-            url,
+            get_redis_url(),
             decode_responses=True,
             socket_timeout=2,
             socket_connect_timeout=2,
@@ -111,14 +110,18 @@ def append_domain_event(
     """
 
     if session is not None:
-        register_after_commit(
-            session,
-            lambda: _publish_domain_event(
+
+        def publish_after_commit() -> None:
+            _publish_domain_event(
                 event_type,
                 payload,
                 scope=scope,
                 subject_key=subject_key,
-            ),
+            )
+
+        register_after_commit(
+            session,
+            publish_after_commit,
         )
         return 0
 
@@ -130,7 +133,9 @@ def append_domain_event(
     )
 
 
-def get_latest_domain_event_id(*, scope: str | None = None, subject_key: str | None = None) -> int:
+def get_latest_domain_event_id(
+    *, scope: str | None = None, subject_key: str | None = None
+) -> int:
     """Return the latest monotonic sequence used for snapshot versioning."""
 
     del scope, subject_key
@@ -144,7 +149,9 @@ def get_latest_domain_event_id(*, scope: str | None = None, subject_key: str | N
         return 0
 
 
-def _decode_stream_messages(messages: list[tuple[str, dict[str, Any]]]) -> list[dict[str, Any]]:
+def _decode_stream_messages(
+    messages: list[tuple[str, dict[str, Any]]],
+) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for msg_id, fields in messages:
         payload_raw = fields.get("payload_json", "{}")
@@ -254,7 +261,9 @@ def get_domain_event_runtime(*, limit: int = 10) -> dict[str, Any]:
             runtime["consumers"] = int(group.get("consumers", 0) or 0)
             lag = group.get("lag")
             runtime["lag"] = int(lag) if lag not in (None, "") else 0
-            runtime["last_delivered_id"] = group.get("last-delivered-id") or group.get("last_delivered_id")
+            runtime["last_delivered_id"] = group.get("last-delivered-id") or group.get(
+                "last_delivered_id"
+            )
     except Exception:
         log.debug("Failed to inspect domain-event consumer group", exc_info=True)
 

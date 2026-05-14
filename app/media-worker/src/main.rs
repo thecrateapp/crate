@@ -1,3 +1,5 @@
+//! Binary entry point for the crate-media-worker CLI and TCP server.
+
 use std::env;
 use std::fs;
 use std::io::{self, Read};

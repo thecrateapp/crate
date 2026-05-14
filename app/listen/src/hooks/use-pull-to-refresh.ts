@@ -15,13 +15,16 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
       setPulling(true);
     }, []),
 
-    onTouchMove: useCallback((e: React.TouchEvent) => {
-      if (!pulling || refreshing) return;
-      const dy = e.touches[0]!.clientY - startY.current;
-      if (dy > 0) {
-        setPullDistance(Math.min(dy * 0.4, 120));
-      }
-    }, [pulling, refreshing]),
+    onTouchMove: useCallback(
+      (e: React.TouchEvent) => {
+        if (!pulling || refreshing) return;
+        const dy = e.touches[0]!.clientY - startY.current;
+        if (dy > 0) {
+          setPullDistance(Math.min(dy * 0.4, 120));
+        }
+      },
+      [pulling, refreshing],
+    ),
 
     onTouchEnd: useCallback(async () => {
       if (!pulling) return;

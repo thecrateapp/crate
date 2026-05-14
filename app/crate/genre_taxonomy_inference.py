@@ -63,7 +63,9 @@ def _lexical_match_score(raw_name: str, candidate_text: str) -> float:
     if not raw_tokens or not candidate_tokens:
         return 0.0
 
-    overlap = len(raw_tokens & candidate_tokens) / max(len(raw_tokens | candidate_tokens), 1)
+    overlap = len(raw_tokens & candidate_tokens) / max(
+        len(raw_tokens | candidate_tokens), 1
+    )
     score = _sequence_similarity(raw_norm, candidate_norm) * 0.7 + overlap * 0.3
 
     if candidate_norm in raw_norm or raw_norm in candidate_norm:
@@ -117,7 +119,9 @@ def _family_hints_from_name(raw_name: str) -> dict[str, float]:
     }
     for keyword, slug in keyword_map.items():
         if keyword in text:
-            hints[slug] = max(hints.get(slug, 0.0), 1.0 if "-" in keyword or " " in keyword else 0.8)
+            hints[slug] = max(
+                hints.get(slug, 0.0), 1.0 if "-" in keyword or " " in keyword else 0.8
+            )
             top_level_slug = get_top_level_slug(slug)
             if top_level_slug and top_level_slug != slug:
                 hints[top_level_slug] = max(hints.get(top_level_slug, 0.0), 0.5)
@@ -155,7 +159,13 @@ def infer_canonical_genre(
     lexical_scores: dict[str, float] = {}
 
     for slug in catalog:
-        best_lexical = max((_lexical_match_score(raw_norm, term) for term in get_genre_alias_terms(slug)), default=0.0)
+        best_lexical = max(
+            (
+                _lexical_match_score(raw_norm, term)
+                for term in get_genre_alias_terms(slug)
+            ),
+            default=0.0,
+        )
         lexical_scores[slug] = best_lexical
         if best_lexical >= 0.42:
             lexical_score = best_lexical * 2.1
@@ -215,7 +225,9 @@ def infer_canonical_genre(
     best_is_top_level = bool(catalog[best_slug]["top_level"])
     best_lexical = lexical_scores.get(best_slug, 0.0)
 
-    if not best_is_top_level and (best_lexical >= 0.78 or (best_score >= 2.15 and margin >= 0.18)):
+    if not best_is_top_level and (
+        best_lexical >= 0.78 or (best_score >= 2.15 and margin >= 0.18)
+    ):
         confidence = min(0.99, 0.55 + best_lexical * 0.25 + min(best_score, 4.0) * 0.06)
         return {
             "canonical_slug": best_slug,
@@ -256,17 +268,23 @@ def _collect_local_evidence(genre_slug: str, genre_name: str) -> InferenceEviden
     cooccurring: dict[str, float] = defaultdict(float)
     for row in cooccurring_rows:
         slug = row["canonical_slug"]
-        cooccurring[slug] += float(row.get("score") or 0) + float(row.get("hits") or 0) * 0.25
+        cooccurring[slug] += (
+            float(row.get("score") or 0) + float(row.get("hits") or 0) * 0.25
+        )
     for row in album_rows:
         slug = row["canonical_slug"]
-        cooccurring[slug] += float(row.get("score") or 0) * 0.8 + float(row.get("hits") or 0) * 0.2
+        cooccurring[slug] += (
+            float(row.get("score") or 0) * 0.8 + float(row.get("hits") or 0) * 0.2
+        )
 
     artists = [row["artist_name"] for row in artist_rows if row.get("artist_name")]
     family_hints = _family_hints_from_name(genre_name)
     for slug, score in cooccurring.items():
         top_level_slug = get_top_level_slug(slug)
         if top_level_slug and top_level_slug != slug:
-            family_hints[top_level_slug] = family_hints.get(top_level_slug, 0.0) + min(score, 8.0) * 0.12
+            family_hints[top_level_slug] = (
+                family_hints.get(top_level_slug, 0.0) + min(score, 8.0) * 0.12
+            )
 
     return InferenceEvidence(
         cooccurring=dict(cooccurring),
@@ -299,9 +317,13 @@ def _collect_external_evidence(artists: list[str]) -> dict[str, float]:
                 for tag_index, tag_name in enumerate(info.get("tags") or []):
                     canonical_slug = resolve_genre_slug(tag_name)
                     if canonical_slug:
-                        evidence[canonical_slug] += max(0.3, artist_weight - tag_index * 0.18)
+                        evidence[canonical_slug] += max(
+                            0.3, artist_weight - tag_index * 0.18
+                        )
             except Exception:
-                log.debug("Last.fm genre evidence failed for %s", artist_name, exc_info=True)
+                log.debug(
+                    "Last.fm genre evidence failed for %s", artist_name, exc_info=True
+                )
 
         if search_artist is not None:
             try:
@@ -309,9 +331,13 @@ def _collect_external_evidence(artists: list[str]) -> dict[str, float]:
                 for tag_index, genre_name in enumerate(artist.get("genres") or []):
                     canonical_slug = resolve_genre_slug(genre_name)
                     if canonical_slug:
-                        evidence[canonical_slug] += max(0.25, artist_weight - tag_index * 0.15)
+                        evidence[canonical_slug] += max(
+                            0.25, artist_weight - tag_index * 0.15
+                        )
             except Exception:
-                log.debug("Spotify genre evidence failed for %s", artist_name, exc_info=True)
+                log.debug(
+                    "Spotify genre evidence failed for %s", artist_name, exc_info=True
+                )
 
     return dict(evidence)
 
@@ -347,7 +373,14 @@ def infer_genre_taxonomy_batch(
         genre_slug = item["slug"]
         genre_name = item["name"]
         if event_callback:
-            event_callback({"message": f"Inferring taxonomy for {genre_name}", "genre": genre_name, "step": index, "total": total})
+            event_callback(
+                {
+                    "message": f"Inferring taxonomy for {genre_name}",
+                    "genre": genre_name,
+                    "step": index,
+                    "total": total,
+                }
+            )
 
         evidence = _collect_local_evidence(genre_slug, genre_name)
 
@@ -356,7 +389,10 @@ def infer_genre_taxonomy_batch(
             for slug, score in evidence.external.items():
                 top_level_slug = get_top_level_slug(slug)
                 if top_level_slug and top_level_slug != slug:
-                    evidence.family_hints[top_level_slug] = evidence.family_hints.get(top_level_slug, 0.0) + min(score, 6.0) * 0.08
+                    evidence.family_hints[top_level_slug] = (
+                        evidence.family_hints.get(top_level_slug, 0.0)
+                        + min(score, 6.0) * 0.08
+                    )
 
         proposal = infer_canonical_genre(
             genre_name,
@@ -367,8 +403,16 @@ def infer_genre_taxonomy_batch(
         )
 
         applied = False
+        canonical_slug = None
+        confidence = None
+        mode = None
+        reason = None
         if proposal and proposal.get("canonical_slug"):
-            applied = assign_genre_alias_value(genre_name, proposal["canonical_slug"])
+            canonical_slug = str(proposal["canonical_slug"])
+            confidence = proposal.get("confidence")
+            mode = proposal.get("mode")
+            reason = proposal.get("reason")
+            applied = assign_genre_alias_value(genre_name, canonical_slug)
 
         if applied:
             mapped += 1
@@ -377,19 +421,19 @@ def infer_genre_taxonomy_batch(
                     {
                         "source_slug": genre_slug,
                         "source_name": genre_name,
-                        "canonical_slug": proposal["canonical_slug"],
-                        "confidence": proposal["confidence"],
-                        "mode": proposal["mode"],
-                        "reason": proposal["reason"],
+                        "canonical_slug": canonical_slug,
+                        "confidence": confidence,
+                        "mode": mode,
+                        "reason": reason,
                     }
                 )
             if event_callback:
                 event_callback(
                     {
-                        "message": f"{genre_name} → {proposal['canonical_slug']}",
+                        "message": f"{genre_name} → {canonical_slug}",
                         "genre": genre_name,
-                        "canonical_slug": proposal["canonical_slug"],
-                        "confidence": proposal["confidence"],
+                        "canonical_slug": canonical_slug,
+                        "confidence": confidence,
                     }
                 )
         else:
@@ -399,7 +443,8 @@ def infer_genre_taxonomy_batch(
                     {
                         "source_slug": genre_slug,
                         "source_name": genre_name,
-                        "reason": (proposal or {}).get("reason") or "No confident taxonomy match",
+                        "reason": (proposal or {}).get("reason")
+                        or "No confident taxonomy match",
                     }
                 )
 

@@ -28,11 +28,19 @@ def _add_columns() -> None:
     op.execute("ALTER TABLE library_artists ADD COLUMN IF NOT EXISTS entity_uid UUID")
     op.execute("ALTER TABLE library_albums ADD COLUMN IF NOT EXISTS entity_uid UUID")
     op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS entity_uid UUID")
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint TEXT")
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint_source TEXT")
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint_computed_at TIMESTAMPTZ")
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint TEXT"
+    )
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint_source TEXT"
+    )
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS audio_fingerprint_computed_at TIMESTAMPTZ"
+    )
     op.execute("ALTER TABLE genres ADD COLUMN IF NOT EXISTS entity_uid UUID")
-    op.execute("ALTER TABLE genre_taxonomy_nodes ADD COLUMN IF NOT EXISTS entity_uid UUID")
+    op.execute(
+        "ALTER TABLE genre_taxonomy_nodes ADD COLUMN IF NOT EXISTS entity_uid UUID"
+    )
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS entity_identity_keys (
@@ -64,10 +72,14 @@ def _backfill_library_artists(connection) -> None:
     ).mappings()
     for row in rows:
         connection.execute(
-            text("UPDATE library_artists SET entity_uid = :entity_uid WHERE id = :artist_id"),
+            text(
+                "UPDATE library_artists SET entity_uid = :entity_uid WHERE id = :artist_id"
+            ),
             {
                 "artist_id": row["id"],
-                "entity_uid": str(artist_entity_uid(name=row["name"], mbid=row.get("mbid"))),
+                "entity_uid": str(
+                    artist_entity_uid(name=row["name"], mbid=row.get("mbid"))
+                ),
             },
         )
 
@@ -94,7 +106,9 @@ def _backfill_library_albums(connection) -> None:
     ).mappings()
     for row in rows:
         connection.execute(
-            text("UPDATE library_albums SET entity_uid = :entity_uid WHERE id = :album_id"),
+            text(
+                "UPDATE library_albums SET entity_uid = :entity_uid WHERE id = :album_id"
+            ),
             {
                 "album_id": row["id"],
                 "entity_uid": str(
@@ -104,7 +118,9 @@ def _backfill_library_albums(connection) -> None:
                         album_name=row["name"],
                         year=row.get("year"),
                         musicbrainz_albumid=row.get("musicbrainz_albumid"),
-                        musicbrainz_releasegroupid=row.get("musicbrainz_releasegroupid"),
+                        musicbrainz_releasegroupid=row.get(
+                            "musicbrainz_releasegroupid"
+                        ),
                         tag_album=row.get("tag_album"),
                     )
                 ),
@@ -136,7 +152,9 @@ def _backfill_library_tracks(connection) -> None:
     ).mappings()
     for row in rows:
         connection.execute(
-            text("UPDATE library_tracks SET entity_uid = :entity_uid WHERE id = :track_id"),
+            text(
+                "UPDATE library_tracks SET entity_uid = :entity_uid WHERE id = :track_id"
+            ),
             {
                 "track_id": row["id"],
                 "entity_uid": str(
@@ -206,9 +224,10 @@ def _canonicalize_duplicate_genres(connection) -> None:
     connection.execute(
         text("SELECT pg_advisory_xact_lock(hashtext('016-entity-uids-genres-dedupe'))")
     )
-    duplicate_rows = connection.execute(
-        text(
-            """
+    duplicate_rows = (
+        connection.execute(
+            text(
+                """
             WITH duplicate_groups AS (
                 SELECT
                     lower(trim(name)) AS genre_key,
@@ -232,8 +251,11 @@ def _canonicalize_duplicate_genres(connection) -> None:
             FROM duplicate_groups
             ORDER BY keep_id, genre_key
             """
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     for row in duplicate_rows:
         ids = [int(item) for item in (row.get("ids") or [])]
@@ -276,7 +298,9 @@ def _backfill_genre_taxonomy_nodes(connection) -> None:
     ).mappings()
     for row in rows:
         connection.execute(
-            text("UPDATE genre_taxonomy_nodes SET entity_uid = :entity_uid WHERE id = :node_id"),
+            text(
+                "UPDATE genre_taxonomy_nodes SET entity_uid = :entity_uid WHERE id = :node_id"
+            ),
             {
                 "node_id": row["id"],
                 "entity_uid": str(
@@ -340,7 +364,15 @@ def _normalize_key_value(key_type: str, key_value: str | None) -> str:
     return normalize_identity_key_value(key_type, key_value)
 
 
-def _upsert_identity_key(connection, *, entity_type: str, entity_uid: str, key_type: str, key_value: str | None, is_primary: bool = False) -> None:
+def _upsert_identity_key(
+    connection,
+    *,
+    entity_type: str,
+    entity_uid: str,
+    key_type: str,
+    key_value: str | None,
+    is_primary: bool = False,
+) -> None:
     normalized = _normalize_key_value(key_type, key_value)
     if not normalized:
         return
@@ -366,13 +398,41 @@ def _upsert_identity_key(connection, *, entity_type: str, entity_uid: str, key_t
 
 def _backfill_identity_keys(connection) -> None:
     artist_rows = connection.execute(
-        text("SELECT entity_uid::text AS entity_uid, name, slug, mbid, spotify_id FROM library_artists WHERE entity_uid IS NOT NULL")
+        text(
+            "SELECT entity_uid::text AS entity_uid, name, slug, mbid, spotify_id FROM library_artists WHERE entity_uid IS NOT NULL"
+        )
     ).mappings()
     for row in artist_rows:
-        _upsert_identity_key(connection, entity_type="artist", entity_uid=row["entity_uid"], key_type="name", key_value=row["name"], is_primary=True)
-        _upsert_identity_key(connection, entity_type="artist", entity_uid=row["entity_uid"], key_type="slug", key_value=row.get("slug"), is_primary=True)
-        _upsert_identity_key(connection, entity_type="artist", entity_uid=row["entity_uid"], key_type="mbid", key_value=row.get("mbid"))
-        _upsert_identity_key(connection, entity_type="artist", entity_uid=row["entity_uid"], key_type="spotify_id", key_value=row.get("spotify_id"))
+        _upsert_identity_key(
+            connection,
+            entity_type="artist",
+            entity_uid=row["entity_uid"],
+            key_type="name",
+            key_value=row["name"],
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="artist",
+            entity_uid=row["entity_uid"],
+            key_type="slug",
+            key_value=row.get("slug"),
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="artist",
+            entity_uid=row["entity_uid"],
+            key_type="mbid",
+            key_value=row.get("mbid"),
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="artist",
+            entity_uid=row["entity_uid"],
+            key_type="spotify_id",
+            key_value=row.get("spotify_id"),
+        )
 
     album_rows = connection.execute(
         text(
@@ -384,10 +444,36 @@ def _backfill_identity_keys(connection) -> None:
         )
     ).mappings()
     for row in album_rows:
-        _upsert_identity_key(connection, entity_type="album", entity_uid=row["entity_uid"], key_type="scoped_name", key_value=f"{row['artist']}::{row['name']}", is_primary=True)
-        _upsert_identity_key(connection, entity_type="album", entity_uid=row["entity_uid"], key_type="slug", key_value=row.get("slug"), is_primary=True)
-        _upsert_identity_key(connection, entity_type="album", entity_uid=row["entity_uid"], key_type="musicbrainz_albumid", key_value=row.get("musicbrainz_albumid"))
-        _upsert_identity_key(connection, entity_type="album", entity_uid=row["entity_uid"], key_type="musicbrainz_releasegroupid", key_value=row.get("musicbrainz_releasegroupid"))
+        _upsert_identity_key(
+            connection,
+            entity_type="album",
+            entity_uid=row["entity_uid"],
+            key_type="scoped_name",
+            key_value=f"{row['artist']}::{row['name']}",
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="album",
+            entity_uid=row["entity_uid"],
+            key_type="slug",
+            key_value=row.get("slug"),
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="album",
+            entity_uid=row["entity_uid"],
+            key_type="musicbrainz_albumid",
+            key_value=row.get("musicbrainz_albumid"),
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="album",
+            entity_uid=row["entity_uid"],
+            key_type="musicbrainz_releasegroupid",
+            key_value=row.get("musicbrainz_releasegroupid"),
+        )
 
     track_rows = connection.execute(
         text(
@@ -400,24 +486,82 @@ def _backfill_identity_keys(connection) -> None:
     ).mappings()
     for row in track_rows:
         scoped_name = f"{row['album']}::{row.get('disc_number') or 1}::{row.get('track_number') or 0}::{row.get('title') or row.get('filename')}"
-        _upsert_identity_key(connection, entity_type="track", entity_uid=row["entity_uid"], key_type="scoped_track", key_value=scoped_name, is_primary=True)
-        _upsert_identity_key(connection, entity_type="track", entity_uid=row["entity_uid"], key_type="slug", key_value=row.get("slug"), is_primary=True)
-        _upsert_identity_key(connection, entity_type="track", entity_uid=row["entity_uid"], key_type="musicbrainz_trackid", key_value=row.get("musicbrainz_trackid"))
+        _upsert_identity_key(
+            connection,
+            entity_type="track",
+            entity_uid=row["entity_uid"],
+            key_type="scoped_track",
+            key_value=scoped_name,
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="track",
+            entity_uid=row["entity_uid"],
+            key_type="slug",
+            key_value=row.get("slug"),
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="track",
+            entity_uid=row["entity_uid"],
+            key_type="musicbrainz_trackid",
+            key_value=row.get("musicbrainz_trackid"),
+        )
 
     genre_rows = connection.execute(
-        text("SELECT entity_uid::text AS entity_uid, name, slug FROM genres WHERE entity_uid IS NOT NULL")
+        text(
+            "SELECT entity_uid::text AS entity_uid, name, slug FROM genres WHERE entity_uid IS NOT NULL"
+        )
     ).mappings()
     for row in genre_rows:
-        _upsert_identity_key(connection, entity_type="genre", entity_uid=row["entity_uid"], key_type="name", key_value=row["name"], is_primary=True)
-        _upsert_identity_key(connection, entity_type="genre", entity_uid=row["entity_uid"], key_type="slug", key_value=row["slug"], is_primary=True)
+        _upsert_identity_key(
+            connection,
+            entity_type="genre",
+            entity_uid=row["entity_uid"],
+            key_type="name",
+            key_value=row["name"],
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="genre",
+            entity_uid=row["entity_uid"],
+            key_type="slug",
+            key_value=row["slug"],
+            is_primary=True,
+        )
 
     taxonomy_rows = connection.execute(
-        text("SELECT entity_uid::text AS entity_uid, name, slug, musicbrainz_mbid FROM genre_taxonomy_nodes WHERE entity_uid IS NOT NULL")
+        text(
+            "SELECT entity_uid::text AS entity_uid, name, slug, musicbrainz_mbid FROM genre_taxonomy_nodes WHERE entity_uid IS NOT NULL"
+        )
     ).mappings()
     for row in taxonomy_rows:
-        _upsert_identity_key(connection, entity_type="genre_taxonomy", entity_uid=row["entity_uid"], key_type="name", key_value=row["name"], is_primary=True)
-        _upsert_identity_key(connection, entity_type="genre_taxonomy", entity_uid=row["entity_uid"], key_type="slug", key_value=row["slug"], is_primary=True)
-        _upsert_identity_key(connection, entity_type="genre_taxonomy", entity_uid=row["entity_uid"], key_type="mbid", key_value=row.get("musicbrainz_mbid"))
+        _upsert_identity_key(
+            connection,
+            entity_type="genre_taxonomy",
+            entity_uid=row["entity_uid"],
+            key_type="name",
+            key_value=row["name"],
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="genre_taxonomy",
+            entity_uid=row["entity_uid"],
+            key_type="slug",
+            key_value=row["slug"],
+            is_primary=True,
+        )
+        _upsert_identity_key(
+            connection,
+            entity_type="genre_taxonomy",
+            entity_uid=row["entity_uid"],
+            key_type="mbid",
+            key_value=row.get("musicbrainz_mbid"),
+        )
 
 
 def upgrade() -> None:
@@ -441,8 +585,12 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_lib_artists_entity_uid")
     op.execute("DROP INDEX IF EXISTS idx_entity_identity_keys_entity")
     op.execute("DROP TABLE IF EXISTS entity_identity_keys")
-    op.execute("ALTER TABLE library_tracks DROP COLUMN IF EXISTS audio_fingerprint_computed_at")
-    op.execute("ALTER TABLE library_tracks DROP COLUMN IF EXISTS audio_fingerprint_source")
+    op.execute(
+        "ALTER TABLE library_tracks DROP COLUMN IF EXISTS audio_fingerprint_computed_at"
+    )
+    op.execute(
+        "ALTER TABLE library_tracks DROP COLUMN IF EXISTS audio_fingerprint_source"
+    )
     op.execute("ALTER TABLE library_tracks DROP COLUMN IF EXISTS audio_fingerprint")
     op.execute("ALTER TABLE genre_taxonomy_nodes DROP COLUMN IF EXISTS entity_uid")
     op.execute("ALTER TABLE genres DROP COLUMN IF EXISTS entity_uid")

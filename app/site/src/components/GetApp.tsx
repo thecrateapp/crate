@@ -14,7 +14,10 @@ import { Download, Smartphone, Apple, Share2, ArrowRight } from "lucide-react";
 
 export function GetApp() {
   return (
-    <section id="install" className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28">
+    <section
+      id="install"
+      className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-28"
+    >
       <div className="mb-12 max-w-2xl">
         <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
           Install it
@@ -23,9 +26,9 @@ export function GetApp() {
           Use it from the phone.
         </h2>
         <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-          Crate is still a self-hosted system, but listening should not feel like
-          remote administration. Point the app at an instance and use it like a normal
-          music player.
+          Crate is still a self-hosted system, but listening should not feel
+          like remote administration. Point the app at an instance and use it
+          like a normal music player.
         </p>
       </div>
 
@@ -40,18 +43,22 @@ export function GetApp() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
                 Android
               </div>
-              <div className="text-lg font-semibold text-white">Install the Android build</div>
+              <div className="text-lg font-semibold text-white">
+                Install the Android build
+              </div>
             </div>
           </div>
 
           <p className="text-[14.5px] leading-[1.65] text-white/60">
-            Each release can include an Android build. Download it, install it, and
-            connect it to your Crate server.
+            Each release can include an Android build. Download it, install it,
+            and connect it to your Crate server.
           </p>
 
           <ol className="mt-5 space-y-2.5 text-[14px] text-white/70">
             <Step n={1}>Download the APK below.</Step>
-            <Step n={2}>Open it from your downloads; approve the install prompt.</Step>
+            <Step n={2}>
+              Open it from your downloads; approve the install prompt.
+            </Step>
             <Step n={3}>Launch Crate, enter your server URL, sign in.</Step>
           </ol>
 
@@ -61,7 +68,10 @@ export function GetApp() {
           >
             <Download size={16} />
             Download crate.apk
-            <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+            <ArrowRight
+              size={16}
+              className="transition group-hover:translate-x-0.5"
+            />
           </a>
           <p className="mt-3 text-[11px] text-white/35">
             From the latest GitHub release.
@@ -78,19 +88,22 @@ export function GetApp() {
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300">
                 iPhone
               </div>
-              <div className="text-lg font-semibold text-white">Use the PWA</div>
+              <div className="text-lg font-semibold text-white">
+                Use the PWA
+              </div>
             </div>
           </div>
 
           <p className="text-[14.5px] leading-[1.65] text-white/60">
-            On iPhone, Crate works as a PWA. It is not the same as a native App Store
-            app, but it gives you a home-screen icon and a standalone player.
+            On iPhone, Crate works as a PWA. It is not the same as a native App
+            Store app, but it gives you a home-screen icon and a standalone
+            player.
           </p>
 
           <ol className="mt-5 space-y-3 text-[14px] text-white/70">
             <IOSStep n={1}>
-              Open <strong className="text-white">Safari</strong> (this only works in
-              Safari — Chrome on iOS can't install PWAs).
+              Open <strong className="text-white">Safari</strong> (this only
+              works in Safari — Chrome on iOS can't install PWAs).
             </IOSStep>
             <IOSStep n={2}>
               Go to your Crate URL, e.g.{" "}
@@ -100,22 +113,24 @@ export function GetApp() {
               .
             </IOSStep>
             <IOSStep n={3}>
-              Tap the <ShareGlyph /> <strong className="text-white">Share</strong>{" "}
-              button at the bottom of the screen.
+              Tap the <ShareGlyph />{" "}
+              <strong className="text-white">Share</strong> button at the bottom
+              of the screen.
             </IOSStep>
             <IOSStep n={4}>
               Scroll down in the share sheet and tap{" "}
               <strong className="text-white">Add to Home Screen</strong>.
             </IOSStep>
             <IOSStep n={5}>
-              Tap <strong className="text-white">Add</strong>. Crate now lives next
-              to your other apps.
+              Tap <strong className="text-white">Add</strong>. Crate now lives
+              next to your other apps.
             </IOSStep>
           </ol>
 
           <p className="mt-7 border-l border-cyan-400/25 pl-4 text-[13px] leading-[1.6] text-white/55">
-            A native iOS app may happen later. For now, the PWA is the honest path:
-            simple to install, easy to update, and good enough for regular listening.
+            A native iOS app may happen later. For now, the PWA is the honest
+            path: simple to install, easy to update, and good enough for regular
+            listening.
           </p>
         </article>
       </div>

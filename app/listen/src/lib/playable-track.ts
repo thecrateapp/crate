@@ -63,48 +63,63 @@ export type PlayableTrackIdentityInput = Pick<
   | "libraryTrackId"
 >;
 
-export function getPlayableTrackLibraryId(input: PlayableTrackIdentityInput): number | undefined {
-  return input.libraryTrackId ?? input.library_track_id ?? (
-    typeof input.track_id === "number" ? input.track_id : undefined
-  ) ?? (
-    typeof input.id === "number" ? input.id : undefined
+export function getPlayableTrackLibraryId(
+  input: PlayableTrackIdentityInput,
+): number | undefined {
+  return (
+    input.libraryTrackId ??
+    input.library_track_id ??
+    (typeof input.track_id === "number" ? input.track_id : undefined) ??
+    (typeof input.id === "number" ? input.id : undefined)
   );
 }
 
-export function hasPlayableTrackReference(input: PlayableTrackIdentityInput): boolean {
-  return getPlayableTrackLibraryId(input) != null
-    || Boolean(
-      input.entityUid
-      ?? input.entity_uid
-      ?? input.track_entity_uid
-      ?? input.path
-      ?? input.track_path,
-    );
+export function hasPlayableTrackReference(
+  input: PlayableTrackIdentityInput,
+): boolean {
+  return (
+    getPlayableTrackLibraryId(input) != null ||
+    Boolean(
+      input.entityUid ??
+        input.entity_uid ??
+        input.track_entity_uid ??
+        input.path ??
+        input.track_path,
+    )
+  );
 }
 
 export function resolvePlayableTrackId(input: PlayableTrackInput): string {
-  return input.entityUid
-    || input.entity_uid
-    || input.track_entity_uid
-    || input.path
-    || input.track_path
-    || (input.track_id != null ? String(input.track_id) : undefined)
-    || String(input.id || "");
+  return (
+    input.entityUid ||
+    input.entity_uid ||
+    input.track_entity_uid ||
+    input.path ||
+    input.track_path ||
+    (input.track_id != null ? String(input.track_id) : undefined) ||
+    String(input.id || "")
+  );
 }
 
 export function toPlayableTrack(
   input: PlayableTrackInput,
   options: { cover?: string } = {},
 ): Track {
-  const albumCover = resolveMaybeApiAssetUrl(options.cover || input.albumCover) || undefined;
+  const albumCover =
+    resolveMaybeApiAssetUrl(options.cover || input.albumCover) || undefined;
 
   return {
     id: resolvePlayableTrackId(input),
-    entityUid: input.entityUid ?? input.entity_uid ?? input.track_entity_uid ?? undefined,
+    entityUid:
+      input.entityUid ??
+      input.entity_uid ??
+      input.track_entity_uid ??
+      undefined,
     title: input.title || "Unknown",
     artist: input.artist,
     artistId: input.artistId ?? input.artist_id ?? undefined,
-    artistEntityUid: input.artistEntityUid ?? input.artist_entity_uid ?? undefined,
+    artistEntityUid:
+      input.artistEntityUid ?? input.artist_entity_uid ?? undefined,
     artistSlug: input.artistSlug ?? input.artist_slug ?? undefined,
     album: input.album ?? undefined,
     albumId: input.albumId ?? input.album_id ?? undefined,

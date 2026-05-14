@@ -22,7 +22,9 @@ describe("RadioFeedback", () => {
   it("skips to the next track immediately on dislike", () => {
     const onDislike = vi.fn();
 
-    render(<RadioFeedback sessionId="sess-1" trackId={42} onDislike={onDislike} />);
+    render(
+      <RadioFeedback sessionId="sess-1" trackId={42} onDislike={onDislike} />,
+    );
 
     fireEvent.click(screen.getByTitle("Less like this"));
 

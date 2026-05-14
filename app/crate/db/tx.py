@@ -56,8 +56,12 @@ def register_after_commit(session, callback: Callable[[], None]) -> None:
     # The listener fires once per session lifecycle and is discarded
     # when the session is garbage-collected, preventing accumulation.
     event.listen(session, "after_commit", _run_after_commit_callbacks, propagate=False)
-    event.listen(session, "after_rollback", _clear_after_commit_callbacks, propagate=False)
-    event.listen(session, "after_soft_rollback", _clear_after_commit_callbacks, propagate=False)
+    event.listen(
+        session, "after_rollback", _clear_after_commit_callbacks, propagate=False
+    )
+    event.listen(
+        session, "after_soft_rollback", _clear_after_commit_callbacks, propagate=False
+    )
     session.info[_AFTER_COMMIT_HOOKS_KEY] = True
 
 

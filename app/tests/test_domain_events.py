@@ -6,7 +6,13 @@ class _FakeRedisStream:
         self.pending_by_consumer: dict[str, list[tuple[str, dict]]] = {}
         self.delivered_ids: set[str] = set()
 
-    def xadd(self, _stream_key: str, fields: dict, maxlen: int | None = None, approximate: bool = True) -> str:
+    def xadd(
+        self,
+        _stream_key: str,
+        fields: dict,
+        maxlen: int | None = None,
+        approximate: bool = True,
+    ) -> str:
         del maxlen, approximate
         msg_id = f"{len(self.stream) + 1}-0"
         self.stream.append((msg_id, dict(fields)))
@@ -19,13 +25,22 @@ class _FakeRedisStream:
     def get(self, _key: str) -> str | None:
         return str(self.seq) if self.seq else None
 
-    def xgroup_create(self, _stream_key: str, _group_name: str, id: str = "0", mkstream: bool = True) -> None:
+    def xgroup_create(
+        self, _stream_key: str, _group_name: str, id: str = "0", mkstream: bool = True
+    ) -> None:
         del id, mkstream
         if self.group_created:
             raise RuntimeError("BUSYGROUP Consumer Group name already exists")
         self.group_created = True
 
-    def xreadgroup(self, _group_name: str, consumer_name: str, streams: dict[str, str], count: int, block: int | None = None):
+    def xreadgroup(
+        self,
+        _group_name: str,
+        consumer_name: str,
+        streams: dict[str, str],
+        count: int,
+        block: int | None = None,
+    ):
         del block
         request_id = next(iter(streams.values()))
         pending = self.pending_by_consumer.setdefault(consumer_name, [])
@@ -62,7 +77,7 @@ class _FakeRedisStream:
 
 
 def _patch_fake_redis(monkeypatch):
-    from crate.db import domain_events
+    import crate.db.domain_events as domain_events
 
     fake_redis = _FakeRedisStream()
     monkeypatch.setattr(domain_events, "_get_redis", lambda: fake_redis)
@@ -74,7 +89,11 @@ def test_append_domain_event_defers_publish_until_after_commit(monkeypatch):
     domain_events, fake_redis = _patch_fake_redis(monkeypatch)
     callbacks = []
 
-    monkeypatch.setattr(domain_events, "register_after_commit", lambda session, callback: callbacks.append(callback))
+    monkeypatch.setattr(
+        domain_events,
+        "register_after_commit",
+        lambda session, callback: callbacks.append(callback),
+    )
 
     returned = domain_events.append_domain_event(
         "library.scan.completed",
@@ -107,8 +126,12 @@ def test_append_domain_event_defers_publish_until_after_commit(monkeypatch):
 def test_list_domain_events_replays_pending_before_consuming_new(monkeypatch):
     domain_events, _fake_redis = _patch_fake_redis(monkeypatch)
 
-    domain_events.append_domain_event("first.event", {"order": 1}, scope="ops", subject_key="dashboard")
-    domain_events.append_domain_event("second.event", {"order": 2}, scope="ops", subject_key="dashboard")
+    domain_events.append_domain_event(
+        "first.event", {"order": 1}, scope="ops", subject_key="dashboard"
+    )
+    domain_events.append_domain_event(
+        "second.event", {"order": 2}, scope="ops", subject_key="dashboard"
+    )
 
     first = domain_events.list_domain_events(limit=1, consumer_name="worker")
     assert [event["event_type"] for event in first] == ["first.event"]

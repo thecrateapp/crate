@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from crate.db.repositories.playlists_rule_engine_config import FIELD_COLUMNS, TEXT_FIELDS
-from crate.db.repositories.playlists_rule_engine_genre import build_genre_relevance_expression
+from crate.db.repositories.playlists_rule_engine_config import (
+    FIELD_COLUMNS,
+    TEXT_FIELDS,
+)
+from crate.db.repositories.playlists_rule_engine_genre import (
+    build_genre_relevance_expression,
+)
 
 
 def split_pipe_values(value: str) -> list[str]:
     return [item.strip() for item in value.split("|") if item.strip()]
 
 
-def build_rule_conditions(rule_list: list[dict], match_mode: str) -> tuple[str, dict, list[str]]:
+def build_rule_conditions(
+    rule_list: list[dict], match_mode: str
+) -> tuple[str, dict, list[str]]:
     conditions: list[str] = []
     genre_score_exprs: list[str] = []
     params: dict = {}
@@ -28,7 +35,11 @@ def build_rule_conditions(rule_list: list[dict], match_mode: str) -> tuple[str, 
             continue
 
         if field == "genre" and op == "contains":
-            values = split_pipe_values(value) if isinstance(value, str) and "|" in value else [str(value)]
+            values = (
+                split_pipe_values(value)
+                if isinstance(value, str) and "|" in value
+                else [str(value)]
+            )
             score_expr = build_genre_relevance_expression(values, params, next_param)
             conditions.append(f"({score_expr}) > 0")
             genre_score_exprs.append(score_expr)

@@ -21,7 +21,13 @@ from crate.db.jobs.analysis_shared import (
 from crate.db.tx import transaction_scope
 
 
-def _ensure_claimable_processing_rows(session, *, pipeline: str, batch_size: int) -> None:
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
+def _ensure_claimable_processing_rows(
+    session, *, pipeline: str, batch_size: int
+) -> None:
     seed_limit = max(batch_size * 8, batch_size)
     ensure_processing_rows(session, pipeline=pipeline, limit=seed_limit)
     if pipeline == "bliss":
@@ -35,32 +41,45 @@ def claim_track(state_column: str) -> dict | None:
 
 
 def claim_tracks(state_column: str, *, limit: int = 1) -> list[dict]:
-    """Atomically claim the next pending batch for processing."""
+    """Atomically claim the next pending batch for processing.
+
+    The ``state_column`` value is validated against an explicit whitelist
+    (``ALLOWED_STATE_COLUMNS``) before being used in SQL.
+    """
     col = validate_state_column(state_column)
     pipeline = pipeline_name_for_state_column(col)
     batch_size = max(1, min(int(limit or 1), 200))
     claimed_at = datetime.now(timezone.utc).isoformat()
     claimed_by = f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     with transaction_scope() as session:
-        _ensure_claimable_processing_rows(session, pipeline=pipeline, batch_size=batch_size)
+        _ensure_claimable_processing_rows(
+            session, pipeline=pipeline, batch_size=batch_size
+        )
         pending = session.execute(
             text(processing_pending_exists_sql(col)),
             {"pipeline": pipeline},
         ).scalar()
         if not pending:
             return []
-        rows = session.execute(
-            text(claim_batch_sql(col)),
-            {
-                "pipeline": pipeline,
-                "claimed_at": claimed_at,
-                "claimed_by": claimed_by,
-                "limit": batch_size,
-            },
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(claim_batch_sql(col)),
+                {
+                    "pipeline": pipeline,
+                    "claimed_at": claimed_at,
+                    "claimed_by": claimed_by,
+                    "limit": batch_size,
+                },
+            )
+            .mappings()
+            .all()
+        )
+        # col is validated against ALLOWED_STATE_COLUMNS whitelist above.
         if rows:
             session.execute(
-                text(f"UPDATE library_tracks SET {col} = 'analyzing' WHERE id = ANY(:track_ids)"),
+                text(
+                    f"UPDATE library_tracks SET {col} = 'analyzing' WHERE id = ANY(:track_ids)"
+                ),
                 {"track_ids": [int(row["id"]) for row in rows]},
             )
             for row in rows:
@@ -81,8 +100,11 @@ def release_claims(track_ids: list[int], state_column: str) -> int:
         return 0
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
+        # col is validated against ALLOWED_STATE_COLUMNS whitelist above.
         result = session.execute(
-            text(f"UPDATE library_tracks SET {col} = 'pending' WHERE id = ANY(:track_ids) AND {col} = 'analyzing'"),
+            text(
+                f"UPDATE library_tracks SET {col} = 'pending' WHERE id = ANY(:track_ids) AND {col} = 'analyzing'"
+            ),
             {"track_ids": cleaned},
         )
         session.execute(
@@ -100,9 +122,10 @@ def release_claims(track_ids: list[int], state_column: str) -> int:
             ),
             {"pipeline": pipeline, "track_ids": cleaned},
         )
-        if result.rowcount:
+        changed = _rowcount(result)
+        if changed:
             mark_ops_snapshot_dirty(session)
-        return int(result.rowcount or 0)
+        return changed
 
 
 def reset_stale_claims(state_column: str) -> int:
@@ -115,9 +138,11 @@ def reset_stale_claims(state_column: str) -> int:
     col = validate_state_column(state_column)
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    # col is validated against ALLOWED_STATE_COLUMNS whitelist above.
+                    f"""
                 WITH reset AS (
                     UPDATE track_processing_state
                     SET state = 'pending',
@@ -134,9 +159,12 @@ def reset_stale_claims(state_column: str) -> int:
                 WHERE lt.id = reset.track_id
                 RETURNING reset.track_id
                 """
-            ),
-            {"pipeline": pipeline},
-        ).mappings().all()
+                ),
+                {"pipeline": pipeline},
+            )
+            .mappings()
+            .all()
+        )
         reset_count = len(rows)
         if reset_count:
             mark_ops_snapshot_dirty(session)
@@ -148,10 +176,14 @@ def get_pending_count(state_column: str) -> int:
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
         _ensure_claimable_processing_rows(session, pipeline=pipeline, batch_size=2000)
-        row = session.execute(
-            text(processing_pending_count_sql(col)),
-            {"pipeline": pipeline},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(processing_pending_count_sql(col)),
+                {"pipeline": pipeline},
+            )
+            .mappings()
+            .first()
+        )
         return int(row["cnt"] or 0) if row else 0
 
 

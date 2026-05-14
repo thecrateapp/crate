@@ -80,36 +80,58 @@ interface TopTrack {
   listeners?: number;
 }
 
-export function useArtistEnrichment(artistId: number | undefined, artistEntityUid?: string) {
+export function useArtistEnrichment(
+  artistId: number | undefined,
+  artistEntityUid?: string,
+) {
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const endpoint = artistActionApiPath({ artistId, artistEntityUid }, "enrichment");
+    const endpoint = artistActionApiPath(
+      { artistId, artistEntityUid },
+      "enrichment",
+    );
     if (!endpoint) return;
     let cancelled = false;
     setLoading(true);
     api<EnrichmentData>(endpoint)
-      .then((d) => { if (!cancelled) setEnrichment(d); })
+      .then((d) => {
+        if (!cancelled) setEnrichment(d);
+      })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [artistEntityUid, artistId]);
 
   return { enrichment, loading };
 }
 
-export function useTopTracks(artistId: number | undefined, artistEntityUid?: string) {
+export function useTopTracks(
+  artistId: number | undefined,
+  artistEntityUid?: string,
+) {
   const [tracks, setTracks] = useState<TopTrack[]>([]);
 
   useEffect(() => {
-    const endpoint = artistActionApiPath({ artistId, artistEntityUid }, "top-tracks?count=10");
+    const endpoint = artistActionApiPath(
+      { artistId, artistEntityUid },
+      "top-tracks?count=10",
+    );
     if (!endpoint) return;
     let cancelled = false;
     api<TopTrack[]>(endpoint)
-      .then((d) => { if (!cancelled && Array.isArray(d)) setTracks(d); })
+      .then((d) => {
+        if (!cancelled && Array.isArray(d)) setTracks(d);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [artistEntityUid, artistId]);
 
   return tracks;

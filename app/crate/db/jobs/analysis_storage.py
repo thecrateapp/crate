@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 
 from crate.db.bliss_vectors import to_pgvector_literal
-from crate.db.jobs.artist_bliss_centroids import refresh_artist_bliss_centroids_for_track_ids
+from crate.db.jobs.artist_bliss_centroids import (
+    refresh_artist_bliss_centroids_for_track_ids,
+)
 from crate.db.jobs.analysis_shared import (
     append_pipeline_event,
     complete_processing_state,
@@ -21,6 +23,7 @@ from crate.db.tx import transaction_scope
 
 
 def mark_done(track_id: int, state_column: str) -> None:
+    # col is validated against ALLOWED_STATE_COLUMNS whitelist.
     col = validate_state_column(state_column)
     now = datetime.now(timezone.utc).isoformat()
     extra_set = ""
@@ -41,10 +44,15 @@ def mark_done(track_id: int, state_column: str) -> None:
             completed_at=now,
         )
         mark_ops_snapshot_dirty(session)
-        append_pipeline_event(session, pipeline=pipeline, track_id=track_id, state="done")
+        append_pipeline_event(
+            session, pipeline=pipeline, track_id=track_id, state="done"
+        )
 
 
-def mark_failed(track_id: int, state_column: str, error_message: str | None = None) -> None:
+def mark_failed(
+    track_id: int, state_column: str, error_message: str | None = None
+) -> None:
+    # col is validated against ALLOWED_STATE_COLUMNS whitelist.
     col = validate_state_column(state_column)
     pipeline = pipeline_name_for_state_column(col)
     with transaction_scope() as session:
@@ -173,8 +181,12 @@ def store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]) -> None:
             completed_at=now,
         )
         for row in rows:
-            append_pipeline_event(session, pipeline="bliss", track_id=row["track_id"], state="done")
-        refresh_artist_bliss_centroids_for_track_ids(session, [row["track_id"] for row in rows])
+            append_pipeline_event(
+                session, pipeline="bliss", track_id=row["track_id"], state="done"
+            )
+        refresh_artist_bliss_centroids_for_track_ids(
+            session, [row["track_id"] for row in rows]
+        )
         mark_ops_snapshot_dirty(session)
 
 
@@ -338,7 +350,9 @@ def store_analysis_results(results: list[tuple[int, str, dict]]) -> None:
             completed_at=now,
         )
         for row in rows:
-            append_pipeline_event(session, pipeline="analysis", track_id=row["track_id"], state="done")
+            append_pipeline_event(
+                session, pipeline="analysis", track_id=row["track_id"], state="done"
+            )
         mark_ops_snapshot_dirty(session)
 
 

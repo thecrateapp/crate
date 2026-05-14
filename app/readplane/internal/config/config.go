@@ -20,6 +20,7 @@ const (
 	defaultRouteMode             = "shadow"
 )
 
+// Config holds all runtime configuration for the readplane service.
 type Config struct {
 	Addr            string
 	DatabaseURL     string
@@ -38,6 +39,7 @@ type Config struct {
 	Version         string
 }
 
+// Load reads environment variables and returns a populated Config.
 func Load(version string) Config {
 	return Config{
 		Addr:            stringEnv("READPLANE_ADDR", defaultAddr),

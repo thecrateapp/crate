@@ -1,3 +1,5 @@
+//! Fast and full-file MD5-based fingerprints for audio files.
+
 use md5::{Digest, Md5};
 use serde::Serialize;
 use std::fs::File;
@@ -88,7 +90,10 @@ pub fn run_fingerprint(
     mode: String,
 ) {
     match fingerprint_paths(file, dir, extensions, mode) {
-        Some(result) => println!("{}", serde_json::to_string(&result).unwrap_or_default()),
+        Some(result) => match serde_json::to_string(&result) {
+            Ok(json) => println!("{}", json),
+            Err(err) => eprintln!("failed to serialize fingerprint result: {err}"),
+        },
         None => {
             eprintln!("provide --file or --dir");
             std::process::exit(2);

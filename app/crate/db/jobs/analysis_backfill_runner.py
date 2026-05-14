@@ -18,9 +18,15 @@ def backfill_pipeline_read_models(*, limit: int = 1000) -> dict[str, int]:
     """Incrementally backfill shadow pipeline tables from legacy hot columns."""
     batch_size = max(1, min(int(limit or 1000), 5000))
     with transaction_scope() as session:
-        analysis_state_inserted = backfill_analysis_processing_state(session, limit=batch_size)
-        bliss_state_inserted = backfill_bliss_processing_state(session, limit=batch_size)
-        analysis_features_inserted = backfill_analysis_features(session, limit=batch_size)
+        analysis_state_inserted = backfill_analysis_processing_state(
+            session, limit=batch_size
+        )
+        bliss_state_inserted = backfill_bliss_processing_state(
+            session, limit=batch_size
+        )
+        analysis_features_inserted = backfill_analysis_features(
+            session, limit=batch_size
+        )
         bliss_embeddings_inserted = backfill_bliss_embeddings(session, limit=batch_size)
         inserted_total = (
             analysis_state_inserted

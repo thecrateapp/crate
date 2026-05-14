@@ -10,7 +10,10 @@ from crate.entity_ids import album_entity_uid
 from crate.db.orm.library import LibraryAlbum
 from crate.db.orm.library import LibraryArtist
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
-from crate.db.repositories.library_shared import allocate_unique_slug, coerce_uuid_or_none
+from crate.db.repositories.library_shared import (
+    allocate_unique_slug,
+    coerce_uuid_or_none,
+)
 from crate.db.tx import optional_scope
 from crate.slugs import build_album_slug
 
@@ -20,7 +23,11 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
         now = datetime.now(timezone.utc)
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
         path_match = LibraryAlbum.path == data["path"]
-        entity_match = LibraryAlbum.entity_uid == requested_entity_uid if requested_entity_uid is not None else false()
+        entity_match = (
+            LibraryAlbum.entity_uid == requested_entity_uid
+            if requested_entity_uid is not None
+            else false()
+        )
         requested_mbid = (data.get("musicbrainz_albumid") or "").strip()
         requested_rgid = (data.get("musicbrainz_releasegroupid") or "").strip()
         existing = s.execute(
@@ -37,22 +44,35 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                 or_(
                     path_match,
                     entity_match,
-                    LibraryAlbum.musicbrainz_albumid == requested_mbid if requested_mbid else false(),
-                    LibraryAlbum.musicbrainz_releasegroupid == requested_rgid if requested_rgid else false(),
+                    LibraryAlbum.musicbrainz_albumid == requested_mbid
+                    if requested_mbid
+                    else false(),
+                    LibraryAlbum.musicbrainz_releasegroupid == requested_rgid
+                    if requested_rgid
+                    else false(),
                 )
             )
             .limit(1)
         ).first()
-        slug = existing[1] if existing and existing[1] else allocate_unique_slug(s, LibraryAlbum, build_album_slug(data["artist"], data["name"]))
+        slug = (
+            existing[1]
+            if existing and existing[1]
+            else allocate_unique_slug(
+                s, LibraryAlbum, build_album_slug(data["artist"], data["name"])
+            )
+        )
         requested_storage_id = coerce_uuid_or_none(data.get("storage_id"))
         artist_entity_uid = s.execute(
-            select(LibraryArtist.entity_uid).where(LibraryArtist.name == data["artist"]).limit(1)
+            select(LibraryArtist.entity_uid)
+            .where(LibraryArtist.name == data["artist"])
+            .limit(1)
         ).scalar_one_or_none()
         requested_tag_album = data.get("tag_album")
         entity_uid = (
             existing[3]
             if existing and existing[3]
-            else requested_entity_uid or album_entity_uid(
+            else requested_entity_uid
+            or album_entity_uid(
                 artist_name=data["artist"],
                 artist_uid=artist_entity_uid,
                 album_name=data["name"],
@@ -86,8 +106,11 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                     genre=data.get("genre"),
                     has_cover=data.get("has_cover", 0),
                     musicbrainz_albumid=requested_mbid or existing_album_mbid,
-                    musicbrainz_releasegroupid=requested_rgid or existing_releasegroupid,
-                    tag_album=requested_tag_album if requested_tag_album is not None else existing_tag_album,
+                    musicbrainz_releasegroupid=requested_rgid
+                    or existing_releasegroupid,
+                    tag_album=requested_tag_album
+                    if requested_tag_album is not None
+                    else existing_tag_album,
                     dir_mtime=data.get("dir_mtime"),
                     updated_at=now,
                 )
@@ -100,11 +123,30 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                 key_value=f"{data['artist']}::{data['name']}",
                 is_primary=True,
             )
-            upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+            upsert_entity_identity_key(
+                s,
+                entity_type="album",
+                entity_uid=entity_uid,
+                key_type="slug",
+                key_value=slug,
+                is_primary=True,
+            )
             if requested_mbid:
-                upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="musicbrainz_albumid", key_value=requested_mbid)
+                upsert_entity_identity_key(
+                    s,
+                    entity_type="album",
+                    entity_uid=entity_uid,
+                    key_type="musicbrainz_albumid",
+                    key_value=requested_mbid,
+                )
             if requested_rgid:
-                upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="musicbrainz_releasegroupid", key_value=requested_rgid)
+                upsert_entity_identity_key(
+                    s,
+                    entity_type="album",
+                    entity_uid=entity_uid,
+                    key_type="musicbrainz_releasegroupid",
+                    key_value=requested_rgid,
+                )
             return album_id
         insert_stmt = pg_insert(LibraryAlbum).values(
             storage_id=storage_id,
@@ -129,8 +171,12 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             insert_stmt.on_conflict_do_update(
                 index_elements=[LibraryAlbum.path],
                 set_={
-                    "storage_id": func.coalesce(LibraryAlbum.storage_id, insert_stmt.excluded.storage_id),
-                    "entity_uid": func.coalesce(LibraryAlbum.entity_uid, insert_stmt.excluded.entity_uid),
+                    "storage_id": func.coalesce(
+                        LibraryAlbum.storage_id, insert_stmt.excluded.storage_id
+                    ),
+                    "entity_uid": func.coalesce(
+                        LibraryAlbum.entity_uid, insert_stmt.excluded.entity_uid
+                    ),
                     "artist": insert_stmt.excluded.artist,
                     "name": insert_stmt.excluded.name,
                     "slug": func.coalesce(LibraryAlbum.slug, insert_stmt.excluded.slug),
@@ -145,7 +191,9 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                         func.nullif(insert_stmt.excluded.musicbrainz_albumid, ""),
                         LibraryAlbum.musicbrainz_albumid,
                     ),
-                    "tag_album": func.coalesce(insert_stmt.excluded.tag_album, LibraryAlbum.tag_album),
+                    "tag_album": func.coalesce(
+                        insert_stmt.excluded.tag_album, LibraryAlbum.tag_album
+                    ),
                     "dir_mtime": insert_stmt.excluded.dir_mtime,
                     "updated_at": insert_stmt.excluded.updated_at,
                 },
@@ -159,12 +207,33 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             key_value=f"{data['artist']}::{data['name']}",
             is_primary=True,
         )
-        upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+        upsert_entity_identity_key(
+            s,
+            entity_type="album",
+            entity_uid=entity_uid,
+            key_type="slug",
+            key_value=slug,
+            is_primary=True,
+        )
         if requested_mbid:
-            upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="musicbrainz_albumid", key_value=requested_mbid)
+            upsert_entity_identity_key(
+                s,
+                entity_type="album",
+                entity_uid=entity_uid,
+                key_type="musicbrainz_albumid",
+                key_value=requested_mbid,
+            )
         if requested_rgid:
-            upsert_entity_identity_key(s, entity_type="album", entity_uid=entity_uid, key_type="musicbrainz_releasegroupid", key_value=requested_rgid)
-        row = s.execute(select(LibraryAlbum.id).where(LibraryAlbum.path == data["path"]).limit(1)).scalar_one()
+            upsert_entity_identity_key(
+                s,
+                entity_type="album",
+                entity_uid=entity_uid,
+                key_type="musicbrainz_releasegroupid",
+                key_value=requested_rgid,
+            )
+        row = s.execute(
+            select(LibraryAlbum.id).where(LibraryAlbum.path == data["path"]).limit(1)
+        ).scalar_one()
         return int(row)
 
 

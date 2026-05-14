@@ -2,7 +2,10 @@ import { defineConfig } from "tsup";
 import { readdirSync, statSync } from "fs";
 import { join, relative } from "path";
 
-function collectEntries(dirs: string[], extensions: string[]): Record<string, string> {
+function collectEntries(
+  dirs: string[],
+  extensions: string[],
+): Record<string, string> {
   const entries: Record<string, string> = {};
   for (const dir of dirs) {
     try {

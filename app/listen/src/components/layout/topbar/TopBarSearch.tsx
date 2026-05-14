@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { Disc, Loader2, Music, Search, User, X } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -24,7 +30,9 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${item.type === "artist" ? "rounded-full" : "rounded"}`}
+        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${
+          item.type === "artist" ? "rounded-full" : "rounded"
+        }`}
         onError={(e) => {
           (e.target as HTMLImageElement).style.display = "none";
         }}
@@ -32,12 +40,27 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
     );
   }
   if (item.type === "artist") {
-    return <User size={14} className="h-8 w-8 shrink-0 rounded-full bg-white/5 p-2 text-white/30" />;
+    return (
+      <User
+        size={14}
+        className="h-8 w-8 shrink-0 rounded-full bg-white/5 p-2 text-white/30"
+      />
+    );
   }
   if (item.type === "album") {
-    return <Disc size={14} className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30" />;
+    return (
+      <Disc
+        size={14}
+        className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+      />
+    );
   }
-  return <Music size={14} className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30" />;
+  return (
+    <Music
+      size={14}
+      className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+    />
+  );
 }
 
 export function TopBarSearch() {
@@ -59,7 +82,11 @@ export function TopBarSearch() {
   const collapseTimerRef = useRef<number | undefined>(undefined);
   const queryRef = useRef(query);
   const showDropdownRef = useRef(showDropdown);
-  const [dropdownStyle, setDropdownStyle] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<{
+    left: number;
+    top: number;
+    width: number;
+  } | null>(null);
   const queryActive = query.trim().length > 0;
   const searchOpen = expanded || showDropdown || queryActive;
 
@@ -93,20 +120,26 @@ export function TopBarSearch() {
     setActiveIdx(-1);
   }, []);
 
-  const scheduleCollapseIfIdle = useCallback((nextShowDropdown?: boolean) => {
-    clearCollapseTimer();
-    collapseTimerRef.current = window.setTimeout(() => {
-      collapseIfIdle(nextShowDropdown);
-    }, 140);
-  }, [clearCollapseTimer, collapseIfIdle]);
+  const scheduleCollapseIfIdle = useCallback(
+    (nextShowDropdown?: boolean) => {
+      clearCollapseTimer();
+      collapseTimerRef.current = window.setTimeout(() => {
+        collapseIfIdle(nextShowDropdown);
+      }, 140);
+    },
+    [clearCollapseTimer, collapseIfIdle],
+  );
 
-  const openSearch = useCallback((withDropdown = true) => {
-    clearCollapseTimer();
-    setExpanded(true);
-    if (withDropdown) {
-      setShowDropdown(true);
-    }
-  }, [clearCollapseTimer]);
+  const openSearch = useCallback(
+    (withDropdown = true) => {
+      clearCollapseTimer();
+      setExpanded(true);
+      if (withDropdown) {
+        setShowDropdown(true);
+      }
+    },
+    [clearCollapseTimer],
+  );
 
   useEffect(() => {
     return () => {
@@ -157,7 +190,9 @@ export function TopBarSearch() {
 
     setLoading(true);
     debounceRef.current = setTimeout(() => {
-      api<SearchResult>(`/api/search?q=${encodeURIComponent(query.trim())}&limit=10`)
+      api<SearchResult>(
+        `/api/search?q=${encodeURIComponent(query.trim())}&limit=10`,
+      )
         .then((data) => {
           setResults(flattenTopBarSearchResults(data));
           setActiveIdx(-1);
@@ -228,12 +263,15 @@ export function TopBarSearch() {
     [navigate, play],
   );
 
-  const selectRecent = useCallback((term: string) => {
-    setExpanded(true);
-    setQuery(term);
-    setShowDropdown(true);
-    focusInputSoon();
-  }, [focusInputSoon]);
+  const selectRecent = useCallback(
+    (term: string) => {
+      setExpanded(true);
+      setQuery(term);
+      setShowDropdown(true);
+      focusInputSoon();
+    },
+    [focusInputSoon],
+  );
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     const items = query.trim() ? results : recents.map((label) => ({ label }));
@@ -256,7 +294,8 @@ export function TopBarSearch() {
   }
 
   const showRecents = showDropdown && !query.trim() && recents.length > 0;
-  const showResults = showDropdown && query.trim().length > 0 && (results.length > 0 || loading);
+  const showResults =
+    showDropdown && query.trim().length > 0 && (results.length > 0 || loading);
   const dropdown =
     dropdownStyle && (showResults || showRecents)
       ? createPortal(
@@ -284,12 +323,18 @@ export function TopBarSearch() {
                   >
                     <SearchResultThumb item={item} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] text-white/80">{item.label}</p>
+                      <p className="truncate text-[13px] text-white/80">
+                        {item.label}
+                      </p>
                       {item.sublabel ? (
-                        <p className="truncate text-[11px] text-white/40">{item.sublabel}</p>
+                        <p className="truncate text-[11px] text-white/40">
+                          {item.sublabel}
+                        </p>
                       ) : null}
                     </div>
-                    <span className="shrink-0 text-[10px] capitalize text-white/20">{item.type}</span>
+                    <span className="shrink-0 text-[10px] capitalize text-white/20">
+                      {item.type}
+                    </span>
                   </button>
                 ))}
                 {query.trim() && (
@@ -322,7 +367,9 @@ export function TopBarSearch() {
                     }`}
                   >
                     <Search size={12} className="shrink-0 text-white/20" />
-                    <span className="truncate text-[13px] text-white/60">{term}</span>
+                    <span className="truncate text-[13px] text-white/60">
+                      {term}
+                    </span>
                   </button>
                 ))}
               </>
@@ -342,8 +389,12 @@ export function TopBarSearch() {
           ? "w-[min(22rem,calc(100vw-8.75rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
           : "w-12 md:w-11",
       )}
-      onMouseEnter={() => { if (canHover) openSearch(false); }}
-      onMouseLeave={() => { if (canHover) scheduleCollapseIfIdle(); }}
+      onMouseEnter={() => {
+        if (canHover) openSearch(false);
+      }}
+      onMouseLeave={() => {
+        if (canHover) scheduleCollapseIfIdle();
+      }}
     >
       <div
         className={cn(
@@ -375,7 +426,12 @@ export function TopBarSearch() {
           >
             <Search size={17} />
           </button>
-          {loading && searchOpen ? <Loader2 size={15} className="absolute right-4 animate-spin text-white/40" /> : null}
+          {loading && searchOpen ? (
+            <Loader2
+              size={15}
+              className="absolute right-4 animate-spin text-white/40"
+            />
+          ) : null}
           {!loading && query && searchOpen ? (
             <button
               onClick={() => {

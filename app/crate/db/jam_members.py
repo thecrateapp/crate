@@ -27,28 +27,44 @@ _MEMBER_SELECT_SQL = text(
 
 def get_jam_room_members(room_id: str) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(f"{_MEMBER_SELECT_SQL.text} ORDER BY jrm.joined_at ASC"),
-            {"room_id": room_id},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                # SQL_SAFE: _MEMBER_SELECT_SQL is a constant SQL construct.
+                text(f"{_MEMBER_SELECT_SQL.text} ORDER BY jrm.joined_at ASC"),
+                {"room_id": room_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_jam_room_member(room_id: str, user_id: int) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(f"{_MEMBER_SELECT_SQL.text} AND jrm.user_id = :user_id LIMIT 1"),
-            {"room_id": room_id, "user_id": user_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                # SQL_SAFE: _MEMBER_SELECT_SQL is a constant SQL construct.
+                text(f"{_MEMBER_SELECT_SQL.text} AND jrm.user_id = :user_id LIMIT 1"),
+                {"room_id": room_id, "user_id": user_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def is_jam_room_member(room_id: str, user_id: int) -> bool:
     with transaction_scope() as session:
-        row = session.execute(
-            text("SELECT 1 FROM jam_room_members WHERE room_id = :room_id AND user_id = :user_id"),
-            {"room_id": room_id, "user_id": user_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT 1 FROM jam_room_members WHERE room_id = :room_id AND user_id = :user_id"
+                ),
+                {"room_id": room_id, "user_id": user_id},
+            )
+            .mappings()
+            .first()
+        )
     return row is not None
 
 
@@ -80,10 +96,12 @@ def touch_jam_room_member(room_id: str, user_id: int) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
         result = session.execute(
-            text("UPDATE jam_room_members SET last_seen_at = :now WHERE room_id = :room_id AND user_id = :user_id"),
+            text(
+                "UPDATE jam_room_members SET last_seen_at = :now WHERE room_id = :room_id AND user_id = :user_id"
+            ),
             {"now": now, "room_id": room_id, "user_id": user_id},
         )
-    return result.rowcount > 0
+    return int(getattr(result, "rowcount", 0) or 0) > 0
 
 
 __all__ = [

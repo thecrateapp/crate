@@ -10,7 +10,12 @@ from crate.db.queries.paths import (
     load_artist_similarity_graph,
     load_shared_members_graph,
 )
-from crate.genre_taxonomy import get_genre_ancestor_slugs, get_related_genre_terms, resolve_genre_slug, slugify_genre
+from crate.genre_taxonomy import (
+    get_genre_ancestor_slugs,
+    get_related_genre_terms,
+    resolve_genre_slug,
+    slugify_genre,
+)
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +44,9 @@ def _genre_cache_key(genres: dict[str, float]) -> tuple[tuple[str, float], ...]:
 
 
 @lru_cache(maxsize=4096)
-def _expand_genre_weight_items(items: tuple[tuple[str, float], ...]) -> tuple[tuple[str, float], ...]:
+def _expand_genre_weight_items(
+    items: tuple[tuple[str, float], ...],
+) -> tuple[tuple[str, float], ...]:
     expanded: dict[str, float] = {}
     for raw_genre, weight in items:
         if weight <= 0:
@@ -47,12 +54,18 @@ def _expand_genre_weight_items(items: tuple[tuple[str, float], ...]) -> tuple[tu
         canonical_slug = resolve_genre_slug(raw_genre) or slugify_genre(raw_genre)
         if not canonical_slug:
             continue
-        ancestors = get_genre_ancestor_slugs(canonical_slug, include_self=True) or [canonical_slug]
+        ancestors = get_genre_ancestor_slugs(canonical_slug, include_self=True) or [
+            canonical_slug
+        ]
         for index, slug in enumerate(ancestors):
             weighted = weight if index == 0 else weight * 0.65
             expanded[slug] = max(expanded.get(slug, 0.0), weighted)
-        for related_term in get_related_genre_terms(canonical_slug, limit=12, max_depth=1):
-            related_slug = resolve_genre_slug(related_term) or slugify_genre(related_term)
+        for related_term in get_related_genre_terms(
+            canonical_slug, limit=12, max_depth=1
+        ):
+            related_slug = resolve_genre_slug(related_term) or slugify_genre(
+                related_term
+            )
             if related_slug and related_slug not in expanded:
                 expanded[related_slug] = weight * 0.35
     return tuple(sorted(expanded.items()))
@@ -89,7 +102,12 @@ def _artist_affinity(
             candidate_sims = sim_graph.get(candidate_lower, {})
             shared = set(context_sims.keys()) & set(candidate_sims.keys())
             if shared:
-                second_degree = max(min(context_sims[item], candidate_sims[item]) for item in shared) * 0.5
+                second_degree = (
+                    max(
+                        min(context_sims[item], candidate_sims[item]) for item in shared
+                    )
+                    * 0.5
+                )
                 if second_degree > best:
                     best = second_degree
 
@@ -102,7 +120,9 @@ def _genre_overlap(
     genre_map: dict[str, dict[str, float]],
 ) -> float:
     """Weighted Jaccard-like genre overlap between candidate and target artists."""
-    candidate_genres = _expand_genre_weights(genre_map.get(candidate_artist.lower(), {}))
+    candidate_genres = _expand_genre_weights(
+        genre_map.get(candidate_artist.lower(), {})
+    )
     if not candidate_genres or not target_artists:
         return 0.0
 
@@ -114,7 +134,9 @@ def _genre_overlap(
         shared_keys = set(candidate_genres.keys()) & set(target_genres.keys())
         if not shared_keys:
             continue
-        intersection = sum(min(candidate_genres[key], target_genres[key]) for key in shared_keys)
+        intersection = sum(
+            min(candidate_genres[key], target_genres[key]) for key in shared_keys
+        )
         union = sum(
             max(candidate_genres.get(key, 0), target_genres.get(key, 0))
             for key in set(candidate_genres.keys()) | set(target_genres.keys())

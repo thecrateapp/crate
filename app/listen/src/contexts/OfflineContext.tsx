@@ -1,11 +1,6 @@
-import {
-  useContext,
-  type ReactNode,
-} from "react";
+import { useContext, type ReactNode } from "react";
 
-import {
-  OfflineContext,
-} from "@/contexts/offline-context";
+import { OfflineContext } from "@/contexts/offline-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOfflineRuntime } from "@/contexts/use-offline-runtime";
 
@@ -14,9 +9,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   const value = useOfflineRuntime(user);
 
   return (
-    <OfflineContext.Provider value={value}>
-      {children}
-    </OfflineContext.Provider>
+    <OfflineContext.Provider value={value}>{children}</OfflineContext.Provider>
   );
 }
 

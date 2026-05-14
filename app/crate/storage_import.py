@@ -7,14 +7,27 @@ import uuid
 from pathlib import Path
 
 from crate.audio import read_tags
-from crate.db.repositories.library import get_library_album, get_library_artist, upsert_artist
+from crate.db.repositories.library import (
+    get_library_album,
+    get_library_artist,
+    upsert_artist,
+)
 from crate.entity_ids import album_entity_uid, artist_entity_uid, track_entity_uid
 from crate.storage_layout import album_dir as managed_album_dir
 from crate.storage_layout import entity_uid_for, looks_like_entity_uid
 
 log = logging.getLogger(__name__)
 
-DEFAULT_AUDIO_EXTENSIONS = {".flac", ".mp3", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".alac"}
+DEFAULT_AUDIO_EXTENSIONS = {
+    ".flac",
+    ".mp3",
+    ".m4a",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".aac",
+    ".alac",
+}
 
 
 def _normalize_segment_key(name: str) -> str:
@@ -29,13 +42,17 @@ def sanitize_segment(name: str, fallback: str = "Unknown") -> str:
     return cleaned or fallback
 
 
-def resolve_child_dir_name(parent: Path, raw_name: str, fallback: str = "Unknown") -> str:
+def resolve_child_dir_name(
+    parent: Path, raw_name: str, fallback: str = "Unknown"
+) -> str:
     safe_name = sanitize_segment(raw_name, fallback=fallback)
     if not parent.exists():
         return safe_name
     existing_dirs = [d.name for d in parent.iterdir() if d.is_dir()]
     normalized_matches = [
-        name for name in existing_dirs if _normalize_segment_key(name) == _normalize_segment_key(raw_name)
+        name
+        for name in existing_dirs
+        if _normalize_segment_key(name) == _normalize_segment_key(raw_name)
     ]
     visible_matches = [name for name in normalized_matches if not name.startswith(".")]
     if visible_matches:
@@ -45,7 +62,9 @@ def resolve_child_dir_name(parent: Path, raw_name: str, fallback: str = "Unknown
     return safe_name
 
 
-def iter_audio_files_recursive(root: Path, extensions: set[str] | None = None) -> list[Path]:
+def iter_audio_files_recursive(
+    root: Path, extensions: set[str] | None = None
+) -> list[Path]:
     allowed = {ext.lower() for ext in (extensions or DEFAULT_AUDIO_EXTENSIONS)}
     return sorted(
         path
@@ -54,14 +73,29 @@ def iter_audio_files_recursive(root: Path, extensions: set[str] | None = None) -
     )
 
 
-def infer_album_identity(staged_album_dir: Path, fallback_artist: str = "") -> tuple[str, str]:
+def infer_album_identity(
+    staged_album_dir: Path, fallback_artist: str = ""
+) -> tuple[str, str]:
     tracks = iter_audio_files_recursive(staged_album_dir)
     if tracks:
         tags = read_tags(tracks[0])
-        artist_name = (tags.get("albumartist") or tags.get("artist") or fallback_artist or staged_album_dir.parent.name).strip()
-        album_name = (tags.get("album") or staged_album_dir.name or "Unknown Album").strip()
-        return artist_name or fallback_artist or "Unknown Artist", album_name or "Unknown Album"
-    return fallback_artist or staged_album_dir.parent.name or "Unknown Artist", staged_album_dir.name or "Unknown Album"
+        artist_name = (
+            tags.get("albumartist")
+            or tags.get("artist")
+            or fallback_artist
+            or staged_album_dir.parent.name
+        ).strip()
+        album_name = (
+            tags.get("album") or staged_album_dir.name or "Unknown Album"
+        ).strip()
+        return (
+            artist_name or fallback_artist or "Unknown Artist",
+            album_name or "Unknown Album",
+        )
+    return (
+        fallback_artist or staged_album_dir.parent.name or "Unknown Artist",
+        staged_album_dir.name or "Unknown Album",
+    )
 
 
 def _parse_tag_integer(value) -> int | None:
@@ -79,34 +113,46 @@ def _parse_tag_integer(value) -> int | None:
 def ensure_import_artist(artist_name: str) -> dict:
     artist = get_library_artist(artist_name)
     if artist:
-        return artist
+        return dict(artist)
 
     entity_uid = str(artist_entity_uid(name=artist_name))
-    upsert_artist({
-        "name": artist_name,
-        "entity_uid": entity_uid,
-        "folder_name": entity_uid,
-        "album_count": 0,
-        "track_count": 0,
-        "total_size": 0,
-        "formats": [],
-        "dir_mtime": None,
-    })
+    upsert_artist(
+        {
+            "name": artist_name,
+            "entity_uid": entity_uid,
+            "folder_name": entity_uid,
+            "album_count": 0,
+            "track_count": 0,
+            "total_size": 0,
+            "formats": [],
+            "dir_mtime": None,
+        }
+    )
     created = get_library_artist(artist_name)
-    return created or {
-        "name": artist_name,
-        "entity_uid": entity_uid,
-        "folder_name": entity_uid,
-    }
+    return (
+        dict(created)
+        if created
+        else {
+            "name": artist_name,
+            "entity_uid": entity_uid,
+            "folder_name": entity_uid,
+        }
+    )
 
 
-def resolve_import_album_target(library_root: str | Path, artist_name: str, album_name: str) -> tuple[dict, Path, bool]:
+def resolve_import_album_target(
+    library_root: str | Path, artist_name: str, album_name: str
+) -> tuple[dict, Path, bool]:
     root = Path(library_root)
     artist = ensure_import_artist(artist_name)
 
     folder_name = str(artist.get("folder_name") or "")
-    artist_uid = str(entity_uid_for(artist, "entity_uid") or artist_entity_uid(name=artist["name"]))
-    is_managed_artist = bool(artist_uid) and (folder_name == artist_uid or looks_like_entity_uid(folder_name))
+    artist_uid = str(
+        entity_uid_for(artist, "entity_uid") or artist_entity_uid(name=artist["name"])
+    )
+    is_managed_artist = bool(artist_uid) and (
+        folder_name == artist_uid or looks_like_entity_uid(folder_name)
+    )
 
     # For managed artists, always use V2 layout
     if is_managed_artist and artist_uid:
@@ -117,7 +163,9 @@ def resolve_import_album_target(library_root: str | Path, artist_name: str, albu
             if looks_like_entity_uid(existing_path.name):
                 return artist, existing_path, True
         # New album or legacy path — create V2 target
-        existing_album_uid = entity_uid_for(existing_album, "entity_uid") if existing_album else None
+        existing_album_uid = (
+            entity_uid_for(existing_album, "entity_uid") if existing_album else None
+        )
         album_uid = str(
             existing_album_uid
             if existing_album_uid
@@ -136,8 +184,12 @@ def resolve_import_album_target(library_root: str | Path, artist_name: str, albu
         target = Path(existing_album["path"])
         return artist, target, looks_like_entity_uid(target.name)
 
-    artist_root = root / (folder_name or sanitize_segment(artist["name"], fallback="Unknown Artist"))
-    album_folder = resolve_child_dir_name(artist_root, album_name, fallback="Unknown Album")
+    artist_root = root / (
+        folder_name or sanitize_segment(artist["name"], fallback="Unknown Artist")
+    )
+    album_folder = resolve_child_dir_name(
+        artist_root, album_name, fallback="Unknown Album"
+    )
     return artist, artist_root / album_folder, False
 
 
@@ -173,7 +225,9 @@ def resolve_managed_track_destination(
     )
     dest = target_album_dir / f"{track_uid}{src.suffix.lower()}"
     if dest.exists():
-        collision_uid = uuid.uuid5(track_uid, f"collision:{src.name.lower()}:{src.stat().st_size}")
+        collision_uid = uuid.uuid5(
+            track_uid, f"collision:{src.name.lower()}:{src.stat().st_size}"
+        )
         dest = target_album_dir / f"{collision_uid}{src.suffix.lower()}"
     return dest
 

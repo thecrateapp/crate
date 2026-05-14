@@ -1,7 +1,5 @@
 """Schema models for artwork endpoints."""
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict
 
 from crate.api.schemas.common import TaskEnqueueResponse

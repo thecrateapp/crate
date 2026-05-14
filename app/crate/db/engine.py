@@ -1,19 +1,11 @@
 """SQLAlchemy 2.x engine and session factory for Crate.
 
-This module is the entry point for all new code that wants to talk to
-PostgreSQL through SQLAlchemy rather than the legacy psycopg2 pool in
-``core.py``. Both coexist: the legacy pool handles existing code that
-uses ``get_db_ctx()``, while this engine handles code that uses
-``Session`` (repositories, new queries, ORM models when they arrive).
+This module is the canonical entry point for all runtime code that talks
+to PostgreSQL through SQLAlchemy ``Session`` (repositories, queries, ORM
+models, and the API layer).
 
-The two pools are independent — same database, separate connection
-lifecycles. This is safe because PostgreSQL handles concurrent
-connections from different pools without issue. Over time, as code
-migrates from ``get_db_ctx()`` to ``Session``, the legacy pool will
-see fewer connections and can eventually be removed.
-
-Configuration reads the same ``CRATE_POSTGRES_*`` env vars as
-``core.py``, so there is zero additional setup for operators.
+Configuration reads the ``CRATE_POSTGRES_*`` environment variables, so
+there is zero additional setup for operators.
 """
 
 import os
@@ -44,10 +36,10 @@ def _default_pool_settings() -> tuple[int, int]:
     """Return (pool_size, max_overflow) based on runtime context."""
     runtime = os.environ.get("CRATE_RUNTIME", "").lower()
     if runtime == "api":
-        return 4, 2   # API: keep connection pressure low on small hardware
+        return 4, 2  # API: keep connection pressure low on small hardware
     elif runtime == "worker":
-        return 2, 1   # Worker: background tasks should be conservative too
-    return 4, 2       # Fallback (dev, tests)
+        return 2, 1  # Worker: background tasks should be conservative too
+    return 4, 2  # Fallback (dev, tests)
 
 
 def get_engine():
@@ -56,7 +48,9 @@ def get_engine():
     if _engine is None:
         default_size, default_overflow = _default_pool_settings()
         pool_size = _get_pool_setting("CRATE_SQLALCHEMY_POOL_SIZE", default_size)
-        max_overflow = _get_pool_setting("CRATE_SQLALCHEMY_MAX_OVERFLOW", default_overflow)
+        max_overflow = _get_pool_setting(
+            "CRATE_SQLALCHEMY_MAX_OVERFLOW", default_overflow
+        )
         _engine = create_engine(
             _build_dsn(),
             pool_size=pool_size,
@@ -92,6 +86,7 @@ class Base(DeclarativeBase):
     as anyone wants to create a mapped class. Keeping it next to the
     engine avoids circular imports.
     """
+
     pass
 
 

@@ -18,6 +18,57 @@
 # services.
 
 services:
+  # Capacity profile for the official Crate server.
+  #
+  # The base compose file remains intentionally conservative for smaller
+  # self-hosted installs. The project server currently has 8 logical CPUs and
+  # 64GB RAM, so this overlay gives the hot services enough headroom without
+  # letting background work consume the whole box.
+  crate-api:
+    mem_limit: 1536m
+    mem_reservation: 512m
+    cpus: "2.0"
+    environment:
+      - CRATE_API_WORKERS=${CRATE_API_WORKERS:-2}
+
+  crate-readplane:
+    mem_limit: 256m
+    mem_reservation: 64m
+    cpus: "0.5"
+
+  crate-worker:
+    mem_limit: 2g
+    mem_reservation: 768m
+    cpus: "1.5"
+
+  crate-maintenance-worker:
+    mem_limit: 1536m
+    mem_reservation: 512m
+    cpus: "1.0"
+
+  crate-analysis-worker:
+    mem_limit: 4g
+    mem_reservation: 1g
+    cpus: "2.0"
+
+  crate-playback-worker:
+    mem_limit: 2g
+    mem_reservation: 512m
+    cpus: "2.0"
+
+  crate-projector:
+    mem_limit: 768m
+    mem_reservation: 192m
+    cpus: "0.5"
+
+  crate-media-worker:
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: "1.0"
+
+  crate-postgres:
+    mem_limit: 4g
+
   crate-site:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-site:${CRATE_IMAGE_TAG:-latest}
     build:

@@ -1,14 +1,38 @@
 def test_build_live_activity_payload_prefers_worker_runtime_state(monkeypatch):
-    from crate.db import ops_snapshot_builders as ops_snapshot
-    from crate.db import ops_snapshot_activity
+    import crate.db.ops_snapshot_builders as ops_snapshot
+    import crate.db.ops_snapshot_activity as ops_snapshot_activity
 
     runtime_state = {
         "engine": "dramatiq",
         "running_count": 2,
         "pending_count": 3,
-        "running_tasks": [{"id": "r1", "type": "scan", "status": "running", "pool": "default", "progress": {}, "created_at": None, "started_at": None, "updated_at": None}],
-        "pending_tasks": [{"id": "p1", "type": "library_sync", "status": "pending", "pool": "heavy", "progress": {}, "created_at": None, "started_at": None, "updated_at": None}],
-        "recent_tasks": [{"id": "r1", "type": "scan", "status": "running", "updated_at": None}],
+        "running_tasks": [
+            {
+                "id": "r1",
+                "type": "scan",
+                "status": "running",
+                "pool": "default",
+                "progress": {},
+                "created_at": None,
+                "started_at": None,
+                "updated_at": None,
+            }
+        ],
+        "pending_tasks": [
+            {
+                "id": "p1",
+                "type": "library_sync",
+                "status": "pending",
+                "pool": "heavy",
+                "progress": {},
+                "created_at": None,
+                "started_at": None,
+                "updated_at": None,
+            }
+        ],
+        "recent_tasks": [
+            {"id": "r1", "type": "scan", "status": "running", "updated_at": None}
+        ],
         "worker_slots": {"max": 6, "active": 2},
         "queue_breakdown": {
             "running": {"fast": 0, "default": 1, "heavy": 1},
@@ -19,10 +43,22 @@ def test_build_live_activity_payload_prefers_worker_runtime_state(monkeypatch):
         "systems": {"postgres": True, "watcher": True},
     }
 
-    monkeypatch.setattr(ops_snapshot_activity, "get_worker_live_state", lambda max_age_seconds=30: runtime_state)
-    monkeypatch.setattr(ops_snapshot_activity, "list_tasks", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("list_tasks should not be called")))
+    monkeypatch.setattr(
+        ops_snapshot_activity,
+        "get_worker_live_state",
+        lambda max_age_seconds=30: runtime_state,
+    )
+    monkeypatch.setattr(
+        ops_snapshot_activity,
+        "list_tasks",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("list_tasks should not be called")
+        ),
+    )
     monkeypatch.setattr(ops_snapshot_activity, "get_latest_scan", lambda: None)
-    monkeypatch.setattr(ops_snapshot_activity, "count_import_queue_items", lambda status="pending": 0)
+    monkeypatch.setattr(
+        ops_snapshot_activity, "count_import_queue_items", lambda status="pending": 0
+    )
 
     live = ops_snapshot.build_live_activity_payload()
     recent = ops_snapshot.build_recent_activity_payload()
@@ -46,8 +82,10 @@ def test_build_live_activity_payload_prefers_worker_runtime_state(monkeypatch):
     assert status["progress"] == {"phase": "scan"}
 
 
-def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(monkeypatch):
-    from crate.db import ops_snapshot_pipeline
+def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(
+    monkeypatch,
+):
+    import crate.db.ops_snapshot_pipeline as ops_snapshot_pipeline
 
     calls: list[int | None] = []
 
@@ -57,7 +95,9 @@ def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(mon
             return {"total": 10, "analysis_done": 8}
         return None
 
-    monkeypatch.setattr(ops_snapshot_pipeline, "get_ops_runtime_state", fake_get_ops_runtime_state)
+    monkeypatch.setattr(
+        ops_snapshot_pipeline, "get_ops_runtime_state", fake_get_ops_runtime_state
+    )
 
     payload = ops_snapshot_pipeline.build_analysis_payload()
 
@@ -68,9 +108,13 @@ def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(mon
 
 
 def test_build_analysis_payload_returns_empty_when_runtime_state_missing(monkeypatch):
-    from crate.db import ops_snapshot_pipeline
+    import crate.db.ops_snapshot_pipeline as ops_snapshot_pipeline
 
-    monkeypatch.setattr(ops_snapshot_pipeline, "get_ops_runtime_state", lambda key, *, max_age_seconds=None: None)
+    monkeypatch.setattr(
+        ops_snapshot_pipeline,
+        "get_ops_runtime_state",
+        lambda key, *, max_age_seconds=None: None,
+    )
 
     payload = ops_snapshot_pipeline.build_analysis_payload()
 

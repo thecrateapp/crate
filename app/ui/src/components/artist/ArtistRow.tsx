@@ -57,10 +57,16 @@ export function ArtistRow({
     >
       {selectMode ? (
         <div className="flex-shrink-0">
-          <div className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
-            isSelected ? "border-primary bg-primary" : "border-white/35 bg-transparent"
-          }`}>
-            {isSelected ? <Check size={11} className="text-primary-foreground" /> : null}
+          <div
+            className={`flex h-5 w-5 items-center justify-center rounded-md border transition-colors ${
+              isSelected
+                ? "border-primary bg-primary"
+                : "border-white/35 bg-transparent"
+            }`}
+          >
+            {isSelected ? (
+              <Check size={11} className="text-primary-foreground" />
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -87,7 +93,9 @@ export function ArtistRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{name}</div>
+        <div className="truncate text-sm font-medium text-foreground">
+          {name}
+        </div>
         {genres && genres.length > 0 ? (
           <div className="mt-1 flex flex-wrap gap-1.5">
             {genres.slice(0, 3).map((genre) => (
@@ -97,9 +105,15 @@ export function ArtistRow({
         ) : null}
       </div>
 
-      <div className="hidden text-xs text-muted-foreground sm:block">{albums} albums</div>
-      <div className="hidden w-20 text-right text-xs text-muted-foreground sm:block">{tracks} tracks</div>
-      <div className="hidden w-16 text-right text-xs text-muted-foreground lg:block">{formatSize(total_size_mb)}</div>
+      <div className="hidden text-xs text-muted-foreground sm:block">
+        {albums} albums
+      </div>
+      <div className="hidden w-20 text-right text-xs text-muted-foreground sm:block">
+        {tracks} tracks
+      </div>
+      <div className="hidden w-16 text-right text-xs text-muted-foreground lg:block">
+        {formatSize(total_size_mb)}
+      </div>
       {listeners != null && listeners > 0 ? (
         <div className="hidden w-20 items-center justify-end gap-1 text-xs text-muted-foreground md:flex">
           <Users size={12} />

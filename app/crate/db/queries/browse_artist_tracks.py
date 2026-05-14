@@ -13,9 +13,10 @@ def get_artist_all_tracks(artist_name: str, limit: int | None = None) -> list[di
         params["limit"] = max(1, int(limit))
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT
                     t.id, t.title, t.artist, t.album, t.path, t.duration,
                     t.track_number, t.format,
@@ -34,30 +35,38 @@ def get_artist_all_tracks(artist_name: str, limit: int | None = None) -> list[di
                     t.title ASC
                 {limit_sql}
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def get_artist_track_titles_with_albums(artist_name: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT t.title, t.path, a.name AS album, a.id AS album_id, a.slug AS album_slug "
-                "FROM library_tracks t JOIN library_albums a ON t.album_id = a.id "
-                "WHERE a.artist = :artist_name ORDER BY t.title"
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT t.title, t.path, a.name AS album, a.id AS album_id, a.slug AS album_slug "
+                    "FROM library_tracks t JOIN library_albums a ON t.album_id = a.id "
+                    "WHERE a.artist = :artist_name ORDER BY t.title"
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def get_artist_setlist_tracks(artist_name: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     t.id,
                     t.entity_uid::text AS track_entity_uid,
@@ -80,9 +89,12 @@ def get_artist_setlist_tracks(artist_name: str) -> list[dict]:
                 WHERE a.artist = :artist_name
                 ORDER BY a.year NULLS LAST, a.name, t.track_number NULLS LAST, t.title
                 """
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 

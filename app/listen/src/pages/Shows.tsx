@@ -1,5 +1,12 @@
 import { type ReactNode, useMemo, useState } from "react";
-import { Calendar, Check, Loader2, Play, RadioTower, Sparkles } from "lucide-react";
+import {
+  Calendar,
+  Check,
+  Loader2,
+  Play,
+  RadioTower,
+  Sparkles,
+} from "lucide-react";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
@@ -45,7 +52,9 @@ export function Shows() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [dismissedInsights, setDismissedInsights] = useState<Record<string, boolean>>({});
+  const [dismissedInsights, setDismissedInsights] = useState<
+    Record<string, boolean>
+  >({});
   const [actingInsightKey, setActingInsightKey] = useState<string | null>(null);
   const { data, loading } = useApi<UpcomingResponse>("/api/me/upcoming");
   const { playAll } = usePlayerActions();
@@ -66,28 +75,41 @@ export function Shows() {
       );
     }
     if (filter === "shows") next = next.filter((item) => item.type === "show");
-    if (filter === "releases") next = next.filter((item) => item.type === "release");
+    if (filter === "releases")
+      next = next.filter((item) => item.type === "release");
     return next;
   }, [filter, items, search]);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const comingUp = filtered.filter((item) => item.is_upcoming || item.date >= today);
-  const attendingShows = items.filter((item) => item.type === "show" && item.user_attending);
+  const comingUp = filtered.filter(
+    (item) => item.is_upcoming || item.date >= today,
+  );
+  const attendingShows = items.filter(
+    (item) => item.type === "show" && item.user_attending,
+  );
   const nextAttendingShow = attendingShows
     .filter((item) => item.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   const nextAttendingDate = nextAttendingShow?.date
-    ? new Date(`${nextAttendingShow.date}T12:00:00`).toLocaleDateString("en-US", {
-        month: "long",
-        day: "numeric",
-      })
+    ? new Date(`${nextAttendingShow.date}T12:00:00`).toLocaleDateString(
+        "en-US",
+        {
+          month: "long",
+          day: "numeric",
+        },
+      )
     : null;
   const recentlyReleased = filtered
-    .filter((item) => item.type === "release" && !item.is_upcoming && item.date < today)
+    .filter(
+      (item) =>
+        item.type === "release" && !item.is_upcoming && item.date < today,
+    )
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const hasFollowedArtists = (summary?.followed_artists ?? 0) > 0;
-  const visibleInsights = insights.filter((insight) => !dismissedInsights[insightKey(insight)]);
+  const visibleInsights = insights.filter(
+    (insight) => !dismissedInsights[insightKey(insight)],
+  );
 
   async function acknowledgeInsight(insight: UpcomingInsight) {
     const key = insightKey(insight);
@@ -109,11 +131,17 @@ export function Shows() {
     setActingInsightKey(key);
     try {
       if (!insight.artist_id) return;
-      const queue = await fetchPlayableSetlist({ artistId: insight.artist_id, artistName: insight.artist });
+      const queue = await fetchPlayableSetlist({
+        artistId: insight.artist_id,
+        artistName: insight.artist,
+      });
       if (!queue.length) {
         toast.info("No probable setlist tracks matched your library");
       } else {
-        playAll(queue, 0, { type: "playlist", name: `${insight.artist} Probable Setlist` });
+        playAll(queue, 0, {
+          type: "playlist",
+          name: `${insight.artist} Probable Setlist`,
+        });
         await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
           reminder_type: insight.type,
         });
@@ -135,20 +163,42 @@ export function Shows() {
             <RadioTower size={12} className="text-primary" />
             Upcoming
           </div>
-          <h1 className="mt-3 text-3xl font-bold text-foreground">Shows & Upcoming Releases</h1>
+          <h1 className="mt-3 text-3xl font-bold text-foreground">
+            Shows & Upcoming Releases
+          </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Everything coming up from the artists you follow: upcoming shows, future releases, and the latest releases you might have missed.
+            Everything coming up from the artists you follow: upcoming shows,
+            future releases, and the latest releases you might have missed.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {summary ? (
             <>
-              <SummaryPill label="Followed artists" value={summary.followed_artists} />
-              <SummaryPill label="Shows" value={summary.show_count} accent="cyan" />
-              <SummaryPill label="Releases" value={summary.release_count} accent="cyan" />
-              <SummaryPill label="Attending" value={attendingShows.length} accent="cyan" />
-              <SummaryPill label="Insights" value={visibleInsights.length} accent="cyan" />
+              <SummaryPill
+                label="Followed artists"
+                value={summary.followed_artists}
+              />
+              <SummaryPill
+                label="Shows"
+                value={summary.show_count}
+                accent="cyan"
+              />
+              <SummaryPill
+                label="Releases"
+                value={summary.release_count}
+                accent="cyan"
+              />
+              <SummaryPill
+                label="Attending"
+                value={attendingShows.length}
+                accent="cyan"
+              />
+              <SummaryPill
+                label="Insights"
+                value={visibleInsights.length}
+                accent="cyan"
+              />
             </>
           ) : null}
         </div>
@@ -158,7 +208,9 @@ export function Shows() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles size={15} className="text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Show prep</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+              Show prep
+            </h2>
           </div>
           <div className="grid gap-3 xl:grid-cols-2">
             {visibleInsights.map((insight) => {
@@ -177,11 +229,21 @@ export function Shows() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
-                        {insight.type === "show_prep" ? "Show prep" : insight.type === "one_week" ? "This week" : "One month"}
+                        {insight.type === "show_prep"
+                          ? "Show prep"
+                          : insight.type === "one_week"
+                            ? "This week"
+                            : "One month"}
                       </div>
-                      <h3 className="mt-3 text-lg font-semibold text-foreground">{insight.title}</h3>
-                      <p className="mt-1 text-sm text-muted-foreground">{insight.subtitle}</p>
-                      <p className="mt-3 text-sm leading-6 text-white/70">{insight.message}</p>
+                      <h3 className="mt-3 text-lg font-semibold text-foreground">
+                        {insight.title}
+                      </h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {insight.subtitle}
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-white/70">
+                        {insight.message}
+                      </p>
                     </div>
                     {insight.weight === "high" ? (
                       <span className="rounded-full border border-primary/20 bg-primary/12 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
@@ -197,7 +259,11 @@ export function Shows() {
                         disabled={busy}
                         className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-60"
                       >
-                        {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} className="fill-current" />}
+                        {busy ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Play size={14} className="fill-current" />
+                        )}
                         Play probable setlist
                       </button>
                     ) : null}
@@ -206,7 +272,11 @@ export function Shows() {
                       disabled={busy}
                       className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/65 transition hover:border-white/20 hover:text-foreground disabled:opacity-60"
                     >
-                      {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                      {busy ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Check size={14} />
+                      )}
                       Got it
                     </button>
                   </div>
@@ -225,7 +295,9 @@ export function Shows() {
                 <Calendar size={12} />
                 Attending soon
               </div>
-              <h2 className="mt-4 text-2xl font-bold text-foreground">{nextAttendingShow.artist}</h2>
+              <h2 className="mt-4 text-2xl font-bold text-foreground">
+                {nextAttendingShow.artist}
+              </h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 {nextAttendingShow.title} · {nextAttendingShow.subtitle}
               </p>
@@ -233,13 +305,21 @@ export function Shows() {
             <div className="flex gap-3">
               {nextAttendingDate ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Date</div>
-                  <div className="mt-1 text-sm font-semibold text-foreground">{nextAttendingDate}</div>
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                    Date
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-foreground">
+                    {nextAttendingDate}
+                  </div>
                 </div>
               ) : null}
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Venue</div>
-                <div className="mt-1 text-sm font-semibold text-foreground">{nextAttendingShow.title}</div>
+                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                  Venue
+                </div>
+                <div className="mt-1 text-sm font-semibold text-foreground">
+                  {nextAttendingShow.title}
+                </div>
               </div>
             </div>
           </div>
@@ -259,7 +339,11 @@ export function Shows() {
                   : "border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground",
               )}
             >
-              {value === "all" ? "All" : value === "shows" ? "Shows" : "Releases"}
+              {value === "all"
+                ? "All"
+                : value === "shows"
+                  ? "Shows"
+                  : "Releases"}
             </button>
           ))}
         </div>
@@ -303,7 +387,9 @@ export function Shows() {
             <section className="space-y-4">
               <div className="flex items-center gap-2">
                 <Sparkles size={15} className="text-primary" />
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Coming up</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+                  Coming up
+                </h2>
               </div>
               <div className="space-y-8">
                 {groupByMonth(comingUp).map(([month, monthItems]) => (
@@ -323,7 +409,9 @@ export function Shows() {
             <section className="space-y-4">
               <div className="flex items-center gap-2">
                 <Calendar size={15} className="text-muted-foreground" />
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">Recently released</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Recently released
+                </h2>
               </div>
               <div className="space-y-8">
                 {groupByMonth(recentlyReleased).map(([month, monthItems]) => (
@@ -359,8 +447,15 @@ function SummaryPill({
       : "border-white/10 text-white/60";
 
   return (
-    <div className={cn("rounded-2xl border bg-white/[0.03] px-3 py-2", accentClass)}>
-      <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{label}</div>
+    <div
+      className={cn(
+        "rounded-2xl border bg-white/[0.03] px-3 py-2",
+        accentClass,
+      )}
+    >
+      <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">
+        {label}
+      </div>
       <div className="mt-1 text-sm font-semibold">{value}</div>
     </div>
   );
@@ -385,7 +480,9 @@ function EmptyState({
         {icon}
       </div>
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{body}</p>
+      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+        {body}
+      </p>
     </div>
   );
 }

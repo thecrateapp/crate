@@ -12,16 +12,28 @@ export default defineConfig({
           if (!id.includes("node_modules")) {
             return undefined;
           }
-          if (id.includes("/node_modules/@nivo/") || id.includes("/node_modules/d3-")) {
+          if (
+            id.includes("/node_modules/@nivo/") ||
+            id.includes("/node_modules/d3-")
+          ) {
             return "charts-vendor";
           }
-          if (id.includes("/node_modules/react-leaflet/") || id.includes("/node_modules/leaflet/")) {
+          if (
+            id.includes("/node_modules/react-leaflet/") ||
+            id.includes("/node_modules/leaflet/")
+          ) {
             return "maps-vendor";
           }
-          if (id.includes("/node_modules/react-force-graph-2d/") || id.includes("/node_modules/force-graph/")) {
+          if (
+            id.includes("/node_modules/react-force-graph-2d/") ||
+            id.includes("/node_modules/force-graph/")
+          ) {
             return "graph-vendor";
           }
-          if (id.includes("/node_modules/@radix-ui/") || id.includes("/node_modules/cmdk/")) {
+          if (
+            id.includes("/node_modules/@radix-ui/") ||
+            id.includes("/node_modules/cmdk/")
+          ) {
             return "ui-vendor";
           }
           if (
@@ -39,7 +51,13 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: "@", replacement: path.resolve(__dirname, "./src") },
-      { find: /^leaflet$/, replacement: path.resolve(__dirname, "../../node_modules/leaflet/dist/leaflet-src.esm.js") },
+      {
+        find: /^leaflet$/,
+        replacement: path.resolve(
+          __dirname,
+          "../../node_modules/leaflet/dist/leaflet-src.esm.js",
+        ),
+      },
       { find: "lodash", replacement: "lodash-es" },
     ],
   },

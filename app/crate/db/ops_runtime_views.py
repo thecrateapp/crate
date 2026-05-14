@@ -43,8 +43,12 @@ def get_worker_live_state(*, max_age_seconds: int = 30) -> dict | None:
         "running_tasks": running_tasks,
         "pending_tasks": pending_tasks,
         "recent_tasks": list(cached.get("recent_tasks") or []),
-        "worker_slots": cached.get("worker_slots") or {
-            "max": int(get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS),
+        "worker_slots": cached.get("worker_slots")
+        or {
+            "max": int(
+                get_setting("max_workers", str(DEFAULT_MAX_WORKERS))
+                or DEFAULT_MAX_WORKERS
+            ),
             "active": len(running_tasks),
         },
         "queue_breakdown": _coerce_queue_breakdown(cached.get("queue_breakdown")),

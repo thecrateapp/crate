@@ -42,57 +42,57 @@ export type EqGains = readonly number[];
  * entry describe the intent so anyone can tune them later.
  */
 export const EQ_PRESETS: Record<string, EqGains> = {
-  flat:        [ 0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+  flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
   // ── General-purpose ─────────────────────────────────────────────
-  rock:        [ 4,  3, -1, -3, -2,  1,  3,  5,  5,  5],
-  pop:         [-1,  2,  4,  4,  2, -1, -1, -1, -1, -1],
-  jazz:        [ 3,  2,  1,  2, -1, -1,  0,  1,  2,  3],
-  classical:   [ 4,  3,  2,  1, -1, -1,  0,  2,  3,  4],
-  bass_boost:  [ 7,  6,  4,  2,  0, -1, -2, -2, -2, -2],
-  treble_boost:[-2, -2, -2, -1,  0,  1,  3,  5,  6,  7],
-  vocal:       [-2, -3, -3,  1,  4,  4,  3,  1,  0, -1],
-  electronic:  [ 5,  4,  1, -1, -2,  1,  0,  1,  4,  5],
-  acoustic:    [ 4,  3,  2,  1,  2,  2,  3,  3,  2,  1],
+  rock: [4, 3, -1, -3, -2, 1, 3, 5, 5, 5],
+  pop: [-1, 2, 4, 4, 2, -1, -1, -1, -1, -1],
+  jazz: [3, 2, 1, 2, -1, -1, 0, 1, 2, 3],
+  classical: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+  bass_boost: [7, 6, 4, 2, 0, -1, -2, -2, -2, -2],
+  treble_boost: [-2, -2, -2, -1, 0, 1, 3, 5, 6, 7],
+  vocal: [-2, -3, -3, 1, 4, 4, 3, 1, 0, -1],
+  electronic: [5, 4, 1, -1, -2, 1, 0, 1, 4, 5],
+  acoustic: [4, 3, 2, 1, 2, 2, 3, 3, 2, 1],
 
   // ── Underground / heavy genres ──────────────────────────────────
 
   // Black metal: tremolo picking presence (4–8k), scooped 500–1k,
   // blast-beat body at 60–125, tame the sub (production usually lo-fi).
-  black_metal: [-1,  3,  4,  1, -3, -2,  3,  6,  6,  4],
+  black_metal: [-1, 3, 4, 1, -3, -2, 3, 6, 6, 4],
 
   // Death metal: kick + guitar low-end body (80–250), classic scoop at
   // 500, pick-attack + double-bass articulation at 2–4k, tight extremes.
-  death_metal: [ 2,  5,  6,  4, -3, -2,  4,  5,  2,  0],
+  death_metal: [2, 5, 6, 4, -3, -2, 4, 5, 2, 0],
 
   // Thrash: aggressive V-shape — big chugs, scooped mids, bright cymbals.
-  thrash:      [ 3,  5,  4,  0, -4, -3,  2,  5,  6,  5],
+  thrash: [3, 5, 4, 0, -4, -3, 2, 5, 6, 5],
 
   // Doom / sludge: massive low-end, recessed upper mids, dark top.
-  doom:        [ 6,  6,  5,  3,  0, -2, -3, -3, -2, -1],
+  doom: [6, 6, 5, 3, 0, -2, -3, -3, -2, -1],
 
   // Hardcore / metalcore: breakdowns need bass, screamed vocals at 3k,
   // crunchy guitars at 1.5–2k.
-  hardcore:    [ 4,  4,  2, -1,  1,  3,  5,  4,  2,  1],
+  hardcore: [4, 4, 2, -1, 1, 3, 5, 4, 2, 1],
 
   // Punk: upfront mids, raw. Guitar bite at 1–3k, modest low-end,
   // slight roll-off on top to keep it grimy.
-  punk:        [ 2,  3,  1, -1,  2,  4,  4,  3,  1, -1],
+  punk: [2, 3, 1, -1, 2, 4, 4, 3, 1, -1],
 
   // Progressive rock / metal: balanced, wide-open, preserves detail.
-  progressive: [ 2,  2,  1,  0,  0,  0,  1,  2,  3,  3],
+  progressive: [2, 2, 1, 0, 0, 0, 1, 2, 3, 3],
 
   // Shoegaze: mid-forward wall-of-sound, dense, not much extreme action.
-  shoegaze:    [ 1,  2,  3,  3,  4,  3,  2,  1,  0,  0],
+  shoegaze: [1, 2, 3, 3, 4, 3, 2, 1, 0, 0],
 
   // Post-rock: dynamic, spacious, just a subtle shape.
-  post_rock:   [ 2,  2,  2,  1,  0,  0,  1,  2,  3,  3],
+  post_rock: [2, 2, 2, 1, 0, 0, 1, 2, 3, 3],
 
   // Indie / lo-fi: warmth without losing character, very subtle.
-  lo_fi:       [ 1,  2,  2,  1,  1,  0,  0,  1,  2,  1],
+  lo_fi: [1, 2, 2, 1, 1, 0, 0, 1, 2, 1],
 
   // Hip-hop: 808 sub weight + crisp kick punch + vocal clarity.
-  hip_hop:     [ 6,  5,  3,  1,  0,  1,  2,  3,  3,  2],
+  hip_hop: [6, 5, 3, 1, 0, 1, 2, 3, 3, 2],
 };
 
 export type EqPresetName = keyof typeof EQ_PRESETS;
@@ -138,7 +138,12 @@ const DEFAULT_RAMP_MS = 80;
  * stack — and anchor the curve to the live value at `now` so the
  * ramp starts from where we actually are.
  */
-function rampParam(param: AudioParam, ctx: AudioContext, target: number, rampMs: number): void {
+function rampParam(
+  param: AudioParam,
+  ctx: AudioContext,
+  target: number,
+  rampMs: number,
+): void {
   const now = typeof ctx.currentTime === "number" ? ctx.currentTime : 0;
   try {
     param.cancelScheduledValues(now);
@@ -194,7 +199,11 @@ export function createEqChain(ctx: AudioContext): EqChain {
     readGains: () => filters.map((f) => f.gain.value),
     dispose: () => {
       for (const f of filters) {
-        try { f.disconnect(); } catch { /* ignore */ }
+        try {
+          f.disconnect();
+        } catch {
+          /* ignore */
+        }
       }
     },
   };

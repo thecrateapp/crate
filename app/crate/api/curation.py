@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.curation import (
     CuratedFollowMutationResponse,
     CuratedFollowStatusResponse,
@@ -32,7 +36,9 @@ _CURATION_RESPONSES = merge_responses(
 )
 
 
-def _serialize_playlist(playlist: dict, *, user_id: int, include_tracks: bool = False) -> dict:
+def _serialize_playlist(
+    playlist: dict, *, user_id: int, include_tracks: bool = False
+) -> dict:
     item = dict(playlist)
     follower_count = item.get("follower_count")
     if follower_count is None:

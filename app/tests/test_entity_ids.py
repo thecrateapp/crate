@@ -67,7 +67,11 @@ def test_genre_entity_uid_is_slug_first():
 
 
 def test_genre_taxonomy_entity_uid_prefers_mbid():
-    left = genre_taxonomy_entity_uid(slug="post-hardcore", name="Post Hardcore", musicbrainz_mbid="MB-42")
-    right = genre_taxonomy_entity_uid(slug="other", name="Other", musicbrainz_mbid="mb42")
+    left = genre_taxonomy_entity_uid(
+        slug="post-hardcore", name="Post Hardcore", musicbrainz_mbid="MB-42"
+    )
+    right = genre_taxonomy_entity_uid(
+        slug="other", name="Other", musicbrainz_mbid="mb42"
+    )
 
     assert left == right

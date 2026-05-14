@@ -3,11 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/api", () => ({
   getApiBase: () => "https://listen.example",
   getAuthToken: () => "listen-token",
-  resolveMaybeApiAssetUrl: (url: string | null | undefined) => (
+  resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
       ? `https://listen.example${url}?token=listen-token`
-      : (url ?? null)
-  ),
+      : url ?? null,
 }));
 
 vi.mock("@/lib/offline", () => ({
@@ -28,7 +27,9 @@ describe("player engine adapter", () => {
       duration: 187,
     });
 
-    expect(track.artwork).toBe("https://listen.example/api/albums/1/cover?token=listen-token");
+    expect(track.artwork).toBe(
+      "https://listen.example/api/albums/1/cover?token=listen-token",
+    );
     expect(track.durationMs).toBe(187000);
   });
 

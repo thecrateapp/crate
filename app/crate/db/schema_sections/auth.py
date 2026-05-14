@@ -80,7 +80,9 @@ def create_auth_schema(cur) -> None:
             UNIQUE (user_id, provider)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_external_identities_provider ON user_external_identities(provider)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_external_identities_provider ON user_external_identities(provider)"
+    )
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_external_identities_provider_username "
         "ON user_external_identities(provider, external_username) WHERE external_username IS NOT NULL"
@@ -102,4 +104,6 @@ def create_auth_schema(cur) -> None:
             accepted_at TIMESTAMPTZ
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_auth_invites_created_by ON auth_invites(created_by, created_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_invites_created_by ON auth_invites(created_by, created_at DESC)"
+    )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import AsyncIterator
 
 from fastapi import APIRouter, Request
 from starlette.responses import StreamingResponse
@@ -29,7 +30,7 @@ def api_admin_ops_snapshot(request: Request, fresh: bool = False):
     return get_cached_ops_snapshot(fresh=fresh)
 
 
-async def _ops_stream() -> asyncio.AsyncIterator[str]:
+async def _ops_stream() -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_ops_snapshot())}\n\n"
     pubsub = None
     channel = snapshot_channel("ops", "dashboard")
@@ -37,7 +38,9 @@ async def _ops_stream() -> asyncio.AsyncIterator[str]:
         pubsub = await open_pubsub(channel)
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(get_cached_ops_snapshot())}\n\n"
                 heartbeat_counter = 0

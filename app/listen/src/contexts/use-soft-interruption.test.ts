@@ -37,20 +37,29 @@ const globalFetch = global.fetch;
 
 const TRACK: Track = { id: "t1", title: "Test", artist: "Artist" };
 
-function createRefs(overrides: {
-  currentTrack?: Track | undefined;
-  isPlaying?: boolean;
-  isBuffering?: boolean;
-  bufferingIntent?: boolean;
-} = {}) {
-  const has = (k: keyof typeof overrides) => Object.prototype.hasOwnProperty.call(overrides, k);
+function createRefs(
+  overrides: {
+    currentTrack?: Track | undefined;
+    isPlaying?: boolean;
+    isBuffering?: boolean;
+    bufferingIntent?: boolean;
+  } = {},
+) {
+  const has = (k: keyof typeof overrides) =>
+    Object.prototype.hasOwnProperty.call(overrides, k);
   const refs = {
     currentTrackRef: {
       current: has("currentTrack") ? overrides.currentTrack : TRACK,
     } as MutableRefObject<Track | undefined>,
-    isPlayingRef: { current: overrides.isPlaying ?? true } as MutableRefObject<boolean>,
-    isBufferingRef: { current: overrides.isBuffering ?? false } as MutableRefObject<boolean>,
-    bufferingIntentRef: { current: overrides.bufferingIntent ?? false } as MutableRefObject<boolean>,
+    isPlayingRef: {
+      current: overrides.isPlaying ?? true,
+    } as MutableRefObject<boolean>,
+    isBufferingRef: {
+      current: overrides.isBuffering ?? false,
+    } as MutableRefObject<boolean>,
+    bufferingIntentRef: {
+      current: overrides.bufferingIntent ?? false,
+    } as MutableRefObject<boolean>,
     commitIsPlaying: vi.fn(),
     commitIsBuffering: vi.fn(),
   };
@@ -62,7 +71,9 @@ beforeEach(() => {
   mockFadeOutAndPause.mockClear();
   mockIsOnline.mockClear();
   mockIsOnline.mockResolvedValue(true);
-  global.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, body: null } as Response)) as typeof fetch;
+  global.fetch = vi.fn(() =>
+    Promise.resolve({ ok: true, status: 200, body: null } as Response),
+  ) as typeof fetch;
 });
 
 afterEach(() => {
@@ -124,10 +135,14 @@ describe("useSoftInterruption", () => {
     const refs = createRefs();
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.beginSoftInterruption("stream"); });
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
     expect(result.current.isSoftInterrupted()).toBe(true);
 
-    act(() => { result.current.cancelSoftInterruption(); });
+    act(() => {
+      result.current.cancelSoftInterruption();
+    });
     expect(result.current.isSoftInterrupted()).toBe(false);
   });
 
@@ -137,9 +152,15 @@ describe("useSoftInterruption", () => {
     window.addEventListener("crate:playback-needs-user-gesture", listener);
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.beginSoftInterruption("stream"); });
-    act(() => { result.current.requireUserGestureToResume(); });
-    act(() => { vi.advanceTimersByTime(3100); });
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    act(() => {
+      result.current.requireUserGestureToResume();
+    });
+    act(() => {
+      vi.advanceTimersByTime(3100);
+    });
 
     expect(listener).toHaveBeenCalledOnce();
     expect(refs.commitIsPlaying).toHaveBeenCalledWith(false);
@@ -153,8 +174,12 @@ describe("useSoftInterruption", () => {
     const refs = createRefs();
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.beginSoftInterruption("stream"); });
-    act(() => { result.current.beginSoftInterruption("offline"); });
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    act(() => {
+      result.current.beginSoftInterruption("offline");
+    });
 
     // Both calls succeed; second call doesn't re-pause but does upgrade
     // the reason internally. We can't inspect the reason from outside,
@@ -166,7 +191,9 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: true });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.scheduleStallProtection(); });
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
     expect(result.current.isSoftInterrupted()).toBe(false);
 
     // Fast-forward past STREAM_STALL_GRACE_MS (2500ms).
@@ -180,8 +207,12 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: true, bufferingIntent: true });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.scheduleStallProtection(); });
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(result.current.isSoftInterrupted()).toBe(false);
   });
 
@@ -189,8 +220,12 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: false });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.scheduleStallProtection(); });
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(result.current.isSoftInterrupted()).toBe(false);
   });
 
@@ -198,9 +233,15 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: true });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.scheduleStallProtection(); });
-    act(() => { result.current.clearStallTimer(); });
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
+    act(() => {
+      result.current.clearStallTimer();
+    });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(result.current.isSoftInterrupted()).toBe(false);
   });
 
@@ -247,7 +288,9 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: true });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.beginSoftInterruption("stream"); });
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
 
     expect(result.current.isSoftInterrupted()).toBe(false);
     expect(gaplessPlayer.fadeOutAndPause).not.toHaveBeenCalled();
@@ -258,13 +301,17 @@ describe("useSoftInterruption", () => {
     const refs = createRefs({ isPlaying: true });
     const { result, unmount } = renderHook(() => useSoftInterruption(refs));
 
-    act(() => { result.current.scheduleStallProtection(); });
+    act(() => {
+      result.current.scheduleStallProtection();
+    });
     unmount();
 
     // After unmount, advancing timers should not invoke anything
     // — refs.commitIsBuffering stays at whatever it was.
     const before = refs.commitIsBuffering.mock.calls.length;
-    act(() => { vi.advanceTimersByTime(5000); });
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
     expect(refs.commitIsBuffering.mock.calls.length).toBe(before);
   });
 

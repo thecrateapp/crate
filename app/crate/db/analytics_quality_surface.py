@@ -3,10 +3,16 @@ from __future__ import annotations
 from typing import Any
 
 from crate.db.analytics_surface_shared import QUALITY_SNAPSHOT_SCOPE, _decorate_snapshot
-from crate.db.ui_snapshot_store import get_ui_snapshot, mark_ui_snapshots_stale, upsert_ui_snapshot
+from crate.db.ui_snapshot_store import (
+    get_ui_snapshot,
+    mark_ui_snapshots_stale,
+    upsert_ui_snapshot,
+)
 
 
-def empty_quality_report(*, computing: bool = False, task_id: str | None = None) -> dict[str, Any]:
+def empty_quality_report(
+    *, computing: bool = False, task_id: str | None = None
+) -> dict[str, Any]:
     return {
         "ready": False,
         "computing": computing,
@@ -22,7 +28,9 @@ def empty_quality_report(*, computing: bool = False, task_id: str | None = None)
     }
 
 
-def get_cached_quality_report(*, max_age_seconds: int | None = None) -> dict[str, Any] | None:
+def get_cached_quality_report(
+    *, max_age_seconds: int | None = None
+) -> dict[str, Any] | None:
     row = get_ui_snapshot(
         QUALITY_SNAPSHOT_SCOPE,
         "global",

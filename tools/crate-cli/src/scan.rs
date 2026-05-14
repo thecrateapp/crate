@@ -1,3 +1,5 @@
+//! Directory scanner: extracts artist/album/track hierarchy, tags, and cover art metadata.
+
 use lofty::file::TaggedFileExt;
 use lofty::prelude::*;
 use lofty::tag::{Accessor, ItemKey, TagType};
@@ -549,7 +551,10 @@ pub fn scan_directory(dir: PathBuf, extensions: String, hash: bool, covers: bool
 
 pub fn run_scan(dir: PathBuf, extensions: String, hash: bool, covers: bool) {
     let result = scan_directory(dir, extensions, hash, covers);
-    println!("{}", serde_json::to_string(&result).unwrap_or_default());
+    match serde_json::to_string(&result) {
+        Ok(json) => println!("{}", json),
+        Err(err) => eprintln!("failed to serialize scan result: {err}"),
+    }
 }
 
 #[cfg(test)]

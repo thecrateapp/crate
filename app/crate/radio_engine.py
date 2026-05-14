@@ -11,6 +11,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from crate.db.paths import (
     _centroid,
@@ -54,13 +55,25 @@ _SEED_ANCHOR_BLEND = 0.02
 _GRAPH_CACHE_TTL_SECONDS = 3600
 _DB_EXCLUDE_ID_LIMIT = 200
 
-_graph_cache: tuple[float, dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]] | None = None
+_graph_cache: (
+    tuple[
+        float,
+        dict[str, dict[str, float]],
+        dict[str, dict[str, float]],
+        dict[str, set[str]],
+    ]
+    | None
+) = None
 
 
-def _redis():
+def _redis() -> Any:
     """Get the Redis connection used for radio sessions."""
-    from crate.db.cache_runtime import _get_redis
-    return _get_redis()
+    from crate.db.cache_runtime import get_redis
+
+    redis = get_redis()
+    if redis is None:
+        raise RuntimeError("Redis is not configured for radio sessions")
+    return redis
 
 
 # ── Session management ─────────────────────────────────────────────
@@ -114,14 +127,22 @@ def _seed_context_from_rows(rows: list[dict]) -> dict:
             seen_tracks.add(track_id)
             track_ids.append(track_id)
 
-    return {"seed_artists": artists[:24], "seed_genres": [], "seed_track_ids": track_ids[:80]}
+    return {
+        "seed_artists": artists[:24],
+        "seed_genres": [],
+        "seed_track_ids": track_ids[:80],
+    }
 
 
 def _context_for_seed(seed_type: str, seed_value: str, seed_label: str) -> dict:
     if seed_type == "artist":
         return {"seed_artists": [seed_label], "seed_genres": [], "seed_track_ids": []}
     if seed_type == "genre":
-        return {"seed_artists": [], "seed_genres": [seed_value or seed_label], "seed_track_ids": []}
+        return {
+            "seed_artists": [],
+            "seed_genres": [seed_value or seed_label],
+            "seed_track_ids": [],
+        }
     if " — " in seed_label:
         artist = seed_label.rsplit(" — ", 1)[-1].strip()
         if artist:
@@ -130,10 +151,14 @@ def _context_for_seed(seed_type: str, seed_value: str, seed_label: str) -> dict:
 
 
 def _vectors_from_rows(rows: list[dict]) -> list[list[float]]:
-    return [list(row["bliss_vector"]) for row in rows if row.get("bliss_vector") is not None]
+    return [
+        list(row["bliss_vector"]) for row in rows if row.get("bliss_vector") is not None
+    ]
 
 
-def _seed_result_from_rows(rows: list[dict], label: str, *, minimum: int = 1) -> tuple[list[float], str, dict] | None:
+def _seed_result_from_rows(
+    rows: list[dict], label: str, *, minimum: int = 1
+) -> tuple[list[float], str, dict] | None:
     vectors = _vectors_from_rows(rows)
     if len(vectors) < minimum:
         return None
@@ -145,7 +170,9 @@ def clear_radio_graph_cache() -> None:
     _graph_cache = None
 
 
-def _load_radio_graphs() -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]]:
+def _load_radio_graphs() -> tuple[
+    dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]
+]:
     global _graph_cache
     now = time.monotonic()
     if _graph_cache and now - _graph_cache[0] < _GRAPH_CACHE_TTL_SECONDS:
@@ -200,15 +227,19 @@ def resolve_discovery_seed(user_id: int) -> tuple[list[float], str, dict] | None
 def has_enough_data(user_id: int) -> bool:
     """Check if a user has enough data for discovery radio."""
     counts = count_user_radio_signals(user_id)
-    return (int(counts["likes"]) >= 3
-            or int(counts["follows"]) >= 1
-            or int(counts["saved_albums"]) >= 1)
+    return (
+        int(counts["likes"]) >= 3
+        or int(counts["follows"]) >= 1
+        or int(counts["saved_albums"]) >= 1
+    )
 
 
 # ── Radio start ───────────────────────────────────────────────────
 
 
-def _resolve_seed(user_id: int, seed_type: str, seed_value: str) -> tuple[list[float], str, dict] | None:
+def _resolve_seed(
+    user_id: int, seed_type: str, seed_value: str
+) -> tuple[list[float], str, dict] | None:
     if seed_type == "track":
         return get_track_seed_context(seed_value)
 
@@ -263,8 +294,12 @@ def start_radio(
 
     # Pre-seed with historical feedback
     hist_liked, hist_disliked = load_feedback_history(user_id)
-    log.info("Radio start: %d historical likes, %d dislikes for user %d",
-             len(hist_liked), len(hist_disliked), user_id)
+    log.info(
+        "Radio start: %d historical likes, %d dislikes for user %d",
+        len(hist_liked),
+        len(hist_disliked),
+        user_id,
+    )
 
     initial_target = seed_vec
     if hist_liked:
@@ -342,7 +377,9 @@ def radio_feedback(session_id: str, track_id: int, action: str) -> dict | None:
         liked = session["liked_vectors"]
         like_centroid = _centroid(liked)
         blend = min(0.4, 0.08 * len(liked))
-        session["current_target"] = _lerp(session["initial_target"], like_centroid, blend)
+        session["current_target"] = _lerp(
+            session["initial_target"], like_centroid, blend
+        )
         effect = "target_shifted"
     elif action == "dislike":
         session["disliked_vectors"].append(vec)
@@ -378,7 +415,10 @@ def _too_close_to_disliked(candidate: dict, disliked_vecs: list[list[float]]) ->
     for disliked_vec in disliked_vecs:
         if not disliked_vec or len(disliked_vec) != len(cand_vec):
             continue
-        distance = sum((cand_vec[d] - disliked_vec[d]) ** 2 for d in range(len(cand_vec))) ** 0.5
+        distance = (
+            sum((cand_vec[d] - disliked_vec[d]) ** 2 for d in range(len(cand_vec)))
+            ** 0.5
+        )
         if distance < _DISLIKE_PENALTY_RADIUS:
             return True
     return False
@@ -438,11 +478,19 @@ def _generate_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict]:
     while len(tracks) < count and attempts < max_attempts:
         attempts += 1
         import random
+
         drift = [target[d] + random.gauss(0, 0.02) for d in range(len(target))]
 
         candidate = _select_best_candidate_from_rows(
-            candidate_rows, drift, used_ids, used_titles, recent_artists,
-            sim_graph, genre_map, member_graph, target_artists,
+            candidate_rows,
+            drift,
+            used_ids,
+            used_titles,
+            recent_artists,
+            sim_graph,
+            genre_map,
+            member_graph,
+            target_artists,
             artist_affinity=_artist_affinity,
             genre_overlap=_genre_overlap,
             recent_tracks=recent_tracks,
@@ -481,24 +529,28 @@ def _generate_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict]:
             if seed_vector:
                 target = _lerp(target, seed_vector, _SEED_ANCHOR_BLEND)
 
-        tracks.append({
-            "track_id": track_id,
-            "entity_uid": str(candidate["entity_uid"]) if candidate.get("entity_uid") else None,
-            "title": title,
-            "artist": artist,
-            "album": candidate.get("album"),
-            "album_id": candidate.get("album_id"),
-            "bpm": candidate.get("bpm"),
-            "audio_key": candidate.get("audio_key"),
-            "audio_scale": candidate.get("audio_scale"),
-            "energy": candidate.get("energy"),
-            "danceability": candidate.get("danceability"),
-            "valence": candidate.get("valence"),
-            "duration": candidate.get("duration"),
-            "year": candidate.get("year"),
-            "bliss_vector": list(cand_vec) if cand_vec else None,
-            "distance": round(candidate["distance"], 6),
-        })
+        tracks.append(
+            {
+                "track_id": track_id,
+                "entity_uid": str(candidate["entity_uid"])
+                if candidate.get("entity_uid")
+                else None,
+                "title": title,
+                "artist": artist,
+                "album": candidate.get("album"),
+                "album_id": candidate.get("album_id"),
+                "bpm": candidate.get("bpm"),
+                "audio_key": candidate.get("audio_key"),
+                "audio_scale": candidate.get("audio_scale"),
+                "energy": candidate.get("energy"),
+                "danceability": candidate.get("danceability"),
+                "valence": candidate.get("valence"),
+                "duration": candidate.get("duration"),
+                "year": candidate.get("year"),
+                "bliss_vector": list(cand_vec) if cand_vec else None,
+                "distance": round(candidate["distance"], 6),
+            }
+        )
 
     # Update session state
     session["used_track_ids"] = used_track_ids

@@ -7,11 +7,19 @@ from pathlib import Path
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
 from crate.db.repositories.library import get_library_album, get_library_artist
-from crate.db.queries.tasks import get_task
-from crate.task_progress import TaskProgress, emit_item_event, emit_progress, entity_label
-from crate.db.jobs.artwork import set_album_has_cover, set_artist_has_photo, touch_artist_artwork
+from crate.task_progress import TaskProgress, emit_progress, entity_label
+from crate.db.jobs.artwork import (
+    set_album_has_cover,
+    set_artist_has_photo,
+    touch_artist_artwork,
+)
 from crate.storage_layout import resolve_artist_dir
-from crate.worker_handlers import DEFAULT_AUDIO_EXTENSIONS, TaskHandler, is_cancelled, start_scan
+from crate.worker_handlers import (
+    DEFAULT_AUDIO_EXTENSIONS,
+    TaskHandler,
+    is_cancelled,
+    start_scan,
+)
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +43,11 @@ def _handle_fetch_artwork_all(task_id: str, params: dict, config: dict) -> dict:
         if not mbid:
             continue
         p.done = i + 1
-        p.item = entity_label(artist=album.get("artist", ""), album=album.get("album", ""), path=album.get("path", ""))
+        p.item = entity_label(
+            artist=album.get("artist", ""),
+            album=album.get("album", ""),
+            path=album.get("path", ""),
+        )
         emit_progress(task_id, p)
         image = fetch_cover_from_caa(mbid)
         if image:
@@ -44,7 +56,11 @@ def _handle_fetch_artwork_all(task_id: str, params: dict, config: dict) -> dict:
         else:
             failed += 1
 
-    emit_task_event(task_id, "info", {"message": f"Artwork fetch complete: {fetched}/{total} covers fetched"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Artwork fetch complete: {fetched}/{total} covers fetched"},
+    )
     return {"fetched": fetched, "failed": failed, "total": total}
 
 
@@ -83,7 +99,9 @@ def _handle_batch_covers(task_id: str, params: dict, config: dict) -> dict:
             results.append({"path": path, "error": "Not found on CAA"})
 
     fetched = sum(1 for r in results if r.get("status") == "fetched")
-    emit_task_event(task_id, "info", {"message": f"Batch covers: fetched {fetched}/{len(albums)}"})
+    emit_task_event(
+        task_id, "info", {"message": f"Batch covers: fetched {fetched}/{len(albums)}"}
+    )
     return {"results": results}
 
 
@@ -95,14 +113,20 @@ def _handle_fetch_cover(task_id: str, params: dict, config: dict) -> dict:
     if not mbid:
         return {"error": "No MBID"}
 
-    emit_task_event(task_id, "info", {"message": f"Fetching cover from CoverArtArchive for {path or mbid}"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Fetching cover from CoverArtArchive for {path or mbid}"},
+    )
 
     lib = Path(config["library_path"])
     album_dir = lib / path if path else None
 
     image = fetch_cover_from_caa(mbid)
     if not image:
-        emit_task_event(task_id, "info", {"message": f"No cover found on CAA for {path or mbid}"})
+        emit_task_event(
+            task_id, "info", {"message": f"No cover found on CAA for {path or mbid}"}
+        )
         return {"error": "No cover found on CAA"}
 
     if album_dir and album_dir.is_dir():
@@ -121,14 +145,18 @@ def _handle_fetch_artist_covers(task_id: str, params: dict, config: dict) -> dic
     artist_name = params.get("artist", "")
     lib = Path(config["library_path"])
     artist_row = get_library_artist(artist_name)
-    artist_dir = resolve_artist_dir(lib, artist_row, fallback_name=artist_name, existing_only=True)
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist_name, existing_only=True
+    )
     exts = set(config.get("audio_extensions", [".flac", ".mp3", ".m4a"]))
 
     if not artist_dir or not artist_dir.is_dir():
         return {"error": "Artist not found"}
 
     fetched = failed = skipped = total = 0
-    p = TaskProgress(phase="artist_covers", phase_count=1, item=entity_label(artist=artist_name))
+    p = TaskProgress(
+        phase="artist_covers", phase_count=1, item=entity_label(artist=artist_name)
+    )
     for album_dir in sorted(artist_dir.iterdir()):
         if not album_dir.is_dir() or album_dir.name.startswith("."):
             continue
@@ -156,7 +184,13 @@ def _handle_fetch_artist_covers(task_id: str, params: dict, config: dict) -> dic
         else:
             failed += 1
 
-    emit_task_event(task_id, "info", {"message": f"Artist covers for {artist_name}: {fetched}/{total} fetched, {skipped} skipped"})
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Artist covers for {artist_name}: {fetched}/{total} fetched, {skipped} skipped"
+        },
+    )
     return {"fetched": fetched, "failed": failed, "skipped": skipped, "total": total}
 
 
@@ -248,19 +282,29 @@ def _search_musicbrainz_cover(artist: str, album: str) -> bytes | None:
 
 def _handle_scan_missing_covers(task_id: str, params: dict, config: dict) -> dict:
     """Scan for missing covers, search sources, emit events for each find."""
-    from crate.artwork import extract_embedded_cover, fetch_cover_from_caa, save_cover, scan_missing_covers
+    from crate.artwork import (
+        extract_embedded_cover,
+        fetch_cover_from_caa,
+        save_cover,
+        scan_missing_covers,
+    )
 
     lib = Path(config["library_path"])
 
     p = TaskProgress(phase="scanning", phase_count=2)
     emit_progress(task_id, p, force=True)
-    emit_task_event(task_id, "info", {"message": "Scanning library for missing covers..."})
+    emit_task_event(
+        task_id, "info", {"message": "Scanning library for missing covers..."}
+    )
     missing = scan_missing_covers(lib, DEFAULT_AUDIO_EXTENSIONS)
 
     emit_task_event(
         task_id,
         "info",
-        {"message": f"Found {len(missing)} albums without covers", "total": len(missing)},
+        {
+            "message": f"Found {len(missing)} albums without covers",
+            "total": len(missing),
+        },
     )
 
     found = 0
@@ -291,7 +335,9 @@ def _handle_scan_missing_covers(task_id: str, params: dict, config: dict) -> dic
                 source = "coverartarchive"
 
         if not cover_data:
-            audio_files = list(Path(album_path).glob("*.flac")) + list(Path(album_path).glob("*.mp3"))
+            audio_files = list(Path(album_path).glob("*.flac")) + list(
+                Path(album_path).glob("*.mp3")
+            )
             for audio_file in audio_files[:1]:
                 embedded = extract_embedded_cover(audio_file)
                 if embedded:
@@ -410,7 +456,9 @@ def _handle_apply_cover(task_id: str, params: dict, config: dict) -> dict:
                     if img_resp.status_code == 200:
                         cover_data = img_resp.content
         except Exception:
-            log.debug("Failed to fetch Deezer cover for %s / %s", artist, album, exc_info=True)
+            log.debug(
+                "Failed to fetch Deezer cover for %s / %s", artist, album, exc_info=True
+            )
 
     if not cover_data:
         return {"error": "Failed to fetch cover"}
@@ -465,7 +513,9 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         invalidation_scopes.extend(["library", "home"])
     elif img_type == "artist_photo":
         artist_row = get_library_artist(artist)
-        found_dir = resolve_artist_dir(lib, artist_row, fallback_name=artist, existing_only=True)
+        found_dir = resolve_artist_dir(
+            lib, artist_row, fallback_name=artist, existing_only=True
+        )
         if not found_dir or not found_dir.is_dir():
             return {"error": "Artist directory not found"}
         dest = _safe_dest(found_dir / "artist.jpg")
@@ -476,7 +526,9 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
         invalidation_scopes.extend(["library", "home", "shows", "upcoming"])
     elif img_type == "background":
         artist_row = get_library_artist(artist)
-        found_dir = resolve_artist_dir(lib, artist_row, fallback_name=artist, existing_only=True)
+        found_dir = resolve_artist_dir(
+            lib, artist_row, fallback_name=artist, existing_only=True
+        )
         if not found_dir or not found_dir.is_dir():
             return {"error": "Artist directory not found"}
         dest = _safe_dest(found_dir / "background.jpg")
@@ -488,11 +540,12 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
     else:
         return {"error": f"Unknown image type: {img_type}"}
 
-    log.info("Image uploaded: %s for %s (%dx%d)", img_type, artist, img.width, img.height)
+    log.info(
+        "Image uploaded: %s for %s (%dx%d)", img_type, artist, img.width, img.height
+    )
 
     if img_type == "cover":
         try:
-
             start_scan()
         except Exception:
             log.debug("Failed to start library scan after cover upload", exc_info=True)
@@ -508,7 +561,12 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
     except Exception:
         log.debug("Failed to broadcast artwork cache invalidation", exc_info=True)
 
-    return {"type": img_type, "path": str(dest), "width": img.width, "height": img.height}
+    return {
+        "type": img_type,
+        "path": str(dest),
+        "width": img.width,
+        "height": img.height,
+    }
 
 
 def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
@@ -575,13 +633,27 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
         save_cover(album_dir, cover_data)
         if album_id:
             set_album_has_cover(album_id)
-        emit_task_event(task_id, "cover_applied", {
-            "message": f"Cover found for {artist} / {album} ({source})",
-            "source": source,
-        })
+        emit_task_event(
+            task_id,
+            "cover_applied",
+            {
+                "message": f"Cover found for {artist} / {album} ({source})",
+                "source": source,
+            },
+        )
         return {"status": "found", "source": source}
 
-    return {"status": "not_found", "sources_tried": ["coverartarchive", "embedded", "deezer", "itunes", "lastfm", "musicbrainz"]}
+    return {
+        "status": "not_found",
+        "sources_tried": [
+            "coverartarchive",
+            "embedded",
+            "deezer",
+            "itunes",
+            "lastfm",
+            "musicbrainz",
+        ],
+    }
 
 
 ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {

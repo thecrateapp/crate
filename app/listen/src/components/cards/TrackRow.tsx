@@ -1,19 +1,35 @@
 import { memo } from "react";
 import { useNavigate } from "react-router";
 import { Play, Pause, Heart } from "lucide-react";
-import { ItemActionMenu, ItemActionMenuButton, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
-import { usePlayerState, usePlayerActions, type Track } from "@/contexts/PlayerContext";
+import {
+  usePlayerState,
+  usePlayerActions,
+  type Track,
+} from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
-import { hasPlayableTrackReference, resolvePlayableTrackId, toPlayableTrack } from "@/lib/playable-track";
+import {
+  hasPlayableTrackReference,
+  resolvePlayableTrackId,
+  toPlayableTrack,
+} from "@/lib/playable-track";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn, formatDuration } from "@/lib/utils";
-import { albumCoverApiUrl, artistPagePath, albumPagePath } from "@/lib/library-routes";
+import {
+  albumCoverApiUrl,
+  artistPagePath,
+  albumPagePath,
+} from "@/lib/library-routes";
 
 export interface TrackRowData {
   id?: string | number;
@@ -57,7 +73,10 @@ interface TrackRowProps {
   albumCover?: string;
   showCoverThumb?: boolean;
   playlistOptions?: TrackRowPlaylistOption[];
-  onAddToPlaylist?: (playlistId: number, track: TrackRowData) => void | Promise<void>;
+  onAddToPlaylist?: (
+    playlistId: number,
+    track: TrackRowData,
+  ) => void | Promise<void>;
   onCreatePlaylist?: (track: TrackRowData) => void | Promise<void>;
   onActionMenuOpen?: () => void;
   onPlayOverride?: () => void;
@@ -93,19 +112,21 @@ export const TrackRow = memo(function TrackRow({
   );
   const offlineState = getTrackState(track.entity_uid);
   const offlineLabel = getOfflineStateLabel(offlineState);
-  const cover = albumCover || (track.album_id != null
-    ? albumCoverApiUrl(
-        {
-          albumId: track.album_id,
-          albumEntityUid: track.album_entity_uid,
-          artistEntityUid: track.artist_entity_uid,
-          albumSlug: track.album_slug,
-          artistName: track.artist,
-          albumName: track.album,
-        },
-        { size: 128 },
-      )
-    : undefined);
+  const cover =
+    albumCover ||
+    (track.album_id != null
+      ? albumCoverApiUrl(
+          {
+            albumId: track.album_id,
+            albumEntityUid: track.album_entity_uid,
+            artistEntityUid: track.artist_entity_uid,
+            albumSlug: track.album_slug,
+            artistName: track.artist,
+            albumName: track.album,
+          },
+          { size: 128 },
+        )
+      : undefined);
 
   const playerTrack: Track = toPlayableTrack(track, { cover });
   const playbackId = resolvePlayableTrackId(track);
@@ -138,7 +159,10 @@ export const TrackRow = memo(function TrackRow({
       const idx = queueTracks.findIndex((t) => {
         return resolvePlayableTrackId(t) === myId;
       });
-      playAll(queueTracks.map((t) => buildTrackMenuPlayerTrack(t)), Math.max(0, idx));
+      playAll(
+        queueTracks.map((t) => buildTrackMenuPlayerTrack(t)),
+        Math.max(0, idx),
+      );
       return;
     }
     play(playerTrack);
@@ -148,9 +172,7 @@ export const TrackRow = memo(function TrackRow({
     <div
       className={cn(
         "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer",
-        isActive
-          ? "bg-primary/10"
-          : "hover:bg-white/5",
+        isActive ? "bg-primary/10" : "hover:bg-white/5",
       )}
       onContextMenu={(event) => {
         onActionMenuOpen?.();
@@ -175,7 +197,11 @@ export const TrackRow = memo(function TrackRow({
             ) : (
               <Play
                 size={16}
-                className={`text-white transition-opacity ${isActive ? "opacity-100" : "opacity-0 md:group-hover:opacity-100"}`}
+                className={`text-white transition-opacity ${
+                  isActive
+                    ? "opacity-100"
+                    : "opacity-0 md:group-hover:opacity-100"
+                }`}
                 fill="currentColor"
               />
             )}
@@ -190,7 +216,10 @@ export const TrackRow = memo(function TrackRow({
               <span className="text-xs text-muted-foreground md:group-hover:hidden">
                 {index != null ? index : track.track_number || "-"}
               </span>
-              <Play size={14} className="text-foreground mx-auto hidden md:group-hover:block" />
+              <Play
+                size={14}
+                className="text-foreground mx-auto hidden md:group-hover:block"
+              />
             </>
           )}
         </div>
@@ -199,30 +228,64 @@ export const TrackRow = memo(function TrackRow({
       {/* Title + optional artist/album */}
       <div className="flex-1 min-w-0">
         <div className="flex min-w-0 items-center gap-2">
-          <div className={`min-w-0 truncate text-sm ${isActive ? "text-primary font-medium" : "text-foreground"}`}>
+          <div
+            className={`min-w-0 truncate text-sm ${
+              isActive ? "text-primary font-medium" : "text-foreground"
+            }`}
+          >
             {track.title || "Unknown"}
           </div>
-          <OfflineBadge state={offlineState} compact subtle className="flex-shrink-0" />
+          <OfflineBadge
+            state={offlineState}
+            compact
+            subtle
+            className="flex-shrink-0"
+          />
         </div>
         {(showArtist || showAlbum || offlineLabel) && (
           <div className="text-xs text-muted-foreground truncate">
-            {showArtist && (track.artist_id ? (
-              <span
-                className="hover:text-foreground hover:underline transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); navigate(artistPagePath({ artistId: track.artist_id, artistSlug: track.artist_slug, artistName: track.artist })); }}
-              >
-                {track.artist}
-              </span>
-            ) : track.artist)}
+            {showArtist &&
+              (track.artist_id ? (
+                <span
+                  className="hover:text-foreground hover:underline transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(
+                      artistPagePath({
+                        artistId: track.artist_id,
+                        artistSlug: track.artist_slug,
+                        artistName: track.artist,
+                      }),
+                    );
+                  }}
+                >
+                  {track.artist}
+                </span>
+              ) : (
+                track.artist
+              ))}
             {showArtist && showAlbum && " · "}
-            {showAlbum && (track.album_id ? (
-              <span
-                className="hover:text-foreground hover:underline transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); navigate(albumPagePath({ albumId: track.album_id, albumSlug: track.album_slug, artistName: track.artist, albumName: track.album })); }}
-              >
-                {track.album}
-              </span>
-            ) : track.album)}
+            {showAlbum &&
+              (track.album_id ? (
+                <span
+                  className="hover:text-foreground hover:underline transition-colors cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(
+                      albumPagePath({
+                        albumId: track.album_id,
+                        albumSlug: track.album_slug,
+                        artistName: track.artist,
+                        albumName: track.album,
+                      }),
+                    );
+                  }}
+                >
+                  {track.album}
+                </span>
+              ) : (
+                track.album
+              ))}
             {(showArtist || showAlbum) && offlineLabel && " · "}
             {offlineLabel ? (
               <span
@@ -262,7 +325,9 @@ export const TrackRow = memo(function TrackRow({
           e.stopPropagation();
           const path = track.path || "";
           const trackEntityUid = track.entity_uid ?? null;
-          const libraryTrackId = track.library_track_id ?? (typeof track.id === "number" ? track.id : undefined);
+          const libraryTrackId =
+            track.library_track_id ??
+            (typeof track.id === "number" ? track.id : undefined);
           if (!hasTrackRef) return;
           try {
             await toggleTrackLike(libraryTrackId ?? null, trackEntityUid, path);
@@ -271,10 +336,7 @@ export const TrackRow = memo(function TrackRow({
           }
         }}
       >
-        <Heart
-          size={14}
-          className={liked ? "fill-current" : ""}
-        />
+        <Heart size={14} className={liked ? "fill-current" : ""} />
       </ActionIconButton>
 
       <div className="flex-shrink-0 flex gap-1 opacity-100 md:opacity-65 md:group-hover:opacity-100 transition-opacity">

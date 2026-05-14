@@ -4,7 +4,11 @@ from collections.abc import Callable
 
 from sqlalchemy import text
 
-from crate.db.repositories.tasks_mutation_shared import new_task_id, task_runtime_config, utc_now_iso
+from crate.db.repositories.tasks_mutation_shared import (
+    new_task_id,
+    task_runtime_config,
+    utc_now_iso,
+)
 from crate.db.tx import optional_scope, register_after_commit, transaction_scope
 
 
@@ -22,7 +26,9 @@ def create_task(
     register_tasks_surface_signal_fn: Callable[[object], None],
 ) -> str:
     if priority is None or pool is None:
-        default_priority, default_pool, max_duration, max_retries = task_runtime_config(task_type)
+        default_priority, default_pool, max_duration, max_retries = task_runtime_config(
+            task_type
+        )
         priority = default_priority if priority is None else priority
         pool = default_pool if pool is None else pool
     else:
@@ -163,7 +169,7 @@ def create_task_dedup(
                 "updated_at": now,
             },
         )
-        if result.rowcount == 0:
+        if int(getattr(result, "rowcount", 0) or 0) == 0:
             return None
 
         if dispatch:
@@ -183,9 +189,10 @@ def find_active_task_by_type_params(
     params_json = dumps_fn(payload, sort_keys=True)
     explicit_dedup_key = dedup_key.strip()
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id
                 FROM tasks
                 WHERE type = :type
@@ -197,13 +204,16 @@ def find_active_task_by_type_params(
                 ORDER BY created_at ASC
                 LIMIT 1
                 """
-            ),
-            {
-                "type": task_type,
-                "dedup_key": explicit_dedup_key,
-                "params_json": params_json,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "type": task_type,
+                    "dedup_key": explicit_dedup_key,
+                    "params_json": params_json,
+                },
+            )
+            .mappings()
+            .first()
+        )
     return str(row["id"]) if row and row.get("id") else None
 
 

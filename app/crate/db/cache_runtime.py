@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from threading import RLock
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+
+from crate.config import get_redis_url
 
 log = logging.getLogger(__name__)
 
@@ -15,7 +17,24 @@ _mem_lock = RLock()
 _MEM_TTL = 300
 _MEM_MAX_SIZE = 10000
 
-_redis_client = None
+_redis_client: Any | None = None
+
+
+def _mask_url_secret(url: str) -> str:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return "<invalid-url>"
+    if not parsed.password:
+        return url
+    username = parsed.username or ""
+    auth = f"{username}:***@" if username else "***@"
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return urlunsplit(
+        (parsed.scheme, f"{auth}{host}", parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def _mem_get(key: str) -> Any | None:
@@ -31,7 +50,9 @@ def _mem_get(key: str) -> Any | None:
 def _mem_set(key: str, value: Any, ttl: int = _MEM_TTL) -> None:
     with _mem_lock:
         if len(_mem_cache) >= _MEM_MAX_SIZE:
-            sorted_keys = sorted(_mem_cache, key=lambda cache_key: _mem_cache[cache_key][0])
+            sorted_keys = sorted(
+                _mem_cache, key=lambda cache_key: _mem_cache[cache_key][0]
+            )
             for cache_key in sorted_keys[: _MEM_MAX_SIZE // 5]:
                 del _mem_cache[cache_key]
         _mem_cache[key] = (time.time() + ttl, value)
@@ -42,24 +63,30 @@ def _mem_delete(key: str) -> None:
         _mem_cache.pop(key, None)
 
 
-def _get_redis():
+def get_redis() -> Any | None:
     global _redis_client
     if _redis_client is None:
         import redis as _redis
 
-        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        url = get_redis_url()
         try:
-            _redis_client = _redis.from_url(url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2)
+            _redis_client = _redis.from_url(
+                url, decode_responses=True, socket_timeout=2, socket_connect_timeout=2
+            )
             _redis_client.ping()
-            log.info("Redis connected: %s", url)
+            log.info("Redis connected: %s", _mask_url_secret(url))
         except Exception as exc:
-            log.warning("Redis not available (%s), falling back to PostgreSQL: %s", url, exc)
+            log.warning(
+                "Redis not available (%s), falling back to PostgreSQL: %s",
+                _mask_url_secret(url),
+                exc,
+            )
             _redis_client = None
     return _redis_client
 
 
 __all__ = [
-    "_get_redis",
+    "get_redis",
     "_MEM_MAX_SIZE",
     "_MEM_TTL",
     "_mem_cache",

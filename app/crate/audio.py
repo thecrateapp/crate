@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from pathlib import Path
 
 import mutagen
@@ -13,15 +14,17 @@ def _read_mp4_tags_raw(filepath: Path) -> dict:
     """
     try:
         from mutagen.mp4 import MP4
+
         audio = MP4(filepath)
     except Exception:
         return {}
     if not audio or not audio.tags:
         return {}
+    raw_tags = audio.tags
 
     def first(keys):
         for key in keys:
-            val = audio.tags.get(key)
+            val = raw_tags.get(key)
             if val and isinstance(val, list) and val[0]:
                 v = str(val[0]).strip()
                 if v:
@@ -45,7 +48,7 @@ def _read_mp4_tags_raw(filepath: Path) -> dict:
 def read_tags(filepath: Path) -> dict:
     """Read audio tags from a file. Returns normalized dict."""
     try:
-        audio = mutagen.File(filepath, easy=True)
+        audio = getattr(mutagen, "File")(filepath, easy=True)
     except Exception:
         return {}
 
@@ -115,7 +118,7 @@ def read_audio_quality(filepath: Path) -> dict[str, int | float | None]:
         return native
 
     try:
-        audio = mutagen.File(filepath)
+        audio = getattr(mutagen, "File")(filepath)
     except Exception:
         return {
             "duration": None,
@@ -133,7 +136,7 @@ def read_audio_quality(filepath: Path) -> dict[str, int | float | None]:
     }
 
 
-def get_audio_files(directory: Path, extensions: list[str]) -> list[Path]:
+def get_audio_files(directory: Path, extensions: Collection[str]) -> list[Path]:
     """Get all audio files in a directory (non-recursive)."""
     files = []
     for f in sorted(directory.iterdir()):

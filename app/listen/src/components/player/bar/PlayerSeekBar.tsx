@@ -36,7 +36,10 @@ export function PlayerSeekBar({
   }, [currentTime, isScrubbing]);
 
   const displayedTime = isScrubbing ? draftTime : currentTime;
-  const progress = safeDuration > 0 ? Math.max(0, Math.min(100, (displayedTime / safeDuration) * 100)) : 0;
+  const progress =
+    safeDuration > 0
+      ? Math.max(0, Math.min(100, (displayedTime / safeDuration) * 100))
+      : 0;
 
   const sliderStyle = useMemo(
     () => ({
@@ -46,27 +49,35 @@ export function PlayerSeekBar({
     [progress],
   );
 
-  const hoverTime = hoverPercent != null && safeDuration > 0
-    ? formatPlayerTime(hoverPercent * safeDuration)
-    : null;
+  const hoverTime =
+    hoverPercent != null && safeDuration > 0
+      ? formatPlayerTime(hoverPercent * safeDuration)
+      : null;
   const glowTrackClass = thin ? "h-[3px]" : "h-1";
   const glowWidthStyle = { width: `${progress}%` };
   const glowLeftStyle = { left: `calc(${progress}% - 4px)` };
 
-  const handleHover = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const el = trackRef.current;
-    if (!el || safeDuration <= 0) return;
-    const rect = el.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    setHoverPercent(pct);
-  }, [safeDuration]);
+  const handleHover = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const el = trackRef.current;
+      if (!el || safeDuration <= 0) return;
+      const rect = el.getBoundingClientRect();
+      const pct = Math.max(
+        0,
+        Math.min(1, (e.clientX - rect.left) / rect.width),
+      );
+      setHoverPercent(pct);
+    },
+    [safeDuration],
+  );
 
   function stopPropagation(event: React.SyntheticEvent) {
     event.stopPropagation();
   }
 
   function commitSeek(value: number) {
-    const clamped = safeDuration > 0 ? Math.max(0, Math.min(safeDuration, value)) : 0;
+    const clamped =
+      safeDuration > 0 ? Math.max(0, Math.min(safeDuration, value)) : 0;
     setDraftTime(clamped);
     onSeek(clamped);
   }
@@ -100,7 +111,9 @@ export function PlayerSeekBar({
               {hoverTime}
             </div>
           )}
-          <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-white/10 ${glowTrackClass}`} />
+          <div
+            className={`absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full bg-white/10 ${glowTrackClass}`}
+          />
           <div
             className="pointer-events-none absolute left-0 top-1/2 h-3 -translate-y-1/2 overflow-hidden rounded-full opacity-65 transition-[width] duration-150"
             style={glowWidthStyle}

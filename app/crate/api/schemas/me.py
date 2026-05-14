@@ -1,11 +1,22 @@
 """Schema models for personal-library and stats endpoints."""
 
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_validator,
+    model_validator,
+)
 
-from crate.api.schemas.common import IdentityFieldsMixin, OkResponse, SnapshotMetadataResponse
+from crate.api.schemas.common import (
+    IdentityFieldsMixin,
+    OkResponse,
+    SnapshotMetadataResponse,
+)
 
 
 from crate.api.schemas.playlists import PlaylistSummaryResponse
@@ -99,9 +110,13 @@ class RecordPlayEventRequest(IdentityFieldsMixin):
         if self.was_skipped and self.was_completed:
             raise ValueError("was_skipped and was_completed cannot both be true")
         if self.track_duration_seconds and self.completion_ratio is not None:
-            derived = min(1.0, max(0.0, self.played_seconds / self.track_duration_seconds))
+            derived = min(
+                1.0, max(0.0, self.played_seconds / self.track_duration_seconds)
+            )
             if abs(derived - self.completion_ratio) > 0.15:
-                raise ValueError("completion_ratio does not match played_seconds and track_duration_seconds")
+                raise ValueError(
+                    "completion_ratio does not match played_seconds and track_duration_seconds"
+                )
         return self
 
 
@@ -215,7 +230,9 @@ class FollowedPlaylistResponse(PlaylistSummaryResponse):
 
 class LibraryPlaylistsPageResponse(BaseModel):
     playlists: list[PlaylistSummaryResponse] = Field(default_factory=list)
-    followed_curated_playlists: list[FollowedPlaylistResponse] = Field(default_factory=list)
+    followed_curated_playlists: list[FollowedPlaylistResponse] = Field(
+        default_factory=list
+    )
 
 
 class FollowedArtistResponse(IdentityFieldsMixin):
@@ -347,7 +364,7 @@ class StatsOverviewResponse(BaseModel):
 
 
 class TrendPointResponse(BaseModel):
-    day: date | str
+    day: date_type | str
     play_count: int
     complete_play_count: int
     skip_count: int
@@ -544,7 +561,7 @@ class FeedItemResponse(BaseModel):
     type: str
     artist: str | None = None
     title: str | None = None
-    date: date | datetime | str | None = None
+    date: date_type | datetime | str | None = None
 
 
 class MeUpcomingInsightResponse(BaseModel):
@@ -553,7 +570,7 @@ class MeUpcomingInsightResponse(BaseModel):
     type: str
     show_id: int | None = None
     artist: str | None = None
-    date: date | datetime | str | None = None
+    date: date_type | datetime | str | None = None
     title: str | None = None
     subtitle: str | None = None
     message: str | None = None

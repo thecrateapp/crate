@@ -7,7 +7,11 @@ from pathlib import Path
 import mutagen
 
 from crate.audio import get_audio_files, read_tags
-from crate.db.cache_dir_mtimes import delete_dir_mtime, get_all_dir_mtimes, set_dir_mtime
+from crate.db.cache_dir_mtimes import (
+    delete_dir_mtime,
+    get_all_dir_mtimes,
+    set_dir_mtime,
+)
 
 log = logging.getLogger(__name__)
 
@@ -50,7 +54,8 @@ def _compute_artist_data(artist_dir: Path, extensions: set[str]) -> dict:
                 decades[key] = decades.get(key, 0) + 1
 
             try:
-                info = mutagen.File(track)
+                mutagen_file = getattr(mutagen, "File")
+                info = mutagen_file(track)
                 if info and hasattr(info.info, "bitrate") and info.info.bitrate:
                     br = info.info.bitrate // 1000
                     bucket = _bitrate_bucket(br)
@@ -101,26 +106,42 @@ def _merge_artist_data(all_data: list[tuple[str, dict]]) -> dict:
         all_tracks_per_album.extend(data.get("tracks_per_album", []))
         total_duration += data.get("duration", 0.0)
 
-    top_artists = [{"name": name, "albums": count} for name, count in artists_by_albums.most_common(25)]
-    avg_tracks = round(sum(all_tracks_per_album) / len(all_tracks_per_album), 1) if all_tracks_per_album else 0
+    top_artists = [
+        {"name": name, "albums": count}
+        for name, count in artists_by_albums.most_common(25)
+    ]
+    avg_tracks = (
+        round(sum(all_tracks_per_album) / len(all_tracks_per_album), 1)
+        if all_tracks_per_album
+        else 0
+    )
 
     return {
         "genres": dict(genres.most_common(30)),
         "decades": dict(sorted(decades.items())),
         "formats": dict(formats.most_common()),
         "bitrates": dict(sorted(bitrates.items(), key=lambda x: _bitrate_sort(x[0]))),
-        "sizes_by_format_gb": {k: round(v / (1024**3), 2) for k, v in sizes_by_format.items()},
+        "sizes_by_format_gb": {
+            k: round(v / (1024**3), 2) for k, v in sizes_by_format.items()
+        },
         "top_artists": top_artists,
         "avg_tracks_per_album": avg_tracks,
         "total_duration_hours": round(total_duration / 3600, 1),
     }
 
 
-def compute_analytics(library_path: Path, extensions: set[str],
-                      progress_callback=None, incremental: bool = True) -> dict:
+def compute_analytics(
+    library_path: Path,
+    extensions: set[str],
+    progress_callback=None,
+    incremental: bool = True,
+) -> dict:
     """Compute library analytics, incrementally if possible."""
-    artist_dirs = [d for d in sorted(library_path.iterdir())
-                   if d.is_dir() and not d.name.startswith(".")]
+    artist_dirs = [
+        d
+        for d in sorted(library_path.iterdir())
+        if d.is_dir() and not d.name.startswith(".")
+    ]
     total_artists = len(artist_dirs)
 
     stored = get_all_dir_mtimes("analytics:") if incremental else {}
@@ -144,15 +165,19 @@ def compute_analytics(library_path: Path, extensions: set[str],
             recomputed_count += 1
 
         if progress_callback and idx % 5 == 0:
-            progress_callback({
-                "phase": "analytics",
-                "artist": artist_dir.name,
-                "artists_done": idx + 1,
-                "artists_total": total_artists,
-                "tracks_processed": sum(d.get("track_count", 0) for _, d in all_data),
-                "cached": cached_count,
-                "recomputed": recomputed_count,
-            })
+            progress_callback(
+                {
+                    "phase": "analytics",
+                    "artist": artist_dir.name,
+                    "artists_done": idx + 1,
+                    "artists_total": total_artists,
+                    "tracks_processed": sum(
+                        d.get("track_count", 0) for _, d in all_data
+                    ),
+                    "cached": cached_count,
+                    "recomputed": recomputed_count,
+                }
+            )
 
     # Clean up entries for artist dirs that no longer exist
     current_keys = {f"analytics:{d}" for d in artist_dirs}
@@ -179,5 +204,12 @@ def _bitrate_bucket(br: int) -> str:
 
 
 def _bitrate_sort(bucket: str) -> int:
-    order = {"≤128k": 0, "129-192k": 1, "193-256k": 2, "257-320k": 3, "321-500k": 4, "500k+ (lossless)": 5}
+    order = {
+        "≤128k": 0,
+        "129-192k": 1,
+        "193-256k": 2,
+        "257-320k": 3,
+        "321-500k": 4,
+        "500k+ (lossless)": 5,
+    }
     return order.get(bucket, 99)

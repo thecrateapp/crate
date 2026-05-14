@@ -21,7 +21,9 @@ def upsert_genre_taxonomy_edge(
         return False
     if relation_type not in {"parent", "related", "influenced_by", "fusion_of"}:
         return False
-    edge_weight = weight if weight is not None else (0.7 if relation_type == "related" else 1.0)
+    edge_weight = (
+        weight if weight is not None else (0.7 if relation_type == "related" else 1.0)
+    )
 
     if session is None:
         with transaction_scope() as s:
@@ -32,14 +34,22 @@ def upsert_genre_taxonomy_edge(
                 weight=weight,
                 session=s,
             )
-    source_row = session.execute(
-        text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
-        {"slug": source_slug},
-    ).mappings().first()
-    target_row = session.execute(
-        text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
-        {"slug": target_slug},
-    ).mappings().first()
+    source_row = (
+        session.execute(
+            text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
+            {"slug": source_slug},
+        )
+        .mappings()
+        .first()
+    )
+    target_row = (
+        session.execute(
+            text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
+            {"slug": target_slug},
+        )
+        .mappings()
+        .first()
+    )
     if not source_row or not target_row:
         return False
     session.execute(

@@ -22,9 +22,7 @@ export default defineConfig({
       "docs.lespedants.org",
     ],
     fs: {
-      allow: [
-        path.resolve(__dirname, "../.."),
-      ],
+      allow: [path.resolve(__dirname, "../..")],
     },
   },
 });

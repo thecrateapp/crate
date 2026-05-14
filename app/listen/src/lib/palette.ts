@@ -4,10 +4,22 @@
  * Colors are boosted in saturation to look good as light sources.
  */
 
-interface RGB { r: number; g: number; b: number }
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
 
-export async function extractPalette(imageUrl: string): Promise<[[number, number, number], [number, number, number], [number, number, number]]> {
-  const DEFAULT: [[number, number, number], [number, number, number], [number, number, number]] = [
+export async function extractPalette(
+  imageUrl: string,
+): Promise<
+  [[number, number, number], [number, number, number], [number, number, number]]
+> {
+  const DEFAULT: [
+    [number, number, number],
+    [number, number, number],
+    [number, number, number],
+  ] = [
     [0.024, 0.714, 0.831],
     [0.4, 0.9, 1.0],
     [0.1, 0.3, 0.8],
@@ -49,7 +61,10 @@ function sampleColors(img: HTMLImageElement): RGB[] {
   const data = ctx.getImageData(0, 0, size, size).data;
 
   // Collect pixels into buckets using simple quantization
-  const buckets = new Map<string, { r: number; g: number; b: number; count: number }>();
+  const buckets = new Map<
+    string,
+    { r: number; g: number; b: number; count: number }
+  >();
 
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i]!;
@@ -78,8 +93,7 @@ function sampleColors(img: HTMLImageElement): RGB[] {
   }
 
   // Sort by frequency, take top colors that are distinct
-  const sorted = Array.from(buckets.values())
-    .sort((a, b) => b.count - a.count);
+  const sorted = Array.from(buckets.values()).sort((a, b) => b.count - a.count);
 
   const result: RGB[] = [];
   for (const bucket of sorted) {
@@ -91,7 +105,9 @@ function sampleColors(img: HTMLImageElement): RGB[] {
 
     // Skip if too similar to an existing color
     const tooSimilar = result.some(
-      (c) => Math.abs(c.r - avg.r) + Math.abs(c.g - avg.g) + Math.abs(c.b - avg.b) < 80,
+      (c) =>
+        Math.abs(c.r - avg.r) + Math.abs(c.g - avg.g) + Math.abs(c.b - avg.b) <
+        80,
     );
     if (!tooSimilar) {
       result.push(avg);

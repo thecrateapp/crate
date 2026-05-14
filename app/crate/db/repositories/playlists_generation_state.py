@@ -10,23 +10,31 @@ from sqlalchemy import text
 from crate.db.tx import optional_scope
 
 
-def log_generation_start(playlist_id: int, rules: dict | None, triggered_by: str = "manual") -> int:
+def log_generation_start(
+    playlist_id: int, rules: dict | None, triggered_by: str = "manual"
+) -> int:
     with optional_scope(None) as s:
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 INSERT INTO playlist_generation_log (playlist_id, started_at, status, rule_snapshot_json, triggered_by)
                 VALUES (:playlist_id, :started_at, 'running', :rule_snapshot_json, :triggered_by)
                 RETURNING id
                 """
-            ),
-            {
-                "playlist_id": playlist_id,
-                "started_at": datetime.now(timezone.utc).isoformat(),
-                "rule_snapshot_json": json.dumps(rules, default=str) if rules else None,
-                "triggered_by": triggered_by,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "playlist_id": playlist_id,
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "rule_snapshot_json": json.dumps(rules, default=str)
+                    if rules
+                    else None,
+                    "triggered_by": triggered_by,
+                },
+            )
+            .mappings()
+            .first()
+        )
         return row["id"] if row else 0
 
 
@@ -67,7 +75,9 @@ def log_generation_failed(log_id: int, error: str) -> None:
         )
 
 
-def set_generation_status(playlist_id: int, status: str, error: str | None = None) -> None:
+def set_generation_status(
+    playlist_id: int, status: str, error: str | None = None
+) -> None:
     updates = ["generation_status = :status", "updated_at = :now"]
     params: dict[str, object] = {
         "playlist_id": playlist_id,
@@ -81,6 +91,7 @@ def set_generation_status(playlist_id: int, status: str, error: str | None = Non
         updates.append("generation_error = :error")
         params["error"] = error[:500]
 
+    # SQL_SAFE: updates are built internally from hardcoded column assignments.
     with optional_scope(None) as s:
         s.execute(
             text(f"UPDATE playlists SET {', '.join(updates)} WHERE id = :playlist_id"),

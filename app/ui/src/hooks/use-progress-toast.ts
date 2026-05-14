@@ -24,7 +24,9 @@ export function useProgressToast(taskId: string | null, label: string) {
       if (lastEvent.type === "step_done") {
         toast.loading(label, {
           id: toastIdRef.current!,
-          description: `${(data.step as string)?.replace(/_/g, " ") || "Processing"}...`,
+          description: `${
+            (data.step as string)?.replace(/_/g, " ") || "Processing"
+          }...`,
         });
       } else if (lastEvent.type === "info") {
         toast.loading(label, {

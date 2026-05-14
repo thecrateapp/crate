@@ -67,9 +67,15 @@ def create_playlist_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position)")
-    cur.execute("ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    cur.execute("ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position)"
+    )
+    cur.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    cur.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID"
+    )
     cur.execute(
         """
         DO $$ BEGIN
@@ -106,7 +112,9 @@ def create_playlist_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_playlist_members_user ON playlist_members(user_id, created_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_playlist_members_user ON playlist_members(user_id, created_at DESC)"
+    )
 
     cur.execute(
         """
@@ -121,7 +129,9 @@ def create_playlist_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_playlist_invites_playlist ON playlist_invites(playlist_id, created_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_playlist_invites_playlist ON playlist_invites(playlist_id, created_at DESC)"
+    )
 
     cur.execute(
         """
@@ -133,8 +143,12 @@ def create_playlist_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_followed_playlists_user ON user_followed_playlists(user_id, followed_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_followed_playlists_playlist ON user_followed_playlists(playlist_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_followed_playlists_user ON user_followed_playlists(user_id, followed_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_followed_playlists_playlist ON user_followed_playlists(playlist_id)"
+    )
 
 
 __all__ = [

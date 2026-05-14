@@ -16,7 +16,9 @@ def append_pipeline_event(
     state: str,
     error_message: str | None = None,
 ) -> None:
-    event_type = "track.bliss.updated" if pipeline == "bliss" else "track.analysis.updated"
+    event_type = (
+        "track.bliss.updated" if pipeline == "bliss" else "track.analysis.updated"
+    )
     append_domain_event(
         event_type,
         {

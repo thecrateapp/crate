@@ -77,7 +77,10 @@ const PROPS: Prop[] = [
 
 export function ValueProps() {
   return (
-    <section id="features" className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32">
+    <section
+      id="features"
+      className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32"
+    >
       <div className="mb-12 max-w-2xl">
         <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
           What it can do
@@ -86,25 +89,33 @@ export function ValueProps() {
           Useful pieces around a music library.
         </h2>
         <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-          Crate does a few jobs at once: it catalogs files, adds context, serves audio,
-          runs background work, and gives you separate surfaces for listening and
-          library care. You can use the parts that matter to you.
+          Crate does a few jobs at once: it catalogs files, adds context, serves
+          audio, runs background work, and gives you separate surfaces for
+          listening and library care. You can use the parts that matter to you.
         </p>
       </div>
 
       <div className="grid gap-x-8 gap-y-10 md:grid-cols-3">
-        {PROPS.filter(({ hidden }) => !hidden).map(({ icon: Icon, title, body, className }) => (
-          <article
-            key={title}
-            className={`group border-t border-white/10 pt-6 ${className ?? ""}`}
-          >
-            <div className="mb-4 text-cyan-300">
-              <Icon size={18} />
-            </div>
-            <h3 className="mb-2 text-lg font-semibold tracking-tight text-white">{title}</h3>
-            <p className="text-[14.5px] leading-[1.65] text-white/60">{body}</p>
-          </article>
-        ))}
+        {PROPS.filter(({ hidden }) => !hidden).map(
+          ({ icon: Icon, title, body, className }) => (
+            <article
+              key={title}
+              className={`group border-t border-white/10 pt-6 ${
+                className ?? ""
+              }`}
+            >
+              <div className="mb-4 text-cyan-300">
+                <Icon size={18} />
+              </div>
+              <h3 className="mb-2 text-lg font-semibold tracking-tight text-white">
+                {title}
+              </h3>
+              <p className="text-[14.5px] leading-[1.65] text-white/60">
+                {body}
+              </p>
+            </article>
+          ),
+        )}
       </div>
     </section>
   );

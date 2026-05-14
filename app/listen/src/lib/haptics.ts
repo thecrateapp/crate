@@ -2,7 +2,13 @@ import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
 import { isNative } from "@/lib/capacitor-runtime";
 
-type HapticFeedback = "light" | "medium" | "selection" | "success" | "warning" | "error";
+type HapticFeedback =
+  | "light"
+  | "medium"
+  | "selection"
+  | "success"
+  | "warning"
+  | "error";
 
 export function triggerHaptic(feedback: HapticFeedback = "light"): void {
   if (!isNative) return;

@@ -3,7 +3,11 @@ import { ChevronDown, Search } from "lucide-react";
 
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Input } from "@crate/ui/shadcn/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@crate/ui/shadcn/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@crate/ui/shadcn/popover";
 import { cn } from "@/lib/utils";
 
 export interface AdminSelectOption {
@@ -50,12 +54,15 @@ export function AdminSelect({
     const normalized = search.trim().toLowerCase();
     if (!normalized) return options;
     return options.filter((option) => {
-      const haystack = `${option.label} ${option.searchText ?? ""}`.toLowerCase();
+      const haystack = `${option.label} ${
+        option.searchText ?? ""
+      }`.toLowerCase();
       return haystack.includes(normalized);
     });
   }, [options, search]);
 
-  const selectedLabel = options.find((option) => option.value === value)?.label ?? placeholder;
+  const selectedLabel =
+    options.find((option) => option.value === value)?.label ?? placeholder;
 
   return (
     <Popover
@@ -91,24 +98,27 @@ export function AdminSelect({
         }}
         className={cn("w-[240px] overflow-hidden p-2", menuClassName)}
       >
-          {searchable ? (
-            <div className="border-b border-white/5 px-1 pb-2">
-              <div className="relative">
-                <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
-                <Input
-                  type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={searchPlaceholder}
-                  autoFocus
-                  className="h-10 border-white/10 bg-black/25 pl-9 text-sm"
-                />
-              </div>
+        {searchable ? (
+          <div className="border-b border-white/5 px-1 pb-2">
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={searchPlaceholder}
+                autoFocus
+                className="h-10 border-white/10 bg-black/25 pl-9 text-sm"
+              />
             </div>
-          ) : null}
+          </div>
+        ) : null}
 
-          <div className="max-h-[220px] overflow-y-auto p-1">
-            <div className="flex flex-col gap-1">
+        <div className="max-h-[220px] overflow-y-auto p-1">
+          <div className="flex flex-col gap-1">
             {allowClear ? (
               <button
                 type="button"
@@ -147,14 +157,20 @@ export function AdminSelect({
                   )}
                 >
                   <span className="truncate">{option.label}</span>
-                  {option.count != null ? <CrateChip className="text-[10px]">{option.count}</CrateChip> : null}
+                  {option.count != null ? (
+                    <CrateChip className="text-[10px]">
+                      {option.count}
+                    </CrateChip>
+                  ) : null}
                 </button>
               ))
             ) : (
-              <div className="px-2 py-4 text-center text-sm text-white/40">{noMatchesLabel}</div>
+              <div className="px-2 py-4 text-center text-sm text-white/40">
+                {noMatchesLabel}
+              </div>
             )}
-            </div>
           </div>
+        </div>
       </PopoverContent>
     </Popover>
   );

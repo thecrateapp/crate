@@ -6,7 +6,10 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { api } from "@/lib/api";
-import { __resetTrackInfoCacheForTests, useTrackInfo } from "@/hooks/use-track-info";
+import {
+  __resetTrackInfoCacheForTests,
+  useTrackInfo,
+} from "@/hooks/use-track-info";
 
 const TEST_TRACK = {
   id: "42",
@@ -138,7 +141,9 @@ describe("useTrackInfo", () => {
   });
 
   it("skips the request entirely when disabled", () => {
-    const result = renderHook(() => useTrackInfo(TEST_TRACK, { enabled: false }));
+    const result = renderHook(() =>
+      useTrackInfo(TEST_TRACK, { enabled: false }),
+    );
     expect(result.result.current.info).toBeNull();
     expect(result.result.current.loading).toBe(false);
     expect(vi.mocked(api)).not.toHaveBeenCalled();

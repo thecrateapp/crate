@@ -1,4 +1,9 @@
-import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import {
+  useEffect,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { getStreamUrl } from "@/contexts/player-utils";
@@ -38,7 +43,10 @@ interface UsePlayerEngineCallbacksParams {
   requireUserGestureToResume: () => void;
   beginSoftInterruption: (reason: "offline" | "stream") => void;
   isSoftInterrupted: () => boolean;
-  ensureTrackerSession: (track: Track | undefined, source: PlaySource | null) => void;
+  ensureTrackerSession: (
+    track: Track | undefined,
+    source: PlaySource | null,
+  ) => void;
   rotateTrackerSession: (
     reason: "completed" | "skipped" | "interrupted",
     expectedTrack: Track | undefined,
@@ -47,15 +55,19 @@ interface UsePlayerEngineCallbacksParams {
   ) => void;
   markSeekPosition: (seconds: number) => void;
   recordProgress: (seconds: number) => void;
-  pullFromEngine: (sourceQueue?: Track[]) => { resolvedTrack: Track | undefined };
+  pullFromEngine: (sourceQueue?: Track[]) => {
+    resolvedTrack: Track | undefined;
+  };
   setAnalyserVersion: Dispatch<SetStateAction<number>>;
-  setCrossfadeTransition: Dispatch<SetStateAction<{
-    outgoing: Track;
-    incoming: Track;
-    durationMs: number;
-    startedAt: number;
-    outgoingDurationSeconds: number;
-  } | null>>;
+  setCrossfadeTransition: Dispatch<
+    SetStateAction<{
+      outgoing: Track;
+      incoming: Track;
+      durationMs: number;
+      startedAt: number;
+      outgoingDurationSeconds: number;
+    } | null>
+  >;
 }
 
 export function usePlayerEngineCallbacks({
@@ -221,7 +233,11 @@ export function usePlayerEngineCallbacks({
       const currentTrack = currentTrackRef.current;
       const currentPath = currentTrack ? getStreamUrl(currentTrack) : null;
       if (currentPath && path && path !== currentPath) {
-        console.warn("[gapless] preload error ignored (non-current track):", path, err);
+        console.warn(
+          "[gapless] preload error ignored (non-current track):",
+          path,
+          err,
+        );
         return;
       }
       if (isPlaybackGestureRequiredError(err)) {
@@ -231,7 +247,11 @@ export function usePlayerEngineCallbacks({
         return;
       }
       if (isCurrentTrackFullyBuffered()) {
-        console.warn("[gapless] error ignored (current track fully buffered):", path, err);
+        console.warn(
+          "[gapless] error ignored (current track fully buffered):",
+          path,
+          err,
+        );
         return;
       }
       console.error("[gapless] error:", err);
@@ -255,10 +275,13 @@ export function usePlayerEngineCallbacks({
     },
   };
 
-  useEffect(() => () => {
-    if (crossfadeTimerRef.current != null) {
-      window.clearTimeout(crossfadeTimerRef.current);
-      crossfadeTimerRef.current = null;
-    }
-  }, [crossfadeTimerRef]);
+  useEffect(
+    () => () => {
+      if (crossfadeTimerRef.current != null) {
+        window.clearTimeout(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+    },
+    [crossfadeTimerRef],
+  );
 }

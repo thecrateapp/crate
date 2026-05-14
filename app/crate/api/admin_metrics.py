@@ -15,7 +15,10 @@ from crate.api.auth import _require_admin
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.operations import AdminLogsSnapshotResponse
-from crate.db.admin_logs_surface import LOGS_SURFACE_STREAM_CHANNEL, get_cached_logs_surface
+from crate.db.admin_logs_surface import (
+    LOGS_SURFACE_STREAM_CHANNEL,
+    get_cached_logs_surface,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin-metrics"])
 
@@ -74,6 +77,7 @@ _SUMMARY_METRICS = {
     "media_worker_cache_bytes_removed": ("media_worker.cache.bytes_removed", 60),
 }
 
+
 def _build_metrics_summary() -> dict:
     from crate.metrics import query_summaries
 
@@ -91,7 +95,9 @@ def _build_metrics_system() -> dict:
                 "total_gb": round(usage.total / (1024**3), 1),
                 "used_gb": round(usage.used / (1024**3), 1),
                 "free_gb": round(usage.free / (1024**3), 1),
-                "percent": round(usage.used / usage.total * 100, 1) if usage.total else 0,
+                "percent": round(usage.used / usage.total * 100, 1)
+                if usage.total
+                else 0,
             }
         except Exception:
             disk[label] = None
@@ -100,6 +106,7 @@ def _build_metrics_system() -> dict:
     db_pools = {"combined": {}, "sqlalchemy": {}, "legacy": {}}
     try:
         from crate.db.engine import _engine
+
         if _engine:
             pool = _engine.pool
             sqlalchemy_pool = {
@@ -113,33 +120,20 @@ def _build_metrics_system() -> dict:
     except Exception:
         pass
 
-    try:
-        from crate.db.core import _pool as legacy_pool
-        if legacy_pool:
-            checked_in = len(getattr(legacy_pool, "_pool", []) or [])
-            checked_out = len(getattr(legacy_pool, "_used", {}) or {})
-            legacy_state = {
-                "size": int(getattr(legacy_pool, "maxconn", 0) or 0),
-                "checked_in": checked_in,
-                "checked_out": checked_out,
-                "overflow": max(0, checked_out + checked_in - int(getattr(legacy_pool, "maxconn", 0) or 0)),
-                "total": checked_in + checked_out,
-                "minconn": int(getattr(legacy_pool, "minconn", 0) or 0),
-                "maxconn": int(getattr(legacy_pool, "maxconn", 0) or 0),
-            }
-            db_pools["legacy"] = legacy_state
-    except Exception:
-        pass
-
     sqlalchemy_pool = db_pools.get("sqlalchemy") or {}
     legacy_state = db_pools.get("legacy") or {}
     if sqlalchemy_pool or legacy_state:
         combined = {
-            "size": int(sqlalchemy_pool.get("size") or 0) + int(legacy_state.get("size") or 0),
-            "checked_in": int(sqlalchemy_pool.get("checked_in") or 0) + int(legacy_state.get("checked_in") or 0),
-            "checked_out": int(sqlalchemy_pool.get("checked_out") or 0) + int(legacy_state.get("checked_out") or 0),
-            "overflow": int(sqlalchemy_pool.get("overflow") or 0) + int(legacy_state.get("overflow") or 0),
-            "total": int(sqlalchemy_pool.get("total") or 0) + int(legacy_state.get("total") or 0),
+            "size": int(sqlalchemy_pool.get("size") or 0)
+            + int(legacy_state.get("size") or 0),
+            "checked_in": int(sqlalchemy_pool.get("checked_in") or 0)
+            + int(legacy_state.get("checked_in") or 0),
+            "checked_out": int(sqlalchemy_pool.get("checked_out") or 0)
+            + int(legacy_state.get("checked_out") or 0),
+            "overflow": int(sqlalchemy_pool.get("overflow") or 0)
+            + int(legacy_state.get("overflow") or 0),
+            "total": int(sqlalchemy_pool.get("total") or 0)
+            + int(legacy_state.get("total") or 0),
         }
         db_pools["combined"] = combined
         db_pool = combined or sqlalchemy_pool or legacy_state
@@ -147,6 +141,7 @@ def _build_metrics_system() -> dict:
     analysis = {}
     try:
         from crate.analysis_daemon import get_analysis_status
+
         analysis = get_analysis_status()
     except Exception:
         pass
@@ -168,7 +163,10 @@ def _build_metrics_system() -> dict:
     resource_pressure = {}
     try:
         from crate.db.cache_store import get_cache
-        from crate.resource_governor import evaluate_maintenance_window, evaluate_resources
+        from crate.resource_governor import (
+            evaluate_maintenance_window,
+            evaluate_resources,
+        )
 
         decision = evaluate_resources(label="admin metrics", listener_sensitive=True)
         resource_pressure = decision.to_dict()
@@ -253,7 +251,12 @@ def _build_playback_delivery() -> dict:
 
 def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     from crate.db.cache_store import get_cache, set_cache
-    from crate.metrics import query_historical, query_recent, query_recent_rolled, query_route_latency
+    from crate.metrics import (
+        query_historical,
+        query_recent,
+        query_recent_rolled,
+        query_route_latency,
+    )
 
     cache_key = f"admin:metrics:dashboard:{period}:{minutes}"
     cached = get_cache(cache_key, max_age_seconds=10)
@@ -265,7 +268,9 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
         if period == "minute":
             timeseries[response_name] = query_recent(metric_name, minutes)
         elif period == "hour":
-            timeseries[response_name] = query_recent_rolled(metric_name, minutes=minutes, bucket_minutes=60)
+            timeseries[response_name] = query_recent_rolled(
+                metric_name, minutes=minutes, bucket_minutes=60
+            )
         else:
             timeseries[response_name] = query_historical(metric_name, period)
 
@@ -281,20 +286,30 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     return payload
 
 
-@router.get("/metrics/summary", responses=AUTH_ERROR_RESPONSES, summary="Current metrics snapshot")
+@router.get(
+    "/metrics/summary",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Current metrics snapshot",
+)
 def metrics_summary(request: Request):
     _require_admin(request)
     return _build_metrics_summary()
 
 
-@router.get("/metrics/timeseries", responses=AUTH_ERROR_RESPONSES, summary="Time-series metric data")
+@router.get(
+    "/metrics/timeseries",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Time-series metric data",
+)
 def metrics_timeseries(
     request: Request,
     name: str = Query(..., description="Metric name, e.g. api.latency"),
     period: str = Query("hour", description="Granularity: minute, hour, day"),
     start: str | None = Query(None, description="ISO start timestamp"),
     end: str | None = Query(None, description="ISO end timestamp"),
-    minutes: int = Query(60, ge=1, le=2880, description="Minutes of recent data (for period=minute)"),
+    minutes: int = Query(
+        60, ge=1, le=2880, description="Minutes of recent data (for period=minute)"
+    ),
 ):
     _require_admin(request)
     from crate.metrics import query_recent, query_historical, query_recent_rolled
@@ -302,18 +317,32 @@ def metrics_timeseries(
     metric_name = _DASHBOARD_TIMESERIES.get(name, name)
 
     if period == "minute":
-        return {"name": name, "period": period, "data": query_recent(metric_name, minutes)}
+        return {
+            "name": name,
+            "period": period,
+            "data": query_recent(metric_name, minutes),
+        }
     if period == "hour" and not start and not end:
         return {
             "name": name,
             "period": period,
-            "data": query_recent_rolled(metric_name, minutes=minutes, bucket_minutes=60),
+            "data": query_recent_rolled(
+                metric_name, minutes=minutes, bucket_minutes=60
+            ),
         }
 
-    return {"name": name, "period": period, "data": query_historical(metric_name, period, start, end)}
+    return {
+        "name": name,
+        "period": period,
+        "data": query_historical(metric_name, period, start, end),
+    }
 
 
-@router.get("/metrics/routes", responses=AUTH_ERROR_RESPONSES, summary="Recent API route latency")
+@router.get(
+    "/metrics/routes",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Recent API route latency",
+)
 def metrics_routes(
     request: Request,
     minutes: int = Query(15, ge=1, le=240, description="Recent minutes to aggregate"),
@@ -331,7 +360,11 @@ def metrics_routes(
     }
 
 
-@router.get("/metrics/dashboard", responses=AUTH_ERROR_RESPONSES, summary="Bundled system health payload")
+@router.get(
+    "/metrics/dashboard",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Bundled system health payload",
+)
 def metrics_dashboard(
     request: Request,
     period: str = Query("minute", description="Granularity: minute or hour"),
@@ -342,10 +375,13 @@ def metrics_dashboard(
     return _build_metrics_dashboard(safe_period, minutes)
 
 
-@router.get("/llm/status", responses=AUTH_ERROR_RESPONSES, summary="Check LLM provider status")
+@router.get(
+    "/llm/status", responses=AUTH_ERROR_RESPONSES, summary="Check LLM provider status"
+)
 def llm_status(request: Request):
     _require_admin(request)
     from crate.llm import get_config
+
     config = get_config()
 
     # Test connectivity
@@ -354,9 +390,12 @@ def llm_status(request: Request):
     try:
         if config["provider"] == "ollama":
             import requests as req
+
             resp = req.get(f"{config['ollama_url']}/api/tags", timeout=5)
             available = resp.status_code == 200
-            models = [m["name"] for m in resp.json().get("models", [])] if available else []
+            models = (
+                [m["name"] for m in resp.json().get("models", [])] if available else []
+            )
         else:
             available = True  # Cloud providers assumed available if key is set
             models = []
@@ -373,7 +412,11 @@ def llm_status(request: Request):
     }
 
 
-@router.get("/metrics/system", responses=AUTH_ERROR_RESPONSES, summary="System-level health stats")
+@router.get(
+    "/metrics/system",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="System-level health stats",
+)
 def metrics_system(request: Request):
     """Disk usage, DB pool status, analysis progress."""
     _require_admin(request)
@@ -403,7 +446,9 @@ def admin_logs(
     )
 
 
-@router.get("/logs/workers", responses=AUTH_ERROR_RESPONSES, summary="List known workers")
+@router.get(
+    "/logs/workers", responses=AUTH_ERROR_RESPONSES, summary="List known workers"
+)
 def admin_workers(request: Request):
     _require_admin(request)
     from crate.db.worker_logs import list_known_workers
@@ -417,7 +462,9 @@ def admin_workers(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Get the canonical admin logs snapshot",
 )
-def admin_logs_snapshot(request: Request, fresh: bool = False, limit: int = Query(100, ge=1, le=200)):
+def admin_logs_snapshot(
+    request: Request, fresh: bool = False, limit: int = Query(100, ge=1, le=200)
+):
     _require_admin(request)
     return get_cached_logs_surface(limit=limit, fresh=fresh)
 
@@ -429,7 +476,9 @@ async def _admin_logs_stream(limit: int) -> AsyncIterator[str]:
         pubsub = await open_pubsub(LOGS_SURFACE_STREAM_CHANNEL)
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(get_cached_logs_surface(limit=limit))}\n\n"
                 heartbeat_counter = 0
@@ -461,13 +510,20 @@ async def admin_logs_stream(request: Request, limit: int = Query(100, ge=1, le=2
     )
 
 
-@router.get("/download-policy", responses=AUTH_ERROR_RESPONSES, summary="Download policy status and suggested limits")
+@router.get(
+    "/download-policy",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Download policy status and suggested limits",
+)
 def admin_download_policy(request: Request):
     _require_admin(request)
     from crate.db.cache_settings import get_setting
     from crate.actors import (
-        _is_download_allowed, _count_active_users, _count_active_streams,
-        _is_in_time_window, get_suggested_download_limits,
+        _is_download_allowed,
+        _count_active_users,
+        _count_active_streams,
+        _is_in_time_window,
+        get_suggested_download_limits,
     )
 
     suggested = get_suggested_download_limits()
@@ -503,13 +559,19 @@ class DownloadPolicyUpdate(BaseModel):
     max_active_streams: int | None = None
 
 
-@router.put("/download-policy", responses=AUTH_ERROR_RESPONSES, summary="Update download policy settings")
+@router.put(
+    "/download-policy",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Update download policy settings",
+)
 def update_download_policy(request: Request, body: DownloadPolicyUpdate):
     _require_admin(request)
     from crate.db.cache_settings import set_setting
 
     if body.window_enabled is not None:
-        set_setting("download_window_enabled", "true" if body.window_enabled else "false")
+        set_setting(
+            "download_window_enabled", "true" if body.window_enabled else "false"
+        )
     if body.window_start is not None:
         set_setting("download_window_start", body.window_start.strip())
     if body.window_end is not None:
@@ -522,7 +584,11 @@ def update_download_policy(request: Request, body: DownloadPolicyUpdate):
     return {"ok": True}
 
 
-@router.get("/users/map", responses=AUTH_ERROR_RESPONSES, summary="Users with geolocation, online and now-playing status")
+@router.get(
+    "/users/map",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Users with geolocation, online and now-playing status",
+)
 def users_map(request: Request):
     _require_admin(request)
     from crate.db.repositories.auth import list_users_map_rows

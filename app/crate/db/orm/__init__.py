@@ -12,7 +12,12 @@ and ``db/jobs/``. See the refactor plan for the rationale.
 from crate.db.orm.genre import GenreTaxonomyAlias, GenreTaxonomyEdge, GenreTaxonomyNode
 from crate.db.orm.health import HealthIssue
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
-from crate.db.orm.playlist import Playlist, PlaylistMember, PlaylistTrack, UserFollowedPlaylist
+from crate.db.orm.playlist import (
+    Playlist,
+    PlaylistMember,
+    PlaylistTrack,
+    UserFollowedPlaylist,
+)
 from crate.db.orm.releases import NewRelease
 from crate.db.orm.settings import Setting
 from crate.db.orm.tidal import TidalDownload, TidalMonitoredArtist

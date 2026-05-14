@@ -56,45 +56,70 @@ export function SearchResults() {
   const { playAll } = usePlayerActions();
 
   useEffect(() => {
-    if (!query.trim()) { setData(null); return; }
+    if (!query.trim()) {
+      setData(null);
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
-    api<SearchData>(`/api/search?q=${encodeURIComponent(query)}&limit=50`, "GET", undefined, { signal: controller.signal })
+    api<SearchData>(
+      `/api/search?q=${encodeURIComponent(query)}&limit=50`,
+      "GET",
+      undefined,
+      { signal: controller.signal },
+    )
       .then(setData)
-      .catch((e) => { if (!(e instanceof ApiError)) return; setData({ artists: [], albums: [], tracks: [] }); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+      .catch((e) => {
+        if (!(e instanceof ApiError)) return;
+        setData({ artists: [], albums: [], tracks: [] });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
     return () => controller.abort();
   }, [query]);
 
-  const trackRowData = useMemo(() =>
-    (data?.tracks ?? []).map((t, i) => toTrackRowData({
-      ...t,
-      id: t.id ?? t.path ?? `${t.artist}-${t.title}-${i}`,
-      library_track_id: typeof t.id === "number" ? t.id : undefined,
-    })),
+  const trackRowData = useMemo(
+    () =>
+      (data?.tracks ?? []).map((t, i) =>
+        toTrackRowData({
+          ...t,
+          id: t.id ?? t.path ?? `${t.artist}-${t.title}-${i}`,
+          library_track_id: typeof t.id === "number" ? t.id : undefined,
+        }),
+      ),
     [data?.tracks],
   );
 
-  if (!query) return <p className="text-muted-foreground">Enter a search term</p>;
-  if (loading && !data) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+  if (!query)
+    return <p className="text-muted-foreground">Enter a search term</p>;
+  if (loading && !data)
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      </div>
+    );
   if (!data) return null;
 
   const trackToPlayer = (t: SearchData["tracks"][0]): Track =>
-    toPlayableTrack({
-      ...t,
-      library_track_id: typeof t.id === "number" ? t.id : undefined,
-    }, {
-      cover: t.album
-        ? albumCoverApiUrl({
-            albumId: t.album_id,
-            albumEntityUid: t.album_entity_uid,
-            artistEntityUid: t.artist_entity_uid,
-            albumSlug: t.album_slug,
-            artistName: t.artist,
-            albumName: t.album,
-          })
-        : undefined,
-    });
+    toPlayableTrack(
+      {
+        ...t,
+        library_track_id: typeof t.id === "number" ? t.id : undefined,
+      },
+      {
+        cover: t.album
+          ? albumCoverApiUrl({
+              albumId: t.album_id,
+              albumEntityUid: t.album_entity_uid,
+              artistEntityUid: t.artist_entity_uid,
+              albumSlug: t.album_slug,
+              artistName: t.artist,
+              albumName: t.album,
+            })
+          : undefined,
+      },
+    );
 
   return (
     <div className="space-y-8">
@@ -102,7 +127,9 @@ export function SearchResults() {
 
       {data.artists.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Artists ({data.artists.length})</h2>
+          <h2 className="text-lg font-semibold mb-3">
+            Artists ({data.artists.length})
+          </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-4">
             {data.artists.map((a) => (
               <ArtistCard
@@ -120,7 +147,9 @@ export function SearchResults() {
 
       {data.albums.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold mb-3">Albums ({data.albums.length})</h2>
+          <h2 className="text-lg font-semibold mb-3">
+            Albums ({data.albums.length})
+          </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {data.albums.map((a) => (
               <AlbumCard
@@ -150,9 +179,16 @@ export function SearchResults() {
       {data.tracks.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-lg font-semibold">Tracks ({data.tracks.length})</h2>
+            <h2 className="text-lg font-semibold">
+              Tracks ({data.tracks.length})
+            </h2>
             <button
-              onClick={() => playAll(data.tracks.map(trackToPlayer), 0, { type: "queue", name: `Search: ${query}` })}
+              onClick={() =>
+                playAll(data.tracks.map(trackToPlayer), 0, {
+                  type: "queue",
+                  name: `Search: ${query}`,
+                })
+              }
               className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white"
             >
               <Play size={12} fill="currentColor" /> Play all
@@ -173,9 +209,13 @@ export function SearchResults() {
         </section>
       )}
 
-      {data.artists.length === 0 && data.albums.length === 0 && data.tracks.length === 0 && (
-        <p className="text-muted-foreground text-center py-12">No results found for "{query}"</p>
-      )}
+      {data.artists.length === 0 &&
+        data.albums.length === 0 &&
+        data.tracks.length === 0 && (
+          <p className="text-muted-foreground text-center py-12">
+            No results found for "{query}"
+          </p>
+        )}
     </div>
   );
 }

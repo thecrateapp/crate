@@ -12,11 +12,21 @@ from crate.db.repositories.library import (
     get_library_artist_by_slug,
 )
 
-COVER_NAMES = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png", "album.jpg", "album.png"]
+COVER_NAMES = [
+    "cover.jpg",
+    "cover.png",
+    "folder.jpg",
+    "folder.png",
+    "front.jpg",
+    "front.png",
+    "album.jpg",
+    "album.png",
+]
 
 
 class DateTimeEncoder(json.JSONEncoder):
     """JSON encoder that handles datetime/date from TIMESTAMPTZ columns."""
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
@@ -60,7 +70,9 @@ def library_path() -> Path:
 
 
 def extensions() -> set[str]:
-    return set(get_config().get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"]))
+    return set(
+        get_config().get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
+    )
 
 
 def exclude_dirs() -> set[str]:
@@ -78,13 +90,18 @@ def enrich_radio_tracks(tracks: list[dict]) -> list[dict]:
     if not tracks:
         return []
 
-    track_ids = [track.get("track_id") for track in tracks if track.get("track_id") is not None]
+    track_ids = [
+        int(track_id)
+        for track in tracks
+        if (track_id := track.get("track_id")) is not None
+    ]
     refs_by_track_id = enrich_track_refs(track_ids) if track_ids else {}
 
     enriched: list[dict] = []
     for track in tracks:
         current = dict(track)
-        ref = refs_by_track_id.get(track.get("track_id"))
+        track_id = track.get("track_id")
+        ref = refs_by_track_id.get(int(track_id)) if track_id is not None else None
         if ref:
             current.setdefault("track_entity_uid", ref.get("track_entity_uid"))
             current.setdefault("track_slug", ref.get("track_slug"))

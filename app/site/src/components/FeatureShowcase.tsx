@@ -1,11 +1,34 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { ArrowRight, Tag, Sparkles, Sun, Volume2, Activity, Radio, SkipForward } from "lucide-react";
+import {
+  ArrowRight,
+  Tag,
+  Sparkles,
+  Sun,
+  Volume2,
+  Activity,
+  Radio,
+  SkipForward,
+} from "lucide-react";
 
 // ── Adaptive EQ mock ────────────────────────────────────────────────
 
-const EQ_BANDS = ["32", "64", "125", "250", "500", "1K", "2K", "4K", "8K", "16K"];
+const EQ_BANDS = [
+  "32",
+  "64",
+  "125",
+  "250",
+  "500",
+  "1K",
+  "2K",
+  "4K",
+  "8K",
+  "16K",
+];
 
-const EQ_CURVES: Record<string, { label: string; gains: number[]; chip: string }> = {
+const EQ_CURVES: Record<
+  string,
+  { label: string; gains: number[]; chip: string }
+> = {
   black_metal: {
     label: "Black Metal",
     gains: [-1, 3, 4, 1, -3, -2, 3, 6, 6, 4],
@@ -29,7 +52,8 @@ const EQ_CURVES: Record<string, { label: string; gains: number[]; chip: string }
 };
 
 function EqMock() {
-  const [presetKey, setPresetKey] = useState<keyof typeof EQ_CURVES>("black_metal");
+  const [presetKey, setPresetKey] =
+    useState<keyof typeof EQ_CURVES>("black_metal");
   const preset = EQ_CURVES[presetKey]!;
   const range = 24;
   return (
@@ -46,22 +70,24 @@ function EqMock() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-1.5">
-        {(Object.keys(EQ_CURVES) as Array<keyof typeof EQ_CURVES>).map((key) => {
-          const active = key === presetKey;
-          return (
-            <button
-              key={key}
-              onClick={() => setPresetKey(key)}
-              className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                active
-                  ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-200"
-                  : "border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white"
-              }`}
-            >
-              {EQ_CURVES[key]!.label}
-            </button>
-          );
-        })}
+        {(Object.keys(EQ_CURVES) as Array<keyof typeof EQ_CURVES>).map(
+          (key) => {
+            const active = key === presetKey;
+            return (
+              <button
+                key={key}
+                onClick={() => setPresetKey(key)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  active
+                    ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-200"
+                    : "border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white"
+                }`}
+              >
+                {EQ_CURVES[key]!.label}
+              </button>
+            );
+          },
+        )}
       </div>
 
       <div className="grid grid-cols-10 gap-1.5 rounded-xl border border-white/10 bg-black/40 p-3">
@@ -80,14 +106,18 @@ function EqMock() {
                   style={{ top: `calc(${100 - pct}% - 6px)` }}
                 />
               </div>
-              <span className="font-mono text-[9px] text-white/45">{EQ_BANDS[i] ?? ""}</span>
+              <span className="font-mono text-[9px] text-white/45">
+                {EQ_BANDS[i] ?? ""}
+              </span>
             </div>
           );
         })}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <span className="text-[9px] uppercase tracking-[0.14em] text-white/35">Track</span>
+        <span className="text-[9px] uppercase tracking-[0.14em] text-white/35">
+          Track
+        </span>
         <FeatureChip icon={Sun} label="97% bright" active />
         <FeatureChip icon={Volume2} label="-8.4 LUFS" active />
         <FeatureChip icon={Activity} label="9.8 dB DR" />
@@ -126,8 +156,19 @@ function TaxonomyMock() {
     () => [
       { slug: "metal", name: "metal", gains: true, depth: 0, top: true },
       { slug: "thrash-metal", name: "thrash metal", gains: true, depth: 1 },
-      { slug: "crossover-thrash", name: "crossover thrash", gains: false, depth: 1 },
-      { slug: "black-metal", name: "black metal", gains: true, depth: 1, highlight: true },
+      {
+        slug: "crossover-thrash",
+        name: "crossover thrash",
+        gains: false,
+        depth: 1,
+      },
+      {
+        slug: "black-metal",
+        name: "black metal",
+        gains: true,
+        depth: 1,
+        highlight: true,
+      },
       { slug: "death-metal", name: "death metal", gains: true, depth: 1 },
       { slug: "doom-metal", name: "doom metal", gains: true, depth: 1 },
       { slug: "sludge-metal", name: "sludge metal", gains: true, depth: 1 },
@@ -165,7 +206,11 @@ function TaxonomyMock() {
             />
             <span
               className={`flex-1 font-medium ${
-                n.highlight ? "text-cyan-100" : n.top ? "text-white" : "text-white/75"
+                n.highlight
+                  ? "text-cyan-100"
+                  : n.top
+                    ? "text-white"
+                    : "text-white/75"
               }`}
             >
               {n.name}
@@ -194,7 +239,12 @@ const RADIO_TRACKS = [
   { name: "New Bermuda", artist: "Deafheaven", similarity: 0.79, angle: 180 },
   { name: "Sunbather", artist: "Deafheaven", similarity: 0.76, angle: 225 },
   { name: "Mariana", artist: "Birds In Row", similarity: 0.73, angle: 270 },
-  { name: "I Don't Dance", artist: "Birds In Row", similarity: 0.71, angle: 315 },
+  {
+    name: "I Don't Dance",
+    artist: "Birds In Row",
+    similarity: 0.71,
+    angle: 315,
+  },
 ];
 
 function RadioMock() {
@@ -233,7 +283,11 @@ function RadioMock() {
         <div className="absolute inset-[45%] rounded-full border border-white/[0.04]" />
 
         {/* Center seed */}
-        <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ${pulse ? "scale-125" : "scale-100"}`}>
+        <div
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ${
+            pulse ? "scale-125" : "scale-100"
+          }`}
+        >
           <div className="h-5 w-5 rounded-full bg-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.7)]" />
         </div>
 
@@ -259,7 +313,9 @@ function RadioMock() {
                 width={Math.abs(x) + 20}
                 height={Math.abs(y) + 20}
                 style={{
-                  transform: `translate(${x > 0 ? "-100%" : "0"}, ${y > 0 ? "-100%" : "0"})`,
+                  transform: `translate(${x > 0 ? "-100%" : "0"}, ${
+                    y > 0 ? "-100%" : "0"
+                  })`,
                 }}
               >
                 <line
@@ -267,7 +323,9 @@ function RadioMock() {
                   y1={y > 0 ? "100%" : "0"}
                   x2={x > 0 ? "0" : "100%"}
                   y2={y > 0 ? "0" : "100%"}
-                  stroke={isActive ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)"}
+                  stroke={
+                    isActive ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)"
+                  }
                   strokeWidth={isActive ? 1.5 : 0.5}
                 />
               </svg>
@@ -290,7 +348,9 @@ function RadioMock() {
             <div className="truncate text-sm font-semibold text-white">
               {RADIO_TRACKS[activeIndex]!.name}
             </div>
-            <div className="text-[11px] text-white/50">{RADIO_TRACKS[activeIndex]!.artist}</div>
+            <div className="text-[11px] text-white/50">
+              {RADIO_TRACKS[activeIndex]!.artist}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 font-mono text-[10px] tabular-nums text-cyan-200">
@@ -307,8 +367,8 @@ function RadioMock() {
       </div>
 
       <div className="mt-3 text-[11px] leading-relaxed text-white/40">
-        Start from a track and let Crate look for nearby sounds in your own library.
-        Skips and likes nudge what comes next.
+        Start from a track and let Crate look for nearby sounds in your own
+        library. Skips and likes nudge what comes next.
       </div>
     </div>
   );
@@ -344,15 +404,20 @@ export function FeatureShowcase() {
             EQ can use what Crate knows about a track.
           </h3>
           <p className="mt-4 text-[15px] leading-7 text-white/60">
-            Adaptive mode looks at simple audio features like brightness, loudness,
-            dynamic range, and energy. It makes small changes, not a dramatic remix.
-            Genre mode can use a preset from the track's genre, with inheritance for
-            nearby subgenres.
+            Adaptive mode looks at simple audio features like brightness,
+            loudness, dynamic range, and energy. It makes small changes, not a
+            dramatic remix. Genre mode can use a preset from the track's genre,
+            with inheritance for nearby subgenres.
           </p>
           <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
             <Bullet>10 bands with smooth ramps so changes do not click.</Bullet>
-            <Bullet>Genre presets for styles where a small tonal nudge is useful.</Bullet>
-            <Bullet>Optional LLM-assisted preset drafts when you want a starting point.</Bullet>
+            <Bullet>
+              Genre presets for styles where a small tonal nudge is useful.
+            </Bullet>
+            <Bullet>
+              Optional LLM-assisted preset drafts when you want a starting
+              point.
+            </Bullet>
           </ul>
         </div>
         <EqMock />
@@ -366,14 +431,21 @@ export function FeatureShowcase() {
             Genres are treated as a map, not a flat list.
           </h3>
           <p className="mt-4 text-[15px] leading-7 text-white/60">
-            Raw tags from files and external sources are noisy. Crate tries to group
-            them into a smaller taxonomy with parents, aliases, and related styles,
-            so browsing and EQ presets have something steadier to lean on.
+            Raw tags from files and external sources are noisy. Crate tries to
+            group them into a smaller taxonomy with parents, aliases, and
+            related styles, so browsing and EQ presets have something steadier
+            to lean on.
           </p>
           <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
-            <Bullet>Seeded genre families for common styles and substyles.</Bullet>
-            <Bullet>Admin tools to rename, merge, map, or let a tag inherit context.</Bullet>
-            <Bullet>Optional assistance for unmapped tags, always editable afterwards.</Bullet>
+            <Bullet>
+              Seeded genre families for common styles and substyles.
+            </Bullet>
+            <Bullet>
+              Admin tools to rename, merge, map, or let a tag inherit context.
+            </Bullet>
+            <Bullet>
+              Optional assistance for unmapped tags, always editable afterwards.
+            </Bullet>
           </ul>
           <a
             href="https://docs.cratemusic.app/technical/audio-analysis-similarity-and-discovery"
@@ -392,16 +464,24 @@ export function FeatureShowcase() {
             Radio built from your own library.
           </h3>
           <p className="mt-4 text-[15px] leading-7 text-white/60">
-            Part of the inspiration is old Pandora: that feeling of starting with a
-            song and letting a station slowly find its shape. Crate tries to bring a
-            little of that back, but using the music you already have. It combines
-            acoustic similarity, artist links, shared members, and genre overlap, then
-            lets likes and skips gently steer the next choices.
+            Part of the inspiration is old Pandora: that feeling of starting
+            with a song and letting a station slowly find its shape. Crate tries
+            to bring a little of that back, but using the music you already
+            have. It combines acoustic similarity, artist links, shared members,
+            and genre overlap, then lets likes and skips gently steer the next
+            choices.
           </p>
           <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
-            <Bullet>Uses audio similarity, artist relationships, and genre overlap.</Bullet>
-            <Bullet>Likes and dislikes adjust the queue without hiding why tracks appeared.</Bullet>
-            <Bullet>Feedback can carry across sessions, but it stays on your instance.</Bullet>
+            <Bullet>
+              Uses audio similarity, artist relationships, and genre overlap.
+            </Bullet>
+            <Bullet>
+              Likes and dislikes adjust the queue without hiding why tracks
+              appeared.
+            </Bullet>
+            <Bullet>
+              Feedback can carry across sessions, but it stays on your instance.
+            </Bullet>
           </ul>
         </div>
         <RadioMock />
@@ -409,20 +489,25 @@ export function FeatureShowcase() {
 
       {/* Listening experience */}
       <div className="mt-28 max-w-2xl">
-          <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            A player for the library you keep.
-          </h3>
-          <p className="mt-4 text-[15px] leading-7 text-white/60">
-            The Listen app is the everyday player. It has gapless playback, crossfade,
-            lyrics, offline support, and mobile installs. The admin app stays separate,
-            because managing a library and listening to one are different moods.
-          </p>
-          <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
-            <Bullet>Gapless playback and crossfade for albums and queues.</Bullet>
-            <Bullet>Synced lyrics when they are available.</Bullet>
-            <Bullet>Offline albums for places where the network is not reliable.</Bullet>
-            <Bullet>Shows and setlists connected back to the artists in your library.</Bullet>
-          </ul>
+        <h3 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          A player for the library you keep.
+        </h3>
+        <p className="mt-4 text-[15px] leading-7 text-white/60">
+          The Listen app is the everyday player. It has gapless playback,
+          crossfade, lyrics, offline support, and mobile installs. The admin app
+          stays separate, because managing a library and listening to one are
+          different moods.
+        </p>
+        <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
+          <Bullet>Gapless playback and crossfade for albums and queues.</Bullet>
+          <Bullet>Synced lyrics when they are available.</Bullet>
+          <Bullet>
+            Offline albums for places where the network is not reliable.
+          </Bullet>
+          <Bullet>
+            Shows and setlists connected back to the artists in your library.
+          </Bullet>
+        </ul>
       </div>
     </section>
   );

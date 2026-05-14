@@ -26,14 +26,19 @@ def _seed_context_from_rows(rows) -> dict:
             if track_id not in seen_track_ids:
                 seen_track_ids.add(track_id)
                 track_ids.append(track_id)
-    return {"seed_artists": artists[:24], "seed_genres": [], "seed_track_ids": track_ids[:80]}
+    return {
+        "seed_artists": artists[:24],
+        "seed_genres": [],
+        "seed_track_ids": track_ids[:80],
+    }
 
 
 def get_track_seed_context(track_ref: str) -> tuple[list[float], str, dict] | None:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     id AS track_id,
                     bliss_vector,
@@ -57,9 +62,12 @@ def get_track_seed_context(track_ref: str) -> tuple[list[float], str, dict] | No
                   END
                 LIMIT 1
                 """
-            ),
-            {"track_ref": track_ref},
-        ).mappings().first()
+                ),
+                {"track_ref": track_ref},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         return None
     return (
@@ -77,18 +85,25 @@ def get_track_seed(track_ref: str) -> tuple[list[float], str] | None:
     return vector, label
 
 
-def get_playlist_seed_context(playlist_id: int, limit: int = 30) -> tuple[list[list[float]], str, dict] | None:
+def get_playlist_seed_context(
+    playlist_id: int, limit: int = 30
+) -> tuple[list[list[float]], str, dict] | None:
     with read_scope() as session:
-        playlist = session.execute(
-            text("SELECT name FROM playlists WHERE id = :playlist_id"),
-            {"playlist_id": playlist_id},
-        ).mappings().first()
+        playlist = (
+            session.execute(
+                text("SELECT name FROM playlists WHERE id = :playlist_id"),
+                {"playlist_id": playlist_id},
+            )
+            .mappings()
+            .first()
+        )
         if not playlist:
             return None
 
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT lt.id AS track_id, lt.artist, lt.bliss_vector
                 FROM (
                     SELECT
@@ -121,9 +136,12 @@ def get_playlist_seed_context(playlist_id: int, limit: int = 30) -> tuple[list[l
                 ORDER BY pt.position
                 LIMIT :limit
                 """
-            ),
-            {"playlist_id": playlist_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"playlist_id": playlist_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
 
     vectors = [list(row["bliss_vector"]) for row in rows]
     if not vectors:
@@ -131,7 +149,9 @@ def get_playlist_seed_context(playlist_id: int, limit: int = 30) -> tuple[list[l
     return vectors, str(playlist["name"]), _seed_context_from_rows(rows)
 
 
-def get_playlist_seed(playlist_id: int, limit: int = 30) -> tuple[list[list[float]], str] | None:
+def get_playlist_seed(
+    playlist_id: int, limit: int = 30
+) -> tuple[list[list[float]], str] | None:
     resolved = get_playlist_seed_context(playlist_id, limit)
     if not resolved:
         return None
@@ -139,7 +159,9 @@ def get_playlist_seed(playlist_id: int, limit: int = 30) -> tuple[list[list[floa
     return vectors, label
 
 
-def get_home_playlist_seed_context(user_id: int, playlist_id: str, limit: int = 30) -> tuple[list[list[float]], str, dict] | None:
+def get_home_playlist_seed_context(
+    user_id: int, playlist_id: str, limit: int = 30
+) -> tuple[list[list[float]], str, dict] | None:
     from crate.db.home import get_home_playlist
 
     playlist = get_home_playlist(user_id, playlist_id, limit=max(limit, 40))
@@ -152,7 +174,12 @@ def get_home_playlist_seed_context(user_id: int, playlist_id: str, limit: int = 
         track_ref = (
             str(track.get("track_id"))
             if track.get("track_id") is not None
-            else str(track.get("track_entity_uid") or track.get("track_storage_id") or track.get("track_path") or "")
+            else str(
+                track.get("track_entity_uid")
+                or track.get("track_storage_id")
+                or track.get("track_path")
+                or ""
+            )
         )
         if not track_ref:
             continue
@@ -162,19 +189,27 @@ def get_home_playlist_seed_context(user_id: int, playlist_id: str, limit: int = 
         vector, _label, context = resolved
         vectors.append(vector)
         for track_id in context.get("seed_track_ids", []):
-            context_rows.append({
-                "track_id": track_id,
-                "artist": (context.get("seed_artists") or [""])[0],
-            })
+            context_rows.append(
+                {
+                    "track_id": track_id,
+                    "artist": (context.get("seed_artists") or [""])[0],
+                }
+            )
         if len(vectors) >= limit:
             break
 
     if not vectors:
         return None
-    return vectors, str(playlist.get("name") or playlist_id), _seed_context_from_rows(context_rows)
+    return (
+        vectors,
+        str(playlist.get("name") or playlist_id),
+        _seed_context_from_rows(context_rows),
+    )
 
 
-def get_home_playlist_seed(user_id: int, playlist_id: str, limit: int = 30) -> tuple[list[list[float]], str] | None:
+def get_home_playlist_seed(
+    user_id: int, playlist_id: str, limit: int = 30
+) -> tuple[list[list[float]], str] | None:
     resolved = get_home_playlist_seed_context(user_id, playlist_id, limit)
     if not resolved:
         return None

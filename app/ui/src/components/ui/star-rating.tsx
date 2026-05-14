@@ -9,7 +9,12 @@ interface StarRatingProps {
   readonly?: boolean;
 }
 
-export function StarRating({ value, onChange, size = 14, readonly = false }: StarRatingProps) {
+export function StarRating({
+  value,
+  onChange,
+  size = 14,
+  readonly = false,
+}: StarRatingProps) {
   const [hover, setHover] = useState(0);
 
   return (
@@ -24,7 +29,7 @@ export function StarRating({ value, onChange, size = 14, readonly = false }: Sta
             className={cn(
               "transition-colors",
               readonly ? "cursor-default" : "cursor-pointer hover:scale-110",
-              filled ? "text-primary" : "text-muted-foreground/20"
+              filled ? "text-primary" : "text-muted-foreground/20",
             )}
             onMouseEnter={() => !readonly && setHover(star)}
             onMouseLeave={() => setHover(0)}

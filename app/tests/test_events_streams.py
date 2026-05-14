@@ -22,7 +22,9 @@ class _FakePubSub:
         while True:
             await asyncio.sleep(3600)
 
-    async def get_message(self, ignore_subscribe_messages: bool = True, timeout: float = 0.0):
+    async def get_message(
+        self, ignore_subscribe_messages: bool = True, timeout: float = 0.0
+    ):
         del ignore_subscribe_messages, timeout
         if self.get_message_error is not None:
             error = self.get_message_error
@@ -48,12 +50,16 @@ class _FakeRedis:
 def test_global_stream_pubsub_cleans_up_redis_connections(monkeypatch):
     from crate.api import events
 
-    fake_pubsub = _FakePubSub([
-        {"type": "message", "data": "refresh"},
-    ])
+    fake_pubsub = _FakePubSub(
+        [
+            {"type": "message", "data": "refresh"},
+        ]
+    )
     fake_redis = _FakeRedis(fake_pubsub)
 
-    fake_asyncio_module = types.SimpleNamespace(from_url=lambda *_args, **_kwargs: fake_redis)
+    fake_asyncio_module = types.SimpleNamespace(
+        from_url=lambda *_args, **_kwargs: fake_redis
+    )
     fake_redis_package = types.ModuleType("redis")
     fake_redis_package.asyncio = fake_asyncio_module
 
@@ -70,8 +76,8 @@ def test_global_stream_pubsub_cleans_up_redis_connections(monkeypatch):
 
     initial, live = asyncio.run(_collect())
 
-    assert initial == "data: {\"tasks\": []}\n\n"
-    assert live == "data: {\"tasks\": []}\n\n"
+    assert initial == 'data: {"tasks": []}\n\n'
+    assert live == 'data: {"tasks": []}\n\n'
     assert fake_pubsub.subscribed == [events.REDIS_CHANNEL_GLOBAL]
     assert fake_pubsub.unsubscribed == [events.REDIS_CHANNEL_GLOBAL]
     assert fake_redis.closed is False
@@ -81,7 +87,9 @@ def _install_fake_async_redis(monkeypatch, pubsub: _FakePubSub):
     from crate.api import redis_sse
 
     fake_redis = _FakeRedis(pubsub)
-    fake_asyncio_module = types.SimpleNamespace(from_url=lambda *_args, **_kwargs: fake_redis)
+    fake_asyncio_module = types.SimpleNamespace(
+        from_url=lambda *_args, **_kwargs: fake_redis
+    )
     fake_redis_package = types.ModuleType("redis")
     fake_redis_package.asyncio = fake_asyncio_module
     monkeypatch.setitem(sys.modules, "redis", fake_redis_package)
@@ -91,6 +99,55 @@ def _install_fake_async_redis(monkeypatch, pubsub: _FakePubSub):
     monkeypatch.setattr(redis_sse, "_redis_module_marker", None)
     monkeypatch.setattr(redis_sse, "_redis_url", None)
     return fake_redis
+
+
+def test_redis_sse_uses_bounded_connection_pool(monkeypatch):
+    from crate.api import redis_sse
+
+    class FakeConnectionPool:
+        kwargs = None
+
+        @classmethod
+        def from_url(cls, *_args, **kwargs):
+            cls.kwargs = kwargs
+            return "pool"
+
+    class FakeRedisClient:
+        def __init__(self, connection_pool):
+            self.connection_pool = connection_pool
+
+    fake_asyncio_module = types.SimpleNamespace(
+        ConnectionPool=FakeConnectionPool,
+        Redis=FakeRedisClient,
+    )
+    fake_redis_package = types.ModuleType("redis")
+    fake_redis_package.asyncio = fake_asyncio_module
+    monkeypatch.setitem(sys.modules, "redis", fake_redis_package)
+    monkeypatch.setitem(sys.modules, "redis.asyncio", fake_asyncio_module)
+    monkeypatch.setattr(redis_sse, "_redis_client", None)
+    monkeypatch.setattr(redis_sse, "_redis_pool", None)
+    monkeypatch.setattr(redis_sse, "_redis_module_marker", None)
+    monkeypatch.setattr(redis_sse, "_redis_url", None)
+    monkeypatch.delenv("CRATE_SSE_REDIS_MAX_CONNECTIONS", raising=False)
+
+    client = redis_sse.get_async_redis()
+
+    assert isinstance(client, FakeRedisClient)
+    assert client.connection_pool == "pool"
+    assert FakeConnectionPool.kwargs["max_connections"] == 128
+
+
+def test_redis_sse_max_connections_is_configurable(monkeypatch):
+    from crate.api import redis_sse
+
+    monkeypatch.setenv("CRATE_SSE_REDIS_MAX_CONNECTIONS", "64")
+    assert redis_sse._max_connections() == 64
+
+    monkeypatch.setenv("CRATE_SSE_REDIS_MAX_CONNECTIONS", "9999")
+    assert redis_sse._max_connections() == 512
+
+    monkeypatch.setenv("CRATE_SSE_REDIS_MAX_CONNECTIONS", "invalid")
+    assert redis_sse._max_connections() == 128
 
 
 def _collect_initial_and_fallback(stream_factory):
@@ -109,12 +166,14 @@ def test_ops_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
 
     fake_pubsub = _FakePubSub([], get_message_error=RuntimeError("redis down"))
     fake_redis = _install_fake_async_redis(monkeypatch, fake_pubsub)
-    monkeypatch.setattr(admin_ops, "get_cached_ops_snapshot", lambda fresh=False: {"fresh": fresh})
+    monkeypatch.setattr(
+        admin_ops, "get_cached_ops_snapshot", lambda fresh=False: {"fresh": fresh}
+    )
 
     initial, fallback = _collect_initial_and_fallback(admin_ops._ops_stream)
 
-    assert initial == "data: {\"fresh\": false}\n\n"
-    assert fallback == "data: {\"fresh\": false}\n\n"
+    assert initial == 'data: {"fresh": false}\n\n'
+    assert fallback == 'data: {"fresh": false}\n\n'
     assert fake_pubsub.subscribed == [admin_ops.snapshot_channel("ops", "dashboard")]
     assert fake_pubsub.unsubscribed == [admin_ops.snapshot_channel("ops", "dashboard")]
     assert fake_redis.closed is False
@@ -125,12 +184,16 @@ def test_tasks_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
 
     fake_pubsub = _FakePubSub([], get_message_error=RuntimeError("redis down"))
     fake_redis = _install_fake_async_redis(monkeypatch, fake_pubsub)
-    monkeypatch.setattr(tasks, "get_cached_tasks_surface", lambda limit=100, fresh=False: {"limit": limit, "fresh": fresh})
+    monkeypatch.setattr(
+        tasks,
+        "get_cached_tasks_surface",
+        lambda limit=100, fresh=False: {"limit": limit, "fresh": fresh},
+    )
 
     initial, fallback = _collect_initial_and_fallback(lambda: tasks._tasks_stream(25))
 
-    assert initial == "data: {\"limit\": 25, \"fresh\": false}\n\n"
-    assert fallback == "data: {\"limit\": 25, \"fresh\": false}\n\n"
+    assert initial == 'data: {"limit": 25, "fresh": false}\n\n'
+    assert fallback == 'data: {"limit": 25, "fresh": false}\n\n'
     assert fake_pubsub.subscribed == [tasks.TASKS_SURFACE_STREAM_CHANNEL]
     assert fake_pubsub.unsubscribed == [tasks.TASKS_SURFACE_STREAM_CHANNEL]
     assert fake_redis.closed is False
@@ -144,13 +207,19 @@ def test_health_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
     monkeypatch.setattr(
         management,
         "get_cached_health_surface",
-        lambda check_type=None, limit=500, fresh=False: {"check_type": check_type, "limit": limit, "fresh": fresh},
+        lambda check_type=None, limit=500, fresh=False: {
+            "check_type": check_type,
+            "limit": limit,
+            "fresh": fresh,
+        },
     )
 
-    initial, fallback = _collect_initial_and_fallback(lambda: management._health_stream(check_type="tags", limit=33))
+    initial, fallback = _collect_initial_and_fallback(
+        lambda: management._health_stream(check_type="tags", limit=33)
+    )
 
-    assert initial == "data: {\"check_type\": \"tags\", \"limit\": 33, \"fresh\": false}\n\n"
-    assert fallback == "data: {\"check_type\": \"tags\", \"limit\": 33, \"fresh\": false}\n\n"
+    assert initial == 'data: {"check_type": "tags", "limit": 33, "fresh": false}\n\n'
+    assert fallback == 'data: {"check_type": "tags", "limit": 33, "fresh": false}\n\n'
     assert fake_pubsub.subscribed == [management.HEALTH_SURFACE_STREAM_CHANNEL]
     assert fake_pubsub.unsubscribed == [management.HEALTH_SURFACE_STREAM_CHANNEL]
     assert fake_redis.closed is False
@@ -161,12 +230,18 @@ def test_admin_logs_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
 
     fake_pubsub = _FakePubSub([], get_message_error=RuntimeError("redis down"))
     fake_redis = _install_fake_async_redis(monkeypatch, fake_pubsub)
-    monkeypatch.setattr(admin_metrics, "get_cached_logs_surface", lambda limit=100, fresh=False: {"limit": limit, "fresh": fresh})
+    monkeypatch.setattr(
+        admin_metrics,
+        "get_cached_logs_surface",
+        lambda limit=100, fresh=False: {"limit": limit, "fresh": fresh},
+    )
 
-    initial, fallback = _collect_initial_and_fallback(lambda: admin_metrics._admin_logs_stream(40))
+    initial, fallback = _collect_initial_and_fallback(
+        lambda: admin_metrics._admin_logs_stream(40)
+    )
 
-    assert initial == "data: {\"limit\": 40, \"fresh\": false}\n\n"
-    assert fallback == "data: {\"limit\": 40, \"fresh\": false}\n\n"
+    assert initial == 'data: {"limit": 40, "fresh": false}\n\n'
+    assert fallback == 'data: {"limit": 40, "fresh": false}\n\n'
     assert fake_pubsub.subscribed == [admin_metrics.LOGS_SURFACE_STREAM_CHANNEL]
     assert fake_pubsub.unsubscribed == [admin_metrics.LOGS_SURFACE_STREAM_CHANNEL]
     assert fake_redis.closed is False

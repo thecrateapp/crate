@@ -11,7 +11,9 @@ from crate.db.ops_runtime import get_ops_runtime_state
 from crate.db.tx import read_scope
 
 
-def list_import_queue_items(*, status: str | None = "pending", limit: int = 500) -> list[dict[str, Any]]:
+def list_import_queue_items(
+    *, status: str | None = "pending", limit: int = 500
+) -> list[dict[str, Any]]:
     query = (
         "SELECT source, path, artist, album, status, payload_json, discovered_at, updated_at "
         "FROM import_queue_items "
@@ -37,10 +39,16 @@ def count_import_queue_items(*, status: str = "pending") -> int:
             pass
 
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = :status"),
-            {"status": status},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = :status"
+                ),
+                {"status": status},
+            )
+            .mappings()
+            .first()
+        )
     return int((row or {}).get("cnt") or 0)
 
 

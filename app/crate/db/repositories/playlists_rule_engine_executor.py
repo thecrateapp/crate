@@ -1,11 +1,23 @@
 from __future__ import annotations
 
+from typing import Literal, overload
+
 from sqlalchemy import text
 
 from crate.db.repositories.playlists_rule_engine_builder import build_rule_conditions
 from crate.db.repositories.playlists_rule_engine_config import SORT_MAP
 from crate.db.repositories.playlists_rule_engine_genre import combine_sql_extrema
 from crate.db.tx import read_scope
+
+
+@overload
+def execute_smart_rules(rules: dict, *, count_only: Literal[True]) -> int: ...
+
+
+@overload
+def execute_smart_rules(
+    rules: dict, *, count_only: Literal[False] = False
+) -> list[dict]: ...
 
 
 def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] | int:
@@ -20,9 +32,10 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
 
     with read_scope() as session:
         if count_only:
-            row = session.execute(
-                text(
-                    f"""
+            row = (
+                session.execute(
+                    text(
+                        f"""
                     SELECT COUNT(*) AS cnt
                     FROM library_tracks t
                     LEFT JOIN library_albums a ON t.album_id = a.id
@@ -30,9 +43,12 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
                     WHERE ({where})
                       AND (t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
                     """
-                ),
-                params,
-            ).mappings().first()
+                    ),
+                    params,
+                )
+                .mappings()
+                .first()
+            )
             return row["cnt"] if row else 0
 
         sort_clause = SORT_MAP.get(sort, "RANDOM()")
@@ -45,9 +61,10 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
 
         fetch_limit = limit * 3 if deduplicate_artist else limit
         query_params = {**params, "lim": fetch_limit}
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT t.id, t.entity_uid::text AS entity_uid, t.storage_id::text AS storage_id,
                        t.path, t.title, t.artist, a.name AS album,
                        t.duration, t.format, t.bpm, t.energy, t.genre, t.year,
@@ -61,9 +78,12 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
                 ORDER BY {sort_clause}
                 LIMIT :lim
                 """
-            ),
-            query_params,
-        ).mappings().all()
+                ),
+                query_params,
+            )
+            .mappings()
+            .all()
+        )
 
     results = [dict(row) for row in rows]
     if deduplicate_artist and max_per_artist > 0:

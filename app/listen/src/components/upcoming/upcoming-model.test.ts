@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { artistShowToUpcomingItem, itemKey } from "@/components/upcoming/upcoming-model";
+import {
+  artistShowToUpcomingItem,
+  itemKey,
+} from "@/components/upcoming/upcoming-model";
 
 describe("upcoming model", () => {
   it("preserves the original artist show event id for expansion keys", () => {

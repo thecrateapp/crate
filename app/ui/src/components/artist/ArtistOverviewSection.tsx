@@ -1,5 +1,10 @@
 import { StatCard } from "@/components/artist/ArtistPageBits";
-import type { ArtistExternalLink, LastfmData, MusicBrainzData, SpotifyData } from "@/components/artist/artistPageTypes";
+import type {
+  ArtistExternalLink,
+  LastfmData,
+  MusicBrainzData,
+  SpotifyData,
+} from "@/components/artist/artistPageTypes";
 import { MusicContextMenu } from "@/components/ui/music-context-menu";
 import { Skeleton } from "@crate/ui/shadcn/skeleton";
 import type { TopTrack } from "@/hooks/use-artist-data";
@@ -46,7 +51,9 @@ export function ArtistOverviewSection({
     <div className="space-y-8">
       {bioText && (
         <div className="max-w-3xl">
-          <h3 className="text-sm font-semibold text-white/70 mb-2">Biography</h3>
+          <h3 className="text-sm font-semibold text-white/70 mb-2">
+            Biography
+          </h3>
           <p className="text-sm text-white/60 leading-relaxed whitespace-pre-line">
             {bioExpanded ? bioText : bioText.slice(0, 400)}
             {!bioExpanded && bioText.length > 400 && "..."}
@@ -56,7 +63,15 @@ export function ArtistOverviewSection({
               onClick={onToggleBioExpanded}
               className="text-xs text-primary hover:text-primary/80 mt-2 flex items-center gap-1"
             >
-              {bioExpanded ? <><ChevronUp size={12} /> Less</> : <><ChevronDown size={12} /> More</>}
+              {bioExpanded ? (
+                <>
+                  <ChevronUp size={12} /> Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={12} /> More
+                </>
+              )}
             </button>
           )}
         </div>
@@ -64,15 +79,18 @@ export function ArtistOverviewSection({
 
       {topTracks.length > 0 && (
         <div className="max-w-2xl">
-          <h3 className="text-sm font-semibold text-white/70 mb-2">Top Tracks</h3>
-            <div className="space-y-0.5">
+          <h3 className="text-sm font-semibold text-white/70 mb-2">
+            Top Tracks
+          </h3>
+          <div className="space-y-0.5">
             {topTracks.slice(0, 5).map((track, i) => {
-              const coverUrl = albumCoverApiUrl({
-                albumId: track.album_id,
-                albumSlug: track.album_slug,
-                artistName: track.artist,
-                albumName: track.album,
-              }) || undefined;
+              const coverUrl =
+                albumCoverApiUrl({
+                  albumId: track.album_id,
+                  albumSlug: track.album_slug,
+                  artistName: track.artist,
+                  albumName: track.album,
+                }) || undefined;
               return (
                 <MusicContextMenu
                   key={track.id}
@@ -88,9 +106,15 @@ export function ArtistOverviewSection({
                   albumCover={coverUrl}
                 >
                   <div className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition-colors group text-left">
-                    <span className="w-5 text-right text-xs text-white/30">{i + 1}</span>
-                    <span className="flex-1 text-sm truncate text-white/80">{track.title}</span>
-                    <span className="text-xs text-white/30">{formatDuration(track.duration)}</span>
+                    <span className="w-5 text-right text-xs text-white/30">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 text-sm truncate text-white/80">
+                      {track.title}
+                    </span>
+                    <span className="text-xs text-white/30">
+                      {formatDuration(track.duration)}
+                    </span>
                   </div>
                 </MusicContextMenu>
               );
@@ -102,14 +126,62 @@ export function ArtistOverviewSection({
       <div>
         <h3 className="text-sm font-semibold text-white/70 mb-3">Stats</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-w-3xl">
-          {musicbrainz?.type && <StatCard label="Type" value={musicbrainz.type} icon={<Users size={14} />} />}
-          {musicbrainz?.begin_date && <StatCard label="Formed" value={musicbrainz.begin_date} icon={<Calendar size={14} />} />}
-          {musicbrainz?.country && <StatCard label="Country" value={musicbrainz.country} icon={<MapPin size={14} />} />}
-          {activeMembersCount > 0 && <StatCard label="Active Members" value={String(activeMembersCount)} icon={<Users size={14} />} />}
-          {(lastfm?.listeners ?? 0) > 0 && <StatCard label="Listeners" value={formatCompact(lastfm!.listeners!)} icon={<Headphones size={14} />} />}
-          {(spotify?.followers ?? 0) > 0 && <StatCard label="Followers" value={formatCompact(spotify!.followers!)} icon={<Users size={14} />} />}
-          {(spotify?.popularity ?? 0) > 0 && <StatCard label="Popularity" value={`${spotify!.popularity}%`} icon={<BarChart3 size={14} />} />}
-          {(lastfm?.playcount ?? 0) > 0 && <StatCard label="Scrobbles" value={formatCompact(lastfm!.playcount!)} icon={<Music size={14} />} />}
+          {musicbrainz?.type && (
+            <StatCard
+              label="Type"
+              value={musicbrainz.type}
+              icon={<Users size={14} />}
+            />
+          )}
+          {musicbrainz?.begin_date && (
+            <StatCard
+              label="Formed"
+              value={musicbrainz.begin_date}
+              icon={<Calendar size={14} />}
+            />
+          )}
+          {musicbrainz?.country && (
+            <StatCard
+              label="Country"
+              value={musicbrainz.country}
+              icon={<MapPin size={14} />}
+            />
+          )}
+          {activeMembersCount > 0 && (
+            <StatCard
+              label="Active Members"
+              value={String(activeMembersCount)}
+              icon={<Users size={14} />}
+            />
+          )}
+          {(lastfm?.listeners ?? 0) > 0 && (
+            <StatCard
+              label="Listeners"
+              value={formatCompact(lastfm!.listeners!)}
+              icon={<Headphones size={14} />}
+            />
+          )}
+          {(spotify?.followers ?? 0) > 0 && (
+            <StatCard
+              label="Followers"
+              value={formatCompact(spotify!.followers!)}
+              icon={<Users size={14} />}
+            />
+          )}
+          {(spotify?.popularity ?? 0) > 0 && (
+            <StatCard
+              label="Popularity"
+              value={`${spotify!.popularity}%`}
+              icon={<BarChart3 size={14} />}
+            />
+          )}
+          {(lastfm?.playcount ?? 0) > 0 && (
+            <StatCard
+              label="Scrobbles"
+              value={formatCompact(lastfm!.playcount!)}
+              icon={<Music size={14} />}
+            />
+          )}
         </div>
       </div>
 

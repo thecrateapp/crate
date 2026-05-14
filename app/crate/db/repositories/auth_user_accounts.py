@@ -23,7 +23,9 @@ def suggest_username(email: str, preferred: str | None = None, *, session=None) 
         candidate = base
         suffix = 1
         while True:
-            exists = s.execute(select(User.id).where(User.username == candidate).limit(1)).scalar_one_or_none()
+            exists = s.execute(
+                select(User.id).where(User.username == candidate).limit(1)
+            ).scalar_one_or_none()
             if exists is None:
                 return candidate
             candidate = f"{base}-{suffix}"
@@ -37,7 +39,9 @@ def suggest_username(email: str, preferred: str | None = None, *, session=None) 
 
 def count_users() -> int:
     with read_scope() as session:
-        return int(session.execute(select(func.count()).select_from(User)).scalar_one() or 0)
+        return int(
+            session.execute(select(func.count()).select_from(User)).scalar_one() or 0
+        )
 
 
 def _seed_admin(session=None):
@@ -45,7 +49,9 @@ def _seed_admin(session=None):
         with transaction_scope() as s:
             return _seed_admin(s)
 
-    total_users = int(session.execute(select(func.count()).select_from(User)).scalar_one() or 0)
+    total_users = int(
+        session.execute(select(func.count()).select_from(User)).scalar_one() or 0
+    )
     if total_users == 0:
         from crate.auth import hash_password
 
@@ -54,7 +60,9 @@ def _seed_admin(session=None):
             password = secrets.token_urlsafe(16)
             log.warning("No DEFAULT_ADMIN_PASSWORD set — generated: %s", password)
 
-        existing = session.execute(select(User).where(User.email == "admin@cratemusic.app").limit(1)).scalar_one_or_none()
+        existing = session.execute(
+            select(User).where(User.email == "admin@cratemusic.app").limit(1)
+        ).scalar_one_or_none()
         if existing is None:
             session.add(
                 User(
@@ -67,7 +75,9 @@ def _seed_admin(session=None):
                 )
             )
     else:
-        admin = session.execute(select(User).where(User.email == "admin@cratemusic.app").limit(1)).scalar_one_or_none()
+        admin = session.execute(
+            select(User).where(User.email == "admin@cratemusic.app").limit(1)
+        ).scalar_one_or_none()
         if admin is not None and not admin.username:
             admin.username = "admin"
 
@@ -84,7 +94,9 @@ def create_user(
     session=None,
 ) -> dict:
     def _impl(s) -> dict:
-        existing = s.execute(select(User).where(User.email == email).limit(1)).scalar_one_or_none()
+        existing = s.execute(
+            select(User).where(User.email == email).limit(1)
+        ).scalar_one_or_none()
         if existing is not None:
             raise ValueError(f"Email already registered: {email}")
 
@@ -109,13 +121,17 @@ def create_user(
 
 def get_user_by_email(email: str) -> dict | None:
     with read_scope() as session:
-        user = session.execute(select(User).where(User.email == email).limit(1)).scalar_one_or_none()
+        user = session.execute(
+            select(User).where(User.email == email).limit(1)
+        ).scalar_one_or_none()
         return model_to_dict(user) if user is not None else None
 
 
 def get_user_by_google_id(google_id: str) -> dict | None:
     with read_scope() as session:
-        user = session.execute(select(User).where(User.google_id == google_id).limit(1)).scalar_one_or_none()
+        user = session.execute(
+            select(User).where(User.google_id == google_id).limit(1)
+        ).scalar_one_or_none()
         return model_to_dict(user) if user is not None else None
 
 

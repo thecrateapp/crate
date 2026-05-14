@@ -26,11 +26,13 @@ var (
 	ErrUnavailable  = errors.New("auth unavailable")
 )
 
+// ConnectedAccount represents an external identity linked to a Crate user.
 type ConnectedAccount struct {
 	Provider string `json:"provider"`
 	Status   string `json:"status"`
 }
 
+// User represents an authenticated Crate user with profile and session data.
 type User struct {
 	ID                int64              `json:"id"`
 	Email             string             `json:"email"`
@@ -43,6 +45,7 @@ type User struct {
 	ConnectedAccounts []ConnectedAccount `json:"connected_accounts"`
 }
 
+// Authenticator validates sessions and loads user data from the database.
 type Authenticator struct {
 	pool         *pgxpool.Pool
 	queryTimeout time.Duration
@@ -53,6 +56,7 @@ type Authenticator struct {
 	secretLoadedAt time.Time
 }
 
+// NewAuthenticator creates an Authenticator using the given database pool and JWT secret.
 func NewAuthenticator(pool *pgxpool.Pool, envSecret string, queryTimeout time.Duration) *Authenticator {
 	return &Authenticator{
 		pool:         pool,
@@ -61,6 +65,7 @@ func NewAuthenticator(pool *pgxpool.Pool, envSecret string, queryTimeout time.Du
 	}
 }
 
+// Authenticate verifies the request's session token and returns the associated user.
 func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*User, error) {
 	token := ExtractToken(r, allowQueryToken)
 	if token == "" {
@@ -86,6 +91,7 @@ func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*Us
 	return user, nil
 }
 
+// ExtractToken extracts a bearer token from the Authorization header, query string, or cookies.
 func ExtractToken(r *http.Request, allowQueryToken bool) string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	if authHeader != "" {

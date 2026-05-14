@@ -19,15 +19,20 @@ def list_portable_album_ids(
     limit: int | None = None,
 ) -> list[int]:
     safe_limit = min(max(int(limit), 1), 10000) if limit is not None else None
-    params: dict[str, Any] = {"album_id": album_id, "album_entity_uid": album_entity_uid, "artist": artist}
+    params: dict[str, Any] = {
+        "album_id": album_id,
+        "album_entity_uid": album_entity_uid,
+        "artist": artist,
+    }
     limit_sql = "LIMIT :limit" if safe_limit is not None else ""
     if safe_limit is not None:
         params["limit"] = safe_limit
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT id
                 FROM library_albums
                 WHERE (:album_id IS NULL OR id = :album_id)
@@ -36,17 +41,21 @@ def list_portable_album_ids(
                 ORDER BY artist, COALESCE(year, ''), name, id
                 {limit_sql}
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [int(row["id"]) for row in rows]
 
 
 def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
     with read_scope() as session:
-        album_row = session.execute(
-            text(
-                """
+        album_row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     alb.id,
                     alb.storage_id,
@@ -73,15 +82,19 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                 WHERE alb.id = :album_id
                 LIMIT 1
                 """
-            ),
-            {"album_id": album_id},
-        ).mappings().first()
+                ),
+                {"album_id": album_id},
+            )
+            .mappings()
+            .first()
+        )
         if not album_row:
             return None
 
-        artist_row = session.execute(
-            text(
-                """
+        artist_row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     id,
                     storage_id,
@@ -110,13 +123,17 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                 WHERE name = :artist
                 LIMIT 1
                 """
-            ),
-            {"artist": album_row["artist"]},
-        ).mappings().first()
+                ),
+                {"artist": album_row["artist"]},
+            )
+            .mappings()
+            .first()
+        )
 
-        track_rows = session.execute(
-            text(
-                """
+        track_rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     lt.id,
                     lt.storage_id,
@@ -192,9 +209,12 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                 WHERE lt.album_id = :album_id
                 ORDER BY COALESCE(lt.disc_number, 1), COALESCE(lt.track_number, 9999), lt.filename, lt.id
                 """
-            ),
-            {"album_id": album_id},
-        ).mappings().all()
+                ),
+                {"album_id": album_id},
+            )
+            .mappings()
+            .all()
+        )
 
     album = _row_dict(album_row)
     artist_payload = _row_dict(artist_row)
@@ -220,7 +240,7 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                 "entity_uid": track.get("entity_uid"),
                 "path": path,
                 "relative_path": (
-                    path[len(album_prefix):]
+                    path[len(album_prefix) :]
                     if album_prefix and path.startswith(album_prefix)
                     else track.get("filename")
                 ),
@@ -244,7 +264,9 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                 "musicbrainz_trackid": track.get("musicbrainz_trackid"),
                 "audio_fingerprint": track.get("audio_fingerprint"),
                 "audio_fingerprint_source": track.get("audio_fingerprint_source"),
-                "audio_fingerprint_computed_at": track.get("audio_fingerprint_computed_at"),
+                "audio_fingerprint_computed_at": track.get(
+                    "audio_fingerprint_computed_at"
+                ),
                 "updated_at": track.get("updated_at"),
                 "analysis": {
                     "bpm": track.get("analysis_bpm"),
@@ -262,7 +284,9 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
                     "updated_at": track.get("analysis_updated_at"),
                 },
                 "bliss": {
-                    "vector": list(track["bliss_vector"]) if track.get("bliss_vector") is not None else None,
+                    "vector": list(track["bliss_vector"])
+                    if track.get("bliss_vector") is not None
+                    else None,
                     "computed_at": track.get("bliss_computed_at"),
                 },
                 "lyrics": lyrics,
@@ -279,17 +303,21 @@ def get_portable_album_payload(album_id: int) -> dict[str, Any] | None:
 
 def get_portable_track_payload_by_path(track_path: str) -> dict[str, Any] | None:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT album_id
                 FROM library_tracks
                 WHERE path = :track_path
                 LIMIT 1
                 """
-            ),
-            {"track_path": str(track_path)},
-        ).mappings().first()
+                ),
+                {"track_path": str(track_path)},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         return None
 
@@ -308,4 +336,8 @@ def get_portable_track_payload_by_path(track_path: str) -> dict[str, Any] | None
     return None
 
 
-__all__ = ["get_portable_album_payload", "get_portable_track_payload_by_path", "list_portable_album_ids"]
+__all__ = [
+    "get_portable_album_payload",
+    "get_portable_track_payload_by_path",
+    "list_portable_album_ids",
+]

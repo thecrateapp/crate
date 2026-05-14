@@ -142,12 +142,14 @@ class AuthCurrentSessionResponse(BaseModel):
 
 class AuthLoginResponse(AuthUserPublicResponse):
     token: str
+    access_expires_at: datetime | None = None
     refresh_token: str | None = None
     session: AuthCurrentSessionResponse | None = None
 
 
 class AuthRefreshResponse(BaseModel):
     token: str
+    access_expires_at: datetime | None = None
     refresh_token: str | None = None
     session: AuthCurrentSessionResponse | None = None
 

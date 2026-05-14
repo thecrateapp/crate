@@ -16,8 +16,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID")
-    op.execute("ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
+    op.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID"
+    )
+    op.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
     op.execute(
         """
         WITH matched AS (

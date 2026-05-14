@@ -2,7 +2,9 @@ def _vector(value: float) -> list[float]:
     return [value] * 20
 
 
-def _candidate(track_id: int, *, title: str, artist: str, vector: list[float], bpm: float = 120.0) -> dict:
+def _candidate(
+    track_id: int, *, title: str, artist: str, vector: list[float], bpm: float = 120.0
+) -> dict:
     return {
         "id": track_id,
         "entity_uid": None,
@@ -27,11 +29,17 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     from crate import radio_engine
 
     rows = [
-        {"track_id": index, "artist": f"Artist {index % 2}", "bliss_vector": _vector(float(index))}
+        {
+            "track_id": index,
+            "artist": f"Artist {index % 2}",
+            "bliss_vector": _vector(float(index)),
+        }
         for index in range(5)
     ]
 
-    monkeypatch.setattr(radio_engine, "get_recent_liked_seed_rows", lambda *_args, **_kwargs: rows)
+    monkeypatch.setattr(
+        radio_engine, "get_recent_liked_seed_rows", lambda *_args, **_kwargs: rows
+    )
 
     resolved = radio_engine.resolve_discovery_seed(9)
 
@@ -42,7 +50,9 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert context["seed_track_ids"] == [0, 1, 2, 3, 4]
 
 
-def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(monkeypatch):
+def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(
+    monkeypatch,
+):
     from crate import radio_engine
 
     candidates = [
@@ -89,8 +99,12 @@ def test_next_tracks_resaves_session_to_refresh_ttl(monkeypatch):
     saved = []
 
     monkeypatch.setattr(radio_engine, "_load_session", lambda _session_id: session)
-    monkeypatch.setattr(radio_engine, "_generate_batch", lambda _session, _count: [{"track_id": 3}])
-    monkeypatch.setattr(radio_engine, "_save_session", lambda value: saved.append(dict(value)))
+    monkeypatch.setattr(
+        radio_engine, "_generate_batch", lambda _session, _count: [{"track_id": 3}]
+    )
+    monkeypatch.setattr(
+        radio_engine, "_save_session", lambda value: saved.append(dict(value))
+    )
 
     result = radio_engine.next_tracks("session", count=1)
 
@@ -100,16 +114,18 @@ def test_next_tracks_resaves_session_to_refresh_ttl(monkeypatch):
 
 
 def test_best_candidate_prefers_compatible_audio_context(monkeypatch):
-    from crate.db import paths_candidates
+    import crate.db.paths_candidates as paths_candidates
 
     rows = [
-        _candidate(1, title="Far", artist="Artist", vector=_vector(0.1), bpm=180.0) | {
+        _candidate(1, title="Far", artist="Artist", vector=_vector(0.1), bpm=180.0)
+        | {
             "distance": 0.1,
             "energy": 0.1,
             "audio_key": "F#",
             "year": 1980,
         },
-        _candidate(2, title="Close", artist="Artist", vector=_vector(0.1), bpm=122.0) | {
+        _candidate(2, title="Close", artist="Artist", vector=_vector(0.1), bpm=122.0)
+        | {
             "distance": 0.1,
             "energy": 0.72,
             "audio_key": "C",
@@ -117,7 +133,9 @@ def test_best_candidate_prefers_compatible_audio_context(monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(paths_candidates, "find_candidate_rows", lambda *_args, **_kwargs: rows)
+    monkeypatch.setattr(
+        paths_candidates, "find_candidate_rows", lambda *_args, **_kwargs: rows
+    )
 
     candidate = paths_candidates._find_best_candidate(
         _vector(0.0),
@@ -128,7 +146,15 @@ def test_best_candidate_prefers_compatible_audio_context(monkeypatch):
         genre_map={},
         member_graph={},
         target_artists=[],
-        recent_tracks=[{"bpm": 120.0, "energy": 0.7, "audio_key": "C", "audio_scale": "minor", "year": 2020}],
+        recent_tracks=[
+            {
+                "bpm": 120.0,
+                "energy": 0.7,
+                "audio_key": "C",
+                "audio_scale": "minor",
+                "year": 2020,
+            }
+        ],
     )
 
     assert candidate is not None
@@ -151,7 +177,7 @@ def test_genre_overlap_uses_taxonomy_ancestors():
 
 
 def test_genre_overlap_reuses_expanded_taxonomy(monkeypatch):
-    from crate.db import paths_similarity
+    import crate.db.paths_similarity as paths_similarity
 
     calls: list[str] = []
     paths_similarity._expand_genre_weight_items.cache_clear()
@@ -189,7 +215,7 @@ def test_home_mix_preparation_deprioritizes_liked_and_overplayed_tracks():
 
 
 def test_daily_discovery_uses_cold_start_genres_when_profile_is_empty(monkeypatch):
-    from crate.db import home_builder_mix_generation
+    import crate.db.home_builder_mix_generation as home_builder_mix_generation
 
     captured = {}
 
@@ -197,7 +223,9 @@ def test_daily_discovery_uses_cold_start_genres_when_profile_is_empty(monkeypatc
         captured["genres"] = genres
         return []
 
-    monkeypatch.setattr(home_builder_mix_generation, "_query_discovery_tracks", fake_query)
+    monkeypatch.setattr(
+        home_builder_mix_generation, "_query_discovery_tracks", fake_query
+    )
 
     home_builder_mix_generation._build_mix_rows(
         1,
@@ -213,38 +241,46 @@ def test_daily_discovery_uses_cold_start_genres_when_profile_is_empty(monkeypatc
 def test_artist_bliss_centroid_refresh_and_resolution(pg_db):
     from sqlalchemy import text
 
-    from crate.db.jobs.artist_bliss_centroids import refresh_artist_bliss_centroids_for_track_ids
+    from crate.db.jobs.artist_bliss_centroids import (
+        refresh_artist_bliss_centroids_for_track_ids,
+    )
     from crate.db.paths_vectors import resolve_bliss_centroid
     from crate.db.queries.artist_bliss_centroids import get_artist_bliss_centroid
     from crate.db.tx import transaction_scope
 
     pg_db.upsert_artist({"name": "Centroid Artist"})
     artist = pg_db.get_library_artist("Centroid Artist")
-    album_id = pg_db.upsert_album({
-        "artist": "Centroid Artist",
-        "name": "Centroid Album",
-        "path": "/music/Centroid Artist/Centroid Album",
-    })
-    pg_db.upsert_track({
-        "album_id": album_id,
-        "artist": "Centroid Artist",
-        "album": "Centroid Album",
-        "filename": "01 - Low.flac",
-        "title": "Low",
-        "track_number": 1,
-        "format": "flac",
-        "path": "/music/Centroid Artist/Centroid Album/01 - Low.flac",
-    })
-    pg_db.upsert_track({
-        "album_id": album_id,
-        "artist": "Centroid Artist",
-        "album": "Centroid Album",
-        "filename": "02 - High.flac",
-        "title": "High",
-        "track_number": 2,
-        "format": "flac",
-        "path": "/music/Centroid Artist/Centroid Album/02 - High.flac",
-    })
+    album_id = pg_db.upsert_album(
+        {
+            "artist": "Centroid Artist",
+            "name": "Centroid Album",
+            "path": "/music/Centroid Artist/Centroid Album",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Centroid Artist",
+            "album": "Centroid Album",
+            "filename": "01 - Low.flac",
+            "title": "Low",
+            "track_number": 1,
+            "format": "flac",
+            "path": "/music/Centroid Artist/Centroid Album/01 - Low.flac",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Centroid Artist",
+            "album": "Centroid Album",
+            "filename": "02 - High.flac",
+            "title": "High",
+            "track_number": 2,
+            "format": "flac",
+            "path": "/music/Centroid Artist/Centroid Album/02 - High.flac",
+        }
+    )
     tracks = pg_db.get_library_tracks(album_id)
     vectors = {
         "Low": [0.0] * 20,
@@ -263,7 +299,9 @@ def test_artist_bliss_centroid_refresh_and_resolution(pg_db):
                 ),
                 {"track_id": track["id"], "vector": vectors[track["title"]]},
             )
-        refreshed = refresh_artist_bliss_centroids_for_track_ids(session, [track["id"] for track in tracks])
+        refreshed = refresh_artist_bliss_centroids_for_track_ids(
+            session, [track["id"] for track in tracks]
+        )
 
     assert refreshed == 1
     centroid = get_artist_bliss_centroid(str(artist["id"]))

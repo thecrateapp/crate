@@ -7,7 +7,12 @@
 
 import { Gapless5 } from "@/lib/gapless5/gapless5";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
-import { createEqChain, isFlatGains, type EqChain, type EqGains } from "@/lib/equalizer";
+import {
+  createEqChain,
+  isFlatGains,
+  type EqChain,
+  type EqGains,
+} from "@/lib/equalizer";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
 
 // Gapless-5 doesn't expose its playlist internals on the public type,
@@ -38,7 +43,11 @@ export interface GaplessPlayerCallbacks {
   onAllFinished?: () => void;
   onPrev?: (from: string, to: string) => void;
   onNext?: (from: string, to: string) => void;
-  onLoad?: (trackPath: string, fullyLoaded: boolean, durationMs: number) => void;
+  onLoad?: (
+    trackPath: string,
+    fullyLoaded: boolean,
+    durationMs: number,
+  ) => void;
   onError?: (trackPath: string, error: unknown) => void;
   onBuffering?: (trackPath: string) => void;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
@@ -96,7 +105,9 @@ export function isCurrentTrackFullyBuffered(): boolean {
 export function isPlaybackGestureRequiredError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as Partial<PlaybackGestureRequiredError>;
-  return candidate.type === "not_allowed" || candidate.name === "NotAllowedError";
+  return (
+    candidate.type === "not_allowed" || candidate.name === "NotAllowedError"
+  );
 }
 
 function setAnalyser(analyser: AnalyserNode | null) {
@@ -261,7 +272,9 @@ export function destroyPlayer(): void {
     try {
       instance.stop();
       instance.removeAllTracks();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     instance = null;
     currentAnalyser = null;
   }
@@ -354,12 +367,14 @@ export function replaceTrack(index: number, url: string): void {
  * user-initiated play path so the first tap always unlocks audio.
  */
 function ensureContextResumed(): void {
-  const patched = instance as (Gapless5 & {
-    context?: AudioContext;
-    masterOut?: GainNode;
-    _outputChainInput?: AudioNode | null;
-    _outputChainOutput?: AudioNode | null;
-  }) | null;
+  const patched = instance as
+    | (Gapless5 & {
+        context?: AudioContext;
+        masterOut?: GainNode;
+        _outputChainInput?: AudioNode | null;
+        _outputChainOutput?: AudioNode | null;
+      })
+    | null;
   const ctx = patched?.context;
   if (ctx?.state === "closed") {
     const audioWindow = window as unknown as {
@@ -367,7 +382,8 @@ function ensureContextResumed(): void {
       webkitAudioContext?: typeof AudioContext;
       gapless5AudioContext?: AudioContext;
     };
-    const MaybeContext = audioWindow.AudioContext || audioWindow.webkitAudioContext;
+    const MaybeContext =
+      audioWindow.AudioContext || audioWindow.webkitAudioContext;
     if (!MaybeContext || !patched) return;
     const nextContext = new MaybeContext();
     audioWindow.gapless5AudioContext = nextContext;
@@ -419,7 +435,10 @@ export function prev(): void {
  * Jump to an arbitrary track. Does NOT crossfade — use next()/prev()
  * for sequential skips that should respect the crossfade setting.
  */
-export function gotoTrack(indexOrUrl: number | string, forcePlay = false): void {
+export function gotoTrack(
+  indexOrUrl: number | string,
+  forcePlay = false,
+): void {
   if (forcePlay) ensureContextResumed();
   instance?.gotoTrack(indexOrUrl, forcePlay);
 }

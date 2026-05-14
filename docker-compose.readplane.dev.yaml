@@ -12,7 +12,7 @@ services:
     environment:
       READPLANE_ADDR: :8686
       DATABASE_URL: postgresql://crate:crate@postgres:5432/crate?sslmode=disable
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       JWT_SECRET: dev-secret-not-for-production
       READPLANE_ENABLED: "true"
       READPLANE_ENABLE_SSE: "true"

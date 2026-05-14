@@ -59,9 +59,10 @@ def list_tracks_missing_audio_fingerprints(
         params["album"] = album
     where_sql = " AND ".join(filters)
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT
                     id,
                     entity_uid::text AS entity_uid,
@@ -75,9 +76,12 @@ def list_tracks_missing_audio_fingerprints(
                 ORDER BY id ASC
                 LIMIT :limit
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 

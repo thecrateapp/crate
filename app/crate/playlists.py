@@ -3,10 +3,6 @@
 import logging
 
 from crate.db.repositories.playlists import (
-    generate_by_artist,
-    generate_by_decade,
-    generate_by_genre,
-    generate_random,
     generate_similar_artists as _generate_similar_artists,
 )
 from crate.lastfm import get_artist_info

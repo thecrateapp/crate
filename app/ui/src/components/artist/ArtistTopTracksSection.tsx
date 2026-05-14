@@ -20,8 +20,12 @@ export function ArtistTopTracksSection({
   topTracks,
   spotifyTopTracks,
 }: ArtistTopTracksSectionProps) {
-  if (topTracks.length === 0 && !(spotifyTopTracks?.length)) {
-    return <div className="text-center py-12 text-muted-foreground">No top tracks available</div>;
+  if (topTracks.length === 0 && !spotifyTopTracks?.length) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        No top tracks available
+      </div>
+    );
   }
 
   return (
@@ -36,12 +40,13 @@ export function ArtistTopTracksSection({
       </div>
       <div className="space-y-0.5">
         {topTracks.map((track, index) => {
-          const coverUrl = albumCoverApiUrl({
-            albumId: track.album_id,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
-          }) || undefined;
+          const coverUrl =
+            albumCoverApiUrl({
+              albumId: track.album_id,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            }) || undefined;
           return (
             <MusicContextMenu
               key={`nd-${track.id}`}
@@ -57,16 +62,26 @@ export function ArtistTopTracksSection({
               albumCover={coverUrl}
             >
               <div className="w-full flex items-center gap-4 px-4 py-2 text-left transition-colors group hover:bg-white/5">
-                <span className="w-8 text-right text-sm text-white/30">{index + 1}</span>
+                <span className="w-8 text-right text-sm text-white/30">
+                  {index + 1}
+                </span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate text-white/90">
                     {track.title}
                   </div>
                 </div>
-                <div className="w-32 hidden sm:block text-xs text-white/40 truncate">{track.album}</div>
-                <div className="w-20 text-right text-xs text-white/30">{formatDuration(track.duration)}</div>
+                <div className="w-32 hidden sm:block text-xs text-white/40 truncate">
+                  {track.album}
+                </div>
+                <div className="w-20 text-right text-xs text-white/30">
+                  {formatDuration(track.duration)}
+                </div>
                 <div className="w-20 text-right hidden sm:block">
-                  {track.listeners ? <span className="text-xs text-white/30">{formatCompact(track.listeners)}</span> : null}
+                  {track.listeners ? (
+                    <span className="text-xs text-white/30">
+                      {formatCompact(track.listeners)}
+                    </span>
+                  ) : null}
                 </div>
                 <div className="w-8" />
               </div>
@@ -75,18 +90,32 @@ export function ArtistTopTracksSection({
         })}
 
         {spotifyTopTracks
-          ?.filter((spotifyTrack) => !topTracks.some((track) => track.title.toLowerCase() === spotifyTrack.name.toLowerCase()))
+          ?.filter(
+            (spotifyTrack) =>
+              !topTracks.some(
+                (track) =>
+                  track.title.toLowerCase() === spotifyTrack.name.toLowerCase(),
+              ),
+          )
           .map((spotifyTrack, index) => (
             <div
               key={`sp-${index}`}
               className="w-full flex items-center gap-4 px-4 py-2 text-left opacity-60 transition-colors hover:bg-white/5"
             >
-              <span className="w-8 text-right text-sm text-white/30">{topTracks.length + index + 1}</span>
+              <span className="w-8 text-right text-sm text-white/30">
+                {topTracks.length + index + 1}
+              </span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-white/70 truncate">{spotifyTrack.name}</div>
+                <div className="text-sm text-white/70 truncate">
+                  {spotifyTrack.name}
+                </div>
               </div>
-              <div className="w-32 hidden sm:block text-xs text-white/40 truncate">{spotifyTrack.album}</div>
-              <div className="w-20 text-right text-xs text-white/30">{formatDurationMs(spotifyTrack.duration_ms)}</div>
+              <div className="w-32 hidden sm:block text-xs text-white/40 truncate">
+                {spotifyTrack.album}
+              </div>
+              <div className="w-20 text-right text-xs text-white/30">
+                {formatDurationMs(spotifyTrack.duration_ms)}
+              </div>
               <div className="w-20 text-right hidden sm:block">
                 <PopularityBar value={spotifyTrack.popularity} />
               </div>

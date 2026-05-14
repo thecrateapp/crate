@@ -28,7 +28,13 @@ interface TagEditorProps {
   onSaved?: () => void;
 }
 
-export function TagEditor({ albumId, albumEntityUid, tags, tracks, onSaved }: TagEditorProps) {
+export function TagEditor({
+  albumId,
+  albumEntityUid,
+  tags,
+  tracks,
+  onSaved,
+}: TagEditorProps) {
   const [values, setValues] = useState({
     artist: tags.artist || "",
     albumartist: tags.artist || "",
@@ -36,14 +42,19 @@ export function TagEditor({ albumId, albumEntityUid, tags, tracks, onSaved }: Ta
     date: tags.year || "",
     genre: tags.genre || "",
   });
-  const [trackEdits, setTrackEdits] = useState<Record<string, { title?: string; tracknumber?: string }>>({});
+  const [trackEdits, setTrackEdits] = useState<
+    Record<string, { title?: string; tracknumber?: string }>
+  >({});
   const [saving, setSaving] = useState(false);
   const [showTracks, setShowTracks] = useState(true);
   const [availableGenres, setAvailableGenres] = useState<string[]>([]);
 
   useEffect(() => {
     api<{ name: string; count: number }[]>("/api/genres")
-      .then((d) => { if (Array.isArray(d)) setAvailableGenres(d.map((g) => g.name).slice(0, 50)); })
+      .then((d) => {
+        if (Array.isArray(d))
+          setAvailableGenres(d.map((g) => g.name).slice(0, 50));
+      })
       .catch(() => {});
   }, []);
 
@@ -88,7 +99,9 @@ export function TagEditor({ albumId, albumEntityUid, tags, tracks, onSaved }: Ta
       const task = await waitForTask(task_id, 60000);
       setSaving(false);
       if (task.status === "completed") {
-        toast.success(`Tags saved (${Number(task.result?.updated ?? 0)} tracks)`);
+        toast.success(
+          `Tags saved (${Number(task.result?.updated ?? 0)} tracks)`,
+        );
         onSaved?.();
       } else if (task.status === "failed") {
         toast.error("Failed to save tags");
@@ -141,7 +154,10 @@ export function TagEditor({ albumId, albumEntityUid, tags, tracks, onSaved }: Ta
             {currentGenres.map((g) => (
               <Badge key={g} variant="default" className="text-xs gap-1 pr-1">
                 {g}
-                <button onClick={() => removeGenre(g)} className="hover:text-destructive">
+                <button
+                  onClick={() => removeGenre(g)}
+                  className="hover:text-destructive"
+                >
                   <X size={12} />
                 </button>
               </Badge>
@@ -185,23 +201,35 @@ export function TagEditor({ albumId, albumEntityUid, tags, tracks, onSaved }: Ta
               <div className="flex gap-2 items-center text-[10px] text-muted-foreground uppercase tracking-wider px-1 mb-1">
                 <span className="w-16">#</span>
                 <span className="flex-1">Title</span>
-                <span className="w-[120px] text-right hidden sm:block">File</span>
+                <span className="w-[120px] text-right hidden sm:block">
+                  File
+                </span>
               </div>
               {tracks.map((t) => {
                 const edits = trackEdits[t.filename] || {};
-                const modified = edits.title !== undefined || edits.tracknumber !== undefined;
+                const modified =
+                  edits.title !== undefined || edits.tracknumber !== undefined;
                 return (
-                  <div key={t.filename} className={`flex gap-2 items-center rounded-md px-1 py-0.5 ${modified ? "bg-primary/5 ring-1 ring-primary/20" : ""}`}>
+                  <div
+                    key={t.filename}
+                    className={`flex gap-2 items-center rounded-md px-1 py-0.5 ${
+                      modified ? "bg-primary/5 ring-1 ring-primary/20" : ""
+                    }`}
+                  >
                     <Input
                       className="w-16 bg-input border-border text-xs text-center"
                       value={edits.tracknumber ?? t.tracknumber ?? ""}
-                      onChange={(e) => updateTrack(t.filename, "tracknumber", e.target.value)}
+                      onChange={(e) =>
+                        updateTrack(t.filename, "tracknumber", e.target.value)
+                      }
                       placeholder="#"
                     />
                     <Input
                       className="flex-1 bg-input border-border text-sm"
                       value={edits.title ?? t.title ?? ""}
-                      onChange={(e) => updateTrack(t.filename, "title", e.target.value)}
+                      onChange={(e) =>
+                        updateTrack(t.filename, "title", e.target.value)
+                      }
                       placeholder="Track title"
                     />
                     <span className="text-[10px] text-muted-foreground truncate max-w-[120px] hidden sm:block">

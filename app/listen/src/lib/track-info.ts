@@ -33,12 +33,16 @@ export interface TrackInfo {
   bliss_signature: BlissSignature | null;
 }
 
-export function resolveTrackInfoUrl(track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">): string | null {
+export function resolveTrackInfoUrl(
+  track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">,
+): string | null {
   const path = trackInfoApiPath(track);
   return path || null;
 }
 
-export function getTrackQualityFallback(track: Pick<Track, "format" | "bitrate" | "sampleRate" | "bitDepth">) {
+export function getTrackQualityFallback(
+  track: Pick<Track, "format" | "bitrate" | "sampleRate" | "bitDepth">,
+) {
   return {
     format: track.format,
     bitrate: track.bitrate,

@@ -20,10 +20,20 @@ class TestAnalysisDaemonUnit:
 
         monkeypatch.setattr(analysis_daemon, "_reset_stale_claims", lambda state: None)
         monkeypatch.setattr(analysis_daemon, "_get_pending_count", lambda state: 1)
-        monkeypatch.setattr(analysis_daemon, "_claim_tracks", lambda state, limit: [track])
+        monkeypatch.setattr(
+            analysis_daemon, "_claim_tracks", lambda state, limit: [track]
+        )
         monkeypatch.setattr(analysis_daemon, "_should_pause_for_load", lambda: False)
-        monkeypatch.setattr(analysis_daemon, "_mark_failed", lambda track_id, state: calls["failed"].append((track_id, state)))
-        monkeypatch.setattr(analysis_daemon, "_release_claims", lambda track_ids, state: calls["released"].append((track_ids, state)))
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_mark_failed",
+            lambda track_id, state: calls["failed"].append((track_id, state)),
+        )
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_release_claims",
+            lambda track_ids, state: calls["released"].append((track_ids, state)),
+        )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_analysis_results",
@@ -48,10 +58,14 @@ class TestAnalysisDaemonUnit:
                     "scale": "major",
                     "energy": 0.91,
                     "mood": {"happy": 0.8},
-                }
+                },
             ),
         )
-        monkeypatch.setattr(analysis_daemon.time, "sleep", lambda _seconds: (_ for _ in ()).throw(_LoopExit()))
+        monkeypatch.setattr(
+            analysis_daemon.time,
+            "sleep",
+            lambda _seconds: (_ for _ in ()).throw(_LoopExit()),
+        )
 
         with pytest.raises(_LoopExit):
             analysis_daemon.analysis_daemon({})
@@ -80,10 +94,20 @@ class TestAnalysisDaemonUnit:
 
         monkeypatch.setattr(analysis_daemon, "_reset_stale_claims", lambda state: None)
         monkeypatch.setattr(analysis_daemon, "_get_pending_count", lambda state: 1)
-        monkeypatch.setattr(analysis_daemon, "_claim_tracks", lambda state, limit: [track])
+        monkeypatch.setattr(
+            analysis_daemon, "_claim_tracks", lambda state, limit: [track]
+        )
         monkeypatch.setattr(analysis_daemon, "_should_pause_for_load", lambda: False)
-        monkeypatch.setattr(analysis_daemon, "_mark_failed", lambda track_id, state: calls["failed"].append((track_id, state)))
-        monkeypatch.setattr(analysis_daemon, "_release_claims", lambda track_ids, state: calls["released"].append((track_ids, state)))
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_mark_failed",
+            lambda track_id, state: calls["failed"].append((track_id, state)),
+        )
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_release_claims",
+            lambda track_ids, state: calls["released"].append((track_ids, state)),
+        )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_analysis_results",
@@ -97,7 +121,11 @@ class TestAnalysisDaemonUnit:
                 analyze_track=lambda path: {"key": "D"},
             ),
         )
-        monkeypatch.setattr(analysis_daemon.time, "sleep", lambda _seconds: (_ for _ in ()).throw(_LoopExit()))
+        monkeypatch.setattr(
+            analysis_daemon.time,
+            "sleep",
+            lambda _seconds: (_ for _ in ()).throw(_LoopExit()),
+        )
 
         with pytest.raises(_LoopExit):
             analysis_daemon.analysis_daemon({})
@@ -110,15 +138,29 @@ class TestAnalysisDaemonUnit:
         import crate.analysis_daemon as analysis_daemon
 
         calls: dict[str, list] = {"stored": [], "failed": [], "released": []}
-        track = {"id": 9, "path": "/music/Artist/Album/bliss.flac", "title": "Bliss Track"}
+        track = {
+            "id": 9,
+            "path": "/music/Artist/Album/bliss.flac",
+            "title": "Bliss Track",
+        }
         vector = [0.1] * 20
 
         monkeypatch.setattr(analysis_daemon, "_reset_stale_claims", lambda state: None)
         monkeypatch.setattr(analysis_daemon, "_get_pending_count", lambda state: 1)
-        monkeypatch.setattr(analysis_daemon, "_claim_tracks", lambda state, limit: [track])
+        monkeypatch.setattr(
+            analysis_daemon, "_claim_tracks", lambda state, limit: [track]
+        )
         monkeypatch.setattr(analysis_daemon, "_should_pause_for_load", lambda: False)
-        monkeypatch.setattr(analysis_daemon, "_mark_failed", lambda track_id, state: calls["failed"].append((track_id, state)))
-        monkeypatch.setattr(analysis_daemon, "_release_claims", lambda track_ids, state: calls["released"].append((track_ids, state)))
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_mark_failed",
+            lambda track_id, state: calls["failed"].append((track_id, state)),
+        )
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_release_claims",
+            lambda track_ids, state: calls["released"].append((track_ids, state)),
+        )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_bliss_vectors",
@@ -130,10 +172,16 @@ class TestAnalysisDaemonUnit:
             SimpleNamespace(
                 is_available=lambda: True,
                 analyze_directory=lambda path: {track["path"]: vector},
-                analyze_file=lambda path: (_ for _ in ()).throw(AssertionError("single-file fallback should not run")),
+                analyze_file=lambda path: (_ for _ in ()).throw(
+                    AssertionError("single-file fallback should not run")
+                ),
             ),
         )
-        monkeypatch.setattr(analysis_daemon.time, "sleep", lambda _seconds: (_ for _ in ()).throw(_LoopExit()))
+        monkeypatch.setattr(
+            analysis_daemon.time,
+            "sleep",
+            lambda _seconds: (_ for _ in ()).throw(_LoopExit()),
+        )
 
         with pytest.raises(_LoopExit):
             analysis_daemon.bliss_daemon({})
@@ -142,19 +190,35 @@ class TestAnalysisDaemonUnit:
         assert calls["failed"] == []
         assert calls["released"] == []
 
-    def test_bliss_daemon_falls_back_to_single_file_when_directory_batch_misses_track(self, monkeypatch):
+    def test_bliss_daemon_falls_back_to_single_file_when_directory_batch_misses_track(
+        self, monkeypatch
+    ):
         import crate.analysis_daemon as analysis_daemon
 
         calls: dict[str, list] = {"stored": [], "failed": [], "released": []}
-        track = {"id": 11, "path": "/music/Artist/Album/missed.flac", "title": "Missed Track"}
+        track = {
+            "id": 11,
+            "path": "/music/Artist/Album/missed.flac",
+            "title": "Missed Track",
+        }
         vector = [0.3] * 20
 
         monkeypatch.setattr(analysis_daemon, "_reset_stale_claims", lambda state: None)
         monkeypatch.setattr(analysis_daemon, "_get_pending_count", lambda state: 1)
-        monkeypatch.setattr(analysis_daemon, "_claim_tracks", lambda state, limit: [track])
+        monkeypatch.setattr(
+            analysis_daemon, "_claim_tracks", lambda state, limit: [track]
+        )
         monkeypatch.setattr(analysis_daemon, "_should_pause_for_load", lambda: False)
-        monkeypatch.setattr(analysis_daemon, "_mark_failed", lambda track_id, state: calls["failed"].append((track_id, state)))
-        monkeypatch.setattr(analysis_daemon, "_release_claims", lambda track_ids, state: calls["released"].append((track_ids, state)))
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_mark_failed",
+            lambda track_id, state: calls["failed"].append((track_id, state)),
+        )
+        monkeypatch.setattr(
+            analysis_daemon,
+            "_release_claims",
+            lambda track_ids, state: calls["released"].append((track_ids, state)),
+        )
         monkeypatch.setattr(
             analysis_daemon,
             "_store_bliss_vectors",
@@ -169,7 +233,11 @@ class TestAnalysisDaemonUnit:
                 analyze_file=lambda path: vector,
             ),
         )
-        monkeypatch.setattr(analysis_daemon.time, "sleep", lambda _seconds: (_ for _ in ()).throw(_LoopExit()))
+        monkeypatch.setattr(
+            analysis_daemon.time,
+            "sleep",
+            lambda _seconds: (_ for _ in ()).throw(_LoopExit()),
+        )
 
         with pytest.raises(_LoopExit):
             analysis_daemon.bliss_daemon({})
@@ -215,10 +283,14 @@ class TestAnalysisJobsIntegration:
         )
 
         with transaction_scope() as session:
-            row = session.execute(
-                text("SELECT id, path FROM library_tracks WHERE path = :path"),
-                {"path": path},
-            ).mappings().first()
+            row = (
+                session.execute(
+                    text("SELECT id, path FROM library_tracks WHERE path = :path"),
+                    {"path": path},
+                )
+                .mappings()
+                .first()
+            )
         return dict(row)
 
     def test_upsert_track_creates_processing_rows(self, pg_db):
@@ -227,25 +299,33 @@ class TestAnalysisJobsIntegration:
         track = self._seed_track(pg_db, "processing-rows")
 
         with transaction_scope() as session:
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT pipeline, state
                     FROM track_processing_state
                     WHERE track_id = :id
                     ORDER BY pipeline
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().all()
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .all()
+            )
 
         assert {(row["pipeline"], row["state"]) for row in rows} == {
             ("analysis", "pending"),
             ("bliss", "pending"),
         }
 
-    def test_fingerprint_backfill_artist_scope_includes_album_tracks_with_feature_artists(self, pg_db):
-        from crate.db.jobs.analysis_fingerprints import list_tracks_missing_audio_fingerprints
+    def test_fingerprint_backfill_artist_scope_includes_album_tracks_with_feature_artists(
+        self, pg_db
+    ):
+        from crate.db.jobs.analysis_fingerprints import (
+            list_tracks_missing_audio_fingerprints,
+        )
 
         artist = "KNEECAP"
         album = "Fine Art"
@@ -289,7 +369,9 @@ class TestAnalysisJobsIntegration:
             }
         )
 
-        rows = list_tracks_missing_audio_fingerprints(artist=artist, album=album_folder, limit=10)
+        rows = list_tracks_missing_audio_fingerprints(
+            artist=artist, album=album_folder, limit=10
+        )
 
         assert {row["title"] for row in rows} >= {"Main Track", "Feature Track"}
 
@@ -300,7 +382,9 @@ class TestAnalysisJobsIntegration:
         track = self._seed_track(pg_db, "claim")
         with transaction_scope() as session:
             session.execute(
-                text("UPDATE library_tracks SET analysis_state = 'pending', bliss_state = 'pending' WHERE id = :id"),
+                text(
+                    "UPDATE library_tracks SET analysis_state = 'pending', bliss_state = 'pending' WHERE id = :id"
+                ),
                 {"id": track["id"]},
             )
 
@@ -326,7 +410,9 @@ class TestAnalysisJobsIntegration:
         track = self._seed_track(pg_db, "bliss")
         with transaction_scope() as session:
             session.execute(
-                text("UPDATE library_tracks SET analysis_state = 'analyzing', bliss_state = 'pending' WHERE id = :id"),
+                text(
+                    "UPDATE library_tracks SET analysis_state = 'analyzing', bliss_state = 'pending' WHERE id = :id"
+                ),
                 {"id": track["id"]},
             )
             session.execute(
@@ -352,18 +438,22 @@ class TestAnalysisJobsIntegration:
         analysis_jobs.store_bliss_vector(track["id"], vector)
 
         with transaction_scope() as session:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT analysis_state, bliss_state, bliss_vector,
                            bliss_computed_at,
                            bliss_embedding IS NOT NULL AS has_bliss_embedding
                     FROM library_tracks
                     WHERE id = :id
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().first()
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .first()
+            )
 
         assert row["analysis_state"] == "pending"
         assert row["bliss_state"] == "done"
@@ -381,7 +471,9 @@ class TestAnalysisJobsIntegration:
         track = self._seed_track(pg_db, "legacy-only-stale")
         with transaction_scope() as session:
             session.execute(
-                text("UPDATE library_tracks SET analysis_state = 'analyzing' WHERE id = :id"),
+                text(
+                    "UPDATE library_tracks SET analysis_state = 'analyzing' WHERE id = :id"
+                ),
                 {"id": track["id"]},
             )
 
@@ -390,7 +482,9 @@ class TestAnalysisJobsIntegration:
         assert reset == 0
         assert analysis_jobs.get_pending_count("analysis_state") == 1
 
-    def test_store_analysis_results_updates_multiple_tracks_and_processing_rows(self, pg_db):
+    def test_store_analysis_results_updates_multiple_tracks_and_processing_rows(
+        self, pg_db
+    ):
         from crate.db.jobs import analysis as analysis_jobs
         from crate.db.tx import transaction_scope
 
@@ -427,30 +521,40 @@ class TestAnalysisJobsIntegration:
         )
 
         with transaction_scope() as session:
-            processing = session.execute(
-                text(
-                    """
+            processing = (
+                session.execute(
+                    text(
+                        """
                     SELECT track_id, pipeline, state
                     FROM track_processing_state
                     WHERE track_id IN (:first_id, :second_id) AND pipeline = 'analysis'
                     ORDER BY track_id
                     """
-                ),
-                {"first_id": first["id"], "second_id": second["id"]},
-            ).mappings().all()
-            features = session.execute(
-                text(
-                    """
+                    ),
+                    {"first_id": first["id"], "second_id": second["id"]},
+                )
+                .mappings()
+                .all()
+            )
+            features = (
+                session.execute(
+                    text(
+                        """
                     SELECT track_id, bpm, audio_key, audio_scale, energy, mood_json, danceability, valence
                     FROM track_analysis_features
                     WHERE track_id IN (:first_id, :second_id)
                     ORDER BY track_id
                     """
-                ),
-                {"first_id": first["id"], "second_id": second["id"]},
-            ).mappings().all()
+                    ),
+                    {"first_id": first["id"], "second_id": second["id"]},
+                )
+                .mappings()
+                .all()
+            )
 
-        assert [(row["track_id"], row["pipeline"], row["state"]) for row in processing] == [
+        assert [
+            (row["track_id"], row["pipeline"], row["state"]) for row in processing
+        ] == [
             (first["id"], "analysis", "done"),
             (second["id"], "analysis", "done"),
         ]
@@ -516,17 +620,25 @@ class TestAnalysisJobsIntegration:
         assert claimed["id"] == eligible["id"]
 
         with transaction_scope() as session:
-            rows = session.execute(
-                text("SELECT id, analysis_state, bliss_state FROM library_tracks WHERE id IN (:blocked_id, :eligible_id) ORDER BY id"),
-                {"blocked_id": blocked["id"], "eligible_id": eligible["id"]},
-            ).mappings().all()
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT id, analysis_state, bliss_state FROM library_tracks WHERE id IN (:blocked_id, :eligible_id) ORDER BY id"
+                    ),
+                    {"blocked_id": blocked["id"], "eligible_id": eligible["id"]},
+                )
+                .mappings()
+                .all()
+            )
 
         by_id = {row["id"]: row for row in rows}
         assert by_id[blocked["id"]]["analysis_state"] == "analyzing"
         assert by_id[blocked["id"]]["bliss_state"] == "pending"
         assert by_id[eligible["id"]]["bliss_state"] == "analyzing"
 
-    def test_bliss_claim_ignores_stale_legacy_analysis_state_when_processing_row_is_pending(self, pg_db):
+    def test_bliss_claim_ignores_stale_legacy_analysis_state_when_processing_row_is_pending(
+        self, pg_db
+    ):
         from crate.db.jobs import analysis as analysis_jobs
         from crate.db.tx import transaction_scope
 
@@ -563,7 +675,9 @@ class TestAnalysisJobsIntegration:
         assert claimed is not None
         assert claimed["id"] == track["id"]
 
-    def test_processing_rows_prefer_shadow_tables_when_legacy_states_are_stale(self, pg_db):
+    def test_processing_rows_prefer_shadow_tables_when_legacy_states_are_stale(
+        self, pg_db
+    ):
         from crate.db.jobs import analysis as analysis_jobs
         from crate.db.tx import transaction_scope
 
@@ -589,7 +703,10 @@ class TestAnalysisJobsIntegration:
                 ),
                 {"id": track["id"], "vector": vector, "vector_literal": vector_literal},
             )
-            session.execute(text("DELETE FROM track_processing_state WHERE track_id = :id"), {"id": track["id"]})
+            session.execute(
+                text("DELETE FROM track_processing_state WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
             session.execute(
                 text(
                     """
@@ -640,24 +757,32 @@ class TestAnalysisJobsIntegration:
                         updated_at = EXCLUDED.updated_at
                     """
                 ),
-                {"track_id": track["id"], "vector": vector, "vector_literal": vector_literal},
+                {
+                    "track_id": track["id"],
+                    "vector": vector,
+                    "vector_literal": vector_literal,
+                },
             )
 
         assert analysis_jobs.get_pending_count("analysis_state") == 0
         assert analysis_jobs.get_pending_count("bliss_state") == 0
 
         with transaction_scope() as session:
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT pipeline, state, completed_at
                     FROM track_processing_state
                     WHERE track_id = :id
                     ORDER BY pipeline
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().all()
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .all()
+            )
 
         assert {(row["pipeline"], row["state"]) for row in rows} == {
             ("analysis", "done"),
@@ -692,9 +817,18 @@ class TestAnalysisJobsIntegration:
                 ),
                 {"id": track["id"]},
             )
-            session.execute(text("DELETE FROM track_processing_state WHERE track_id = :id"), {"id": track["id"]})
-            session.execute(text("DELETE FROM track_analysis_features WHERE track_id = :id"), {"id": track["id"]})
-            session.execute(text("DELETE FROM track_bliss_embeddings WHERE track_id = :id"), {"id": track["id"]})
+            session.execute(
+                text("DELETE FROM track_processing_state WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
+            session.execute(
+                text("DELETE FROM track_analysis_features WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
+            session.execute(
+                text("DELETE FROM track_bliss_embeddings WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
 
         assert analysis_jobs.get_pending_count("analysis_state") == 1
         assert analysis_jobs.get_pending_count("bliss_state") == 1
@@ -820,9 +954,18 @@ class TestAnalysisJobsIntegration:
                     "vector_literal": "[" + ",".join(["0.4"] * 20) + "]",
                 },
             )
-            session.execute(text("DELETE FROM track_processing_state WHERE track_id = :id"), {"id": track["id"]})
-            session.execute(text("DELETE FROM track_analysis_features WHERE track_id = :id"), {"id": track["id"]})
-            session.execute(text("DELETE FROM track_bliss_embeddings WHERE track_id = :id"), {"id": track["id"]})
+            session.execute(
+                text("DELETE FROM track_processing_state WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
+            session.execute(
+                text("DELETE FROM track_analysis_features WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
+            session.execute(
+                text("DELETE FROM track_bliss_embeddings WHERE track_id = :id"),
+                {"id": track["id"]},
+            )
 
         result = analysis_jobs.backfill_pipeline_read_models(limit=100)
 
@@ -832,37 +975,49 @@ class TestAnalysisJobsIntegration:
         assert result["bliss_embeddings"] >= 1
 
         with transaction_scope() as session:
-            processing = session.execute(
-                text(
-                    """
+            processing = (
+                session.execute(
+                    text(
+                        """
                     SELECT pipeline, state
                     FROM track_processing_state
                     WHERE track_id = :id
                     ORDER BY pipeline
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().all()
-            analysis_features = session.execute(
-                text(
-                    """
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .all()
+            )
+            analysis_features = (
+                session.execute(
+                    text(
+                        """
                     SELECT bpm, audio_key, audio_scale, energy
                     FROM track_analysis_features
                     WHERE track_id = :id
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().first()
-            bliss_features = session.execute(
-                text(
-                    """
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .first()
+            )
+            bliss_features = (
+                session.execute(
+                    text(
+                        """
                     SELECT bliss_vector, bliss_embedding IS NOT NULL AS has_embedding
                     FROM track_bliss_embeddings
                     WHERE track_id = :id
                     """
-                ),
-                {"id": track["id"]},
-            ).mappings().first()
+                    ),
+                    {"id": track["id"]},
+                )
+                .mappings()
+                .first()
+            )
 
         assert {(row["pipeline"], row["state"]) for row in processing} == {
             ("analysis", "done"),

@@ -10,11 +10,14 @@ from sqlalchemy.orm import Session
 from crate.db.tx import read_scope
 
 
-def get_playlist_tracks(playlist_id: int, *, session: Session | None = None) -> list[dict]:
+def get_playlist_tracks(
+    playlist_id: int, *, session: Session | None = None
+) -> list[dict]:
     def _impl(s: Session) -> list[dict]:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT
                     pt.id,
                     pt.playlist_id,
@@ -77,9 +80,12 @@ def get_playlist_tracks(playlist_id: int, *, session: Session | None = None) -> 
                 LEFT JOIN library_artists ar ON ar.name = COALESCE(lt.artist, pt.artist)
                 ORDER BY pt.position
                 """
-            ),
-            {"playlist_id": playlist_id},
-        ).mappings().all()
+                ),
+                {"playlist_id": playlist_id},
+            )
+            .mappings()
+            .all()
+        )
         tracks = [dict(row) for row in rows]
         for track in tracks:
             bliss_vector = track.get("bliss_vector")
@@ -98,8 +104,12 @@ def get_playlist_filter_options() -> dict:
         formats = [
             row["format"]
             for row in s.execute(
-                text("SELECT DISTINCT format FROM library_tracks WHERE format IS NOT NULL AND format != '' ORDER BY format")
-            ).mappings().all()
+                text(
+                    "SELECT DISTINCT format FROM library_tracks WHERE format IS NOT NULL AND format != '' ORDER BY format"
+                )
+            )
+            .mappings()
+            .all()
         ]
         keys = [
             row["audio_key"]
@@ -107,7 +117,9 @@ def get_playlist_filter_options() -> dict:
                 text(
                     "SELECT DISTINCT audio_key FROM library_tracks WHERE audio_key IS NOT NULL AND audio_key != '' ORDER BY audio_key"
                 )
-            ).mappings().all()
+            )
+            .mappings()
+            .all()
         ]
         scales = [
             row["audio_scale"]
@@ -115,45 +127,77 @@ def get_playlist_filter_options() -> dict:
                 text(
                     "SELECT DISTINCT audio_scale FROM library_tracks WHERE audio_scale IS NOT NULL AND audio_scale != '' ORDER BY audio_scale"
                 )
-            ).mappings().all()
+            )
+            .mappings()
+            .all()
         ]
-        artists = [row["name"] for row in s.execute(text("SELECT name FROM library_artists ORDER BY name")).mappings().all()]
-        year_row = s.execute(
-            text("SELECT MIN(year) AS min_y, MAX(year) AS max_y FROM library_tracks WHERE year IS NOT NULL AND year != ''")
-        ).mappings().first()
-        bpm_row = s.execute(
-            text("SELECT MIN(bpm) AS min_b, MAX(bpm) AS max_b FROM library_tracks WHERE bpm IS NOT NULL")
-        ).mappings().first()
+        artists = [
+            row["name"]
+            for row in s.execute(text("SELECT name FROM library_artists ORDER BY name"))
+            .mappings()
+            .all()
+        ]
+        year_row = (
+            s.execute(
+                text(
+                    "SELECT MIN(year) AS min_y, MAX(year) AS max_y FROM library_tracks WHERE year IS NOT NULL AND year != ''"
+                )
+            )
+            .mappings()
+            .first()
+        )
+        bpm_row = (
+            s.execute(
+                text(
+                    "SELECT MIN(bpm) AS min_b, MAX(bpm) AS max_b FROM library_tracks WHERE bpm IS NOT NULL"
+                )
+            )
+            .mappings()
+            .first()
+        )
+
+    year_min = year_row["min_y"] if year_row is not None else None
+    year_max = year_row["max_y"] if year_row is not None else None
+    bpm_min = bpm_row["min_b"] if bpm_row is not None else None
+    bpm_max = bpm_row["max_b"] if bpm_row is not None else None
 
     return {
         "formats": formats,
         "keys": keys,
         "scales": scales,
         "artists": artists,
-        "year_range": [year_row["min_y"] or "1960", year_row["max_y"] or "2026"],
-        "bpm_range": [int(bpm_row["min_b"] or 60), int(bpm_row["max_b"] or 200)],
+        "year_range": [year_min or "1960", year_max or "2026"],
+        "bpm_range": [int(bpm_min or 60), int(bpm_max or 200)],
     }
 
 
 def get_generation_history(playlist_id: int, limit: int = 5) -> list[dict]:
     with read_scope() as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT *
                 FROM playlist_generation_log
                 WHERE playlist_id = :playlist_id
                 ORDER BY started_at DESC
                 LIMIT :limit
                 """
-            ),
-            {"playlist_id": playlist_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"playlist_id": playlist_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     results: list[dict] = []
     for row in rows:
         item = dict(row)
         snapshot = item.pop("rule_snapshot_json", None)
-        item["rule_snapshot"] = snapshot if isinstance(snapshot, dict) else (json.loads(snapshot) if snapshot else None)
+        item["rule_snapshot"] = (
+            snapshot
+            if isinstance(snapshot, dict)
+            else (json.loads(snapshot) if snapshot else None)
+        )
         for key in ("started_at", "completed_at"):
             if hasattr(item.get(key), "isoformat"):
                 item[key] = item[key].isoformat()

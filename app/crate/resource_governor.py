@@ -17,74 +17,86 @@ from collections.abc import Sequence
 
 log = logging.getLogger(__name__)
 
-RESOURCE_GOVERNED_TASK_TYPES = frozenset({
-    "backfill_track_audio_fingerprints",
-    "batch_covers",
-    "batch_retag",
-    "compute_analytics",
-    "compute_popularity",
-    "enrich_mbids",
-    "export_rich_metadata",
-    "fetch_artwork_all",
-    "fix_artist",
-    "fix_issues",
-    "health_check",
-    "library_pipeline",
-    "library_sync",
-    "migrate_storage_v2",
-    "process_new_content",
-    "rebuild_library",
-    "rehydrate_portable_metadata",
-    "repair",
-    "resolve_duplicates",
-    "scan",
-    "scan_missing_covers",
-    "verify_storage_v2",
-    "wipe_library",
-    "write_portable_metadata",
-})
+RESOURCE_GOVERNED_TASK_TYPES = frozenset(
+    {
+        "backfill_track_audio_fingerprints",
+        "batch_covers",
+        "batch_retag",
+        "compute_analytics",
+        "compute_popularity",
+        "enrich_mbids",
+        "export_rich_metadata",
+        "fetch_artwork_all",
+        "fix_artist",
+        "fix_issues",
+        "health_check",
+        "library_pipeline",
+        "library_sync",
+        "migrate_storage_v2",
+        "process_new_content",
+        "rebuild_library",
+        "rehydrate_portable_metadata",
+        "repair",
+        "resolve_duplicates",
+        "scan",
+        "scan_missing_covers",
+        "verify_storage_v2",
+        "wipe_library",
+        "write_portable_metadata",
+    }
+)
 
-AUDIO_HEAVY_TASK_TYPES = frozenset({
-    "backfill_track_audio_fingerprints",
-})
+AUDIO_HEAVY_TASK_TYPES = frozenset(
+    {
+        "backfill_track_audio_fingerprints",
+    }
+)
 
-MAINTENANCE_WINDOW_TASK_TYPES = frozenset({
-    "batch_retag",
-    "export_rich_metadata",
-    "fix_issues",
-    "library_pipeline",
-    "migrate_storage_v2",
-    "rebuild_library",
-    "rehydrate_portable_metadata",
-    "verify_storage_v2",
-    "wipe_library",
-    "write_portable_metadata",
-})
+MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
+    {
+        "batch_retag",
+        "export_rich_metadata",
+        "fix_issues",
+        "library_pipeline",
+        "migrate_storage_v2",
+        "rebuild_library",
+        "rehydrate_portable_metadata",
+        "verify_storage_v2",
+        "wipe_library",
+        "write_portable_metadata",
+    }
+)
 
-SCOPED_RESOURCE_BYPASS_TASK_TYPES = frozenset({
-    "backfill_track_audio_fingerprints",
-    "export_rich_metadata",
-    "fix_artist",
-    "fix_issues",
-    "health_check",
-    "library_sync",
-    "process_new_content",
-    "rehydrate_portable_metadata",
-    "repair",
-    "write_portable_metadata",
-})
+SCOPED_RESOURCE_BYPASS_TASK_TYPES = frozenset(
+    {
+        "backfill_track_audio_fingerprints",
+        "export_rich_metadata",
+        "fix_artist",
+        "fix_issues",
+        "health_check",
+        "library_sync",
+        "process_new_content",
+        "rehydrate_portable_metadata",
+        "repair",
+        "write_portable_metadata",
+    }
+)
 
-MANUAL_RESOURCE_BYPASS_TASK_TYPES = frozenset({
-    "health_check",
-})
+MANUAL_RESOURCE_BYPASS_TASK_TYPES = frozenset(
+    {
+        "health_check",
+    }
+)
 
-MANUAL_TRIGGER_VALUES = frozenset({
-    "admin",
-    "api",
-    "manual",
-    "ui",
-    "user",
-})
+MANUAL_TRIGGER_VALUES = frozenset(
+    {
+        "admin",
+        "api",
+        "manual",
+        "ui",
+        "user",
+    }
+)
 
 DEFAULT_DEFER_SECONDS = 300
 DEFAULT_LOAD_RATIO = 0.85
@@ -152,9 +164,15 @@ def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDec
     if not _maintenance_window_enabled():
         return ResourceDecision(allowed=True)
 
-    start_raw = os.environ.get("CRATE_MAINTENANCE_WINDOW_START", DEFAULT_MAINTENANCE_WINDOW_START)
-    end_raw = os.environ.get("CRATE_MAINTENANCE_WINDOW_END", DEFAULT_MAINTENANCE_WINDOW_END)
-    start_min = _parse_hhmm(start_raw, _parse_hhmm(DEFAULT_MAINTENANCE_WINDOW_START, 120))
+    start_raw = os.environ.get(
+        "CRATE_MAINTENANCE_WINDOW_START", DEFAULT_MAINTENANCE_WINDOW_START
+    )
+    end_raw = os.environ.get(
+        "CRATE_MAINTENANCE_WINDOW_END", DEFAULT_MAINTENANCE_WINDOW_END
+    )
+    start_min = _parse_hhmm(
+        start_raw, _parse_hhmm(DEFAULT_MAINTENANCE_WINDOW_START, 120)
+    )
     end_min = _parse_hhmm(end_raw, _parse_hhmm(DEFAULT_MAINTENANCE_WINDOW_END, 420))
     now_min = _local_minutes_now()
     in_window = _minutes_in_window(now_min, start_min, end_min)
@@ -170,7 +188,9 @@ def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDec
     if in_window:
         return ResourceDecision(allowed=True, window=window)
 
-    reason = f"outside maintenance window {_format_hhmm(start_min)}-{_format_hhmm(end_min)}"
+    reason = (
+        f"outside maintenance window {_format_hhmm(start_min)}-{_format_hhmm(end_min)}"
+    )
     return ResourceDecision(
         allowed=False,
         reason=reason,
@@ -179,28 +199,40 @@ def evaluate_maintenance_window(*, task_type: str = "background") -> ResourceDec
     )
 
 
-def evaluate_resources(*, label: str = "background", listener_sensitive: bool = True) -> ResourceDecision:
+def evaluate_resources(
+    *, label: str = "background", listener_sensitive: bool = True
+) -> ResourceDecision:
     if not _enabled():
         return ResourceDecision(allowed=True)
 
     snapshot = build_snapshot(include_playback=listener_sensitive)
     reasons: list[str] = []
     max_load_ratio = _float_setting("CRATE_RESOURCE_MAX_LOAD_RATIO", DEFAULT_LOAD_RATIO)
-    max_iowait = _float_setting("CRATE_RESOURCE_MAX_IOWAIT_PERCENT", DEFAULT_IOWAIT_PERCENT)
+    max_iowait = _float_setting(
+        "CRATE_RESOURCE_MAX_IOWAIT_PERCENT", DEFAULT_IOWAIT_PERCENT
+    )
     max_swap = _float_setting("CRATE_RESOURCE_MAX_SWAP_PERCENT", DEFAULT_SWAP_PERCENT)
-    min_swap_used_mb = _float_setting("CRATE_RESOURCE_MIN_SWAP_USED_MB", DEFAULT_SWAP_MIN_USED_MB)
+    min_swap_used_mb = _float_setting(
+        "CRATE_RESOURCE_MIN_SWAP_USED_MB", DEFAULT_SWAP_MIN_USED_MB
+    )
     min_memory_available = _float_setting(
         "CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT",
         DEFAULT_MIN_MEMORY_AVAILABLE_PERCENT,
     )
     max_active_users = _nonnegative_int_setting("CRATE_RESOURCE_MAX_ACTIVE_USERS", 0)
-    max_active_streams = _nonnegative_int_setting("CRATE_RESOURCE_MAX_ACTIVE_STREAMS", 0)
+    max_active_streams = _nonnegative_int_setting(
+        "CRATE_RESOURCE_MAX_ACTIVE_STREAMS", 0
+    )
 
     if listener_sensitive:
         if (snapshot.active_users or 0) > max_active_users:
-            reasons.append(f"{snapshot.active_users} active listener(s)>{max_active_users}")
+            reasons.append(
+                f"{snapshot.active_users} active listener(s)>{max_active_users}"
+            )
         if (snapshot.active_streams or 0) > max_active_streams:
-            reasons.append(f"{snapshot.active_streams} recent stream(s)>{max_active_streams}")
+            reasons.append(
+                f"{snapshot.active_streams} recent stream(s)>{max_active_streams}"
+            )
 
     if snapshot.load_ratio is not None and snapshot.load_ratio > max_load_ratio:
         reasons.append(f"load {snapshot.load_ratio:.2f}>{max_load_ratio:.2f}")
@@ -209,7 +241,11 @@ def evaluate_resources(*, label: str = "background", listener_sensitive: bool = 
     if (
         snapshot.swap_used_percent is not None
         and snapshot.swap_used_percent > max_swap
-        and _swap_indicates_pressure(snapshot, min_swap_used_mb=min_swap_used_mb, min_memory_available=min_memory_available)
+        and _swap_indicates_pressure(
+            snapshot,
+            min_swap_used_mb=min_swap_used_mb,
+            min_memory_available=min_memory_available,
+        )
     ):
         reasons.append(f"swap {snapshot.swap_used_percent:.1f}%>{max_swap:.1f}%")
 
@@ -217,7 +253,9 @@ def evaluate_resources(*, label: str = "background", listener_sensitive: bool = 
     decision = ResourceDecision(
         allowed=allowed,
         reason=", ".join(reasons),
-        defer_seconds=_int_setting("CRATE_RESOURCE_DEFER_SECONDS", DEFAULT_DEFER_SECONDS),
+        defer_seconds=_int_setting(
+            "CRATE_RESOURCE_DEFER_SECONDS", DEFAULT_DEFER_SECONDS
+        ),
         snapshot=snapshot,
     )
     if not allowed:
@@ -232,7 +270,7 @@ def build_snapshot(*, include_playback: bool = True) -> ResourceSnapshot:
     try:
         load_1m = float(os.getloadavg()[0])
         load_ratio = load_1m / max(cpu_count, 1)
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     active_users: int | None = None
@@ -284,14 +322,18 @@ def record_decision(
     try:
         from crate.db.cache_store import set_cache
 
-        set_cache("resource_pressure", decision.to_dict(), ttl=max(decision.defer_seconds, 60))
+        set_cache(
+            "resource_pressure", decision.to_dict(), ttl=max(decision.defer_seconds, 60)
+        )
     except Exception:
-        pass
+        log.debug("Failed to record decision", exc_info=True)
     if not decision.allowed:
         _record_deferral_metrics(decision, task_type=task_type, source=source)
 
 
-def low_priority_command(command: Sequence[str], *, nice_value: int | None = None, idle_io: bool = True) -> list[str]:
+def low_priority_command(
+    command: Sequence[str], *, nice_value: int | None = None, idle_io: bool = True
+) -> list[str]:
     wrapped = [str(part) for part in command]
     if os.name != "posix":
         return wrapped
@@ -367,7 +409,10 @@ def _requires_maintenance_window(task_type: str, params: dict) -> bool:
         return not _has_specific_scope(params)
     if task_type == "backfill_track_audio_fingerprints":
         limit = _coerce_int(params.get("limit"), 5000)
-        threshold = _int_setting("CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT", DEFAULT_FINGERPRINT_WINDOW_LIMIT)
+        threshold = _int_setting(
+            "CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT",
+            DEFAULT_FINGERPRINT_WINDOW_LIMIT,
+        )
         return not _has_specific_scope(params) or limit > threshold
     return False
 
@@ -381,7 +426,10 @@ def _bypasses_resource_pressure(task_type: str, params: dict) -> bool:
         return False
     if task_type == "backfill_track_audio_fingerprints":
         limit = _coerce_int(params.get("limit"), DEFAULT_FINGERPRINT_WINDOW_LIMIT + 1)
-        threshold = _int_setting("CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT", DEFAULT_FINGERPRINT_WINDOW_LIMIT)
+        threshold = _int_setting(
+            "CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT",
+            DEFAULT_FINGERPRINT_WINDOW_LIMIT,
+        )
         return _has_specific_scope(params) and limit <= threshold
     return _has_specific_scope(params)
 
@@ -423,7 +471,7 @@ def _parse_hhmm(value: str, default: int) -> int:
         minute = int(minute_raw)
         if 0 <= hour <= 23 and 0 <= minute <= 59:
             return hour * 60 + minute
-    except Exception:
+    except (ValueError, TypeError):
         pass
     return default
 
@@ -510,19 +558,39 @@ def _record_deferral_metrics(
             if snapshot.load_ratio is not None:
                 record("worker.resource.load_ratio", float(snapshot.load_ratio), tags)
             if snapshot.iowait_percent is not None:
-                record("worker.resource.iowait_percent", float(snapshot.iowait_percent), tags)
+                record(
+                    "worker.resource.iowait_percent",
+                    float(snapshot.iowait_percent),
+                    tags,
+                )
             if snapshot.swap_used_percent is not None:
-                record("worker.resource.swap_used_percent", float(snapshot.swap_used_percent), tags)
+                record(
+                    "worker.resource.swap_used_percent",
+                    float(snapshot.swap_used_percent),
+                    tags,
+                )
             if snapshot.swap_used_mb is not None:
-                record("worker.resource.swap_used_mb", float(snapshot.swap_used_mb), tags)
+                record(
+                    "worker.resource.swap_used_mb", float(snapshot.swap_used_mb), tags
+                )
             if snapshot.memory_available_percent is not None:
-                record("worker.resource.memory_available_percent", float(snapshot.memory_available_percent), tags)
+                record(
+                    "worker.resource.memory_available_percent",
+                    float(snapshot.memory_available_percent),
+                    tags,
+                )
             if snapshot.active_users is not None:
-                record("worker.resource.active_users", float(snapshot.active_users), tags)
+                record(
+                    "worker.resource.active_users", float(snapshot.active_users), tags
+                )
             if snapshot.active_streams is not None:
-                record("worker.resource.active_streams", float(snapshot.active_streams), tags)
+                record(
+                    "worker.resource.active_streams",
+                    float(snapshot.active_streams),
+                    tags,
+                )
     except Exception:
-        pass
+        log.debug("Deferral metrics recording failed", exc_info=True)
 
 
 def _reason_family(reason: str) -> str:
@@ -608,7 +676,9 @@ def _memory_pressure_values() -> dict[str, float | None]:
     mem_total = values.get("MemTotal", 0)
     mem_available = values.get("MemAvailable", 0)
     return {
-        "swap_used_percent": 0.0 if swap_total <= 0 else round(swap_used / swap_total * 100, 1),
+        "swap_used_percent": 0.0
+        if swap_total <= 0
+        else round(swap_used / swap_total * 100, 1),
         "swap_used_mb": round(swap_used / 1024, 1),
         "memory_available_percent": (
             None

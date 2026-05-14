@@ -15,7 +15,13 @@ interface ImageCropUploadProps {
   label?: string;
 }
 
-export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label }: ImageCropUploadProps) {
+export function ImageCropUpload({
+  endpoint,
+  aspect,
+  onUploaded,
+  className,
+  label,
+}: ImageCropUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
@@ -44,7 +50,11 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
       const blob = await getCroppedBlob(imageSrc, croppedArea);
       const form = new FormData();
       form.append("file", blob, "image.jpg");
-      const res = await fetch(endpoint, { method: "POST", body: form, credentials: "include" });
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
 
@@ -61,7 +71,9 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
       setImageSrc(null);
       onUploaded?.();
     } catch (e) {
-      toast.error(`Upload failed: ${e instanceof Error ? e.message : "Unknown"}`);
+      toast.error(
+        `Upload failed: ${e instanceof Error ? e.message : "Unknown"}`,
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -77,13 +89,27 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
 
   return (
     <>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }} />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.[0]) handleFileSelect(e.target.files[0]);
+        }}
+      />
 
       {/* Trigger button (overlay) */}
       <button
-        className={className ?? "absolute bottom-1 right-1 p-1.5 rounded-md bg-black/60 text-white/70 hover:text-white hover:bg-black/80 opacity-0 group-hover/cover:opacity-100 transition-opacity"}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); inputRef.current?.click(); }}
+        className={
+          className ??
+          "absolute bottom-1 right-1 p-1.5 rounded-md bg-black/60 text-white/70 hover:text-white hover:bg-black/80 opacity-0 group-hover/cover:opacity-100 transition-opacity"
+        }
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          inputRef.current?.click();
+        }}
         title="Upload image"
       >
         <Camera size={14} />
@@ -92,14 +118,28 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
 
       {/* Crop modal */}
       {imageSrc && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80" onClick={cancel}>
-          <div className="bg-card rounded-md shadow-2xl w-[90vw] max-w-[600px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/80"
+          onClick={cancel}
+        >
+          <div
+            className="bg-card rounded-md shadow-2xl w-[90vw] max-w-[600px] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <span className="text-sm font-medium">Crop Image</span>
-              <button onClick={cancel} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
+              <button
+                onClick={cancel}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div className="relative w-full" style={{ height: aspect >= 1 ? 400 : 500 }}>
+            <div
+              className="relative w-full"
+              style={{ height: aspect >= 1 ? 400 : 500 }}
+            >
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -115,7 +155,9 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
               <span className="text-xs text-muted-foreground">Zoom</span>
               <input
                 type="range"
-                min={1} max={3} step={0.05}
+                min={1}
+                max={3}
+                step={0.05}
                 value={zoom}
                 onChange={(e) => setZoom(Number(e.target.value))}
                 className="flex-1 accent-primary"
@@ -123,9 +165,18 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
             </div>
 
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
-              <Button variant="outline" size="sm" onClick={cancel}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={cancel}>
+                Cancel
+              </Button>
               <Button size="sm" onClick={handleUpload} disabled={uploading}>
-                {uploading ? <><Loader2 size={14} className="animate-spin mr-1" /> Uploading...</> : "Upload"}
+                {uploading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin mr-1" />{" "}
+                    Uploading...
+                  </>
+                ) : (
+                  "Upload"
+                )}
               </Button>
             </div>
           </div>
@@ -135,19 +186,32 @@ export function ImageCropUpload({ endpoint, aspect, onUploaded, className, label
   );
 }
 
-
 async function getCroppedBlob(imageSrc: string, crop: Area): Promise<Blob> {
   const img = await createImage(imageSrc);
   const canvas = document.createElement("canvas");
   canvas.width = crop.width;
   canvas.height = crop.height;
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(img, crop.x, crop.y, crop.width, crop.height, 0, 0, crop.width, crop.height);
+  ctx.drawImage(
+    img,
+    crop.x,
+    crop.y,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    crop.width,
+    crop.height,
+  );
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("Canvas toBlob failed"));
-    }, "image/jpeg", 0.92);
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Canvas toBlob failed"));
+      },
+      "image/jpeg",
+      0.92,
+    );
   });
 }
 

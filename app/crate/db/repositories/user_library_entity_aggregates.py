@@ -7,11 +7,18 @@ from crate.db.repositories.user_library_aggregate_shared import window_filter_sq
 
 def recompute_user_track_stats(session, user_id: int, window: str, cutoff: str | None):
     session.execute(
-        text("DELETE FROM user_track_stats WHERE user_id = :user_id AND stat_window = :window"),
+        text(
+            "DELETE FROM user_track_stats WHERE user_id = :user_id AND stat_window = :window"
+        ),
         {"user_id": user_id, "window": window},
     )
     where_sql, extra_params = window_filter_sql(cutoff)
-    params = {"user_id": user_id, "window": window, "filter_user_id": user_id, **extra_params}
+    params = {
+        "user_id": user_id,
+        "window": window,
+        "filter_user_id": user_id,
+        **extra_params,
+    }
     session.execute(
         text(
             f"""
@@ -58,11 +65,18 @@ def recompute_user_track_stats(session, user_id: int, window: str, cutoff: str |
 
 def recompute_user_artist_stats(session, user_id: int, window: str, cutoff: str | None):
     session.execute(
-        text("DELETE FROM user_artist_stats WHERE user_id = :user_id AND stat_window = :window"),
+        text(
+            "DELETE FROM user_artist_stats WHERE user_id = :user_id AND stat_window = :window"
+        ),
         {"user_id": user_id, "window": window},
     )
     where_sql, extra_params = window_filter_sql(cutoff)
-    params = {"user_id": user_id, "window": window, "filter_user_id": user_id, **extra_params}
+    params = {
+        "user_id": user_id,
+        "window": window,
+        "filter_user_id": user_id,
+        **extra_params,
+    }
     session.execute(
         text(
             f"""
@@ -97,11 +111,18 @@ def recompute_user_artist_stats(session, user_id: int, window: str, cutoff: str 
 
 def recompute_user_album_stats(session, user_id: int, window: str, cutoff: str | None):
     session.execute(
-        text("DELETE FROM user_album_stats WHERE user_id = :user_id AND stat_window = :window"),
+        text(
+            "DELETE FROM user_album_stats WHERE user_id = :user_id AND stat_window = :window"
+        ),
         {"user_id": user_id, "window": window},
     )
     where_sql, extra_params = window_filter_sql(cutoff)
-    params = {"user_id": user_id, "window": window, "filter_user_id": user_id, **extra_params}
+    params = {
+        "user_id": user_id,
+        "window": window,
+        "filter_user_id": user_id,
+        **extra_params,
+    }
     session.execute(
         text(
             f"""
@@ -140,11 +161,18 @@ def recompute_user_album_stats(session, user_id: int, window: str, cutoff: str |
 
 def recompute_user_genre_stats(session, user_id: int, window: str, cutoff: str | None):
     session.execute(
-        text("DELETE FROM user_genre_stats WHERE user_id = :user_id AND stat_window = :window"),
+        text(
+            "DELETE FROM user_genre_stats WHERE user_id = :user_id AND stat_window = :window"
+        ),
         {"user_id": user_id, "window": window},
     )
     where_sql, extra_params = window_filter_sql(cutoff)
-    params = {"user_id": user_id, "window": window, "filter_user_id": user_id, **extra_params}
+    params = {
+        "user_id": user_id,
+        "window": window,
+        "filter_user_id": user_id,
+        **extra_params,
+    }
     session.execute(
         text(
             f"""

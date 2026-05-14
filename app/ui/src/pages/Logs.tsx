@@ -14,7 +14,11 @@ import {
   Wifi,
 } from "lucide-react";
 
-import { OpsPageHero, OpsPanel, OpsStatTile } from "@/components/admin/ops-surfaces";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+} from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
@@ -45,30 +49,38 @@ interface LogsSnapshotData {
   workers: WorkerInfo[];
 }
 
-const KNOWN_CATEGORIES = ["general", "enrichment", "analysis", "tidal", "sync", "system"];
+const KNOWN_CATEGORIES = [
+  "general",
+  "enrichment",
+  "analysis",
+  "tidal",
+  "sync",
+  "system",
+];
 
-const LEVEL_META: Record<string, { dot: string; text: string; pill: string }> = {
-  error: {
-    dot: "bg-red-400",
-    text: "text-red-100",
-    pill: "border-red-500/25 bg-red-500/10 text-red-100",
-  },
-  warn: {
-    dot: "bg-amber-400",
-    text: "text-amber-100",
-    pill: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-  },
-  info: {
-    dot: "bg-cyan-400",
-    text: "text-white/80",
-    pill: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
-  },
-  debug: {
-    dot: "bg-white/25",
-    text: "text-white/55",
-    pill: "border-white/10 bg-white/[0.04] text-white/55",
-  },
-};
+const LEVEL_META: Record<string, { dot: string; text: string; pill: string }> =
+  {
+    error: {
+      dot: "bg-red-400",
+      text: "text-red-100",
+      pill: "border-red-500/25 bg-red-500/10 text-red-100",
+    },
+    warn: {
+      dot: "bg-amber-400",
+      text: "text-amber-100",
+      pill: "border-amber-500/25 bg-amber-500/10 text-amber-100",
+    },
+    info: {
+      dot: "bg-cyan-400",
+      text: "text-white/80",
+      pill: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
+    },
+    debug: {
+      dot: "bg-white/25",
+      text: "text-white/55",
+      pill: "border-white/10 bg-white/[0.04] text-white/55",
+    },
+  };
 
 function formatLogTimestamp(ts: string) {
   try {
@@ -112,19 +124,33 @@ function WorkerTile({
       onClick={onClick}
       className={cn(
         "rounded-md border bg-black/20 p-3 text-left transition-colors",
-        active ? "border-cyan-400/25 bg-cyan-400/10" : "border-white/8 hover:border-white/16 hover:bg-white/[0.04]",
+        active
+          ? "border-cyan-400/25 bg-cyan-400/10"
+          : "border-white/8 hover:border-white/16 hover:bg-white/[0.04]",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <div className="text-sm font-medium text-white">{worker.worker_id}</div>
-          <div className="text-xs text-white/40">{worker.log_count} log lines seen</div>
+          <div className="text-sm font-medium text-white">
+            {worker.worker_id}
+          </div>
+          <div className="text-xs text-white/40">
+            {worker.log_count} log lines seen
+          </div>
         </div>
-        <CrateChip className={online ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200" : ""}>
+        <CrateChip
+          className={
+            online
+              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+              : ""
+          }
+        >
           {online ? "Online" : "Idle"}
         </CrateChip>
       </div>
-      <div className="mt-3 text-xs text-white/35">Last seen {timeAgo(worker.last_seen)}</div>
+      <div className="mt-3 text-xs text-white/35">
+        Last seen {timeAgo(worker.last_seen)}
+      </div>
     </button>
   );
 }
@@ -135,19 +161,33 @@ function LogRow({ entry }: { entry: LogEntry }) {
   const metadata = metadataPreview(entry.metadata);
 
   return (
-    <div className={cn("grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors hover:bg-white/[0.03] md:grid-cols-[78px_68px_minmax(0,1fr)]", level === "error" && "bg-red-500/[0.04]")}>
-      <div className="text-white/25 tabular-nums">{formatLogTimestamp(entry.created_at)}</div>
+    <div
+      className={cn(
+        "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors hover:bg-white/[0.03] md:grid-cols-[78px_68px_minmax(0,1fr)]",
+        level === "error" && "bg-red-500/[0.04]",
+      )}
+    >
+      <div className="text-white/25 tabular-nums">
+        {formatLogTimestamp(entry.created_at)}
+      </div>
       <div className="flex items-center gap-2">
         <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
-        <span className={cn("uppercase tracking-[0.12em]", meta.text)}>{level}</span>
+        <span className={cn("uppercase tracking-[0.12em]", meta.text)}>
+          {level}
+        </span>
       </div>
       <div className="min-w-0 space-y-1">
-        <div className={cn("break-words leading-5", meta.text)}>{entry.message}</div>
+        <div className={cn("break-words leading-5", meta.text)}>
+          {entry.message}
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/35">
           <CrateChip className="font-sans">{entry.category}</CrateChip>
           <CrateChip className="font-sans">{entry.worker_id}</CrateChip>
           {entry.task_id ? (
-            <Link to={`/tasks?task=${entry.task_id}`} className="font-sans text-primary/70 hover:text-primary">
+            <Link
+              to={`/tasks?task=${entry.task_id}`}
+              className="font-sans text-primary/70 hover:text-primary"
+            >
               Task {entry.task_id.slice(0, 8)}
             </Link>
           ) : null}
@@ -179,7 +219,9 @@ export function Logs() {
     if (!loadedRef.current) setLoading(true);
     try {
       const query = fresh ? "?limit=100&fresh=1" : "?limit=100";
-      const data = await api<LogsSnapshotData>(`/api/admin/logs-snapshot${query}`);
+      const data = await api<LogsSnapshotData>(
+        `/api/admin/logs-snapshot${query}`,
+      );
       setSnapshot(data);
       setError(null);
       loadedRef.current = true;
@@ -201,7 +243,9 @@ export function Logs() {
 
     function connect() {
       if (disposed) return;
-      stream = new EventSource("/api/admin/logs-stream?limit=100", { withCredentials: true });
+      stream = new EventSource("/api/admin/logs-stream?limit=100", {
+        withCredentials: true,
+      });
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as LogsSnapshotData;
@@ -236,7 +280,9 @@ export function Logs() {
   const workers = snapshot?.workers ?? [];
 
   const categories = useMemo(() => {
-    const dynamic = new Set(logs.map((entry) => entry.category).filter(Boolean));
+    const dynamic = new Set(
+      logs.map((entry) => entry.category).filter(Boolean),
+    );
     for (const categoryName of KNOWN_CATEGORIES) dynamic.add(categoryName);
     return [...dynamic].sort((a, b) => a.localeCompare(b));
   }, [logs]);
@@ -249,16 +295,24 @@ export function Logs() {
       if (workerId && entry.worker_id !== workerId) return false;
       if (!normalized) return true;
       const metadata = metadataPreview(entry.metadata).toLowerCase();
-      const haystack = `${entry.message} ${entry.category} ${entry.worker_id} ${entry.task_id ?? ""} ${metadata}`.toLowerCase();
+      const haystack = `${entry.message} ${entry.category} ${entry.worker_id} ${
+        entry.task_id ?? ""
+      } ${metadata}`.toLowerCase();
       return haystack.includes(normalized);
     });
   }, [category, level, logs, search, workerId]);
 
   const summary = useMemo(() => {
-    const errors = visibleLogs.filter((entry) => entry.level === "error").length;
-    const warnings = visibleLogs.filter((entry) => entry.level === "warn").length;
+    const errors = visibleLogs.filter(
+      (entry) => entry.level === "error",
+    ).length;
+    const warnings = visibleLogs.filter(
+      (entry) => entry.level === "warn",
+    ).length;
     const infos = visibleLogs.filter((entry) => entry.level === "info").length;
-    const onlineWorkers = workers.filter((worker) => isWorkerOnline(worker.last_seen)).length;
+    const onlineWorkers = workers.filter((worker) =>
+      isWorkerOnline(worker.last_seen),
+    ).length;
     return { errors, warnings, infos, onlineWorkers };
   }, [visibleLogs, workers]);
 
@@ -271,7 +325,9 @@ export function Logs() {
   }
 
   if (error && !snapshot) {
-    return <ErrorState message={error} onRetry={() => void fetchSnapshot(true)} />;
+    return (
+      <ErrorState message={error} onRetry={() => void fetchSnapshot(true)} />
+    );
   }
 
   return (
@@ -291,25 +347,68 @@ export function Logs() {
               {autoRefresh ? <Pause size={14} /> : <Play size={14} />}
               {autoRefresh ? "Pause live" : "Resume live"}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => void fetchSnapshot(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => void fetchSnapshot(true)}
+            >
               <RefreshCw size={14} />
               Refresh
             </Button>
           </>
         }
       >
-        <CratePill active icon={ScrollText}>{visibleLogs.length} lines</CratePill>
-        <CratePill icon={Wifi}>{summary.onlineWorkers}/{workers.length} workers online</CratePill>
-        {summary.errors > 0 ? <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">{summary.errors} errors</CratePill> : null}
-        {summary.warnings > 0 ? <CratePill className="border-amber-500/25 bg-amber-500/10 text-amber-100">{summary.warnings} warnings</CratePill> : null}
+        <CratePill active icon={ScrollText}>
+          {visibleLogs.length} lines
+        </CratePill>
+        <CratePill icon={Wifi}>
+          {summary.onlineWorkers}/{workers.length} workers online
+        </CratePill>
+        {summary.errors > 0 ? (
+          <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
+            {summary.errors} errors
+          </CratePill>
+        ) : null}
+        {summary.warnings > 0 ? (
+          <CratePill className="border-amber-500/25 bg-amber-500/10 text-amber-100">
+            {summary.warnings} warnings
+          </CratePill>
+        ) : null}
         <CratePill>{autoRefresh ? "Live mode" : "Frozen snapshot"}</CratePill>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <OpsStatTile icon={ShieldAlert} label="Errors" value={summary.errors.toLocaleString()} caption="Filtered lines at error level" tone={summary.errors > 0 ? "danger" : "default"} />
-        <OpsStatTile icon={AlertTriangle} label="Warnings" value={summary.warnings.toLocaleString()} caption="Things worth checking before they hard-fail" tone={summary.warnings > 0 ? "warning" : "default"} />
-        <OpsStatTile icon={Wifi} label="Workers online" value={summary.onlineWorkers.toLocaleString()} caption={`${workers.length.toLocaleString()} known workers`} tone={summary.onlineWorkers > 0 ? "success" : "default"} />
-        <OpsStatTile icon={Bug} label="Info / debug" value={(summary.infos + visibleLogs.filter((entry) => entry.level === "debug").length).toLocaleString()} caption="Operational noise still visible in the stream" />
+        <OpsStatTile
+          icon={ShieldAlert}
+          label="Errors"
+          value={summary.errors.toLocaleString()}
+          caption="Filtered lines at error level"
+          tone={summary.errors > 0 ? "danger" : "default"}
+        />
+        <OpsStatTile
+          icon={AlertTriangle}
+          label="Warnings"
+          value={summary.warnings.toLocaleString()}
+          caption="Things worth checking before they hard-fail"
+          tone={summary.warnings > 0 ? "warning" : "default"}
+        />
+        <OpsStatTile
+          icon={Wifi}
+          label="Workers online"
+          value={summary.onlineWorkers.toLocaleString()}
+          caption={`${workers.length.toLocaleString()} known workers`}
+          tone={summary.onlineWorkers > 0 ? "success" : "default"}
+        />
+        <OpsStatTile
+          icon={Bug}
+          label="Info / debug"
+          value={(
+            summary.infos +
+            visibleLogs.filter((entry) => entry.level === "debug").length
+          ).toLocaleString()}
+          caption="Operational noise still visible in the stream"
+        />
       </div>
 
       <OpsPanel
@@ -319,7 +418,10 @@ export function Logs() {
       >
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative flex-1 min-w-[240px]">
-            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+            />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -342,7 +444,10 @@ export function Logs() {
             value={category}
             onChange={setCategory}
             placeholder="All categories"
-            options={categories.map((entry) => ({ value: entry, label: entry }))}
+            options={categories.map((entry) => ({
+              value: entry,
+              label: entry,
+            }))}
             searchable
             searchPlaceholder="Filter categories..."
           />
@@ -373,7 +478,11 @@ export function Logs() {
                 key={worker.worker_id}
                 worker={worker}
                 active={workerId === worker.worker_id}
-                onClick={() => setWorkerId((current) => current === worker.worker_id ? "" : worker.worker_id)}
+                onClick={() =>
+                  setWorkerId((current) =>
+                    current === worker.worker_id ? "" : worker.worker_id,
+                  )
+                }
               />
             ))}
           </div>
@@ -392,11 +501,17 @@ export function Logs() {
         <div className="overflow-hidden rounded-md border border-white/8 bg-[#06080c]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              {level ? <CrateChip className={LEVEL_META[level]?.pill}>{level}</CrateChip> : null}
+              {level ? (
+                <CrateChip className={LEVEL_META[level]?.pill}>
+                  {level}
+                </CrateChip>
+              ) : null}
               {category ? <CrateChip>{category}</CrateChip> : null}
               {workerId ? <CrateChip>{workerId}</CrateChip> : null}
               {search ? <CrateChip>{search}</CrateChip> : null}
-              {!level && !category && !workerId && !search ? <CrateChip>All filters open</CrateChip> : null}
+              {!level && !category && !workerId && !search ? (
+                <CrateChip>All filters open</CrateChip>
+              ) : null}
             </div>
             <div className="text-xs text-white/35">
               Showing {visibleLogs.length} of {logs.length} lines

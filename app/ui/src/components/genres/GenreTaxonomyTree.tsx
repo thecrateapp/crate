@@ -47,10 +47,18 @@ interface TaxonomyTree {
 
 function matchesSearch(node: TaxonomyNode, query: string): boolean {
   const q = query.toLowerCase();
-  return node.name.includes(q) || node.slug.includes(q) || node.alias_names.some((a) => a.includes(q));
+  return (
+    node.name.includes(q) ||
+    node.slug.includes(q) ||
+    node.alias_names.some((a) => a.includes(q))
+  );
 }
 
-function collectAncestors(slug: string, nodeMap: Map<string, TaxonomyNode>, result: Set<string>) {
+function collectAncestors(
+  slug: string,
+  nodeMap: Map<string, TaxonomyNode>,
+  result: Set<string>,
+) {
   const node = nodeMap.get(slug);
   if (!node) return;
   for (const parent of node.parent_slugs) {
@@ -87,36 +95,66 @@ function NodeDetailPanel({
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold text-foreground capitalize">{node.name}</h3>
+        <h3 className="text-lg font-semibold text-foreground capitalize">
+          {node.name}
+        </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {node.top_level && (
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">top-level</Badge>
+            <Badge
+              variant="outline"
+              className="border-primary/30 bg-primary/10 text-primary"
+            >
+              top-level
+            </Badge>
           )}
-          <Badge variant="outline" className={hasPreset ? "border-primary/30 bg-primary/10 text-primary" : "border-white/15 text-white/55"}>
-            {node.eq_preset_source === "direct" ? "direct preset" : node.eq_preset_source === "inherited" ? `inherits from ${node.eq_preset_inherited_from}` : "no preset"}
+          <Badge
+            variant="outline"
+            className={
+              hasPreset
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-white/15 text-white/55"
+            }
+          >
+            {node.eq_preset_source === "direct"
+              ? "direct preset"
+              : node.eq_preset_source === "inherited"
+                ? `inherits from ${node.eq_preset_inherited_from}`
+                : "no preset"}
           </Badge>
           {empty && (
-            <Badge variant="outline" className="border-white/15 text-white/40">empty</Badge>
+            <Badge variant="outline" className="border-white/15 text-white/40">
+              empty
+            </Badge>
           )}
         </div>
       </div>
 
       {/* Stats */}
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span className="flex items-center gap-1.5"><Users size={14} />{node.artist_count} artists</span>
-        <span className="flex items-center gap-1.5"><Disc3 size={14} />{node.album_count} albums</span>
+        <span className="flex items-center gap-1.5">
+          <Users size={14} />
+          {node.artist_count} artists
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Disc3 size={14} />
+          {node.album_count} albums
+        </span>
       </div>
 
       {/* Description */}
       {node.description ? (
         <p className="text-sm leading-6 text-white/60">{node.description}</p>
       ) : (
-        <p className="text-sm italic text-white/30">No description available. Run enrichment to fetch one.</p>
+        <p className="text-sm italic text-white/30">
+          No description available. Run enrichment to fetch one.
+        </p>
       )}
 
       {/* References */}
       <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">References</div>
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+          References
+        </div>
         <div className="space-y-1.5">
           {node.musicbrainz_mbid ? (
             <div className="flex items-center gap-2">
@@ -140,10 +178,14 @@ function NodeDetailPanel({
               >
                 <Copy size={11} />
               </button>
-              <span className="font-mono text-[10px] text-white/25 select-all">{node.musicbrainz_mbid}</span>
+              <span className="font-mono text-[10px] text-white/25 select-all">
+                {node.musicbrainz_mbid}
+              </span>
             </div>
           ) : (
-            <div className="text-xs text-white/30 italic">No MusicBrainz MBID — run MB sync to match.</div>
+            <div className="text-xs text-white/30 italic">
+              No MusicBrainz MBID — run MB sync to match.
+            </div>
           )}
           {node.wikidata_url ? (
             <div className="flex items-center gap-2">
@@ -160,14 +202,18 @@ function NodeDetailPanel({
           ) : null}
           <div className="flex items-center gap-2">
             <span className="text-xs text-white/40">Slug:</span>
-            <span className="font-mono text-[11px] text-white/50 select-all">{node.slug}</span>
+            <span className="font-mono text-[11px] text-white/50 select-all">
+              {node.slug}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Actions */}
       <div>
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">Actions</div>
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-white/35">
+          Actions
+        </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton
             label="Sync MusicBrainz"
@@ -221,7 +267,9 @@ function NodeDetailPanel({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {node.alias_names.map((alias) => (
-              <Badge key={alias} variant="outline" className="text-xs">{alias}</Badge>
+              <Badge key={alias} variant="outline" className="text-xs">
+                {alias}
+              </Badge>
             ))}
           </div>
         </div>
@@ -234,9 +282,19 @@ function NodeDetailPanel({
         initialGains={node.eq_gains}
         initialResolved={
           node.eq_preset_source === "inherited" && node.eq_preset_inherited_from
-            ? { gains: node.eq_gains ?? [], source: "inherited", slug: node.eq_preset_inherited_from, name: node.eq_preset_inherited_from }
+            ? {
+                gains: node.eq_gains ?? [],
+                source: "inherited",
+                slug: node.eq_preset_inherited_from,
+                name: node.eq_preset_inherited_from,
+              }
             : node.eq_gains
-              ? { gains: node.eq_gains, source: "direct", slug: node.slug, name: node.name }
+              ? {
+                  gains: node.eq_gains,
+                  source: "direct",
+                  slug: node.slug,
+                  name: node.name,
+                }
               : null
         }
         onSaved={onRefetch}
@@ -294,12 +352,30 @@ function NodeDetailPanel({
   );
 }
 
-function ActionButton({ label, icon: Icon, busy, onClick }: {
-  label: string; icon: typeof Sparkles; busy: boolean; onClick: () => void;
+function ActionButton({
+  label,
+  icon: Icon,
+  busy,
+  onClick,
+}: {
+  label: string;
+  icon: typeof Sparkles;
+  busy: boolean;
+  onClick: () => void;
 }) {
   return (
-    <Button variant="outline" size="sm" className="text-xs" onClick={onClick} disabled={busy}>
-      {busy ? <Loader2 size={12} className="mr-1 animate-spin" /> : <Icon size={12} className="mr-1" />}
+    <Button
+      variant="outline"
+      size="sm"
+      className="text-xs"
+      onClick={onClick}
+      disabled={busy}
+    >
+      {busy ? (
+        <Loader2 size={12} className="mr-1 animate-spin" />
+      ) : (
+        <Icon size={12} className="mr-1" />
+      )}
       {label}
     </Button>
   );
@@ -307,7 +383,13 @@ function ActionButton({ label, icon: Icon, busy, onClick }: {
 
 // ── Main Component ──────────────────────────────────────────────
 
-export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?: string; hideEmpty?: boolean }) {
+export function GenreTaxonomyTree({
+  filter = "",
+  hideEmpty = false,
+}: {
+  filter?: string;
+  hideEmpty?: boolean;
+}) {
   const { data, refetch } = useApi<TaxonomyTree>("/api/genres/taxonomy/tree");
   const { pollTask } = useTaskPoll();
   const navigate = useNavigate();
@@ -323,7 +405,8 @@ export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?:
   }, [data?.nodes]);
 
   const { visibleSlugs, autoExpanded } = useMemo(() => {
-    if (!search.trim() || !data) return { visibleSlugs: null, autoExpanded: new Set<string>() };
+    if (!search.trim() || !data)
+      return { visibleSlugs: null, autoExpanded: new Set<string>() };
     const q = search.trim().toLowerCase();
     const matches = new Set<string>();
     const ancestors = new Set<string>();
@@ -333,7 +416,10 @@ export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?:
         collectAncestors(node.slug, nodeMap, ancestors);
       }
     }
-    return { visibleSlugs: new Set([...matches, ...ancestors]), autoExpanded: ancestors };
+    return {
+      visibleSlugs: new Set([...matches, ...ancestors]),
+      autoExpanded: ancestors,
+    };
   }, [search, data, nodeMap]);
 
   const nonEmptySlugs = useMemo(() => {
@@ -370,62 +456,92 @@ export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?:
 
   const selectedNode = selectedSlug ? nodeMap.get(selectedSlug) ?? null : null;
 
-  const runAction = useCallback((key: string) => {
-    if (busy[key] || !selectedSlug) return;
-    setBusy((prev) => ({ ...prev, [key]: true }));
+  const runAction = useCallback(
+    (key: string) => {
+      if (busy[key] || !selectedSlug) return;
+      setBusy((prev) => ({ ...prev, [key]: true }));
 
-    const actions: Record<string, { url: string; body: Record<string, unknown>; success: string; error: string }> = {
-      "mb-sync": {
-        url: "/api/genres/musicbrainz/sync",
-        body: { limit: 80, focus_slug: selectedSlug },
-        success: "MusicBrainz sync complete",
-        error: "MusicBrainz sync failed",
-      },
-      "enrich": {
-        url: "/api/genres/descriptions/enrich",
-        body: { limit: 20, focus_slug: selectedSlug },
-        success: "Description enrichment complete",
-        error: "Description enrichment failed",
-      },
-      "infer": {
-        url: "/api/genres/infer",
-        body: { limit: 50, focus_slug: selectedSlug, aggressive: true, include_external: true },
-        success: "Taxonomy inference complete",
-        error: "Taxonomy inference failed",
-      },
-      "cleanup": {
-        url: "/api/genres/taxonomy/cleanup-invalid",
-        body: {},
-        success: "Invalid nodes cleaned",
-        error: "Cleanup failed",
-      },
-      "playlist": {
-        url: `/api/genres/${selectedSlug}/playlist`,
-        body: { limit: 50 },
-        success: "Playlist generated",
-        error: "Playlist generation failed",
-      },
-    };
+      const actions: Record<
+        string,
+        {
+          url: string;
+          body: Record<string, unknown>;
+          success: string;
+          error: string;
+        }
+      > = {
+        "mb-sync": {
+          url: "/api/genres/musicbrainz/sync",
+          body: { limit: 80, focus_slug: selectedSlug },
+          success: "MusicBrainz sync complete",
+          error: "MusicBrainz sync failed",
+        },
+        enrich: {
+          url: "/api/genres/descriptions/enrich",
+          body: { limit: 20, focus_slug: selectedSlug },
+          success: "Description enrichment complete",
+          error: "Description enrichment failed",
+        },
+        infer: {
+          url: "/api/genres/infer",
+          body: {
+            limit: 50,
+            focus_slug: selectedSlug,
+            aggressive: true,
+            include_external: true,
+          },
+          success: "Taxonomy inference complete",
+          error: "Taxonomy inference failed",
+        },
+        cleanup: {
+          url: "/api/genres/taxonomy/cleanup-invalid",
+          body: {},
+          success: "Invalid nodes cleaned",
+          error: "Cleanup failed",
+        },
+        playlist: {
+          url: `/api/genres/${selectedSlug}/playlist`,
+          body: { limit: 50 },
+          success: "Playlist generated",
+          error: "Playlist generation failed",
+        },
+      };
 
-    const action = actions[key];
-    if (!action) { setBusy((prev) => ({ ...prev, [key]: false })); return; }
-
-    void (async () => {
-      try {
-        const { task_id } = await api<{ task_id: string }>(action.url, "POST", action.body);
-        pollTask(
-          task_id,
-          () => { setBusy((prev) => ({ ...prev, [key]: false })); refetch(); toast.success(action.success); },
-          (err) => { setBusy((prev) => ({ ...prev, [key]: false })); toast.error(err || action.error); },
-          3000,
-          10 * 60 * 1000,
-        );
-      } catch {
+      const action = actions[key];
+      if (!action) {
         setBusy((prev) => ({ ...prev, [key]: false }));
-        toast.error(action.error);
+        return;
       }
-    })();
-  }, [busy, selectedSlug, pollTask, refetch]);
+
+      void (async () => {
+        try {
+          const { task_id } = await api<{ task_id: string }>(
+            action.url,
+            "POST",
+            action.body,
+          );
+          pollTask(
+            task_id,
+            () => {
+              setBusy((prev) => ({ ...prev, [key]: false }));
+              refetch();
+              toast.success(action.success);
+            },
+            (err) => {
+              setBusy((prev) => ({ ...prev, [key]: false }));
+              toast.error(err || action.error);
+            },
+            3000,
+            10 * 60 * 1000,
+          );
+        } catch {
+          setBusy((prev) => ({ ...prev, [key]: false }));
+          toast.error(action.error);
+        }
+      })();
+    },
+    [busy, selectedSlug, pollTask, refetch],
+  );
 
   const isBusy = useCallback((key: string) => !!busy[key], [busy]);
 
@@ -440,7 +556,8 @@ export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?:
     });
   };
 
-  const isExpanded = (slug: string) => expanded.has(slug) || autoExpanded.has(slug);
+  const isExpanded = (slug: string) =>
+    expanded.has(slug) || autoExpanded.has(slug);
 
   const selectNode = (slug: string) => {
     setSelectedSlug(slug);
@@ -479,34 +596,49 @@ export function GenreTaxonomyTree({ filter = "", hideEmpty = false }: { filter?:
             <span
               role="button"
               className="flex-shrink-0 p-0.5 rounded hover:bg-white/10"
-              onClick={(e) => { e.stopPropagation(); toggleExpand(slug); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleExpand(slug);
+              }}
             >
               <ChevronRight
                 size={12}
-                className={`text-white/40 transition-transform ${open ? "rotate-90" : ""}`}
+                className={`text-white/40 transition-transform ${
+                  open ? "rotate-90" : ""
+                }`}
               />
             </span>
           ) : (
             <span className="w-4 flex-shrink-0" />
           )}
-          <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-            empty ? "bg-white/15"
-              : hasPreset ? "bg-cyan-400"
-              : "bg-white/25"
-          }`} />
-          <span className={`flex-1 truncate font-medium ${
-            isSelected ? "text-cyan-100"
-              : empty ? "text-white/30"
-              : node.top_level ? "text-white"
-              : "text-white/75"
-          }`}>
+          <span
+            className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+              empty ? "bg-white/15" : hasPreset ? "bg-cyan-400" : "bg-white/25"
+            }`}
+          />
+          <span
+            className={`flex-1 truncate font-medium ${
+              isSelected
+                ? "text-cyan-100"
+                : empty
+                  ? "text-white/30"
+                  : node.top_level
+                    ? "text-white"
+                    : "text-white/75"
+            }`}
+          >
             {node.name}
           </span>
           {node.artist_count > 0 && (
-            <span className="text-[10px] tabular-nums text-white/30 flex-shrink-0">{node.artist_count}</span>
+            <span className="text-[10px] tabular-nums text-white/30 flex-shrink-0">
+              {node.artist_count}
+            </span>
           )}
         </button>
-        {open && node.children_slugs.map((childSlug) => renderNode(childSlug, depth + 1))}
+        {open &&
+          node.children_slugs.map((childSlug) =>
+            renderNode(childSlug, depth + 1),
+          )}
       </div>
     );
   };

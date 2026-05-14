@@ -8,56 +8,239 @@ interface PathNode {
   artist: string;
   genre: string;
   similarity: number; // 0-1 progress along the path
-  energy: number;     // visual: node pulse intensity
+  energy: number; // visual: node pulse intensity
 }
 
-const DEMO_PATHS: Record<string, { origin: string; destination: string; nodes: PathNode[] }> = {
+const DEMO_PATHS: Record<
+  string,
+  { origin: string; destination: string; nodes: PathNode[] }
+> = {
   "nyhc-crank": {
     origin: "NY Hardcore",
     destination: "Crank Wave",
     nodes: [
-      { track: "Don't Forget to Breathe", artist: "Madball", genre: "nyhc", similarity: 0, energy: 0.92 },
-      { track: "Gomorrah", artist: "Trapped Under Ice", genre: "hardcore", similarity: 0.12, energy: 0.88 },
-      { track: "Modern Life Is War", artist: "Defeater", genre: "melodic hc", similarity: 0.25, energy: 0.82 },
-      { track: "No Spiritual Surrender", artist: "Inside Out", genre: "post-hardcore", similarity: 0.35, energy: 0.75 },
-      { track: "Apes of God", artist: "Refused", genre: "post-hardcore", similarity: 0.48, energy: 0.80 },
-      { track: "No Save Point", artist: "Run The Jewels", genre: "alt hip-hop", similarity: 0.58, energy: 0.78 },
-      { track: "Crawl", artist: "Squid", genre: "post-punk", similarity: 0.70, energy: 0.74 },
-      { track: "Narrator", artist: "Squid", genre: "post-punk", similarity: 0.78, energy: 0.70 },
-      { track: "Nylon", artist: "Lynks", genre: "crank wave", similarity: 0.88, energy: 0.85 },
-      { track: "Opus", artist: "Scowl", genre: "crank wave", similarity: 1, energy: 0.90 },
+      {
+        track: "Don't Forget to Breathe",
+        artist: "Madball",
+        genre: "nyhc",
+        similarity: 0,
+        energy: 0.92,
+      },
+      {
+        track: "Gomorrah",
+        artist: "Trapped Under Ice",
+        genre: "hardcore",
+        similarity: 0.12,
+        energy: 0.88,
+      },
+      {
+        track: "Modern Life Is War",
+        artist: "Defeater",
+        genre: "melodic hc",
+        similarity: 0.25,
+        energy: 0.82,
+      },
+      {
+        track: "No Spiritual Surrender",
+        artist: "Inside Out",
+        genre: "post-hardcore",
+        similarity: 0.35,
+        energy: 0.75,
+      },
+      {
+        track: "Apes of God",
+        artist: "Refused",
+        genre: "post-hardcore",
+        similarity: 0.48,
+        energy: 0.8,
+      },
+      {
+        track: "No Save Point",
+        artist: "Run The Jewels",
+        genre: "alt hip-hop",
+        similarity: 0.58,
+        energy: 0.78,
+      },
+      {
+        track: "Crawl",
+        artist: "Squid",
+        genre: "post-punk",
+        similarity: 0.7,
+        energy: 0.74,
+      },
+      {
+        track: "Narrator",
+        artist: "Squid",
+        genre: "post-punk",
+        similarity: 0.78,
+        energy: 0.7,
+      },
+      {
+        track: "Nylon",
+        artist: "Lynks",
+        genre: "crank wave",
+        similarity: 0.88,
+        energy: 0.85,
+      },
+      {
+        track: "Opus",
+        artist: "Scowl",
+        genre: "crank wave",
+        similarity: 1,
+        energy: 0.9,
+      },
     ],
   },
   "ambient-metal": {
     origin: "Ambient",
     destination: "Black Metal",
     nodes: [
-      { track: "An Ending", artist: "Brian Eno", genre: "ambient", similarity: 0, energy: 0.15 },
-      { track: "Stars of the Lid", artist: "Stars of the Lid", genre: "drone", similarity: 0.12, energy: 0.18 },
-      { track: "Dungtitled", artist: "Sigur Ros", genre: "post-rock", similarity: 0.25, energy: 0.30 },
-      { track: "Storm", artist: "GY!BE", genre: "post-rock", similarity: 0.38, energy: 0.45 },
-      { track: "Infinite Granite", artist: "Deafheaven", genre: "shoegaze", similarity: 0.48, energy: 0.55 },
-      { track: "Sunbather", artist: "Deafheaven", genre: "blackgaze", similarity: 0.58, energy: 0.70 },
-      { track: "New Bermuda", artist: "Deafheaven", genre: "blackgaze", similarity: 0.70, energy: 0.78 },
-      { track: "Exercices Spirituels", artist: "Blut Aus Nord", genre: "atmo black", similarity: 0.82, energy: 0.72 },
-      { track: "Bergtatt", artist: "Ulver", genre: "black metal", similarity: 0.90, energy: 0.80 },
-      { track: "Transilvanian Hunger", artist: "Darkthrone", genre: "black metal", similarity: 1, energy: 0.88 },
+      {
+        track: "An Ending",
+        artist: "Brian Eno",
+        genre: "ambient",
+        similarity: 0,
+        energy: 0.15,
+      },
+      {
+        track: "Stars of the Lid",
+        artist: "Stars of the Lid",
+        genre: "drone",
+        similarity: 0.12,
+        energy: 0.18,
+      },
+      {
+        track: "Dungtitled",
+        artist: "Sigur Ros",
+        genre: "post-rock",
+        similarity: 0.25,
+        energy: 0.3,
+      },
+      {
+        track: "Storm",
+        artist: "GY!BE",
+        genre: "post-rock",
+        similarity: 0.38,
+        energy: 0.45,
+      },
+      {
+        track: "Infinite Granite",
+        artist: "Deafheaven",
+        genre: "shoegaze",
+        similarity: 0.48,
+        energy: 0.55,
+      },
+      {
+        track: "Sunbather",
+        artist: "Deafheaven",
+        genre: "blackgaze",
+        similarity: 0.58,
+        energy: 0.7,
+      },
+      {
+        track: "New Bermuda",
+        artist: "Deafheaven",
+        genre: "blackgaze",
+        similarity: 0.7,
+        energy: 0.78,
+      },
+      {
+        track: "Exercices Spirituels",
+        artist: "Blut Aus Nord",
+        genre: "atmo black",
+        similarity: 0.82,
+        energy: 0.72,
+      },
+      {
+        track: "Bergtatt",
+        artist: "Ulver",
+        genre: "black metal",
+        similarity: 0.9,
+        energy: 0.8,
+      },
+      {
+        track: "Transilvanian Hunger",
+        artist: "Darkthrone",
+        genre: "black metal",
+        similarity: 1,
+        energy: 0.88,
+      },
     ],
   },
   "jazz-electronic": {
     origin: "Jazz",
     destination: "Electronic",
     nodes: [
-      { track: "So What", artist: "Miles Davis", genre: "jazz", similarity: 0, energy: 0.40 },
-      { track: "Maiden Voyage", artist: "Herbie Hancock", genre: "jazz", similarity: 0.12, energy: 0.42 },
-      { track: "Chameleon", artist: "Herbie Hancock", genre: "jazz-funk", similarity: 0.25, energy: 0.55 },
-      { track: "Lingus", artist: "Snarky Puppy", genre: "fusion", similarity: 0.38, energy: 0.65 },
-      { track: "Glimmer", artist: "Bicep", genre: "breakbeat", similarity: 0.50, energy: 0.72 },
-      { track: "Opus", artist: "Eric Prydz", genre: "progressive house", similarity: 0.60, energy: 0.78 },
-      { track: "Windowlicker", artist: "Aphex Twin", genre: "idm", similarity: 0.72, energy: 0.68 },
-      { track: "Xtal", artist: "Aphex Twin", genre: "ambient techno", similarity: 0.82, energy: 0.55 },
-      { track: "Teardrops", artist: "Burial", genre: "dubstep", similarity: 0.90, energy: 0.50 },
-      { track: "Archangel", artist: "Burial", genre: "electronic", similarity: 1, energy: 0.48 },
+      {
+        track: "So What",
+        artist: "Miles Davis",
+        genre: "jazz",
+        similarity: 0,
+        energy: 0.4,
+      },
+      {
+        track: "Maiden Voyage",
+        artist: "Herbie Hancock",
+        genre: "jazz",
+        similarity: 0.12,
+        energy: 0.42,
+      },
+      {
+        track: "Chameleon",
+        artist: "Herbie Hancock",
+        genre: "jazz-funk",
+        similarity: 0.25,
+        energy: 0.55,
+      },
+      {
+        track: "Lingus",
+        artist: "Snarky Puppy",
+        genre: "fusion",
+        similarity: 0.38,
+        energy: 0.65,
+      },
+      {
+        track: "Glimmer",
+        artist: "Bicep",
+        genre: "breakbeat",
+        similarity: 0.5,
+        energy: 0.72,
+      },
+      {
+        track: "Opus",
+        artist: "Eric Prydz",
+        genre: "progressive house",
+        similarity: 0.6,
+        energy: 0.78,
+      },
+      {
+        track: "Windowlicker",
+        artist: "Aphex Twin",
+        genre: "idm",
+        similarity: 0.72,
+        energy: 0.68,
+      },
+      {
+        track: "Xtal",
+        artist: "Aphex Twin",
+        genre: "ambient techno",
+        similarity: 0.82,
+        energy: 0.55,
+      },
+      {
+        track: "Teardrops",
+        artist: "Burial",
+        genre: "dubstep",
+        similarity: 0.9,
+        energy: 0.5,
+      },
+      {
+        track: "Archangel",
+        artist: "Burial",
+        genre: "electronic",
+        similarity: 1,
+        energy: 0.48,
+      },
     ],
   },
 };
@@ -67,7 +250,8 @@ const PATH_KEYS = Object.keys(DEMO_PATHS) as Array<keyof typeof DEMO_PATHS>;
 // ── Component ─────────────────────────────────────────────────────
 
 export function MusicPaths() {
-  const [activePathKey, setActivePathKey] = useState<keyof typeof DEMO_PATHS>("nyhc-crank");
+  const [activePathKey, setActivePathKey] =
+    useState<keyof typeof DEMO_PATHS>("nyhc-crank");
   const [activeStep, setActiveStep] = useState(0);
   const [playing, setPlaying] = useState(true);
   // Disable transition briefly when resetting to step 0 to avoid backward slide
@@ -81,7 +265,9 @@ export function MusicPaths() {
       if (next >= nodeCount) {
         // Reset to start — disable transition so it doesn't slide backward
         setAnimate(false);
-        requestAnimationFrame(() => requestAnimationFrame(() => setAnimate(true)));
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => setAnimate(true)),
+        );
         return 0;
       }
       return next;
@@ -112,22 +298,31 @@ export function MusicPaths() {
             Music Paths.
           </h2>
           <p className="mt-4 text-[15px] leading-7 text-white/60">
-            Pick a starting point and an ending point, then let Crate try to find
-            a route between them. It is an experiment in listening through a collection
-            instead of jumping around it.
+            Pick a starting point and an ending point, then let Crate try to
+            find a route between them. It is an experiment in listening through
+            a collection instead of jumping around it.
           </p>
           <ul className="mt-6 space-y-3 text-[14.5px] text-white/75">
             <li className="flex gap-3">
               <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-cyan-400" />
-              <span>Add waypoints when you want the route to pass through a certain sound.</span>
+              <span>
+                Add waypoints when you want the route to pass through a certain
+                sound.
+              </span>
             </li>
             <li className="flex gap-3">
               <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-cyan-400" />
-              <span>Similarity comes from audio features, with genre labels as context.</span>
+              <span>
+                Similarity comes from audio features, with genre labels as
+                context.
+              </span>
             </li>
             <li className="flex gap-3">
               <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-cyan-400" />
-              <span>Save a path as a playlist, or regenerate it when the library changes.</span>
+              <span>
+                Save a path as a playlist, or regenerate it when the library
+                changes.
+              </span>
             </li>
           </ul>
           <a
@@ -201,10 +396,13 @@ export function MusicPaths() {
 
               {/* Trail — glowing line behind the traveler */}
               <div
-                className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full ${animate ? "transition-[width] duration-[1600ms] ease-out" : ""}`}
+                className={`absolute left-0 top-1/2 h-[2px] -translate-y-1/2 rounded-full ${
+                  animate ? "transition-[width] duration-[1600ms] ease-out" : ""
+                }`}
                 style={{
                   width: `${(activeStep / (nodeCount - 1)) * 100}%`,
-                  background: "linear-gradient(90deg, rgba(6,182,212,0.1), rgba(6,182,212,0.5))",
+                  background:
+                    "linear-gradient(90deg, rgba(6,182,212,0.1), rgba(6,182,212,0.5))",
                   boxShadow: "0 0 8px rgba(6,182,212,0.3)",
                 }}
               />
@@ -214,7 +412,10 @@ export function MusicPaths() {
                 {path.nodes.map((node, i) => {
                   const isPast = i < activeStep;
                   const isActive = i === activeStep;
-                  const showGenre = i === 0 || i === path.nodes.length - 1 || (i > 0 && node.genre !== path.nodes[i - 1]!.genre);
+                  const showGenre =
+                    i === 0 ||
+                    i === path.nodes.length - 1 ||
+                    (i > 0 && node.genre !== path.nodes[i - 1]!.genre);
 
                   return (
                     <button
@@ -231,9 +432,13 @@ export function MusicPaths() {
                         }`}
                       />
                       {showGenre && (
-                        <span className={`pointer-events-none absolute top-full mt-1.5 whitespace-nowrap text-[8px] transition-colors duration-300 ${
-                          isActive || isPast ? "text-cyan-300/60" : "text-white/20"
-                        }`}>
+                        <span
+                          className={`pointer-events-none absolute top-full mt-1.5 whitespace-nowrap text-[8px] transition-colors duration-300 ${
+                            isActive || isPast
+                              ? "text-cyan-300/60"
+                              : "text-white/20"
+                          }`}
+                        >
                           {node.genre}
                         </span>
                       )}
@@ -244,7 +449,9 @@ export function MusicPaths() {
 
               {/* Traveling dot — positioned as simple percentage of container width */}
               <div
-                className={`pointer-events-none absolute top-1/2 ${animate ? "transition-[left] duration-[1600ms] ease-out" : ""}`}
+                className={`pointer-events-none absolute top-1/2 ${
+                  animate ? "transition-[left] duration-[1600ms] ease-out" : ""
+                }`}
                 style={{ left: `${(activeStep / (nodeCount - 1)) * 100}%` }}
               >
                 <div className="absolute -inset-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/20 blur-md" />
@@ -257,7 +464,10 @@ export function MusicPaths() {
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3 transition-all duration-300">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-400/15">
-                <Play size={16} className="ml-0.5 fill-cyan-300 text-cyan-300" />
+                <Play
+                  size={16}
+                  className="ml-0.5 fill-cyan-300 text-cyan-300"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-white">
@@ -266,7 +476,9 @@ export function MusicPaths() {
                 <div className="flex items-center gap-2 text-[11px] text-white/50">
                   <span>{path.nodes[activeStep]!.artist}</span>
                   <span className="text-white/15">·</span>
-                  <span className="text-cyan-300/70">{path.nodes[activeStep]!.genre}</span>
+                  <span className="text-cyan-300/70">
+                    {path.nodes[activeStep]!.genre}
+                  </span>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
@@ -277,7 +489,9 @@ export function MusicPaths() {
                 <div className="flex h-1 w-12 overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full bg-cyan-400/60 transition-all duration-500"
-                    style={{ width: `${path.nodes[activeStep]!.energy * 100}%` }}
+                    style={{
+                      width: `${path.nodes[activeStep]!.energy * 100}%`,
+                    }}
                   />
                 </div>
               </div>
@@ -287,7 +501,10 @@ export function MusicPaths() {
           {/* Waypoint hint */}
           <div className="mt-3 flex items-center gap-2 text-[11px] text-white/35">
             <Plus size={10} className="text-cyan-400/50" />
-            <span>Add waypoints to steer the route through specific genres or artists</span>
+            <span>
+              Add waypoints to steer the route through specific genres or
+              artists
+            </span>
           </div>
         </div>
       </div>

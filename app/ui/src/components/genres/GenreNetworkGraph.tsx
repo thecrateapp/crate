@@ -21,7 +21,13 @@ interface GenreGraphNode {
 interface GenreGraphLink {
   source: string;
   target: string;
-  relation_type: "alias" | "parent" | "child" | "related" | "influenced_by" | "fusion_of";
+  relation_type:
+    | "alias"
+    | "parent"
+    | "child"
+    | "related"
+    | "influenced_by"
+    | "fusion_of";
   weight: number;
 }
 
@@ -51,27 +57,51 @@ function isEmptyNode(node: GenreGraphNode): boolean {
   return node.artist_count === 0 && node.album_count === 0;
 }
 
-const RELATION_STYLES: Record<GenreGraphLink["relation_type"], { dash: number[]; width: number; opacity: number; label: string }> = {
+const RELATION_STYLES: Record<
+  GenreGraphLink["relation_type"],
+  { dash: number[]; width: number; opacity: number; label: string }
+> = {
   alias: { dash: [2, 5], width: 2.5, opacity: 0.96, label: "alias / mapped" },
   parent: { dash: [], width: 2.4, opacity: 0.9, label: "parent genre" },
   child: { dash: [9, 5], width: 2.2, opacity: 0.84, label: "subgenre" },
   related: { dash: [3, 9], width: 1.6, opacity: 0.64, label: "related scene" },
-  influenced_by: { dash: [12, 5], width: 1.8, opacity: 0.78, label: "influenced by" },
+  influenced_by: {
+    dash: [12, 5],
+    width: 1.8,
+    opacity: 0.78,
+    label: "influenced by",
+  },
   fusion_of: { dash: [1, 5], width: 2.05, opacity: 0.72, label: "fusion of" },
 };
 
 function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
   const safeRadius = Math.min(radius, width / 2, height / 2);
   ctx.beginPath();
   ctx.moveTo(x + safeRadius, y);
   ctx.lineTo(x + width - safeRadius, y);
   ctx.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
   ctx.lineTo(x + width, y + height - safeRadius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+  ctx.quadraticCurveTo(
+    x + width,
+    y + height,
+    x + width - safeRadius,
+    y + height,
+  );
   ctx.lineTo(x + safeRadius, y + height);
   ctx.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
   ctx.lineTo(x, y + safeRadius);
@@ -79,7 +109,12 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   ctx.closePath();
 }
 
-function drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, size: number) {
+function drawDiamond(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+) {
   ctx.beginPath();
   ctx.moveTo(x, y - size);
   ctx.lineTo(x + size, y);
@@ -96,12 +131,18 @@ function relationLabel(relationType: GenreGraphLink["relation_type"]): string {
   return RELATION_STYLES[relationType].label;
 }
 
-function relationDash(relationType: GenreGraphLink["relation_type"], globalScale: number): number[] {
+function relationDash(
+  relationType: GenreGraphLink["relation_type"],
+  globalScale: number,
+): number[] {
   const scale = Math.max(globalScale, 0.8);
   return RELATION_STYLES[relationType].dash.map((segment) => segment / scale);
 }
 
-function relationWidth(relationType: GenreGraphLink["relation_type"], globalScale: number): number {
+function relationWidth(
+  relationType: GenreGraphLink["relation_type"],
+  globalScale: number,
+): number {
   return RELATION_STYLES[relationType].width / Math.max(globalScale, 0.85);
 }
 
@@ -136,11 +177,17 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
     const graph = fgRef.current;
     if (!graph || !data?.nodes?.length) return;
     const linkDistances: Record<string, number> = {
-      alias: 84, parent: 102, child: 102, related: 132,
-      influenced_by: 118, fusion_of: 124,
+      alias: 84,
+      parent: 102,
+      child: 102,
+      related: 132,
+      influenced_by: 118,
+      fusion_of: 124,
     };
     graph.d3Force("charge")?.strength(-260).distanceMax(320);
-    graph.d3Force("link")?.distance((link: any) => linkDistances[link.relation_type] ?? 102);
+    graph
+      .d3Force("link")
+      ?.distance((link: any) => linkDistances[link.relation_type] ?? 102);
     graph.d3Force("center")?.strength(0.12);
     graph.d3ReheatSimulation();
   }, [data?.nodes?.length, data?.links?.length]);
@@ -153,8 +200,14 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
   if (loading || width === 0 || !data?.nodes?.length) {
     return (
       <div className="rounded-md border border-border bg-card/70 p-4">
-        <div ref={containerRef} style={{ height: graphHeight }} className="flex w-full items-center justify-center text-sm text-muted-foreground">
-          {loading || width === 0 ? "Loading genre graph..." : "No genre graph available."}
+        <div
+          ref={containerRef}
+          style={{ height: graphHeight }}
+          className="flex w-full items-center justify-center text-sm text-muted-foreground"
+        >
+          {loading || width === 0
+            ? "Loading genre graph..."
+            : "No genre graph available."}
         </div>
       </div>
     );
@@ -166,43 +219,73 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
         <div>
           <div className="text-sm font-medium text-foreground">Genre map</div>
           {data.mapping?.description && (
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">{data.mapping.description}</p>
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+              {data.mapping.description}
+            </p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
           {(
-            Object.entries(RELATION_STYLES) as [GenreGraphLink["relation_type"], (typeof RELATION_STYLES)[GenreGraphLink["relation_type"]]][]
+            Object.entries(RELATION_STYLES) as [
+              GenreGraphLink["relation_type"],
+              (typeof RELATION_STYLES)[GenreGraphLink["relation_type"]],
+            ][]
           ).map(([relationType, style]) => (
             <span
               key={relationType}
               className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1"
-              style={{ borderColor: ACCENT_SOFT, backgroundColor: ACCENT_FAINT, color: TEXT_MUTED }}
+              style={{
+                borderColor: ACCENT_SOFT,
+                backgroundColor: ACCENT_FAINT,
+                color: TEXT_MUTED,
+              }}
             >
               <span
                 className="block w-5 border-t"
-                style={{ borderColor: relationStroke(relationType), borderTopStyle: style.dash.length ? "dashed" : "solid" }}
+                style={{
+                  borderColor: relationStroke(relationType),
+                  borderTopStyle: style.dash.length ? "dashed" : "solid",
+                }}
               />
               {style.label}
             </span>
           ))}
           <span
             className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1"
-            style={{ borderColor: ACCENT_SOFT, backgroundColor: ACCENT_FAINT, color: TEXT_MUTED }}
+            style={{
+              borderColor: ACCENT_SOFT,
+              backgroundColor: ACCENT_FAINT,
+              color: TEXT_MUTED,
+            }}
           >
-            <span className="block h-3 w-3 border" style={{ borderColor: ACCENT, backgroundColor: ACCENT_SOFT }} />
+            <span
+              className="block h-3 w-3 border"
+              style={{ borderColor: ACCENT, backgroundColor: ACCENT_SOFT }}
+            />
             main genre
           </span>
           <span
             className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1"
-            style={{ borderColor: ACCENT_SOFT, backgroundColor: ACCENT_FAINT, color: TEXT_MUTED }}
+            style={{
+              borderColor: ACCENT_SOFT,
+              backgroundColor: ACCENT_FAINT,
+              color: TEXT_MUTED,
+            }}
           >
-            <span className="block h-3 w-3 rounded-md border" style={{ borderColor: ACCENT, backgroundColor: PANEL_SOFT }} />
+            <span
+              className="block h-3 w-3 rounded-md border"
+              style={{ borderColor: ACCENT, backgroundColor: PANEL_SOFT }}
+            />
             scene / subgenre
           </span>
         </div>
       </div>
 
-      <div ref={containerRef} style={{ height: graphHeight }} className="w-full overflow-hidden">
+      <div
+        ref={containerRef}
+        style={{ height: graphHeight }}
+        className="w-full overflow-hidden"
+      >
         <ForceGraph2D
           ref={fgRef}
           width={width}
@@ -213,18 +296,27 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
           linkWidth={() => 0}
           linkDirectionalParticles={0}
           linkCanvasObjectMode={() => "after"}
-          linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+          linkCanvasObject={(
+            link: any,
+            ctx: CanvasRenderingContext2D,
+            globalScale: number,
+          ) => {
             const source = typeof link.source === "object" ? link.source : null;
             const target = typeof link.target === "object" ? link.target : null;
             if (!source || !target) return;
 
             const sourceNode = nodeSet.get(source.id);
             const targetNode = nodeSet.get(target.id);
-            const inactive = (sourceNode && isEmptyNode(sourceNode)) || (targetNode && isEmptyNode(targetNode));
+            const inactive =
+              (sourceNode && isEmptyNode(sourceNode)) ||
+              (targetNode && isEmptyNode(targetNode));
 
-            const relationType = (link.relation_type || "related") as GenreGraphLink["relation_type"];
+            const relationType = (link.relation_type ||
+              "related") as GenreGraphLink["relation_type"];
             ctx.save();
-            ctx.strokeStyle = inactive ? INACTIVE_STROKE : relationStroke(relationType);
+            ctx.strokeStyle = inactive
+              ? INACTIVE_STROKE
+              : relationStroke(relationType);
             ctx.lineWidth = relationWidth(relationType, globalScale);
             ctx.setLineDash(relationDash(relationType, globalScale));
             ctx.beginPath();
@@ -237,21 +329,48 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
           nodeVal={(node: any) => {
             const currentNode = nodeSet.get(node.id);
             if (!currentNode) return 8;
-            const base = currentNode.is_center ? 18 : currentNode.is_top_level ? 13 : currentNode.kind === "library" ? 12 : 10;
-            return Math.max(base, base + Math.min(currentNode.artist_count, 120) / 9);
+            const base = currentNode.is_center
+              ? 18
+              : currentNode.is_top_level
+                ? 13
+                : currentNode.kind === "library"
+                  ? 12
+                  : 10;
+            return Math.max(
+              base,
+              base + Math.min(currentNode.artist_count, 120) / 9,
+            );
           }}
-          nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+          nodeCanvasObject={(
+            node: any,
+            ctx: CanvasRenderingContext2D,
+            globalScale: number,
+          ) => {
             const currentNode = nodeSet.get(node.id);
             if (!currentNode) return;
 
             const x = node.x ?? 0;
             const y = node.y ?? 0;
             const empty = isEmptyNode(currentNode);
-            const baseSize = currentNode.is_center ? 18 : currentNode.is_top_level ? 14 : currentNode.kind === "library" ? 12 : 11;
+            const baseSize = currentNode.is_center
+              ? 18
+              : currentNode.is_top_level
+                ? 14
+                : currentNode.kind === "library"
+                  ? 12
+                  : 11;
             const size = empty
               ? baseSize * 0.75
-              : Math.max(baseSize, baseSize + Math.min(currentNode.artist_count, 120) / 12);
-            const strokeWidth = (currentNode.is_center ? 2.3 : currentNode.is_top_level ? 1.8 : 1.35) / Math.max(globalScale, 0.8);
+              : Math.max(
+                  baseSize,
+                  baseSize + Math.min(currentNode.artist_count, 120) / 12,
+                );
+            const strokeWidth =
+              (currentNode.is_center
+                ? 2.3
+                : currentNode.is_top_level
+                  ? 1.8
+                  : 1.35) / Math.max(globalScale, 0.8);
 
             if (currentNode.is_center && !empty) {
               ctx.beginPath();
@@ -279,7 +398,9 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
             } else if (currentNode.kind === "unmapped") {
               ctx.fillStyle = PANEL;
             } else if (currentNode.is_top_level) {
-              ctx.fillStyle = currentNode.is_center ? accent(0.28) : ACCENT_SOFT;
+              ctx.fillStyle = currentNode.is_center
+                ? accent(0.28)
+                : ACCENT_SOFT;
             } else if (currentNode.kind === "library") {
               ctx.fillStyle = accent(0.18);
             } else {
@@ -289,7 +410,14 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
 
             ctx.strokeStyle = empty ? INACTIVE_STROKE : ACCENT;
             ctx.lineWidth = strokeWidth;
-            ctx.setLineDash(currentNode.kind === "unmapped" ? [5 / Math.max(globalScale, 0.9), 4 / Math.max(globalScale, 0.9)] : []);
+            ctx.setLineDash(
+              currentNode.kind === "unmapped"
+                ? [
+                    5 / Math.max(globalScale, 0.9),
+                    4 / Math.max(globalScale, 0.9),
+                  ]
+                : [],
+            );
             ctx.stroke();
             ctx.restore();
 
@@ -302,7 +430,14 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
               const badgeHeight = 16 / globalScale;
               const badgeX = x - badgeWidth / 2;
               const badgeY = y - size - badgeHeight - 4;
-              roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 8 / globalScale);
+              roundRect(
+                ctx,
+                badgeX,
+                badgeY,
+                badgeWidth,
+                badgeHeight,
+                8 / globalScale,
+              );
               ctx.fillStyle = PANEL;
               ctx.fill();
               ctx.strokeStyle = ACCENT;
@@ -315,7 +450,13 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
             }
 
             const labelFontSize = Math.max(9, 12 / globalScale);
-            ctx.font = `${currentNode.is_center ? "700" : currentNode.is_top_level ? "600" : "500"} ${labelFontSize}px ui-sans-serif, system-ui`;
+            ctx.font = `${
+              currentNode.is_center
+                ? "700"
+                : currentNode.is_top_level
+                  ? "600"
+                  : "500"
+            } ${labelFontSize}px ui-sans-serif, system-ui`;
             ctx.fillStyle = empty ? INACTIVE_TEXT : TEXT;
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
@@ -326,14 +467,28 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
             if (!currentNode) return "";
             return `
               <div style="background:${PANEL};border:1px solid ${ACCENT_SOFT};border-radius:12px;padding:10px 12px;min-width:240px;box-shadow:0 10px 24px rgba(0,0,0,0.35)">
-                <div style="font-weight:700;color:${TEXT};margin-bottom:6px">${escapeHtml(currentNode.label)}</div>
+                <div style="font-weight:700;color:${TEXT};margin-bottom:6px">${escapeHtml(
+                  currentNode.label,
+                )}</div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:${TEXT_MUTED}">
                   <span>${currentNode.artist_count} artists</span>
                   <span>${currentNode.album_count} albums</span>
-                  <span>${escapeHtml(currentNode.is_top_level ? "main genre" : currentNode.kind)}</span>
+                  <span>${escapeHtml(
+                    currentNode.is_top_level ? "main genre" : currentNode.kind,
+                  )}</span>
                 </div>
-                ${currentNode.description ? `<div style="margin-top:8px;font-size:11px;line-height:1.45;color:${TEXT_MUTED}">${escapeHtml(currentNode.description)}</div>` : ""}
-                ${currentNode.page_slug ? `<div style="margin-top:8px;font-size:10px;color:${ACCENT}">click to open genre</div>` : ""}
+                ${
+                  currentNode.description
+                    ? `<div style="margin-top:8px;font-size:11px;line-height:1.45;color:${TEXT_MUTED}">${escapeHtml(
+                        currentNode.description,
+                      )}</div>`
+                    : ""
+                }
+                ${
+                  currentNode.page_slug
+                    ? `<div style="margin-top:8px;font-size:10px;color:${ACCENT}">click to open genre</div>`
+                    : ""
+                }
               </div>
             `;
           }}
@@ -343,7 +498,12 @@ export function GenreNetworkGraph({ slug }: { slug: string }) {
               navigate(`/genres/${encodeURIComponent(currentNode.page_slug)}`);
             }
           }}
-          linkLabel={(link: any) => relationLabel((link.relation_type || "related") as GenreGraphLink["relation_type"])}
+          linkLabel={(link: any) =>
+            relationLabel(
+              (link.relation_type ||
+                "related") as GenreGraphLink["relation_type"],
+            )
+          }
         />
       </div>
     </div>

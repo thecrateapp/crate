@@ -11,7 +11,9 @@ from crate.db.orm.library import LibraryAlbum, LibraryTrack
 from crate.db.tx import optional_scope
 
 
-def quarantine_album(album_id: int, task_id: str, *, session: Session | None = None) -> bool:
+def quarantine_album(
+    album_id: int, task_id: str, *, session: Session | None = None
+) -> bool:
     def _impl(s: Session) -> bool:
         album = s.get(LibraryAlbum, album_id)
         if album is None or album.quarantined_at is not None:
@@ -37,7 +39,9 @@ def unquarantine_album(album_id: int, *, session: Session | None = None) -> bool
         return _impl(s)
 
 
-def delete_quarantined_album(album_id: int, *, session: Session | None = None) -> dict | None:
+def delete_quarantined_album(
+    album_id: int, *, session: Session | None = None
+) -> dict | None:
     def _impl(s: Session) -> dict | None:
         album = s.get(LibraryAlbum, album_id)
         if album is None or album.quarantined_at is None:

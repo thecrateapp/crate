@@ -1,11 +1,10 @@
 import logging
-import time
 from pathlib import Path
 
 from crate.db.events import emit_task_event
-from crate.db.queries.tasks import get_latest_scan, get_task
+from crate.db.queries.tasks import get_latest_scan
 from crate.db.repositories.tasks import create_task, save_scan_result
-from crate.task_progress import TaskProgress, emit_item_event, emit_progress, entity_label
+from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.library_sync import LibrarySync
 from crate.matcher import apply_match, match_album
 from crate.report import save_report
@@ -110,18 +109,26 @@ def _handle_batch_retag(task_id: str, params: dict, config: dict) -> dict:
 
         album_dir = lib / artist / album_name
         if not album_dir.is_dir():
-            results.append({"artist": artist, "album": album_name, "error": "Not found"})
+            results.append(
+                {"artist": artist, "album": album_name, "error": "Not found"}
+            )
             continue
 
         candidates = match_album(album_dir, exts)
         if not candidates:
-            results.append({"artist": artist, "album": album_name, "error": "No MB match"})
+            results.append(
+                {"artist": artist, "album": album_name, "error": "No MB match"}
+            )
             continue
 
         best = candidates[0]
         if best["match_score"] < 60:
             results.append(
-                {"artist": artist, "album": album_name, "error": f"Low score: {best['match_score']}"}
+                {
+                    "artist": artist,
+                    "album": album_name,
+                    "error": f"Low score: {best['match_score']}",
+                }
             )
             continue
 
@@ -132,22 +139,34 @@ def _handle_batch_retag(task_id: str, params: dict, config: dict) -> dict:
         results.append(result)
 
     retagged = sum(1 for r in results if "error" not in r)
-    emit_task_event(task_id, "info", {"message": f"Batch retag complete: {retagged}/{len(albums)} albums retagged"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Batch retag complete: {retagged}/{len(albums)} albums retagged"},
+    )
     return {"results": results}
 
 
 def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
     sync_config = dict(config)
     if "native_scan_payload_shadow" in params:
-        sync_config["native_scan_payload_shadow"] = params.get("native_scan_payload_shadow")
+        sync_config["native_scan_payload_shadow"] = params.get(
+            "native_scan_payload_shadow"
+        )
     if "native_scan_payload_prefer" in params:
-        sync_config["native_scan_payload_prefer"] = params.get("native_scan_payload_prefer")
+        sync_config["native_scan_payload_prefer"] = params.get(
+            "native_scan_payload_prefer"
+        )
     if "native_scan_payload_source" in params:
-        sync_config["native_scan_payload_source"] = params.get("native_scan_payload_source")
+        sync_config["native_scan_payload_source"] = params.get(
+            "native_scan_payload_source"
+        )
     if "native_scan_diff_shadow" in params:
         sync_config["native_scan_diff_shadow"] = params.get("native_scan_diff_shadow")
     if "native_scan_diff_skip_unchanged" in params:
-        sync_config["native_scan_diff_skip_unchanged"] = params.get("native_scan_diff_skip_unchanged")
+        sync_config["native_scan_diff_skip_unchanged"] = params.get(
+            "native_scan_diff_skip_unchanged"
+        )
     if "native_scan_diff_source" in params:
         sync_config["native_scan_diff_source"] = params.get("native_scan_diff_source")
     if "native_scan_snapshot_dir" in params:
@@ -165,8 +184,12 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
         shadow_config = dict(sync_config)
         if "native_scan_shadow" in params:
             shadow_config["native_scan_shadow"] = params.get("native_scan_shadow")
-        file_set_summary = maybe_compare_native_scan_file_set(root, sync.extensions, shadow_config)
-        diff_summary = maybe_update_native_scan_diff_snapshot(root, sync.extensions, shadow_config)
+        file_set_summary = maybe_compare_native_scan_file_set(
+            root, sync.extensions, shadow_config
+        )
+        diff_summary = maybe_update_native_scan_diff_snapshot(
+            root, sync.extensions, shadow_config
+        )
         if file_set_summary:
             emit_task_event(
                 task_id,
@@ -200,7 +223,9 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
         try:
             album_dir.resolve().relative_to(sync.library_path.resolve())
         except ValueError:
-            return {"error": f"Album path is outside the configured library: {album_dir}"}
+            return {
+                "error": f"Album path is outside the configured library: {album_dir}"
+            }
         if not album_dir.exists():
             return {"mode": "album", "album_dir": str(album_dir), "skipped": "missing"}
 
@@ -210,7 +235,11 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
         emit_task_event(
             task_id,
             "info",
-            {"message": "Starting scoped library sync", "artist": canonical, "album": album_dir.name},
+            {
+                "message": "Starting scoped library sync",
+                "artist": canonical,
+                "album": album_dir.name,
+            },
         )
         native_shadow = _emit_native_shadow(album_dir)
         if native_shadow and native_shadow.get("skip_unchanged"):
@@ -236,8 +265,10 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
                 "native_scan_diff_shadow": native_shadow.get("diff"),
             }
 
-        album_result = sync.sync_album(album_dir, canonical) if album_dir.is_dir() else {}
-        artist_tracks = sync.sync_artist(artist_dir)
+        album_result = (
+            sync.sync_album(album_dir, canonical) if album_dir.is_dir() else {}
+        )
+        artist_tracks = sync.sync_artist_dirs(canonical, [artist_dir])
 
         process_task_id = None
         if params.get("is_new_file"):
@@ -260,7 +291,10 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
                         },
                     )
             except Exception:
-                log.debug("Failed to queue process_new_content after scoped sync", exc_info=True)
+                log.debug(
+                    "Failed to queue process_new_content after scoped sync",
+                    exc_info=True,
+                )
 
         return {
             "mode": "album",

@@ -23,10 +23,7 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         or track.get("trackEntityUid")
         or track.get("entityUid")
     )
-    track_storage_id = (
-        track.get("track_storage_id")
-        or track.get("trackStorageId")
-    )
+    track_storage_id = track.get("track_storage_id") or track.get("trackStorageId")
     track_path = track.get("track_path") or track.get("path") or ""
 
     library_track = resolve_library_track_reference(
@@ -47,20 +44,31 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
             "track_entity_uid": resolved_entity_uid,
             "track_storage_id": resolved_storage_id,
             "track_path": library_track.get("path") or track_path,
-            "title": track.get("title") or library_track.get("title") or library_track.get("filename") or "",
+            "title": track.get("title")
+            or library_track.get("title")
+            or library_track.get("filename")
+            or "",
             "artist": track.get("artist") or library_track.get("artist") or "",
             "album": track.get("album") or library_track.get("album") or "",
-            "duration": float(track.get("duration") or library_track.get("duration") or 0),
+            "duration": float(
+                track.get("duration") or library_track.get("duration") or 0
+            ),
         }
 
     return None
 
 
-def add_playlist_tracks(playlist_id: int, tracks: list[dict], *, session: Session | None = None) -> int:
+def add_playlist_tracks(
+    playlist_id: int, tracks: list[dict], *, session: Session | None = None
+) -> int:
     def _impl(s: Session) -> int:
         now = datetime.now(timezone.utc)
         max_position = int(
-            s.execute(select(func.coalesce(func.max(PlaylistTrack.position), 0)).where(PlaylistTrack.playlist_id == playlist_id)).scalar_one()
+            s.execute(
+                select(func.coalesce(func.max(PlaylistTrack.position), 0)).where(
+                    PlaylistTrack.playlist_id == playlist_id
+                )
+            ).scalar_one()
             or 0
         )
         position = max_position
@@ -89,11 +97,19 @@ def add_playlist_tracks(playlist_id: int, tracks: list[dict], *, session: Sessio
         playlist = s.get(Playlist, playlist_id)
         if playlist is not None:
             playlist.track_count = int(
-                s.execute(select(func.count()).select_from(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist_id)).scalar_one()
+                s.execute(
+                    select(func.count())
+                    .select_from(PlaylistTrack)
+                    .where(PlaylistTrack.playlist_id == playlist_id)
+                ).scalar_one()
                 or 0
             )
             playlist.total_duration = float(
-                s.execute(select(func.coalesce(func.sum(PlaylistTrack.duration), 0)).where(PlaylistTrack.playlist_id == playlist_id)).scalar_one()
+                s.execute(
+                    select(func.coalesce(func.sum(PlaylistTrack.duration), 0)).where(
+                        PlaylistTrack.playlist_id == playlist_id
+                    )
+                ).scalar_one()
                 or 0
             )
             playlist.updated_at = now
@@ -109,11 +125,15 @@ def add_playlist_tracks(playlist_id: int, tracks: list[dict], *, session: Sessio
         return _impl(s)
 
 
-def remove_playlist_track(playlist_id: int, position: int, *, session: Session | None = None) -> None:
+def remove_playlist_track(
+    playlist_id: int, position: int, *, session: Session | None = None
+) -> None:
     def _impl(s: Session) -> None:
         now = datetime.now(timezone.utc)
         s.execute(
-            text("DELETE FROM playlist_tracks WHERE playlist_id = :playlist_id AND position = :position"),
+            text(
+                "DELETE FROM playlist_tracks WHERE playlist_id = :playlist_id AND position = :position"
+            ),
             {"playlist_id": playlist_id, "position": position},
         )
         s.execute(
@@ -128,11 +148,19 @@ def remove_playlist_track(playlist_id: int, position: int, *, session: Session |
         playlist = s.get(Playlist, playlist_id)
         if playlist is not None:
             playlist.track_count = int(
-                s.execute(select(func.count()).select_from(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist_id)).scalar_one()
+                s.execute(
+                    select(func.count())
+                    .select_from(PlaylistTrack)
+                    .where(PlaylistTrack.playlist_id == playlist_id)
+                ).scalar_one()
                 or 0
             )
             playlist.total_duration = float(
-                s.execute(select(func.coalesce(func.sum(PlaylistTrack.duration), 0)).where(PlaylistTrack.playlist_id == playlist_id)).scalar_one()
+                s.execute(
+                    select(func.coalesce(func.sum(PlaylistTrack.duration), 0)).where(
+                        PlaylistTrack.playlist_id == playlist_id
+                    )
+                ).scalar_one()
                 or 0
             )
             playlist.updated_at = now
@@ -147,12 +175,16 @@ def remove_playlist_track(playlist_id: int, position: int, *, session: Session |
         _impl(s)
 
 
-def reorder_playlist(playlist_id: int, track_ids: list[int], *, session: Session | None = None) -> None:
+def reorder_playlist(
+    playlist_id: int, track_ids: list[int], *, session: Session | None = None
+) -> None:
     def _impl(s: Session) -> None:
         now = datetime.now(timezone.utc)
         for position, track_id in enumerate(track_ids, 1):
             s.execute(
-                text("UPDATE playlist_tracks SET position = :pos WHERE id = :tid AND playlist_id = :playlist_id"),
+                text(
+                    "UPDATE playlist_tracks SET position = :pos WHERE id = :tid AND playlist_id = :playlist_id"
+                ),
                 {"pos": position, "tid": track_id, "playlist_id": playlist_id},
             )
         playlist = s.get(Playlist, playlist_id)
@@ -169,10 +201,15 @@ def reorder_playlist(playlist_id: int, track_ids: list[int], *, session: Session
         _impl(s)
 
 
-def replace_playlist_tracks(playlist_id: int, tracks: list[dict], *, session: Session | None = None) -> int:
+def replace_playlist_tracks(
+    playlist_id: int, tracks: list[dict], *, session: Session | None = None
+) -> int:
     def _impl(s: Session) -> int:
         now = datetime.now(timezone.utc)
-        s.execute(text("DELETE FROM playlist_tracks WHERE playlist_id = :playlist_id"), {"playlist_id": playlist_id})
+        s.execute(
+            text("DELETE FROM playlist_tracks WHERE playlist_id = :playlist_id"),
+            {"playlist_id": playlist_id},
+        )
 
         position = 0
         total_duration = 0.0
@@ -215,4 +252,9 @@ def replace_playlist_tracks(playlist_id: int, tracks: list[dict], *, session: Se
         return _impl(s)
 
 
-__all__ = ["add_playlist_tracks", "remove_playlist_track", "replace_playlist_tracks", "reorder_playlist"]
+__all__ = [
+    "add_playlist_tracks",
+    "remove_playlist_track",
+    "replace_playlist_tracks",
+    "reorder_playlist",
+]

@@ -4,61 +4,68 @@ import { resolvePlayableTrackId, toPlayableTrack } from "@/lib/playable-track";
 
 describe("playable track mapper", () => {
   it("normalizes snake_case API payloads into player tracks", () => {
-    const track = toPlayableTrack({
-      id: 12,
-      entity_uid: "entity-12",
-      title: "Track One",
-      artist: "Artist",
-      artist_id: 4,
-      artist_slug: "artist",
-      album: "Album",
-      album_id: 8,
-      album_slug: "album",
-      path: "/music/artist/album/01.flac",
-      duration: 211,
-      format: "flac",
-      bitrate: 1411,
-      sample_rate: 44100,
-      bit_depth: 16,
-      bpm: 124,
-      audio_key: "C",
-      audio_scale: "minor",
-      energy: 0.72,
-      danceability: 0.41,
-      valence: 0.28,
-      bliss_vector: [0.1, 0.2, 0.3],
-    }, { cover: "/api/albums/8/cover" });
+    const track = toPlayableTrack(
+      {
+        id: 12,
+        entity_uid: "entity-12",
+        title: "Track One",
+        artist: "Artist",
+        artist_id: 4,
+        artist_slug: "artist",
+        album: "Album",
+        album_id: 8,
+        album_slug: "album",
+        path: "/music/artist/album/01.flac",
+        duration: 211,
+        format: "flac",
+        bitrate: 1411,
+        sample_rate: 44100,
+        bit_depth: 16,
+        bpm: 124,
+        audio_key: "C",
+        audio_scale: "minor",
+        energy: 0.72,
+        danceability: 0.41,
+        valence: 0.28,
+        bliss_vector: [0.1, 0.2, 0.3],
+      },
+      { cover: "/api/albums/8/cover" },
+    );
 
-    expect(track).toEqual(expect.objectContaining({
-      id: "entity-12",
-      entityUid: "entity-12",
-      artistId: 4,
-      artistSlug: "artist",
-      albumId: 8,
-      albumSlug: "album",
-      albumCover: "/api/albums/8/cover",
-      duration: 211,
-      format: "flac",
-      bitrate: 1411,
-      sampleRate: 44100,
-      bitDepth: 16,
-      bpm: 124,
-      audioKey: "C",
-      audioScale: "minor",
-      energy: 0.72,
-      danceability: 0.41,
-      valence: 0.28,
-      blissVector: [0.1, 0.2, 0.3],
-    }));
+    expect(track).toEqual(
+      expect.objectContaining({
+        id: "entity-12",
+        entityUid: "entity-12",
+        artistId: 4,
+        artistSlug: "artist",
+        albumId: 8,
+        albumSlug: "album",
+        albumCover: "/api/albums/8/cover",
+        duration: 211,
+        format: "flac",
+        bitrate: 1411,
+        sampleRate: 44100,
+        bitDepth: 16,
+        bpm: 124,
+        audioKey: "C",
+        audioScale: "minor",
+        energy: 0.72,
+        danceability: 0.41,
+        valence: 0.28,
+        blissVector: [0.1, 0.2, 0.3],
+      }),
+    );
   });
 
   it("preserves camelCase metadata and resolves a stable playback id", () => {
-    expect(resolvePlayableTrackId({
-      id: "fallback-id",
-      entityUid: "entity-99",
-      title: "Track Two",
-      artist: "Artist",
-    })).toBe("entity-99");
+    expect(
+      resolvePlayableTrackId({
+        id: "fallback-id",
+        entityUid: "entity-99",
+        title: "Track Two",
+        artist: "Artist",
+      }),
+    ).toBe("entity-99");
 
     const track = toPlayableTrack({
       id: "fallback-id",
@@ -71,14 +78,16 @@ describe("playable track mapper", () => {
       format: "aac",
     });
 
-    expect(track).toEqual(expect.objectContaining({
-      id: "entity-99",
-      entityUid: "entity-99",
-      sampleRate: 48000,
-      bitDepth: null,
-      bitrate: 320,
-      format: "aac",
-    }));
+    expect(track).toEqual(
+      expect.objectContaining({
+        id: "entity-99",
+        entityUid: "entity-99",
+        sampleRate: 48000,
+        bitDepth: null,
+        bitrate: 320,
+        format: "aac",
+      }),
+    );
   });
 
   it("understands track_* aliases from stats/home/radio payloads", () => {
@@ -91,12 +100,14 @@ describe("playable track mapper", () => {
       album: "Album",
     });
 
-    expect(track).toEqual(expect.objectContaining({
-      id: "entity-42",
-      entityUid: "entity-42",
-      path: "/music/artist/album/42.flac",
-      libraryTrackId: 42,
-    }));
+    expect(track).toEqual(
+      expect.objectContaining({
+        id: "entity-42",
+        entityUid: "entity-42",
+        path: "/music/artist/album/42.flac",
+        libraryTrackId: 42,
+      }),
+    );
 
     expect(
       resolvePlayableTrackId({

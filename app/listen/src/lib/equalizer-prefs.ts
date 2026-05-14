@@ -1,10 +1,15 @@
-import { EQ_BAND_COUNT, EQ_PRESETS, type EqGains, type EqPresetName } from "@/lib/equalizer";
+import {
+  EQ_BAND_COUNT,
+  EQ_PRESETS,
+  type EqGains,
+  type EqPresetName,
+} from "@/lib/equalizer";
 
 export const EQ_PREFS_EVENT = "listen-equalizer-prefs";
 
 const ENABLED_KEY = "listen-eq-enabled";
 const PRESET_KEY = "listen-eq-preset"; // "custom" or one of EQ_PRESETS keys
-const GAINS_KEY = "listen-eq-gains";   // JSON array of numbers
+const GAINS_KEY = "listen-eq-gains"; // JSON array of numbers
 const ADAPTIVE_KEY = "listen-eq-adaptive";
 const GENRE_ADAPTIVE_KEY = "listen-eq-genre-adaptive";
 
@@ -39,7 +44,9 @@ export function setEqualizerEnabled(value: boolean): void {
   try {
     localStorage.setItem(ENABLED_KEY, value ? "true" : "false");
     dispatchPrefsEvent();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getEqualizerPreset(): EqPresetName | "custom" {
@@ -60,10 +67,14 @@ export function getEqualizerGains(): number[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length === EQ_BAND_COUNT) {
-        return parsed.map((v) => (typeof v === "number" && Number.isFinite(v) ? v : 0));
+        return parsed.map((v) =>
+          typeof v === "number" && Number.isFinite(v) ? v : 0,
+        );
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   // Default: whatever the persisted preset says, or flat.
   const preset = getEqualizerPreset();
   if (preset === "custom") return new Array(EQ_BAND_COUNT).fill(0);
@@ -82,7 +93,9 @@ export function applyEqualizerPreset(preset: EqPresetName): EqGains {
     localStorage.setItem(PRESET_KEY, preset);
     localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
     dispatchPrefsEvent();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return gains;
 }
 
@@ -95,7 +108,9 @@ export function setCustomEqualizerGains(gains: EqGains): void {
     localStorage.setItem(PRESET_KEY, "custom");
     localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
     dispatchPrefsEvent();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getEqualizerAdaptive(): boolean {
@@ -116,7 +131,9 @@ export function setEqualizerAdaptive(value: boolean): void {
       localStorage.setItem(GENRE_ADAPTIVE_KEY, "false");
     }
     dispatchPrefsEvent();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getEqualizerGenreAdaptive(): boolean {
@@ -134,7 +151,9 @@ export function setEqualizerGenreAdaptive(value: boolean): void {
       localStorage.setItem(ADAPTIVE_KEY, "false");
     }
     dispatchPrefsEvent();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getEqualizerSnapshot(): EqualizerSnapshot {
@@ -150,5 +169,7 @@ export function getEqualizerSnapshot(): EqualizerSnapshot {
 function dispatchPrefsEvent(): void {
   try {
     window.dispatchEvent(new CustomEvent(EQ_PREFS_EVENT));
-  } catch { /* ignore (SSR, etc.) */ }
+  } catch {
+    /* ignore (SSR, etc.) */
+  }
 }

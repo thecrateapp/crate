@@ -1,5 +1,5 @@
-import Drawable from '../rendering/Drawable';
-import { gl } from '../globals';
+import Drawable from "../rendering/Drawable";
+import { gl } from "../globals";
 
 class Ring extends Drawable {
   indices!: Uint32Array;

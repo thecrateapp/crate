@@ -1,6 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Plus, Heart, Users, Disc, ListMusic, Loader2, Play, Pencil, Trash2, Search } from "lucide-react";
+import {
+  Plus,
+  Heart,
+  Users,
+  Disc,
+  ListMusic,
+  Loader2,
+  Play,
+  Pencil,
+  Trash2,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -11,15 +22,27 @@ import { ArtistCard } from "@/components/cards/ArtistCard";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { PlaylistListRow } from "@/components/playlists/PlaylistListRow";
-import { PlaylistCreateModal, type PlaylistComposerTrack } from "@/components/playlists/PlaylistCreateModal";
-import { AppModal, ModalBody, ModalCloseButton, ModalFooter, ModalHeader } from "@crate/ui/primitives/AppModal";
+import {
+  PlaylistCreateModal,
+  type PlaylistComposerTrack,
+} from "@/components/playlists/PlaylistCreateModal";
+import {
+  AppModal,
+  ModalBody,
+  ModalCloseButton,
+  ModalFooter,
+  ModalHeader,
+} from "@crate/ui/primitives/AppModal";
 import { type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 import { formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
+import {
+  hasTrackReference,
+  toTrackReferencePayload,
+} from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -128,10 +151,10 @@ const tabs: { key: Tab; label: string; icon: typeof ListMusic }[] = [
 ];
 
 function parseTab(value: string | null): Tab {
-  if (value === "artists" || value === "albums" || value === "liked") return value;
+  if (value === "artists" || value === "albums" || value === "liked")
+    return value;
   return "playlists";
 }
-
 
 function Spinner() {
   return (
@@ -159,11 +182,17 @@ function StatBox({ value, label }: { value: number; label: string }) {
 }
 
 function PlaylistsTab() {
-  const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>("/api/me/playlists-page");
+  const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>(
+    "/api/me/playlists-page",
+  );
   const { openCreatePlaylist } = usePlaylistComposer();
-  const [editingPlaylist, setEditingPlaylist] = useState<PlaylistDetail | null>(null);
+  const [editingPlaylist, setEditingPlaylist] = useState<PlaylistDetail | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
-  const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(null);
+  const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(
+    null,
+  );
   const [deleting, setDeleting] = useState(false);
   const playlists = data?.playlists;
   const followedCurated = data?.followed_curated_playlists;
@@ -227,18 +256,25 @@ function PlaylistsTab() {
 
       for (const track of removedTracks) {
         if (track.playlistPosition != null) {
-          await api(`/api/playlists/${editingPlaylist.id}/tracks/${track.playlistPosition}`, "DELETE");
+          await api(
+            `/api/playlists/${editingPlaylist.id}/tracks/${track.playlistPosition}`,
+            "DELETE",
+          );
         }
       }
 
-      const newTracks = payload.tracks.filter((track) => track.playlistEntryId == null && hasTrackReference(track));
+      const newTracks = payload.tracks.filter(
+        (track) => track.playlistEntryId == null && hasTrackReference(track),
+      );
       if (newTracks.length > 0) {
         await api(`/api/playlists/${editingPlaylist.id}/tracks`, "POST", {
-          tracks: newTracks.map((track) => toTrackReferencePayload({
-            ...track,
-            album: track.album || "",
-            duration: track.duration || 0,
-          })),
+          tracks: newTracks.map((track) =>
+            toTrackReferencePayload({
+              ...track,
+              album: track.album || "",
+              duration: track.duration || 0,
+            }),
+          ),
         });
       }
 
@@ -292,7 +328,14 @@ function PlaylistsTab() {
               coverDataUrl={playlist.cover_data_url}
               artworkTracks={playlist.artwork_tracks}
               trackCount={playlist.track_count}
-              meta={[playlist.category, playlist.follower_count > 0 ? `${playlist.follower_count} followers` : null].filter(Boolean).join(" · ")}
+              meta={[
+                playlist.category,
+                playlist.follower_count > 0
+                  ? `${playlist.follower_count} followers`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               href={`/curation/playlist/${playlist.id}`}
               detailEndpoint={`/api/curation/playlists/${playlist.id}`}
               crateManaged
@@ -324,7 +367,11 @@ function PlaylistsTab() {
               coverDataUrl={pl.cover_data_url}
               artworkTracks={pl.artwork_tracks}
               trackCount={pl.track_count}
-              meta={pl.total_duration > 0 ? formatTotalDuration(pl.total_duration) : undefined}
+              meta={
+                pl.total_duration > 0
+                  ? formatTotalDuration(pl.total_duration)
+                  : undefined
+              }
               href={`/playlist/${pl.id}`}
               detailEndpoint={`/api/playlists/${pl.id}`}
               badge={pl.is_smart ? "smart" : "personal"}
@@ -362,17 +409,32 @@ function PlaylistsTab() {
         onSubmit={handleSavePlaylist}
       />
 
-      <AppModal open={!!deletingPlaylist} onClose={() => !deleting && setDeletingPlaylist(null)} maxWidthClassName="sm:max-w-md">
+      <AppModal
+        open={!!deletingPlaylist}
+        onClose={() => !deleting && setDeletingPlaylist(null)}
+        maxWidthClassName="sm:max-w-md"
+      >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Delete playlist</h2>
-            <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+            <h2 className="text-lg font-semibold text-foreground">
+              Delete playlist
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              This action cannot be undone.
+            </p>
           </div>
-          <ModalCloseButton onClick={() => setDeletingPlaylist(null)} disabled={deleting} />
+          <ModalCloseButton
+            onClick={() => setDeletingPlaylist(null)}
+            disabled={deleting}
+          />
         </ModalHeader>
         <ModalBody className="px-5 py-5">
           <p className="text-sm text-muted-foreground">
-            Delete <span className="font-medium text-foreground">{deletingPlaylist?.name}</span> and remove all its track entries?
+            Delete{" "}
+            <span className="font-medium text-foreground">
+              {deletingPlaylist?.name}
+            </span>{" "}
+            and remove all its track entries?
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
@@ -408,11 +470,14 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 }
 
 function ArtistsTab() {
-  const { data: artists, loading } = useApi<FollowedArtist[]>("/api/me/follows");
+  const { data: artists, loading } =
+    useApi<FollowedArtist[]>("/api/me/follows");
 
   if (loading) return <Spinner />;
   if (!artists || artists.length === 0) {
-    return <EmptyState message="You haven't followed any artists yet. Explore the library to find artists you love." />;
+    return (
+      <EmptyState message="You haven't followed any artists yet. Explore the library to find artists you love." />
+    );
   }
 
   return (
@@ -479,27 +544,33 @@ function LikedTab() {
           t.album?.toLowerCase().includes(q),
       );
     }
-    if (sort === "title") list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    else if (sort === "artist") list.sort((a, b) => (a.artist || "").localeCompare(b.artist || ""));
-    else if (sort === "album") list.sort((a, b) => (a.album || "").localeCompare(b.album || ""));
+    if (sort === "title")
+      list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    else if (sort === "artist")
+      list.sort((a, b) => (a.artist || "").localeCompare(b.artist || ""));
+    else if (sort === "album")
+      list.sort((a, b) => (a.album || "").localeCompare(b.album || ""));
     return list;
   }, [tracks, search, sort]);
 
-  const trackRows = useMemo<TrackRowData[]>(() =>
-    filtered.map((t) =>
-      toTrackRowData({
-        ...t,
-        id: t.track_id ?? t.relative_path ?? t.path ?? t.title,
-        path: t.relative_path || t.path,
-        library_track_id: t.track_id,
-      }),
-    ),
+  const trackRows = useMemo<TrackRowData[]>(
+    () =>
+      filtered.map((t) =>
+        toTrackRowData({
+          ...t,
+          id: t.track_id ?? t.relative_path ?? t.path ?? t.title,
+          path: t.relative_path || t.path,
+          library_track_id: t.track_id,
+        }),
+      ),
     [filtered],
   );
 
   if (loading) return <Spinner />;
   if (!tracks || tracks.length === 0) {
-    return <EmptyState message="No liked tracks yet. Tap the heart on any track to save it here." />;
+    return (
+      <EmptyState message="No liked tracks yet. Tap the heart on any track to save it here." />
+    );
   }
 
   function handlePlayAll() {
@@ -513,16 +584,17 @@ function LikedTab() {
           library_track_id: t.track_id,
         },
         {
-          cover: t.artist && t.album
-            ? albumCoverApiUrl({
-                albumId: t.album_id,
-                albumEntityUid: t.album_entity_uid,
-                artistEntityUid: t.artist_entity_uid,
-                albumSlug: t.album_slug,
-                artistName: t.artist,
-                albumName: t.album,
-              })
-            : undefined,
+          cover:
+            t.artist && t.album
+              ? albumCoverApiUrl({
+                  albumId: t.album_id,
+                  albumEntityUid: t.album_entity_uid,
+                  artistEntityUid: t.artist_entity_uid,
+                  albumSlug: t.album_slug,
+                  artistName: t.artist,
+                  albumName: t.album,
+                })
+              : undefined,
         },
       ),
     );
@@ -540,7 +612,10 @@ function LikedTab() {
           Play {filtered.length < tracks.length ? `${filtered.length}` : "All"}
         </button>
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <Search
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
+          />
           <input
             type="text"
             value={search}
@@ -563,23 +638,29 @@ function LikedTab() {
       <WindowVirtualList
         items={trackRows}
         estimateSize={72}
-        itemKey={(row, index) => row.id ?? row.path ?? `${row.artist}-${row.album}-${row.title}-${index}`}
+        itemKey={(row, index) =>
+          row.id ??
+          row.path ??
+          `${row.artist}-${row.album}-${row.title}-${index}`
+        }
         renderItem={(row, i) => (
           <TrackRow
             track={row}
             index={i + 1}
             showArtist
             showAlbum
-            albumCover={row.artist && row.album
-              ? albumCoverApiUrl({
-                  albumId: row.album_id,
-                  albumEntityUid: row.album_entity_uid,
-                  artistEntityUid: row.artist_entity_uid,
-                  albumSlug: row.album_slug,
-                  artistName: row.artist,
-                  albumName: row.album,
-                })
-              : undefined}
+            albumCover={
+              row.artist && row.album
+                ? albumCoverApiUrl({
+                    albumId: row.album_id,
+                    albumEntityUid: row.album_entity_uid,
+                    artistEntityUid: row.artist_entity_uid,
+                    albumSlug: row.album_slug,
+                    artistName: row.artist,
+                    albumName: row.album,
+                  })
+                : undefined
+            }
             showCoverThumb
             queueTracks={trackRows}
           />
@@ -592,7 +673,9 @@ function LikedTab() {
 export function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isDesktop = useIsDesktop();
-  const { data: stats, refetch: refetchStats } = useApi<MeStats>(isDesktop ? "/api/me" : null);
+  const { data: stats, refetch: refetchStats } = useApi<MeStats>(
+    isDesktop ? "/api/me" : null,
+  );
   const tab = parseTab(searchParams.get("tab"));
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -601,7 +684,11 @@ export function Library() {
     setRefreshKey((k) => k + 1);
   }, [refetchStats]);
 
-  const { handlers: pullHandlers, pullDistance, refreshing } = usePullToRefresh(onRefresh);
+  const {
+    handlers: pullHandlers,
+    pullDistance,
+    refreshing,
+  } = usePullToRefresh(onRefresh);
 
   function setTab(tab: Tab) {
     setSearchParams({ tab });

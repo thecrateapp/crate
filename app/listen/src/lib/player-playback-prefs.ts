@@ -3,8 +3,10 @@ export const PLAYER_PLAYBACK_PREFS_EVENT = "listen-player-playback-prefs";
 const CROSSFADE_DURATION_KEY = "listen-player-crossfade-seconds";
 const SMART_CROSSFADE_KEY = "listen-player-smart-crossfade";
 const INFINITE_PLAYBACK_KEY = "listen-player-infinite-playback";
-const SMART_PLAYLIST_SUGGESTIONS_KEY = "listen-player-smart-playlist-suggestions";
-const SMART_PLAYLIST_SUGGESTIONS_CADENCE_KEY = "listen-player-smart-playlist-suggestions-cadence";
+const SMART_PLAYLIST_SUGGESTIONS_KEY =
+  "listen-player-smart-playlist-suggestions";
+const SMART_PLAYLIST_SUGGESTIONS_CADENCE_KEY =
+  "listen-player-smart-playlist-suggestions-cadence";
 const PLAYBACK_DELIVERY_POLICY_KEY = "listen-player-delivery-policy";
 const MOBILE_ENHANCED_AUDIO_KEY = "listen-player-mobile-enhanced-audio";
 
@@ -17,15 +19,18 @@ const PLAYBACK_DELIVERY_POLICIES = new Set<PlaybackDeliveryPolicy>([
 ]);
 
 function isMobileRuntime(): boolean {
-  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  if (typeof window === "undefined" || typeof navigator === "undefined")
+    return false;
   const ua = navigator.userAgent || "";
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || window.innerWidth < 768;
 }
 
-function normalizePlaybackDeliveryPolicy(value: string | null | undefined): PlaybackDeliveryPolicy | null {
+function normalizePlaybackDeliveryPolicy(
+  value: string | null | undefined,
+): PlaybackDeliveryPolicy | null {
   const normalized = (value || "").trim().toLowerCase().replace(/-/g, "_");
   return PLAYBACK_DELIVERY_POLICIES.has(normalized as PlaybackDeliveryPolicy)
-    ? normalized as PlaybackDeliveryPolicy
+    ? (normalized as PlaybackDeliveryPolicy)
     : null;
 }
 
@@ -35,15 +40,22 @@ export function getDefaultPlaybackDeliveryPolicy(): PlaybackDeliveryPolicy {
 
 export function getPlaybackDeliveryPolicyPreference(): PlaybackDeliveryPolicy {
   try {
-    return normalizePlaybackDeliveryPolicy(localStorage.getItem(PLAYBACK_DELIVERY_POLICY_KEY))
-      ?? getDefaultPlaybackDeliveryPolicy();
+    return (
+      normalizePlaybackDeliveryPolicy(
+        localStorage.getItem(PLAYBACK_DELIVERY_POLICY_KEY),
+      ) ?? getDefaultPlaybackDeliveryPolicy()
+    );
   } catch {
     return getDefaultPlaybackDeliveryPolicy();
   }
 }
 
-export function setPlaybackDeliveryPolicyPreference(policy: PlaybackDeliveryPolicy) {
-  const value = normalizePlaybackDeliveryPolicy(policy) ?? getDefaultPlaybackDeliveryPolicy();
+export function setPlaybackDeliveryPolicyPreference(
+  policy: PlaybackDeliveryPolicy,
+) {
+  const value =
+    normalizePlaybackDeliveryPolicy(policy) ??
+    getDefaultPlaybackDeliveryPolicy();
   try {
     localStorage.setItem(PLAYBACK_DELIVERY_POLICY_KEY, value);
     window.dispatchEvent(
@@ -93,7 +105,11 @@ export function setCrossfadeDurationPreference(seconds: number) {
   const value = Math.max(0, Math.min(seconds, 12));
   try {
     localStorage.setItem(CROSSFADE_DURATION_KEY, String(value));
-    window.dispatchEvent(new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, { detail: { crossfadeSeconds: value } }));
+    window.dispatchEvent(
+      new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
+        detail: { crossfadeSeconds: value },
+      }),
+    );
   } catch {
     // ignore localStorage failures in private mode or restricted environments
   }
@@ -157,7 +173,10 @@ export function getSmartPlaylistSuggestionsPreference(): boolean {
 
 export function setSmartPlaylistSuggestionsPreference(enabled: boolean) {
   try {
-    localStorage.setItem(SMART_PLAYLIST_SUGGESTIONS_KEY, enabled ? "true" : "false");
+    localStorage.setItem(
+      SMART_PLAYLIST_SUGGESTIONS_KEY,
+      enabled ? "true" : "false",
+    );
     window.dispatchEvent(
       new CustomEvent(PLAYER_PLAYBACK_PREFS_EVENT, {
         detail: { smartPlaylistSuggestionsEnabled: enabled },

@@ -44,7 +44,11 @@ vi.mock("@/lib/api", () => ({
   setAuthTokens,
 }));
 
-import { consumeOAuthCallbackUrl, consumePendingOAuthNext, getOAuthCallbackPayload } from "@/lib/capacitor";
+import {
+  consumeOAuthCallbackUrl,
+  consumePendingOAuthNext,
+  getOAuthCallbackPayload,
+} from "@/lib/capacitor";
 
 describe("capacitor OAuth callback helpers", () => {
   beforeEach(() => {
@@ -53,27 +57,50 @@ describe("capacitor OAuth callback helpers", () => {
   });
 
   it("stores token and pending next for native OAuth callbacks", async () => {
-    const result = await consumeOAuthCallbackUrl("cratemusic://oauth/callback?token=abc123&next=%2Fmixes");
+    const result = await consumeOAuthCallbackUrl(
+      "cratemusic://oauth/callback?token=abc123&next=%2Fmixes",
+    );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined);
+    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
     expect(consumePendingOAuthNext()).toBe("/mixes");
     expect(consumePendingOAuthNext()).toBeNull();
   });
 
   it("stores token and pending next for iOS universal link callbacks", async () => {
-    const result = await consumeOAuthCallbackUrl("https://listen.lespedants.org/auth/callback?token=abc123&next=%2Fmixes");
+    const result = await consumeOAuthCallbackUrl(
+      "https://listen.lespedants.org/auth/callback?token=abc123&next=%2Fmixes",
+    );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined);
+    expect(setAuthTokens).toHaveBeenCalledWith("abc123", undefined, undefined);
     expect(consumePendingOAuthNext()).toBe("/mixes");
   });
 
   it("stores refresh token when the native callback includes one", async () => {
-    const result = await consumeOAuthCallbackUrl("cratemusic://oauth/callback?token=abc123&refresh_token=refresh456&next=%2Fmixes");
+    const result = await consumeOAuthCallbackUrl(
+      "cratemusic://oauth/callback?token=abc123&refresh_token=refresh456&next=%2Fmixes",
+    );
 
     expect(result).toEqual({ handled: true, next: "/mixes" });
-    expect(setAuthTokens).toHaveBeenCalledWith("abc123", "refresh456");
+    expect(setAuthTokens).toHaveBeenCalledWith(
+      "abc123",
+      "refresh456",
+      undefined,
+    );
+  });
+
+  it("stores access expiry when the callback includes it", async () => {
+    const result = await consumeOAuthCallbackUrl(
+      "cratemusic://oauth/callback?token=abc123&access_expires_at=2026-05-12T13%3A08%3A10%2B00%3A00&next=%2Fmixes",
+    );
+
+    expect(result).toEqual({ handled: true, next: "/mixes" });
+    expect(setAuthTokens).toHaveBeenCalledWith(
+      "abc123",
+      undefined,
+      "2026-05-12T13:08:10+00:00",
+    );
   });
 
   it("ignores unrelated URLs", async () => {
@@ -87,6 +114,7 @@ describe("capacitor OAuth callback helpers", () => {
   it("parses token and next from plain search params too", () => {
     expect(getOAuthCallbackPayload("?token=abc123&next=%2Fstats")).toEqual({
       token: "abc123",
+      accessExpiresAt: null,
       refreshToken: null,
       next: "/stats",
     });

@@ -1,7 +1,10 @@
 import logging
 import shutil
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
+from crate.content import compute_dir_hash as _compute_dir_hash
 from crate.db.audit import log_audit
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
@@ -18,11 +21,20 @@ from crate.db.jobs.enrichment import (
     update_album_popularity,
     update_artist_content_hash,
 )
-from crate.db.repositories.library import get_library_albums, get_library_artist, get_library_artists, get_library_tracks
-from crate.db.queries.tasks import get_task
+from crate.db.repositories.library import (
+    get_library_albums,
+    get_library_artist,
+    get_library_artists,
+    get_library_tracks,
+)
 from crate.provider_rate_limits import wait_for_provider_slot
 from crate.storage_layout import looks_like_entity_uid, resolve_artist_dir
-from crate.task_progress import TaskProgress, emit_item_event, emit_progress, entity_label
+from crate.task_progress import (
+    TaskProgress,
+    emit_item_event,
+    emit_progress,
+    entity_label,
+)
 from crate.worker_handlers import DEFAULT_AUDIO_EXTENSIONS, TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
@@ -47,9 +59,6 @@ def _unmark_processing(artist_name: str):
     delete_cache(f"processing:{artist_name.lower()}")
 
 
-from crate.content import compute_dir_hash as _compute_dir_hash
-
-
 def _clean_album_lookup_name(album_name: str) -> str:
     import re
 
@@ -57,10 +66,10 @@ def _clean_album_lookup_name(album_name: str) -> str:
 
 
 def _build_album_match_local_info(
-    album: dict,
+    album: Mapping[str, Any],
     artist_name: str,
     clean_album: str,
-    tracks_db: list[dict],
+    tracks_db: Sequence[Mapping[str, Any]],
     exts: set[str],
 ) -> dict:
     from crate.audio import get_audio_files
@@ -83,13 +92,13 @@ def _build_album_match_local_info(
         "tracks": [
             {
                 "title": track.get("title", ""),
-                "length_sec": int(track.get("duration", 0)),
+                "length_sec": int(track.get("duration") or 0),
                 "tracknumber": str(track.get("track_number", "")),
                 "filename": track.get("filename", ""),
             }
             for track in tracks_db
         ],
-        "total_length": sum(int(track.get("duration", 0)) for track in tracks_db),
+        "total_length": sum(int(track.get("duration") or 0) for track in tracks_db),
     }
 
 
@@ -148,19 +157,27 @@ def _auto_apply_album_release(
         emit_task_event(
             task_id,
             "info",
-            {"message": f"Auto-applied tags: {artist_name}/{clean_album} (score {score}%)"},
+            {
+                "message": f"Auto-applied tags: {artist_name}/{clean_album} (score {score}%)"
+            },
         )
         return True
     except Exception:
-        log.warning("Auto-apply failed for %s/%s", artist_name, clean_album, exc_info=True)
+        log.warning(
+            "Auto-apply failed for %s/%s", artist_name, clean_album, exc_info=True
+        )
         return False
 
 
-def _persist_album_release_mbids(album_id: int, tracks_db: list[dict], release: dict) -> None:
+def _persist_album_release_mbids(
+    album_id: int, tracks_db: Sequence[Mapping[str, Any]], release: dict
+) -> None:
     _db_persist_album_release_mbids(album_id, tracks_db, release)
 
 
-def _write_album_release_tags(tracks_db: list[dict], release: dict) -> None:
+def _write_album_release_tags(
+    tracks_db: Sequence[Mapping[str, Any]], release: dict
+) -> None:
     import mutagen
 
     release_mbid = release["mbid"]
@@ -176,7 +193,7 @@ def _write_album_release_tags(tracks_db: list[dict], release: dict) -> None:
         if not track_path or not Path(track_path).is_file():
             continue
         try:
-            audio = mutagen.File(track_path, easy=True)
+            audio = getattr(mutagen, "File")(track_path, easy=True)
             if audio is None:
                 continue
             changed = False
@@ -195,7 +212,9 @@ def _write_album_release_tags(tracks_db: list[dict], release: dict) -> None:
             log.warning("Failed to write MBID tags to %s", track_path)
 
 
-def _sync_album_after_auto_apply(album_name: str, artist_name: str, album_dir: Path | None, config: dict) -> None:
+def _sync_album_after_auto_apply(
+    album_name: str, artist_name: str, album_dir: Path | None, config: dict
+) -> None:
     if not album_dir or not album_dir.is_dir():
         return
     try:
@@ -210,7 +229,9 @@ def _sync_album_after_auto_apply(album_name: str, artist_name: str, album_dir: P
 def _handle_enrich_artists(task_id: str, params: dict, config: dict) -> dict:
     from crate.enrichment import enrich_artist
 
-    artist_names = [str(name).strip() for name in (params.get("artists") or []) if str(name).strip()]
+    artist_names = [
+        str(name).strip() for name in (params.get("artists") or []) if str(name).strip()
+    ]
     if artist_names:
         total = len(artist_names)
     else:
@@ -218,7 +239,13 @@ def _handle_enrich_artists(task_id: str, params: dict, config: dict) -> dict:
         artist_names = [artist["name"] for artist in all_artists]
 
         try:
-            chunk_size = int(params.get("chunk_size") or get_setting("enrich_artists_chunk_size", str(ENRICH_ARTISTS_CHUNK_SIZE)))
+            chunk_size = int(
+                params.get("chunk_size")
+                or get_setting(
+                    "enrich_artists_chunk_size", str(ENRICH_ARTISTS_CHUNK_SIZE)
+                )
+                or str(ENRICH_ARTISTS_CHUNK_SIZE)
+            )
         except (TypeError, ValueError):
             chunk_size = ENRICH_ARTISTS_CHUNK_SIZE
         chunk_size = max(1, min(chunk_size, 100))
@@ -232,7 +259,9 @@ def _handle_enrich_artists(task_id: str, params: dict, config: dict) -> dict:
             emit_task_event(
                 task_id,
                 "info",
-                {"message": f"Dispatching enrichment for {total} artists in {len(chunks)} chunks"},
+                {
+                    "message": f"Dispatching enrichment for {total} artists in {len(chunks)} chunks"
+                },
             )
             for index, chunk in enumerate(chunks):
                 chunk_params = {
@@ -245,7 +274,9 @@ def _handle_enrich_artists(task_id: str, params: dict, config: dict) -> dict:
                     chunk_params["force"] = True
                 create_task("enrich_artists", chunk_params, parent_task_id=task_id)
 
-            p = TaskProgress(phase="dispatched", phase_count=1, total=len(chunks), done=0)
+            p = TaskProgress(
+                phase="dispatched", phase_count=1, total=len(chunks), done=0
+            )
             p.item = f"0/{len(chunks)} chunks"
             emit_progress(task_id, p, force=True)
             return {"_delegated": True, "chunks": len(chunks), "artists": total}
@@ -266,10 +297,14 @@ def _handle_enrich_artists(task_id: str, params: dict, config: dict) -> dict:
         result = enrich_artist(name, config, force=bool(params.get("force", False)))
         if result.get("skipped"):
             skipped += 1
-            emit_item_event(task_id, level="info", message=f"Skipped: {name}", artist=name)
+            emit_item_event(
+                task_id, level="info", message=f"Skipped: {name}", artist=name
+            )
         else:
             enriched += 1
-            emit_item_event(task_id, level="info", message=f"Enriched: {name}", artist=name)
+            emit_item_event(
+                task_id, level="info", message=f"Enriched: {name}", artist=name
+            )
 
     return {"enriched": enriched, "skipped": skipped, "total": total}
 
@@ -282,7 +317,9 @@ def _handle_enrich_single(task_id: str, params: dict, config: dict) -> dict:
     if not name:
         return {"error": "No artist specified"}
 
-    p = TaskProgress(phase="enriching", phase_count=1, total=1, item=entity_label(artist=name))
+    p = TaskProgress(
+        phase="enriching", phase_count=1, total=1, item=entity_label(artist=name)
+    )
     emit_progress(task_id, p)
     result = enrich_artist(name, config, force=True)
     p.done = 1
@@ -426,7 +463,6 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
 
 def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
     """Enrich albums and tracks with MusicBrainz IDs."""
-    lib = Path(config["library_path"])
     exts = DEFAULT_AUDIO_EXTENSIONS
     artist_filter = params.get("artist")
     min_score = params.get("min_score", 70)
@@ -484,7 +520,7 @@ def _handle_enrich_mbids(task_id: str, params: dict, config: dict) -> dict:
             failed += 1
             continue
 
-        auto_apply_threshold = int(get_setting("mb_auto_apply_threshold", "95"))
+        auto_apply_threshold = int(get_setting("mb_auto_apply_threshold", "95") or "95")
         if best_score >= auto_apply_threshold and album_dir and album_dir.is_dir():
             _auto_apply_album_release(
                 task_id,
@@ -536,14 +572,25 @@ def _reorganize_artist_folders(
     from crate.audio import get_audio_files, read_tags
 
     artist_row = get_library_artist(artist_name)
-    artist_dir = resolve_artist_dir(lib, artist_row, fallback_name=artist_name, existing_only=True)
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist_name, existing_only=True
+    )
     if artist_row and looks_like_entity_uid(str(artist_row.get("folder_name") or "")):
-        log.info("Skip folder reorganization for managed-storage artist %s", artist_name)
+        log.info(
+            "Skip folder reorganization for managed-storage artist %s", artist_name
+        )
         return
     if not artist_dir or not artist_dir.is_dir():
         return
-    if any(looks_like_entity_uid(part.name) for part in artist_dir.iterdir() if part.is_dir()):
-        log.info("Skip folder reorganization for %s because managed-storage album dirs were detected", artist_name)
+    if any(
+        looks_like_entity_uid(part.name)
+        for part in artist_dir.iterdir()
+        if part.is_dir()
+    ):
+        log.info(
+            "Skip folder reorganization for %s because managed-storage album dirs were detected",
+            artist_name,
+        )
         return
 
     year_prefix_re = _re.compile(r"^(\d{4})\s*[-–]\s*(.+)$")
@@ -575,7 +622,9 @@ def _reorganize_artist_folders(
         if target == subdir:
             continue
         if target.exists():
-            log.warning("Cannot reorganize %s: target %s already exists", subdir, target)
+            log.warning(
+                "Cannot reorganize %s: target %s already exists", subdir, target
+            )
             continue
 
         try:
@@ -586,7 +635,12 @@ def _reorganize_artist_folders(
             update_album_path_after_reorganize(old_path, new_path, clean_name)
             moved += 1
             log.info("Reorganized: %s -> %s", subdir.name, f"{year}/{clean_name}")
-            emit_task_event(task_id, "info", {"message": f"Moved {subdir.name} -> {year}/{clean_name}"})
+            if task_id:
+                emit_task_event(
+                    task_id,
+                    "info",
+                    {"message": f"Moved {subdir.name} -> {year}/{clean_name}"},
+                )
         except Exception:
             log.warning("Failed to reorganize %s", subdir, exc_info=True)
 
@@ -633,20 +687,22 @@ def _process_new_content_enrich_artist(
         emit_task_event(
             task_id,
             "step_done",
-            {"message": f"Enriched: {artist_name}", "step": "enrich_artist", "result": enrich_result},
+            {
+                "message": f"Enriched: {artist_name}",
+                "step": "enrich_artist",
+                "result": enrich_result,
+            },
         )
     except Exception:
         log.warning("Enrich artist failed for %s", artist_name, exc_info=True)
         result["steps"]["enrich_artist"] = "failed"
 
 
-def _get_album_tracks_cached(album: dict) -> list[dict]:
+def _get_album_tracks_cached(album: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
     cached = album.get("_tracks")
     if isinstance(cached, list):
         return cached
-    tracks = get_library_tracks(album["id"])
-    album["_tracks"] = tracks
-    return tracks
+    return get_library_tracks(int(album["id"]))
 
 
 def _process_new_content_album_genres(
@@ -655,11 +711,11 @@ def _process_new_content_album_genres(
     artist_name: str,
     album_folder: str,
     p: TaskProgress,
-) -> list[dict]:
+) -> Sequence[Mapping[str, Any]]:
     from crate.db.queries.browse_artist import get_artist_genre_profile
     from crate.genre_indexer import derive_album_genres
 
-    albums = []
+    albums: Sequence[Mapping[str, Any]] = []
     p.phase = "album_genres"
     p.phase_index += 1
     p.item = entity_label(artist=artist_name)
@@ -671,9 +727,12 @@ def _process_new_content_album_genres(
             if album_folder and album["name"] != album_folder:
                 continue
             tracks = _get_album_tracks_cached(album)
+            track_genres = [
+                str(genre) for track in tracks if (genre := track.get("genre"))
+            ]
             genres = derive_album_genres(
                 album.get("genre"),
-                [track.get("genre") for track in tracks if track.get("genre")],
+                track_genres,
                 artist_profile=artist_profile,
             )
             if genres:
@@ -688,7 +747,7 @@ def _process_new_content_album_genres(
 def _process_new_content_album_mbids(
     task_id: str,
     result: dict,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     artist_name: str,
     album_folder: str,
     config: dict,
@@ -708,9 +767,11 @@ def _process_new_content_album_mbids(
             if existing_mbid and existing_mbid.strip():
                 continue
 
-            clean_name = _clean_album_lookup_name(album.get("tag_album") or album["name"])
+            clean_name = _clean_album_lookup_name(
+                album.get("tag_album") or album["name"]
+            )
             tracks_db = _get_album_tracks_cached(album)
-            track_count = album.get("track_count", 0)
+            track_count = int(album.get("track_count") or 0)
             local_info = _build_album_match_local_info(
                 album,
                 artist_name,
@@ -740,7 +801,7 @@ def _process_new_content_album_mbids(
 def _process_new_content_popularity(
     task_id: str,
     result: dict,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     artist_name: str,
     album_folder: str,
     p: TaskProgress,
@@ -761,9 +822,13 @@ def _process_new_content_popularity(
         for album in albums:
             if album_folder and album["name"] != album_folder:
                 continue
-            album_name = _clean_album_lookup_name(album.get("tag_album") or album["name"])
+            album_name = _clean_album_lookup_name(
+                album.get("tag_album") or album["name"]
+            )
             wait_for_provider_slot("lastfm", 0.25)
-            data = _lastfm_get("album.getinfo", artist=artist_name, album=album_name, autocorrect="1")
+            data = _lastfm_get(
+                "album.getinfo", artist=artist_name, album=album_name, autocorrect="1"
+            )
             if data and "album" in data:
                 info = data["album"]
                 listeners = _parse_int(info.get("listeners", 0))
@@ -790,7 +855,7 @@ def _process_new_content_popularity(
 def _process_new_content_missing_covers(
     task_id: str,
     result: dict,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     artist_name: str,
     album_folder: str,
     p: TaskProgress,
@@ -811,7 +876,10 @@ def _process_new_content_missing_covers(
             album_dir = Path(album["path"]) if album.get("path") else None
             if not album_dir or not album_dir.is_dir():
                 continue
-            if any((album_dir / candidate).exists() for candidate in ("cover.jpg", "cover.png", "folder.jpg")):
+            if any(
+                (album_dir / candidate).exists()
+                for candidate in ("cover.jpg", "cover.png", "folder.jpg")
+            ):
                 continue
 
             cover_data = None
@@ -822,7 +890,9 @@ def _process_new_content_missing_covers(
 
             if not cover_data:
                 try:
-                    album_name = _clean_album_lookup_name(album.get("tag_album") or album["name"])
+                    album_name = _clean_album_lookup_name(
+                        album.get("tag_album") or album["name"]
+                    )
                     wait_for_provider_slot("deezer", 0.3)
                     resp = _requests.get(
                         "https://api.deezer.com/search/album",
@@ -834,10 +904,18 @@ def _process_new_content_missing_covers(
                         if data and data[0].get("cover_xl"):
                             wait_for_provider_slot("deezer", 0.3)
                             img_resp = _requests.get(data[0]["cover_xl"], timeout=10)
-                            if img_resp.status_code == 200 and len(img_resp.content) > 1000:
+                            if (
+                                img_resp.status_code == 200
+                                and len(img_resp.content) > 1000
+                            ):
                                 cover_data = img_resp.content
                 except Exception:
-                    log.debug("Failed to fetch Deezer cover for %s / %s", artist_name, album_name, exc_info=True)
+                    log.debug(
+                        "Failed to fetch Deezer cover for %s / %s",
+                        artist_name,
+                        album_name,
+                        exc_info=True,
+                    )
 
             if cover_data:
                 save_cover(album_dir, cover_data)
@@ -853,7 +931,7 @@ def _process_new_content_missing_covers(
 def _process_new_content_portable_metadata(
     task_id: str,
     result: dict,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     artist_name: str,
     album_folder: str,
     params: dict,
@@ -923,7 +1001,7 @@ def _process_new_content_portable_metadata(
 def _process_new_content_lyrics(
     task_id: str,
     result: dict,
-    albums: list[dict],
+    albums: Sequence[Mapping[str, Any]],
     artist_name: str,
     album_folder: str,
     p: TaskProgress,
@@ -937,11 +1015,11 @@ def _process_new_content_lyrics(
     p.item = entity_label(artist=artist_name)
     emit_progress(task_id, p, force=True)
     try:
-        tracks: list[dict] = []
+        tracks: list[dict[str, Any]] = []
         for album in albums:
             if album_folder and album["name"] != album_folder:
                 continue
-            tracks.extend(_get_album_tracks_cached(album))
+            tracks.extend(dict(track) for track in _get_album_tracks_cached(album))
 
         def _lyrics_progress(data: dict) -> None:
             p.done = data.get("done", p.done)
@@ -995,15 +1073,24 @@ def _process_new_content_audio_fingerprints(
             params,
             dedup_key=f"fingerprints:{artist_name.lower()}:{album_folder.lower()}",
         )
-        result["steps"]["audio_fingerprints"] = "queued" if child_task_id else "deduplicated"
+        result["steps"]["audio_fingerprints"] = (
+            "queued" if child_task_id else "deduplicated"
+        )
         if child_task_id:
             emit_task_event(
                 task_id,
                 "info",
-                {"message": "Queued audio fingerprint backfill", "child_task_id": child_task_id},
+                {
+                    "message": "Queued audio fingerprint backfill",
+                    "child_task_id": child_task_id,
+                },
             )
     except Exception:
-        log.debug("Failed to queue audio fingerprint backfill for %s", artist_name, exc_info=True)
+        log.debug(
+            "Failed to queue audio fingerprint backfill for %s",
+            artist_name,
+            exc_info=True,
+        )
         result["steps"]["audio_fingerprints"] = "failed"
 
 
@@ -1015,6 +1102,26 @@ def _process_new_content_update_artist_hash(artist_dir: Path, artist_name: str) 
     update_artist_content_hash(artist_name, final_hash)
 
 
+def _process_new_content_refresh_artist_summary(artist_name: str, config: dict) -> None:
+    if not artist_name:
+        return
+    try:
+        from crate.library_sync import LibrarySync
+
+        lib = Path(config["library_path"])
+        artist_row = get_library_artist(artist_name)
+        folder = (artist_row.get("folder_name") if artist_row else None) or artist_name
+        artist_dir = lib / folder
+        if artist_dir.is_dir():
+            LibrarySync(config).refresh_artist_summary(artist_name, [artist_dir])
+    except Exception:
+        log.warning(
+            "Failed to refresh artist summary after process_new_content for %s",
+            artist_name,
+            exc_info=True,
+        )
+
+
 def _handle_process_new_content(task_id: str, params: dict, config: dict) -> dict:
     """Full pipeline for new content: enrich artist + index genres + analyze audio + bliss."""
     artist_name = params.get("artist", "")
@@ -1022,8 +1129,11 @@ def _handle_process_new_content(task_id: str, params: dict, config: dict) -> dic
 
     _mark_processing(artist_name)
     try:
-        return _process_new_content_inner(task_id, params, config, artist_name, album_folder)
+        return _process_new_content_inner(
+            task_id, params, config, artist_name, album_folder
+        )
     finally:
+        _process_new_content_refresh_artist_summary(artist_name, config)
         _unmark_processing(artist_name)
 
 
@@ -1041,25 +1151,38 @@ def _process_new_content_inner(
         new_hash = _compute_dir_hash(artist_dir)
         old_hash = artist_row.get("content_hash") if artist_row else None
         if old_hash and new_hash == old_hash:
-            log.info("Skipping %s - content unchanged (hash: %s)", artist_name, new_hash[:12])
-            return {"artist": artist_name, "skipped": True, "reason": "content_unchanged"}
+            log.info(
+                "Skipping %s - content unchanged (hash: %s)", artist_name, new_hash[:12]
+            )
+            return {
+                "artist": artist_name,
+                "skipped": True,
+                "reason": "content_unchanged",
+            }
 
     # Ensure artist content is synced (may be missing after migration or fresh download)
     if artist_dir.is_dir():
         try:
             from crate.library_sync import LibrarySync
+
             sync = LibrarySync(config)
             sync.sync_artist(artist_dir)
         except Exception:
             log.warning("Pre-enrichment sync failed for %s", artist_name, exc_info=True)
 
-    p = TaskProgress(phase="starting", phase_count=8, total=1, item=entity_label(artist=artist_name))
+    p = TaskProgress(
+        phase="starting", phase_count=8, total=1, item=entity_label(artist=artist_name)
+    )
     emit_progress(task_id, p, force=True)
 
     _process_new_content_organize_folders(task_id, result, artist_name, lib, config, p)
     _process_new_content_enrich_artist(task_id, result, artist_name, config, p)
-    albums = _process_new_content_album_genres(task_id, result, artist_name, album_folder, p)
-    _process_new_content_album_mbids(task_id, result, albums, artist_name, album_folder, config, p)
+    albums = _process_new_content_album_genres(
+        task_id, result, artist_name, album_folder, p
+    )
+    _process_new_content_album_mbids(
+        task_id, result, albums, artist_name, album_folder, config, p
+    )
     _process_new_content_lyrics(task_id, result, albums, artist_name, album_folder, p)
 
     # Audio analysis and bliss are handled by background daemons (analysis_daemon.py).
@@ -1069,20 +1192,31 @@ def _process_new_content_inner(
     result["steps"]["bliss"] = "background_daemon"
     _process_new_content_audio_fingerprints(task_id, result, artist_name, album_folder)
 
-    _process_new_content_popularity(task_id, result, albums, artist_name, album_folder, p)
-    _process_new_content_missing_covers(task_id, result, albums, artist_name, album_folder, p)
-    _process_new_content_portable_metadata(task_id, result, albums, artist_name, album_folder, params, p)
+    _process_new_content_popularity(
+        task_id, result, albums, artist_name, album_folder, p
+    )
+    _process_new_content_missing_covers(
+        task_id, result, albums, artist_name, album_folder, p
+    )
+    _process_new_content_portable_metadata(
+        task_id, result, albums, artist_name, album_folder, params, p
+    )
     _process_new_content_update_artist_hash(artist_dir, artist_name)
 
     # Notify connected clients to refresh cached library data.
     # Worker runs in a separate process — POST to the API to broadcast.
     try:
         import requests as _req
+
         _artist_row = get_library_artist(artist_name)
         _scopes = ["library"]
         if _artist_row and _artist_row.get("id"):
             _scopes.append(f"artist:{_artist_row['id']}")
-        _req.post("http://crate-api:8585/api/cache/invalidate", json={"scopes": _scopes}, timeout=3)
+        _req.post(
+            "http://crate-api:8585/api/cache/invalidate",
+            json={"scopes": _scopes},
+            timeout=3,
+        )
     except Exception:
         pass  # Cache invalidation is best-effort
 
@@ -1110,15 +1244,22 @@ def _handle_compute_completeness(task_id: str, params: dict, config: dict) -> di
         emit_progress(task_id, p)
 
         try:
-            mb_data = get_cache(f"mb:albums:{artist['mbid']}", max_age_seconds=86400 * 7)
+            mb_data = get_cache(
+                f"mb:albums:{artist['mbid']}", max_age_seconds=86400 * 7
+            )
             if not mb_data:
                 try:
                     wait_for_provider_slot("musicbrainz", 1.1)
-                    mb_artist = musicbrainzngs.get_artist_by_id(artist["mbid"])["artist"]
+                    mb_artist = musicbrainzngs.get_artist_by_id(artist["mbid"])[
+                        "artist"
+                    ]
                     mb_name = mb_artist.get("name", "")
                     from thefuzz import fuzz
+
                     if fuzz.ratio(artist["name"].lower(), mb_name.lower()) < 70:
-                        log.debug("MBID mismatch: %s -> %s, skipping", artist["mbid"], mb_name)
+                        log.debug(
+                            "MBID mismatch: %s -> %s, skipping", artist["mbid"], mb_name
+                        )
                         continue
                 except Exception:
                     pass
@@ -1134,7 +1275,9 @@ def _handle_compute_completeness(task_id: str, params: dict, config: dict) -> di
                         {
                             "title": rg.get("title", ""),
                             "type": rg.get("primary-type", ""),
-                            "year": rg.get("first-release-date", "")[:4] if rg.get("first-release-date") else "",
+                            "year": rg.get("first-release-date", "")[:4]
+                            if rg.get("first-release-date")
+                            else "",
                         }
                         for rg in mb_albums
                     ],
@@ -1149,28 +1292,36 @@ def _handle_compute_completeness(task_id: str, params: dict, config: dict) -> di
             local_clean = {year_re.sub("", name).lower() for name in local_names}
 
             missing = [
-                album for album in mb_data["albums"]
-                if album["title"].lower() not in local_names and album["title"].lower() not in local_clean
+                album
+                for album in mb_data["albums"]
+                if album["title"].lower() not in local_names
+                and album["title"].lower() not in local_clean
             ]
 
-            results.append({
-                "artist_id": artist["id"],
-                "artist_entity_uid": artist.get("entity_uid"),
-                "artist_slug": artist["slug"],
-                "artist": artist["name"],
-                "has_photo": bool(artist["has_photo"]),
-                "listeners": artist.get("listeners", 0),
-                "local_count": local_count,
-                "mb_count": mb_count,
-                "pct": min(pct, 100),
-                "missing": missing[:10],
-            })
+            results.append(
+                {
+                    "artist_id": artist["id"],
+                    "artist_entity_uid": artist.get("entity_uid"),
+                    "artist_slug": artist["slug"],
+                    "artist": artist["name"],
+                    "has_photo": bool(artist["has_photo"]),
+                    "listeners": artist.get("listeners", 0),
+                    "local_count": local_count,
+                    "mb_count": mb_count,
+                    "pct": min(pct, 100),
+                    "missing": missing[:10],
+                }
+            )
         except Exception:
             log.debug("Completeness check failed for %s", artist["name"], exc_info=True)
 
     results.sort(key=lambda item: item["pct"])
     set_cache("discover:completeness", results, ttl=86400)
-    emit_task_event(task_id, "info", {"message": f"Completeness computed: {len(results)}/{total} artists checked"})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Completeness computed: {len(results)}/{total} artists checked"},
+    )
     return {"artists_checked": len(results), "total": total}
 
 

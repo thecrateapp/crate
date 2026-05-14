@@ -17,7 +17,10 @@ from crate.db.ops_snapshot_activity import (
 )
 from crate.db.ops_snapshot_eventing import build_eventing_payload
 from crate.db.ops_snapshot_stats import build_analytics_payload, build_stats_payload
-from crate.db.queries.analytics import get_overview_stat_summary, get_track_distribution_summary
+from crate.db.queries.analytics import (
+    get_overview_stat_summary,
+    get_track_distribution_summary,
+)
 from crate.db.queries.tasks import get_latest_scan
 from crate.db.repositories.library import get_library_stats
 
@@ -74,11 +77,17 @@ def build_ops_snapshot_payload() -> dict[str, Any]:
         summary=summary,
         track_distributions=track_distributions,
     )
-    analytics = build_analytics_payload(summary=summary, track_distributions=track_distributions)
+    analytics = build_analytics_payload(
+        summary=summary, track_distributions=track_distributions
+    )
     live = build_live_activity_payload(worker_live)
-    recent = build_recent_activity_payload(worker_live=worker_live, scan=scan, pending_imports=pending_imports)
+    recent = build_recent_activity_payload(
+        worker_live=worker_live, scan=scan, pending_imports=pending_imports
+    )
     analysis = build_analysis_payload()
-    status = build_public_status_payload(live, scan=scan, pending_imports=pending_imports)
+    status = build_public_status_payload(
+        live, scan=scan, pending_imports=pending_imports
+    )
     payload = {
         "status": status,
         "stats": stats,

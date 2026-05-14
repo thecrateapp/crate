@@ -1,12 +1,11 @@
-import { mat4, vec3 } from 'gl-matrix';
-import Drawable from './Drawable';
-import Camera from '../Camera';
-import { gl } from '../globals';
-import ShaderProgram from './ShaderProgram';
+import { mat4, vec3 } from "gl-matrix";
+import Drawable from "./Drawable";
+import Camera from "../Camera";
+import { gl } from "../globals";
+import ShaderProgram from "./ShaderProgram";
 
 class OpenGLRenderer {
-  constructor(public canvas: HTMLCanvasElement) {
-  }
+  constructor(public canvas: HTMLCanvasElement) {}
 
   setClearColor(r: number, g: number, b: number, a: number) {
     gl.clearColor(r, g, b, a);
@@ -21,14 +20,24 @@ class OpenGLRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
 
-  render(camera: Camera, prog: ShaderProgram, drawables: Array<Drawable>, scale: number = 1.0) {
+  render(
+    camera: Camera,
+    prog: ShaderProgram,
+    drawables: Array<Drawable>,
+    scale: number = 1.0,
+  ) {
     const model = mat4.create();
     mat4.identity(model);
     mat4.scale(model, model, vec3.fromValues(scale, scale, scale));
     this.renderWithModel(camera, prog, drawables, model);
   }
 
-  renderWithModel(camera: Camera, prog: ShaderProgram, drawables: Array<Drawable>, model: mat4) {
+  renderWithModel(
+    camera: Camera,
+    prog: ShaderProgram,
+    drawables: Array<Drawable>,
+    model: mat4,
+  ) {
     const viewProj = mat4.create();
     mat4.multiply(viewProj, camera.projectionMatrix, camera.viewMatrix);
     prog.setModelMatrix(model);

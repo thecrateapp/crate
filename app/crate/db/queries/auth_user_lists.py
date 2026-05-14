@@ -8,9 +8,10 @@ from crate.db.tx import read_scope
 
 def list_users() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     u.id,
                     u.email,
@@ -53,10 +54,15 @@ def list_users() -> list[dict]:
                 FROM users u
                 ORDER BY u.id
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     users = [dict(row) for row in rows]
-    presence = get_users_presence([int(user["id"]) for user in users if user.get("id") is not None])
+    presence = get_users_presence(
+        [int(user["id"]) for user in users if user.get("id") is not None]
+    )
     for user in users:
         if user.get("id") is not None:
             user.update(presence.get(int(user["id"]), {}))
@@ -67,9 +73,10 @@ def list_users_map_rows() -> list[dict]:
     from crate.db.cache_store import get_cache
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT u.id, u.name, u.email, u.avatar, u.city, u.country, u.latitude, u.longitude,
                        u.created_at,
                        MAX(COALESCE(s.last_seen_at, s.created_at)) AS last_seen_at,
@@ -86,8 +93,11 @@ def list_users_map_rows() -> list[dict]:
                 WHERE u.latitude IS NOT NULL AND u.longitude IS NOT NULL
                 GROUP BY u.id
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
     result: list[dict] = []
     for row in rows:

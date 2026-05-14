@@ -1,5 +1,11 @@
 import { useMemo, useState, type ChangeEvent } from "react";
-import { Loader2, Music, Upload as UploadIcon, Archive, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  Music,
+  Upload as UploadIcon,
+  Archive,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
@@ -20,7 +26,9 @@ function formatBytes(bytes: number): string {
     value /= 1024;
     unitIndex += 1;
   }
-  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${
+    units[unitIndex]
+  }`;
 }
 
 export function Upload() {
@@ -47,9 +55,15 @@ export function Upload() {
 
     setSubmitting(true);
     try {
-      const response = await api<UploadResponse>("/api/acquisition/upload", "POST", formData);
+      const response = await api<UploadResponse>(
+        "/api/acquisition/upload",
+        "POST",
+        formData,
+      );
       setLastUpload(response);
-      toast.success("Upload queued. Crate is importing your music in the background.");
+      toast.success(
+        "Upload queued. Crate is importing your music in the background.",
+      );
       setFiles([]);
     } catch {
       toast.error("Failed to queue upload");
@@ -65,10 +79,13 @@ export function Upload() {
           <UploadIcon size={12} />
           Upload music
         </div>
-        <h1 className="text-3xl font-bold text-foreground">Add music to your library</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          Add music to your library
+        </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Upload individual tracks or zipped albums. Crate will import them into the shared library,
-          run the usual enrichment pipeline, and add what you uploaded to your collection automatically.
+          Upload individual tracks or zipped albums. Crate will import them into
+          the shared library, run the usual enrichment pipeline, and add what
+          you uploaded to your collection automatically.
         </p>
       </div>
 
@@ -79,7 +96,9 @@ export function Upload() {
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <UploadIcon size={24} />
               </div>
-              <div className="text-base font-semibold text-foreground">Drop files here or choose files</div>
+              <div className="text-base font-semibold text-foreground">
+                Drop files here or choose files
+              </div>
               <div className="mt-2 text-sm text-muted-foreground">
                 FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
               </div>
@@ -96,9 +115,12 @@ export function Upload() {
               <div className="space-y-2 rounded-2xl border border-white/10 bg-[var(--gradient-bg-50)] p-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-foreground">Ready to import</div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Ready to import
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {files.length} file{files.length === 1 ? "" : "s"} · {formatBytes(totalBytes)}
+                      {files.length} file{files.length === 1 ? "" : "s"} ·{" "}
+                      {formatBytes(totalBytes)}
                     </div>
                   </div>
                   <button
@@ -119,8 +141,12 @@ export function Upload() {
                       ) : (
                         <Music size={14} className="shrink-0 text-primary" />
                       )}
-                      <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                      <span className="text-[11px] text-white/40">{formatBytes(file.size)}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {file.name}
+                      </span>
+                      <span className="text-[11px] text-white/40">
+                        {formatBytes(file.size)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -129,7 +155,9 @@ export function Upload() {
           </div>
 
           <div className="space-y-4 rounded-[24px] border border-white/10 bg-[var(--gradient-bg-50)] p-5">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">What happens next</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              What happens next
+            </h2>
             <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
               <li>Crate imports the files into the shared library.</li>
               <li>Library sync and enrichment run in the background.</li>
@@ -141,7 +169,11 @@ export function Upload() {
               disabled={submitting || files.length === 0}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? <Loader2 size={16} className="animate-spin" /> : <UploadIcon size={16} />}
+              {submitting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <UploadIcon size={16} />
+              )}
               Import to library
             </button>
             {lastUpload ? (
@@ -151,7 +183,8 @@ export function Upload() {
                   Upload queued
                 </div>
                 <div className="mt-1 text-xs text-emerald-100/80">
-                  Task `{lastUpload.task_id}` is processing {lastUpload.file_count} file
+                  Task `{lastUpload.task_id}` is processing{" "}
+                  {lastUpload.file_count} file
                   {lastUpload.file_count === 1 ? "" : "s"}.
                 </div>
               </div>

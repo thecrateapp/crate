@@ -12,11 +12,14 @@ def get_genre_detail(slug: str) -> dict | None:
         if not genre:
             return None
         if not genre.get("description") and not genre.get("mapped"):
-            genre["description"] = "raw library tag detected in your collection but not yet linked into the curated taxonomy."
+            genre["description"] = (
+                "raw library tag detected in your collection but not yet linked into the curated taxonomy."
+            )
 
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     ag.artist_name,
                     la.id AS artist_id,
@@ -33,14 +36,18 @@ def get_genre_detail(slug: str) -> dict | None:
                 WHERE ag.genre_id = :genre_id
                 ORDER BY ag.weight DESC, la.listeners DESC NULLS LAST
                 """
-            ),
-            {"genre_id": genre["id"]},
-        ).mappings().all()
+                ),
+                {"genre_id": genre["id"]},
+            )
+            .mappings()
+            .all()
+        )
         genre["artists"] = [dict(r) for r in rows]
 
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT DISTINCT ON (a.id)
                     a.id AS album_id,
                     a.slug AS album_slug,
@@ -59,9 +66,12 @@ def get_genre_detail(slug: str) -> dict | None:
                 WHERE alg.genre_id IS NOT NULL OR ag.genre_id IS NOT NULL
                 ORDER BY a.id, a.year DESC NULLS LAST
                 """
-            ),
-            {"genre_id": genre["id"]},
-        ).mappings().all()
+                ),
+                {"genre_id": genre["id"]},
+            )
+            .mappings()
+            .all()
+        )
         genre["albums"] = [dict(r) for r in rows]
 
         return genre
@@ -69,46 +79,63 @@ def get_genre_detail(slug: str) -> dict | None:
 
 def get_artists_with_tags() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(text("SELECT name, tags_json FROM library_artists WHERE tags_json IS NOT NULL")).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT name, tags_json FROM library_artists WHERE tags_json IS NOT NULL"
+                )
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def get_albums_with_genres() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT a.id, a.artist, a.name, a.genre,
                        array_agg(DISTINCT t.genre) FILTER (WHERE t.genre IS NOT NULL AND t.genre != '') AS track_genres
                 FROM library_albums a
                 LEFT JOIN library_tracks t ON t.album_id = a.id
                 GROUP BY a.id, a.artist, a.name, a.genre
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def get_artists_missing_genre_mapping() -> list[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT DISTINCT a.artist AS name
                 FROM library_albums a
                 JOIN album_genres ag ON ag.album_id = a.id
                 WHERE a.artist NOT IN (SELECT artist_name FROM artist_genres)
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return [r["name"] for r in rows]
 
 
 def get_artist_album_genres(artist_name: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT g.name, COALESCE(SUM(ag.weight), 0)::FLOAT AS score
                 FROM album_genres ag
                 JOIN genres g ON ag.genre_id = g.id
@@ -117,9 +144,12 @@ def get_artist_album_genres(artist_name: str) -> list[dict]:
                 GROUP BY g.name
                 ORDER BY score DESC, g.name ASC
                 """
-            ),
-            {"artist": artist_name},
-        ).mappings().all()
+                ),
+                {"artist": artist_name},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 

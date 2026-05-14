@@ -10,7 +10,9 @@ def combine_sql_extrema(expressions: list[str], mode: str = "greatest") -> str:
     return f"{fn}({', '.join(expressions)})"
 
 
-def build_genre_relevance_expression(values: list[str], params: dict, next_param) -> str:
+def build_genre_relevance_expression(
+    values: list[str], params: dict, next_param
+) -> str:
     per_value_scores: list[str] = []
 
     for raw_value in values:

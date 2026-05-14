@@ -7,12 +7,15 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 
 
-def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[list[float]]:
+def fetch_bliss_vectors_for_endpoint(
+    endpoint_type: str, value: str
+) -> list[list[float]]:
     with read_scope() as session:
         if endpoint_type == "track":
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT bliss_vector
                     FROM library_tracks
                     WHERE bliss_vector IS NOT NULL
@@ -27,15 +30,19 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
                       END
                     LIMIT 1
                     """
-                ),
-                {"value": value},
-            ).mappings().first()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .first()
+            )
             return [list(row["bliss_vector"])] if row else []
 
         if endpoint_type == "album":
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT bliss_vector FROM library_tracks
                     WHERE bliss_vector IS NOT NULL
                       AND album_id IN (
@@ -45,15 +52,19 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
                            OR (entity_uid IS NOT NULL AND CAST(entity_uid AS text) = :value)
                       )
                     """
-                ),
-                {"value": value},
-            ).mappings().all()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .all()
+            )
             return [list(r["bliss_vector"]) for r in rows]
 
         if endpoint_type == "artist":
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT t.bliss_vector
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
@@ -72,15 +83,19 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
                     AND t.bliss_vector IS NOT NULL
                     LIMIT 20
                     """
-                ),
-                {"value": value},
-            ).mappings().all()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .all()
+            )
             return [list(r["bliss_vector"]) for r in rows]
 
         if endpoint_type == "genre":
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT t.bliss_vector
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
@@ -90,9 +105,12 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
                     ORDER BY ag.weight DESC
                     LIMIT 30
                     """
-                ),
-                {"slug": value},
-            ).mappings().all()
+                    ),
+                    {"slug": value},
+                )
+                .mappings()
+                .all()
+            )
             return [list(r["bliss_vector"]) for r in rows]
 
     return []
@@ -101,9 +119,10 @@ def fetch_bliss_vectors_for_endpoint(endpoint_type: str, value: str) -> list[lis
 def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
     with read_scope() as session:
         if endpoint_type == "track":
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT title, artist
                     FROM library_tracks
                     WHERE CAST(id AS text) = :value
@@ -115,15 +134,19 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
                       END
                     LIMIT 1
                     """
-                ),
-                {"value": value},
-            ).mappings().first()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .first()
+            )
             return f"{row['title']} — {row['artist']}" if row else value
 
         if endpoint_type == "album":
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT name, artist
                     FROM library_albums
                     WHERE CAST(id AS text) = :value
@@ -135,15 +158,19 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
                       END
                     LIMIT 1
                     """
-                ),
-                {"value": value},
-            ).mappings().first()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .first()
+            )
             return f"{row['name']} — {row['artist']}" if row else value
 
         if endpoint_type == "artist":
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT name
                     FROM library_artists
                     WHERE CAST(id AS text) = :value
@@ -155,16 +182,23 @@ def resolve_endpoint_label(endpoint_type: str, value: str) -> str:
                       END
                     LIMIT 1
                     """
-                ),
-                {"value": value},
-            ).mappings().first()
+                    ),
+                    {"value": value},
+                )
+                .mappings()
+                .first()
+            )
             return row["name"] if row else value
 
         if endpoint_type == "genre":
-            row = session.execute(
-                text("SELECT name FROM genres WHERE slug = :slug"),
-                {"slug": value},
-            ).mappings().first()
+            row = (
+                session.execute(
+                    text("SELECT name FROM genres WHERE slug = :slug"),
+                    {"slug": value},
+                )
+                .mappings()
+                .first()
+            )
             return row["name"] if row else value
 
     return value

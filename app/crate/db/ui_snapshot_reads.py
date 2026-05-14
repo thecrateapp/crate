@@ -17,16 +17,20 @@ def get_ui_snapshot(
     max_age_seconds: int | None = None,
 ) -> dict[str, Any] | None:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT scope, subject_key, version, payload_json, built_at, source_seq, generation_ms, stale_after
                 FROM ui_snapshots
                 WHERE scope = :scope AND subject_key = :subject_key
                 """
-            ),
-            {"scope": scope, "subject_key": subject_key},
-        ).mappings().first()
+                ),
+                {"scope": scope, "subject_key": subject_key},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         return None
     record = dict(row)

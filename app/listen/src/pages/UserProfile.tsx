@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, Loader2, Music4, UserPlus, UserRoundCheck, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Music4,
+  UserPlus,
+  UserRoundCheck,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,11 +74,20 @@ function UserAvatar({
 }) {
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
-    return <img src={avatarUrl} alt={name} onError={handleAvatarError} className={`${className} rounded-full object-cover`} />;
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        onError={handleAvatarError}
+        className={`${className} rounded-full object-cover`}
+      />
+    );
   }
   const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
-    <div className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center text-2xl font-semibold`}>
+    <div
+      className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center text-2xl font-semibold`}
+    >
       {initial}
     </div>
   );
@@ -81,7 +97,10 @@ function formatJoinedDate(value?: string | null) {
   if (!value) return "Recently";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Recently";
-  return date.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function affinityTone(band?: string) {
@@ -115,10 +134,16 @@ export function UserProfile() {
     try {
       if (data.relationship_state.following) {
         await api(`/api/users/${data.id}/follow`, "DELETE");
-        toast.success(`You unfollowed ${data.display_name || data.username || "this user"}`);
+        toast.success(
+          `You unfollowed ${data.display_name || data.username || "this user"}`,
+        );
       } else {
         await api(`/api/users/${data.id}/follow`, "POST");
-        toast.success(`You are now following ${data.display_name || data.username || "this user"}`);
+        toast.success(
+          `You are now following ${
+            data.display_name || data.username || "this user"
+          }`,
+        );
       }
       refetch();
     } catch {
@@ -140,7 +165,10 @@ export function UserProfile() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <p className="text-lg font-medium text-foreground">Profile not found</p>
-        <Link to="/people" className="inline-flex items-center gap-2 text-sm text-primary hover:underline">
+        <Link
+          to="/people"
+          className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+        >
           <ArrowLeft size={14} />
           Back to people
         </Link>
@@ -157,10 +185,16 @@ export function UserProfile() {
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
-            <UserAvatar name={displayName} avatar={data.avatar} userId={data.id} />
+            <UserAvatar
+              name={displayName}
+              avatar={data.avatar}
+              userId={data.id}
+            />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="truncate text-3xl font-bold text-foreground">{displayName}</h1>
+                <h1 className="truncate text-3xl font-bold text-foreground">
+                  {displayName}
+                </h1>
                 {data.relationship_state.is_friend && !isOwnProfile ? (
                   <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium text-cyan-300">
                     Friends
@@ -168,9 +202,14 @@ export function UserProfile() {
                 ) : null}
               </div>
               <div className="mt-1 text-sm text-muted-foreground">
-                {data.username ? `@${data.username}` : "No username yet"} · Joined {formatJoinedDate(data.joined_at)}
+                {data.username ? `@${data.username}` : "No username yet"} ·
+                Joined {formatJoinedDate(data.joined_at)}
               </div>
-              {data.bio ? <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">{data.bio}</p> : null}
+              {data.bio ? (
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
+                  {data.bio}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -185,7 +224,13 @@ export function UserProfile() {
                   : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
-              {busy ? <Loader2 size={15} className="animate-spin" /> : data.relationship_state.following ? <UserRoundCheck size={15} /> : <UserPlus size={15} />}
+              {busy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : data.relationship_state.following ? (
+                <UserRoundCheck size={15} />
+              ) : (
+                <UserPlus size={15} />
+              )}
               {data.relationship_state.following ? "Following" : "Follow"}
             </button>
           ) : (
@@ -200,25 +245,53 @@ export function UserProfile() {
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Followers</div>
-            <Link to={data.username ? `/users/${data.username}/followers` : "/people"} className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Followers
+            </div>
+            <Link
+              to={
+                data.username ? `/users/${data.username}/followers` : "/people"
+              }
+              className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors"
+            >
               {data.followers_count}
             </Link>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Following</div>
-            <Link to={data.username ? `/users/${data.username}/following` : "/people"} className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Following
+            </div>
+            <Link
+              to={
+                data.username ? `/users/${data.username}/following` : "/people"
+              }
+              className="mt-2 block text-2xl font-semibold text-foreground hover:text-cyan-300 transition-colors"
+            >
               {data.following_count}
             </Link>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Friends</div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">{data.friends_count}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Friends
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-foreground">
+              {data.friends_count}
+            </div>
           </div>
-          <div className={`rounded-2xl border p-4 ${affinityTone(data.affinity_band)}`}>
-            <div className="text-xs uppercase tracking-wide opacity-75">Affinity</div>
-            <div className="mt-2 text-2xl font-semibold">{data.affinity_score}%</div>
-            <div className="mt-1 text-xs capitalize opacity-75">{data.affinity_band.replace("_", " ")}</div>
+          <div
+            className={`rounded-2xl border p-4 ${affinityTone(
+              data.affinity_band,
+            )}`}
+          >
+            <div className="text-xs uppercase tracking-wide opacity-75">
+              Affinity
+            </div>
+            <div className="mt-2 text-2xl font-semibold">
+              {data.affinity_score}%
+            </div>
+            <div className="mt-1 text-xs capitalize opacity-75">
+              {data.affinity_band.replace("_", " ")}
+            </div>
           </div>
         </div>
       </div>
@@ -226,11 +299,14 @@ export function UserProfile() {
       <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Users size={16} className="text-cyan-300" />
-          <h2 className="text-lg font-semibold text-foreground">Why you match</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Why you match
+          </h2>
         </div>
         {isOwnProfile ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            This is your public profile. When you visit someone else here, Crate will compare your listening and library overlap.
+            This is your public profile. When you visit someone else here, Crate
+            will compare your listening and library overlap.
           </p>
         ) : data.affinity_reasons.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -245,7 +321,8 @@ export function UserProfile() {
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            Not enough shared listening yet. As both profiles build up activity, this score will get more useful.
+            Not enough shared listening yet. As both profiles build up activity,
+            this score will get more useful.
           </p>
         )}
       </section>
@@ -254,7 +331,9 @@ export function UserProfile() {
         <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <div className="flex items-center gap-2">
             <Music4 size={16} className="text-cyan-300" />
-            <h2 className="text-lg font-semibold text-foreground">Public playlists</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Public playlists
+            </h2>
           </div>
           <div className="mt-4 space-y-3">
             {data.public_playlists.length === 0 ? (
@@ -280,13 +359,21 @@ export function UserProfile() {
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">{playlist.name}</div>
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {playlist.name}
+                    </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {playlist.track_count} tracks
-                      {playlist.total_duration > 0 ? ` · ${formatTotalDuration(playlist.total_duration)}` : ""}
+                      {playlist.total_duration > 0
+                        ? ` · ${formatTotalDuration(playlist.total_duration)}`
+                        : ""}
                       {playlist.is_collaborative ? " · Collaborative" : ""}
                     </div>
-                    {playlist.description ? <div className="mt-1 truncate text-xs text-muted-foreground">{playlist.description}</div> : null}
+                    {playlist.description ? (
+                      <div className="mt-1 truncate text-xs text-muted-foreground">
+                        {playlist.description}
+                      </div>
+                    ) : null}
                   </div>
                 </Link>
               ))
@@ -297,9 +384,14 @@ export function UserProfile() {
         <section className="space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Followers</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Followers
+              </h2>
               {data.username ? (
-                <Link to={`/users/${data.username}/followers`} className="text-xs text-cyan-300 hover:underline">
+                <Link
+                  to={`/users/${data.username}/followers`}
+                  className="text-xs text-cyan-300 hover:underline"
+                >
                   See all
                 </Link>
               ) : null}
@@ -311,24 +403,40 @@ export function UserProfile() {
                   to={item.username ? `/users/${item.username}` : "/people"}
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                 >
-                  <UserAvatar name={item.display_name || item.username || "User"} avatar={item.avatar} userId={item.id} className="h-10 w-10" />
+                  <UserAvatar
+                    name={item.display_name || item.username || "User"}
+                    avatar={item.avatar}
+                    userId={item.id}
+                    className="h-10 w-10"
+                  />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{item.display_name || item.username}</div>
-                    <div className="truncate text-xs text-muted-foreground">{item.username ? `@${item.username}` : "Profile"}</div>
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {item.display_name || item.username}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {item.username ? `@${item.username}` : "Profile"}
+                    </div>
                   </div>
                 </Link>
               ))}
-              {(!followers || followers.length === 0) ? (
-                <p className="text-sm text-muted-foreground">No followers yet.</p>
+              {!followers || followers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No followers yet.
+                </p>
               ) : null}
             </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-foreground">Following</h2>
+              <h2 className="text-lg font-semibold text-foreground">
+                Following
+              </h2>
               {data.username ? (
-                <Link to={`/users/${data.username}/following`} className="text-xs text-cyan-300 hover:underline">
+                <Link
+                  to={`/users/${data.username}/following`}
+                  className="text-xs text-cyan-300 hover:underline"
+                >
                   See all
                 </Link>
               ) : null}
@@ -340,15 +448,26 @@ export function UserProfile() {
                   to={item.username ? `/users/${item.username}` : "/people"}
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                 >
-                  <UserAvatar name={item.display_name || item.username || "User"} avatar={item.avatar} userId={item.id} className="h-10 w-10" />
+                  <UserAvatar
+                    name={item.display_name || item.username || "User"}
+                    avatar={item.avatar}
+                    userId={item.id}
+                    className="h-10 w-10"
+                  />
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{item.display_name || item.username}</div>
-                    <div className="truncate text-xs text-muted-foreground">{item.username ? `@${item.username}` : "Profile"}</div>
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {item.display_name || item.username}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {item.username ? `@${item.username}` : "Profile"}
+                    </div>
                   </div>
                 </Link>
               ))}
-              {(!following || following.length === 0) ? (
-                <p className="text-sm text-muted-foreground">Not following anyone yet.</p>
+              {!following || following.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Not following anyone yet.
+                </p>
               ) : null}
             </div>
           </div>

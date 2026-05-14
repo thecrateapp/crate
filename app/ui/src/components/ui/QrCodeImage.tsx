@@ -39,5 +39,13 @@ export function QrCodeImage({
     return <div className={className} style={{ width: size, height: size }} />;
   }
 
-  return <img src={src} alt="QR code" width={size} height={size} className={className} />;
+  return (
+    <img
+      src={src}
+      alt="QR code"
+      width={size}
+      height={size}
+      className={className}
+    />
+  );
 }

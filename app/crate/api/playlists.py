@@ -2,7 +2,11 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import FileResponse
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.playlist_utils import apply_playlist_cover_payload
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.playlists import (
@@ -77,6 +81,7 @@ _PLAYLIST_COVER_RESPONSES = merge_responses(
 
 # ── Filter options ───────────────────────────────────────────────
 
+
 @router.get(
     "/filter-options",
     response_model=PlaylistFilterOptionsResponse,
@@ -95,6 +100,7 @@ def filter_options():
 
 
 # ── CRUD ─────────────────────────────────────────────────────────
+
 
 @router.get(
     "",
@@ -171,16 +177,26 @@ def update(request: Request, playlist_id: int, body: UpdatePlaylistRequest):
     if body.description is not None:
         kwargs["description"] = body.description
     if body.cover_data_url is not None:
-        kwargs.update(apply_playlist_cover_payload(playlist_id, body.cover_data_url, pl.get("cover_path")) or {})
+        kwargs.update(
+            apply_playlist_cover_payload(
+                playlist_id, body.cover_data_url, pl.get("cover_path")
+            )
+            or {}
+        )
     if body.smart_rules is not None:
         kwargs["smart_rules"] = body.smart_rules
     if body.visibility is not None:
         if user.get("role") != "admin" and not is_playlist_owner(pl, user["id"]):
-            raise HTTPException(status_code=403, detail="Only the owner can change playlist visibility")
+            raise HTTPException(
+                status_code=403, detail="Only the owner can change playlist visibility"
+            )
         kwargs["visibility"] = body.visibility
     if body.is_collaborative is not None:
         if user.get("role") != "admin" and not is_playlist_owner(pl, user["id"]):
-            raise HTTPException(status_code=403, detail="Only the owner can change playlist collaboration")
+            raise HTTPException(
+                status_code=403,
+                detail="Only the owner can change playlist collaboration",
+            )
         kwargs["is_collaborative"] = body.is_collaborative
     if kwargs:
         update_playlist(playlist_id, **kwargs)
@@ -199,7 +215,9 @@ def delete(request: Request, playlist_id: int):
     if not pl:
         raise HTTPException(status_code=404, detail="Playlist not found")
     if user.get("role") != "admin" and not is_playlist_owner(pl, user["id"]):
-        raise HTTPException(status_code=403, detail="Only the owner can delete this playlist")
+        raise HTTPException(
+            status_code=403, detail="Only the owner can delete this playlist"
+        )
     delete_playlist_cover(pl.get("cover_path"))
     delete_playlist(playlist_id)
     return {"ok": True}
@@ -225,6 +243,7 @@ def get_cover(request: Request, playlist_id: int):
 
 # ── Tracks ───────────────────────────────────────────────────────
 
+
 @router.post(
     "/{playlist_id}/tracks",
     response_model=PlaylistTracksAddedResponse,
@@ -240,7 +259,8 @@ def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
         raise HTTPException(status_code=403, detail="Not allowed to edit this playlist")
     if not body.tracks:
         raise HTTPException(status_code=422, detail="No tracks provided")
-    added = add_playlist_tracks(playlist_id, body.tracks)
+    tracks = [track.model_dump(exclude_none=True) for track in body.tracks]
+    added = add_playlist_tracks(playlist_id, tracks)
     return {"ok": True, "added": added}
 
 
@@ -280,6 +300,7 @@ def reorder(request: Request, playlist_id: int, body: ReorderRequest):
 
 # ── Smart playlist generation ───────────────────────────────────
 
+
 @router.post(
     "/{playlist_id}/generate",
     response_model=PlaylistGenerateResponse,
@@ -291,7 +312,9 @@ def generate_smart(request: Request, playlist_id: int):
     user = _require_auth(request)
     pl = get_playlist(playlist_id)
     if not pl or not pl.get("is_smart") or not pl.get("smart_rules"):
-        raise HTTPException(status_code=400, detail="Not a smart playlist or no rules defined")
+        raise HTTPException(
+            status_code=400, detail="Not a smart playlist or no rules defined"
+        )
     if user.get("role") != "admin" and not can_edit_playlist(pl, user["id"]):
         raise HTTPException(status_code=403, detail="Not allowed to edit this playlist")
 
@@ -334,7 +357,9 @@ def add_member(request: Request, playlist_id: int, body: PlaylistMemberRequest):
         raise HTTPException(status_code=403, detail="Only the owner can manage members")
     if body.role != "collab":
         raise HTTPException(status_code=422, detail="Invalid member role")
-    add_playlist_member(playlist_id, body.user_id, role=body.role, invited_by=user["id"])
+    add_playlist_member(
+        playlist_id, body.user_id, role=body.role, invited_by=user["id"]
+    )
     update_playlist(playlist_id, is_collaborative=True)
     return {"ok": True, "members": get_playlist_members(playlist_id)}
 
@@ -400,6 +425,12 @@ def accept_invite(request: Request, token: str):
     pl = get_playlist(invite_row["playlist_id"])
     if not pl:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    add_playlist_member(pl["id"], user["id"], role="collab", invited_by=invite_row.get("created_by"))
+    add_playlist_member(
+        pl["id"], user["id"], role="collab", invited_by=invite_row.get("created_by")
+    )
     update_playlist(pl["id"], is_collaborative=True)
-    return {"ok": True, "playlist_id": pl["id"], "members": get_playlist_members(pl["id"])}
+    return {
+        "ok": True,
+        "playlist_id": pl["id"],
+        "members": get_playlist_members(pl["id"]),
+    }

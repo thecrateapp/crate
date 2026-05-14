@@ -364,7 +364,10 @@ func (s *Server) requireCatalogUser(w http.ResponseWriter, r *http.Request) (*au
 func (s *Server) writeCatalogPayload(w http.ResponseWriter, r *http.Request, payload any, err error, fallbackDetail string, notFoundDetail string) {
 	if err == nil {
 		httpx.MarkReadplane(w, "hit")
-		httpx.WriteJSON(w, http.StatusOK, payload)
+		if err := httpx.WriteJSON(w, http.StatusOK, payload); err != nil {
+			s.logger.Warn("failed to write JSON response", "path", r.URL.Path, "error", err)
+			_ = httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
+		}
 		return
 	}
 	if errors.Is(err, catalog.ErrNotFound) {

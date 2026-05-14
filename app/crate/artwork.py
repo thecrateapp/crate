@@ -1,7 +1,6 @@
 """Album art management: detect missing, fetch from Cover Art Archive, extract embedded."""
 
 import logging
-from io import BytesIO
 from pathlib import Path
 
 import mutagen
@@ -11,7 +10,14 @@ from crate.audio import get_audio_files
 
 log = logging.getLogger(__name__)
 
-COVER_NAMES = ["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png"]
+COVER_NAMES = [
+    "cover.jpg",
+    "cover.png",
+    "folder.jpg",
+    "folder.png",
+    "front.jpg",
+    "front.png",
+]
 CAA_URL = "https://coverartarchive.org/release/{mbid}/front-500"
 
 
@@ -38,16 +44,19 @@ def scan_missing_covers(library_path: Path, extensions: set[str]) -> list[dict]:
             if not has_embedded:
                 # Try to get MBID for potential fetch
                 from crate.audio import read_tags
+
                 tags = read_tags(tracks[0])
-                missing.append({
-                    "artist": artist_dir.name,
-                    "album": album_dir.name,
-                    "path": str(album_dir),
-                    "track_count": len(tracks),
-                    "mbid": tags.get("musicbrainz_albumid"),
-                    "has_embedded": False,
-                    "has_file": False,
-                })
+                missing.append(
+                    {
+                        "artist": artist_dir.name,
+                        "album": album_dir.name,
+                        "path": str(album_dir),
+                        "track_count": len(tracks),
+                        "mbid": tags.get("musicbrainz_albumid"),
+                        "has_embedded": False,
+                        "has_file": False,
+                    }
+                )
 
     return missing
 
@@ -66,7 +75,8 @@ def fetch_cover_from_caa(mbid: str) -> bytes | None:
 def extract_embedded_cover(track_path: Path) -> bytes | None:
     """Extract embedded cover art from an audio file."""
     try:
-        audio = mutagen.File(track_path)
+        mutagen_file = getattr(mutagen, "File")
+        audio = mutagen_file(track_path)
         if audio is None:
             return None
 
@@ -102,6 +112,7 @@ def fetch_cover_from_tidal(artist: str, album: str) -> bytes | None:
     """Search Tidal for an album and return cover art bytes, or None."""
     try:
         from crate import tidal
+
         results = tidal.search(f"{artist} {album}", content_type="albums", limit=3)
         albums = results.get("albums", [])
         if not albums:

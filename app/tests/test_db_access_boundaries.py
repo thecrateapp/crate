@@ -28,7 +28,10 @@ class _DbBoundaryVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
-        if isinstance(func, ast.Name) and func.id in {"get_db_ctx", "transaction_scope"}:
+        if isinstance(func, ast.Name) and func.id in {
+            "get_db_ctx",
+            "transaction_scope",
+        }:
             self.transport_calls.append(f"{func.id}:{node.lineno}")
         elif (
             isinstance(func, ast.Attribute)
@@ -69,7 +72,9 @@ def test_no_transport_calls_outside_db_package():
                 f"{path.relative_to(APP_ROOT)} -> {', '.join(visitor.transport_calls)}"
             )
 
-    assert findings == [], "Direct DB transport leaked outside crate.db:\n" + "\n".join(findings)
+    assert findings == [], "Direct DB transport leaked outside crate.db:\n" + "\n".join(
+        findings
+    )
 
 
 def test_refactored_modules_do_not_use_db_mega_facade():
@@ -78,38 +83,42 @@ def test_refactored_modules_do_not_use_db_mega_facade():
         path = APP_ROOT / relative_path
         visitor = _parse_file(path)
         if visitor.facade_imports:
-            findings.append(
-                f"{relative_path} -> {', '.join(visitor.facade_imports)}"
-            )
+            findings.append(f"{relative_path} -> {', '.join(visitor.facade_imports)}")
 
-    assert findings == [], "Refactored modules still import the crate.db mega-facade:\n" + "\n".join(findings)
+    assert findings == [], (
+        "Refactored modules still import the crate.db mega-facade:\n"
+        + "\n".join(findings)
+    )
 
 
-def test_get_db_ctx_is_confined_to_core_and_compat_facade():
+def test_get_db_ctx_is_eliminated_from_codebase():
+    """After migration to SQLAlchemy scopes, get_db_ctx must not exist anywhere."""
     findings: list[str] = []
-    allowed_paths = {
-        DB_ROOT / "__init__.py",
-        DB_ROOT / "core.py",
-    }
 
-    for path in sorted(DB_ROOT.rglob("*.py")):
-        if path in allowed_paths:
-            continue
+    for path in sorted(APP_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == "crate.db.core":
                 for alias in node.names:
                     if alias.name == "get_db_ctx":
-                        findings.append(f"{path.relative_to(APP_ROOT)} -> import:{node.lineno}")
+                        findings.append(
+                            f"{path.relative_to(APP_ROOT)} -> import:{node.lineno}"
+                        )
             elif isinstance(node, ast.Call):
                 func = node.func
                 if isinstance(func, ast.Name) and func.id == "get_db_ctx":
-                    findings.append(f"{path.relative_to(APP_ROOT)} -> get_db_ctx():{node.lineno}")
+                    findings.append(
+                        f"{path.relative_to(APP_ROOT)} -> get_db_ctx():{node.lineno}"
+                    )
                 elif (
                     isinstance(func, ast.Attribute)
                     and func.attr == "get_db_ctx"
                     and isinstance(func.value, ast.Name)
                 ):
-                    findings.append(f"{path.relative_to(APP_ROOT)} -> {func.value.id}.get_db_ctx():{node.lineno}")
+                    findings.append(
+                        f"{path.relative_to(APP_ROOT)} -> {func.value.id}.get_db_ctx():{node.lineno}"
+                    )
 
-    assert findings == [], "get_db_ctx should be confined to crate.db.core (+ compat re-export):\n" + "\n".join(findings)
+    assert findings == [], (
+        "get_db_ctx has been removed; no usages should remain:\n" + "\n".join(findings)
+    )

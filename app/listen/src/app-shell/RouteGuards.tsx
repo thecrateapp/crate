@@ -23,7 +23,12 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!user) {
     const returnTo = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to={`/login?return_to=${encodeURIComponent(returnTo)}`} replace />;
+    return (
+      <Navigate
+        to={`/login?return_to=${encodeURIComponent(returnTo)}`}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;
@@ -31,7 +36,9 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
 export function ServerGate({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const [hasServer, setHasServer] = useState(() => !isNative || Boolean(getCurrentServer()));
+  const [hasServer, setHasServer] = useState(
+    () => !isNative || Boolean(getCurrentServer()),
+  );
 
   useEffect(() => {
     if (!isNative) return;

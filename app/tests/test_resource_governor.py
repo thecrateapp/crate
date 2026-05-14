@@ -33,7 +33,9 @@ def test_resource_governor_allows_non_governed_tasks_without_sampling(monkeypatc
     monkeypatch.setattr(
         governor,
         "build_snapshot",
-        lambda include_playback=True: (_ for _ in ()).throw(AssertionError("should not sample")),
+        lambda include_playback=True: (_ for _ in ()).throw(
+            AssertionError("should not sample")
+        ),
     )
 
     decision = governor.should_defer_task("tidal_download")
@@ -54,7 +56,9 @@ def test_resource_governor_can_be_bypassed_per_task(monkeypatch):
         ),
     )
 
-    decision = governor.should_defer_task("library_sync", {"ignore_resource_governor": True})
+    decision = governor.should_defer_task(
+        "library_sync", {"ignore_resource_governor": True}
+    )
 
     assert decision.allowed is True
 
@@ -67,7 +71,9 @@ def test_resource_governor_allows_scoped_process_new_content_under_load(monkeypa
     monkeypatch.setattr(
         governor,
         "build_snapshot",
-        lambda include_playback=True: (_ for _ in ()).throw(AssertionError("scoped task should not sample")),
+        lambda include_playback=True: (_ for _ in ()).throw(
+            AssertionError("scoped task should not sample")
+        ),
     )
 
     decision = governor.should_defer_task(
@@ -85,7 +91,9 @@ def test_resource_governor_allows_manual_admin_health_check_under_load(monkeypat
     monkeypatch.setattr(
         governor,
         "build_snapshot",
-        lambda include_playback=True: (_ for _ in ()).throw(AssertionError("manual task should not sample")),
+        lambda include_playback=True: (_ for _ in ()).throw(
+            AssertionError("manual task should not sample")
+        ),
     )
 
     decision = governor.should_defer_task("health_check", {"triggered_by": "admin"})
@@ -118,7 +126,9 @@ def test_resource_governor_still_defers_unscoped_health_check_under_load(monkeyp
     assert "swap 41.0%>30.0%" in decision.reason
 
 
-def test_resource_governor_ignores_stale_low_volume_swap_when_memory_is_available(monkeypatch):
+def test_resource_governor_ignores_stale_low_volume_swap_when_memory_is_available(
+    monkeypatch,
+):
     from crate import resource_governor as governor
 
     monkeypatch.setenv("CRATE_RESOURCE_GOVERNOR_ENABLED", "true")
@@ -215,7 +225,9 @@ def test_maintenance_window_defers_full_batch_work_outside_window(monkeypatch):
     monkeypatch.setattr(
         governor,
         "build_snapshot",
-        lambda include_playback=True: (_ for _ in ()).throw(AssertionError("window should short-circuit")),
+        lambda include_playback=True: (_ for _ in ()).throw(
+            AssertionError("window should short-circuit")
+        ),
     )
 
     decision = governor.should_defer_task("library_sync", {})
@@ -244,7 +256,9 @@ def test_maintenance_window_allows_scoped_sync_outside_window(monkeypatch, tmp_p
         ),
     )
 
-    decision = governor.should_defer_task("library_sync", {"album_dir": str(tmp_path / "Album")})
+    decision = governor.should_defer_task(
+        "library_sync", {"album_dir": str(tmp_path / "Album")}
+    )
 
     assert decision.allowed is True
 
@@ -256,7 +270,9 @@ def test_maintenance_window_defers_large_fingerprint_backfill(monkeypatch):
     monkeypatch.setenv("CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT", "1000")
     monkeypatch.setattr(governor, "_local_minutes_now", lambda: 12 * 60)
 
-    decision = governor.should_defer_task("backfill_track_audio_fingerprints", {"limit": 5000})
+    decision = governor.should_defer_task(
+        "backfill_track_audio_fingerprints", {"limit": 5000}
+    )
 
     assert decision.allowed is False
     assert "maintenance window" in decision.reason
@@ -269,8 +285,14 @@ def test_record_decision_emits_deferral_metrics(monkeypatch):
     records: list[tuple[str, float, dict | None]] = []
 
     monkeypatch.setattr("crate.db.cache_store.set_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.metrics.record_counter", lambda name, tags=None: counters.append((name, tags)))
-    monkeypatch.setattr("crate.metrics.record", lambda name, value, tags=None: records.append((name, value, tags)))
+    monkeypatch.setattr(
+        "crate.metrics.record_counter",
+        lambda name, tags=None: counters.append((name, tags)),
+    )
+    monkeypatch.setattr(
+        "crate.metrics.record",
+        lambda name, value, tags=None: records.append((name, value, tags)),
+    )
 
     decision = governor.ResourceDecision(
         allowed=False,
@@ -290,7 +312,11 @@ def test_record_decision_emits_deferral_metrics(monkeypatch):
     assert counters == [
         (
             "worker.resource.deferred",
-            {"task_type": "library_pipeline", "source": "scheduler", "reason": "maintenance_window"},
+            {
+                "task_type": "library_pipeline",
+                "source": "scheduler",
+                "reason": "maintenance_window",
+            },
         )
     ]
     assert ("worker.resource.defer_seconds", 600.0, counters[0][1]) in records

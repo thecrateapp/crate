@@ -9,19 +9,97 @@ interface Row {
 }
 
 const ROWS: Row[] = [
-  { label: "Multi-source enrichment (8+)", crate: true, navidrome: false, plex: true, jellyfin: false },
-  { label: "Audio analysis (BPM, key, mood)", crate: true, navidrome: false, plex: true, jellyfin: false },
-  { label: "Adaptive EQ per track", crate: true, navidrome: false, plex: false, jellyfin: false },
-  { label: "Bliss-based similarity radio", crate: true, navidrome: false, plex: false, jellyfin: false },
-  { label: "Genre taxonomy with inheritance", crate: true, navidrome: false, plex: false, jellyfin: false },
-  { label: "Upcoming shows + setlists", crate: true, navidrome: false, plex: false, jellyfin: false },
-  { label: "Subsonic API", crate: true, navidrome: true, plex: false, jellyfin: false },
-  { label: "Native mobile app", crate: true, navidrome: false, plex: true, jellyfin: true },
-  { label: "Synced lyrics with seek-by-line", crate: true, navidrome: false, plex: true, jellyfin: false },
-  { label: "Offline downloads", crate: true, navidrome: false, plex: true, jellyfin: true },
-  { label: "Low-resource footprint", crate: false, navidrome: true, plex: "partial", jellyfin: "partial" },
-  { label: "Comfortable on very small servers", crate: false, navidrome: true, plex: "partial", jellyfin: "partial" },
-  { label: "Open source", crate: true, navidrome: true, plex: false, jellyfin: true },
+  {
+    label: "Multi-source enrichment (8+)",
+    crate: true,
+    navidrome: false,
+    plex: true,
+    jellyfin: false,
+  },
+  {
+    label: "Audio analysis (BPM, key, mood)",
+    crate: true,
+    navidrome: false,
+    plex: true,
+    jellyfin: false,
+  },
+  {
+    label: "Adaptive EQ per track",
+    crate: true,
+    navidrome: false,
+    plex: false,
+    jellyfin: false,
+  },
+  {
+    label: "Bliss-based similarity radio",
+    crate: true,
+    navidrome: false,
+    plex: false,
+    jellyfin: false,
+  },
+  {
+    label: "Genre taxonomy with inheritance",
+    crate: true,
+    navidrome: false,
+    plex: false,
+    jellyfin: false,
+  },
+  {
+    label: "Upcoming shows + setlists",
+    crate: true,
+    navidrome: false,
+    plex: false,
+    jellyfin: false,
+  },
+  {
+    label: "Subsonic API",
+    crate: true,
+    navidrome: true,
+    plex: false,
+    jellyfin: false,
+  },
+  {
+    label: "Native mobile app",
+    crate: true,
+    navidrome: false,
+    plex: true,
+    jellyfin: true,
+  },
+  {
+    label: "Synced lyrics with seek-by-line",
+    crate: true,
+    navidrome: false,
+    plex: true,
+    jellyfin: false,
+  },
+  {
+    label: "Offline downloads",
+    crate: true,
+    navidrome: false,
+    plex: true,
+    jellyfin: true,
+  },
+  {
+    label: "Low-resource footprint",
+    crate: false,
+    navidrome: true,
+    plex: "partial",
+    jellyfin: "partial",
+  },
+  {
+    label: "Comfortable on very small servers",
+    crate: false,
+    navidrome: true,
+    plex: "partial",
+    jellyfin: "partial",
+  },
+  {
+    label: "Open source",
+    crate: true,
+    navidrome: true,
+    plex: false,
+    jellyfin: true,
+  },
 ];
 
 function Cell({ value }: { value: boolean | "partial" }) {
@@ -51,7 +129,10 @@ const COLS = [
 
 export function Comparison() {
   return (
-    <section id="compare" className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32">
+    <section
+      id="compare"
+      className="relative mx-auto max-w-[1400px] px-5 py-24 sm:px-8 sm:py-32"
+    >
       <div className="mb-12 max-w-2xl">
         <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
           Context
@@ -60,16 +141,17 @@ export function Comparison() {
           Crate asks for more machine.
         </h2>
         <p className="mt-4 text-base leading-7 text-white/60 sm:text-lg">
-          If you want a small music server that mostly stays out of the way, Navidrome
-          may be a better fit. Crate does more background work: enrichment, audio
-          analysis, acquisition, cache generation, admin views, and a separate listening
-          app. That costs CPU, memory, and disk I/O.
+          If you want a small music server that mostly stays out of the way,
+          Navidrome may be a better fit. Crate does more background work:
+          enrichment, audio analysis, acquisition, cache generation, admin
+          views, and a separate listening app. That costs CPU, memory, and disk
+          I/O.
         </p>
         <p className="mt-5 border-l border-cyan-300/35 pl-4 text-[14.5px] leading-7 text-white/52">
-          Reducing that footprint is active work, especially around workers, read paths,
-          caching, and native helpers. Even so, Crate is still an opinionated, heavier
-          system. It should run comfortably, but it is not designed to be the lightest
-          thing you can put on a tiny server.
+          Reducing that footprint is active work, especially around workers,
+          read paths, caching, and native helpers. Even so, Crate is still an
+          opinionated, heavier system. It should run comfortably, but it is not
+          designed to be the lightest thing you can put on a tiny server.
         </p>
       </div>
 
@@ -127,7 +209,8 @@ export function Comparison() {
       </div>
 
       <p className="mt-5 text-center text-[13px] text-white/30">
-        Try the simple thing first. Use Crate when you actually want the extra work it does.
+        Try the simple thing first. Use Crate when you actually want the extra
+        work it does.
       </p>
     </section>
   );

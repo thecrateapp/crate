@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
+import {
+  hasTrackReference,
+  toTrackReferencePayload,
+} from "@/lib/track-reference";
 
 describe("track reference helpers", () => {
   it("drops legacy storage ids when an entity uid exists", () => {
@@ -26,9 +29,11 @@ describe("track reference helpers", () => {
   });
 
   it("accepts path references when no canonical identity is available", () => {
-    expect(hasTrackReference({
-      path: "/music/artist/album/02.flac",
-    })).toBe(true);
+    expect(
+      hasTrackReference({
+        path: "/music/artist/album/02.flac",
+      }),
+    ).toBe(true);
 
     expect(hasTrackReference({})).toBe(false);
   });

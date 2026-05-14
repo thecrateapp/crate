@@ -2,9 +2,21 @@ from __future__ import annotations
 
 
 def _track_payload(row: dict) -> dict:
-    track_entity_uid = str(row["track_entity_uid"]) if row.get("track_entity_uid") is not None else None
-    artist_entity_uid = str(row["artist_entity_uid"]) if row.get("artist_entity_uid") is not None else None
-    album_entity_uid = str(row["album_entity_uid"]) if row.get("album_entity_uid") is not None else None
+    track_entity_uid = (
+        str(row["track_entity_uid"])
+        if row.get("track_entity_uid") is not None
+        else None
+    )
+    artist_entity_uid = (
+        str(row["artist_entity_uid"])
+        if row.get("artist_entity_uid") is not None
+        else None
+    )
+    album_entity_uid = (
+        str(row["album_entity_uid"])
+        if row.get("album_entity_uid") is not None
+        else None
+    )
     bliss_vector = row.get("bliss_vector")
     return {
         "track_id": row.get("track_id"),
@@ -47,13 +59,17 @@ def _artwork_tracks(rows: list[dict], limit: int = 4) -> list[dict]:
                 "artist": row.get("artist"),
                 "artist_id": row.get("artist_id"),
                 "artist_entity_uid": (
-                    str(row["artist_entity_uid"]) if row.get("artist_entity_uid") is not None else None
+                    str(row["artist_entity_uid"])
+                    if row.get("artist_entity_uid") is not None
+                    else None
                 ),
                 "artist_slug": row.get("artist_slug"),
                 "album": row.get("album"),
                 "album_id": row.get("album_id"),
                 "album_entity_uid": (
-                    str(row["album_entity_uid"]) if row.get("album_entity_uid") is not None else None
+                    str(row["album_entity_uid"])
+                    if row.get("album_entity_uid") is not None
+                    else None
                 ),
                 "album_slug": row.get("album_slug"),
             }
@@ -76,7 +92,9 @@ def _artwork_artists(rows: list[dict], limit: int = 4) -> list[dict]:
                 "artist_name": row.get("artist") or "",
                 "artist_id": row.get("artist_id"),
                 "artist_entity_uid": (
-                    str(row["artist_entity_uid"]) if row.get("artist_entity_uid") is not None else None
+                    str(row["artist_entity_uid"])
+                    if row.get("artist_entity_uid") is not None
+                    else None
                 ),
                 "artist_slug": row.get("artist_slug"),
             }

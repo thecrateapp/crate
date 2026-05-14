@@ -34,7 +34,9 @@ def create_playlist(
 ) -> int:
     now = datetime.now(timezone.utc)
     final_scope = scope or ("system" if user_id is None else "user")
-    final_visibility = visibility or ("public" if final_scope == "system" else "private")
+    final_visibility = visibility or (
+        "public" if final_scope == "system" else "private"
+    )
     final_generation_mode = generation_mode or ("smart" if is_smart else "static")
 
     def impl(s: Session) -> int:

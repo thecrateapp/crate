@@ -1,4 +1,9 @@
-import { isAndroidNative, isIosNative, isNative, platform } from "@/lib/capacitor-runtime";
+import {
+  isAndroidNative,
+  isIosNative,
+  isNative,
+  platform,
+} from "@/lib/capacitor-runtime";
 
 export type ListenDeviceType = "android" | "ipad" | "iphone" | "web";
 export type ListenAppPlatform = "listen-android" | "listen-ios" | "listen-web";
@@ -10,7 +15,10 @@ export function isIpadRuntime(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   const navPlatform = navigator.platform || "";
-  return /iPad/i.test(ua) || (navPlatform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return (
+    /iPad/i.test(ua) ||
+    (navPlatform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
 export function getListenDeviceType(): ListenDeviceType {
@@ -43,7 +51,9 @@ function generateDeviceFingerprint(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return `listen:${crypto.randomUUID()}`;
   }
-  return `listen:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `listen:${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
 }
 
 export function getListenDeviceFingerprint(): string {

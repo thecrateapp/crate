@@ -1,9 +1,21 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, LogOut, Radio, Settings, Upload, User, Users } from "lucide-react";
+import {
+  BarChart3,
+  LogOut,
+  Radio,
+  Settings,
+  Upload,
+  User,
+  Users,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 
-import { AppMenuButton, AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
+import {
+  AppMenuButton,
+  AppPopover,
+  AppPopoverDivider,
+} from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
@@ -27,7 +39,10 @@ export function TopBarUserMenu() {
   const userName = user?.name || user?.email || null;
   const userInitial = userName ? userName.charAt(0).toUpperCase() : null;
   const profilePath = user?.username ? `/users/${user.username}` : "/settings";
-  const { avatarUrl, handleAvatarError } = useUserAvatarUrl(user?.avatar, user?.id);
+  const { avatarUrl, handleAvatarError } = useUserAvatarUrl(
+    user?.avatar,
+    user?.id,
+  );
 
   function go(path: string) {
     setShowUserMenu(false);
@@ -39,43 +54,77 @@ export function TopBarUserMenu() {
       <div className="px-3 pb-2 pt-2">
         <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" onError={handleAvatarError} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+            <img
+              src={avatarUrl}
+              alt=""
+              onError={handleAvatarError}
+              className="h-8 w-8 shrink-0 rounded-full object-cover"
+            />
           ) : (
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white/60">
               {userInitial || <User size={14} />}
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-[11px] font-medium text-white/85 truncate">{userName || "Signed in"}</p>
+            <p className="text-[11px] font-medium text-white/85 truncate">
+              {userName || "Signed in"}
+            </p>
             {user?.email ? (
-              <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
+              <p className="truncate text-[10px] text-muted-foreground">
+                {user.email}
+              </p>
             ) : null}
           </div>
         </div>
       </div>
       <AppPopoverDivider />
-      <AppMenuButton onClick={() => go(profilePath)} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton
+        onClick={() => go(profilePath)}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+      >
         <User size={14} /> Profile
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/people")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton
+        onClick={() => go("/people")}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+      >
         <Users size={14} /> People
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/jam")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton
+        onClick={() => go("/jam")}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+      >
         <Radio size={14} /> Jam sessions
       </AppMenuButton>
-      <AppMenuButton onClick={() => go("/upload")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton
+        onClick={() => go("/upload")}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+      >
         <Upload size={14} /> Upload music
       </AppMenuButton>
       {isDesktop ? (
-        <AppMenuButton onClick={() => go("/stats")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+        <AppMenuButton
+          onClick={() => go("/stats")}
+          className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+        >
           <BarChart3 size={14} /> Stats
         </AppMenuButton>
       ) : null}
-      <AppMenuButton onClick={() => go("/settings")} className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white">
+      <AppMenuButton
+        onClick={() => go("/settings")}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
+      >
         <Settings size={14} /> Settings
       </AppMenuButton>
       <AppPopoverDivider />
-      <AppMenuButton onClick={() => { setShowUserMenu(false); void logout(); }} className="min-h-11 gap-2.5 px-3 py-2 text-[13px]" danger>
+      <AppMenuButton
+        onClick={() => {
+          setShowUserMenu(false);
+          void logout();
+        }}
+        className="min-h-11 gap-2.5 px-3 py-2 text-[13px]"
+        danger
+      >
         <LogOut size={14} /> Sign out
       </AppMenuButton>
     </>
@@ -91,25 +140,39 @@ export function TopBarUserMenu() {
           className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/30 text-sm font-medium text-white/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
         >
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" onError={handleAvatarError} className="h-full w-full object-cover" />
-          ) : userInitial || <User size={18} />}
+            <img
+              src={avatarUrl}
+              alt=""
+              onError={handleAvatarError}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            userInitial || <User size={18} />
+          )}
         </button>
 
         {showUserMenu && isDesktop && (
-          <AppPopover ref={userMenuRef} className="absolute right-0 top-full mt-2 w-60 py-1">
+          <AppPopover
+            ref={userMenuRef}
+            className="absolute right-0 top-full mt-2 w-60 py-1"
+          >
             {menuContent}
           </AppPopover>
         )}
       </div>
 
-      {showUserMenu && !isDesktop && createPortal(
-        <AppModal open={showUserMenu} onClose={() => setShowUserMenu(false)} maxWidthClassName="sm:max-w-sm">
-          <ModalBody className="py-2">
-            {menuContent}
-          </ModalBody>
-        </AppModal>,
-        document.body,
-      )}
+      {showUserMenu &&
+        !isDesktop &&
+        createPortal(
+          <AppModal
+            open={showUserMenu}
+            onClose={() => setShowUserMenu(false)}
+            maxWidthClassName="sm:max-w-sm"
+          >
+            <ModalBody className="py-2">{menuContent}</ModalBody>
+          </AppModal>,
+          document.body,
+        )}
     </>
   );
 }

@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 
 const isServer = typeof window === "undefined";
 
-export function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(
-    () => (isServer ? false : window.matchMedia("(min-width: 768px)").matches),
+interface UseIsDesktopOptions {
+  ssr?: boolean;
+}
+
+export function useIsDesktop(options?: UseIsDesktopOptions) {
+  const ssrFallback = options?.ssr ?? false;
+  const [isDesktop, setIsDesktop] = useState(() =>
+    isServer ? ssrFallback : window.matchMedia("(min-width: 768px)").matches,
   );
 
   useEffect(() => {

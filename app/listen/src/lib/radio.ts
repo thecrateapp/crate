@@ -51,42 +51,67 @@ interface RadioRequestOptions {
 }
 
 function looksLikeUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function toTrack(payload: RadioTrackPayload): Track {
   const cover = payload.album
-    ? albumCoverApiUrl({
-        albumId: payload.album_id,
-        albumEntityUid: payload.album_entity_uid,
-        artistEntityUid: payload.artist_entity_uid,
-        albumSlug: payload.album_slug,
-        artistName: payload.artist,
-        albumName: payload.album,
-      }, { size: 512 }) || artistPhotoApiUrl({
-        artistId: payload.artist_id,
-        artistEntityUid: payload.artist_entity_uid,
-        artistSlug: payload.artist_slug,
-        artistName: payload.artist,
-      }, { size: 512 }) || undefined
-    : artistPhotoApiUrl({
-        artistId: payload.artist_id,
-        artistEntityUid: payload.artist_entity_uid,
-        artistSlug: payload.artist_slug,
-        artistName: payload.artist,
-      }, { size: 512 }) || undefined;
+    ? albumCoverApiUrl(
+        {
+          albumId: payload.album_id,
+          albumEntityUid: payload.album_entity_uid,
+          artistEntityUid: payload.artist_entity_uid,
+          albumSlug: payload.album_slug,
+          artistName: payload.artist,
+          albumName: payload.album,
+        },
+        { size: 512 },
+      ) ||
+      artistPhotoApiUrl(
+        {
+          artistId: payload.artist_id,
+          artistEntityUid: payload.artist_entity_uid,
+          artistSlug: payload.artist_slug,
+          artistName: payload.artist,
+        },
+        { size: 512 },
+      ) ||
+      undefined
+    : artistPhotoApiUrl(
+        {
+          artistId: payload.artist_id,
+          artistEntityUid: payload.artist_entity_uid,
+          artistSlug: payload.artist_slug,
+          artistName: payload.artist,
+        },
+        { size: 512 },
+      ) || undefined;
 
-  return toPlayableTrack({
-    ...payload,
-    id: payload.track_id ?? `radio:${payload.artist || "unknown"}:${payload.album || "unknown"}:${payload.title || "unknown"}`,
-    path: payload.track_path,
-    library_track_id: payload.track_id,
-  }, { cover });
+  return toPlayableTrack(
+    {
+      ...payload,
+      id:
+        payload.track_id ??
+        `radio:${payload.artist || "unknown"}:${payload.album || "unknown"}:${
+          payload.title || "unknown"
+        }`,
+      path: payload.track_path,
+      library_track_id: payload.track_id,
+    },
+    { cover },
+  );
 }
 
-async function requestRadio(url: string, options: RadioRequestOptions = {}): Promise<RadioResponse> {
+async function requestRadio(
+  url: string,
+  options: RadioRequestOptions = {},
+): Promise<RadioResponse> {
   try {
-    return await api<RadioResponse>(url, "GET", undefined, { signal: options.signal });
+    return await api<RadioResponse>(url, "GET", undefined, {
+      signal: options.signal,
+    });
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return { tracks: [] };
@@ -96,7 +121,13 @@ async function requestRadio(url: string, options: RadioRequestOptions = {}): Pro
 }
 
 async function startSeededRadioSession(
-  seedType: "artist" | "album" | "track" | "playlist" | "home-playlist" | "genre",
+  seedType:
+    | "artist"
+    | "album"
+    | "track"
+    | "playlist"
+    | "home-playlist"
+    | "genre",
   seedValue: string,
   seedLabel: string,
   options: RadioRequestOptions = {},
@@ -118,15 +149,18 @@ async function startSeededRadioSession(
     tracks: data.tracks.map(shapedToTrack),
     source: {
       type: "radio",
-      name: getPlaySourceLabel({
-        type: "radio",
-        name: `${data.seed_label || seedLabel} Radio`,
-        radio: {
-          seedType,
-          seedId: Number.isNaN(Number(seedValue)) ? seedValue : Number(seedValue),
-          shapedSessionId: data.session_id,
-        },
-      }) || `${data.seed_label || seedLabel} Radio`,
+      name:
+        getPlaySourceLabel({
+          type: "radio",
+          name: `${data.seed_label || seedLabel} Radio`,
+          radio: {
+            seedType,
+            seedId: Number.isNaN(Number(seedValue))
+              ? seedValue
+              : Number(seedValue),
+            shapedSessionId: data.session_id,
+          },
+        }) || `${data.seed_label || seedLabel} Radio`,
       radio: {
         seedType,
         seedId: Number.isNaN(Number(seedValue)) ? seedValue : Number(seedValue),
@@ -146,15 +180,23 @@ export async function fetchArtistRadio(
   source: PlaySource;
 }> {
   void limit;
-  return startSeededRadioSession("artist", String(artistId), artistName, options);
+  return startSeededRadioSession(
+    "artist",
+    String(artistId),
+    artistName,
+    options,
+  );
 }
 
-export async function fetchTrackRadio(seed: {
-  libraryTrackId?: number | null;
-  entityUid?: string | null;
-  path?: string | null;
-  title: string;
-}, options: RadioRequestOptions = {}): Promise<{
+export async function fetchTrackRadio(
+  seed: {
+    libraryTrackId?: number | null;
+    entityUid?: string | null;
+    path?: string | null;
+    title: string;
+  },
+  options: RadioRequestOptions = {},
+): Promise<{
   tracks: Track[];
   source: PlaySource;
 }> {
@@ -168,35 +210,59 @@ export async function fetchTrackRadio(seed: {
   return startSeededRadioSession("track", seedValue, seed.title, options);
 }
 
-export async function fetchAlbumRadio(seed: {
-  albumId: number;
-  artistName: string;
-  albumName: string;
-}, options: RadioRequestOptions = {}): Promise<{
+export async function fetchAlbumRadio(
+  seed: {
+    albumId: number;
+    artistName: string;
+    albumName: string;
+  },
+  options: RadioRequestOptions = {},
+): Promise<{
   tracks: Track[];
   source: PlaySource;
 }> {
-  return startSeededRadioSession("album", String(seed.albumId), seed.albumName, options);
+  return startSeededRadioSession(
+    "album",
+    String(seed.albumId),
+    seed.albumName,
+    options,
+  );
 }
 
-export async function fetchPlaylistRadio(seed: {
-  playlistId: number;
-  playlistName: string;
-}, options: RadioRequestOptions = {}): Promise<{
+export async function fetchPlaylistRadio(
+  seed: {
+    playlistId: number;
+    playlistName: string;
+  },
+  options: RadioRequestOptions = {},
+): Promise<{
   tracks: Track[];
   source: PlaySource;
 }> {
-  return startSeededRadioSession("playlist", String(seed.playlistId), seed.playlistName, options);
+  return startSeededRadioSession(
+    "playlist",
+    String(seed.playlistId),
+    seed.playlistName,
+    options,
+  );
 }
 
-export async function fetchHomePlaylistRadio(seed: {
-  playlistId: string;
-  playlistName: string;
-}, options: RadioRequestOptions = {}): Promise<{
+export async function fetchHomePlaylistRadio(
+  seed: {
+    playlistId: string;
+    playlistName: string;
+  },
+  options: RadioRequestOptions = {},
+): Promise<{
   tracks: Track[];
   source: PlaySource;
 }> {
-  return startSeededRadioSession("home-playlist", seed.playlistId, seed.playlistName, options);
+  return startSeededRadioSession(
+    "home-playlist",
+    seed.playlistId,
+    seed.playlistName,
+    options,
+  );
 }
 
 export async function fetchRadioContinuation(
@@ -213,18 +279,25 @@ export async function fetchRadioContinuation(
 
   if (radio.seedType === "artist" && radio.seedId) {
     if (typeof radio.seedId !== "number") return [];
-    const data = await requestRadio(`/api/artists/${radio.seedId}/radio?limit=${limit}`, options);
+    const data = await requestRadio(
+      `/api/artists/${radio.seedId}/radio?limit=${limit}`,
+      options,
+    );
     return (data.tracks || []).map(toTrack);
   }
 
   if (radio.seedType === "track") {
     const params = new URLSearchParams({ limit: String(limit) });
-    const legacySeedStorageId = (radio as { seedStorageId?: string | null }).seedStorageId;
+    const legacySeedStorageId = (radio as { seedStorageId?: string | null })
+      .seedStorageId;
     if (radio.seedEntityUid) {
       params.set("entity_uid", radio.seedEntityUid);
     } else if (typeof radio.seedId === "number") {
       params.set("track_id", String(radio.seedId));
-    } else if (typeof radio.seedId === "string" && looksLikeUuid(radio.seedId)) {
+    } else if (
+      typeof radio.seedId === "string" &&
+      looksLikeUuid(radio.seedId)
+    ) {
       params.set("entity_uid", radio.seedId);
     } else if (typeof radio.seedId === "string" && radio.seedId.includes("/")) {
       params.set("path", radio.seedId);
@@ -239,19 +312,28 @@ export async function fetchRadioContinuation(
     } else {
       return [];
     }
-    const data = await requestRadio(`/api/radio/track?${params.toString()}`, options);
+    const data = await requestRadio(
+      `/api/radio/track?${params.toString()}`,
+      options,
+    );
     return (data.tracks || []).map(toTrack);
   }
 
   if (radio.seedType === "album" && radio.seedId != null) {
-    const data = await requestRadio(`/api/radio/album/${radio.seedId}?limit=${limit}`, options);
+    const data = await requestRadio(
+      `/api/radio/album/${radio.seedId}?limit=${limit}`,
+      options,
+    );
     return (data.tracks || []).map(toTrack);
   }
 
   if (radio.seedType === "playlist" && radio.seedId != null) {
-    const path = typeof radio.seedId === "number"
-      ? `/api/radio/playlist/${radio.seedId}?limit=${limit}`
-      : `/api/radio/home-playlist/${encodeURIComponent(String(radio.seedId))}?limit=${limit}`;
+    const path =
+      typeof radio.seedId === "number"
+        ? `/api/radio/playlist/${radio.seedId}?limit=${limit}`
+        : `/api/radio/home-playlist/${encodeURIComponent(
+            String(radio.seedId),
+          )}?limit=${limit}`;
     const data = await requestRadio(path, options);
     return (data.tracks || []).map(toTrack);
   }
@@ -267,22 +349,35 @@ export async function fetchInfiniteContinuation(
   const seed = source.radio;
   if (!seed) return [];
 
-  if (source.type === "album" && seed.seedType === "album" && seed.seedId != null) {
-    const data = await requestRadio(`/api/radio/album/${seed.seedId}?limit=${limit}`, options);
+  if (
+    source.type === "album" &&
+    seed.seedType === "album" &&
+    seed.seedId != null
+  ) {
+    const data = await requestRadio(
+      `/api/radio/album/${seed.seedId}?limit=${limit}`,
+      options,
+    );
     return (data.tracks || []).map(toTrack);
   }
 
-  if (source.type === "playlist" && seed.seedType === "playlist" && seed.seedId != null) {
-    const path = typeof seed.seedId === "number"
-      ? `/api/radio/playlist/${seed.seedId}?limit=${limit}`
-      : `/api/radio/home-playlist/${encodeURIComponent(String(seed.seedId))}?limit=${limit}`;
+  if (
+    source.type === "playlist" &&
+    seed.seedType === "playlist" &&
+    seed.seedId != null
+  ) {
+    const path =
+      typeof seed.seedId === "number"
+        ? `/api/radio/playlist/${seed.seedId}?limit=${limit}`
+        : `/api/radio/home-playlist/${encodeURIComponent(
+            String(seed.seedId),
+          )}?limit=${limit}`;
     const data = await requestRadio(path, options);
     return (data.tracks || []).map(toTrack);
   }
 
   return [];
 }
-
 
 // ── Shaped Radio (v2) — sessions with like/dislike feedback ────────
 
@@ -345,29 +440,53 @@ export async function startShapedRadio(
   mode: "seeded" | "discovery",
   seedType?: string,
   seedValue?: string,
-): Promise<{ sessionId: string; seedLabel: string; tracks: Track[]; source: PlaySource } | null> {
+): Promise<{
+  sessionId: string;
+  seedLabel: string;
+  tracks: Track[];
+  source: PlaySource;
+} | null> {
   try {
-    const data = await api<ShapedRadioStartResponse>("/api/radio/start", "POST", {
-      mode,
-      seed_type: seedType,
-      seed_value: seedValue,
-    });
+    const data = await api<ShapedRadioStartResponse>(
+      "/api/radio/start",
+      "POST",
+      {
+        mode,
+        seed_type: seedType,
+        seed_value: seedValue,
+      },
+    );
     return {
       sessionId: data.session_id,
       seedLabel: data.seed_label,
       tracks: data.tracks.map(shapedToTrack),
       source: {
         type: "radio",
-        name: mode === "discovery" ? "Discovery Radio" : `${data.seed_label} Radio`,
+        name:
+          mode === "discovery" ? "Discovery Radio" : `${data.seed_label} Radio`,
         radio: {
-          seedType: (seedType || "discovery") as "track" | "album" | "artist" | "playlist" | "home-playlist" | "genre" | "discovery",
-          seedId: seedValue ? (isNaN(Number(seedValue)) ? seedValue : Number(seedValue)) : null,
+          seedType: (seedType || "discovery") as
+            | "track"
+            | "album"
+            | "artist"
+            | "playlist"
+            | "home-playlist"
+            | "genre"
+            | "discovery",
+          seedId: seedValue
+            ? isNaN(Number(seedValue))
+              ? seedValue
+              : Number(seedValue)
+            : null,
           shapedSessionId: data.session_id,
         },
       },
     };
   } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 422)) {
+    if (
+      error instanceof ApiError &&
+      (error.status === 404 || error.status === 422)
+    ) {
       return null;
     }
     throw error;

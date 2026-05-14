@@ -19,7 +19,10 @@ class LibraryFixer:
 
         log.info(
             "Issues: %d total, %d auto-fixable (confidence >= %d), %d need review",
-            len(issues), len(auto), self.threshold, len(manual),
+            len(issues),
+            len(auto),
+            self.threshold,
+            len(manual),
         )
 
         if dry_run:
@@ -35,8 +38,10 @@ class LibraryFixer:
             for issue in manual:
                 log.info(
                     "[%s] confidence=%d: %s -> %s",
-                    issue.type.value, issue.confidence,
-                    issue.description, issue.suggestion,
+                    issue.type.value,
+                    issue.confidence,
+                    issue.description,
+                    issue.suggestion,
                 )
 
     def _get_handler(self, issue_type: IssueType):
@@ -80,7 +85,9 @@ class LibraryFixer:
                         log.info("  [SKIP] Album already exists: %s", album_target)
                         continue
                     if dry_run:
-                        log.info("  [DRY] Would move: %s -> %s", album_dir, album_target)
+                        log.info(
+                            "  [DRY] Would move: %s -> %s", album_dir, album_target
+                        )
                     else:
                         shutil.move(str(album_dir), str(album_target))
                         log.info("  Moved: %s -> %s", album_dir, album_target)

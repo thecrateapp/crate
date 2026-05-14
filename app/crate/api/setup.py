@@ -6,7 +6,12 @@ from fastapi import APIRouter, Request, HTTPException
 
 from crate.auth import hash_password
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    OpenApiResponses,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import (
     SetupAdminRequest,
@@ -25,7 +30,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
-_SETUP_PUBLIC_RESPONSES = {
+_SETUP_PUBLIC_RESPONSES: OpenApiResponses = {
     400: error_response("The request could not be processed."),
     403: error_response("Setup has already been completed or is not allowed."),
     422: error_response("The request payload failed validation."),

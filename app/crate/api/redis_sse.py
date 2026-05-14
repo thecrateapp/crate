@@ -7,6 +7,8 @@ import os
 from importlib import import_module
 from typing import Any
 
+from crate.config import get_redis_url
+
 _redis_client: Any | None = None
 _redis_pool: Any | None = None
 _redis_module_marker: int | None = None
@@ -14,7 +16,7 @@ _redis_url: str | None = None
 
 
 def _get_redis_url() -> str:
-    return os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    return get_redis_url()
 
 
 def _max_connections() -> int:
@@ -25,7 +27,7 @@ def _max_connections() -> int:
         return 128
 
 
-def get_async_redis():
+def get_async_redis() -> Any:
     global _redis_client, _redis_pool, _redis_module_marker, _redis_url
 
     redis_url = _get_redis_url()

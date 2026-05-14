@@ -1,7 +1,25 @@
-import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useDeferredValue,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams } from "react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
-import { AlertCircle, ArrowLeft, ArrowDownToLine, CheckCircle2, Heart, Loader2, Play, Radio, Shuffle, Share2, Users } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowDownToLine,
+  CheckCircle2,
+  Heart,
+  Loader2,
+  Play,
+  Radio,
+  Shuffle,
+  Share2,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
@@ -9,14 +27,23 @@ import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
-import { PlaylistTrackFilterBar, filterPlaylistTracks } from "@/components/playlists/PlaylistTrackFilterBar";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistTrackFilterBar,
+  filterPlaylistTracks,
+} from "@/components/playlists/PlaylistTrackFilterBar";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { isOfflineBusy } from "@/lib/offline";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
+import {
+  hasTrackReference,
+  toTrackReferencePayload,
+} from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { fetchPlaylistRadio } from "@/lib/radio";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
@@ -71,7 +98,10 @@ const TRACK_ROW_ESTIMATE_PX = 58;
 interface CuratedTrackListProps {
   tracks: CuratedPlaylistTrack[];
   playlistOptions?: { id: number; name: string }[];
-  onAddToPlaylist: (playlistId: number, track: TrackRowData) => void | Promise<void>;
+  onAddToPlaylist: (
+    playlistId: number,
+    track: TrackRowData,
+  ) => void | Promise<void>;
   onCreatePlaylist: (track: TrackRowData) => void | Promise<void>;
   onActionMenuOpen: () => void;
   onPlayTrack: (trackEntryId: number) => void;
@@ -110,7 +140,12 @@ function CuratedTrackList(props: CuratedTrackListProps) {
     return (
       <div className="space-y-1">
         {props.tracks.map((track, index) => (
-          <CuratedTrackRow key={track.id} {...props} track={track} index={index + 1} />
+          <CuratedTrackRow
+            key={track.id}
+            {...props}
+            track={track}
+            index={index + 1}
+          />
         ))}
       </div>
     );
@@ -140,7 +175,9 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
     measure();
 
     const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
     resizeObserver?.observe(node);
     window.addEventListener("resize", measure, { passive: true });
 
@@ -184,41 +221,46 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
   );
 }
 
-
-
 export function CuratedPlaylist() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
-  const { supported: offlineSupported, getPlaylistState, getPlaylistRecord, togglePlaylistOffline } = useOffline();
+  const {
+    supported: offlineSupported,
+    getPlaylistState,
+    getPlaylistRecord,
+    togglePlaylistOffline,
+  } = useOffline();
   const { data, loading, refetch } = useApi<CuratedPlaylistData>(
     id ? `/api/curation/playlists/${id}` : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
   );
-  const { playlistOptions, ensurePlaylistOptionsLoaded } = useLazyPlaylistOptions();
+  const { playlistOptions, ensurePlaylistOptionsLoaded } =
+    useLazyPlaylistOptions();
   const [togglingFollow, setTogglingFollow] = useState(false);
   const [filterQuery, setFilterQuery] = useState("");
   const deferredFilterQuery = useDeferredValue(filterQuery);
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
-    return data.tracks.map((t): Track =>
-      toPlayableTrack(t, {
-        cover:
-          t.artist && t.album
-            ? albumCoverApiUrl({
-                albumId: t.album_id,
-                albumEntityUid: t.album_entity_uid,
-                artistEntityUid: t.artist_entity_uid,
-                albumSlug: t.album_slug,
-                artistName: t.artist,
-                albumName: t.album,
-              })
-            : undefined,
-      }),
+    return data.tracks.map(
+      (t): Track =>
+        toPlayableTrack(t, {
+          cover:
+            t.artist && t.album
+              ? albumCoverApiUrl({
+                  albumId: t.album_id,
+                  albumEntityUid: t.album_entity_uid,
+                  artistEntityUid: t.artist_entity_uid,
+                  albumSlug: t.album_slug,
+                  artistName: t.artist,
+                  albumName: t.album,
+                })
+              : undefined,
+        }),
     );
   }, [data]);
 
@@ -239,7 +281,9 @@ export function CuratedPlaylist() {
 
   function handlePlayTrack(trackEntryId: number) {
     if (!data || playerTracks.length === 0) return;
-    const startIndex = data.tracks.findIndex((track) => track.id === trackEntryId);
+    const startIndex = data.tracks.findIndex(
+      (track) => track.id === trackEntryId,
+    );
     if (startIndex < 0) return;
     playAll(playerTracks, startIndex, {
       type: "playlist",
@@ -281,7 +325,11 @@ export function CuratedPlaylist() {
     const shareUrl = `${window.location.origin}/curation/playlist/${data.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: data.name, text: data.name, url: shareUrl });
+        await navigator.share({
+          title: data.name,
+          text: data.name,
+          url: shareUrl,
+        });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         toast.success("Playlist link copied");
@@ -298,11 +346,13 @@ export function CuratedPlaylist() {
     if (!hasTrackReference(track)) return;
     try {
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
-        tracks: [toTrackReferencePayload({
-          ...track,
-          album: track.album || "",
-          duration: track.duration || 0,
-        })],
+        tracks: [
+          toTrackReferencePayload({
+            ...track,
+            album: track.album || "",
+            duration: track.duration || 0,
+          }),
+        ],
       });
       toast.success("Track added to playlist");
     } catch {
@@ -354,36 +404,38 @@ export function CuratedPlaylist() {
   const offlineState = getPlaylistState(data.id);
   const offlineRecord = getPlaylistRecord(data.id);
   const offlineBusy = isOfflineBusy(offlineState);
-  const offlineProgress =
-    offlineRecord?.trackCount
-      ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount}`
-      : null;
-  const offlineButtonLabel =
-    data.is_smart
-      ? "Static only"
-      : offlineState === "ready"
-        ? "Available offline"
+  const offlineProgress = offlineRecord?.trackCount
+    ? `${Math.min(
+        offlineRecord.readyTrackCount || 0,
+        offlineRecord.trackCount,
+      )}/${offlineRecord.trackCount}`
+    : null;
+  const offlineButtonLabel = data.is_smart
+    ? "Static only"
+    : offlineState === "ready"
+      ? "Available offline"
+      : offlineState === "error"
+        ? "Retry offline"
+        : offlineState === "syncing"
+          ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
+          : offlineBusy
+            ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
+            : "Make available offline";
+  const offlineStatusDetail = data.is_smart
+    ? "Offline mirror is only available for static playlists."
+    : offlineState === "ready"
+      ? offlineRecord?.trackCount
+        ? `${offlineRecord.trackCount} track${
+            offlineRecord.trackCount === 1 ? "" : "s"
+          } available offline`
+        : "Available offline"
+      : offlineBusy && offlineProgress
+        ? `${offlineProgress} tracks saved for offline`
         : offlineState === "error"
-          ? "Retry offline"
-          : offlineState === "syncing"
-            ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
-            : offlineBusy
-              ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
-              : "Make available offline";
-  const offlineStatusDetail =
-    data.is_smart
-      ? "Offline mirror is only available for static playlists."
-      : offlineState === "ready"
-        ? offlineRecord?.trackCount
-          ? `${offlineRecord.trackCount} track${offlineRecord.trackCount === 1 ? "" : "s"} available offline`
-          : "Available offline"
-        : offlineBusy && offlineProgress
-          ? `${offlineProgress} tracks saved for offline`
-          : offlineState === "error"
-            ? offlineRecord?.readyTrackCount
-              ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
-              : "Offline copy failed. Retry to finish the playlist mirror."
-            : null;
+          ? offlineRecord?.readyTrackCount
+            ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
+            : "Offline copy failed. Retry to finish the playlist mirror."
+          : null;
 
   async function handleToggleOffline() {
     if (!data) return;
@@ -393,7 +445,11 @@ export function CuratedPlaylist() {
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(result === "removed" ? "Offline copy removed" : "Playlist available offline");
+      toast.success(
+        result === "removed"
+          ? "Offline copy removed"
+          : "Playlist available offline",
+      );
     } catch (error) {
       toast.error((error as Error).message || "Failed to update offline copy");
     }
@@ -424,19 +480,26 @@ export function CuratedPlaylist() {
         <div className="flex flex-col justify-end gap-3 text-left">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-bold text-foreground">{data.name}</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                {data.name}
+              </h1>
               <OfflineBadge state={offlineState} />
             </div>
             {data.description ? (
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{data.description}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {data.description}
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>{data.track_count} tracks</span>
-            {data.total_duration > 0 ? <span>{formatTotalDuration(data.total_duration)}</span> : null}
+            {data.total_duration > 0 ? (
+              <span>{formatTotalDuration(data.total_duration)}</span>
+            ) : null}
             <span className="inline-flex items-center gap-1">
               <Users size={12} />
-              {data.follower_count} follower{data.follower_count !== 1 ? "s" : ""}
+              {data.follower_count} follower
+              {data.follower_count !== 1 ? "s" : ""}
             </span>
             {data.category ? <span>{data.category}</span> : null}
           </div>
@@ -480,7 +543,11 @@ export function CuratedPlaylist() {
                   ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
                   : "border-white/15 text-foreground hover:bg-white/5"
           }`}
-          aria-label={offlineState === "ready" ? "Remove offline copy" : "Make available offline"}
+          aria-label={
+            offlineState === "ready"
+              ? "Remove offline copy"
+              : "Make available offline"
+          }
           title={offlineButtonLabel}
         >
           {offlineState === "ready" ? (
@@ -502,7 +569,14 @@ export function CuratedPlaylist() {
               : "border-white/15 text-foreground hover:bg-white/5"
           }`}
         >
-          {togglingFollow ? <Loader2 size={15} className="animate-spin" /> : <Heart size={15} className={data.is_followed ? "fill-current" : ""} />}
+          {togglingFollow ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Heart
+              size={15}
+              className={data.is_followed ? "fill-current" : ""}
+            />
+          )}
           {data.is_followed ? "Following" : "Follow"}
         </button>
         <button
@@ -515,9 +589,7 @@ export function CuratedPlaylist() {
       </div>
 
       {offlineStatusDetail ? (
-        <p className="text-xs text-muted-foreground">
-          {offlineStatusDetail}
-        </p>
+        <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
       ) : null}
 
       <PlaylistTrackFilterBar
@@ -529,11 +601,15 @@ export function CuratedPlaylist() {
 
       {data.tracks.length === 0 ? (
         <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">This playlist has no tracks yet</p>
+          <p className="text-sm text-muted-foreground">
+            This playlist has no tracks yet
+          </p>
         </div>
       ) : filteredTracks.length === 0 ? (
         <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">No tracks match this filter</p>
+          <p className="text-sm text-muted-foreground">
+            No tracks match this filter
+          </p>
         </div>
       ) : (
         <CuratedTrackList

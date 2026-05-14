@@ -1,5 +1,14 @@
 import { useMemo } from "react";
-import { ArrowDownToLine, Download, Heart, Loader2, Play, Radio, Share2, Shuffle } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Download,
+  Heart,
+  Loader2,
+  Play,
+  Radio,
+  Share2,
+  Shuffle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
@@ -12,7 +21,11 @@ import {
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
-import { albumDownloadApiPath, albumPagePath, downloadApiUrl } from "@/lib/library-routes";
+import {
+  albumDownloadApiPath,
+  albumPagePath,
+  downloadApiUrl,
+} from "@/lib/library-routes";
 import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
@@ -21,14 +34,23 @@ function albumPlaySource(data: AlbumMenuData): PlaySource {
   return {
     type: "album",
     name: `${data.artist} - ${data.album}`,
-    radio: data.albumId != null ? { seedType: "album", seedId: data.albumId } : undefined,
+    radio:
+      data.albumId != null
+        ? { seedType: "album", seedId: data.albumId }
+        : undefined,
   };
 }
 
-export function useAlbumActionEntries(input: AlbumMenuData): ItemActionMenuEntry[] {
+export function useAlbumActionEntries(
+  input: AlbumMenuData,
+): ItemActionMenuEntry[] {
   const { playAll } = usePlayerActions();
   const { isSaved, toggleAlbumSaved } = useSavedAlbums();
-  const { supported: offlineSupported, getAlbumState, toggleAlbumOffline } = useOffline();
+  const {
+    supported: offlineSupported,
+    getAlbumState,
+    toggleAlbumOffline,
+  } = useOffline();
   const saved = isSaved(input.albumId);
   const offlineState = getAlbumState(input.albumId);
 
@@ -116,13 +138,25 @@ export function useAlbumActionEntries(input: AlbumMenuData): ItemActionMenuEntry
         label: getOfflineActionLabel(offlineState),
         icon: isOfflineBusy(offlineState) ? Loader2 : ArrowDownToLine,
         active: offlineState === "ready",
-        disabled: !offlineSupported || input.albumId == null || isOfflineBusy(offlineState),
+        disabled:
+          !offlineSupported ||
+          input.albumId == null ||
+          isOfflineBusy(offlineState),
         onSelect: async () => {
           try {
-            const result = await toggleAlbumOffline({ albumId: input.albumId, title: input.album });
-            toast.success(result === "removed" ? "Offline copy removed" : "Album available offline");
+            const result = await toggleAlbumOffline({
+              albumId: input.albumId,
+              title: input.album,
+            });
+            toast.success(
+              result === "removed"
+                ? "Offline copy removed"
+                : "Album available offline",
+            );
           } catch (error) {
-            toast.error((error as Error).message || "Failed to update offline copy");
+            toast.error(
+              (error as Error).message || "Failed to update offline copy",
+            );
           }
         },
       }),
@@ -149,5 +183,13 @@ export function useAlbumActionEntries(input: AlbumMenuData): ItemActionMenuEntry
         onSelect: sharePath(albumPath, `${input.artist} - ${input.album}`),
       }),
     ];
-  }, [input, offlineState, offlineSupported, playAll, saved, toggleAlbumOffline, toggleAlbumSaved]);
+  }, [
+    input,
+    offlineState,
+    offlineSupported,
+    playAll,
+    saved,
+    toggleAlbumOffline,
+    toggleAlbumSaved,
+  ]);
 }

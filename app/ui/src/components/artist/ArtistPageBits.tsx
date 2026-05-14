@@ -3,7 +3,15 @@ import { Link } from "react-router";
 
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
-export function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+export function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+}) {
   return (
     <div className="bg-white/[0.03] border border-white/5 rounded-md px-3 py-2.5">
       <div className="flex items-center gap-1.5 text-white/40 mb-1">
@@ -50,8 +58,19 @@ export function SimilarArtistCard({
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const letter = name.charAt(0).toUpperCase();
-  const targetPath = id != null ? artistPagePath({ artistId: id, artistSlug: slug, artistName: name }) : null;
-  const imageUrl = image || (id != null ? `${artistPhotoApiUrl({ artistId: id, artistSlug: slug, artistName: name })}?v=stable-similar-photo` : "");
+  const targetPath =
+    id != null
+      ? artistPagePath({ artistId: id, artistSlug: slug, artistName: name })
+      : null;
+  const imageUrl =
+    image ||
+    (id != null
+      ? `${artistPhotoApiUrl({
+          artistId: id,
+          artistSlug: slug,
+          artistName: name,
+        })}?v=stable-similar-photo`
+      : "");
 
   const content = (
     <>
@@ -61,7 +80,9 @@ export function SimilarArtistCard({
             src={imageUrl}
             alt={name}
             loading="lazy"
-            className={`w-full h-full object-cover transition-opacity duration-500 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            className={`w-full h-full object-cover transition-opacity duration-500 ${
+              imgLoaded ? "opacity-100" : "opacity-0"
+            }`}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
           />
@@ -80,7 +101,9 @@ export function SimilarArtistCard({
         {name}
       </div>
       {genres && genres.length > 0 && (
-        <div className="text-[10px] text-white/30 truncate mt-0.5">{genres.slice(0, 2).join(", ")}</div>
+        <div className="text-[10px] text-white/30 truncate mt-0.5">
+          {genres.slice(0, 2).join(", ")}
+        </div>
       )}
       {popularity != null && popularity > 0 && (
         <div className="flex justify-center mt-1">
@@ -91,7 +114,11 @@ export function SimilarArtistCard({
   );
 
   if (targetPath) {
-    return <Link to={targetPath} className="group text-center">{content}</Link>;
+    return (
+      <Link to={targetPath} className="group text-center">
+        {content}
+      </Link>
+    );
   }
 
   return (
@@ -106,10 +133,9 @@ export function SimilarArtistCard({
   );
 }
 
-export function fuzzyMatchTrack<T extends { title: string; album: string; path: string }>(
-  songTitle: string,
-  tracks: T[],
-): T | undefined {
+export function fuzzyMatchTrack<
+  T extends { title: string; album: string; path: string },
+>(songTitle: string, tracks: T[]): T | undefined {
   const normalize = (value: string) =>
     value
       .toLowerCase()
@@ -121,20 +147,28 @@ export function fuzzyMatchTrack<T extends { title: string; album: string; path: 
 
   const normalizedTitle = normalize(songTitle);
 
-  const exact = tracks.find((track) => track.title.toLowerCase() === songTitle.toLowerCase());
+  const exact = tracks.find(
+    (track) => track.title.toLowerCase() === songTitle.toLowerCase(),
+  );
   if (exact) return exact;
 
-  const normalized = tracks.find((track) => normalize(track.title) === normalizedTitle);
+  const normalized = tracks.find(
+    (track) => normalize(track.title) === normalizedTitle,
+  );
   if (normalized) return normalized;
 
   const contains = tracks.find((track) => {
     const normalizedTrack = normalize(track.title);
-    return normalizedTrack.includes(normalizedTitle) || normalizedTitle.includes(normalizedTrack);
+    return (
+      normalizedTrack.includes(normalizedTitle) ||
+      normalizedTitle.includes(normalizedTrack)
+    );
   });
   if (contains) return contains;
 
   return tracks.find(
     (track) =>
-      normalize(track.title).startsWith(normalizedTitle) || normalizedTitle.startsWith(normalize(track.title)),
+      normalize(track.title).startsWith(normalizedTitle) ||
+      normalizedTitle.startsWith(normalize(track.title)),
   );
 }

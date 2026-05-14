@@ -1,12 +1,8 @@
 """Tests for the library repair system."""
 
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 import tempfile
-import os
-import shutil
-
-import pytest
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 CRATE_ROOT = APP_ROOT / "crate"
@@ -28,10 +24,14 @@ class TestRepairCatalog:
                 source,
             )
         }
-        missing = sorted(check for check in auto_fixable_checks if check not in repair.FIXER_METHODS)
+        missing = sorted(
+            check for check in auto_fixable_checks if check not in repair.FIXER_METHODS
+        )
         assert missing == []
 
-    def test_repair_skips_duplicate_tracks_when_no_safe_automatic_resolution_exists(self):
+    def test_repair_skips_duplicate_tracks_when_no_safe_automatic_resolution_exists(
+        self,
+    ):
         from crate.repair import LibraryRepair
 
         repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
@@ -39,7 +39,11 @@ class TestRepairCatalog:
             "issues": [
                 {
                     "check": "duplicate_tracks",
-                    "details": {"artist": "Terror", "album": "Keepers Of The Faith", "title": "Return to strength"},
+                    "details": {
+                        "artist": "Terror",
+                        "album": "Keepers Of The Faith",
+                        "title": "Return to strength",
+                    },
                 }
             ]
         }
@@ -60,7 +64,11 @@ class TestRepairCatalog:
                 {
                     "id": 9,
                     "check": "duplicate_albums",
-                    "details": {"artist": "Birds In Row", "album": "UGLY", "paths": ["/music/a", "/music/b"]},
+                    "details": {
+                        "artist": "Birds In Row",
+                        "album": "UGLY",
+                        "paths": ["/music/a", "/music/b"],
+                    },
                 }
             ]
         }
@@ -90,7 +98,10 @@ class TestRepairCatalog:
         assert result["items"][0]["risk"] == "destructive"
         assert result["items"][0]["scope"] == "hybrid"
         assert result["items"][0]["requires_confirmation"] is True
-        assert result["items"][0]["message"] == "Would delete loose duplicate album folder for Birds In Row/UGLY"
+        assert (
+            result["items"][0]["message"]
+            == "Would delete loose duplicate album folder for Birds In Row/UGLY"
+        )
 
     def test_preview_returns_executable_duplicate_track_action(self):
         from crate.repair import LibraryRepair
@@ -166,7 +177,9 @@ class TestRepairCatalog:
             return_value={
                 "action": "fix_artist_layout",
                 "target": "Quicksand",
-                "details": {"target_artist_dir": "/music/b81635c8-3132-57d2-8d22-920251dc2627"},
+                "details": {
+                    "target_artist_dir": "/music/b81635c8-3132-57d2-8d22-920251dc2627"
+                },
                 "applied": False,
                 "fs_write": True,
                 "message": "Would consolidate 4 album directories into canonical entity_uid layout",
@@ -184,7 +197,10 @@ class TestRepairCatalog:
         assert result["items"][0]["risk"] == "caution"
         assert result["items"][0]["scope"] == "hybrid"
         assert result["items"][0]["requires_confirmation"] is True
-        assert result["items"][0]["message"] == "Would consolidate 4 album directories into canonical entity_uid layout"
+        assert (
+            result["items"][0]["message"]
+            == "Would consolidate 4 album directories into canonical entity_uid layout"
+        )
 
 
 class TestFieldNormalization:
@@ -193,6 +209,7 @@ class TestFieldNormalization:
     def test_normalize_check_type_field(self):
         """Issues from DB use check_type, repair code should read via 'check' or 'check_type'."""
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake_lib"}
         repair = LibraryRepair(config)
 
@@ -207,8 +224,12 @@ class TestFieldNormalization:
             ]
         }
 
-        with patch.object(repair, "_fix_zombie_artists", return_value={"action": "delete_zombie_artist", "applied": False}) as mock_fix:
-            result = repair.repair(report, dry_run=True, auto_only=True)
+        with patch.object(
+            repair,
+            "_fix_zombie_artists",
+            return_value={"action": "delete_zombie_artist", "applied": False},
+        ) as mock_fix:
+            repair.repair(report, dry_run=True, auto_only=True)
             mock_fix.assert_called_once()
             # The issue passed to fixer should have 'details' populated from details_json
             issue_arg = mock_fix.call_args[0][0]
@@ -217,6 +238,7 @@ class TestFieldNormalization:
     def test_normalize_details_json_field(self):
         """Issues from DB use details_json; repair should expose it as 'details'."""
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake_lib"}
         repair = LibraryRepair(config)
 
@@ -238,6 +260,7 @@ class TestFieldNormalization:
     def test_health_check_style_issues_work_unchanged(self):
         """Issues from health check already use 'check' and 'details' — should pass through."""
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake_lib"}
         repair = LibraryRepair(config)
 
@@ -318,8 +341,13 @@ class TestDuplicateTrackRepair:
                 },
             }
 
-            with patch("crate.repair.get_tracks_by_paths", return_value=tracks), \
-                 patch("crate.repair.read_tags", side_effect=lambda path: tag_map[str(path)]):
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch(
+                    "crate.repair.read_tags",
+                    side_effect=lambda path: tag_map[str(path)],
+                ),
+            ):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
             assert result is not None
@@ -389,11 +417,18 @@ class TestDuplicateTrackRepair:
                 },
             }
 
-            with patch("crate.repair.get_tracks_by_paths", return_value=tracks), \
-                 patch("crate.repair.read_tags", side_effect=lambda path: tag_map[str(path)]), \
-                 patch("crate.repair.delete_track") as mock_delete_track, \
-                 patch("crate.repair.log_audit") as mock_log_audit:
-                result = repair._fix_duplicate_tracks(issue, dry_run=False, task_id="task-1")
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch(
+                    "crate.repair.read_tags",
+                    side_effect=lambda path: tag_map[str(path)],
+                ),
+                patch("crate.repair.delete_track") as mock_delete_track,
+                patch("crate.repair.log_audit") as mock_log_audit,
+            ):
+                result = repair._fix_duplicate_tracks(
+                    issue, dry_run=False, task_id="task-1"
+                )
 
             assert result is not None
             assert result["applied"] is True
@@ -455,8 +490,10 @@ class TestDuplicateTrackRepair:
                 },
             }
 
-            with patch("crate.repair.get_tracks_by_paths", return_value=tracks), \
-                 patch("crate.repair.read_tags", return_value={}):
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch("crate.repair.read_tags", return_value={}),
+            ):
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
             assert result is None
@@ -494,8 +531,10 @@ class TestFolderNamingRepair:
                 },
             }
 
-            with patch("crate.repair.update_album_path_and_name"), \
-                 patch("crate.repair.log_audit"):
+            with (
+                patch("crate.repair.update_album_path_and_name"),
+                patch("crate.repair.log_audit"),
+            ):
                 result = repair._fix_folder_naming(issue, dry_run=False)
 
             assert result is not None
@@ -542,8 +581,10 @@ class TestFolderNamingRepair:
                 },
             }
 
-            with patch("crate.repair.merge_album_folder"), \
-                 patch("crate.repair.log_audit"):
+            with (
+                patch("crate.repair.merge_album_folder"),
+                patch("crate.repair.log_audit"),
+            ):
                 result = repair._fix_folder_naming(issue, dry_run=False)
 
             assert result is not None
@@ -574,7 +615,9 @@ class TestFolderNamingRepair:
                     "clean_name": "Gone Album",
                     "year": "2020",
                     "current_path": str(Path(lib) / "TestArtist" / "Gone Album"),
-                    "expected_path": str(Path(lib) / "TestArtist" / "2020" / "Gone Album"),
+                    "expected_path": str(
+                        Path(lib) / "TestArtist" / "2020" / "Gone Album"
+                    ),
                     "reason": "test",
                     "path": str(Path(lib) / "TestArtist" / "Gone Album"),
                 },
@@ -680,11 +723,17 @@ class TestUnindexedFilesRepair:
             }
 
             mock_syncer_instance = MagicMock()
-            with patch("crate.repair.find_canonical_artist_by_folder", return_value=None), \
-                 patch("crate.repair.log_audit"), \
-                 patch("crate.config.load_config", return_value=config), \
-                 patch("crate.library_sync.LibrarySync", return_value=mock_syncer_instance), \
-                 patch.object(repair, "_count_artist_tracks", side_effect=[0, 1]):
+            with (
+                patch(
+                    "crate.repair.find_canonical_artist_by_folder", return_value=None
+                ),
+                patch("crate.repair.log_audit"),
+                patch("crate.config.load_config", return_value=config),
+                patch(
+                    "crate.library_sync.LibrarySync", return_value=mock_syncer_instance
+                ),
+                patch.object(repair, "_count_artist_tracks", side_effect=[0, 1]),
+            ):
                 result = repair._fix_unindexed_files(issue, dry_run=False)
 
             assert result is not None
@@ -728,6 +777,7 @@ class TestDuplicateFoldersRepair:
 
     def test_dry_run_returns_plan(self):
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake"}
         repair = LibraryRepair(config)
 
@@ -748,35 +798,63 @@ class TestRepairOrchestration:
 
     def test_skips_non_auto_fixable_when_auto_only(self):
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake"}
         repair = LibraryRepair(config)
 
         report = {
             "issues": [
                 {"check": "duplicate_albums", "auto_fixable": False, "details": {}},
-                {"check": "zombie_artists", "auto_fixable": True, "details": {"artist": "X"}},
+                {
+                    "check": "zombie_artists",
+                    "auto_fixable": True,
+                    "details": {"artist": "X"},
+                },
             ]
         }
 
-        with patch.object(repair, "_fix_zombie_artists", return_value={"action": "x", "applied": True}) as mock_z:
-            result = repair.repair(report, dry_run=True, auto_only=True)
+        with patch.object(
+            repair, "_fix_zombie_artists", return_value={"action": "x", "applied": True}
+        ) as mock_z:
+            repair.repair(report, dry_run=True, auto_only=True)
             mock_z.assert_called_once()
 
     def test_global_only_skips_non_global_repairs(self):
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake"}
         repair = LibraryRepair(config)
 
         report = {
             "issues": [
-                {"check": "artist_layout_fix", "auto_fixable": True, "details": {"artist": "X"}},
-                {"check": "stale_tracks", "auto_fixable": True, "details": {"path": "/tmp/fake/x.flac"}},
+                {
+                    "check": "artist_layout_fix",
+                    "auto_fixable": True,
+                    "details": {"artist": "X"},
+                },
+                {
+                    "check": "stale_tracks",
+                    "auto_fixable": True,
+                    "details": {"path": "/tmp/fake/x.flac"},
+                },
             ]
         }
 
-        with patch.object(repair, "_fix_artist_layout", return_value={"action": "layout", "applied": True}) as mock_layout, \
-             patch.object(repair, "_fix_stale_tracks", return_value={"action": "stale", "applied": True}) as mock_stale:
-            result = repair.repair(report, dry_run=True, auto_only=True, global_only=True)
+        with (
+            patch.object(
+                repair,
+                "_fix_artist_layout",
+                return_value={"action": "layout", "applied": True},
+            ) as mock_layout,
+            patch.object(
+                repair,
+                "_fix_stale_tracks",
+                return_value={"action": "stale", "applied": True},
+            ) as mock_stale,
+        ):
+            result = repair.repair(
+                report, dry_run=True, auto_only=True, global_only=True
+            )
 
         mock_layout.assert_not_called()
         mock_stale.assert_called_once()
@@ -785,6 +863,7 @@ class TestRepairOrchestration:
 
     def test_unknown_check_type_ignored(self):
         from crate.repair import LibraryRepair
+
         config = {"library_path": "/tmp/fake"}
         repair = LibraryRepair(config)
 

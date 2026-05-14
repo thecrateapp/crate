@@ -2,7 +2,10 @@ import { memo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Heart, Loader2, Play } from "lucide-react";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -13,7 +16,11 @@ import { api } from "@/lib/api";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
-import { albumApiPath, albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
+import {
+  albumApiPath,
+  albumCoverApiUrl,
+  albumPagePath,
+} from "@/lib/library-routes";
 
 interface AlbumCardProps {
   artist: string;
@@ -61,10 +68,19 @@ export const AlbumCard = memo(function AlbumCard({
   const { isSaved, toggleAlbumSaved } = useSavedAlbums();
   const { getAlbumState, getAlbumRecord } = useOffline();
   const [playing, setPlaying] = useState(false);
-  const coverUrl = cover || albumCoverApiUrl(
-    { albumId, albumEntityUid, artistEntityUid, albumSlug, artistName: artist, albumName: album },
-    { size: layout === "grid" ? 320 : compact ? 192 : 256 },
-  );
+  const coverUrl =
+    cover ||
+    albumCoverApiUrl(
+      {
+        albumId,
+        albumEntityUid,
+        artistEntityUid,
+        albumSlug,
+        artistName: artist,
+        albumName: album,
+      },
+      { size: layout === "grid" ? 320 : compact ? 192 : 256 },
+    );
   const saved = isSaved(albumId);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
@@ -74,7 +90,10 @@ export const AlbumCard = memo(function AlbumCard({
         ? `${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState)
       : isOfflineBusy(offlineState) && offlineRecord?.trackCount
-        ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount} offline`
+        ? `${Math.min(
+            offlineRecord.readyTrackCount || 0,
+            offlineRecord.trackCount,
+          )}/${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState);
   const actions = useAlbumActionEntries({
     artist,
@@ -90,7 +109,14 @@ export const AlbumCard = memo(function AlbumCard({
     event.stopPropagation();
     setPlaying(true);
     try {
-      const data = await api<AlbumData>(albumApiPath({ albumId, albumSlug, artistName: artist, albumName: album }));
+      const data = await api<AlbumData>(
+        albumApiPath({
+          albumId,
+          albumSlug,
+          artistName: artist,
+          albumName: album,
+        }),
+      );
       const playerTracks: Track[] = (data.tracks || []).map((track) =>
         toPlayableTrack(
           {
@@ -108,8 +134,16 @@ export const AlbumCard = memo(function AlbumCard({
         playAll(playerTracks, 0, {
           type: "album",
           name: `${artist} - ${album}`,
-          href: albumPagePath({ albumId, albumSlug, artistName: artist, albumName: album }),
-          radio: albumId != null ? { seedType: "album", seedId: albumId } : undefined,
+          href: albumPagePath({
+            albumId,
+            albumSlug,
+            artistName: artist,
+            albumName: album,
+          }),
+          radio:
+            albumId != null
+              ? { seedType: "album", seedId: albumId }
+              : undefined,
         });
       }
     } finally {
@@ -136,12 +170,28 @@ export const AlbumCard = memo(function AlbumCard({
       )}
       onContextMenu={actionMenu.handleContextMenu}
       {...actionMenu.longPressHandlers}
-      onClick={() => navigate(albumPagePath({ albumId, albumSlug, artistName: artist, albumName: album }))}
+      onClick={() =>
+        navigate(
+          albumPagePath({
+            albumId,
+            albumSlug,
+            artistName: artist,
+            albumName: album,
+          }),
+        )
+      }
       onKeyDown={(event) => {
         actionMenu.handleKeyboardTrigger(event);
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          navigate(albumPagePath({ albumId, albumSlug, artistName: artist, albumName: album }));
+          navigate(
+            albumPagePath({
+              albumId,
+              albumSlug,
+              artistName: artist,
+              albumName: album,
+            }),
+          );
         }
       }}
     >
@@ -151,13 +201,17 @@ export const AlbumCard = memo(function AlbumCard({
           alt={album}
           loading="lazy"
           className="w-full h-full object-cover"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
         />
         {albumId != null && (
           <ActionIconButton
             variant="card"
             active={saved}
-            className={`absolute top-2 right-2 z-10 ${saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+            className={`absolute top-2 right-2 z-10 ${
+              saved ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
             onClick={async (event) => {
               event.stopPropagation();
               try {
@@ -170,21 +224,34 @@ export const AlbumCard = memo(function AlbumCard({
             <Heart size={16} className={saved ? "fill-current" : ""} />
           </ActionIconButton>
         )}
-        <OfflineBadge state={offlineState} compact className="absolute left-2 top-2 z-10" />
+        <OfflineBadge
+          state={offlineState}
+          compact
+          className="absolute left-2 top-2 z-10"
+        />
         <div className="absolute inset-0 hidden bg-black/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-black/40">
           <button
             className="flex h-10 w-10 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
             onClick={handlePlayOverlay}
           >
             {playing ? (
-              <Loader2 size={18} className="text-primary-foreground animate-spin" />
+              <Loader2
+                size={18}
+                className="text-primary-foreground animate-spin"
+              />
             ) : (
-              <Play size={18} fill="#0a0a0f" className="text-primary-foreground ml-0.5" />
+              <Play
+                size={18}
+                fill="#0a0a0f"
+                className="text-primary-foreground ml-0.5"
+              />
             )}
           </button>
         </div>
       </div>
-      <div className="truncate text-sm font-medium text-foreground">{album}</div>
+      <div className="truncate text-sm font-medium text-foreground">
+        {album}
+      </div>
       <div className="truncate text-xs text-muted-foreground">
         {year ? `${year} · ${artist}` : artist}
         {offlineMeta ? (

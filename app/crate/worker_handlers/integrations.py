@@ -6,8 +6,7 @@ from crate.db.jobs.integrations import get_artists_with_similar_json
 from crate.db.repositories.library import get_library_artists
 from crate.db.repositories.shows import delete_past_shows, upsert_show
 from crate.db.similarities import bulk_upsert_similarities, mark_library_status
-from crate.db.repositories.tasks import update_task
-from crate.task_progress import TaskProgress, emit_progress, entity_label
+from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
@@ -55,22 +54,32 @@ def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
                     postal_code=event.get("postal_code"),
                     country=event.get("country"),
                     country_code=event.get("country_code"),
-                    latitude=float(event["latitude"]) if event.get("latitude") else None,
-                    longitude=float(event["longitude"]) if event.get("longitude") else None,
+                    latitude=float(event["latitude"])
+                    if event.get("latitude")
+                    else None,
+                    longitude=float(event["longitude"])
+                    if event.get("longitude")
+                    else None,
                     url=event.get("url"),
                     image_url=event.get("image"),
                     lineup=event.get("lineup"),
-                    price_range=str(event["price_range"]) if event.get("price_range") else None,
+                    price_range=str(event["price_range"])
+                    if event.get("price_range")
+                    else None,
                     status=event.get("status", "onsale"),
                 )
                 shows_found += 1
             synced += 1
             if events:
-                emit_task_event(task_id, "info", {
-                    "message": f"Found {len(events)} shows for {name}",
-                    "artist": name,
-                    "count": len(events),
-                })
+                emit_task_event(
+                    task_id,
+                    "info",
+                    {
+                        "message": f"Found {len(events)} shows for {name}",
+                        "artist": name,
+                        "count": len(events),
+                    },
+                )
         except Exception:
             log.debug("Failed to sync shows for %s", name, exc_info=True)
 
@@ -78,10 +87,18 @@ def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
     p.phase_index = 1
     emit_progress(task_id, p, force=True)
     deleted = delete_past_shows(days_old=30)
-    emit_task_event(task_id, "info", {
-        "message": f"Sync complete: {synced} artists checked, {shows_found} shows found, {deleted} old shows removed",
-    })
-    return {"artists_checked": synced, "shows_found": shows_found, "old_deleted": deleted}
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Sync complete: {synced} artists checked, {shows_found} shows found, {deleted} old shows removed",
+        },
+    )
+    return {
+        "artists_checked": synced,
+        "shows_found": shows_found,
+        "old_deleted": deleted,
+    }
 
 
 def _handle_backfill_similarities(task_id: str, params: dict, config: dict) -> dict:
@@ -97,7 +114,11 @@ def _handle_backfill_similarities(task_id: str, params: dict, config: dict) -> d
         if not similar_json:
             continue
         try:
-            similar = similar_json if isinstance(similar_json, list) else json.loads(similar_json)
+            similar = (
+                similar_json
+                if isinstance(similar_json, list)
+                else json.loads(similar_json)
+            )
         except Exception:
             continue
         if not isinstance(similar, list) or not similar:
@@ -106,9 +127,13 @@ def _handle_backfill_similarities(task_id: str, params: dict, config: dict) -> d
             bulk_upsert_similarities(row["name"], similar)
             upserted += len(similar)
         except Exception:
-            log.warning("backfill_similarities: failed for %s", row["name"], exc_info=True)
+            log.warning(
+                "backfill_similarities: failed for %s", row["name"], exc_info=True
+            )
         if index % 50 == 0:
-            p_bf = TaskProgress(phase="backfill", done=index + 1, total=total, item=row.get("name", ""))
+            p_bf = TaskProgress(
+                phase="backfill", done=index + 1, total=total, item=row.get("name", "")
+            )
             emit_progress(task_id, p_bf)
 
     try:
@@ -117,8 +142,16 @@ def _handle_backfill_similarities(task_id: str, params: dict, config: dict) -> d
     except Exception:
         log.warning("backfill_similarities: mark_library_status failed", exc_info=True)
 
-    emit_task_event(task_id, "info", {"message": f"Backfill similarities complete: {total} artists, {upserted} rows upserted"})
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Backfill similarities complete: {total} artists, {upserted} rows upserted"
+        },
+    )
     return {"artists_processed": total, "rows_upserted": upserted}
+
+
 INTEGRATION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_shows": _handle_sync_shows,
     "backfill_similarities": _handle_backfill_similarities,

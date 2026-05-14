@@ -8,7 +8,14 @@ from typing import Any
 
 from sqlalchemy import text
 
-from crate.db.cache_runtime import _get_redis, _mem_cache, _mem_delete, _mem_get, _mem_lock, _mem_set
+from crate.db.cache_runtime import (
+    get_redis,
+    _mem_cache,
+    _mem_delete,
+    _mem_get,
+    _mem_lock,
+    _mem_set,
+)
 from crate.db.tx import read_scope, transaction_scope
 
 
@@ -17,7 +24,7 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
     if val is not None:
         return val
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             raw = redis_client.get(f"cache:{key}")
@@ -30,10 +37,14 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
 
     try:
         with read_scope() as session:
-            row = session.execute(
-                text("SELECT value_json, updated_at FROM cache WHERE key = :key"),
-                {"key": key},
-            ).mappings().first()
+            row = (
+                session.execute(
+                    text("SELECT value_json, updated_at FROM cache WHERE key = :key"),
+                    {"key": key},
+                )
+                .mappings()
+                .first()
+            )
             if not row:
                 return None
             if max_age_seconds is not None:
@@ -64,11 +75,13 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
 def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
     _mem_set(key, value, min(ttl or 86400, 300))
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             redis_ttl = ttl or 86400
-            redis_client.setex(f"cache:{key}", redis_ttl, json.dumps(value, default=str))
+            redis_client.setex(
+                f"cache:{key}", redis_ttl, json.dumps(value, default=str)
+            )
             return
         except Exception:
             pass
@@ -81,7 +94,11 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
                     "INSERT INTO cache (key, value_json, updated_at) VALUES (:key, :value_json, :updated_at) "
                     "ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json, updated_at = EXCLUDED.updated_at"
                 ),
-                {"key": key, "value_json": json.dumps(value, default=str), "updated_at": now},
+                {
+                    "key": key,
+                    "value_json": json.dumps(value, default=str),
+                    "updated_at": now,
+                },
             )
     except Exception:
         pass
@@ -90,7 +107,7 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
 def delete_cache(key: str) -> None:
     _mem_delete(key)
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             redis_client.delete(f"cache:{key}")
@@ -110,12 +127,14 @@ def delete_cache_prefix(prefix: str) -> None:
         for key in to_delete:
             del _mem_cache[key]
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             cursor = 0
             while True:
-                cursor, keys = redis_client.scan(cursor, match=f"cache:{prefix}*", count=100)
+                cursor, keys = redis_client.scan(
+                    cursor, match=f"cache:{prefix}*", count=100
+                )
                 if keys:
                     redis_client.delete(*keys)
                 if cursor == 0:
@@ -125,7 +144,10 @@ def delete_cache_prefix(prefix: str) -> None:
 
     try:
         with transaction_scope() as session:
-            session.execute(text("DELETE FROM cache WHERE key LIKE :prefix"), {"prefix": prefix + "%"})
+            session.execute(
+                text("DELETE FROM cache WHERE key LIKE :prefix"),
+                {"prefix": prefix + "%"},
+            )
     except Exception:
         pass
 
@@ -133,7 +155,7 @@ def delete_cache_prefix(prefix: str) -> None:
 def get_cache_stats() -> dict:
     with _mem_lock:
         stats = {"l1_size": len(_mem_cache)}
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             info = redis_client.info("memory")

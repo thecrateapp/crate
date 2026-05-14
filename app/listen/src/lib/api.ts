@@ -1,7 +1,10 @@
 import { ApiError, createApiClient } from "../../../shared/web/api";
 
 export { ApiError };
-import { redirectToLoginOnUnauthorized, shouldRedirectToLoginOnUnauthorized } from "@/lib/auth-route-policy";
+import {
+  redirectToLoginOnUnauthorized,
+  shouldRedirectToLoginOnUnauthorized,
+} from "@/lib/auth-route-policy";
 import { isNative, platform } from "@/lib/capacitor";
 import {
   getCurrentServer,
@@ -11,7 +14,13 @@ import {
   setCurrentServerRefreshToken,
   setCurrentServerToken,
 } from "@/lib/server-store";
-import { getListenDeviceFingerprint, getListenDeviceLabel } from "@/lib/listen-device";
+import {
+  getListenDeviceFingerprint,
+  getListenDeviceLabel,
+} from "@/lib/listen-device";
+
+export const AUTH_TOKEN_EVENT = "crate:auth-token-updated";
+const WEB_TOKEN_EXPIRES_AT_KEY = "listen-auth-token-expires-at";
 
 /**
  * Default URL used when no server has been configured yet in a native
@@ -64,7 +73,9 @@ function hasQueryParam(url: string, name: string): boolean {
   try {
     const parsed = new URL(
       url,
-      typeof window !== "undefined" ? window.location.origin : "https://crate.local",
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://crate.local",
     );
     return parsed.searchParams.has(name);
   } catch {
@@ -72,8 +83,24 @@ function hasQueryParam(url: string, name: string): boolean {
   }
 }
 
+function isSameOriginUrl(url: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function shouldAttachQueryToken(url: string): boolean {
+  if (isNative) return true;
+  return isAbsoluteHttpUrl(url) && !isSameOriginUrl(url);
+}
+
 /** Resolve an SSE path to a full URL, adding auth token for native clients. */
 export function apiSseUrl(path: string): string {
+  if (!isNative) return apiUrl(path);
   const token = getAuthToken();
   if (!token) return apiUrl(path);
   const separator = path.includes("?") ? "&" : "?";
@@ -85,18 +112,21 @@ export function apiAssetUrl(path: string): string {
   const baseUrl = isAbsoluteHttpUrl(path) ? path : apiUrl(path);
   const token = getAuthToken();
   if (!token) return baseUrl;
+  if (!shouldAttachQueryToken(baseUrl)) return baseUrl;
   if (hasQueryParam(baseUrl, "token")) return baseUrl;
   const separator = baseUrl.includes("?") ? "&" : "?";
   return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
 }
 
-export function resolveMaybeApiAssetUrl(url: string | null | undefined): string | null {
+export function resolveMaybeApiAssetUrl(
+  url: string | null | undefined,
+): string | null {
   if (!url) return null;
   if (
-    url.startsWith("data:")
-    || url.startsWith("blob:")
-    || url.startsWith("file:")
-    || url.startsWith("capacitor:")
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("file:") ||
+    url.startsWith("capacitor:")
   ) {
     return url;
   }
@@ -108,7 +138,10 @@ export function resolveMaybeApiAssetUrl(url: string | null | undefined): string 
     return apiAssetUrl(relative);
   }
 
-  if (typeof window !== "undefined" && url.startsWith(`${window.location.origin}/api/`)) {
+  if (
+    typeof window !== "undefined" &&
+    url.startsWith(`${window.location.origin}/api/`)
+  ) {
     const relative = url.slice(window.location.origin.length);
     return apiAssetUrl(relative);
   }
@@ -144,7 +177,20 @@ export function apiWsUrl(path: string): string {
 
 export function getAuthToken(): string | null {
   if (isNative) return getCurrentServer()?.token ?? null;
-  try { return localStorage.getItem("listen-auth-token"); } catch { return null; }
+  try {
+    return localStorage.getItem("listen-auth-token");
+  } catch {
+    return null;
+  }
+}
+
+export function getAuthTokenExpiresAt(): string | null {
+  if (isNative) return getCurrentServer()?.tokenExpiresAt ?? null;
+  try {
+    return localStorage.getItem(WEB_TOKEN_EXPIRES_AT_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function getRefreshToken(): string | null {
@@ -152,12 +198,45 @@ export function getRefreshToken(): string | null {
   return null;
 }
 
-export function setAuthToken(token: string | null) {
-  setAuthTokens(token, token ? undefined : null);
+function decodeJwtExpiresAt(token: string | null): string | null {
+  if (!token) return null;
+  try {
+    const [, payload] = token.split(".");
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(
+      normalized.length + ((4 - (normalized.length % 4)) % 4),
+      "=",
+    );
+    const decoded = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof decoded.exp === "number"
+      ? new Date(decoded.exp * 1000).toISOString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function emitAuthTokenChange(): void {
+  try {
+    window.dispatchEvent(new CustomEvent(AUTH_TOKEN_EVENT));
+  } catch {
+    // ignore
+  }
+}
+
+export function setAuthToken(
+  token: string | null,
+  accessExpiresAt?: string | null,
+) {
+  setAuthTokens(token, token ? undefined : null, accessExpiresAt);
 }
 
 export function setRefreshToken(refreshToken: string | null) {
-  if (isNative) { setCurrentServerRefreshToken(refreshToken); return; }
+  if (isNative) {
+    setCurrentServerRefreshToken(refreshToken);
+    return;
+  }
   try {
     localStorage.removeItem("listen-auth-refresh-token");
   } catch {
@@ -165,21 +244,37 @@ export function setRefreshToken(refreshToken: string | null) {
   }
 }
 
-export function setAuthTokens(token: string | null, refreshToken?: string | null) {
+export function setAuthTokens(
+  token: string | null,
+  refreshToken?: string | null,
+  accessExpiresAt?: string | null,
+) {
+  const nextAccessExpiresAt =
+    accessExpiresAt === undefined ? decodeJwtExpiresAt(token) : accessExpiresAt;
   if (isNative) {
-    if (refreshToken === undefined) setCurrentServerToken(token);
-    else setCurrentServerAuthTokens(token, refreshToken);
+    if (refreshToken === undefined) {
+      setCurrentServerToken(token, nextAccessExpiresAt);
+    } else {
+      setCurrentServerAuthTokens(token, refreshToken, nextAccessExpiresAt);
+    }
+    emitAuthTokenChange();
     return;
   }
   try {
     if (token) localStorage.setItem("listen-auth-token", token);
     else localStorage.removeItem("listen-auth-token");
+    if (nextAccessExpiresAt) {
+      localStorage.setItem(WEB_TOKEN_EXPIRES_AT_KEY, nextAccessExpiresAt);
+    } else {
+      localStorage.removeItem(WEB_TOKEN_EXPIRES_AT_KEY);
+    }
     if (refreshToken !== undefined && refreshToken === null) {
       localStorage.removeItem("listen-auth-refresh-token");
     }
   } catch {
     // ignore persistence failures
   }
+  emitAuthTokenChange();
 }
 
 export function getApiAuthHeaders(): Record<string, string> {
@@ -194,9 +289,12 @@ export function getApiAuthHeaders(): Record<string, string> {
 export { shouldRedirectToLoginOnUnauthorized };
 
 if (typeof window !== "undefined") {
-  (window as Window & typeof globalThis & {
-    __crateResolveApiAssetUrl?: (path: string) => string;
-  }).__crateResolveApiAssetUrl = apiAssetUrl;
+  (
+    window as Window &
+      typeof globalThis & {
+        __crateResolveApiAssetUrl?: (path: string) => string;
+      }
+  ).__crateResolveApiAssetUrl = apiAssetUrl;
 }
 
 // The shared api client is created ONCE, but we want the base URL to be
@@ -210,10 +308,12 @@ const innerApi = createApiClient({
 let refreshPromise: Promise<boolean> | null = null;
 
 function shouldAttemptRefresh(path: string): boolean {
-  return !path.includes("/api/auth/login")
-    && !path.includes("/api/auth/register")
-    && !path.includes("/api/auth/refresh")
-    && !path.includes("/api/auth/logout");
+  return (
+    !path.includes("/api/auth/login") &&
+    !path.includes("/api/auth/register") &&
+    !path.includes("/api/auth/refresh") &&
+    !path.includes("/api/auth/logout")
+  );
 }
 
 function redirectAfterUnauthorized(): void {
@@ -234,16 +334,33 @@ export async function refreshAuthToken(): Promise<boolean> {
       headers,
       body: JSON.stringify(refreshToken ? { refresh_token: refreshToken } : {}),
     }).catch(() => null);
-    if (!response?.ok) {
-      setAuthToken(null);
+    if (!response) {
       return false;
     }
-    const data = await response.json().catch(() => null) as { token?: string; refresh_token?: string | null } | null;
+    if (!response.ok) {
+      if (
+        response.status === 400 ||
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        setAuthToken(null);
+      }
+      return false;
+    }
+    const data = (await response.json().catch(() => null)) as {
+      token?: string;
+      access_expires_at?: string | null;
+      refresh_token?: string | null;
+    } | null;
     if (!data?.token) {
       setAuthToken(null);
       return false;
     }
-    setAuthTokens(data.token, data.refresh_token ?? undefined);
+    setAuthTokens(
+      data.token,
+      data.refresh_token ?? undefined,
+      data.access_expires_at ?? undefined,
+    );
     return true;
   })().finally(() => {
     refreshPromise = null;
@@ -251,32 +368,56 @@ export async function refreshAuthToken(): Promise<boolean> {
   return refreshPromise;
 }
 
-export function api<T = unknown>(path: string, method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown, options?: { signal?: AbortSignal }): Promise<T> {
-  return innerApi<T>(`${getApiBase()}${path}`, method, body, options).catch(async (error) => {
-    if (error instanceof ApiError && error.status === 401 && shouldAttemptRefresh(path) && await refreshAuthToken()) {
-      return innerApi<T>(`${getApiBase()}${path}`, method, body, options);
-    }
-    if (error instanceof ApiError && error.status === 401) {
-      redirectAfterUnauthorized();
-    }
-    throw error;
-  });
+export function api<T = unknown>(
+  path: string,
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  body?: unknown,
+  options?: { signal?: AbortSignal },
+): Promise<T> {
+  return innerApi<T>(`${getApiBase()}${path}`, method, body, options).catch(
+    async (error) => {
+      if (
+        error instanceof ApiError &&
+        error.status === 401 &&
+        shouldAttemptRefresh(path) &&
+        (await refreshAuthToken())
+      ) {
+        return innerApi<T>(`${getApiBase()}${path}`, method, body, options);
+      }
+      if (error instanceof ApiError && error.status === 401) {
+        redirectAfterUnauthorized();
+      }
+      throw error;
+    },
+  );
 }
 
 /** fetch() wrapper that adds API base URL and auth headers. Fire-and-forget friendly. */
-export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+export async function apiFetch(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
   const headers: Record<string, string> = {
-    ...(init?.headers as Record<string, string> || {}),
+    ...((init?.headers as Record<string, string>) || {}),
     ...getApiAuthHeaders(),
   };
-  const request = () => fetch(`${getApiBase()}${path}`, { ...init, credentials: "include", headers });
+  const request = () =>
+    fetch(`${getApiBase()}${path}`, {
+      ...init,
+      credentials: "include",
+      headers,
+    });
   let response = await request();
-  if (response.status === 401 && shouldAttemptRefresh(path) && await refreshAuthToken()) {
+  if (
+    response.status === 401 &&
+    shouldAttemptRefresh(path) &&
+    (await refreshAuthToken())
+  ) {
     response = await fetch(`${getApiBase()}${path}`, {
       ...init,
       credentials: "include",
       headers: {
-        ...(init?.headers as Record<string, string> || {}),
+        ...((init?.headers as Record<string, string>) || {}),
         ...getApiAuthHeaders(),
       },
     });

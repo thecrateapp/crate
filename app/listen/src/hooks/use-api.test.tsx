@@ -38,10 +38,9 @@ describe("useApi", () => {
     const cacheGetMock = vi.mocked(cacheGet);
     const apiMock = vi.mocked(api);
 
-    const { rerender } = renderHook(
-      ({ url }) => useApi(url),
-      { initialProps: { url: "/api/me" as string | null } },
-    );
+    const { rerender } = renderHook(({ url }) => useApi(url), {
+      initialProps: { url: "/api/me" as string | null },
+    });
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledTimes(1);
@@ -53,7 +52,9 @@ describe("useApi", () => {
     expect(cacheGetMock).toHaveBeenCalledTimes(initialCacheReads);
 
     rerender({ url: "/api/me/stats" });
-    expect(cacheGetMock.mock.calls.slice(initialCacheReads).map(([url]) => url)).toContain("/api/me/stats");
+    expect(
+      cacheGetMock.mock.calls.slice(initialCacheReads).map(([url]) => url),
+    ).toContain("/api/me/stats");
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledTimes(2);
     });
@@ -82,8 +83,12 @@ describe("useApi", () => {
       expect(result.current.data).toEqual({ id: "track-b" });
     });
 
-    expect(cacheSetMock).toHaveBeenCalledWith("/api/tracks/1", { id: "track-a" });
-    expect(cacheSetMock).toHaveBeenCalledWith("/api/tracks/2", { id: "track-b" });
+    expect(cacheSetMock).toHaveBeenCalledWith("/api/tracks/1", {
+      id: "track-a",
+    });
+    expect(cacheSetMock).toHaveBeenCalledWith("/api/tracks/2", {
+      id: "track-b",
+    });
   });
 
   it("does not expose the previous URL data during the first render after a URL change", async () => {
@@ -93,7 +98,8 @@ describe("useApi", () => {
     const second = deferred<{ id: string }>();
 
     cacheGetMock.mockImplementation((url) => {
-      if (url === "/api/artists/high-vis/page") return { id: "cached-high-vis" };
+      if (url === "/api/artists/high-vis/page")
+        return { id: "cached-high-vis" };
       return null;
     });
 
@@ -128,27 +134,26 @@ describe("useApi", () => {
     let reconnect: (() => void) | null = null;
 
     onCacheReconnectMock.mockImplementation((listener) => {
-      reconnect = () => listener({
-        name: "cache-invalidations",
-        connected: true,
-        degraded: false,
-        hasEverConnected: true,
-        reconnectCount: 1,
-        degradeAfterMs: 75_000,
-        lastOpenAt: Date.now(),
-        lastEventAt: Date.now(),
-        lastReconnectAt: Date.now(),
-        lastErrorAt: null,
-        lastCloseAt: null,
-      });
+      reconnect = () =>
+        listener({
+          name: "cache-invalidations",
+          connected: true,
+          degraded: false,
+          hasEverConnected: true,
+          reconnectCount: 1,
+          degradeAfterMs: 75_000,
+          lastOpenAt: Date.now(),
+          lastEventAt: Date.now(),
+          lastReconnectAt: Date.now(),
+          lastErrorAt: null,
+          lastCloseAt: null,
+        });
       return () => {
         reconnect = null;
       };
     });
 
-    apiMock
-      .mockResolvedValueOnce({ ok: 1 })
-      .mockResolvedValueOnce({ ok: 2 });
+    apiMock.mockResolvedValueOnce({ ok: 1 }).mockResolvedValueOnce({ ok: 2 });
 
     const { result } = renderHook(() => useApi<{ ok: number }>("/api/me"));
 
@@ -168,12 +173,12 @@ describe("useApi", () => {
   it("uses a periodic safety-net refetch for critical views", async () => {
     vi.useFakeTimers();
     const apiMock = vi.mocked(api);
-    apiMock
-      .mockResolvedValueOnce({ ok: 1 })
-      .mockResolvedValueOnce({ ok: 2 });
+    apiMock.mockResolvedValueOnce({ ok: 1 }).mockResolvedValueOnce({ ok: 2 });
 
     const { result } = renderHook(() =>
-      useApi<{ ok: number }>("/api/me", "GET", undefined, { safetyNetMs: 1_000 }),
+      useApi<{ ok: number }>("/api/me", "GET", undefined, {
+        safetyNetMs: 1_000,
+      }),
     );
 
     await act(async () => {
@@ -197,17 +202,26 @@ describe("useApi", () => {
     vi.stubGlobal(
       "requestIdleCallback",
       vi.fn((callback: IdleRequestCallback, options?: IdleRequestOptions) => {
-        const handle = window.setTimeout(() => {
-          callback({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline);
-        }, options?.timeout ?? 0);
+        const handle = window.setTimeout(
+          () => {
+            callback({
+              didTimeout: false,
+              timeRemaining: () => 50,
+            } as IdleDeadline);
+          },
+          options?.timeout ?? 0,
+        );
         return handle;
       }),
     );
-    vi.stubGlobal("cancelIdleCallback", vi.fn((handle: number) => window.clearTimeout(handle)));
+    vi.stubGlobal(
+      "cancelIdleCallback",
+      vi.fn((handle: number) => window.clearTimeout(handle)),
+    );
 
-    cacheGetMock.mockImplementation((url) => (
-      url === "/api/me/home/discovery" ? { ok: 1 } : null
-    ));
+    cacheGetMock.mockImplementation((url) =>
+      url === "/api/me/home/discovery" ? { ok: 1 } : null,
+    );
     apiMock.mockResolvedValueOnce({ ok: 2 });
 
     const { result } = renderHook(() =>

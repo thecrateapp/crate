@@ -70,7 +70,11 @@ def _prefer_acoustic_variety(rows: list[dict]) -> list[dict]:
 
     while remaining:
         selected_index = next(
-            (index for index, row in enumerate(remaining) if _audio_bucket(row) not in seen_buckets),
+            (
+                index
+                for index, row in enumerate(remaining)
+                if _audio_bucket(row) not in seen_buckets
+            ),
             0,
         )
         row = remaining.pop(selected_index)
@@ -114,7 +118,11 @@ def _build_mix_rows(
             excluded_artist_names=interest_artists_lower[:12] or [""],
             limit=max(limit * 5, 120),
         )
-        primary_rows = [row for row in primary_rows if not row.get("user_play_count") and not row.get("is_liked")]
+        primary_rows = [
+            row
+            for row in primary_rows
+            if not row.get("user_play_count") and not row.get("is_liked")
+        ]
         fallback_rows: list[dict] = []
         if len(primary_rows) < limit:
             fallback_rows = _query_discovery_tracks(
@@ -124,7 +132,9 @@ def _build_mix_rows(
                 limit=max(limit * 6, 160),
             )
             fallback_rows = [
-                row for row in fallback_rows if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 1
+                row
+                for row in fallback_rows
+                if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 1
             ]
         rows = _merge_track_rows(primary_rows, fallback_rows)
         return (
@@ -139,14 +149,20 @@ def _build_mix_rows(
         )
 
     if mix_id == "my-new-arrivals":
-        releases = recent_releases if recent_releases is not None else _filter_interesting_releases(
-            get_new_releases(limit=250),
-            interest_artists_lower=set(interest_artists_lower),
-            saved_album_ids=set(),
-            days=180,
+        releases = (
+            recent_releases
+            if recent_releases is not None
+            else _filter_interesting_releases(
+                get_new_releases(limit=250),
+                interest_artists_lower=set(interest_artists_lower),
+                saved_album_ids=set(),
+                days=180,
+            )
         )
         album_ids = [row["album_id"] for row in releases if row.get("album_id")][:40]
-        primary_rows = _track_candidates_for_album_ids(user_id, album_ids, limit=max(limit * 5, 120))
+        primary_rows = _track_candidates_for_album_ids(
+            user_id, album_ids, limit=max(limit * 5, 120)
+        )
         primary_rows = [row for row in primary_rows if not row.get("is_liked")]
         fallback_rows: list[dict] = []
         if len(primary_rows) < limit:
@@ -156,7 +172,9 @@ def _build_mix_rows(
                 limit=max(limit * 6, 160),
             )
             fallback_rows = [
-                row for row in fallback_candidates if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 2
+                row
+                for row in fallback_candidates
+                if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 2
             ]
             if len(fallback_rows) < limit:
                 fallback_rows = _merge_track_rows(
