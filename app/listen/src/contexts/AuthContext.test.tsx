@@ -7,8 +7,11 @@ const {
   clearQueueMock,
   consumePendingOAuthNextMock,
   getApiBaseMock,
+  getAuthTokenExpiresAtMock,
+  getAuthTokenMock,
   navigateMock,
   primeOfflineRuntimeProfileMock,
+  refreshAuthTokenMock,
   setActiveOfflineProfileKeyMock,
   setAuthTokenMock,
   syncOfflineProfileToServiceWorkerMock,
@@ -17,15 +20,19 @@ const {
   clearQueueMock: vi.fn(),
   consumePendingOAuthNextMock: vi.fn<() => string | null>(() => null),
   getApiBaseMock: vi.fn(() => ""),
+  getAuthTokenExpiresAtMock: vi.fn<() => string | null>(() => null),
+  getAuthTokenMock: vi.fn<() => string | null>(() => null),
   navigateMock: vi.fn(),
   primeOfflineRuntimeProfileMock: vi.fn(),
+  refreshAuthTokenMock: vi.fn(() => Promise.resolve(false)),
   setActiveOfflineProfileKeyMock: vi.fn(),
   setAuthTokenMock: vi.fn(),
   syncOfflineProfileToServiceWorkerMock: vi.fn(),
 }));
 
 vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof import("react-router")>("react-router");
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -33,8 +40,12 @@ vi.mock("react-router", async () => {
 });
 
 vi.mock("@/lib/api", () => ({
+  AUTH_TOKEN_EVENT: "crate:auth-token-updated",
   api: apiMock,
   getApiBase: getApiBaseMock,
+  getAuthToken: getAuthTokenMock,
+  getAuthTokenExpiresAt: getAuthTokenExpiresAtMock,
+  refreshAuthToken: refreshAuthTokenMock,
   setAuthToken: setAuthTokenMock,
 }));
 
@@ -73,8 +84,14 @@ describe("AuthProvider", () => {
     consumePendingOAuthNextMock.mockReturnValue(null);
     getApiBaseMock.mockReset();
     getApiBaseMock.mockReturnValue("");
+    getAuthTokenExpiresAtMock.mockReset();
+    getAuthTokenExpiresAtMock.mockReturnValue(null);
+    getAuthTokenMock.mockReset();
+    getAuthTokenMock.mockReturnValue(null);
     navigateMock.mockReset();
     primeOfflineRuntimeProfileMock.mockReset();
+    refreshAuthTokenMock.mockReset();
+    refreshAuthTokenMock.mockResolvedValue(false);
     setActiveOfflineProfileKeyMock.mockReset();
     setAuthTokenMock.mockReset();
     syncOfflineProfileToServiceWorkerMock.mockReset();
@@ -124,9 +141,12 @@ describe("AuthProvider", () => {
 
   it("drops previous playback state when the hydrated user changes", async () => {
     const authReset = vi.fn();
-    window.addEventListener(AUTH_RUNTIME_RESET_EVENT, authReset as EventListener);
+    window.addEventListener(
+      AUTH_RUNTIME_RESET_EVENT,
+      authReset as EventListener,
+    );
     localStorage.setItem("listen-auth-user-id", "41");
-    localStorage.setItem("listen-player-state", "{\"queue\":[]}");
+    localStorage.setItem("listen-player-state", '{"queue":[]}');
     localStorage.setItem("listen-recently-played", "[]");
     apiMock.mockResolvedValueOnce({
       id: 42,
@@ -148,13 +168,21 @@ describe("AuthProvider", () => {
     expect(localStorage.getItem("listen-recently-played")).toBeNull();
     expect(clearQueueMock).toHaveBeenCalledTimes(1);
     expect(authReset).toHaveBeenCalledTimes(1);
-    expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe("user-change");
-    window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, authReset as EventListener);
+    expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe(
+      "user-change",
+    );
+    window.removeEventListener(
+      AUTH_RUNTIME_RESET_EVENT,
+      authReset as EventListener,
+    );
   });
 
   it("cleans session state and navigates to login on logout", async () => {
     const authReset = vi.fn();
-    window.addEventListener(AUTH_RUNTIME_RESET_EVENT, authReset as EventListener);
+    window.addEventListener(
+      AUTH_RUNTIME_RESET_EVENT,
+      authReset as EventListener,
+    );
     apiMock
       .mockResolvedValueOnce({
         id: 11,
@@ -164,7 +192,7 @@ describe("AuthProvider", () => {
       })
       .mockResolvedValueOnce({});
 
-    localStorage.setItem("listen-player-state", "{\"queue\":[]}");
+    localStorage.setItem("listen-player-state", '{"queue":[]}');
     localStorage.setItem("listen-recently-played", "[]");
 
     render(
@@ -186,20 +214,23 @@ describe("AuthProvider", () => {
     expect(localStorage.getItem("listen-auth-user-id")).toBeNull();
     expect(clearQueueMock).toHaveBeenCalled();
     expect(authReset).toHaveBeenCalledTimes(1);
-    expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe("logout");
+    expect((authReset.mock.calls[0]?.[0] as CustomEvent).detail.reason).toBe(
+      "logout",
+    );
     expect(navigateMock).toHaveBeenCalledWith("/login");
-    window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, authReset as EventListener);
+    window.removeEventListener(
+      AUTH_RUNTIME_RESET_EVENT,
+      authReset as EventListener,
+    );
   });
 
   it("rehydrates and navigates when the native OAuth event arrives", async () => {
-    apiMock
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 9,
-        email: "oauth@example.test",
-        name: "OAuth",
-        role: "user",
-      });
+    apiMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      id: 9,
+      email: "oauth@example.test",
+      name: "OAuth",
+      role: "user",
+    });
 
     render(
       <MemoryRouter>
@@ -217,6 +248,8 @@ describe("AuthProvider", () => {
     await waitFor(() => {
       expect(navigateMock).toHaveBeenCalledWith("/stats", { replace: true });
     });
-    expect(apiMock.mock.calls.some(([url]) => url === "/api/auth/me")).toBe(true);
+    expect(apiMock.mock.calls.some(([url]) => url === "/api/auth/me")).toBe(
+      true,
+    );
   });
 });

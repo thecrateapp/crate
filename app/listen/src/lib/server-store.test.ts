@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const runtimeState = vi.hoisted(() => ({
-  isNative: true,
+  usesConfigurableServer: true,
 }));
 
-vi.mock("@/lib/capacitor", () => ({
-  get isNative() {
-    return runtimeState.isNative;
+vi.mock("@/lib/platform", () => ({
+  get usesConfigurableServer() {
+    return runtimeState.usesConfigurableServer;
   },
 }));
 
@@ -20,7 +20,7 @@ import {
 
 describe("server-store", () => {
   beforeEach(() => {
-    runtimeState.isNative = true;
+    runtimeState.usesConfigurableServer = true;
     localStorage.clear();
   });
 
@@ -32,6 +32,7 @@ describe("server-store", () => {
       label: "listen.lespedants.org",
       url: "https://listen.lespedants.org",
       token: null,
+      tokenExpiresAt: null,
       refreshToken: null,
     });
   });
@@ -47,7 +48,7 @@ describe("server-store", () => {
   });
 
   it("does not seed web runtime storage", () => {
-    runtimeState.isNative = false;
+    runtimeState.usesConfigurableServer = false;
 
     seedDefaultServer("https://listen.lespedants.org");
 

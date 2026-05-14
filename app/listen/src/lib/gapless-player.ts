@@ -8,6 +8,7 @@
 import { Gapless5 } from "@/lib/gapless5/gapless5";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
 import { createEqChain, isFlatGains, type EqChain, type EqGains } from "@/lib/equalizer";
+import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
 
 // Gapless-5 doesn't expose its playlist internals on the public type,
@@ -168,6 +169,17 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
+  const probe = typeof document !== "undefined" ? document.createElement("audio") : null;
+  recordDevLog("audio", "runtime capabilities", {
+    useHTML5Audio: true,
+    useWebAudio: !preferHtml5Audio,
+    flac: probe?.canPlayType("audio/flac") || "",
+    xFlac: probe?.canPlayType("audio/x-flac") || "",
+    mp4Aac: probe?.canPlayType('audio/mp4; codecs="mp4a.40.2"') || "",
+    aac: probe?.canPlayType("audio/aac") || "",
+    mp3: probe?.canPlayType("audio/mpeg") || "",
+    wav: probe?.canPlayType("audio/wav") || "",
+  }, "info");
 
   instance = new Gapless5({
     useHTML5Audio: true,
@@ -226,15 +238,21 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onerror = (path, err) => {
+    recordDevLog("gapless", "error", { path: redactUrl(path), error: String(err) }, "error");
     currentCallbacks.onError?.(path, err);
   };
 
   instance.onloadstart = (path) => {
+    recordDevLog("gapless", "load start", redactUrl(path), "debug");
     currentCallbacks.onBuffering?.(path);
   };
 
   instance.onload = (path, fullyLoaded) => {
     const durationMs = getCurrentTrackDuration();
+    recordDevLog("gapless", fullyLoaded ? "loaded webaudio" : "loaded html5", {
+      path: redactUrl(path),
+      durationMs,
+    }, "info");
     currentCallbacks.onLoad?.(path, fullyLoaded, durationMs);
     currentCallbacks.onDurationChange?.(durationMs);
   };
@@ -244,6 +262,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     // HTML5 → WebAudio switch. From this moment the track plays from
     // RAM; network failures are survivable.
     currentTrackFullyBuffered = true;
+    recordDevLog("gapless", "switched to webaudio", redactUrl(_path), "info");
     setAnalyser(analyser);
   };
 
@@ -275,6 +294,12 @@ export function loadQueue(
   options: { restartIfSameIndex?: boolean } = {},
 ): void {
   if (!instance) return;
+  recordDevLog("gapless", "load queue", {
+    count: urls.length,
+    startIndex,
+    firstUrl: urls[0] ? redactUrl(urls[0]) : null,
+    restartIfSameIndex: options.restartIfSameIndex === true,
+  }, "debug");
 
   // Idempotent: if the incoming URL list is identical to what the engine
   // already has, don't rebuild the queue — just align the current track.

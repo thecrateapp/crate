@@ -34,6 +34,11 @@ CORS_ALLOWED_HEADERS = [
 ]
 
 
+def _extra_cors_origins() -> list[str]:
+    raw = os.environ.get("CRATE_CORS_EXTRA_ORIGINS", "")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+
 class DateAwareJSONResponse(JSONResponse):
     def render(self, content) -> bytes:
         return json_dumps(content).encode("utf-8")
@@ -145,11 +150,16 @@ def create_app() -> FastAPI:
         # Capacitor native shells
         "capacitor://localhost",
         "https://localhost",
+        # Tauri desktop shell
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
     ]
     # Docs lives on a fixed domain regardless of the operator's DOMAIN.
     allowed_origins += [
         "https://docs.cratemusic.app",
     ]
+    allowed_origins += _extra_cors_origins()
     if is_dev:
         # Dev-only origins — Vite dev servers + dev subdomains
         allowed_origins += [
@@ -157,6 +167,7 @@ def create_app() -> FastAPI:
             "https://docs.dev.cratemusic.app",
             "http://localhost:3000", "http://localhost:5173",
             "http://localhost:5174", "http://localhost:4173",
+            "http://localhost:5178", "http://127.0.0.1:5178",
             "http://127.0.0.1:4173", "http://localhost:8585",
         ]
     app.add_middleware(

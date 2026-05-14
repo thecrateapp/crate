@@ -115,6 +115,40 @@ describe("library route asset helpers", () => {
     expect(path).toBe("/artists/quicksand/slip");
   });
 
+  it("strips stored artist prefixes even when the album name is absent", () => {
+    expect(albumPagePath({
+      albumId: 9,
+      artistSlug: "quicksand",
+      albumSlug: "quicksand-slip",
+    })).toBe("/artists/quicksand/slip");
+
+    expect(albumApiPath({
+      artistSlug: "quicksand",
+      albumSlug: "quicksand-slip",
+    })).toBe("/api/artist-slugs/quicksand/albums/slip");
+  });
+
+  it("keeps album slugs whose title starts with the artist name", () => {
+    expect(albumPagePath({
+      albumId: 9,
+      artistSlug: "lip-critic",
+      albumSlug: "lip-critic-ii",
+    })).toBe("/artists/lip-critic/lip-critic-ii");
+
+    expect(albumApiPath({
+      artistSlug: "lip-critic",
+      albumSlug: "lip-critic-ii",
+    })).toBe("/api/artist-slugs/lip-critic/albums/lip-critic-ii");
+  });
+
+  it("strips only duplicated artist prefixes from stored album slugs", () => {
+    expect(albumPagePath({
+      albumId: 9,
+      artistSlug: "lip-critic",
+      albumSlug: "lip-critic-lip-critic-ii",
+    })).toBe("/artists/lip-critic/lip-critic-ii");
+  });
+
   it("falls back to the legacy album route for reserved child slugs", () => {
     const path = albumPagePath({
       albumId: 9,

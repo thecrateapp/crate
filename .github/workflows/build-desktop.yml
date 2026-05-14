@@ -1,0 +1,110 @@
+name: Build Desktop Apps
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+    paths:
+      - "app/listen/**"
+      - "app/listen-desktop/**"
+      - "app/shared/**"
+      - "app/shared/web/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build-desktop.yml"
+  pull_request:
+    paths:
+      - "app/listen/**"
+      - "app/listen-desktop/**"
+      - "app/shared/**"
+      - "app/shared/web/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build-desktop.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            runner: macos-latest
+            artifact_suffix: macos
+            build_script: tauri:build:macos
+          - name: Linux
+            runner: ubuntu-24.04
+            artifact_suffix: linux
+            build_script: tauri:build:linux
+          - name: Windows
+            runner: windows-latest
+            artifact_suffix: windows
+            build_script: tauri:build:windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/listen-desktop/src-tauri -> target
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            patchelf \
+            pkg-config \
+            rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop bundles
+        run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
+
+      - name: Collect artifacts
+        run: app/listen-desktop/scripts/collect-artifacts.sh ${{ matrix.artifact_suffix }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: crate-desktop-${{ matrix.artifact_suffix }}
+          path: desktop-artifacts/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach desktop artifacts to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: desktop-artifacts/*

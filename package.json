@@ -4,6 +4,7 @@
   "workspaces": [
     "app/shared/ui",
     "app/ui",
-    "app/listen"
+    "app/listen",
+    "app/listen-desktop"
   ]
 }

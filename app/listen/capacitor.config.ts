@@ -4,9 +4,9 @@ import { KeyboardResize, KeyboardStyle } from "@capacitor/keyboard";
 const allowMixedContent = process.env.CRATE_ALLOW_MIXED_CONTENT === "true";
 
 const config: CapacitorConfig = {
-  // Reverse-DNS of the project domain (cratemusic.app). The app itself is
-  // just "Crate" — not "Crate Listen" — so the id drops the old ".listen"
-  // segment that dated from a time when admin + listen were sibling apps.
+  // Reverse-DNS of the project domain (cratemusic.app). Native apps are
+  // branded as "Crate", so the id drops the old ".listen" segment that dated
+  // from a time when admin + listen were sibling apps.
   appId: "app.cratemusic.crate",
   appName: "Crate",
   webDir: "dist",

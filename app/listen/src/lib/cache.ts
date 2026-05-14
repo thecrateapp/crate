@@ -1,5 +1,5 @@
 import { apiSseUrl } from "@/lib/api";
-import { isNative } from "@/lib/capacitor";
+import { usesConfigurableServer } from "@/lib/platform";
 import { recordAssetInvalidationScope } from "@/lib/library-routes";
 import {
   markSseChannelClosed,
@@ -251,7 +251,7 @@ export function connectCacheEvents(): () => void {
   const url = apiSseUrl("/api/cache/events");
 
   try {
-    eventSource = new EventSource(url, { withCredentials: !isNative });
+    eventSource = new EventSource(url, { withCredentials: !usesConfigurableServer });
 
     eventSource.onopen = () => {
       markSseChannelOpen(CACHE_EVENTS_CHANNEL, {

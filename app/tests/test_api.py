@@ -5,11 +5,23 @@ from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
+from crate.api import _extra_cors_origins
+
+
+def test_extra_cors_origins_parse_operator_env(monkeypatch):
+    monkeypatch.setenv(
+        "CRATE_CORS_EXTRA_ORIGINS",
+        " tauri://localhost/, https://tauri.localhost ,,",
+    )
+
+    assert _extra_cors_origins() == [
+        "tauri://localhost",
+        "https://tauri.localhost",
+    ]
+
 
 def _make_mock_session(fetchone_returns=None, fetchall_returns=None, fetchall_side_effects=None):
     """Create a mock transaction_scope that simulates session.execute().mappings().first()/.all()."""
-    fetchone_queue = list(fetchone_returns or [])
-    fetchall_queue = list(fetchall_side_effects or fetchall_returns or [])
     call_index = [0]
 
     class MockMappings:
@@ -190,7 +202,9 @@ class TestArtistDetailAPI:
             },
         ]
 
-        with patch("crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks), \
+        with patch("crate.api.browse_artist.get_cache", return_value=None), \
+             patch("crate.api.browse_artist.set_cache"), \
+             patch("crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks), \
              patch("crate.api.browse_artist.get_top_tracks", return_value=[{"title": "Track Two"}, {"title": "Track One"}]) as mock_top_tracks:
             payload = browse_artist._get_artist_top_tracks_payload("Tool", count=5)
 
@@ -405,7 +419,7 @@ class TestArtistDetailAPI:
              patch("crate.api.browse_artist.api_artist", return_value=artist_payload), \
              patch("crate.api.browse_artist._get_artist_page_info", return_value={"similar": []}), \
              patch("crate.api.browse_artist._get_artist_top_tracks_payload", return_value=[]), \
-             patch("crate.api.browse_artist._get_artist_page_shows", return_value={"events": [], "configured": False, "source": "none"}) as mock_shows, \
+             patch("crate.api.browse_artist._get_artist_page_shows", return_value={"events": [], "configured": False, "source": "none"}), \
              patch("crate.api.browse_artist.get_top_artists", return_value=[]), \
              patch("crate.api.enrichment.get_artist_page_enrichment", return_value={}):
             resp = test_app.get("/api/artists/52/page?slug=poison-the-well")

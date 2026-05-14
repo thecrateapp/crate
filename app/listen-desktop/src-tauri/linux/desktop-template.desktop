@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+Comment={{comment}}
+Exec={{exec}} %u
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+StartupNotify=true
+Actions=PlayPause;Previous;Next;
+
+[Desktop Action PlayPause]
+Name=Play / Pause
+Exec={{exec}} --crate-command=play_pause
+
+[Desktop Action Previous]
+Name=Previous
+Exec={{exec}} --crate-command=previous
+
+[Desktop Action Next]
+Name=Next
+Exec={{exec}} --crate-command=next

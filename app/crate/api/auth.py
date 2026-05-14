@@ -256,7 +256,7 @@ def _is_listen_app_id(app_id: str | None) -> bool:
 
 def _is_native_listen_app_id(app_id: str | None) -> bool:
     normalized = (app_id or "").strip().lower()
-    return normalized in {"listen-android", "listen-ios", "listen-native"}
+    return normalized in {"listen-android", "listen-ios", "listen-native", "listen-tauri"}
 
 
 def _is_listen_return_to(return_to: str | None) -> bool:
@@ -270,6 +270,21 @@ def _is_listen_return_to(return_to: str | None) -> bool:
     except Exception:
         return False
     return host == "listen" or host.startswith("listen.")
+
+
+def _is_tauri_loopback_return_to(return_to: str | None) -> bool:
+    if not return_to:
+        return False
+    try:
+        parsed = urlparse(return_to)
+    except Exception:
+        return False
+    return (
+        parsed.scheme == "http"
+        and parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port == 17654
+        and parsed.path == "/oauth/callback"
+    )
 
 
 def _request_host(request: Request) -> str:
@@ -548,12 +563,14 @@ def _allowed_redirect_origins() -> set[str]:
     return origins
 
 
-def _callback_origin(return_to: str | None = None) -> str:
+def _callback_origin(return_to: str | None = None, *, app_id: str | None = None) -> str:
     allowed = _allowed_redirect_origins()
-    if return_to and return_to.startswith("cratemusic://"):
-        # Native OAuth — callback still goes through our web server.
-        # Fall through to default origin.
-        pass
+    if return_to and (return_to.startswith("cratemusic://") or _is_tauri_loopback_return_to(return_to) or _is_native_listen_app_id(app_id)):
+        # Native/Tauri OAuth still needs an HTTPS callback registered with
+        # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
+        # does not visibly bounce through the admin surface.
+        domain = os.environ.get("DOMAIN", "localhost")
+        return "http://localhost:5174" if domain == "localhost" else f"https://listen.{domain}"
     elif return_to and return_to.startswith(("http://", "https://")):
         parts = return_to.split("/", 3)
         origin = "/".join(parts[:3])
@@ -565,11 +582,13 @@ def _callback_origin(return_to: str | None = None) -> str:
     return f"https://admin.{domain}"
 
 
-def _validate_return_to(return_to: str | None) -> str:
+def _validate_return_to(return_to: str | None, *, app_id: str | None = None) -> str:
     """Validate return_to against allowed origins. Returns safe URL or fallback."""
     if not return_to:
         return "/"
     if return_to.startswith("cratemusic://"):
+        return return_to
+    if app_id == "listen-tauri" and _is_tauri_loopback_return_to(return_to):
         return return_to
     if return_to.startswith("/") and not return_to.startswith("//"):
         return return_to
@@ -581,8 +600,8 @@ def _validate_return_to(return_to: str | None) -> str:
     return "/"
 
 
-def _oauth_callback_url(provider: str, return_to: str | None = None) -> str:
-    return f"{_callback_origin(return_to)}/api/auth/oauth/{provider}/callback"
+def _oauth_callback_url(provider: str, return_to: str | None = None, *, app_id: str | None = None) -> str:
+    return f"{_callback_origin(return_to, app_id=app_id)}/api/auth/oauth/{provider}/callback"
 
 
 def _append_query_param(url: str, key: str, value: str) -> str:
@@ -594,7 +613,7 @@ def _append_query_param(url: str, key: str, value: str) -> str:
 
 def _post_auth_redirect_url(return_to: str, token: str) -> str:
     parsed = urlparse(return_to)
-    if parsed.path == "/auth/callback":
+    if parsed.path in {"/auth/callback", "/oauth/callback"}:
         return _append_query_param(return_to, "token", token)
     return return_to
 
@@ -1383,7 +1402,7 @@ async def _oauth_start_response(
     parsed_state = _parse_oauth_state(state)
     verifier = parsed_state["verifier"]
     common_params = {
-        "redirect_uri": _oauth_callback_url(provider, body.return_to),
+        "redirect_uri": _oauth_callback_url(provider, body.return_to, app_id=app_id),
         "response_type": "code",
         "state": state,
         "code_challenge": _pkce_challenge(verifier),
@@ -1480,7 +1499,8 @@ async def oauth_callback(request: Request, provider: str, code: str = "", state:
     parsed_state = _parse_oauth_state(state)
     if parsed_state.get("provider") != provider:
         raise HTTPException(status_code=400, detail="OAuth provider mismatch")
-    redirect_uri = _oauth_callback_url(provider, parsed_state.get("return_to"))
+    app_id = parsed_state.get("app_id")
+    redirect_uri = _oauth_callback_url(provider, parsed_state.get("return_to"), app_id=app_id)
     verifier = parsed_state["verifier"]
     external_payload = _google_userinfo(code, redirect_uri, verifier) if provider == "google" else _apple_userinfo(code, redirect_uri, verifier)
     external_user_id, email, name, avatar = _resolve_provider_subject(provider, external_payload)
@@ -1575,11 +1595,10 @@ async def oauth_callback(request: Request, provider: str, code: str = "", state:
                 _raise_oauth_identity_conflict(provider, exc)
 
     update_user_last_login(user["id"])
-    app_id = parsed_state.get("app_id")
     token, _session, refresh_token = _create_login_session(user, request, app_id=app_id)
 
     return_to = parsed_state.get("return_to") or "/"
-    safe_return = _validate_return_to(return_to)
+    safe_return = _validate_return_to(return_to, app_id=app_id)
 
     if safe_return.startswith("cratemusic://"):
         redirect_url = _append_query_param(safe_return, "token", token)

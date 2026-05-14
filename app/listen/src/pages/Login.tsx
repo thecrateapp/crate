@@ -3,6 +3,12 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { isTauriRuntime } from "@/lib/platform";
+import {
+  getTauriAuthDiagnostic,
+  TAURI_AUTH_DIAGNOSTIC_EVENT,
+  type TauriAuthDiagnostic,
+} from "@/lib/tauri-auth-diagnostic";
 
 export function Login() {
   const navigate = useNavigate();
@@ -14,11 +20,27 @@ export function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [authConfig, setAuthConfig] = useState<{ invite_only?: boolean }>({});
+  const [tauriAuthDiagnostic, setTauriAuthDiagnostic] =
+    useState<TauriAuthDiagnostic | null>(() =>
+      isTauriRuntime ? getTauriAuthDiagnostic() : null,
+    );
 
   useEffect(() => {
     api<{ invite_only?: boolean }>("/api/auth/config")
       .then(setAuthConfig)
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+    const handleDiagnostic = (event: Event) => {
+      const detail = (event as CustomEvent<TauriAuthDiagnostic>).detail;
+      if (detail) setTauriAuthDiagnostic(detail);
+    };
+    window.addEventListener(TAURI_AUTH_DIAGNOSTIC_EVENT, handleDiagnostic);
+    return () => {
+      window.removeEventListener(TAURI_AUTH_DIAGNOSTIC_EVENT, handleDiagnostic);
+    };
   }, []);
 
   if (authLoading) {
@@ -118,6 +140,14 @@ export function Login() {
         </button>
 
         <OAuthButtons returnTo={returnTo} />
+
+        {tauriAuthDiagnostic ? (
+          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/45">
+            <span className="text-white/65">Desktop OAuth:</span>{" "}
+            {tauriAuthDiagnostic.status}
+            {tauriAuthDiagnostic.detail ? ` · ${tauriAuthDiagnostic.detail}` : ""}
+          </div>
+        ) : null}
 
         <p className="text-center text-sm text-white/40">
           No account?{" "}
