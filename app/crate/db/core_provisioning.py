@@ -20,16 +20,17 @@ def ensure_database() -> None:
     global _db_provisioned
     if _db_provisioned:
         return
-    _db_provisioned = True
 
     su_user = os.environ.get("POSTGRES_SUPERUSER_USER")
     su_pass = os.environ.get("POSTGRES_SUPERUSER_PASSWORD")
     if not su_user:
+        _db_provisioned = True
         return
 
     app_user, app_pass, host, port, app_db = get_pg_connection_settings()
 
     if su_user == app_user:
+        _db_provisioned = True
         return
 
     try:
@@ -69,6 +70,7 @@ def ensure_database() -> None:
 
         cur.close()
         conn.close()
+        _db_provisioned = True
     except Exception:
         log.debug(
             "Could not provision app database (superuser may not be available)",

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import logging
+import os
+import time
 
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from crate.db.core_migrations import run_alembic_upgrade
 from crate.db.core_provisioning import (
@@ -25,6 +28,38 @@ def init_db():
     schema migrations at a time. The lock is automatically released when
     the connection is closed.
     """
+    timeout_seconds = float(os.environ.get("CRATE_DB_INIT_RETRY_TIMEOUT_SECONDS", "60"))
+    interval_seconds = float(
+        os.environ.get("CRATE_DB_INIT_RETRY_INTERVAL_SECONDS", "1")
+    )
+    deadline = time.monotonic() + max(0.0, timeout_seconds)
+    attempt = 0
+
+    while True:
+        attempt += 1
+        try:
+            _init_db_once()
+            return
+        except OperationalError:
+            now = time.monotonic()
+            if now >= deadline:
+                log.exception(
+                    "Database initialization failed after %s attempt(s)", attempt
+                )
+                raise
+
+            sleep_seconds = min(max(0.1, interval_seconds), max(0.0, deadline - now))
+            log.warning(
+                "Database is not ready for initialization; retrying in %.1fs "
+                "(attempt %s)",
+                sleep_seconds,
+                attempt,
+            )
+            time.sleep(sleep_seconds)
+
+
+def _init_db_once():
+    """Run one database initialization attempt."""
     ensure_database()
     engine = get_engine()
     with engine.connect() as conn:

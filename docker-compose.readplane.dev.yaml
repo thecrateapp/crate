@@ -24,10 +24,21 @@ services:
       READPLANE_QUERY_TIMEOUT_MS: "800"
       READPLANE_SNAPSHOT_MAX_AGE_SECONDS: "600"
       READPLANE_STALE_MAX_AGE_SECONDS: "3600"
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
+      no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
     depends_on:
-      - postgres
-      - redis
-      - api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
     ports:
       - "8686:8686"
     networks:
@@ -37,12 +48,23 @@ services:
     volumes:
       - ./data/caddy/Caddyfile.readplane.dev:/etc/caddy/Caddyfile:ro
     depends_on:
-      - api
-      - readplane
+      api:
+        condition: service_started
+      readplane:
+        condition: service_started
 
   readplane-proxy:
     image: caddy:2-alpine
     container_name: crate-dev-readplane-proxy
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
+      no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
     profiles:
       - readplane-proxy
     ports:
@@ -55,8 +77,10 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - api
-      - readplane
+      api:
+        condition: service_started
+      readplane:
+        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

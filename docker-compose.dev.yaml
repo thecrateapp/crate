@@ -36,15 +36,29 @@ services:
       - "5433:5432"
     networks:
       - crate-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crate -d crate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
   redis:
     image: redis:7-alpine
     container_name: crate-dev-redis
     command: redis-server --maxmemory 256mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD:-redis-dev}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev}
     ports:
       - "6380:6379"
     networks:
       - crate-dev
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
 
   slskd:
     image: slskd/slskd:latest
@@ -123,10 +137,14 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
-      - media-worker
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
+      media-worker:
+        condition: service_started
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "1.0"
@@ -183,9 +201,12 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
     mem_limit: 1536m
     mem_reservation: 512m
     cpus: "0.75"
@@ -233,8 +254,10 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 512m
     mem_reservation: 128m
     cpus: "0.25"
@@ -290,9 +313,12 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "0.5"
@@ -349,8 +375,10 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 2g
     mem_reservation: 768m
     cpus: "0.75"
@@ -407,8 +435,10 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "1.0"
@@ -449,6 +479,15 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: crate-dev-caddy
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
+      no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
     ports:
       - "80:80"
       - "443:443"
