@@ -348,7 +348,7 @@ services:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
@@ -440,7 +440,7 @@ services:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-projector
     restart: unless-stopped
     user: ${PUID}:${PGID}
@@ -482,7 +482,7 @@ services:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-maintenance-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
@@ -554,10 +554,10 @@ services:
       ]
 
   crate-analysis-worker:
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}
     build:
       context: ./app
-      target: worker
+      target: worker-analysis
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}
@@ -628,10 +628,10 @@ services:
       ]
 
   crate-playback-worker:
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}
     build:
       context: ./app
-      target: worker
+      target: worker-playback
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID}:${PGID}

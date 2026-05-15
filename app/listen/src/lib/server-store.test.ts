@@ -1,58 +1,124 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 
-const runtimeState = vi.hoisted(() => ({
+vi.mock("@/lib/platform", () => ({
   usesConfigurableServer: true,
 }));
 
-vi.mock("@/lib/platform", () => ({
-  get usesConfigurableServer() {
-    return runtimeState.usesConfigurableServer;
-  },
-}));
-
 import {
+  normaliseServerUrl,
+  deriveLabel,
+  getServers,
   addServer,
   getCurrentServer,
-  getServers,
-  seedDefaultServer,
   setCurrentServerId,
-} from "@/lib/server-store";
+  removeServer,
+  setCurrentServerToken,
+  setCurrentServerRefreshToken,
+  updateServerLabel,
+} from "./server-store";
 
-describe("server-store", () => {
-  beforeEach(() => {
-    runtimeState.usesConfigurableServer = true;
-    localStorage.clear();
+beforeEach(() => {
+  localStorage.clear();
+});
+
+describe("normaliseServerUrl", () => {
+  it("trims and removes trailing slashes", () => {
+    expect(normaliseServerUrl("  https://example.com/  ")).toBe(
+      "https://example.com",
+    );
   });
 
-  it("seeds a build-time default server for fresh native installs", () => {
-    seedDefaultServer("https://listen.lespedants.org/");
+  it("defaults to https", () => {
+    expect(normaliseServerUrl("example.com")).toBe("https://example.com");
+  });
 
+  it("returns empty for empty input", () => {
+    expect(normaliseServerUrl("")).toBe("");
+  });
+});
+
+describe("deriveLabel", () => {
+  it("extracts hostname", () => {
+    expect(deriveLabel("https://api.example.com")).toBe("example.com");
+  });
+
+  it("strips api prefix", () => {
+    expect(deriveLabel("https://api.foo.bar")).toBe("foo.bar");
+  });
+
+  it("falls back to raw url on error", () => {
+    expect(deriveLabel("not-a-url")).toBe("not-a-url");
+  });
+});
+
+describe("addServer / getServers", () => {
+  it("adds a server", () => {
+    const s = addServer("https://crate.local");
+    expect(s.url).toBe("https://crate.local");
     expect(getServers()).toHaveLength(1);
-    expect(getCurrentServer()).toMatchObject({
-      label: "listen.lespedants.org",
-      url: "https://listen.lespedants.org",
-      token: null,
-      tokenExpiresAt: null,
-      refreshToken: null,
-    });
   });
 
-  it("does not override an existing native server", () => {
-    const existing = addServer("https://crate.example.test");
-    setCurrentServerId(existing.id);
-
-    seedDefaultServer("https://listen.lespedants.org");
-
+  it("does not duplicate existing servers", () => {
+    addServer("https://crate.local");
+    addServer("https://crate.local");
     expect(getServers()).toHaveLength(1);
-    expect(getCurrentServer()?.url).toBe("https://crate.example.test");
   });
+});
 
-  it("does not seed web runtime storage", () => {
-    runtimeState.usesConfigurableServer = false;
-
-    seedDefaultServer("https://listen.lespedants.org");
-
-    expect(getServers()).toEqual([]);
+describe("getCurrentServer", () => {
+  it("returns null when no current server", () => {
     expect(getCurrentServer()).toBeNull();
+  });
+
+  it("returns the current server after setting it", () => {
+    const s = addServer("https://crate.local");
+    setCurrentServerId(s.id);
+    expect(getCurrentServer()?.id).toBe(s.id);
+  });
+});
+
+describe("removeServer", () => {
+  it("removes a server and clears current if it was active", () => {
+    const s = addServer("https://crate.local");
+    setCurrentServerId(s.id);
+    removeServer(s.id);
+    expect(getServers()).toHaveLength(0);
+    expect(getCurrentServer()).toBeNull();
+  });
+});
+
+describe("setCurrentServerToken", () => {
+  it("sets token for current server", () => {
+    const s = addServer("https://crate.local");
+    setCurrentServerId(s.id);
+    setCurrentServerToken("tok123");
+    expect(getCurrentServer()?.token).toBe("tok123");
+  });
+
+  it("is a no-op when no current server", () => {
+    expect(() => setCurrentServerToken("tok")).not.toThrow();
+  });
+});
+
+describe("setCurrentServerRefreshToken", () => {
+  it("sets refresh token for current server", () => {
+    const s = addServer("https://crate.local");
+    setCurrentServerId(s.id);
+    setCurrentServerRefreshToken("ref123");
+    expect(getCurrentServer()?.refreshToken).toBe("ref123");
+  });
+});
+
+describe("updateServerLabel", () => {
+  it("updates label", () => {
+    const s = addServer("https://crate.local");
+    updateServerLabel(s.id, "My Crate");
+    expect(getServers()[0]!.label).toBe("My Crate");
+  });
+
+  it("ignores empty label", () => {
+    const s = addServer("https://crate.local");
+    updateServerLabel(s.id, "   ");
+    expect(getServers()[0]!.label).not.toBe("");
   });
 });

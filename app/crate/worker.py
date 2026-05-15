@@ -1,5 +1,7 @@
 import logging
 import threading
+from collections.abc import Iterator, MutableMapping
+from importlib import import_module
 
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
@@ -9,15 +11,7 @@ from crate.db.repositories.tasks import (
     cleanup_zombie_tasks,
     redispatch_stale_pending_tasks,
 )
-from crate.worker_handlers.acquisition import ACQUISITION_TASK_HANDLERS
-from crate.worker_handlers.analysis import ANALYSIS_TASK_HANDLERS
-from crate.worker_handlers.artwork import ARTWORK_TASK_HANDLERS
-from crate.worker_handlers.enrichment import ENRICHMENT_TASK_HANDLERS
-from crate.worker_handlers.integrations import INTEGRATION_TASK_HANDLERS
-from crate.worker_handlers.library import LIBRARY_TASK_HANDLERS
-from crate.worker_handlers.management import MANAGEMENT_TASK_HANDLERS
-from crate.worker_handlers.migration import MIGRATION_TASK_HANDLERS
-from crate.worker_handlers.playback import PLAYBACK_TASK_HANDLERS
+from crate.worker_handlers import TaskHandler
 
 log = logging.getLogger(__name__)
 
@@ -464,29 +458,171 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     log.info("Service loop stopped")
 
 
-TASK_HANDLERS = {}
-
-TASK_HANDLERS.update(ACQUISITION_TASK_HANDLERS)
-TASK_HANDLERS.update(ANALYSIS_TASK_HANDLERS)
-TASK_HANDLERS.update(ARTWORK_TASK_HANDLERS)
-TASK_HANDLERS.update(ENRICHMENT_TASK_HANDLERS)
-TASK_HANDLERS.update(INTEGRATION_TASK_HANDLERS)
-TASK_HANDLERS.update(LIBRARY_TASK_HANDLERS)
-TASK_HANDLERS.update(MANAGEMENT_TASK_HANDLERS)
-TASK_HANDLERS.update(MIGRATION_TASK_HANDLERS)
-TASK_HANDLERS.update(PLAYBACK_TASK_HANDLERS)
-
-all_handler_dicts = [
-    ACQUISITION_TASK_HANDLERS,
-    ANALYSIS_TASK_HANDLERS,
-    ARTWORK_TASK_HANDLERS,
-    ENRICHMENT_TASK_HANDLERS,
-    INTEGRATION_TASK_HANDLERS,
-    LIBRARY_TASK_HANDLERS,
-    MANAGEMENT_TASK_HANDLERS,
-    MIGRATION_TASK_HANDLERS,
-    PLAYBACK_TASK_HANDLERS,
-]
-assert len(TASK_HANDLERS) == sum(len(d) for d in all_handler_dicts), (
-    "Duplicate task_type in handlers"
+_HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "crate.worker_handlers.acquisition",
+        "ACQUISITION_TASK_HANDLERS",
+        (
+            "tidal_download",
+            "check_new_releases",
+            "soulseek_download",
+            "cleanup_incomplete_downloads",
+            "library_upload",
+            "import_queue_item",
+            "import_queue_all",
+            "import_queue_remove",
+            "remux_m4a_dash",
+        ),
+    ),
+    (
+        "crate.worker_handlers.analysis",
+        "ANALYSIS_TASK_HANDLERS",
+        (
+            "compute_analytics",
+            "refresh_user_listening_stats",
+            "index_genres",
+            "infer_genre_taxonomy",
+            "enrich_genre_descriptions",
+            "sync_musicbrainz_genre_graph",
+            "cleanup_invalid_genre_taxonomy",
+            "compute_popularity",
+            "backfill_track_audio_fingerprints",
+            "analyze_tracks",
+            "analyze_all",
+            "analyze_album_full",
+            "compute_bliss",
+        ),
+    ),
+    (
+        "crate.worker_handlers.artwork",
+        "ARTWORK_TASK_HANDLERS",
+        (
+            "fetch_cover",
+            "fetch_album_cover",
+            "fetch_artist_covers",
+            "fetch_artwork_all",
+            "batch_covers",
+            "scan_missing_covers",
+            "apply_cover",
+            "upload_image",
+        ),
+    ),
+    (
+        "crate.worker_handlers.enrichment",
+        "ENRICHMENT_TASK_HANDLERS",
+        (
+            "enrich_artist",
+            "enrich_artists",
+            "sync_lyrics",
+            "reset_enrichment",
+            "enrich_mbids",
+            "process_new_content",
+            "compute_completeness",
+        ),
+    ),
+    (
+        "crate.worker_handlers.integrations",
+        "INTEGRATION_TASK_HANDLERS",
+        (
+            "sync_shows",
+            "backfill_similarities",
+        ),
+    ),
+    (
+        "crate.worker_handlers.library",
+        "LIBRARY_TASK_HANDLERS",
+        (
+            "scan",
+            "fix_issues",
+            "batch_retag",
+            "library_sync",
+        ),
+    ),
+    (
+        "crate.worker_handlers.management",
+        "MANAGEMENT_TASK_HANDLERS",
+        (
+            "health_check",
+            "repair",
+            "library_pipeline",
+            "delete_artist",
+            "delete_album",
+            "move_artist",
+            "wipe_library",
+            "rebuild_library",
+            "match_apply",
+            "update_album_tags",
+            "update_track_tags",
+            "resolve_duplicates",
+            "generate_system_playlist",
+            "refresh_system_smart_playlists",
+            "persist_playlist_cover",
+            "write_portable_metadata",
+            "rehydrate_portable_metadata",
+            "export_rich_metadata",
+        ),
+    ),
+    (
+        "crate.worker_handlers.migration",
+        "MIGRATION_TASK_HANDLERS",
+        (
+            "migrate_storage_v2",
+            "fix_artist",
+            "verify_storage_v2",
+        ),
+    ),
+    (
+        "crate.worker_handlers.playback",
+        "PLAYBACK_TASK_HANDLERS",
+        ("prepare_stream_variant",),
+    ),
 )
+
+
+class LazyTaskHandlers(MutableMapping[str, TaskHandler]):
+    """Mapping-compatible task registry that imports handler modules on demand."""
+
+    def __init__(self, groups: tuple[tuple[str, str, tuple[str, ...]], ...]) -> None:
+        task_modules: dict[str, tuple[str, str]] = {}
+        for module_name, attr_name, task_types in groups:
+            for task_type in task_types:
+                if task_type in task_modules:
+                    raise AssertionError(
+                        f"Duplicate task_type in handlers: {task_type}"
+                    )
+                task_modules[task_type] = (module_name, attr_name)
+        self._task_modules = task_modules
+        self._loaded_groups: dict[tuple[str, str], dict[str, TaskHandler]] = {}
+        self._overrides: dict[str, TaskHandler] = {}
+
+    def _load_group(self, module_name: str, attr_name: str) -> dict[str, TaskHandler]:
+        key = (module_name, attr_name)
+        if key not in self._loaded_groups:
+            module = import_module(module_name)
+            handlers = getattr(module, attr_name)
+            self._loaded_groups[key] = dict(handlers)
+        return self._loaded_groups[key]
+
+    def __getitem__(self, task_type: str) -> TaskHandler:
+        if task_type in self._overrides:
+            return self._overrides[task_type]
+        module_name, attr_name = self._task_modules[task_type]
+        return self._load_group(module_name, attr_name)[task_type]
+
+    def __setitem__(self, task_type: str, handler: TaskHandler) -> None:
+        self._overrides[task_type] = handler
+
+    def __delitem__(self, task_type: str) -> None:
+        if task_type in self._overrides:
+            del self._overrides[task_type]
+            return
+        raise KeyError(task_type)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter({*self._task_modules, *self._overrides})
+
+    def __len__(self) -> int:
+        return len({*self._task_modules, *self._overrides})
+
+
+TASK_HANDLERS: MutableMapping[str, TaskHandler] = LazyTaskHandlers(_HANDLER_GROUPS)

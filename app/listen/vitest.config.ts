@@ -7,6 +7,13 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test-setup.ts"],
+    coverage: {
+      exclude: [
+        "src/lib/gapless5/**",
+        "src/test-setup.ts",
+        "**/*.test.{ts,tsx}",
+      ],
+    },
   },
   resolve: {
     alias: {

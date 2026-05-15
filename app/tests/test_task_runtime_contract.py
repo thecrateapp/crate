@@ -6,6 +6,27 @@ def test_every_registered_handler_has_an_actor_config():
     assert sorted(set(TASK_POOL_CONFIG) - set(TASK_HANDLERS)) == []
 
 
+def test_task_handler_registry_imports_modules_lazily():
+    import sys
+    from typing import Any, cast
+
+    from crate import worker
+
+    heavy_modules = {
+        "crate.worker_handlers.analysis",
+        "crate.worker_handlers.playback",
+    }
+    for module_name in heavy_modules:
+        sys.modules.pop(module_name, None)
+    registry = cast(Any, worker.TASK_HANDLERS)
+    registry._loaded_groups.clear()
+
+    assert heavy_modules.isdisjoint(sys.modules)
+    assert callable(registry.get("prepare_stream_variant"))
+    assert "crate.worker_handlers.playback" in sys.modules
+    assert "crate.worker_handlers.analysis" not in sys.modules
+
+
 def test_actor_treats_handler_error_result_as_failed(monkeypatch):
     from crate import actors
     from crate.worker import TASK_HANDLERS
@@ -22,7 +43,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         "parent_task_id": "parent-task",
     }
     updates: list[dict] = []
-    fan_in: list[tuple[str, str]] = []
+    fan_in: list[tuple[str, str, str]] = []
 
     monkeypatch.setattr("crate.db.queries.tasks.get_task", lambda task_id: task)
     monkeypatch.setattr(
@@ -43,8 +64,11 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
     monkeypatch.setattr("crate.config.load_config", lambda: {"library_path": "/tmp"})
     monkeypatch.setattr("crate.worker._is_cancelled", lambda task_id: False)
     monkeypatch.setattr(
-        "crate.worker_handlers.analysis._try_complete_parent",
-        lambda parent_id, task_type: fan_in.append((parent_id, task_type)),
+        actors,
+        "_try_fan_in_parent",
+        lambda task, task_type, task_id: fan_in.append(
+            (task["parent_task_id"], task_type, task_id)
+        ),
     )
     monkeypatch.setattr(
         "crate.telegram.notify_task_failed", lambda *args, **kwargs: None
@@ -63,4 +87,4 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         update.get("status") == "failed" and update.get("error") == "boom"
         for update in updates
     )
-    assert fan_in == [("parent-task", "scan")]
+    assert fan_in == [("parent-task", "scan", "child-task")]

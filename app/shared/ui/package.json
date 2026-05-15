@@ -73,6 +73,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
@@ -86,6 +88,12 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
-    "tsup": "^8.5.1"
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "happy-dom": "^20.9.0",
+    "jsdom": "^29.0.2",
+    "tsup": "^8.5.1",
+    "vitest": "^4.1.4"
   }
 }

@@ -1,4 +1,4 @@
-"""MusicBrainz matching via beets autotagger as backend."""
+"""MusicBrainz release matching and tag application helpers."""
 
 import logging
 from pathlib import Path

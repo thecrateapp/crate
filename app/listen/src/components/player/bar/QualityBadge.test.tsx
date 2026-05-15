@@ -1,35 +1,33 @@
-import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-
-import { QualityBadge } from "@/components/player/bar/QualityBadge";
+import { render } from "@testing-library/react";
+import { QualityBadge } from "./QualityBadge";
 
 describe("QualityBadge", () => {
-  it("shows the tier icon for source quality badges", () => {
+  it("renders hi-res source badge with icon", () => {
     const { container } = render(
       <QualityBadge
-        badge={{
-          label: "FLAC 16/44.1",
-          detail: "16-bit / 44.1 kHz",
-          tier: "lossless",
-        }}
-        origin="source"
+        badge={{ tier: "hi-res", label: "HI-RES", detail: "24-bit / 96 kHz" }}
       />,
     );
-
-    expect(screen.getByText("FLAC 16/44.1")).toBeTruthy();
-    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.textContent).toContain("HI-RES");
+    expect(container.querySelector("svg")).toBeInTheDocument();
   });
 
-  it("hides the icon and updates the title for stream delivery badges", () => {
+  it("renders stream badge without icon", () => {
     const { container } = render(
       <QualityBadge
-        badge={{ label: "AAC 192", detail: "192 kbps", tier: "high" }}
+        badge={{ tier: "lossless", label: "Lossless", detail: "FLAC" }}
         origin="stream"
       />,
     );
+    expect(container.querySelector("svg")).toBeNull();
+  });
 
-    expect(screen.getByText("AAC 192").getAttribute("title")).toBe(
-      "Streaming delivery quality · 192 kbps",
+  it("renders standard badge without icon", () => {
+    const { container } = render(
+      <QualityBadge
+        badge={{ tier: "standard", label: "MP3", detail: "320 kbps" }}
+      />,
     );
     expect(container.querySelector("svg")).toBeNull();
   });

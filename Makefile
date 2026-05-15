@@ -225,7 +225,7 @@ dev-test-backend: dev-test-preflight ## Run Python backend static checks and pyt
 	@echo "$(YELLOW)Backend: ruff format --check$(NC)"
 	@uv run ruff format --check app/crate app/tests
 	@echo "$(YELLOW)Backend: pytest in an isolated dev runner$(NC)"
-	@$(DC_DEV) run --rm --no-deps worker python -m pytest tests/ -q --durations=20
+	@$(DC_DEV) run --rm --no-deps --entrypoint python worker -m pytest tests/ -q --durations=20
 
 .PHONY: dev-test-readplane
 dev-test-readplane: ## Run Go readplane tests and vet

@@ -20,6 +20,8 @@ REQUIRED_IMAGE_NAMES=(
   crate-api
   crate-readplane
   crate-worker
+  crate-analysis-worker
+  crate-playback-worker
   crate-media-worker
   crate-ui
   crate-listen
