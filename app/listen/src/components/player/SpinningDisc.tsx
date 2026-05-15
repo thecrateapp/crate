@@ -20,7 +20,10 @@ function getPointerAngle(
 ): number {
   const centerX = bounds.left + bounds.width / 2;
   const centerY = bounds.top + bounds.height / 2;
-  return Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI);
+  return (
+    Math.atan2(event.clientY - centerY, event.clientX - centerX) *
+    (180 / Math.PI)
+  );
 }
 
 function normalizeDeltaDegrees(delta: number): number {
@@ -85,34 +88,41 @@ export function SpinningDisc({
 
   const showCrossfade = !!crossfadeOutgoingCover && !!crossfadeIncomingCover;
 
-  const setJogPlaybackRate = useCallback((rate: number, immediate = false) => {
-    if (!onPlaybackRateChange) return;
-    const safeRate = clamp(rate, 0.25, 4);
-    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-    if (
-      !immediate &&
-      now - lastRateUpdateAtRef.current < JOG_RATE_UPDATE_INTERVAL_MS &&
-      Math.abs(safeRate - lastJogRateRef.current) < 0.12
-    ) {
-      return;
-    }
-    lastRateUpdateAtRef.current = now;
-    lastJogRateRef.current = safeRate;
-    onPlaybackRateChange(safeRate);
-  }, [onPlaybackRateChange]);
+  const setJogPlaybackRate = useCallback(
+    (rate: number, immediate = false) => {
+      if (!onPlaybackRateChange) return;
+      const safeRate = clamp(rate, 0.25, 4);
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
+      if (
+        !immediate &&
+        now - lastRateUpdateAtRef.current < JOG_RATE_UPDATE_INTERVAL_MS &&
+        Math.abs(safeRate - lastJogRateRef.current) < 0.12
+      ) {
+        return;
+      }
+      lastRateUpdateAtRef.current = now;
+      lastJogRateRef.current = safeRate;
+      onPlaybackRateChange(safeRate);
+    },
+    [onPlaybackRateChange],
+  );
 
   const setRotorRotation = useCallback((rotation: number) => {
     if (!rotorRef.current) return;
     rotorRef.current.style.transform = `rotate(${rotation}deg)`;
   }, []);
 
-  const projectedPlaybackTime = useCallback((timestamp: number) => {
-    const anchor = playbackAnchorRef.current;
-    if (!isPlaying || isBuffering) return anchor.time;
-    const elapsedSeconds = Math.max(0, (timestamp - anchor.timestamp) / 1000);
-    const projected = anchor.time + elapsedSeconds;
-    return duration > 0 ? Math.min(projected, duration) : projected;
-  }, [duration, isBuffering, isPlaying]);
+  const projectedPlaybackTime = useCallback(
+    (timestamp: number) => {
+      const anchor = playbackAnchorRef.current;
+      if (!isPlaying || isBuffering) return anchor.time;
+      const elapsedSeconds = Math.max(0, (timestamp - anchor.timestamp) / 1000);
+      const projected = anchor.time + elapsedSeconds;
+      return duration > 0 ? Math.min(projected, duration) : projected;
+    },
+    [duration, isBuffering, isPlaying],
+  );
 
   const clearSeekTimer = useCallback(() => {
     if (seekTimerRef.current == null) return;
@@ -126,7 +136,8 @@ export function SpinningDisc({
     const pending = pendingSeekRef.current;
     pendingSeekRef.current = null;
     if (pending == null) return;
-    lastSeekFlushAtRef.current = typeof performance !== "undefined" ? performance.now() : Date.now();
+    lastSeekFlushAtRef.current =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     onSeek(pending);
   }, [clearSeekTimer, onSeek]);
 
@@ -139,7 +150,8 @@ export function SpinningDisc({
         return;
       }
 
-      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       const elapsed = now - lastSeekFlushAtRef.current;
       if (elapsed >= JOG_SEEK_INTERVAL_MS) {
         flushPendingSeek();
@@ -147,7 +159,10 @@ export function SpinningDisc({
       }
 
       if (seekTimerRef.current != null) return;
-      seekTimerRef.current = window.setTimeout(flushPendingSeek, JOG_SEEK_INTERVAL_MS - elapsed);
+      seekTimerRef.current = window.setTimeout(
+        flushPendingSeek,
+        JOG_SEEK_INTERVAL_MS - elapsed,
+      );
     },
     [flushPendingSeek, onSeek],
   );
@@ -175,7 +190,8 @@ export function SpinningDisc({
   useEffect(() => {
     if (isJogging || dragRotation != null) return;
 
-    const timestamp = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const timestamp =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     const projected = projectedPlaybackTime(timestamp);
     const drift = currentTime - projected;
     const shouldHardSync =
@@ -212,7 +228,8 @@ export function SpinningDisc({
     }
 
     if (!isPlaying || isBuffering) {
-      const timestamp = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const timestamp =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       playbackAnchorRef.current = { time: currentTime, timestamp };
       setRotorRotation(currentTime * DISC_DEGREES_PER_SECOND);
       return;
@@ -248,7 +265,8 @@ export function SpinningDisc({
       const bounds = event.currentTarget.getBoundingClientRect();
       const angle = getPointerAngle(event.nativeEvent, bounds);
       const baseRotation = currentTime * DISC_DEGREES_PER_SECOND;
-      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
 
       dragStateRef.current = {
         accumDegrees: 0,
@@ -275,14 +293,16 @@ export function SpinningDisc({
       const bounds = event.currentTarget.getBoundingClientRect();
       const nextAngle = getPointerAngle(event.nativeEvent, bounds);
       const delta = normalizeDeltaDegrees(nextAngle - dragState.previousAngle);
-      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const now =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       const elapsedMs = Math.max(16, now - dragState.previousMoveAt);
       dragState.previousAngle = nextAngle;
       dragState.previousMoveAt = now;
       dragState.accumDegrees += delta;
 
       const nextTime = clamp(
-        dragState.startTime + (dragState.accumDegrees / 360) * JOG_SECONDS_PER_ROTATION,
+        dragState.startTime +
+          (dragState.accumDegrees / 360) * JOG_SECONDS_PER_ROTATION,
         0,
         duration,
       );
@@ -302,24 +322,28 @@ export function SpinningDisc({
     [duration, scheduleSeek, setJogPlaybackRate],
   );
 
-  const finishJog = useCallback((pointerId: number, currentTarget: HTMLDivElement) => {
-    const dragState = dragStateRef.current;
-    if (!dragState || pointerId !== dragState.pointerId) return;
-    const finalTime = pendingSeekRef.current ?? currentTime;
-    flushPendingSeek();
-    dragStateRef.current = null;
-    setIsJogging(false);
-    setDragRotation(null);
-    setJogPlaybackRate(1, true);
-    playbackAnchorRef.current = {
-      time: finalTime,
-      timestamp: typeof performance !== "undefined" ? performance.now() : Date.now(),
-    };
-    setRotorRotation(finalTime * DISC_DEGREES_PER_SECOND);
-    if (currentTarget.hasPointerCapture(pointerId)) {
-      currentTarget.releasePointerCapture(pointerId);
-    }
-  }, [currentTime, flushPendingSeek, setJogPlaybackRate, setRotorRotation]);
+  const finishJog = useCallback(
+    (pointerId: number, currentTarget: HTMLDivElement) => {
+      const dragState = dragStateRef.current;
+      if (!dragState || pointerId !== dragState.pointerId) return;
+      const finalTime = pendingSeekRef.current ?? currentTime;
+      flushPendingSeek();
+      dragStateRef.current = null;
+      setIsJogging(false);
+      setDragRotation(null);
+      setJogPlaybackRate(1, true);
+      playbackAnchorRef.current = {
+        time: finalTime,
+        timestamp:
+          typeof performance !== "undefined" ? performance.now() : Date.now(),
+      };
+      setRotorRotation(finalTime * DISC_DEGREES_PER_SECOND);
+      if (currentTarget.hasPointerCapture(pointerId)) {
+        currentTarget.releasePointerCapture(pointerId);
+      }
+    },
+    [currentTime, flushPendingSeek, setJogPlaybackRate, setRotorRotation],
+  );
 
   const handlePointerUp = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -342,7 +366,9 @@ export function SpinningDisc({
         ref={discRef}
         className={cn(
           "relative aspect-square w-full rounded-full border border-white/12 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.14),rgba(255,255,255,0.02)_26%,rgba(0,0,0,0.88)_68%,rgba(0,0,0,1))] shadow-[0_32px_90px_rgba(0,0,0,0.6),0_12px_32px_rgba(0,0,0,0.42)]",
-          jogEnabled && onSeek ? "cursor-grab touch-none active:cursor-grabbing" : "",
+          jogEnabled && onSeek
+            ? "cursor-grab touch-none active:cursor-grabbing"
+            : "",
         )}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -357,7 +383,10 @@ export function SpinningDisc({
             isJogging ? "" : "will-change-transform",
           )}
           style={{
-            transition: isJogging || (isPlaying && !isBuffering) ? "none" : "transform 140ms linear",
+            transition:
+              isJogging || (isPlaying && !isBuffering)
+                ? "none"
+                : "transform 140ms linear",
           }}
         >
           {showCrossfade ? (
@@ -376,13 +405,16 @@ export function SpinningDisc({
               />
             </>
           ) : albumCover ? (
-            <img src={albumCover} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img
+              src={albumCover}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-white/5">
               <Disc3 size={88} className="text-white/12" />
             </div>
           )}
-
         </div>
 
         <div className="pointer-events-none absolute inset-[2%] rounded-full border border-white/8 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]" />
@@ -400,7 +432,10 @@ export function SpinningDisc({
           ) : isPlaying ? (
             <Pause size={22} className="text-white" />
           ) : (
-            <Play size={22} className="translate-x-[2px] fill-white text-white" />
+            <Play
+              size={22}
+              className="translate-x-[2px] fill-white text-white"
+            />
           )}
         </button>
       </div>

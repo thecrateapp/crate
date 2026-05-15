@@ -6,7 +6,11 @@ from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.playlist_utils import apply_playlist_cover_payload
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.curation import (
@@ -19,7 +23,7 @@ from crate.api.schemas.curation import (
     UpdateSystemPlaylistRequest,
 )
 from crate.playlist_covers import delete_playlist_cover
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.repositories.playlists import (
     create_playlist,
     delete_playlist,
@@ -121,12 +125,19 @@ def _require_system_playlist(playlist_id: int) -> dict:
     return playlist
 
 
-def _validate_generation_mode(generation_mode: str, smart_rules: dict | None = None) -> str:
+def _validate_generation_mode(
+    generation_mode: str, smart_rules: dict | None = None
+) -> str:
     mode = (generation_mode or "static").strip().lower()
     if mode not in {"static", "smart"}:
-        raise HTTPException(status_code=422, detail="generation_mode must be 'static' or 'smart'")
+        raise HTTPException(
+            status_code=422, detail="generation_mode must be 'static' or 'smart'"
+        )
     if mode == "smart" and not smart_rules:
-        raise HTTPException(status_code=422, detail="smart_rules are required for smart system playlists")
+        raise HTTPException(
+            status_code=422,
+            detail="smart_rules are required for smart system playlists",
+        )
     return mode
 
 
@@ -136,7 +147,9 @@ def _validate_generation_mode(generation_mode: str, smart_rules: dict | None = N
     responses=AUTH_ERROR_RESPONSES,
     summary="List admin system playlists",
 )
-def admin_list_system_playlists(request: Request, curated_only: bool = False, include_inactive: bool = True):
+def admin_list_system_playlists(
+    request: Request, curated_only: bool = False, include_inactive: bool = True
+):
     _require_admin(request)
     playlists = list_system_playlists(
         only_curated=curated_only,
@@ -158,7 +171,7 @@ def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistReq
     mode = _validate_generation_mode(body.generation_mode, body.smart_rules)
     playlist_id = create_playlist(
         name=body.name.strip(),
-        description=body.description,
+        description=body.description or "",
         user_id=None,
         is_smart=mode == "smart",
         smart_rules=body.smart_rules if mode == "smart" else None,
@@ -174,7 +187,7 @@ def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistReq
     # Cover via Redis staging → worker task
     if body.cover_data_url:
         try:
-            r = _get_redis()
+            r = get_redis()
             if r:
                 r.set(f"cover:staging:{playlist_id}", body.cover_data_url, ex=600)
                 create_task("persist_playlist_cover", {"playlist_id": playlist_id})
@@ -188,7 +201,10 @@ def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistReq
     # For smart playlists, enqueue initial generation
     if mode == "smart":
         set_generation_status(playlist_id, "queued")
-        create_task("generate_system_playlist", {"playlist_id": playlist_id, "triggered_by": "creation"})
+        create_task(
+            "generate_system_playlist",
+            {"playlist_id": playlist_id, "triggered_by": "creation"},
+        )
 
     playlist = _require_system_playlist(playlist_id)
     return _serialize_admin_playlist(playlist)
@@ -238,13 +254,21 @@ async def admin_stream_system_playlist(request: Request, playlist_id: int):
     responses=_SYSTEM_PLAYLIST_RESPONSES,
     summary="Update a system playlist",
 )
-def admin_update_system_playlist(request: Request, playlist_id: int, body: UpdateSystemPlaylistRequest):
+def admin_update_system_playlist(
+    request: Request, playlist_id: int, body: UpdateSystemPlaylistRequest
+):
     _require_admin(request)
     playlist = _require_system_playlist(playlist_id)
 
     next_mode = body.generation_mode or playlist.get("generation_mode") or "static"
-    next_rules = body.smart_rules if body.smart_rules is not None else playlist.get("smart_rules")
-    mode = _validate_generation_mode(next_mode, next_rules if next_mode == "smart" else None)
+    next_rules = (
+        body.smart_rules
+        if body.smart_rules is not None
+        else playlist.get("smart_rules")
+    )
+    mode = _validate_generation_mode(
+        next_mode, next_rules if next_mode == "smart" else None
+    )
 
     kwargs: dict = {
         "generation_mode": mode,
@@ -259,15 +283,25 @@ def admin_update_system_playlist(request: Request, playlist_id: int, body: Updat
     if body.cover_data_url is not None:
         if body.cover_data_url:
             try:
-                r = _get_redis()
+                r = get_redis()
                 if r:
                     r.set(f"cover:staging:{playlist_id}", body.cover_data_url, ex=600)
                     create_task("persist_playlist_cover", {"playlist_id": playlist_id})
             except Exception:
-                kwargs.update(apply_playlist_cover_payload(playlist_id, body.cover_data_url, playlist.get("cover_path")) or {})
+                kwargs.update(
+                    apply_playlist_cover_payload(
+                        playlist_id, body.cover_data_url, playlist.get("cover_path")
+                    )
+                    or {}
+                )
         else:
             # Removing cover
-            kwargs.update(apply_playlist_cover_payload(playlist_id, None, playlist.get("cover_path")) or {})
+            kwargs.update(
+                apply_playlist_cover_payload(
+                    playlist_id, None, playlist.get("cover_path")
+                )
+                or {}
+            )
     if body.smart_rules is not None or mode == "static":
         kwargs["smart_rules"] = next_rules if mode == "smart" else None
     if body.auto_refresh_enabled is not None:
@@ -286,10 +320,15 @@ def admin_update_system_playlist(request: Request, playlist_id: int, body: Updat
     update_playlist(playlist_id, **kwargs)
 
     # Auto-regenerate if smart rules changed
-    rules_changed = body.smart_rules is not None and body.smart_rules != playlist.get("smart_rules")
+    rules_changed = body.smart_rules is not None and body.smart_rules != playlist.get(
+        "smart_rules"
+    )
     if rules_changed and mode == "smart":
         set_generation_status(playlist_id, "queued")
-        create_task("generate_system_playlist", {"playlist_id": playlist_id, "triggered_by": "rule_change"})
+        create_task(
+            "generate_system_playlist",
+            {"playlist_id": playlist_id, "triggered_by": "rule_change"},
+        )
 
     playlist = _require_system_playlist(playlist_id)
     return _serialize_admin_playlist(playlist)
@@ -350,10 +389,13 @@ def admin_generate_system_playlist(request: Request, playlist_id: int):
         raise HTTPException(status_code=400, detail="Not a smart system playlist")
 
     set_generation_status(playlist_id, "queued")
-    task_id = create_task("generate_system_playlist", {
-        "playlist_id": playlist_id,
-        "triggered_by": "manual",
-    })
+    task_id = create_task(
+        "generate_system_playlist",
+        {
+            "playlist_id": playlist_id,
+            "triggered_by": "manual",
+        },
+    )
     return {"ok": True, "task_id": task_id, "generation_status": "queued"}
 
 
@@ -369,7 +411,11 @@ def admin_preview_system_playlist(
 ):
     _require_admin(request)
     playlist = _require_system_playlist(playlist_id)
-    rules = body.smart_rules if body and body.smart_rules is not None else playlist.get("smart_rules")
+    rules = (
+        body.smart_rules
+        if body and body.smart_rules is not None
+        else playlist.get("smart_rules")
+    )
     if not rules:
         raise HTTPException(status_code=400, detail="No smart rules configured")
 
@@ -404,8 +450,12 @@ def admin_preview_system_playlist(
     return {
         "total_matching": total_matching,
         "tracks": tracks[:20],
-        "genre_distribution": dict(sorted(genre_dist.items(), key=lambda x: -x[1])[:15]),
-        "artist_distribution": dict(sorted(artist_dist.items(), key=lambda x: -x[1])[:15]),
+        "genre_distribution": dict(
+            sorted(genre_dist.items(), key=lambda x: -x[1])[:15]
+        ),
+        "artist_distribution": dict(
+            sorted(artist_dist.items(), key=lambda x: -x[1])[:15]
+        ),
         "format_distribution": format_dist,
         "duration_total_sec": total_duration,
         "avg_year": int(sum(years) / len(years)) if years else None,
@@ -426,12 +476,17 @@ def admin_duplicate_system_playlist(request: Request, playlist_id: int):
         raise HTTPException(status_code=500, detail="Failed to duplicate playlist")
 
     # For smart playlists, enqueue initial generation
-    if new_playlist.get("generation_mode") == "smart" and new_playlist.get("smart_rules"):
+    if new_playlist.get("generation_mode") == "smart" and new_playlist.get(
+        "smart_rules"
+    ):
         set_generation_status(new_playlist["id"], "queued")
-        create_task("generate_system_playlist", {
-            "playlist_id": new_playlist["id"],
-            "triggered_by": "creation",
-        })
+        create_task(
+            "generate_system_playlist",
+            {
+                "playlist_id": new_playlist["id"],
+                "triggered_by": "creation",
+            },
+        )
 
     return _serialize_admin_playlist(new_playlist)
 

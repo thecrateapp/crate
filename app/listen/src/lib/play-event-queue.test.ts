@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearQueue, enqueueEvent, flushQueue, postWithRetry, queueSize } from "./play-event-queue";
+import {
+  clearQueue,
+  enqueueEvent,
+  flushQueue,
+  postWithRetry,
+  queueSize,
+} from "./play-event-queue";
 
 // Module-level mock of apiFetch so we can control every response.
 vi.mock("@/lib/api", () => ({
@@ -10,7 +16,10 @@ vi.mock("@/lib/api", () => ({
 import { apiFetch } from "@/lib/api";
 const mockApiFetch = vi.mocked(apiFetch);
 
-function mkResponse(status: number, ok = status >= 200 && status < 300): Response {
+function mkResponse(
+  status: number,
+  ok = status >= 200 && status < 300,
+): Response {
   return {
     ok,
     status,
@@ -46,9 +55,11 @@ describe("enqueueEvent", () => {
   });
 
   it("survives localStorage write failures gracefully", () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-      throw new Error("QuotaExceeded");
-    });
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("QuotaExceeded");
+      });
     expect(() => enqueueEvent("/api/foo", {})).not.toThrow();
     setItemSpy.mockRestore();
   });
@@ -108,7 +119,9 @@ describe("flushQueue", () => {
     // Event is still there, still with attempts=0. It would've been
     // dropped after MAX_ATTEMPTS=5 if 401 counted.
     expect(queueSize()).toBe(1);
-    const events = JSON.parse(localStorage.getItem("listen-pending-play-events")!);
+    const events = JSON.parse(
+      localStorage.getItem("listen-pending-play-events")!,
+    );
     expect(events[0].attempts).toBe(0);
   });
 
@@ -118,7 +131,9 @@ describe("flushQueue", () => {
 
     await flushQueue();
 
-    const events = JSON.parse(localStorage.getItem("listen-pending-play-events")!);
+    const events = JSON.parse(
+      localStorage.getItem("listen-pending-play-events")!,
+    );
     // nextRetryAt should still be "now-ish" (not pushed into the future)
     // so the next flush attempt fires immediately.
     const retryAt = Date.parse(events[0].nextRetryAt);
@@ -134,7 +149,9 @@ describe("flushQueue", () => {
     expect(result.failed).toBe(1);
     expect(queueSize()).toBe(1);
 
-    const events = JSON.parse(localStorage.getItem("listen-pending-play-events")!);
+    const events = JSON.parse(
+      localStorage.getItem("listen-pending-play-events")!,
+    );
     expect(events[0].attempts).toBe(1);
     // nextRetryAt should be in the future (~2s backoff on first attempt).
     expect(Date.parse(events[0].nextRetryAt)).toBeGreaterThan(Date.now());
@@ -150,7 +167,10 @@ describe("flushQueue", () => {
       attempts: 4,
       nextRetryAt: new Date(0).toISOString(), // due now
     };
-    localStorage.setItem("listen-pending-play-events", JSON.stringify([oldEvent]));
+    localStorage.setItem(
+      "listen-pending-play-events",
+      JSON.stringify([oldEvent]),
+    );
     mockApiFetch.mockRejectedValue(new Error("still down"));
 
     const result = await flushQueue();
@@ -168,7 +188,10 @@ describe("flushQueue", () => {
       attempts: 1,
       nextRetryAt: new Date(Date.now() + 60_000).toISOString(),
     };
-    localStorage.setItem("listen-pending-play-events", JSON.stringify([futureEvent]));
+    localStorage.setItem(
+      "listen-pending-play-events",
+      JSON.stringify([futureEvent]),
+    );
 
     const result = await flushQueue();
 
@@ -180,7 +203,12 @@ describe("flushQueue", () => {
   it("is idempotent on concurrent calls", async () => {
     enqueueEvent("/api/foo", { a: 1 });
     let resolveFirst: (v: Response) => void = () => {};
-    mockApiFetch.mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }));
+    mockApiFetch.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolveFirst = r;
+        }),
+    );
 
     const first = flushQueue();
     const second = await flushQueue(); // should early-return while first is in flight
@@ -208,9 +236,11 @@ describe("clearQueue", () => {
   });
 
   it("survives localStorage failures gracefully", () => {
-    const spy = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
+    const spy = vi
+      .spyOn(Storage.prototype, "removeItem")
+      .mockImplementation(() => {
+        throw new Error("denied");
+      });
     expect(() => clearQueue()).not.toThrow();
     spy.mockRestore();
   });

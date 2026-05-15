@@ -6,11 +6,29 @@ import mutagen
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 
-from crate.api._deps import COVER_NAMES, artist_name_from_id, artist_name_from_ref, coerce_date, extensions, library_path, safe_path
+from crate.api._deps import (
+    COVER_NAMES,
+    artist_name_from_id,
+    artist_name_from_ref,
+    coerce_date,
+    extensions,
+    library_path,
+)
 from crate.api.auth import _require_auth
-from crate.api.browse_shared import ARTIST_PHOTO_NAMES, build_genre_profile, display_name, fs_artist_detail, fs_build_artists_list, has_library_data
+from crate.api.browse_shared import (
+    ARTIST_PHOTO_NAMES,
+    build_genre_profile,
+    display_name,
+    fs_artist_detail,
+    fs_build_artists_list,
+    has_library_data,
+)
 from crate.api.image_variants import build_image_response
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.browse import (
     ArtistsWithShowsResponse,
     ArtistBrowseListResponse,
@@ -151,7 +169,7 @@ def _show_lineup_artists(show: dict, refs_by_name: dict[str, dict]) -> list[dict
 
 
 def _enrich_similar_artists(similar: list[dict]) -> list[dict]:
-    names = [item.get("name") for item in similar if item.get("name")]
+    names = [str(item.get("name")) for item in similar if item.get("name")]
     if not names:
         return []
 
@@ -229,7 +247,7 @@ def _build_artist_page_payload(
     shows_limit: int,
     stats_window: str,
     stats_limit: int,
-) -> dict:
+) -> dict | JSONResponse:
     cache_key = (
         f"listen:artist_page:{user_id}:{artist_id}:"
         f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
@@ -247,7 +265,9 @@ def _build_artist_page_payload(
         return artist_payload
 
     info_payload = _get_artist_page_info(artist_name)
-    top_tracks_payload = _get_artist_top_tracks_payload(artist_name, count=top_tracks_count)
+    top_tracks_payload = _get_artist_top_tracks_payload(
+        artist_name, count=top_tracks_count
+    )
     shows_payload = _get_artist_page_shows(
         user_id=user_id,
         name=artist_name,
@@ -265,7 +285,9 @@ def _build_artist_page_payload(
     artist_hot_rank = next(
         (
             index + 1
-            for index, item in enumerate(get_top_artists(user_id, window=stats_window, limit=stats_limit))
+            for index, item in enumerate(
+                get_top_artists(user_id, window=stats_window, limit=stats_limit)
+            )
             if item.get("artist_id") == artist_id
         ),
         None,
@@ -302,13 +324,15 @@ def _artist_library_info_payload(name: str) -> dict:
 
     tags = _coerce_json_list(artist.get("tags_json"))
     similar = _coerce_json_list(artist.get("similar_json"))
-    if not any([
-        artist.get("bio"),
-        tags,
-        similar,
-        artist.get("listeners"),
-        artist.get("lastfm_playcount"),
-    ]):
+    if not any(
+        [
+            artist.get("bio"),
+            tags,
+            similar,
+            artist.get("listeners"),
+            artist.get("lastfm_playcount"),
+        ]
+    ):
         return {"similar": []}
 
     return {
@@ -351,7 +375,9 @@ def _format_artist_top_track(row: dict) -> dict:
         "energy": row.get("energy"),
         "danceability": row.get("danceability"),
         "valence": row.get("valence"),
-        "bliss_vector": list(row["bliss_vector"]) if row.get("bliss_vector") is not None else None,
+        "bliss_vector": list(row["bliss_vector"])
+        if row.get("bliss_vector") is not None
+        else None,
     }
 
 
@@ -376,9 +402,17 @@ def _build_artist_top_tracks_payload(
                 break
 
     if len(ranked) < count:
-        remaining = [track for track in all_tracks.values() if track["id"] not in seen_ids]
-        remaining.sort(key=lambda track: (track.get("year") or "0", track.get("track_number") or 0), reverse=True)
-        ranked.extend(remaining[:count - len(ranked)])
+        remaining = [
+            track for track in all_tracks.values() if track["id"] not in seen_ids
+        ]
+        remaining.sort(
+            key=lambda track: (
+                track.get("year") or "0",
+                track.get("track_number") or 0,
+            ),
+            reverse=True,
+        )
+        ranked.extend(remaining[: count - len(ranked)])
 
     return [_format_artist_top_track(row) for row in ranked]
 
@@ -398,7 +432,9 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
     return payload
 
 
-def _get_artist_page_shows(*, user_id: int, name: str, limit: int, country: str) -> dict:
+def _get_artist_page_shows(
+    *, user_id: int, name: str, limit: int, country: str
+) -> dict:
     from crate import setlistfm
     from crate.ticketmaster import is_configured
 
@@ -420,7 +456,11 @@ def _get_artist_page_shows(*, user_id: int, name: str, limit: int, country: str)
         )
         events = [
             {
-                "id": str(show.get("id") or show.get("external_id") or f"{name}-{show.get('date', '')}"),
+                "id": str(
+                    show.get("id")
+                    or show.get("external_id")
+                    or f"{name}-{show.get('date', '')}"
+                ),
                 "show_id": show.get("id"),
                 "artist_name": show.get("artist_name", name),
                 "artist_id": artist_ref.get("id") if artist_ref else None,
@@ -477,7 +517,12 @@ def api_browse_filters(
     countries = get_browse_filter_countries()
     decades = get_browse_filter_decades()
     formats = get_browse_filter_formats()
-    payload = {"genres": genres, "countries": countries, "decades": decades, "formats": formats}
+    payload = {
+        "genres": genres,
+        "countries": countries,
+        "decades": decades,
+        "formats": formats,
+    }
     set_cache(cache_key, payload, ttl=300)
     return payload
 
@@ -505,7 +550,9 @@ def api_artists(
         artists = fs_build_artists_list()
         q_lower = q.lower()
         if q_lower:
-            artists = [artist for artist in artists if q_lower in artist["name"].lower()]
+            artists = [
+                artist for artist in artists if q_lower in artist["name"].lower()
+            ]
         if sort == "albums":
             artists.sort(key=lambda artist: artist["albums"], reverse=True)
         elif sort == "size":
@@ -514,7 +561,12 @@ def api_artists(
             artists.sort(key=lambda artist: artist["name"].lower())
         total = len(artists)
         start = (page - 1) * per_page
-        return {"items": artists[start : start + per_page], "total": total, "page": page, "per_page": per_page}
+        return {
+            "items": artists[start : start + per_page],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
 
     select_cols = """
         la.id,
@@ -560,7 +612,9 @@ def api_artists(
         try:
             decade_start = int(decade.rstrip("s"))
             where_clauses.append("la.formed IS NOT NULL AND length(la.formed) >= 4")
-            where_clauses.append("CAST(substring(la.formed, 1, 4) AS INTEGER) BETWEEN :decade_start AND :decade_end")
+            where_clauses.append(
+                "CAST(substring(la.formed, 1, 4) AS INTEGER) BETWEEN :decade_start AND :decade_end"
+            )
             params["decade_start"] = decade_start
             params["decade_end"] = decade_start + 9
         except (ValueError, TypeError):
@@ -578,21 +632,39 @@ def api_artists(
     order_sql = _artist_browse_order_sql(sort)
 
     total = get_artists_count(joins, where_sql, params)
-    rows = get_artists_page(select_cols, joins, where_sql, order_sql, params, per_page, (page - 1) * per_page)
+    rows = get_artists_page(
+        select_cols,
+        joins,
+        where_sql,
+        order_sql,
+        params,
+        per_page,
+        (page - 1) * per_page,
+    )
 
     issue_counts = get_all_artist_issue_counts()
-    list_genres = get_artist_list_genres_map([row["name"] for row in rows]) if view == "list" else {}
+    list_genres = (
+        get_artist_list_genres_map([row["name"] for row in rows])
+        if view == "list"
+        else {}
+    )
     items = []
     for row in rows:
         item = {
             "id": row.get("id"),
-            "entity_uid": str(row["entity_uid"]) if row.get("entity_uid") is not None else None,
+            "entity_uid": str(row["entity_uid"])
+            if row.get("entity_uid") is not None
+            else None,
             "slug": row.get("slug"),
             "name": row["name"],
             "albums": row["album_count"],
             "tracks": row["track_count"],
-            "total_size_mb": round(row["total_size"] / (1024**2)) if row["total_size"] else 0,
-            "formats": row.get("formats_json") if isinstance(row.get("formats_json"), list) else [],
+            "total_size_mb": round(row["total_size"] / (1024**2))
+            if row["total_size"]
+            else 0,
+            "formats": row.get("formats_json")
+            if isinstance(row.get("formats_json"), list)
+            else [],
             "primary_format": row.get("primary_format"),
             "has_photo": bool(row.get("has_photo")),
             "has_issues": bool(issue_counts.get(row["name"], 0)),
@@ -603,7 +675,9 @@ def api_artists(
         if view == "list":
             item["listeners"] = row.get("listeners") or 0
             item["track_count"] = row["track_count"]
-            item["total_size_mb"] = round(row["total_size"] / (1024**2)) if row["total_size"] else 0
+            item["total_size_mb"] = (
+                round(row["total_size"] / (1024**2)) if row["total_size"] else 0
+            )
             item["genres"] = list_genres.get(row["name"], [])
         items.append(item)
 
@@ -681,7 +755,9 @@ def api_artist_page_by_slug(
     responses=AUTH_ERROR_RESPONSES,
     summary="Get top tracks for an artist by slug",
 )
-def api_artist_top_tracks_by_slug(request: Request, artist_slug: str, count: int = Query(20, ge=1, le=50)):
+def api_artist_top_tracks_by_slug(
+    request: Request, artist_slug: str, count: int = Query(20, ge=1, le=50)
+):
     artist = get_library_artist_by_slug(artist_slug)
     if not artist:
         return JSONResponse([], status_code=200)
@@ -768,7 +844,7 @@ def api_artist_page_by_id(
             shows_limit=shows_limit,
             stats_window=stats_window,
             stats_limit=stats_limit,
-    )
+        )
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     if isinstance(payload, JSONResponse):
@@ -791,7 +867,9 @@ def api_artist_background_by_id(
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return Response(status_code=404)
-    return api_artist_background(request, artist_name, random_pick, size=size, image_format=image_format)
+    return api_artist_background(
+        request, artist_name, random_pick, size=size, image_format=image_format
+    )
 
 
 @router.get(
@@ -809,7 +887,9 @@ def api_artist_background_by_entity_uid(
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if not artist:
         return Response(status_code=404)
-    return api_artist_background(request, artist["name"], random_pick, size=size, image_format=image_format)
+    return api_artist_background(
+        request, artist["name"], random_pick, size=size, image_format=image_format
+    )
 
 
 @router.get(
@@ -818,7 +898,9 @@ def api_artist_background_by_entity_uid(
     responses=AUTH_ERROR_RESPONSES,
     summary="Get top tracks for an artist",
 )
-def api_artist_top_tracks(request: Request, artist_id: int, count: int = Query(20, ge=1, le=50)):
+def api_artist_top_tracks(
+    request: Request, artist_id: int, count: int = Query(20, ge=1, le=50)
+):
     """Top tracks for an artist. Uses Last.fm global popularity to rank,
     matched against tracks in the local library. Falls back to local play
     counts if Last.fm data doesn't match, then to album track order."""
@@ -836,7 +918,9 @@ def api_artist_top_tracks(request: Request, artist_id: int, count: int = Query(2
     responses=AUTH_ERROR_RESPONSES,
     summary="Get top tracks for an artist by entity UID",
 )
-def api_artist_top_tracks_by_entity_uid(request: Request, artist_entity_uid: str, count: int = Query(20, ge=1, le=50)):
+def api_artist_top_tracks_by_entity_uid(
+    request: Request, artist_entity_uid: str, count: int = Query(20, ge=1, le=50)
+):
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if not artist:
         return JSONResponse([], status_code=200)
@@ -858,7 +942,9 @@ def api_artist_photo_by_id(
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return Response(status_code=404)
-    return api_artist_photo(request, artist_name, random_pick, size=size, image_format=image_format)
+    return api_artist_photo(
+        request, artist_name, random_pick, size=size, image_format=image_format
+    )
 
 
 @router.get(
@@ -876,7 +962,9 @@ def api_artist_photo_by_entity_uid(
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if not artist:
         return Response(status_code=404)
-    return api_artist_photo(request, artist["name"], random_pick, size=size, image_format=image_format)
+    return api_artist_photo(
+        request, artist["name"], random_pick, size=size, image_format=image_format
+    )
 
 
 @router.get(
@@ -911,7 +999,9 @@ def api_artist_info_by_entity_uid(request: Request, artist_entity_uid: str):
     responses=_BROWSE_RESPONSES,
     summary="Get upcoming shows for an artist",
 )
-def api_artist_shows_by_id(request: Request, artist_id: int, limit: int = Query(10), country: str = Query("")):
+def api_artist_shows_by_id(
+    request: Request, artist_id: int, limit: int = Query(10), country: str = Query("")
+):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -1033,7 +1123,9 @@ def api_artist_network_by_id(request: Request, artist_id: int, depth: int = 2):
     responses=_BROWSE_RESPONSES,
     summary="Get the related-artist network for an artist by entity UID",
 )
-def api_artist_network_by_entity_uid(request: Request, artist_entity_uid: str, depth: int = 2):
+def api_artist_network_by_entity_uid(
+    request: Request, artist_entity_uid: str, depth: int = 2
+):
     artist = get_library_artist_by_entity_uid(artist_entity_uid)
     if not artist:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -1051,13 +1143,22 @@ def api_artist_background(
     _require_auth(request)
     import random as _random
 
-    from crate.lastfm import _deezer_artist_image, download_artist_image, get_fanart_all_images, get_fanart_background
+    from crate.lastfm import (
+        _deezer_artist_image,
+        download_artist_image,
+        get_fanart_all_images,
+        get_fanart_background,
+    )
 
-    _IMG_CACHE = {"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"}
+    _IMG_CACHE = {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+    }
 
     lib = library_path()
     artist_row = get_library_artist(name)
-    artist_dir = resolve_artist_dir(lib, artist_row, fallback_name=name, existing_only=True)
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=name, existing_only=True
+    )
     if artist_dir and artist_dir.is_dir():
         bg_file = artist_dir / "background.jpg"
         if bg_file.exists():
@@ -1075,32 +1176,60 @@ def api_artist_background(
         url = _random.choice(backgrounds) if random_pick else backgrounds[0]
         image_data = download_artist_image(url)
         if image_data:
-            return build_image_response(image_data, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+            return build_image_response(
+                image_data,
+                "image/jpeg",
+                size=size,
+                output_format=image_format,
+                headers=_IMG_CACHE,
+            )
 
     url = get_fanart_background(name)
     if url:
         image_data = download_artist_image(url)
         if image_data:
-            return build_image_response(image_data, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+            return build_image_response(
+                image_data,
+                "image/jpeg",
+                size=size,
+                output_format=image_format,
+                headers=_IMG_CACHE,
+            )
 
     from crate.lastfm import get_lastfm_best_background
 
     lfm_bg = get_lastfm_best_background(name)
     if lfm_bg:
-        return build_image_response(lfm_bg, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+        return build_image_response(
+            lfm_bg,
+            "image/jpeg",
+            size=size,
+            output_format=image_format,
+            headers=_IMG_CACHE,
+        )
 
     deezer_url = _deezer_artist_image(name)
     if deezer_url:
         image_data = download_artist_image(deezer_url)
         if image_data:
-            return build_image_response(image_data, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+            return build_image_response(
+                image_data,
+                "image/jpeg",
+                size=size,
+                output_format=image_format,
+                headers=_IMG_CACHE,
+            )
 
     try:
         from crate.spotify import search_artist as spotify_search
 
         spotify_artist = spotify_search(name)
         if spotify_artist and spotify_artist.get("images"):
-            img_url = spotify_artist["images"][0].get("url") if spotify_artist["images"] else None
+            img_url = (
+                spotify_artist["images"][0].get("url")
+                if spotify_artist["images"]
+                else None
+            )
             if img_url:
                 image_data = download_artist_image(img_url)
                 if image_data:
@@ -1119,7 +1248,12 @@ def api_artist_background(
             photo = artist_dir / photo_name
             if photo.exists():
                 media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
-                return build_image_response(photo.read_bytes(), media_type, size=size, output_format=image_format)
+                return build_image_response(
+                    photo.read_bytes(),
+                    media_type,
+                    size=size,
+                    output_format=image_format,
+                )
 
     return Response(status_code=404)
 
@@ -1134,11 +1268,17 @@ def api_artist_photo(
     _require_auth(request)
     import random as _random
 
-    from crate.lastfm import download_artist_image, get_fanart_all_images, get_best_artist_image
+    from crate.lastfm import (
+        download_artist_image,
+        get_fanart_all_images,
+        get_best_artist_image,
+    )
 
     lib = library_path()
     artist_row = get_library_artist(name)
-    artist_dir = resolve_artist_dir(lib, artist_row, fallback_name=name, existing_only=True)
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=name, existing_only=True
+    )
     if not artist_dir or not artist_dir.is_dir():
         return Response(status_code=404)
 
@@ -1151,10 +1291,14 @@ def api_artist_photo(
                 media_type,
                 size=size,
                 output_format=image_format,
-                headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"},
+                headers={
+                    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+                },
             )
 
-    _IMG_CACHE = {"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"}
+    _IMG_CACHE = {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+    }
 
     if random_pick:
         fanart = get_fanart_all_images(name)
@@ -1163,7 +1307,13 @@ def api_artist_photo(
             url = _random.choice(thumbs)
             image_data = download_artist_image(url)
             if image_data:
-                return build_image_response(image_data, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+                return build_image_response(
+                    image_data,
+                    "image/jpeg",
+                    size=size,
+                    output_format=image_format,
+                    headers=_IMG_CACHE,
+                )
 
     image_data = get_best_artist_image(name)
     if image_data:
@@ -1172,7 +1322,13 @@ def api_artist_photo(
             save_path.write_bytes(image_data)
         except OSError:
             pass
-        return build_image_response(image_data, "image/jpeg", size=size, output_format=image_format, headers=_IMG_CACHE)
+        return build_image_response(
+            image_data,
+            "image/jpeg",
+            size=size,
+            output_format=image_format,
+            headers=_IMG_CACHE,
+        )
 
     exts = extensions()
     for album_dir in sorted(artist_dir.iterdir()):
@@ -1191,15 +1347,23 @@ def api_artist_photo(
                 )
         tracks = get_audio_files(album_dir, exts)
         if tracks:
-            audio = mutagen.File(tracks[0])
+            audio = getattr(mutagen, "File")(tracks[0])
             if audio and hasattr(audio, "pictures") and audio.pictures:
                 pic = audio.pictures[0]
-                return build_image_response(pic.data, pic.mime, size=size, output_format=image_format, headers=_IMG_CACHE)
+                return build_image_response(
+                    pic.data,
+                    pic.mime,
+                    size=size,
+                    output_format=image_format,
+                    headers=_IMG_CACHE,
+                )
             if audio and hasattr(audio, "tags") and audio.tags:
                 for key in audio.tags:
                     if isinstance(key, str) and key.startswith("APIC"):
                         pic = audio.tags[key]
-                        return build_image_response(pic.data, pic.mime, size=size, output_format=image_format)
+                        return build_image_response(
+                            pic.data, pic.mime, size=size, output_format=image_format
+                        )
         break
 
     return Response(status_code=404)
@@ -1237,7 +1401,11 @@ def api_artist_shows(request: Request, name: str, limit: int = 10, country: str 
         )
         events = [
             {
-                "id": str(show.get("id") or show.get("external_id") or f"{name}-{show.get('date', '')}"),
+                "id": str(
+                    show.get("id")
+                    or show.get("external_id")
+                    or f"{name}-{show.get('date', '')}"
+                ),
                 "show_id": show.get("id"),
                 "artist_name": show.get("artist_name", name),
                 "artist_id": artist_ref.get("id") if artist_ref else None,
@@ -1273,7 +1441,11 @@ def api_artist_shows(request: Request, name: str, limit: int = 10, country: str 
     for show in events:
         normalized.append(
             {
-                "id": str(show.get("id") or show.get("external_id") or f"{name}-{show.get('date', '')}"),
+                "id": str(
+                    show.get("id")
+                    or show.get("external_id")
+                    or f"{name}-{show.get('date', '')}"
+                ),
                 "show_id": show.get("id"),
                 "artist_name": show.get("artist_name", name),
                 "artist_id": artist_ref.get("id") if artist_ref else None,
@@ -1364,7 +1536,9 @@ def api_shows_list(request: Request, city: str = "", country: str = ""):
         [
             artist_name
             for show in shows
-            for artist_name in ([show.get("artist_name")] + list(show.get("lineup") or []))
+            for artist_name in (
+                [show.get("artist_name")] + list(show.get("lineup") or [])
+            )
             if artist_name
         ]
     )
@@ -1379,7 +1553,10 @@ def api_shows_list(request: Request, city: str = "", country: str = ""):
                 "lineup_artists": _show_lineup_artists(show, refs_by_name),
             }
         )
-    return {"shows": enriched_shows, "filters": {"cities": get_show_cities(), "countries": get_show_countries()}}
+    return {
+        "shows": enriched_shows,
+        "filters": {"cities": get_show_cities(), "countries": get_show_countries()},
+    }
 
 
 def api_artist_enrich(request: Request, name: str):
@@ -1445,7 +1622,9 @@ def api_artist_setlist_playable(request: Request, name: str):
                 "energy": match.get("energy"),
                 "danceability": match.get("danceability"),
                 "valence": match.get("valence"),
-                "bliss_vector": list(match["bliss_vector"]) if match.get("bliss_vector") is not None else None,
+                "bliss_vector": list(match["bliss_vector"])
+                if match.get("bliss_vector") is not None
+                else None,
                 "setlist_title": song.get("title", ""),
                 "position": song.get("position"),
             }
@@ -1499,7 +1678,9 @@ def api_upcoming(request: Request):
         [
             artist_name
             for show in shows
-            for artist_name in ([show.get("artist_name")] + list(show.get("lineup") or []))
+            for artist_name in (
+                [show.get("artist_name")] + list(show.get("lineup") or [])
+            )
             if artist_name
         ]
     )
@@ -1508,7 +1689,9 @@ def api_upcoming(request: Request):
             {
                 artist_name
                 for show in shows
-                for artist_name in ([show.get("artist_name")] + list(show.get("lineup") or []))
+                for artist_name in (
+                    [show.get("artist_name")] + list(show.get("lineup") or [])
+                )
                 if artist_name
             }
         ),
@@ -1528,7 +1711,9 @@ def api_upcoming(request: Request):
                 "artist_id": artist_ref.get("id") if artist_ref else None,
                 "artist_slug": artist_ref.get("slug") if artist_ref else None,
                 "title": show.get("venue") or "",
-                "subtitle": f"{show.get('city', '')}, {show.get('country', '')}".strip(", "),
+                "subtitle": f"{show.get('city', '')}, {show.get('country', '')}".strip(
+                    ", "
+                ),
                 "cover_url": show.get("image_url"),
                 "status": show.get("status", "onsale"),
                 "url": show.get("url"),
@@ -1610,7 +1795,9 @@ def api_artist(request: Request, name: str):
                 "formats": album.get("formats", []),
                 "bit_depth": album_quality.get(album["id"], {}).get("bit_depth"),
                 "sample_rate": album_quality.get(album["id"], {}).get("sample_rate"),
-                "size_mb": round(album["total_size"] / (1024**2)) if album["total_size"] else 0,
+                "size_mb": round(album["total_size"] / (1024**2))
+                if album["total_size"]
+                else 0,
                 "year": album.get("year", ""),
                 "has_cover": bool(album.get("has_cover")),
                 "musicbrainz_albumid": album.get("musicbrainz_albumid"),
@@ -1621,6 +1808,7 @@ def api_artist(request: Request, name: str):
         )
 
     from crate.storage_layout import looks_like_entity_uid
+
     folder_name = artist.get("folder_name") or ""
     is_v2 = bool(folder_name and looks_like_entity_uid(folder_name))
 
@@ -1632,7 +1820,9 @@ def api_artist(request: Request, name: str):
         "updated_at": artist.get("updated_at"),
         "albums": albums,
         "total_tracks": artist["track_count"],
-        "total_size_mb": round(artist["total_size"] / (1024**2)) if artist["total_size"] else 0,
+        "total_size_mb": round(artist["total_size"] / (1024**2))
+        if artist["total_size"]
+        else 0,
         "primary_format": artist.get("primary_format"),
         "genres": top_genres,
         "genre_profile": genre_profile,

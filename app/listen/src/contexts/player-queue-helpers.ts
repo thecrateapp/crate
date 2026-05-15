@@ -12,7 +12,10 @@ export function shouldRestartTrackBeforePrev(params: {
   currentTimeSeconds: number;
   justRestartedCurrentTrack: boolean;
 }): boolean {
-  return params.currentTimeSeconds > PREV_RESTART_THRESHOLD_SECONDS && !params.justRestartedCurrentTrack;
+  return (
+    params.currentTimeSeconds > PREV_RESTART_THRESHOLD_SECONDS &&
+    !params.justRestartedCurrentTrack
+  );
 }
 
 export function shuffleKeepingCurrent<T>(queue: T[], pinnedIndex: number): T[] {
@@ -20,7 +23,10 @@ export function shuffleKeepingCurrent<T>(queue: T[], pinnedIndex: number): T[] {
   const others = queue.filter((_, index) => index !== pinnedIndex);
   for (let index = others.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
-    [others[index], others[randomIndex]] = [others[randomIndex]!, others[index]!];
+    [others[index], others[randomIndex]] = [
+      others[randomIndex]!,
+      others[index]!,
+    ];
   }
   return pinned ? [pinned, ...others] : others;
 }

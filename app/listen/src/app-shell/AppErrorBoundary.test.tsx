@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AppErrorBoundary } from "@/app-shell/AppErrorBoundary";
+import { AppErrorBoundary } from "@crate/ui/primitives/AppErrorBoundary";
 
 function ThrowingChild() {
   throw new Error("boundary blew up");

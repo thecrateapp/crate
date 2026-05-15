@@ -59,8 +59,20 @@ export interface OpsAnalyticsSnapshot {
 export interface OpsLiveActivity {
   engine?: string;
   queue_breakdown: {
-    running: { fast: number; default: number; heavy: number; maintenance: number; playback: number };
-    pending: { fast: number; default: number; heavy: number; maintenance: number; playback: number };
+    running: {
+      fast: number;
+      default: number;
+      heavy: number;
+      maintenance: number;
+      playback: number;
+    };
+    pending: {
+      fast: number;
+      default: number;
+      heavy: number;
+      maintenance: number;
+      playback: number;
+    };
   };
   db_heavy_gate: {
     active: number;
@@ -87,7 +99,12 @@ export interface OpsLiveActivity {
     started_at?: string | null;
     updated_at?: string | null;
   }[];
-  recent_tasks: { id: string; type: string; status: string; updated_at: string }[];
+  recent_tasks: {
+    id: string;
+    type: string;
+    status: string;
+    updated_at: string;
+  }[];
   worker_slots: { max: number; active: number };
   systems: {
     postgres: boolean;
@@ -255,12 +272,18 @@ export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
     const request = (async () => {
       try {
         const query = fresh ? "?fresh=1" : "";
-        const snapshot = await api<OpsSnapshotData>(`/api/admin/ops-snapshot${query}`);
+        const snapshot = await api<OpsSnapshotData>(
+          `/api/admin/ops-snapshot${query}`,
+        );
         setData(snapshot);
         setError(null);
         hasLoadedRef.current = true;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load operational snapshot");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load operational snapshot",
+        );
       } finally {
         setLoading(false);
         inflightRefreshRef.current = null;
@@ -280,7 +303,9 @@ export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
 
     function connect() {
       if (disposed) return;
-      stream = new EventSource("/api/admin/ops-stream", { withCredentials: true });
+      stream = new EventSource("/api/admin/ops-stream", {
+        withCredentials: true,
+      });
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as OpsSnapshotData;
@@ -332,14 +357,21 @@ export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
-  const value = useMemo<OpsSnapshotContextValue>(() => ({
-    data,
-    loading,
-    error,
-    refresh,
-  }), [data, error, loading, refresh]);
+  const value = useMemo<OpsSnapshotContextValue>(
+    () => ({
+      data,
+      loading,
+      error,
+      refresh,
+    }),
+    [data, error, loading, refresh],
+  );
 
-  return <OpsSnapshotContext.Provider value={value}>{children}</OpsSnapshotContext.Provider>;
+  return (
+    <OpsSnapshotContext.Provider value={value}>
+      {children}
+    </OpsSnapshotContext.Provider>
+  );
 }
 
 export function useOpsSnapshot() {

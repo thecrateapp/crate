@@ -2,8 +2,17 @@ import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 
-import type { CuratedPlaylist, GlobalArtist, LibraryAddition } from "./home-model";
-import { FeaturedPlaylistCard, SectionHeader, SectionLoading, SectionRail } from "./HomeSections";
+import type {
+  CuratedPlaylist,
+  GlobalArtist,
+  LibraryAddition,
+} from "./home-model";
+import {
+  FeaturedPlaylistCard,
+  SectionHeader,
+  SectionLoading,
+  SectionRail,
+} from "./HomeSections";
 
 export function FromCrateSection({
   playlists,
@@ -37,11 +46,15 @@ export function FromCrateSection({
               description={playlist.description}
               coverDataUrl={playlist.cover_data_url}
               tracks={playlist.artwork_tracks}
-              meta={`${playlist.track_count} tracks${playlist.category ? ` · ${playlist.category}` : ""}`}
+              meta={`${playlist.track_count} tracks${
+                playlist.category ? ` · ${playlist.category}` : ""
+              }`}
               href={`/curation/playlist/${playlist.id}`}
               isFollowed={playlist.is_followed}
               onPlay={() => onPlayPlaylist(playlist.id, playlist.name)}
-              onToggleFollow={() => onToggleFollow(playlist.id, playlist.is_followed)}
+              onToggleFollow={() =>
+                onToggleFollow(playlist.id, playlist.is_followed)
+              }
               onClick={() => onOpenPlaylist(playlist.id)}
             />
           ))}
@@ -67,7 +80,11 @@ export function HomeLibrarySection({
   additions: LibraryAddition[];
   loading: boolean;
   onOpenLibrary: () => void;
-  onPlayPlaylist: (playlistId: number, isSystem: boolean, playlistName: string) => void;
+  onPlayPlaylist: (
+    playlistId: number,
+    isSystem: boolean,
+    playlistName: string,
+  ) => void;
   onToggleSystemPlaylistFollow: (playlistId: number) => void;
   onOpenPlaylist: (playlistId: number) => void;
   onOpenSystemPlaylist: (playlistId: number) => void;
@@ -93,7 +110,11 @@ export function HomeLibrarySection({
             ) {
               const isSystem = item.type === "system_playlist";
               const playlistMeta = isSystem
-                ? `${item.playlist_track_count || 0} tracks${item.playlist_follower_count != null ? ` · ${item.playlist_follower_count} followers` : ""}`
+                ? `${item.playlist_track_count || 0} tracks${
+                    item.playlist_follower_count != null
+                      ? ` · ${item.playlist_follower_count} followers`
+                      : ""
+                  }`
                 : `${item.playlist_track_count || 0} tracks`;
               return (
                 <PlaylistCard
@@ -109,8 +130,18 @@ export function HomeLibrarySection({
                   crateManaged={isSystem}
                   isFollowed={isSystem}
                   badge={isSystem ? undefined : item.playlist_badge}
-                  href={isSystem ? `/curation/playlist/${item.playlist_id}` : `/playlist/${item.playlist_id}`}
-                  onPlay={() => onPlayPlaylist(item.playlist_id!, isSystem, item.playlist_name!)}
+                  href={
+                    isSystem
+                      ? `/curation/playlist/${item.playlist_id}`
+                      : `/playlist/${item.playlist_id}`
+                  }
+                  onPlay={() =>
+                    onPlayPlaylist(
+                      item.playlist_id!,
+                      isSystem,
+                      item.playlist_name!,
+                    )
+                  }
                   onToggleFollow={
                     isSystem
                       ? () => onToggleSystemPlaylistFollow(item.playlist_id!)
@@ -185,7 +216,9 @@ export function JustLandedSection({
                     artistId={artist.id}
                     artistEntityUid={artist.entity_uid}
                     artistSlug={artist.slug}
-                    subtitle={`${albumCount} album${albumCount === 1 ? "" : "s"} · ${trackCount} tracks`}
+                    subtitle={`${albumCount} album${
+                      albumCount === 1 ? "" : "s"
+                    } · ${trackCount} tracks`}
                   />
                 );
               })}
@@ -202,7 +235,9 @@ export function JustLandedSection({
                   artistId={artist.id}
                   artistEntityUid={artist.entity_uid}
                   artistSlug={artist.slug}
-                  subtitle={`${albumCount} album${albumCount === 1 ? "" : "s"} · ${trackCount} tracks`}
+                  subtitle={`${albumCount} album${
+                    albumCount === 1 ? "" : "s"
+                  } · ${trackCount} tracks`}
                   layout="grid"
                   fillGrid
                 />

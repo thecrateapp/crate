@@ -34,9 +34,15 @@ def upgrade() -> None:
         )
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_sidecar ON album_portable_metadata(sidecar_written_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_tags ON album_portable_metadata(audio_tags_written_at DESC)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_sidecar ON album_portable_metadata(sidecar_written_at DESC)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_tags ON album_portable_metadata(audio_tags_written_at DESC)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)"
+    )
 
 
 def downgrade() -> None:

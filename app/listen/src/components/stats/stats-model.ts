@@ -154,7 +154,9 @@ export function buildRecapHighlights(
   if (overview?.top_artist?.artist_name) {
     highlights.push({
       title: `${overview.top_artist.artist_name} led this window`,
-      body: `${overview.top_artist.play_count} plays and ${formatStatsMinutes(overview.top_artist.minutes_listened)} listened.`,
+      body: `${overview.top_artist.play_count} plays and ${formatStatsMinutes(
+        overview.top_artist.minutes_listened,
+      )} listened.`,
     });
   }
 
@@ -181,7 +183,11 @@ export function buildRecapHighlights(
   if (replay?.track_count && replay.track_count > 0) {
     highlights.push({
       title: `${replay.track_count} tracks define this replay`,
-      body: `${topArtists.length ? `Spread across ${Math.min(topArtists.length, 8)} key artists.` : "A first replay object is ready to play."}`,
+      body: `${
+        topArtists.length
+          ? `Spread across ${Math.min(topArtists.length, 8)} key artists.`
+          : "A first replay object is ready to play."
+      }`,
     });
   }
 

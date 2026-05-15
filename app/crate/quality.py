@@ -41,78 +41,93 @@ def quality_report(library_path: Path, extensions: set[str]) -> dict:
                 album_formats.add(fmt)
 
                 try:
-                    info = mutagen.File(track)
+                    mutagen_file = getattr(mutagen, "File")
+                    info = mutagen_file(track)
                     if info is None:
-                        corrupt.append({
-                            "artist": artist_dir.name,
-                            "album": album_dir.name,
-                            "file": track.name,
-                            "reason": "Cannot read file",
-                        })
+                        corrupt.append(
+                            {
+                                "artist": artist_dir.name,
+                                "album": album_dir.name,
+                                "file": track.name,
+                                "reason": "Cannot read file",
+                            }
+                        )
                         continue
 
                     # Check for corrupt: no length or zero length
                     length = getattr(info.info, "length", 0)
                     if not length or length < 1:
-                        corrupt.append({
-                            "artist": artist_dir.name,
-                            "album": album_dir.name,
-                            "file": track.name,
-                            "reason": f"Zero/invalid duration ({length:.1f}s)",
-                        })
+                        corrupt.append(
+                            {
+                                "artist": artist_dir.name,
+                                "album": album_dir.name,
+                                "file": track.name,
+                                "reason": f"Zero/invalid duration ({length:.1f}s)",
+                            }
+                        )
                         continue
 
                     # Low bitrate check (only for lossy formats)
                     if fmt in LOSSY:
                         bitrate = getattr(info.info, "bitrate", 0)
                         if bitrate and bitrate < 192000:
-                            low_bitrate.append({
-                                "artist": artist_dir.name,
-                                "album": album_dir.name,
-                                "file": track.name,
-                                "format": fmt,
-                                "bitrate_kbps": bitrate // 1000,
-                            })
+                            low_bitrate.append(
+                                {
+                                    "artist": artist_dir.name,
+                                    "album": album_dir.name,
+                                    "file": track.name,
+                                    "format": fmt,
+                                    "bitrate_kbps": bitrate // 1000,
+                                }
+                            )
 
                 except Exception as e:
-                    corrupt.append({
-                        "artist": artist_dir.name,
-                        "album": album_dir.name,
-                        "file": track.name,
-                        "reason": str(e),
-                    })
+                    corrupt.append(
+                        {
+                            "artist": artist_dir.name,
+                            "album": album_dir.name,
+                            "file": track.name,
+                            "reason": str(e),
+                        }
+                    )
 
             # Mixed format album
             if len(album_formats) > 1:
-                mixed_format_albums.append({
-                    "artist": artist_dir.name,
-                    "album": album_dir.name,
-                    "formats": sorted(album_formats),
-                    "track_count": len(tracks),
-                })
+                mixed_format_albums.append(
+                    {
+                        "artist": artist_dir.name,
+                        "album": album_dir.name,
+                        "formats": sorted(album_formats),
+                        "track_count": len(tracks),
+                    }
+                )
 
             tags = read_tags(tracks[0])
             album_name = _normalize_album(tags.get("album", "") or album_dir.name)
-            album_versions.setdefault(album_name, []).append({
-                "dir": album_dir.name,
-                "formats": album_formats,
-                "track_count": len(tracks),
-                "has_lossless": bool(album_formats & LOSSLESS),
-                "has_lossy": bool(album_formats & LOSSY),
-            })
+            album_versions.setdefault(album_name, []).append(
+                {
+                    "dir": album_dir.name,
+                    "formats": album_formats,
+                    "track_count": len(tracks),
+                    "has_lossless": bool(album_formats & LOSSLESS),
+                    "has_lossy": bool(album_formats & LOSSY),
+                }
+            )
 
         for versions in album_versions.values():
             has_any_lossless = any(v["has_lossless"] for v in versions)
             for v in versions:
                 if v["has_lossy"] and not v["has_lossless"] and has_any_lossless:
-                    lossy_with_lossless.append({
-                        "artist": artist_dir.name,
-                        "lossy_album": v["dir"],
-                        "lossy_formats": sorted(v["formats"] & LOSSY),
-                        "lossless_album": next(
-                            x["dir"] for x in versions if x["has_lossless"]
-                        ),
-                    })
+                    lossy_with_lossless.append(
+                        {
+                            "artist": artist_dir.name,
+                            "lossy_album": v["dir"],
+                            "lossy_formats": sorted(v["formats"] & LOSSY),
+                            "lossless_album": next(
+                                x["dir"] for x in versions if x["has_lossless"]
+                            ),
+                        }
+                    )
 
     return {
         "low_bitrate": low_bitrate,
@@ -128,6 +143,7 @@ def quality_report(library_path: Path, extensions: set[str]) -> dict:
 
 def _normalize_album(name: str) -> str:
     import re
+
     name = name.lower().strip()
     name = re.sub(r"\s*\(.*?\)\s*", "", name)
     name = re.sub(r"\s*\[.*?\]\s*", "", name)

@@ -80,10 +80,14 @@ def infer_format(source_format: str | None, source_path: str | Path) -> str:
     return "aac" if suffix == "m4a" else suffix
 
 
-def decide_delivery(track: dict, source_path: str | Path, requested_policy: str | None) -> DeliveryDecision:
+def decide_delivery(
+    track: dict, source_path: str | Path, requested_policy: str | None
+) -> DeliveryDecision:
     policy = normalize_policy(requested_policy)
     if policy == ORIGINAL_POLICY:
-        return DeliveryDecision(policy, ORIGINAL_POLICY, True, None, "original_requested")
+        return DeliveryDecision(
+            policy, ORIGINAL_POLICY, True, None, "original_requested"
+        )
 
     preset = PRESETS[policy]
     source_format = infer_format(track.get("format"), source_path)
@@ -92,13 +96,26 @@ def decide_delivery(track: dict, source_path: str | Path, requested_policy: str 
 
     if source_format in MOBILE_FRIENDLY_FORMATS:
         if source_bitrate_kbps is None:
-            return DeliveryDecision(policy, ORIGINAL_POLICY, True, None, "mobile_friendly_unknown_bitrate")
-        if source_bitrate_kbps <= preset.max_source_bitrate_kbps and source_sample_rate <= 48_000:
-            return DeliveryDecision(policy, ORIGINAL_POLICY, True, None, "source_already_within_policy")
+            return DeliveryDecision(
+                policy, ORIGINAL_POLICY, True, None, "mobile_friendly_unknown_bitrate"
+            )
+        if (
+            source_bitrate_kbps <= preset.max_source_bitrate_kbps
+            and source_sample_rate <= 48_000
+        ):
+            return DeliveryDecision(
+                policy, ORIGINAL_POLICY, True, None, "source_already_within_policy"
+            )
 
     if source_format and source_format not in LOSSLESS_FORMATS and source_bitrate_kbps:
         if source_bitrate_kbps <= preset.bitrate_kbps:
-            return DeliveryDecision(policy, ORIGINAL_POLICY, True, None, "lossy_source_not_larger_than_target")
+            return DeliveryDecision(
+                policy,
+                ORIGINAL_POLICY,
+                True,
+                None,
+                "lossy_source_not_larger_than_target",
+            )
 
     return DeliveryDecision(policy, policy, False, preset, "transcode_required")
 

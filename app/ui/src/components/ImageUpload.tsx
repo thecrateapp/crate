@@ -10,7 +10,12 @@ interface ImageUploadProps {
   onUploaded?: () => void;
 }
 
-export function ImageUpload({ endpoint, label = "Upload Image", accept = "image/*", onUploaded }: ImageUploadProps) {
+export function ImageUpload({
+  endpoint,
+  label = "Upload Image",
+  accept = "image/*",
+  onUploaded,
+}: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -23,12 +28,18 @@ export function ImageUpload({ endpoint, label = "Upload Image", accept = "image/
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(endpoint, { method: "POST", body: form, credentials: "include" });
+      const res = await fetch(endpoint, {
+        method: "POST",
+        body: form,
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(await res.text());
       toast.success("Image uploaded");
       onUploaded?.();
     } catch (e) {
-      toast.error(`Upload failed: ${e instanceof Error ? e.message : "Unknown"}`);
+      toast.error(
+        `Upload failed: ${e instanceof Error ? e.message : "Unknown"}`,
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -42,7 +53,9 @@ export function ImageUpload({ endpoint, label = "Upload Image", accept = "image/
         type="file"
         accept={accept}
         className="hidden"
-        onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }}
+        onChange={(e) => {
+          if (e.target.files?.[0]) handleFile(e.target.files[0]);
+        }}
       />
       <Button
         size="sm"
@@ -50,7 +63,11 @@ export function ImageUpload({ endpoint, label = "Upload Image", accept = "image/
         disabled={uploading}
         onClick={() => inputRef.current?.click()}
       >
-        {uploading ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
+        {uploading ? (
+          <Loader2 size={14} className="animate-spin mr-1" />
+        ) : (
+          <Upload size={14} className="mr-1" />
+        )}
         {label}
       </Button>
     </>

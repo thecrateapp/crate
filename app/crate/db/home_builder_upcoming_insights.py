@@ -5,14 +5,18 @@ from datetime import datetime, timezone
 from crate.db.home_builder_shared import _coerce_date
 
 
-def _build_upcoming_insights_home(user_id: int, shows: list[dict], attending_show_ids: set[int]) -> list[dict]:
+def _build_upcoming_insights_home(
+    user_id: int, shows: list[dict], attending_show_ids: set[int]
+) -> list[dict]:
     from crate.db.queries.shows import get_show_reminders
     from crate.db.queries.user_library import get_top_artists
 
     if not shows:
         return []
 
-    reminders = get_show_reminders(user_id, [show["id"] for show in shows if show.get("id") is not None])
+    reminders = get_show_reminders(
+        user_id, [show["id"] for show in shows if show.get("id") is not None]
+    )
     reminder_keys = {(row["show_id"], row["reminder_type"]) for row in reminders}
     hot_artists = {
         row["artist_name"]
@@ -69,7 +73,11 @@ def _build_upcoming_insights_home(user_id: int, shows: list[dict], attending_sho
                 }
             )
 
-        if has_setlist and days_until <= 30 and (show_id, "show_prep") not in reminder_keys:
+        if (
+            has_setlist
+            and days_until <= 30
+            and (show_id, "show_prep") not in reminder_keys
+        ):
             insights.append(
                 {
                     "type": "show_prep",

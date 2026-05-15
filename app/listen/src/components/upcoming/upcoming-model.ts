@@ -90,10 +90,17 @@ export function artistShowToUpcomingItem(show: ArtistShowEvent): UpcomingItem {
 }
 
 export function itemKey(item: UpcomingItem, index: number): string {
-  return item.event_key || `${item.type}-${item.artist}-${item.release_id ?? item.venue ?? index}-${item.date}-${item.time ?? ""}`;
+  return (
+    item.event_key ||
+    `${item.type}-${item.artist}-${item.release_id ?? item.venue ?? index}-${
+      item.date
+    }-${item.time ?? ""}`
+  );
 }
 
-export function groupByMonth(items: UpcomingItem[]): [string, UpcomingItem[]][] {
+export function groupByMonth(
+  items: UpcomingItem[],
+): [string, UpcomingItem[]][] {
   const groups = new Map<string, UpcomingItem[]>();
   for (const item of items) {
     const month = (item.date || "").slice(0, 7) || "Unknown";

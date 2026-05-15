@@ -1,15 +1,12 @@
 """Tests for crate.library_sync — filesystem-to-DB synchronization."""
 
-import os
 import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 def _create_test_library(base: Path):
@@ -34,7 +31,9 @@ def _create_test_library(base: Path):
     return base
 
 
-def _fake_upsert_scanned_album(*, artist_payload: dict, album_payload: dict, track_payloads: list[dict]):
+def _fake_upsert_scanned_album(
+    *, artist_payload: dict, album_payload: dict, track_payloads: list[dict]
+):
     return artist_payload["name"], 1, {track["path"] for track in track_payloads}
 
 
@@ -52,27 +51,40 @@ class TestLibrarySyncFullSync:
             }
 
             # Mock all DB calls
-            with patch("crate.library_sync.get_library_artist", return_value=None), \
-                 patch("crate.library_sync.get_library_albums", return_value=[]), \
-                 patch("crate.library_sync.get_library_artists", return_value=([], 0)), \
-                 patch("crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.delete_artist"), \
-                 patch("crate.library_sync.delete_album"), \
-                 patch("crate.library_sync.mutagen.File", return_value=None), \
-                 patch("crate.library_sync.read_tags", return_value={}):
-
+            with (
+                patch("crate.library_sync.get_library_artist", return_value=None),
+                patch("crate.library_sync.get_library_albums", return_value=[]),
+                patch("crate.library_sync.get_library_artists", return_value=([], 0)),
+                patch(
+                    "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.delete_artist"),
+                patch("crate.library_sync.delete_album"),
+                patch("crate.library_sync.mutagen.File", return_value=None),
+                patch("crate.library_sync.read_tags", return_value={}),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.full_sync()
 
                 assert result["artists_added"] == 2
                 # 3 albums total
                 assert mock_upsert_scanned.call_count == 3
-                assert sum(len(call.kwargs["track_payloads"]) for call in mock_upsert_scanned.call_args_list) == 4
+                assert (
+                    sum(
+                        len(call.kwargs["track_payloads"])
+                        for call in mock_upsert_scanned.call_args_list
+                    )
+                    == 4
+                )
 
     def test_full_sync_skips_unchanged_artists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,20 +113,32 @@ class TestLibrarySyncFullSync:
                     return existing_artist
                 return None
 
-            with patch("crate.library_sync.get_library_artist", side_effect=mock_get_artist), \
-                 patch("crate.library_sync.get_library_albums", return_value=[]), \
-                 patch("crate.library_sync.get_library_artists", return_value=([existing_artist], 1)), \
-                 patch("crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.delete_artist"), \
-                 patch("crate.library_sync.delete_album"), \
-                 patch("crate.library_sync.mutagen.File", return_value=None), \
-                 patch("crate.library_sync.read_tags", return_value={}):
-
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist", side_effect=mock_get_artist
+                ),
+                patch("crate.library_sync.get_library_albums", return_value=[]),
+                patch(
+                    "crate.library_sync.get_library_artists",
+                    return_value=([existing_artist], 1),
+                ),
+                patch(
+                    "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.delete_artist"),
+                patch("crate.library_sync.delete_album"),
+                patch("crate.library_sync.mutagen.File", return_value=None),
+                patch("crate.library_sync.read_tags", return_value={}),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.full_sync()
 
@@ -159,19 +183,33 @@ class TestSyncAlbum:
                 "updated_at": datetime.now(UTC).isoformat(),
             }
 
-            with patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=1), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={str(track_path): existing_track}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.read_tags", return_value={
-                    "artist": "Artist",
-                    "albumartist": "Artist",
-                    "album": "Album",
-                    "title": "Track",
-                 }):
-
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=1),
+                patch(
+                    "crate.library_sync.get_tracks_by_album_id",
+                    return_value={str(track_path): existing_track},
+                ),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "albumartist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 sync.sync_album(album_dir, "Artist")
 
@@ -196,15 +234,30 @@ class TestSyncAlbum:
             mock_mf.info.length = 240.0
             mock_mf.info.bitrate = 320000
 
-            with patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.mutagen.File", return_value=mock_mf), \
-                 patch("crate.library_sync.read_tags", return_value={"artist": "Artist", "album": "Album", "title": "Track"}):
-
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.mutagen.File", return_value=mock_mf),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.sync_album(album_dir, "Artist")
 
@@ -212,6 +265,77 @@ class TestSyncAlbum:
                 assert result["total_size"] == 3072
                 assert "flac" in result["formats"]
                 assert len(mock_upsert_scanned.call_args.kwargs["track_payloads"]) == 2
+
+    def test_sync_album_refreshes_artist_summary_after_album_upsert(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            album_dir = lib / "Artist" / "Album"
+            album_dir.mkdir(parents=True)
+            (album_dir / "01.flac").write_bytes(b"\x00" * 1024)
+            (album_dir / "02.flac").write_bytes(b"\x00" * 2048)
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+
+            mock_mf = MagicMock()
+            mock_mf.info.length = 240.0
+            mock_mf.info.bitrate = 320000
+            captured: dict[str, object] = {}
+
+            def _capture_artist(payload: dict):
+                captured.update(payload)
+                return payload["name"]
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={
+                        "name": "Artist",
+                        "entity_uid": "11111111-1111-5111-8111-111111111111",
+                    },
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums",
+                    return_value=[
+                        {
+                            "id": 1,
+                            "track_count": 2,
+                            "total_size": 3072,
+                            "formats": ["flac"],
+                        }
+                    ],
+                ),
+                patch("crate.library_sync.upsert_artist", side_effect=_capture_artist),
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.mutagen.File", return_value=mock_mf),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
+                from crate.library_sync import LibrarySync
+
+                sync = LibrarySync(config)
+                result = sync.sync_album(album_dir, "Artist")
+
+                assert result["track_count"] == 2
+                assert captured["album_count"] == 1
+                assert captured["track_count"] == 2
+                assert captured["total_size"] == 3072
+                assert captured["formats"] == ["flac"]
+                assert captured["primary_format"] == "flac"
 
     def test_sync_album_uses_native_quality_batch_for_new_tracks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -227,35 +351,55 @@ class TestSyncAlbum:
                 "audio_extensions": [".flac"],
             }
             native_quality = {
-                "tracks": [{
-                    "path": str(track_path),
-                    "ok": True,
-                    "duration": 123.5,
-                    "bitrate": 1411000,
-                    "sample_rate": 96000,
-                    "bit_depth": 24,
-                }],
+                "tracks": [
+                    {
+                        "path": str(track_path),
+                        "ok": True,
+                        "duration": 123.5,
+                        "bitrate": 1411000,
+                        "sample_rate": 96000,
+                        "bit_depth": 24,
+                    }
+                ],
             }
 
-            with patch("crate.crate_cli.run_quality", return_value=native_quality) as mock_quality, \
-                 patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.mutagen.File", side_effect=AssertionError("mutagen info should not be needed")), \
-                 patch("crate.library_sync.read_tags", return_value={
-                    "artist": "Artist",
-                    "albumartist": "Artist",
-                    "album": "Album",
-                    "title": "Track",
-                 }):
-
+            with (
+                patch(
+                    "crate.crate_cli.run_quality", return_value=native_quality
+                ) as mock_quality,
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch(
+                    "crate.library_sync.mutagen.File",
+                    side_effect=AssertionError("mutagen info should not be needed"),
+                ),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "albumartist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 sync.sync_album(album_dir, "Artist")
 
-                mock_quality.assert_called_once_with(directory=str(album_dir), extensions="flac")
+                mock_quality.assert_called_once_with(
+                    directory=str(album_dir), extensions="flac"
+                )
                 payload = mock_upsert_scanned.call_args.kwargs["track_payloads"][0]
                 assert payload["duration"] == 123.5
                 assert payload["bitrate"] == 1411000
@@ -277,59 +421,81 @@ class TestSyncAlbum:
                 "native_scan_payload_shadow": True,
             }
             native_quality = {
-                "tracks": [{
-                    "path": str(track_path),
-                    "ok": True,
-                    "duration": 123.5,
-                    "bitrate": 1411000,
-                    "sample_rate": 96000,
-                    "bit_depth": 24,
-                }],
+                "tracks": [
+                    {
+                        "path": str(track_path),
+                        "ok": True,
+                        "duration": 123.5,
+                        "bitrate": 1411000,
+                        "sample_rate": 96000,
+                        "bit_depth": 24,
+                    }
+                ],
             }
             native_scan = {
-                "artists": [{
-                    "name": "Artist",
-                    "albums": [{
-                        "name": "Album",
-                        "path": str(album_dir),
-                        "has_cover": True,
-                        "has_embedded_art": False,
-                        "tracks": [{
-                            "path": str(track_path),
-                            "filename": "01.flac",
-                            "size": 1024,
-                            "tags": {
-                                "title": "Track",
-                                "artist": "Artist",
-                                "album": "Album",
-                                "track_number": None,
-                                "duration_ms": 123500,
-                                "format": "flac",
-                                "bitrate": 1411000,
-                                "sample_rate": 96000,
-                                "bit_depth": 24,
-                            },
-                        }],
-                    }],
-                }],
+                "artists": [
+                    {
+                        "name": "Artist",
+                        "albums": [
+                            {
+                                "name": "Album",
+                                "path": str(album_dir),
+                                "has_cover": True,
+                                "has_embedded_art": False,
+                                "tracks": [
+                                    {
+                                        "path": str(track_path),
+                                        "filename": "01.flac",
+                                        "size": 1024,
+                                        "tags": {
+                                            "title": "Track",
+                                            "artist": "Artist",
+                                            "album": "Album",
+                                            "track_number": None,
+                                            "duration_ms": 123500,
+                                            "format": "flac",
+                                            "bitrate": 1411000,
+                                            "sample_rate": 96000,
+                                            "bit_depth": 24,
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
             }
 
-            with patch("crate.crate_cli.run_quality", return_value=native_quality), \
-                 patch("crate.crate_cli.run_scan", return_value=native_scan), \
-                 patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album), \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.mutagen.File", side_effect=AssertionError("mutagen info should not be needed")), \
-                 patch("crate.library_sync.read_tags", return_value={
-                    "artist": "Artist",
-                    "albumartist": "Artist",
-                    "album": "Album",
-                    "title": "Track",
-                 }):
-
+            with (
+                patch("crate.crate_cli.run_quality", return_value=native_quality),
+                patch("crate.crate_cli.run_scan", return_value=native_scan),
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ),
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch(
+                    "crate.library_sync.mutagen.File",
+                    side_effect=AssertionError("mutagen info should not be needed"),
+                ),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "albumartist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.sync_album(album_dir, "Artist")
 
@@ -352,70 +518,97 @@ class TestSyncAlbum:
                 "native_scan_payload_prefer": True,
             }
             native_quality = {
-                "tracks": [{
-                    "path": str(track_path),
-                    "ok": True,
-                    "duration": 123.5,
-                    "bitrate": 1411000,
-                    "sample_rate": 96000,
-                    "bit_depth": 24,
-                }],
+                "tracks": [
+                    {
+                        "path": str(track_path),
+                        "ok": True,
+                        "duration": 123.5,
+                        "bitrate": 1411000,
+                        "sample_rate": 96000,
+                        "bit_depth": 24,
+                    }
+                ],
             }
             native_scan = {
-                "artists": [{
-                    "name": "Artist",
-                    "albums": [{
-                        "name": "Album",
-                        "path": str(album_dir),
-                        "has_cover": True,
-                        "has_embedded_art": False,
-                        "tracks": [{
-                            "path": str(track_path),
-                            "filename": "01.flac",
-                            "size": 1024,
-                            "tags": {
-                                "title": "Track",
-                                "artist": "Artist",
-                                "album_artist": "Artist",
-                                "album": "Album",
-                                "track_number": None,
-                                "disc_number": 1,
-                                "duration_ms": 123500,
-                                "format": "flac",
-                                "bitrate": 1411000,
-                                "sample_rate": 96000,
-                                "bit_depth": 24,
-                                "crate_identity": {
-                                    "crate_track_uid": "11111111-1111-4111-8111-111111111111",
-                                },
-                            },
-                        }],
-                    }],
-                }],
+                "artists": [
+                    {
+                        "name": "Artist",
+                        "albums": [
+                            {
+                                "name": "Album",
+                                "path": str(album_dir),
+                                "has_cover": True,
+                                "has_embedded_art": False,
+                                "tracks": [
+                                    {
+                                        "path": str(track_path),
+                                        "filename": "01.flac",
+                                        "size": 1024,
+                                        "tags": {
+                                            "title": "Track",
+                                            "artist": "Artist",
+                                            "album_artist": "Artist",
+                                            "album": "Album",
+                                            "track_number": None,
+                                            "disc_number": 1,
+                                            "duration_ms": 123500,
+                                            "format": "flac",
+                                            "bitrate": 1411000,
+                                            "sample_rate": 96000,
+                                            "bit_depth": 24,
+                                            "crate_identity": {
+                                                "crate_track_uid": "11111111-1111-4111-8111-111111111111",
+                                            },
+                                        },
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
             }
 
-            with patch("crate.crate_cli.run_quality", return_value=native_quality), \
-                 patch("crate.crate_cli.run_scan", return_value=native_scan), \
-                 patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.mutagen.File", side_effect=AssertionError("mutagen info should not be needed")), \
-                 patch("crate.library_sync.read_tags", return_value={
-                    "artist": "Artist",
-                    "albumartist": "Artist",
-                    "album": "Album",
-                    "title": "Track",
-                 }):
-
+            with (
+                patch("crate.crate_cli.run_quality", return_value=native_quality),
+                patch("crate.crate_cli.run_scan", return_value=native_scan),
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch(
+                    "crate.library_sync.mutagen.File",
+                    side_effect=AssertionError("mutagen info should not be needed"),
+                ),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "albumartist": "Artist",
+                        "album": "Album",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.sync_album(album_dir, "Artist")
 
                 assert result["native_scan_payload_used"] is True
                 assert result["native_scan_payload_shadow"]["used_for_upsert"] is True
-                assert result["native_scan_payload_shadow"]["native_identity_override_count"] == 1
+                assert (
+                    result["native_scan_payload_shadow"][
+                        "native_identity_override_count"
+                    ]
+                    == 1
+                )
                 payload = mock_upsert_scanned.call_args.kwargs["track_payloads"][0]
                 assert payload["entity_uid"] == "11111111-1111-4111-8111-111111111111"
                 assert "_crate_identity_tagged" not in payload
@@ -441,15 +634,30 @@ class TestSyncAlbum:
             mock_mf.info.length = 240.0
             mock_mf.info.bitrate = 320000
 
-            with patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.upsert_scanned_album", side_effect=_fake_upsert_scanned_album) as mock_upsert_scanned, \
-                 patch("crate.library_sync.get_album_id_by_path", return_value=None), \
-                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}), \
-                 patch("crate.library_sync.delete_track_by_path"), \
-                 patch("crate.library_sync.mutagen.File", return_value=mock_mf), \
-                 patch("crate.library_sync.read_tags", return_value={"artist": "Artist", "album": "Album Deluxe", "title": "Track"}):
-
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.upsert_scanned_album",
+                    side_effect=_fake_upsert_scanned_album,
+                ) as mock_upsert_scanned,
+                patch("crate.library_sync.get_album_id_by_path", return_value=None),
+                patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
+                patch("crate.library_sync.delete_track_by_path"),
+                patch("crate.library_sync.mutagen.File", return_value=mock_mf),
+                patch(
+                    "crate.library_sync.read_tags",
+                    return_value={
+                        "artist": "Artist",
+                        "album": "Album Deluxe",
+                        "title": "Track",
+                    },
+                ),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 result = sync.sync_album(album_dir, "Artist")
 
@@ -486,10 +694,21 @@ class TestSyncAlbum:
 
             from crate.library_sync import LibrarySync
 
-            with patch("crate.library_sync.get_library_artist", return_value={"name": "Artist"}), \
-                 patch("crate.library_sync.get_library_albums", return_value=[stale_album]), \
-                 patch("crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist), \
-                 patch.object(LibrarySync, "_sync_album_unlocked", return_value={"track_count": 3}) as mock_sync_album:
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums", return_value=[stale_album]
+                ),
+                patch(
+                    "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
+                ),
+                patch.object(
+                    LibrarySync, "_sync_album_unlocked", return_value={"track_count": 3}
+                ) as mock_sync_album,
+            ):
                 sync = LibrarySync(config)
                 count = sync.sync_artist(artist_dir)
 
@@ -515,13 +734,17 @@ class TestSyncAlbum:
             def _fake_unlocked(self, artist_name: str, artist_dirs: list[Path]) -> int:
                 with overlap_lock:
                     overlap["active"] += 1
-                    overlap["max_active"] = max(overlap["max_active"], overlap["active"])
+                    overlap["max_active"] = max(
+                        overlap["max_active"], overlap["active"]
+                    )
                 time.sleep(0.15)
                 with overlap_lock:
                     overlap["active"] -= 1
                 return 0
 
-            with patch.object(LibrarySync, "_sync_artist_dirs_unlocked", _fake_unlocked):
+            with patch.object(
+                LibrarySync, "_sync_artist_dirs_unlocked", _fake_unlocked
+            ):
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     futures = [
                         executor.submit(sync.sync_artist_dirs, "Terror", [artist_dir]),
@@ -555,15 +778,75 @@ class TestSyncAlbum:
 
             from crate.library_sync import LibrarySync
 
-            with patch("crate.library_sync.get_library_artist", return_value={"name": "Birds In Row"}), \
-                 patch("crate.library_sync.get_library_albums", return_value=[existing_album]), \
-                 patch("crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist), \
-                 patch("crate.library_sync.delete_album") as mock_delete_album:
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Birds In Row"},
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums",
+                    return_value=[existing_album],
+                ),
+                patch(
+                    "crate.library_sync.upsert_artist", side_effect=_fake_upsert_artist
+                ),
+                patch("crate.library_sync.delete_album") as mock_delete_album,
+            ):
                 sync = LibrarySync(config)
                 count = sync.sync_artist_dirs("Birds In Row", [artist_dir])
 
                 assert count == 0
                 mock_delete_album.assert_not_called()
+
+    def test_sync_artist_dirs_rolls_up_album_formats(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            lib = Path(tmpdir)
+            artist_dir = lib / "Artist"
+            album_dir = artist_dir / "Album"
+            album_dir.mkdir(parents=True)
+            (album_dir / "01.flac").write_bytes(b"\x00" * 1024)
+
+            config = {
+                "library_path": str(lib),
+                "audio_extensions": [".flac"],
+            }
+
+            existing_album = {
+                "id": 11,
+                "path": str(album_dir),
+                "track_count": 1,
+                "dir_mtime": time.time() + 1000,
+                "total_size": 1024,
+                "formats": ["flac"],
+            }
+
+            captured: dict[str, object] = {}
+
+            def _capture_artist(payload: dict):
+                captured.update(payload)
+                return payload["name"]
+
+            from crate.library_sync import LibrarySync
+
+            with (
+                patch(
+                    "crate.library_sync.get_library_artist",
+                    return_value={"name": "Artist"},
+                ),
+                patch(
+                    "crate.library_sync.get_library_albums",
+                    return_value=[existing_album],
+                ),
+                patch("crate.library_sync.get_album_track_count", return_value=1),
+                patch("crate.library_sync.upsert_artist", side_effect=_capture_artist),
+                patch("crate.library_sync.delete_album"),
+            ):
+                sync = LibrarySync(config)
+                count = sync.sync_artist_dirs("Artist", [artist_dir])
+
+                assert count == 1
+                assert captured["formats"] == ["flac"]
+                assert captured["primary_format"] == "flac"
 
 
 class TestRemoveStale:
@@ -578,36 +861,97 @@ class TestRemoveStale:
             }
 
             artists_data = [
-                {"name": "Existing Artist", "folder_name": "Existing Artist", "album_count": 1, "track_count": 5,
-                 "total_size": 0, "formats": [], "primary_format": None, "has_photo": 0, "dir_mtime": None,
-                 "updated_at": None, "id": 1, "storage_id": "fake-uuid-1", "slug": "existing-artist",
-                 "bio": None, "tags_json": None, "similar_json": None, "spotify_id": None,
-                 "spotify_popularity": None, "mbid": None, "country": None, "area": None,
-                 "formed": None, "ended": None, "artist_type": None, "members_json": None,
-                 "urls_json": None, "listeners": None, "enriched_at": None, "discogs_id": None,
-                 "spotify_followers": None, "lastfm_playcount": None, "discogs_profile": None,
-                 "discogs_members_json": None, "latest_release_date": None, "content_hash": None,
-                 "formats_json": "[]"},
-                {"name": "Gone Artist", "folder_name": "Gone Artist", "album_count": 1, "track_count": 3,
-                 "total_size": 0, "formats": [], "primary_format": None, "has_photo": 0, "dir_mtime": None,
-                 "updated_at": None, "id": 2, "storage_id": "fake-uuid-2", "slug": "gone-artist",
-                 "bio": None, "tags_json": None, "similar_json": None, "spotify_id": None,
-                 "spotify_popularity": None, "mbid": None, "country": None, "area": None,
-                 "formed": None, "ended": None, "artist_type": None, "members_json": None,
-                 "urls_json": None, "listeners": None, "enriched_at": None, "discogs_id": None,
-                 "spotify_followers": None, "lastfm_playcount": None, "discogs_profile": None,
-                 "discogs_members_json": None, "latest_release_date": None, "content_hash": None,
-                 "formats_json": "[]"},
+                {
+                    "name": "Existing Artist",
+                    "folder_name": "Existing Artist",
+                    "album_count": 1,
+                    "track_count": 5,
+                    "total_size": 0,
+                    "formats": [],
+                    "primary_format": None,
+                    "has_photo": 0,
+                    "dir_mtime": None,
+                    "updated_at": None,
+                    "id": 1,
+                    "storage_id": "fake-uuid-1",
+                    "slug": "existing-artist",
+                    "bio": None,
+                    "tags_json": None,
+                    "similar_json": None,
+                    "spotify_id": None,
+                    "spotify_popularity": None,
+                    "mbid": None,
+                    "country": None,
+                    "area": None,
+                    "formed": None,
+                    "ended": None,
+                    "artist_type": None,
+                    "members_json": None,
+                    "urls_json": None,
+                    "listeners": None,
+                    "enriched_at": None,
+                    "discogs_id": None,
+                    "spotify_followers": None,
+                    "lastfm_playcount": None,
+                    "discogs_profile": None,
+                    "discogs_members_json": None,
+                    "latest_release_date": None,
+                    "content_hash": None,
+                    "formats_json": "[]",
+                },
+                {
+                    "name": "Gone Artist",
+                    "folder_name": "Gone Artist",
+                    "album_count": 1,
+                    "track_count": 3,
+                    "total_size": 0,
+                    "formats": [],
+                    "primary_format": None,
+                    "has_photo": 0,
+                    "dir_mtime": None,
+                    "updated_at": None,
+                    "id": 2,
+                    "storage_id": "fake-uuid-2",
+                    "slug": "gone-artist",
+                    "bio": None,
+                    "tags_json": None,
+                    "similar_json": None,
+                    "spotify_id": None,
+                    "spotify_popularity": None,
+                    "mbid": None,
+                    "country": None,
+                    "area": None,
+                    "formed": None,
+                    "ended": None,
+                    "artist_type": None,
+                    "members_json": None,
+                    "urls_json": None,
+                    "listeners": None,
+                    "enriched_at": None,
+                    "discogs_id": None,
+                    "spotify_followers": None,
+                    "lastfm_playcount": None,
+                    "discogs_profile": None,
+                    "discogs_members_json": None,
+                    "latest_release_date": None,
+                    "content_hash": None,
+                    "formats_json": "[]",
+                },
             ]
 
-            with patch("crate.library_sync.get_library_artists", return_value=(artists_data, 2)), \
-                 patch("crate.library_sync.get_library_artist", return_value=None), \
-                 patch("crate.library_sync.get_album_paths_for_artist", return_value=[]), \
-                 patch("crate.library_sync.get_all_album_paths", return_value=[]), \
-                 patch("crate.library_sync.delete_artist") as mock_delete, \
-                 patch("crate.library_sync.delete_album"):
-
+            with (
+                patch(
+                    "crate.library_sync.get_library_artists",
+                    return_value=(artists_data, 2),
+                ),
+                patch("crate.library_sync.get_library_artist", return_value=None),
+                patch("crate.library_sync.get_album_paths_for_artist", return_value=[]),
+                patch("crate.library_sync.get_all_album_paths", return_value=[]),
+                patch("crate.library_sync.delete_artist") as mock_delete,
+                patch("crate.library_sync.delete_album"),
+            ):
                 from crate.library_sync import LibrarySync
+
                 sync = LibrarySync(config)
                 removed = sync.remove_stale()
 
@@ -618,20 +962,25 @@ class TestRemoveStale:
 class TestParseInt:
     def test_normal_int(self):
         from crate.library_sync import _parse_int
+
         assert _parse_int("5") == 5
 
     def test_fraction_format(self):
         from crate.library_sync import _parse_int
+
         assert _parse_int("3/12") == 3
 
     def test_none(self):
         from crate.library_sync import _parse_int
+
         assert _parse_int(None) is None
 
     def test_invalid(self):
         from crate.library_sync import _parse_int
+
         assert _parse_int("abc") is None
 
     def test_default(self):
         from crate.library_sync import _parse_int
+
         assert _parse_int(None, 1) == 1

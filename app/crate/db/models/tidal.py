@@ -1,12 +1,12 @@
 """Typed models for Tidal download/acquisition data."""
 
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
 class TidalDownloadRow(BaseModel):
     """A Tidal download queue entry."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -25,6 +25,7 @@ class TidalDownloadRow(BaseModel):
 
 class TidalMonitoredArtist(BaseModel):
     """An artist monitored for new Tidal releases."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -36,6 +37,7 @@ class TidalMonitoredArtist(BaseModel):
 
 class NewReleaseRow(BaseModel):
     """A detected new release (from any source)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

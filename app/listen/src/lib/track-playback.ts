@@ -34,7 +34,9 @@ export function resolveTrackPlaybackUrl(
 ): string | null {
   const path = trackPlaybackApiPath(track);
   if (!path) return null;
-  return policy === "original" ? path : `${path}?delivery=${encodeURIComponent(policy)}`;
+  return policy === "original"
+    ? path
+    : `${path}?delivery=${encodeURIComponent(policy)}`;
 }
 
 export function getTrackQualityFromPlaybackQuality(
@@ -50,7 +52,9 @@ export function getTrackQualityFromPlaybackQuality(
     };
   }
 
-  const format = options.preferCodec ? quality.codec || quality.format : quality.format || quality.codec;
+  const format = options.preferCodec
+    ? quality.codec || quality.format
+    : quality.format || quality.codec;
   return {
     format: format || undefined,
     bitrate: quality.bitrate ?? undefined,

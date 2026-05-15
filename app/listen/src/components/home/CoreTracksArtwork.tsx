@@ -1,17 +1,27 @@
 import { artistPhotoApiUrl } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
-import type { HomeGeneratedPlaylistSummary, HomeGeneratedPlaylistDetail } from "./home-model";
+import type {
+  HomeGeneratedPlaylistSummary,
+  HomeGeneratedPlaylistDetail,
+} from "./home-model";
 
-type CoreTracksLike = HomeGeneratedPlaylistSummary | HomeGeneratedPlaylistDetail;
+type CoreTracksLike =
+  | HomeGeneratedPlaylistSummary
+  | HomeGeneratedPlaylistDetail;
 
 function coreArtistPhoto(item: CoreTracksLike): string | null {
   const firstTrack = item.artwork_tracks?.[0];
-  return artistPhotoApiUrl({
-    artistId: firstTrack?.artist_id,
-    artistSlug: firstTrack?.artist_slug,
-    artistName: item.name,
-  }, { size: 384 }) || null;
+  return (
+    artistPhotoApiUrl(
+      {
+        artistId: firstTrack?.artist_id,
+        artistSlug: firstTrack?.artist_slug,
+        artistName: item.name,
+      },
+      { size: 384 },
+    ) || null
+  );
 }
 
 export function CoreTracksArtwork({
@@ -24,7 +34,12 @@ export function CoreTracksArtwork({
   const photoUrl = coreArtistPhoto(item);
 
   return (
-    <div className={cn("relative overflow-hidden rounded-3xl bg-white/5", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl bg-white/5",
+        className,
+      )}
+    >
       {photoUrl ? (
         <img
           src={photoUrl}

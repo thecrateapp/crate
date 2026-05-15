@@ -58,6 +58,7 @@ test-music/                 Local dev music (3 artists, not committed)
 ## Tech Stack
 
 ### Backend (Python 3.13)
+
 - FastAPI + Uvicorn (API server)
 - SQLAlchemy 2.0 (ORM for CRUD domains) + psycopg2 (driver)
 - Alembic (authoritative schema bootstrap + migrations)
@@ -72,17 +73,19 @@ test-music/                 Local dev music (3 artists, not committed)
 - LLM: Ollama (default), Gemini, litellm (multi-provider)
 
 ### Frontend (TypeScript/React)
+
 - React 19 + React Router 7
 - **@crate/ui** — shared design system (npm workspace at `app/shared/ui/`)
 - Tailwind CSS 4 with unified design tokens (`data-surface="solid|glass"` variants)
 - shadcn/ui components (curated in `@crate/ui/shadcn/`)
-- Nivo (@nivo/*) for charts — NOT recharts (legacy, being phased out)
+- Nivo (@nivo/\*) for charts — NOT recharts (legacy, being phased out)
 - sonner for toasts
 - lucide-react for icons
 - Capacitor (listen app → iOS/Android)
 - npm workspaces (root `package.json` orchestrates `app/shared/ui`, `app/ui`, `app/listen`)
 
 ### Infrastructure
+
 - Docker Compose (12 production services + 3 project overlay)
 - Traefik reverse proxy (Let's Encrypt TLS via Cloudflare DNS)
 - Redis 7-alpine (512MB, volatile-lru)
@@ -116,6 +119,7 @@ Key tables: `library_artists`, `library_albums`, `library_tracks`, `tasks`, `tas
 ## Worker & Background Processing
 
 ### Dramatiq Actors
+
 API creates tasks, Dramatiq actors process them via Redis broker (DB 1):
 
 ```python
@@ -129,6 +133,7 @@ task_id = create_task("task_type", {"param": "value"})
 Tasks that write to filesystem (tags, delete, move) MUST run in the worker (has /music:rw).
 
 ### Daemons (outside task system)
+
 - **Analysis daemon**: Infinite loop, claims tracks via `FOR UPDATE SKIP LOCKED`, pauses under load
 - **Bliss daemon**: Same pattern for bliss vector computation
 - **Projector daemon**: Consumes Redis Stream domain events and warms snapshots
@@ -136,23 +141,24 @@ Tasks that write to filesystem (tags, delete, move) MUST run in the worker (has 
 - **Scheduler**: 6 recurring tasks (enrich_artists 24h, library_pipeline 6h, analytics 4h, new_releases 12h, cleanup 48h, shows 24h)
 
 ### Orchestrator
+
 `orchestrator.py` manages worker child processes (2-5), auto-scales, restarts dead workers, runs scheduler + watcher.
 
 ## SSE & Real-time
 
 Crate uses both classic SSE feeds and snapshot-driven streams:
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/events` | Global status stream |
-| `/api/events/task/{id}` | Per-task progress |
-| `/api/cache/events` | Cache invalidation (with Last-Event-ID replay) |
-| `/api/admin/ops-stream` | Snapshot-driven admin dashboard updates |
-| `/api/admin/tasks-stream` | Admin task surface updates |
-| `/api/admin/health-stream` | Admin health surface updates |
-| `/api/admin/logs-stream` | Admin worker-log surface updates |
-| `/api/admin/stack-stream` | Admin stack snapshot updates |
-| `/api/me/home/discovery-stream` | Per-user Listen home snapshot updates |
+| Endpoint                        | Purpose                                        |
+| ------------------------------- | ---------------------------------------------- |
+| `/api/events`                   | Global status stream                           |
+| `/api/events/task/{id}`         | Per-task progress                              |
+| `/api/cache/events`             | Cache invalidation (with Last-Event-ID replay) |
+| `/api/admin/ops-stream`         | Snapshot-driven admin dashboard updates        |
+| `/api/admin/tasks-stream`       | Admin task surface updates                     |
+| `/api/admin/health-stream`      | Admin health surface updates                   |
+| `/api/admin/logs-stream`        | Admin worker-log surface updates               |
+| `/api/admin/stack-stream`       | Admin stack snapshot updates                   |
+| `/api/me/home/discovery-stream` | Per-user Listen home snapshot updates          |
 
 `CacheInvalidationMiddleware` auto-broadcasts invalidation events after write mutations.
 
@@ -171,11 +177,12 @@ process_new_content task:
   7. Snapshot/read-model refresh follow-ups
 ```
 
-*Spotify requires Premium account — currently returns 403.
+\*Spotify requires Premium account — currently returns 403.
 
 ## LLM Integration
 
 `app/crate/llm/` — Multi-provider abstraction:
+
 - **Ollama** (default, local inference, `llama3.1:8b`)
 - **Gemini** (Google AI, direct HTTP)
 - **litellm** (any provider: OpenAI, Anthropic, Groq, etc.)
@@ -220,6 +227,7 @@ Login: admin@cratemusic.app / admin (dev seed user, also used in production).
 ## Code Conventions
 
 ### Python
+
 - Type hints on function signatures (Python 3.13 union syntax `str | None`)
 - `log = logging.getLogger(__name__)` per module
 - Imports: stdlib → third-party → local, separated by blank lines
@@ -233,6 +241,7 @@ Login: admin@cratemusic.app / admin (dev seed user, also used in production).
 For detailed patterns (FastAPI, SQLAlchemy 2.0, async, testing): consult the `python-backend` skill in `.claude/skills/`.
 
 ### TypeScript/React
+
 - Named exports for page components (`export function PageName()`)
 - `useApi<T>(url)` hook for data fetching (from `shared/web/use-api.ts`)
 - `api<T>(url, method?, body?)` for imperative calls (from `shared/web/api.ts`)
@@ -243,6 +252,7 @@ For detailed patterns (FastAPI, SQLAlchemy 2.0, async, testing): consult the `py
 - Keep `app/ui` and `app/listen` as separate apps
 
 #### @crate/ui design system
+
 - Import UI primitives from `@crate/ui/primitives/*` (AppModal, AppPopover, ActionIconButton, CrateBadge, etc.)
 - Import shadcn components from `@crate/ui/shadcn/*` (Button, Card, Dialog, etc.)
 - Import shared hooks from `@crate/ui/lib/*` (cn, useIsDesktop, useDismissibleLayer, etc.)
@@ -254,6 +264,7 @@ For detailed patterns (FastAPI, SQLAlchemy 2.0, async, testing): consult the `py
 - Shared utilities go in `app/shared/web/` (API client, formatters, route builders)
 
 #### Auth differences
+
 - **ui**: Cookie-based persisted sessions, admin-oriented
 - **listen**: OAuth + persisted-session bootstrap on web, bearer-token storage for native multi-server flows, registration
 
@@ -261,23 +272,24 @@ For detailed patterns (FastAPI, SQLAlchemy 2.0, async, testing): consult the `py
 
 Consult these skills when working on frontend code. Read the skill `.md` file first; for detailed rules, read from `.agents/skills/<name>/rules/` or the compiled `AGENTS.md`.
 
-| Skill | When to use |
-|-------|-------------|
-| `react-best-practices` | Writing/reviewing/refactoring React components, optimizing performance, fixing re-renders, bundle size |
-| `composition-patterns` | Designing component APIs, refactoring boolean-prop components, compound components, context providers |
-| `react-view-transitions` | Adding page transitions, shared element animations, enter/exit animations, list reorder |
-| `web-design-guidelines` | UI audits, accessibility review, UX best practices check |
+| Skill                    | When to use                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `react-best-practices`   | Writing/reviewing/refactoring React components, optimizing performance, fixing re-renders, bundle size |
+| `composition-patterns`   | Designing component APIs, refactoring boolean-prop components, compound components, context providers  |
+| `react-view-transitions` | Adding page transitions, shared element animations, enter/exit animations, list reorder                |
+| `web-design-guidelines`  | UI audits, accessibility review, UX best practices check                                               |
 
 Additional graph-powered skills for code navigation:
 
-| Skill | When to use |
-|-------|-------------|
-| `explore-codebase` | Understanding codebase structure via knowledge graph |
-| `debug-issue` | Tracing bugs through call chains and execution flows |
-| `review-changes` | Risk-scored code review with impact analysis |
-| `refactor-safely` | Safe renames, dead code detection, dependency-aware refactoring |
+| Skill              | When to use                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `explore-codebase` | Understanding codebase structure via knowledge graph            |
+| `debug-issue`      | Tracing bugs through call chains and execution flows            |
+| `review-changes`   | Risk-scored code review with impact analysis                    |
+| `refactor-safely`  | Safe renames, dead code detection, dependency-aware refactoring |
 
 ### API Routing
+
 - Routers registered in `api/__init__.py`
 - Routes with `{name:path}` catch-alls (like browse router) must be registered AFTER specific routes
 - Auth: `_require_auth(request)` for logged-in users, `_require_admin(request)` for admin-only
@@ -285,35 +297,35 @@ Additional graph-powered skills for code navigation:
 
 ## Important Files
 
-| File | Purpose |
-|------|---------|
-| `app/crate/db/` | Database layer: `core.py` (pool + init), `tx.py` (session scopes), `orm/` (models), `queries/` (complex SQL) |
-| `app/crate/worker_handlers/` | 8 task handler modules (~111 handlers) |
-| `app/crate/actors.py` | Dramatiq actor wrappers + queue config |
-| `app/crate/orchestrator.py` | Worker process manager + scheduler + watcher |
-| `app/crate/projector.py` | Domain events → snapshot warming |
-| `app/crate/analysis_daemon.py` | Audio analysis + bliss daemon loops |
-| `app/crate/enrichment.py` | Unified artist enrichment (all sources) |
-| `app/crate/audio_analysis.py` | Essentia/librosa dual backend |
-| `app/crate/bliss.py` | Python integration with grooveyard-bliss Rust CLI |
-| `app/crate/tidal.py` | Tidal auth, search, download via tiddl |
-| `app/crate/library_sync.py` | Filesystem → DB sync |
-| `app/crate/metrics.py` | Redis metrics buckets → PostgreSQL rollups |
-| `app/crate/llm/` | LLM provider abstraction (Ollama/Gemini/litellm) |
-| `app/crate/api/__init__.py` | App factory + router registration order (important!) |
-| `app/shared/ui/` | @crate/ui design system (tokens, primitives, shadcn, domain components) |
-| `app/shared/ui/tokens/` | Design tokens: colors, surfaces (solid/glass), radius, z-index, animations |
-| `app/shared/ui/package.json` | @crate/ui workspace package config + tsup build |
-| `app/shared/web/api.ts` | Shared API client factory |
-| `app/shared/web/use-api.ts` | Shared `useApi` hook factory |
-| `app/shared/web/utils.ts` | Shared utilities (formatDuration, encPath, etc.) |
-| `package.json` | Root workspace config (orchestrates shared/ui, ui, listen) |
-| `app/ui/src/components/layout/Shell.tsx` | Admin layout (sidebar, main) |
-| `app/listen/src/contexts/PlayerContext.tsx` | Public player provider/orchestrator; heavy internals now split across focused hooks |
-| `app/listen/src/components/layout/Shell.tsx` | Listen layout (desktop/mobile adaptive) |
-| `Makefile` | Dev, deploy, Capacitor, utilities |
-| `docker-compose.yaml` | Production stack (12 services) |
-| `docker-compose.dev.yaml` | Dev stack (7 services) |
+| File                                         | Purpose                                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `app/crate/db/`                              | Database layer: `core.py` (pool + init), `tx.py` (session scopes), `orm/` (models), `queries/` (complex SQL) |
+| `app/crate/worker_handlers/`                 | 8 task handler modules (~111 handlers)                                                                       |
+| `app/crate/actors.py`                        | Dramatiq actor wrappers + queue config                                                                       |
+| `app/crate/orchestrator.py`                  | Worker process manager + scheduler + watcher                                                                 |
+| `app/crate/projector.py`                     | Domain events → snapshot warming                                                                             |
+| `app/crate/analysis_daemon.py`               | Audio analysis + bliss daemon loops                                                                          |
+| `app/crate/enrichment.py`                    | Unified artist enrichment (all sources)                                                                      |
+| `app/crate/audio_analysis.py`                | Essentia/librosa dual backend                                                                                |
+| `app/crate/bliss.py`                         | Python integration with grooveyard-bliss Rust CLI                                                            |
+| `app/crate/tidal.py`                         | Tidal auth, search, download via tiddl                                                                       |
+| `app/crate/library_sync.py`                  | Filesystem → DB sync                                                                                         |
+| `app/crate/metrics.py`                       | Redis metrics buckets → PostgreSQL rollups                                                                   |
+| `app/crate/llm/`                             | LLM provider abstraction (Ollama/Gemini/litellm)                                                             |
+| `app/crate/api/__init__.py`                  | App factory + router registration order (important!)                                                         |
+| `app/shared/ui/`                             | @crate/ui design system (tokens, primitives, shadcn, domain components)                                      |
+| `app/shared/ui/tokens/`                      | Design tokens: colors, surfaces (solid/glass), radius, z-index, animations                                   |
+| `app/shared/ui/package.json`                 | @crate/ui workspace package config + tsup build                                                              |
+| `app/shared/web/api.ts`                      | Shared API client factory                                                                                    |
+| `app/shared/web/use-api.ts`                  | Shared `useApi` hook factory                                                                                 |
+| `app/shared/web/utils.ts`                    | Shared utilities (formatDuration, encPath, etc.)                                                             |
+| `package.json`                               | Root workspace config (orchestrates shared/ui, ui, listen)                                                   |
+| `app/ui/src/components/layout/Shell.tsx`     | Admin layout (sidebar, main)                                                                                 |
+| `app/listen/src/contexts/PlayerContext.tsx`  | Public player provider/orchestrator; heavy internals now split across focused hooks                          |
+| `app/listen/src/components/layout/Shell.tsx` | Listen layout (desktop/mobile adaptive)                                                                      |
+| `Makefile`                                   | Dev, deploy, Capacitor, utilities                                                                            |
+| `docker-compose.yaml`                        | Production stack (12 services)                                                                               |
+| `docker-compose.dev.yaml`                    | Dev stack (7 services)                                                                                       |
 
 ## Server
 
@@ -322,6 +334,7 @@ Additional graph-powered skills for code navigation:
 - Domains: admin.lespedants.org (admin UI), listen.lespedants.org (listen app), cratemusic.app (site), api.lespedants.org (API — serves all endpoints; `/rest` subpath is the Open Subsonic-compatible layer)
 
 <!-- code-review-graph MCP tools -->
+
 ## MCP Tools: code-review-graph
 
 **IMPORTANT: This project has a knowledge graph. ALWAYS use the
@@ -342,16 +355,16 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### Key Tools
 
-| Tool | Use when |
-|------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+| Tool                        | Use when                                               |
+| --------------------------- | ------------------------------------------------------ |
+| `detect_changes`            | Reviewing code changes — gives risk-scored analysis    |
+| `get_review_context`        | Need source snippets for review — token-efficient      |
+| `get_impact_radius`         | Understanding blast radius of a change                 |
+| `get_affected_flows`        | Finding which execution paths are impacted             |
+| `query_graph`               | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes`     | Finding functions/classes by name or keyword           |
+| `get_architecture_overview` | Understanding high-level codebase structure            |
+| `refactor_tool`             | Planning renames, finding dead code                    |
 
 ### Workflow
 

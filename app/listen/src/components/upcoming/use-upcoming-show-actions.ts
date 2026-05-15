@@ -53,12 +53,20 @@ export function useUpcomingShowActions(
     }
     try {
       setPlayingSetlist(true);
-      const queue = await fetchPlayableSetlist({ artistId: item.artist_id, artistName: item.artist });
+      const queue = await fetchPlayableSetlist({
+        artistId: item.artist_id,
+        artistName: item.artist,
+      });
       if (!queue.length) {
-        toast.info(`None of the ${item.probable_setlist.length} setlist tracks were found in your library`);
+        toast.info(
+          `None of the ${item.probable_setlist.length} setlist tracks were found in your library`,
+        );
         return;
       }
-      playAll(queue, 0, { type: "playlist", name: `${item.artist} Probable Setlist` });
+      playAll(queue, 0, {
+        type: "playlist",
+        name: `${item.artist} Probable Setlist`,
+      });
       toast.success(`Playing probable setlist: ${queue.length} tracks`);
     } catch {
       toast.error("Failed to load probable setlist");

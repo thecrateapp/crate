@@ -5,7 +5,11 @@ from typing import Any
 from sqlalchemy import text
 
 from crate.db.analytics_surface_shared import MISSING_SNAPSHOT_SCOPE, _decorate_snapshot
-from crate.db.ui_snapshot_store import get_ui_snapshot, mark_ui_snapshots_stale, upsert_ui_snapshot
+from crate.db.ui_snapshot_store import (
+    get_ui_snapshot,
+    mark_ui_snapshots_stale,
+    upsert_ui_snapshot,
+)
 from crate.db.tx import read_scope
 
 
@@ -15,9 +19,10 @@ def resolve_missing_artist(query: str) -> dict[str, Any] | None:
         return None
 
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT id, name, slug, folder_name
                 FROM library_artists
                 WHERE LOWER(name) = LOWER(:query)
@@ -35,26 +40,36 @@ def resolve_missing_artist(query: str) -> dict[str, Any] | None:
                     name ASC
                 LIMIT 1
                 """
-            ),
-            {"query": normalized, "prefix": f"{normalized}%"},
-        ).mappings().first()
+                ),
+                {"query": normalized, "prefix": f"{normalized}%"},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def get_missing_artist_by_id(artist_id: int) -> dict[str, Any] | None:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT id, name, slug, folder_name FROM library_artists WHERE id = :artist_id"),
-            {"artist_id": int(artist_id)},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT id, name, slug, folder_name FROM library_artists WHERE id = :artist_id"
+                ),
+                {"artist_id": int(artist_id)},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def list_local_albums_for_missing(artist_id: int) -> list[dict[str, Any]]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     a.id,
                     a.name,
@@ -70,9 +85,12 @@ def list_local_albums_for_missing(artist_id: int) -> list[dict[str, Any]]:
                   AND a.quarantined_at IS NULL
                 ORDER BY a.year NULLS LAST, a.name
                 """
-            ),
-            {"artist_id": int(artist_id)},
-        ).mappings().all()
+                ),
+                {"artist_id": int(artist_id)},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
@@ -105,7 +123,9 @@ def empty_missing_report(
     }
 
 
-def get_cached_missing_report(artist_id: int, *, max_age_seconds: int | None = None) -> dict[str, Any] | None:
+def get_cached_missing_report(
+    artist_id: int, *, max_age_seconds: int | None = None
+) -> dict[str, Any] | None:
     row = get_ui_snapshot(
         MISSING_SNAPSHOT_SCOPE,
         missing_snapshot_subject_key(artist_id),

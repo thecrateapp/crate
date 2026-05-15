@@ -2,7 +2,10 @@ import { type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
-import { artistShowToUpcomingItem, type ArtistShowEvent } from "@/components/upcoming/UpcomingRows";
+import {
+  artistShowToUpcomingItem,
+  type ArtistShowEvent,
+} from "@/components/upcoming/UpcomingRows";
 
 export interface ArtistAlbum {
   id: number;
@@ -81,7 +84,12 @@ export interface StatsListResponse<T> {
 
 export interface ArtistPageEnrichment {
   setlist?: {
-    probable_setlist: { title: string; frequency: number; play_count: number; last_played?: string }[];
+    probable_setlist: {
+      title: string;
+      frequency: number;
+      play_count: number;
+      last_played?: string;
+    }[];
     total_shows: number;
   };
 }
@@ -99,12 +107,28 @@ export interface ArtistPageData {
   artist_hot_rank?: number | null;
 }
 
-export function buildArtistPhotoUrl(artistName: string, artistId?: number, artistSlug?: string, version?: string | null) {
-  return artistPhotoApiUrl({ artistId, artistSlug, artistName }, { size: 384, version });
+export function buildArtistPhotoUrl(
+  artistName: string,
+  artistId?: number,
+  artistSlug?: string,
+  version?: string | null,
+) {
+  return artistPhotoApiUrl(
+    { artistId, artistSlug, artistName },
+    { size: 384, version },
+  );
 }
 
-export function buildArtistAlbumCover(artistName: string, albumName: string, albumId?: number, albumSlug?: string) {
-  return albumCoverApiUrl({ albumId, albumSlug, artistName, albumName }, { size: 512 });
+export function buildArtistAlbumCover(
+  artistName: string,
+  albumName: string,
+  albumId?: number,
+  albumSlug?: string,
+) {
+  return albumCoverApiUrl(
+    { albumId, albumSlug, artistName, albumName },
+    { size: 512 },
+  );
 }
 
 export function artistGenreSlug(name: string) {
@@ -145,9 +169,15 @@ export function buildArtistPlayerTrack(
     danceability: track.danceability,
     valence: track.valence,
     blissVector: track.bliss_vector,
-    albumCover: track.artist && track.album
-      ? buildArtistAlbumCover(track.artist, track.album, track.album_id, track.album_slug)
-      : coverFallback,
+    albumCover:
+      track.artist && track.album
+        ? buildArtistAlbumCover(
+            track.artist,
+            track.album,
+            track.album_id,
+            track.album_slug,
+          )
+        : coverFallback,
     path: isPath ? track.id : undefined,
   };
 }
@@ -157,13 +187,18 @@ export function buildArtistShowItems(events: ArtistShowEvent[]) {
   const deduped: ArtistShowEvent[] = [];
 
   for (const event of events) {
-    const key = event.id || [
-      event.artist_name,
-      event.date,
-      event.venue,
-      event.city,
-      event.country_code || event.country,
-    ].filter(Boolean).join("|").toLowerCase();
+    const key =
+      event.id ||
+      [
+        event.artist_name,
+        event.date,
+        event.venue,
+        event.city,
+        event.country_code || event.country,
+      ]
+        .filter(Boolean)
+        .join("|")
+        .toLowerCase();
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
     deduped.push(event);

@@ -1,4 +1,9 @@
-import type { ArtistExternalLink, LastfmData, MusicBrainzData, SpotifyData } from "@/components/artist/artistPageTypes";
+import type {
+  ArtistExternalLink,
+  LastfmData,
+  MusicBrainzData,
+  SpotifyData,
+} from "@/components/artist/artistPageTypes";
 import { formatCompact, formatNumber, formatSize } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Globe } from "lucide-react";
 
@@ -31,7 +36,9 @@ export function ArtistAboutSection({
     <div className="max-w-3xl space-y-8">
       {bioText && (
         <div>
-          <h3 className="text-sm font-semibold text-white/70 mb-2">Biography</h3>
+          <h3 className="text-sm font-semibold text-white/70 mb-2">
+            Biography
+          </h3>
           <p className="text-sm text-white/60 leading-relaxed whitespace-pre-line">
             {bioExpanded ? bioText : bioText.slice(0, 600)}
             {!bioExpanded && bioText.length > 600 && "..."}
@@ -41,7 +48,15 @@ export function ArtistAboutSection({
               onClick={onToggleBioExpanded}
               className="text-xs text-primary hover:text-primary/80 mt-2 flex items-center gap-1"
             >
-              {bioExpanded ? <><ChevronUp size={12} /> Less</> : <><ChevronDown size={12} /> More</>}
+              {bioExpanded ? (
+                <>
+                  <ChevronUp size={12} /> Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={12} /> More
+                </>
+              )}
             </button>
           )}
         </div>
@@ -52,11 +67,16 @@ export function ArtistAboutSection({
           <h3 className="text-sm font-semibold text-white/70 mb-3">Members</h3>
           <div className="space-y-2">
             {musicbrainz.members.map((member, i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+              <div
+                key={i}
+                className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
+              >
                 <div>
                   <span className="text-sm text-white/80">{member.name}</span>
                   {member.attributes && member.attributes.length > 0 && (
-                    <span className="text-xs text-white/40 ml-2">{member.attributes.join(", ")}</span>
+                    <span className="text-xs text-white/40 ml-2">
+                      {member.attributes.join(", ")}
+                    </span>
                   )}
                 </div>
                 <span className="text-xs text-white/30">
@@ -73,25 +93,33 @@ export function ArtistAboutSection({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {(lastfm?.listeners ?? 0) > 0 && (
             <div>
-              <div className="text-2xl font-bold text-white/90">{formatCompact(lastfm!.listeners!)}</div>
+              <div className="text-2xl font-bold text-white/90">
+                {formatCompact(lastfm!.listeners!)}
+              </div>
               <div className="text-xs text-white/40">listeners</div>
             </div>
           )}
           {(spotify?.followers ?? 0) > 0 && (
             <div>
-              <div className="text-2xl font-bold text-white/90">{formatCompact(spotify!.followers!)}</div>
+              <div className="text-2xl font-bold text-white/90">
+                {formatCompact(spotify!.followers!)}
+              </div>
               <div className="text-xs text-white/40">followers</div>
             </div>
           )}
           {(lastfm?.playcount ?? 0) > 0 && (
             <div>
-              <div className="text-2xl font-bold text-white/90">{formatCompact(lastfm!.playcount!)}</div>
+              <div className="text-2xl font-bold text-white/90">
+                {formatCompact(lastfm!.playcount!)}
+              </div>
               <div className="text-xs text-white/40">scrobbles</div>
             </div>
           )}
           {(spotify?.popularity ?? 0) > 0 && (
             <div>
-              <div className="text-2xl font-bold text-white/90">{spotify!.popularity}%</div>
+              <div className="text-2xl font-bold text-white/90">
+                {spotify!.popularity}%
+              </div>
               <div className="text-xs text-white/40">popularity</div>
             </div>
           )}
@@ -100,19 +128,52 @@ export function ArtistAboutSection({
 
       {(musicbrainz?.begin_date || musicbrainz?.country) && (
         <div>
-          <h3 className="text-sm font-semibold text-white/70 mb-3">Formation</h3>
+          <h3 className="text-sm font-semibold text-white/70 mb-3">
+            Formation
+          </h3>
           <div className="flex gap-6 text-sm text-white/50">
-            {musicbrainz?.begin_date && <div><span className="text-white/70 font-medium">{musicbrainz.begin_date}</span> formed</div>}
-            {musicbrainz?.country && <div><span className="text-white/70 font-medium">{musicbrainz.country}</span></div>}
-            {musicbrainz?.area && <div><span className="text-white/70 font-medium">{musicbrainz.area}</span></div>}
+            {musicbrainz?.begin_date && (
+              <div>
+                <span className="text-white/70 font-medium">
+                  {musicbrainz.begin_date}
+                </span>{" "}
+                formed
+              </div>
+            )}
+            {musicbrainz?.country && (
+              <div>
+                <span className="text-white/70 font-medium">
+                  {musicbrainz.country}
+                </span>
+              </div>
+            )}
+            {musicbrainz?.area && (
+              <div>
+                <span className="text-white/70 font-medium">
+                  {musicbrainz.area}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       <div className="flex gap-6 text-sm text-white/40">
-        <div><span className="text-white/70 font-medium">{albumCount}</span> albums in library</div>
-        <div><span className="text-white/70 font-medium">{formatNumber(totalTracks)}</span> tracks</div>
-        <div><span className="text-white/70 font-medium">{formatSize(totalSizeMb)}</span></div>
+        <div>
+          <span className="text-white/70 font-medium">{albumCount}</span> albums
+          in library
+        </div>
+        <div>
+          <span className="text-white/70 font-medium">
+            {formatNumber(totalTracks)}
+          </span>{" "}
+          tracks
+        </div>
+        <div>
+          <span className="text-white/70 font-medium">
+            {formatSize(totalSizeMb)}
+          </span>
+        </div>
       </div>
 
       {externalLinks.length > 0 && (

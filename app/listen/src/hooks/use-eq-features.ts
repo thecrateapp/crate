@@ -11,9 +11,9 @@ import { trackEqFeaturesApiPath } from "@/lib/library-routes";
  */
 export interface EqFeatures {
   energy: number | null;
-  loudness: number | null;          // LUFS, roughly -30..-6
-  dynamicRange: number | null;      // dB crest-like
-  brightness: number | null;        // normalized spectral centroid, 0..1
+  loudness: number | null; // LUFS, roughly -30..-6
+  dynamicRange: number | null; // dB crest-like
+  brightness: number | null; // normalized spectral centroid, 0..1
   danceability: number | null;
   valence: number | null;
   acousticness: number | null;
@@ -21,10 +21,10 @@ export interface EqFeatures {
 }
 
 export type EqFeaturesState =
-  | { status: "idle" }          // No track, or no hook consumer (adaptive off).
-  | { status: "loading" }       // Fetch in flight.
+  | { status: "idle" } // No track, or no hook consumer (adaptive off).
+  | { status: "loading" } // Fetch in flight.
   | { status: "ready"; features: EqFeatures }
-  | { status: "unavailable" };  // 404, backend error, or track has no persisted ID.
+  | { status: "unavailable" }; // 404, backend error, or track has no persisted ID.
 
 // In-memory cache so scrubbing through a playlist doesn't hit the API
 // again for tracks we've already seen in this session. Keyed by endpoint
@@ -93,7 +93,9 @@ export function useEqFeatures(track: Track | undefined): EqFeaturesState {
         setState(next);
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [track, track?.id, track?.entityUid, track?.libraryTrackId]);
 
   return state;

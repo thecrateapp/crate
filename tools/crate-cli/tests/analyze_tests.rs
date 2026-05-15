@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::create_test_wav;
+use common::{create_test_wav, create_test_wav_with_amplitude};
 use crate_cli::analyze::analyze_track;
 use tempfile::TempDir;
 
@@ -17,23 +17,7 @@ fn test_analyze_loudness() {
     assert!(loud_result.loudness.is_some());
 
     // Quiet sine wave - create manually with low amplitude
-    let quiet_path = dir.path().join("quiet.wav");
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: 22050,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut writer = hound::WavWriter::create(&quiet_path, spec).unwrap();
-    let num_samples = (22050.0 * 3.0) as usize;
-    for i in 0..num_samples {
-        let t = i as f32 / 22050.0;
-        let sample = (t * 440.0 * 2.0 * std::f32::consts::PI).sin() * 0.01;
-        writer
-            .write_sample((sample * i16::MAX as f32) as i16)
-            .unwrap();
-    }
-    writer.finalize().unwrap();
+    let quiet_path = create_test_wav_with_amplitude(&dir, "quiet.wav", 440.0, 3.0, 0.01);
 
     let quiet_result = analyze_track(&quiet_path);
     assert!(quiet_result.error.is_none());

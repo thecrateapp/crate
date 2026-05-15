@@ -60,16 +60,16 @@ Started by one person who couldn't stomach it anymore. Now looking for people wh
 
 ## Changes from v1
 
-| Addition | Where | Why |
-|----------|-------|-----|
-| Name Spotify, Apple, Amazon, YouTube | After pro-rata paragraph | Naming is accusing. Original hints — this makes it explicit |
-| Ethical nuance paragraph on piracy | Right after "self-defense" | Prevents reading as "don't pay anyone". Differentiates corporate piracy from stealing from artists |
-| Streaming vs Bandcamp math | After artists who left Spotify | Data instead of quote. Same argument, verifiable, no attribution risk |
-| Connection to broader struggles | Before "So yes: download the music" | Frames Crate within wider movements: housing, labor, surveillance |
-| "What you can do today" | Before the closing | Activism without concrete actions is posturing. 5 immediate steps |
-| Collective closing | Replaces original individualistic closing | From "own YOUR music" to "build YOUR OWN infrastructure together" |
-| Honest signature | Replaces anonymous "The Crate Squad" | Transparent about individual origin, inviting collective ownership |
-| "people who will still be self-hosting things in ten years" | Closing | Recovers the best line from the site (`GetInvolved.tsx`) and puts it where it belongs |
+| Addition                                                    | Where                                     | Why                                                                                                |
+| ----------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Name Spotify, Apple, Amazon, YouTube                        | After pro-rata paragraph                  | Naming is accusing. Original hints — this makes it explicit                                        |
+| Ethical nuance paragraph on piracy                          | Right after "self-defense"                | Prevents reading as "don't pay anyone". Differentiates corporate piracy from stealing from artists |
+| Streaming vs Bandcamp math                                  | After artists who left Spotify            | Data instead of quote. Same argument, verifiable, no attribution risk                              |
+| Connection to broader struggles                             | Before "So yes: download the music"       | Frames Crate within wider movements: housing, labor, surveillance                                  |
+| "What you can do today"                                     | Before the closing                        | Activism without concrete actions is posturing. 5 immediate steps                                  |
+| Collective closing                                          | Replaces original individualistic closing | From "own YOUR music" to "build YOUR OWN infrastructure together"                                  |
+| Honest signature                                            | Replaces anonymous "The Crate Squad"      | Transparent about individual origin, inviting collective ownership                                 |
+| "people who will still be self-hosting things in ten years" | Closing                                   | Recovers the best line from the site (`GetInvolved.tsx`) and puts it where it belongs              |
 
 ### What was NOT changed
 

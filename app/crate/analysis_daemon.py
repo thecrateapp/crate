@@ -59,6 +59,7 @@ def _should_pause_for_load() -> bool:
 def _claim_tracks(state_column: str, *, limit: int):
     return _db_claim_tracks(state_column, limit=limit)
 
+
 def _mark_failed(track_id: int, state_column: str):
     _db_mark_failed(track_id, state_column)
 
@@ -76,6 +77,7 @@ def _reset_stale_claims(state_column: str):
 def _get_pending_count(state_column: str) -> int:
     return _db_get_pending_count(state_column)
 
+
 def _store_analysis_results(results: list[tuple[int, str, dict]]):
     _db_store_analysis_results(results)
 
@@ -85,6 +87,7 @@ def _store_bliss_vectors(vectors_by_track_id: dict[int, list[float]]):
 
 
 # ── Audio Analysis Daemon ────────────────────────────────────────
+
 
 def analysis_daemon(config: dict):
     """Single-threaded daemon that analyzes one track at a time.
@@ -96,7 +99,10 @@ def analysis_daemon(config: dict):
         pending = _get_pending_count("analysis_state")
         log.info("Audio analysis daemon: %d tracks pending", pending)
     except Exception:
-        log.warning("Audio analysis daemon: startup state check failed; continuing", exc_info=True)
+        log.warning(
+            "Audio analysis daemon: startup state check failed; continuing",
+            exc_info=True,
+        )
 
     # Import analysis functions (loads Essentia/PANNs on first use)
     from crate.audio_analysis import analyze_batch, analyze_track
@@ -126,7 +132,9 @@ def analysis_daemon(config: dict):
 
             try:
                 batch_results = analyze_batch([track["path"] for track in batch])
-                if not isinstance(batch_results, list) or len(batch_results) != len(batch):
+                if not isinstance(batch_results, list) or len(batch_results) != len(
+                    batch
+                ):
                     raise ValueError("Batch analysis returned mismatched result count")
 
                 for track, result in zip(batch, batch_results):
@@ -139,7 +147,10 @@ def analysis_daemon(config: dict):
                         log.warning("Analysis returned no BPM for: %s", path)
             except Exception:
                 batch_failed = True
-                log.warning("Batch analysis failed, falling back to per-track analysis", exc_info=True)
+                log.warning(
+                    "Batch analysis failed, falling back to per-track analysis",
+                    exc_info=True,
+                )
 
             if batch_failed:
                 successful_results = []
@@ -161,7 +172,8 @@ def analysis_daemon(config: dict):
                         if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                             log.warning(
                                 "Analysis daemon: %d consecutive failures, backing off %ds",
-                                consecutive_failures, FAILURE_BACKOFF,
+                                consecutive_failures,
+                                FAILURE_BACKOFF,
                             )
                             time.sleep(FAILURE_BACKOFF)
                             consecutive_failures = 0
@@ -186,6 +198,7 @@ def analysis_daemon(config: dict):
 
 # ── Bliss Daemon ─────────────────────────────────────────────────
 
+
 def bliss_daemon(config: dict):
     """Single-threaded daemon that computes bliss vectors one track at a time."""
     from crate.bliss import is_available
@@ -201,7 +214,9 @@ def bliss_daemon(config: dict):
         pending = _get_pending_count("bliss_state")
         log.info("Bliss daemon: %d tracks pending", pending)
     except Exception:
-        log.warning("Bliss daemon: startup state check failed; continuing", exc_info=True)
+        log.warning(
+            "Bliss daemon: startup state check failed; continuing", exc_info=True
+        )
 
     from crate.bliss import analyze_directory, analyze_file
 
@@ -236,7 +251,11 @@ def bliss_daemon(config: dict):
                 try:
                     batch_vectors = analyze_directory(directory)
                 except Exception:
-                    log.warning("Bliss batch analysis failed for directory: %s", directory, exc_info=True)
+                    log.warning(
+                        "Bliss batch analysis failed for directory: %s",
+                        directory,
+                        exc_info=True,
+                    )
 
                 for track in directory_tracks:
                     track_id = track["id"]
@@ -261,7 +280,8 @@ def bliss_daemon(config: dict):
                         if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                             log.warning(
                                 "Bliss daemon: %d consecutive failures, backing off %ds",
-                                consecutive_failures, FAILURE_BACKOFF,
+                                consecutive_failures,
+                                FAILURE_BACKOFF,
                             )
                             time.sleep(FAILURE_BACKOFF)
                             consecutive_failures = 0
@@ -270,7 +290,9 @@ def bliss_daemon(config: dict):
                 _store_bliss_vectors(successful_vectors)
                 for track in batch:
                     if int(track["id"]) in successful_vectors:
-                        log.debug("Bliss computed: %s", track.get("title", track["path"]))
+                        log.debug(
+                            "Bliss computed: %s", track.get("title", track["path"])
+                        )
                 consecutive_failures = 0
 
             time.sleep(TRACK_SLEEP)
@@ -281,6 +303,7 @@ def bliss_daemon(config: dict):
 
 
 # ── Status ───────────────────────────────────────────────────────
+
 
 def get_analysis_status() -> dict:
     """Return current analysis progress for both daemons."""

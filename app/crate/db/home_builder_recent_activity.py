@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from crate.db.home_builder_shared import _album_identity, _artist_identity, _select_diverse_tracks_with_backfill
-from crate.db.queries.home import get_artist_core_track_rows, get_library_artist_by_id, get_recent_playlist_rows_with_artwork
+from crate.db.home_builder_shared import (
+    _album_identity,
+    _artist_identity,
+    _select_diverse_tracks_with_backfill,
+)
+from crate.db.queries.home import (
+    get_artist_core_track_rows,
+    get_library_artist_by_id,
+    get_recent_playlist_rows_with_artwork,
+)
 from crate.db.queries.user_library import get_play_history
 
 
@@ -63,7 +71,10 @@ def build_recently_played(user_id: int, limit: int = 9) -> list[dict]:
                     "played_at": row.get("played_at"),
                 }
             )
-        if len(recent_artists) >= target_per_bucket and len(recent_albums) >= target_per_bucket:
+        if (
+            len(recent_artists) >= target_per_bucket
+            and len(recent_albums) >= target_per_bucket
+        ):
             break
 
     recent_playlists = get_recent_playlist_rows_with_artwork(user_id, target_per_bucket)
@@ -86,8 +97,12 @@ def build_artist_core_rows(
     artist_name: str,
     limit: int,
 ) -> list[dict]:
-    rows = get_artist_core_track_rows(artist_id=artist_id, artist_name=artist_name, limit=limit)
-    return _select_diverse_tracks_with_backfill(rows, limit=limit, max_per_artist=limit, max_per_album=2)
+    rows = get_artist_core_track_rows(
+        artist_id=artist_id, artist_name=artist_name, limit=limit
+    )
+    return _select_diverse_tracks_with_backfill(
+        rows, limit=limit, max_per_artist=limit, max_per_album=2
+    )
 
 
 def get_library_artist(artist_id: int) -> dict | None:

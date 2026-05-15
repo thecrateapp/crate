@@ -13,7 +13,8 @@ const authState = vi.hoisted(() => ({
 }));
 
 vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof import("react-router")>("react-router");
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
     useNavigate: () => mockNavigate,
@@ -42,7 +43,11 @@ describe("AuthCallback", () => {
     authState.user = null;
     authState.loading = true;
     localStorage.clear();
-    window.history.replaceState({}, "", "/auth/callback?token=oauth-token&next=%2Fstats");
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/callback?token=oauth-token&next=%2Fstats",
+    );
   });
 
   afterEach(() => {
@@ -54,7 +59,11 @@ describe("AuthCallback", () => {
 
     const { rerender } = render(<AuthCallback />);
 
-    expect(mockSetAuthTokens).toHaveBeenCalledWith("oauth-token", undefined, null);
+    expect(mockSetAuthTokens).toHaveBeenCalledWith(
+      "oauth-token",
+      undefined,
+      null,
+    );
     expect(localStorage.getItem("crate-oauth-next")).toBe("/stats");
     expect(mockRefetch).toHaveBeenCalledTimes(1);
     expect(mockNavigate).not.toHaveBeenCalled();

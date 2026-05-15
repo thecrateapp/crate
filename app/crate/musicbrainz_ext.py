@@ -7,9 +7,9 @@ from crate.db.cache_store import get_cache, set_cache
 log = logging.getLogger(__name__)
 
 
-
 def _search_mbid(name: str) -> str | None:
     from thefuzz import fuzz
+
     try:
         result = musicbrainzngs.search_artists(artist=name, limit=5)
         artists = result.get("artist-list", [])
@@ -107,8 +107,10 @@ def get_artist_releases(mbid: str) -> list[dict]:
             page += 1
             try:
                 result = musicbrainzngs.browse_release_groups(
-                    artist=mbid, release_type=["album", "ep"],
-                    limit=100, offset=offset,
+                    artist=mbid,
+                    release_type=["album", "ep"],
+                    limit=100,
+                    offset=offset,
                 )
             except musicbrainzngs.ResponseError:
                 log.debug("MB 404/error for MBID %s, skipping", mbid)
@@ -122,13 +124,15 @@ def get_artist_releases(mbid: str) -> list[dict]:
                 rg_type = rg.get("primary-type", "Album")
                 first_release = rg.get("first-release-date", "")
                 year = first_release[:4] if first_release else ""
-                all_releases.append({
-                    "title": title,
-                    "year": year,
-                    "type": rg_type,
-                    "mbid": rg.get("id", ""),
-                    "first_release_date": first_release,
-                })
+                all_releases.append(
+                    {
+                        "title": title,
+                        "year": year,
+                        "type": rg_type,
+                        "mbid": rg.get("id", ""),
+                        "first_release_date": first_release,
+                    }
+                )
             offset += len(groups)
             if offset >= int(result.get("release-group-count", 0)):
                 break

@@ -138,17 +138,19 @@ def dedupe_track_variants(rows: list[dict]) -> list[dict]:
             continue
         grouped.setdefault(identity, []).append((index, row))
 
-    ordered = [
-        (index, row)
-        for index, row in passthrough
-    ]
+    ordered = [(index, row) for index, row in passthrough]
     for entries in grouped.values():
         if len(entries) == 1:
             ordered.append(entries[0])
             continue
 
-        raw_title_keys = {_normalized_track_title_key(str(row.get("title") or "")) for _index, row in entries}
-        ranks = [track_variant_rank(str(row.get("title") or "")) for _index, row in entries]
+        raw_title_keys = {
+            _normalized_track_title_key(str(row.get("title") or ""))
+            for _index, row in entries
+        }
+        ranks = [
+            track_variant_rank(str(row.get("title") or "")) for _index, row in entries
+        ]
         has_version_signal = any(rank > 0 for rank in ranks) or len(raw_title_keys) > 1
         if not has_version_signal:
             ordered.extend(entries)

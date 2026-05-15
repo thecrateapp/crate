@@ -3,7 +3,11 @@ import { ChevronDown, Search } from "lucide-react";
 
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Input } from "@crate/ui/shadcn/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@crate/ui/shadcn/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@crate/ui/shadcn/popover";
 import { cn } from "@crate/ui/lib/cn";
 
 export interface AdminSelectOption {
@@ -50,12 +54,15 @@ export function AdminSelect({
     const normalized = search.trim().toLowerCase();
     if (!normalized) return options;
     return options.filter((option) => {
-      const haystack = `${option.label} ${option.searchText ?? ""}`.toLowerCase();
+      const haystack = `${option.label} ${
+        option.searchText ?? ""
+      }`.toLowerCase();
       return haystack.includes(normalized);
     });
   }, [options, search]);
 
-  const selectedLabel = options.find((option) => option.value === value)?.label ?? placeholder;
+  const selectedLabel =
+    options.find((option) => option.value === value)?.label ?? placeholder;
 
   return (
     <Popover
@@ -91,64 +98,71 @@ export function AdminSelect({
         }}
         className={cn("w-[240px] overflow-hidden p-2", menuClassName)}
       >
-          {searchable ? (
-            <div className="border-b border-white/5 px-1 pb-2">
-              <div className="relative">
-                <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
-                <Input
-                  type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={searchPlaceholder}
-                  autoFocus
-                  className="h-10 border-white/10 bg-black/25 pl-9 text-sm"
-                />
-              </div>
+        {searchable ? (
+          <div className="border-b border-white/5 px-1 pb-2">
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              />
+              <Input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={searchPlaceholder}
+                autoFocus
+                className="h-10 border-white/10 bg-black/25 pl-9 text-sm"
+              />
             </div>
+          </div>
+        ) : null}
+
+        <div className="max-h-[220px] overflow-y-auto p-1">
+          {allowClear ? (
+            <button
+              type="button"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+                setSearch("");
+              }}
+              className={cn(
+                "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white",
+                !value && "bg-primary/10 text-primary",
+              )}
+            >
+              <span>{placeholder}</span>
+              {!value ? <CrateChip active>Default</CrateChip> : null}
+            </button>
           ) : null}
 
-          <div className="max-h-[220px] overflow-y-auto p-1">
-            {allowClear ? (
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
               <button
                 type="button"
+                key={option.value}
                 onClick={() => {
-                  onChange("");
+                  onChange(option.value);
                   setOpen(false);
                   setSearch("");
                 }}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white",
-                  !value && "bg-primary/10 text-primary",
+                  value === option.value && "bg-primary/10 text-primary",
                 )}
               >
-                <span>{placeholder}</span>
-                {!value ? <CrateChip active>Default</CrateChip> : null}
+                <span className="truncate">{option.label}</span>
+                {option.count != null ? (
+                  <CrateChip className="text-[10px]">{option.count}</CrateChip>
+                ) : null}
               </button>
-            ) : null}
-
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white",
-                    value === option.value && "bg-primary/10 text-primary",
-                  )}
-                >
-                  <span className="truncate">{option.label}</span>
-                  {option.count != null ? <CrateChip className="text-[10px]">{option.count}</CrateChip> : null}
-                </button>
-              ))
-            ) : (
-              <div className="px-2 py-4 text-center text-sm text-white/40">{noMatchesLabel}</div>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="px-2 py-4 text-center text-sm text-white/40">
+              {noMatchesLabel}
+            </div>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );

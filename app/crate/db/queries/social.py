@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from crate.db.queries.social_affinity import get_affinity_overlap_counts, get_cached_affinity
+from crate.db.queries.social_affinity import (
+    get_affinity_overlap_counts,
+    get_cached_affinity,
+)
 from crate.db.queries.social_profiles import (
     get_followers,
     get_following,

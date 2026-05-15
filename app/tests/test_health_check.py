@@ -4,7 +4,6 @@ from pathlib import Path
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 class TestDuplicateFolders:
     @staticmethod
@@ -64,6 +63,7 @@ class TestDuplicateFolders:
 
     def test_empty_library(self):
         from crate.health_check import LibraryHealthCheck
+
         with tempfile.TemporaryDirectory() as lib:
             config = {"library_path": lib}
             hc = LibraryHealthCheck(config)
@@ -131,7 +131,9 @@ class TestStaleTracks:
                 {"path": missing_path, "artist": "B"},
             ]
 
-            with patch("crate.health_check.get_tracks_sample", return_value=mock_tracks):
+            with patch(
+                "crate.health_check.get_tracks_sample", return_value=mock_tracks
+            ):
                 issues = hc._check_stale_tracks()
 
         assert len(issues) == 1
@@ -160,7 +162,9 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch("crate.health_check.get_albums_with_year", return_value=mock_rows):
+            with patch(
+                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            ):
                 issues = hc._check_folder_naming()
 
         assert len(issues) == 1
@@ -189,7 +193,9 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch("crate.health_check.get_albums_with_year", return_value=mock_rows):
+            with patch(
+                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            ):
                 issues = hc._check_folder_naming()
 
         assert len(issues) == 0
@@ -214,7 +220,9 @@ class TestFolderNaming:
                 },
             ]
 
-            with patch("crate.health_check.get_albums_with_year", return_value=mock_rows):
+            with patch(
+                "crate.health_check.get_albums_with_year", return_value=mock_rows
+            ):
                 issues = hc._check_folder_naming()
 
         assert len(issues) == 1
@@ -258,7 +266,9 @@ class TestHasPhotoDesync:
                 {"name": "Band", "folder_name": "Band", "has_photo": True},
             ]
 
-            with patch("crate.health_check.get_artists_with_photo", return_value=mock_rows):
+            with patch(
+                "crate.health_check.get_artists_with_photo", return_value=mock_rows
+            ):
                 issues = hc._check_has_photo_desync()
 
         assert len(issues) == 1
@@ -280,7 +290,9 @@ class TestHasPhotoDesync:
                 {"name": "Band", "folder_name": "Band", "has_photo": True},
             ]
 
-            with patch("crate.health_check.get_artists_with_photo", return_value=mock_rows):
+            with patch(
+                "crate.health_check.get_artists_with_photo", return_value=mock_rows
+            ):
                 issues = hc._check_has_photo_desync()
 
         assert len(issues) == 0
@@ -303,7 +315,12 @@ class TestRunOrchestration:
                     setattr(hc, attr, MagicMock(return_value=[]))
 
             hc._check_zombie_artists.return_value = [
-                {"check": "zombie_artists", "severity": "low", "auto_fixable": True, "details": {"artist": "X"}},
+                {
+                    "check": "zombie_artists",
+                    "severity": "low",
+                    "auto_fixable": True,
+                    "details": {"artist": "X"},
+                },
             ]
 
             result = hc.run(persist=False)
@@ -326,7 +343,12 @@ class TestRunOrchestration:
 
             hc._check_duplicate_folders.side_effect = RuntimeError("boom")
             hc._check_zombie_artists.return_value = [
-                {"check": "zombie_artists", "severity": "low", "auto_fixable": True, "details": {"artist": "Y"}},
+                {
+                    "check": "zombie_artists",
+                    "severity": "low",
+                    "auto_fixable": True,
+                    "details": {"artist": "Y"},
+                },
             ]
 
             result = hc.run(persist=False)
@@ -346,10 +368,19 @@ class TestRunOrchestration:
                     setattr(hc, attr, MagicMock(return_value=[]))
 
             hc._check_zombie_artists.return_value = [
-                {"check": "zombie_artists", "severity": "low", "auto_fixable": True, "details": {"artist": "X"}},
+                {
+                    "check": "zombie_artists",
+                    "severity": "low",
+                    "auto_fixable": True,
+                    "details": {"artist": "X"},
+                },
             ]
             hc._check_duplicate_albums.return_value = [
-                {"check": "duplicate_albums", "severity": "medium", "details": {"artist": "Y", "album": "Album"}},
+                {
+                    "check": "duplicate_albums",
+                    "severity": "medium",
+                    "details": {"artist": "Y", "album": "Album"},
+                },
             ]
 
             result = hc.run_selected({"zombie_artists"}, persist=False)

@@ -1,7 +1,10 @@
 import { toast } from "sonner";
 import type { LucideIcon } from "lucide-react";
 
-import { buildArtistPlayerTrack, type ArtistTopTrack } from "@/components/artist/artist-model";
+import {
+  buildArtistPlayerTrack,
+  type ArtistTopTrack,
+} from "@/components/artist/artist-model";
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import type { Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
@@ -111,15 +114,23 @@ export function trackToMenuData(track: Track): TrackMenuData {
 }
 
 /** Rebuild a player-ready Track from menu data, honoring optional cover override and carrying metadata. */
-export function buildTrackMenuPlayerTrack(track: TrackMenuData, cover?: string): Track {
-  const resolvedCover = cover || (track.album_id != null
-    ? albumCoverApiUrl({
-        albumId: track.album_id,
-        albumSlug: track.album_slug,
-        artistName: track.artist,
-        albumName: track.album,
-      }, { size: 512 })
-    : undefined);
+export function buildTrackMenuPlayerTrack(
+  track: TrackMenuData,
+  cover?: string,
+): Track {
+  const resolvedCover =
+    cover ||
+    (track.album_id != null
+      ? albumCoverApiUrl(
+          {
+            albumId: track.album_id,
+            albumSlug: track.album_slug,
+            artistName: track.artist,
+            albumName: track.album,
+          },
+          { size: 512 },
+        )
+      : undefined);
 
   return toPlayableTrack(track, { cover: resolvedCover });
 }
@@ -176,58 +187,84 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
       bliss_vector?: number[] | null;
       tags: { title: string };
     }>;
-  }>(albumApiPath({
-    albumId: data.albumId,
-    albumEntityUid: data.albumEntityUid,
-    albumSlug: data.albumSlug,
-    artistSlug: data.artistSlug,
-    artistName: data.artist,
-    albumName: data.album,
-  }));
+  }>(
+    albumApiPath({
+      albumId: data.albumId,
+      albumEntityUid: data.albumEntityUid,
+      albumSlug: data.albumSlug,
+      artistSlug: data.artistSlug,
+      artistName: data.artist,
+      albumName: data.album,
+    }),
+  );
 
-  const coverUrl = data.cover || albumCoverApiUrl({
-    albumId: data.albumId,
-    albumEntityUid: data.albumEntityUid,
-    albumSlug: data.albumSlug,
-    artistName: data.artist,
-    albumName: data.album,
-  }, { size: 512 });
+  const coverUrl =
+    data.cover ||
+    albumCoverApiUrl(
+      {
+        albumId: data.albumId,
+        albumEntityUid: data.albumEntityUid,
+        albumSlug: data.albumSlug,
+        artistName: data.artist,
+        albumName: data.album,
+      },
+      { size: 512 },
+    );
 
-  return (response.tracks || []).map((track) => toPlayableTrack({
-    id: track.id,
-    entity_uid: track.entity_uid,
-    title: track.tags?.title || track.filename || "Unknown",
-    artist: response.artist,
-    album: response.display_name || response.name,
-    album_id: data.albumId,
-    album_entity_uid: data.albumEntityUid,
-    album_slug: data.albumSlug,
-    duration: track.length_sec,
-    path: track.path,
-    format: track.format || undefined,
-    bitrate: track.bitrate,
-    sample_rate: track.sample_rate,
-    bit_depth: track.bit_depth,
-    bpm: track.bpm,
-    audio_key: track.audio_key,
-    audio_scale: track.audio_scale,
-    energy: track.energy,
-    danceability: track.danceability,
-    valence: track.valence,
-    bliss_vector: track.bliss_vector,
-  }, { cover: coverUrl || undefined }));
+  return (response.tracks || []).map((track) =>
+    toPlayableTrack(
+      {
+        id: track.id,
+        entity_uid: track.entity_uid,
+        title: track.tags?.title || track.filename || "Unknown",
+        artist: response.artist,
+        album: response.display_name || response.name,
+        album_id: data.albumId,
+        album_entity_uid: data.albumEntityUid,
+        album_slug: data.albumSlug,
+        duration: track.length_sec,
+        path: track.path,
+        format: track.format || undefined,
+        bitrate: track.bitrate,
+        sample_rate: track.sample_rate,
+        bit_depth: track.bit_depth,
+        bpm: track.bpm,
+        audio_key: track.audio_key,
+        audio_scale: track.audio_scale,
+        energy: track.energy,
+        danceability: track.danceability,
+        valence: track.valence,
+        bliss_vector: track.bliss_vector,
+      },
+      { cover: coverUrl || undefined },
+    ),
+  );
 }
 
-export async function fetchArtistTopTracks(artist: ArtistMenuData): Promise<Track[]> {
+export async function fetchArtistTopTracks(
+  artist: ArtistMenuData,
+): Promise<Track[]> {
   const topTracks = artist.artistSlug
-    ? await api<ArtistTopTrack[]>(`/api/artist-slugs/${encodeURIComponent(artist.artistSlug)}/top-tracks?count=12`)
+    ? await api<ArtistTopTrack[]>(
+        `/api/artist-slugs/${encodeURIComponent(
+          artist.artistSlug,
+        )}/top-tracks?count=12`,
+      )
     : artist.artistId != null
-      ? await api<ArtistTopTrack[]>(`/api/artists/${artist.artistId}/top-tracks?count=12`)
+      ? await api<ArtistTopTrack[]>(
+          `/api/artists/${artist.artistId}/top-tracks?count=12`,
+        )
       : [];
-  const coverFallback = artistPhotoApiUrl({
-    artistId: artist.artistId,
-    artistSlug: artist.artistSlug,
-    artistName: artist.name,
-  }, { size: 512 }) || undefined;
-  return (topTracks || []).map((track) => buildArtistPlayerTrack(track, artist.name, coverFallback));
+  const coverFallback =
+    artistPhotoApiUrl(
+      {
+        artistId: artist.artistId,
+        artistSlug: artist.artistSlug,
+        artistName: artist.name,
+      },
+      { size: 512 },
+    ) || undefined;
+  return (topTracks || []).map((track) =>
+    buildArtistPlayerTrack(track, artist.name, coverFallback),
+  );
 }

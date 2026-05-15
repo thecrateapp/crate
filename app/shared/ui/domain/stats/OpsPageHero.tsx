@@ -19,7 +19,12 @@ export function OpsPageHero({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl", className)}>
+    <section
+      className={cn(
+        "rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl",
+        className,
+      )}
+    >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -27,13 +32,21 @@ export function OpsPageHero({
               <Icon size={22} />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-white">{title}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight text-white">
+                {title}
+              </h1>
               <p className="text-sm text-white/55">{description}</p>
             </div>
           </div>
-          {children ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null}
+          {children ? (
+            <div className="flex flex-wrap items-center gap-2">{children}</div>
+          ) : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2 xl:justify-end">{actions}</div> : null}
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </section>
   );

@@ -18,7 +18,9 @@ down_revision = "010"
 
 def _ensure_vector_extension() -> None:
     bind = op.get_bind()
-    exists = bind.execute(text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')")).scalar()
+    exists = bind.execute(
+        text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+    ).scalar()
     if exists:
         return
 
@@ -56,7 +58,9 @@ def _ensure_vector_extension() -> None:
 
 def upgrade() -> None:
     _ensure_vector_extension()
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS bliss_embedding vector(20)")
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS bliss_embedding vector(20)"
+    )
     # Historical backfill is intentionally deferred outside Alembic so
     # startup migrations stay fast and don't wedge production on large libraries.
     with op.get_context().autocommit_block():
@@ -71,5 +75,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.get_context().autocommit_block():
-        op.execute("DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_hnsw")
+        op.execute(
+            "DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_hnsw"
+        )
     op.execute("ALTER TABLE library_tracks DROP COLUMN IF EXISTS bliss_embedding")

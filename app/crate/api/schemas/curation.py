@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from crate.api.schemas.common import OkResponse, SnapshotMetadataResponse
-from crate.api.schemas.playlists import PlaylistDetailResponse, PlaylistSummaryResponse, PlaylistTrackResponse
+from crate.api.schemas.playlists import PlaylistSummaryResponse, PlaylistTrackResponse
 
 
 class CreateSystemPlaylistRequest(BaseModel):

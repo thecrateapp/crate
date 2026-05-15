@@ -11,7 +11,11 @@ const MAX_DISPLAY_DB = -15;
 const BAR_GAP = 2;
 const MIN_BAR_WIDTH = 2;
 
-function generateFractionalOctaveCenters(divisionsPerOctave: number, minFrequency = 31.5, maxFrequency = 16000) {
+function generateFractionalOctaveCenters(
+  divisionsPerOctave: number,
+  minFrequency = 31.5,
+  maxFrequency = 16000,
+) {
   const centers: number[] = [];
   const ratio = Math.pow(2, 1 / divisionsPerOctave);
   let frequency = minFrequency;
@@ -45,9 +49,10 @@ function aWeighting(frequency: number) {
   if (frequency <= 0) return 0;
   const f2 = frequency * frequency;
   const numerator = Math.pow(12200, 2) * Math.pow(f2, 2);
-  const denominator = (f2 + Math.pow(20.6, 2))
-    * Math.sqrt((f2 + Math.pow(107.7, 2)) * (f2 + Math.pow(737.9, 2)))
-    * (f2 + Math.pow(12200, 2));
+  const denominator =
+    (f2 + Math.pow(20.6, 2)) *
+    Math.sqrt((f2 + Math.pow(107.7, 2)) * (f2 + Math.pow(737.9, 2))) *
+    (f2 + Math.pow(12200, 2));
   return 2 + 20 * Math.log10(numerator / denominator);
 }
 
@@ -59,8 +64,13 @@ function getDisplayedCenters(width: number) {
   return THIRD_OCTAVE_CENTERS.filter((_, i) => i % step === 0);
 }
 
-function buildBandTargets(frequenciesDb: number[], sampleRate: number, centers: readonly number[]) {
-  if (!frequenciesDb.length || !centers.length) return Array.from({ length: centers.length }, () => 0);
+function buildBandTargets(
+  frequenciesDb: number[],
+  sampleRate: number,
+  centers: readonly number[],
+) {
+  if (!frequenciesDb.length || !centers.length)
+    return Array.from({ length: centers.length }, () => 0);
 
   const nyquist = sampleRate * 0.5;
   const binFrequency = nyquist / frequenciesDb.length;
@@ -79,7 +89,9 @@ function buildBandTargets(frequenciesDb: number[], sampleRate: number, centers: 
     for (let index = startIndex; index < endIndex; index += 1) {
       const frequency = index * binFrequency;
       const weightingDb = aWeighting(frequency) * 0.35;
-      const amplitude = dbToAmplitude((frequenciesDb[index] ?? MIN_DISPLAY_DB) + weightingDb);
+      const amplitude = dbToAmplitude(
+        (frequenciesDb[index] ?? MIN_DISPLAY_DB) + weightingDb,
+      );
       peak = Math.max(peak, amplitude);
       rmsSum += amplitude * amplitude;
       count += 1;
@@ -90,7 +102,11 @@ function buildBandTargets(frequenciesDb: number[], sampleRate: number, centers: 
     const rms = Math.sqrt(rmsSum / count);
     const composite = peak * 0.6 + rms * 0.4;
     const compensatedDb = amplitudeToDb(composite);
-    const normalized = clamp((compensatedDb - MIN_DISPLAY_DB) / (MAX_DISPLAY_DB - MIN_DISPLAY_DB), 0, 1);
+    const normalized = clamp(
+      (compensatedDb - MIN_DISPLAY_DB) / (MAX_DISPLAY_DB - MIN_DISPLAY_DB),
+      0,
+      1,
+    );
     return Math.pow(normalized, 0.7);
   });
 }
@@ -136,8 +152,14 @@ export const WaveformCanvas = memo(function WaveformCanvas({
 
     const ensureBuffers = (bandCount: number) => {
       if (targetsRef.current.length === bandCount) return;
-      currentRef.current = Array.from({ length: bandCount }, (_, i) => currentRef.current[i] ?? 0);
-      peaksRef.current = Array.from({ length: bandCount }, (_, i) => peaksRef.current[i] ?? 0);
+      currentRef.current = Array.from(
+        { length: bandCount },
+        (_, i) => currentRef.current[i] ?? 0,
+      );
+      peaksRef.current = Array.from(
+        { length: bandCount },
+        (_, i) => peaksRef.current[i] ?? 0,
+      );
     };
 
     const context = canvas.getContext("2d");
@@ -162,7 +184,11 @@ export const WaveformCanvas = memo(function WaveformCanvas({
       const centers = getDisplayedCenters(width);
       const barCount = centers.length;
       ensureBuffers(barCount);
-      targetsRef.current = buildBandTargets(frequenciesDbRef.current, sampleRate, centers);
+      targetsRef.current = buildBandTargets(
+        frequenciesDbRef.current,
+        sampleRate,
+        centers,
+      );
 
       context.clearRect(0, 0, width, height);
 
@@ -172,7 +198,10 @@ export const WaveformCanvas = memo(function WaveformCanvas({
       const baselineY = height;
       const usableHeight = height - 2;
       const totalBarSpace = width;
-      const barWidth = Math.max(MIN_BAR_WIDTH, (totalBarSpace - (barCount - 1) * BAR_GAP) / barCount);
+      const barWidth = Math.max(
+        MIN_BAR_WIDTH,
+        (totalBarSpace - (barCount - 1) * BAR_GAP) / barCount,
+      );
       const totalUsed = barCount * barWidth + (barCount - 1) * BAR_GAP;
       const offsetX = (width - totalUsed) / 2;
 
@@ -191,12 +220,14 @@ export const WaveformCanvas = memo(function WaveformCanvas({
       for (let i = 0; i < barCount; i += 1) {
         const target = targetsRef.current[i] ?? 0;
         const current = currentRef.current[i] ?? 0;
-        const eased = current + (target - current) * (target > current ? attack : release);
+        const eased =
+          current + (target - current) * (target > current ? attack : release);
         currentRef.current[i] = eased;
 
-        peaksRef.current[i] = target >= (peaksRef.current[i] ?? 0)
-          ? target
-          : Math.max(eased, (peaksRef.current[i] ?? 0) - peakDrop);
+        peaksRef.current[i] =
+          target >= (peaksRef.current[i] ?? 0)
+            ? target
+            : Math.max(eased, (peaksRef.current[i] ?? 0) - peakDrop);
 
         const barH = Math.max(0, eased * usableHeight);
         if (barH > 0.5) {

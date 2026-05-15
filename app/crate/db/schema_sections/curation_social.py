@@ -13,7 +13,9 @@ def create_curation_social_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_relationships_followed ON user_relationships(followed_user_id, created_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_relationships_followed ON user_relationships(followed_user_id, created_at DESC)"
+    )
 
     cur.execute(
         """
@@ -29,7 +31,9 @@ def create_curation_social_schema(cur) -> None:
         )
         """
     )
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_affinity_cache_score ON user_affinity_cache(affinity_score DESC, computed_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_affinity_cache_score ON user_affinity_cache(affinity_score DESC, computed_at DESC)"
+    )
 
 
 __all__ = [

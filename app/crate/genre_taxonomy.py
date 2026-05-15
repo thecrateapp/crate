@@ -38,23 +38,23 @@ class GenreDefinition:
 # defined in app/listen/src/lib/equalizer.ts — if you tune one side,
 # sync the other.
 
-_EQ_ROCK        = (4.0, 3.0, -1.0, -3.0, -2.0, 1.0, 3.0, 5.0, 5.0, 5.0)
-_EQ_POP         = (-1.0, 2.0, 4.0, 4.0, 2.0, -1.0, -1.0, -1.0, -1.0, -1.0)
-_EQ_JAZZ        = (3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0)
-_EQ_CLASSICAL   = (4.0, 3.0, 2.0, 1.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0)
-_EQ_ELECTRONIC  = (5.0, 4.0, 1.0, -1.0, -2.0, 1.0, 0.0, 1.0, 4.0, 5.0)
-_EQ_ACOUSTIC    = (4.0, 3.0, 2.0, 1.0, 2.0, 2.0, 3.0, 3.0, 2.0, 1.0)
-_EQ_HIP_HOP     = (6.0, 5.0, 3.0, 1.0, 0.0, 1.0, 2.0, 3.0, 3.0, 2.0)
+_EQ_ROCK = (4.0, 3.0, -1.0, -3.0, -2.0, 1.0, 3.0, 5.0, 5.0, 5.0)
+_EQ_POP = (-1.0, 2.0, 4.0, 4.0, 2.0, -1.0, -1.0, -1.0, -1.0, -1.0)
+_EQ_JAZZ = (3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0)
+_EQ_CLASSICAL = (4.0, 3.0, 2.0, 1.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0)
+_EQ_ELECTRONIC = (5.0, 4.0, 1.0, -1.0, -2.0, 1.0, 0.0, 1.0, 4.0, 5.0)
+_EQ_ACOUSTIC = (4.0, 3.0, 2.0, 1.0, 2.0, 2.0, 3.0, 3.0, 2.0, 1.0)
+_EQ_HIP_HOP = (6.0, 5.0, 3.0, 1.0, 0.0, 1.0, 2.0, 3.0, 3.0, 2.0)
 _EQ_BLACK_METAL = (-1.0, 3.0, 4.0, 1.0, -3.0, -2.0, 3.0, 6.0, 6.0, 4.0)
 _EQ_DEATH_METAL = (2.0, 5.0, 6.0, 4.0, -3.0, -2.0, 4.0, 5.0, 2.0, 0.0)
-_EQ_THRASH      = (3.0, 5.0, 4.0, 0.0, -4.0, -3.0, 2.0, 5.0, 6.0, 5.0)
-_EQ_DOOM        = (6.0, 6.0, 5.0, 3.0, 0.0, -2.0, -3.0, -3.0, -2.0, -1.0)
-_EQ_HARDCORE    = (4.0, 4.0, 2.0, -1.0, 1.0, 3.0, 5.0, 4.0, 2.0, 1.0)
-_EQ_PUNK        = (2.0, 3.0, 1.0, -1.0, 2.0, 4.0, 4.0, 3.0, 1.0, -1.0)
+_EQ_THRASH = (3.0, 5.0, 4.0, 0.0, -4.0, -3.0, 2.0, 5.0, 6.0, 5.0)
+_EQ_DOOM = (6.0, 6.0, 5.0, 3.0, 0.0, -2.0, -3.0, -3.0, -2.0, -1.0)
+_EQ_HARDCORE = (4.0, 4.0, 2.0, -1.0, 1.0, 3.0, 5.0, 4.0, 2.0, 1.0)
+_EQ_PUNK = (2.0, 3.0, 1.0, -1.0, 2.0, 4.0, 4.0, 3.0, 1.0, -1.0)
 _EQ_PROGRESSIVE = (2.0, 2.0, 1.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0)
-_EQ_SHOEGAZE    = (1.0, 2.0, 3.0, 3.0, 4.0, 3.0, 2.0, 1.0, 0.0, 0.0)
-_EQ_POST_ROCK   = (2.0, 2.0, 2.0, 1.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0)
-_EQ_LO_FI       = (1.0, 2.0, 2.0, 1.0, 1.0, 0.0, 0.0, 1.0, 2.0, 1.0)
+_EQ_SHOEGAZE = (1.0, 2.0, 3.0, 3.0, 4.0, 3.0, 2.0, 1.0, 0.0, 0.0)
+_EQ_POST_ROCK = (2.0, 2.0, 2.0, 1.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0)
+_EQ_LO_FI = (1.0, 2.0, 2.0, 1.0, 1.0, 0.0, 0.0, 1.0, 2.0, 1.0)
 
 
 _GENRE_DESCRIPTIONS: dict[str, str] = {
@@ -125,25 +125,33 @@ _GENRE_DESCRIPTIONS: dict[str, str] = {
 def _normalize_genre_definition(definition: GenreDefinition) -> GenreDefinition:
     slug = slugify_genre(definition.slug)
     name = (definition.name or definition.slug).strip().lower()
-    description = (_GENRE_DESCRIPTIONS.get(slug) or definition.description or "").strip().lower()
+    description = (
+        (_GENRE_DESCRIPTIONS.get(slug) or definition.description or "").strip().lower()
+    )
     aliases = tuple(
         dict.fromkeys(
             normalized
-            for normalized in ((alias or "").strip().lower() for alias in definition.aliases)
+            for normalized in (
+                (alias or "").strip().lower() for alias in definition.aliases
+            )
             if normalized
         )
     )
     parents = tuple(
         dict.fromkeys(
             normalized
-            for normalized in (slugify_genre(parent_slug) for parent_slug in definition.parents)
+            for normalized in (
+                slugify_genre(parent_slug) for parent_slug in definition.parents
+            )
             if normalized
         )
     )
     related = tuple(
         dict.fromkeys(
             normalized
-            for normalized in (slugify_genre(related_slug) for related_slug in definition.related)
+            for normalized in (
+                slugify_genre(related_slug) for related_slug in definition.related
+            )
             if normalized and normalized != slug
         )
     )
@@ -166,77 +174,437 @@ def _normalize_genre_definition(definition: GenreDefinition) -> GenreDefinition:
 
 _RAW_GENRE_DEFINITIONS: tuple[GenreDefinition, ...] = (
     # ── Top-level families (always carry a direct preset) ──
-    GenreDefinition("rock", "rock", top_level=True, aliases=("classic rock", "hard rock"), eq_gains=_EQ_ROCK),
-    GenreDefinition("alternative", "alternative", top_level=True, aliases=("alternative rock", "alt rock"), eq_gains=_EQ_ROCK),
+    GenreDefinition(
+        "rock",
+        "rock",
+        top_level=True,
+        aliases=("classic rock", "hard rock"),
+        eq_gains=_EQ_ROCK,
+    ),
+    GenreDefinition(
+        "alternative",
+        "alternative",
+        top_level=True,
+        aliases=("alternative rock", "alt rock"),
+        eq_gains=_EQ_ROCK,
+    ),
     GenreDefinition("metal", "metal", top_level=True, eq_gains=_EQ_THRASH),
-    GenreDefinition("punk", "punk", top_level=True, aliases=("punk rock",), eq_gains=_EQ_PUNK),
-    GenreDefinition("electronic", "electronic", top_level=True, aliases=("electronica",), eq_gains=_EQ_ELECTRONIC),
-    GenreDefinition("hip-hop", "hip hop", top_level=True, aliases=("hip-hop", "rap"), eq_gains=_EQ_HIP_HOP),
-    GenreDefinition("jazz", "jazz", top_level=True, related=("blues", "soul"), eq_gains=_EQ_JAZZ),
-    GenreDefinition("blues", "blues", top_level=True, related=("jazz", "soul", "rock"), eq_gains=_EQ_JAZZ),
-    GenreDefinition("soul", "soul", top_level=True, aliases=("r&b", "rhythm and blues"), related=("funk", "blues", "jazz"), eq_gains=_EQ_JAZZ),
+    GenreDefinition(
+        "punk", "punk", top_level=True, aliases=("punk rock",), eq_gains=_EQ_PUNK
+    ),
+    GenreDefinition(
+        "electronic",
+        "electronic",
+        top_level=True,
+        aliases=("electronica",),
+        eq_gains=_EQ_ELECTRONIC,
+    ),
+    GenreDefinition(
+        "hip-hop",
+        "hip hop",
+        top_level=True,
+        aliases=("hip-hop", "rap"),
+        eq_gains=_EQ_HIP_HOP,
+    ),
+    GenreDefinition(
+        "jazz", "jazz", top_level=True, related=("blues", "soul"), eq_gains=_EQ_JAZZ
+    ),
+    GenreDefinition(
+        "blues",
+        "blues",
+        top_level=True,
+        related=("jazz", "soul", "rock"),
+        eq_gains=_EQ_JAZZ,
+    ),
+    GenreDefinition(
+        "soul",
+        "soul",
+        top_level=True,
+        aliases=("r&b", "rhythm and blues"),
+        related=("funk", "blues", "jazz"),
+        eq_gains=_EQ_JAZZ,
+    ),
     # funk inherits from soul
-    GenreDefinition("funk", "funk", parents=("soul",), related=("hip-hop", "electronic")),
-    GenreDefinition("folk", "folk", top_level=True, related=("country", "americana"), eq_gains=_EQ_ACOUSTIC),
-    GenreDefinition("country", "country", top_level=True, aliases=("americana",), related=("folk", "rock"), eq_gains=_EQ_ACOUSTIC),
+    GenreDefinition(
+        "funk", "funk", parents=("soul",), related=("hip-hop", "electronic")
+    ),
+    GenreDefinition(
+        "folk",
+        "folk",
+        top_level=True,
+        related=("country", "americana"),
+        eq_gains=_EQ_ACOUSTIC,
+    ),
+    GenreDefinition(
+        "country",
+        "country",
+        top_level=True,
+        aliases=("americana",),
+        related=("folk", "rock"),
+        eq_gains=_EQ_ACOUSTIC,
+    ),
     GenreDefinition("pop", "pop", top_level=True, eq_gains=_EQ_POP),
-    GenreDefinition("classical", "classical", top_level=True, related=("ambient",), eq_gains=_EQ_CLASSICAL),
-    GenreDefinition("ambient", "ambient", top_level=True, related=("classical", "electronic"), eq_gains=_EQ_CLASSICAL),
+    GenreDefinition(
+        "classical",
+        "classical",
+        top_level=True,
+        related=("ambient",),
+        eq_gains=_EQ_CLASSICAL,
+    ),
+    GenreDefinition(
+        "ambient",
+        "ambient",
+        top_level=True,
+        related=("classical", "electronic"),
+        eq_gains=_EQ_CLASSICAL,
+    ),
     # ── Rock subgenres ──
-    GenreDefinition("indie-rock", "indie rock", aliases=("indie",), parents=("alternative",), related=("garage-rock", "dream-pop", "shoegaze"), eq_gains=_EQ_LO_FI),
+    GenreDefinition(
+        "indie-rock",
+        "indie rock",
+        aliases=("indie",),
+        parents=("alternative",),
+        related=("garage-rock", "dream-pop", "shoegaze"),
+        eq_gains=_EQ_LO_FI,
+    ),
     # post-punk inherits → alternative
-    GenreDefinition("post-punk", "post-punk", aliases=("post punk",), parents=("alternative",), related=("gothic-rock", "new-wave", "art-punk", "shoegaze")),
-    GenreDefinition("shoegaze", "shoegaze", parents=("alternative",), related=("dream-pop", "noise-rock", "post-punk"), eq_gains=_EQ_SHOEGAZE),
-    GenreDefinition("dream-pop", "dream pop", aliases=("dream-pop",), parents=("alternative",), related=("shoegaze", "post-punk", "indie-rock"), eq_gains=_EQ_SHOEGAZE),
-    GenreDefinition("noise-rock", "noise rock", aliases=("noise-rock",), parents=("alternative",), related=("post-hardcore", "shoegaze", "art-punk"), eq_gains=_EQ_SHOEGAZE),
-    GenreDefinition("new-wave", "new wave", aliases=("new-wave",), parents=("alternative",), related=("post-punk", "synthpop", "gothic-rock"), eq_gains=_EQ_ELECTRONIC),
+    GenreDefinition(
+        "post-punk",
+        "post-punk",
+        aliases=("post punk",),
+        parents=("alternative",),
+        related=("gothic-rock", "new-wave", "art-punk", "shoegaze"),
+    ),
+    GenreDefinition(
+        "shoegaze",
+        "shoegaze",
+        parents=("alternative",),
+        related=("dream-pop", "noise-rock", "post-punk"),
+        eq_gains=_EQ_SHOEGAZE,
+    ),
+    GenreDefinition(
+        "dream-pop",
+        "dream pop",
+        aliases=("dream-pop",),
+        parents=("alternative",),
+        related=("shoegaze", "post-punk", "indie-rock"),
+        eq_gains=_EQ_SHOEGAZE,
+    ),
+    GenreDefinition(
+        "noise-rock",
+        "noise rock",
+        aliases=("noise-rock",),
+        parents=("alternative",),
+        related=("post-hardcore", "shoegaze", "art-punk"),
+        eq_gains=_EQ_SHOEGAZE,
+    ),
+    GenreDefinition(
+        "new-wave",
+        "new wave",
+        aliases=("new-wave",),
+        parents=("alternative",),
+        related=("post-punk", "synthpop", "gothic-rock"),
+        eq_gains=_EQ_ELECTRONIC,
+    ),
     # gothic-rock, garage-rock, grunge inherit
-    GenreDefinition("gothic-rock", "gothic rock", aliases=("gothic", "goth rock"), parents=("alternative",), related=("post-punk", "new-wave")),
-    GenreDefinition("garage-rock", "garage rock", aliases=("garage-rock",), parents=("rock",), related=("indie-rock", "punk")),
-    GenreDefinition("psychedelic-rock", "psychedelic rock", aliases=("psychedelic", "psych rock"), parents=("rock",), related=("stoner-rock", "doom-metal"), eq_gains=_EQ_PROGRESSIVE),
-    GenreDefinition("stoner-rock", "stoner rock", aliases=("desert rock",), parents=("rock",), related=("stoner-metal", "doom-metal", "psychedelic-rock"), eq_gains=_EQ_DOOM),
-    GenreDefinition("grunge", "grunge", parents=("rock",), related=("alternative", "sludge-metal", "stoner-rock")),
+    GenreDefinition(
+        "gothic-rock",
+        "gothic rock",
+        aliases=("gothic", "goth rock"),
+        parents=("alternative",),
+        related=("post-punk", "new-wave"),
+    ),
+    GenreDefinition(
+        "garage-rock",
+        "garage rock",
+        aliases=("garage-rock",),
+        parents=("rock",),
+        related=("indie-rock", "punk"),
+    ),
+    GenreDefinition(
+        "psychedelic-rock",
+        "psychedelic rock",
+        aliases=("psychedelic", "psych rock"),
+        parents=("rock",),
+        related=("stoner-rock", "doom-metal"),
+        eq_gains=_EQ_PROGRESSIVE,
+    ),
+    GenreDefinition(
+        "stoner-rock",
+        "stoner rock",
+        aliases=("desert rock",),
+        parents=("rock",),
+        related=("stoner-metal", "doom-metal", "psychedelic-rock"),
+        eq_gains=_EQ_DOOM,
+    ),
+    GenreDefinition(
+        "grunge",
+        "grunge",
+        parents=("rock",),
+        related=("alternative", "sludge-metal", "stoner-rock"),
+    ),
     # ── Metal subgenres ──
-    GenreDefinition("heavy-metal", "heavy metal", parents=("metal",), related=("speed-metal", "power-metal", "thrash-metal", "doom-metal"), eq_gains=_EQ_ROCK),
+    GenreDefinition(
+        "heavy-metal",
+        "heavy metal",
+        parents=("metal",),
+        related=("speed-metal", "power-metal", "thrash-metal", "doom-metal"),
+        eq_gains=_EQ_ROCK,
+    ),
     # thrash-metal / crossover-thrash / groove-metal / speed-metal inherit from metal (= _EQ_THRASH)
-    GenreDefinition("thrash-metal", "thrash metal", aliases=("trash metal", "thrash"), parents=("metal",), related=("speed-metal", "groove-metal", "heavy-metal", "crossover-thrash")),
-    GenreDefinition("crossover-thrash", "crossover thrash", aliases=("crossover",), parents=("metal",), related=("thrash-metal", "hardcore-punk", "punk")),
-    GenreDefinition("death-metal", "death metal", parents=("metal",), related=("black-metal", "grindcore", "doom-metal"), eq_gains=_EQ_DEATH_METAL),
-    GenreDefinition("black-metal", "black metal", parents=("metal",), related=("death-metal", "doom-metal", "post-metal"), eq_gains=_EQ_BLACK_METAL),
-    GenreDefinition("doom-metal", "doom metal", parents=("metal",), related=("sludge-metal", "stoner-metal", "heavy-metal", "post-metal"), eq_gains=_EQ_DOOM),
-    GenreDefinition("sludge-metal", "sludge metal", aliases=("sludge",), parents=("metal",), related=("doom-metal", "stoner-metal", "post-metal", "hardcore-punk"), eq_gains=_EQ_DOOM),
-    GenreDefinition("stoner-metal", "stoner metal", parents=("metal",), related=("doom-metal", "sludge-metal", "stoner-rock"), eq_gains=_EQ_DOOM),
-    GenreDefinition("groove-metal", "groove metal", parents=("metal",), related=("thrash-metal", "heavy-metal", "metalcore")),
-    GenreDefinition("speed-metal", "speed metal", parents=("metal",), related=("heavy-metal", "thrash-metal", "power-metal")),
-    GenreDefinition("power-metal", "power metal", parents=("metal",), related=("heavy-metal", "speed-metal", "progressive-metal"), eq_gains=_EQ_ROCK),
-    GenreDefinition("progressive-metal", "progressive metal", aliases=("prog metal",), parents=("metal",), related=("post-metal", "power-metal", "metalcore"), eq_gains=_EQ_PROGRESSIVE),
-    GenreDefinition("industrial-metal", "industrial metal", aliases=("industrial-metal",), parents=("metal",), related=("industrial", "nu-metal"), eq_gains=_EQ_ELECTRONIC),
-    GenreDefinition("post-metal", "post-metal", aliases=("post metal",), parents=("metal",), related=("sludge-metal", "doom-metal", "progressive-metal", "black-metal"), eq_gains=_EQ_POST_ROCK),
-    GenreDefinition("metalcore", "metalcore", parents=("metal",), related=("hardcore-punk", "post-hardcore", "melodic-hardcore", "groove-metal"), eq_gains=_EQ_HARDCORE),
-    GenreDefinition("grindcore", "grindcore", parents=("metal",), related=("death-metal", "hardcore-punk", "crust-punk"), eq_gains=_EQ_DEATH_METAL),
-    GenreDefinition("nu-metal", "nu metal", aliases=("nu-metal",), parents=("metal",), related=("industrial-metal", "alternative", "groove-metal"), eq_gains=_EQ_HARDCORE),
+    GenreDefinition(
+        "thrash-metal",
+        "thrash metal",
+        aliases=("trash metal", "thrash"),
+        parents=("metal",),
+        related=("speed-metal", "groove-metal", "heavy-metal", "crossover-thrash"),
+    ),
+    GenreDefinition(
+        "crossover-thrash",
+        "crossover thrash",
+        aliases=("crossover",),
+        parents=("metal",),
+        related=("thrash-metal", "hardcore-punk", "punk"),
+    ),
+    GenreDefinition(
+        "death-metal",
+        "death metal",
+        parents=("metal",),
+        related=("black-metal", "grindcore", "doom-metal"),
+        eq_gains=_EQ_DEATH_METAL,
+    ),
+    GenreDefinition(
+        "black-metal",
+        "black metal",
+        parents=("metal",),
+        related=("death-metal", "doom-metal", "post-metal"),
+        eq_gains=_EQ_BLACK_METAL,
+    ),
+    GenreDefinition(
+        "doom-metal",
+        "doom metal",
+        parents=("metal",),
+        related=("sludge-metal", "stoner-metal", "heavy-metal", "post-metal"),
+        eq_gains=_EQ_DOOM,
+    ),
+    GenreDefinition(
+        "sludge-metal",
+        "sludge metal",
+        aliases=("sludge",),
+        parents=("metal",),
+        related=("doom-metal", "stoner-metal", "post-metal", "hardcore-punk"),
+        eq_gains=_EQ_DOOM,
+    ),
+    GenreDefinition(
+        "stoner-metal",
+        "stoner metal",
+        parents=("metal",),
+        related=("doom-metal", "sludge-metal", "stoner-rock"),
+        eq_gains=_EQ_DOOM,
+    ),
+    GenreDefinition(
+        "groove-metal",
+        "groove metal",
+        parents=("metal",),
+        related=("thrash-metal", "heavy-metal", "metalcore"),
+    ),
+    GenreDefinition(
+        "speed-metal",
+        "speed metal",
+        parents=("metal",),
+        related=("heavy-metal", "thrash-metal", "power-metal"),
+    ),
+    GenreDefinition(
+        "power-metal",
+        "power metal",
+        parents=("metal",),
+        related=("heavy-metal", "speed-metal", "progressive-metal"),
+        eq_gains=_EQ_ROCK,
+    ),
+    GenreDefinition(
+        "progressive-metal",
+        "progressive metal",
+        aliases=("prog metal",),
+        parents=("metal",),
+        related=("post-metal", "power-metal", "metalcore"),
+        eq_gains=_EQ_PROGRESSIVE,
+    ),
+    GenreDefinition(
+        "industrial-metal",
+        "industrial metal",
+        aliases=("industrial-metal",),
+        parents=("metal",),
+        related=("industrial", "nu-metal"),
+        eq_gains=_EQ_ELECTRONIC,
+    ),
+    GenreDefinition(
+        "post-metal",
+        "post-metal",
+        aliases=("post metal",),
+        parents=("metal",),
+        related=("sludge-metal", "doom-metal", "progressive-metal", "black-metal"),
+        eq_gains=_EQ_POST_ROCK,
+    ),
+    GenreDefinition(
+        "metalcore",
+        "metalcore",
+        parents=("metal",),
+        related=("hardcore-punk", "post-hardcore", "melodic-hardcore", "groove-metal"),
+        eq_gains=_EQ_HARDCORE,
+    ),
+    GenreDefinition(
+        "grindcore",
+        "grindcore",
+        parents=("metal",),
+        related=("death-metal", "hardcore-punk", "crust-punk"),
+        eq_gains=_EQ_DEATH_METAL,
+    ),
+    GenreDefinition(
+        "nu-metal",
+        "nu metal",
+        aliases=("nu-metal",),
+        parents=("metal",),
+        related=("industrial-metal", "alternative", "groove-metal"),
+        eq_gains=_EQ_HARDCORE,
+    ),
     # ── Punk subgenres ──
-    GenreDefinition("hardcore-punk", "hardcore punk", aliases=("hardcore", "hc"), parents=("punk",), related=("melodic-hardcore", "post-hardcore", "crust-punk", "d-beat", "grindcore", "metalcore", "crossover-thrash"), eq_gains=_EQ_HARDCORE),
+    GenreDefinition(
+        "hardcore-punk",
+        "hardcore punk",
+        aliases=("hardcore", "hc"),
+        parents=("punk",),
+        related=(
+            "melodic-hardcore",
+            "post-hardcore",
+            "crust-punk",
+            "d-beat",
+            "grindcore",
+            "metalcore",
+            "crossover-thrash",
+        ),
+        eq_gains=_EQ_HARDCORE,
+    ),
     # beatdown / powerviolence inherit from hardcore-punk
-    GenreDefinition("beatdown-hardcore", "beatdown hardcore", aliases=("beatdown",), parents=("hardcore-punk",), related=("metalcore", "sludge-metal", "crossover-thrash")),
-    GenreDefinition("powerviolence", "powerviolence", parents=("hardcore-punk",), related=("grindcore", "d-beat", "crust-punk")),
-    GenreDefinition("melodic-hardcore", "melodic hardcore", aliases=("melodic-hardcore",), parents=("punk",), related=("hardcore-punk", "post-hardcore", "skate-punk", "emo"), eq_gains=_EQ_HARDCORE),
-    GenreDefinition("post-hardcore", "post-hardcore", aliases=("post hardcore",), parents=("punk",), related=("hardcore-punk", "melodic-hardcore", "emo", "screamo", "noise-rock", "metalcore"), eq_gains=_EQ_HARDCORE),
+    GenreDefinition(
+        "beatdown-hardcore",
+        "beatdown hardcore",
+        aliases=("beatdown",),
+        parents=("hardcore-punk",),
+        related=("metalcore", "sludge-metal", "crossover-thrash"),
+    ),
+    GenreDefinition(
+        "powerviolence",
+        "powerviolence",
+        parents=("hardcore-punk",),
+        related=("grindcore", "d-beat", "crust-punk"),
+    ),
+    GenreDefinition(
+        "melodic-hardcore",
+        "melodic hardcore",
+        aliases=("melodic-hardcore",),
+        parents=("punk",),
+        related=("hardcore-punk", "post-hardcore", "skate-punk", "emo"),
+        eq_gains=_EQ_HARDCORE,
+    ),
+    GenreDefinition(
+        "post-hardcore",
+        "post-hardcore",
+        aliases=("post hardcore",),
+        parents=("punk",),
+        related=(
+            "hardcore-punk",
+            "melodic-hardcore",
+            "emo",
+            "screamo",
+            "noise-rock",
+            "metalcore",
+        ),
+        eq_gains=_EQ_HARDCORE,
+    ),
     # skate-punk / pop-punk / crust / d-beat / anarcho / art-punk inherit from punk
-    GenreDefinition("skate-punk", "skate punk", aliases=("skate-punk",), parents=("punk",), related=("melodic-hardcore", "pop-punk", "hardcore-punk")),
-    GenreDefinition("pop-punk", "pop punk", aliases=("pop-punk",), parents=("punk",), related=("skate-punk", "emo", "alternative")),
-    GenreDefinition("crust-punk", "crust punk", aliases=("crust",), parents=("punk",), related=("d-beat", "hardcore-punk", "grindcore", "sludge-metal")),
-    GenreDefinition("d-beat", "d-beat", aliases=("dbeat",), parents=("punk",), related=("crust-punk", "hardcore-punk")),
-    GenreDefinition("anarcho-punk", "anarcho-punk", aliases=("anarcho punk",), parents=("punk",), related=("art-punk", "crust-punk", "hardcore-punk")),
-    GenreDefinition("art-punk", "art punk", aliases=("art-punk",), parents=("punk",), related=("post-punk", "noise-rock", "anarcho-punk")),
-    GenreDefinition("emo", "emo", parents=("punk",), related=("post-hardcore", "screamo", "melodic-hardcore", "indie-rock"), eq_gains=_EQ_LO_FI),
-    GenreDefinition("screamo", "screamo", parents=("punk",), related=("emo", "post-hardcore", "hardcore-punk"), eq_gains=_EQ_HARDCORE),
+    GenreDefinition(
+        "skate-punk",
+        "skate punk",
+        aliases=("skate-punk",),
+        parents=("punk",),
+        related=("melodic-hardcore", "pop-punk", "hardcore-punk"),
+    ),
+    GenreDefinition(
+        "pop-punk",
+        "pop punk",
+        aliases=("pop-punk",),
+        parents=("punk",),
+        related=("skate-punk", "emo", "alternative"),
+    ),
+    GenreDefinition(
+        "crust-punk",
+        "crust punk",
+        aliases=("crust",),
+        parents=("punk",),
+        related=("d-beat", "hardcore-punk", "grindcore", "sludge-metal"),
+    ),
+    GenreDefinition(
+        "d-beat",
+        "d-beat",
+        aliases=("dbeat",),
+        parents=("punk",),
+        related=("crust-punk", "hardcore-punk"),
+    ),
+    GenreDefinition(
+        "anarcho-punk",
+        "anarcho-punk",
+        aliases=("anarcho punk",),
+        parents=("punk",),
+        related=("art-punk", "crust-punk", "hardcore-punk"),
+    ),
+    GenreDefinition(
+        "art-punk",
+        "art punk",
+        aliases=("art-punk",),
+        parents=("punk",),
+        related=("post-punk", "noise-rock", "anarcho-punk"),
+    ),
+    GenreDefinition(
+        "emo",
+        "emo",
+        parents=("punk",),
+        related=("post-hardcore", "screamo", "melodic-hardcore", "indie-rock"),
+        eq_gains=_EQ_LO_FI,
+    ),
+    GenreDefinition(
+        "screamo",
+        "screamo",
+        parents=("punk",),
+        related=("emo", "post-hardcore", "hardcore-punk"),
+        eq_gains=_EQ_HARDCORE,
+    ),
     # ── Electronic subgenres — industrial / synthpop / techno / house inherit ──
-    GenreDefinition("industrial", "industrial", parents=("electronic",), related=("industrial-metal", "new-wave")),
-    GenreDefinition("synthpop", "synthpop", parents=("electronic",), related=("new-wave", "dream-pop")),
-    GenreDefinition("techno", "techno", parents=("electronic",), related=("house", "industrial")),
-    GenreDefinition("house", "house", parents=("electronic",), related=("techno", "electronic")),
-    GenreDefinition("trip-hop", "trip hop", aliases=("trip-hop",), parents=("electronic",), related=("hip-hop", "ambient"), eq_gains=_EQ_HIP_HOP),
+    GenreDefinition(
+        "industrial",
+        "industrial",
+        parents=("electronic",),
+        related=("industrial-metal", "new-wave"),
+    ),
+    GenreDefinition(
+        "synthpop",
+        "synthpop",
+        parents=("electronic",),
+        related=("new-wave", "dream-pop"),
+    ),
+    GenreDefinition(
+        "techno", "techno", parents=("electronic",), related=("house", "industrial")
+    ),
+    GenreDefinition(
+        "house", "house", parents=("electronic",), related=("techno", "electronic")
+    ),
+    GenreDefinition(
+        "trip-hop",
+        "trip hop",
+        aliases=("trip-hop",),
+        parents=("electronic",),
+        related=("hip-hop", "ambient"),
+        eq_gains=_EQ_HIP_HOP,
+    ),
 )
 
 _GENRE_DEFINITIONS: tuple[GenreDefinition, ...] = tuple(
@@ -281,7 +649,9 @@ def _register_alias(graph: dict, canonical_slug: str, alias_value: str) -> None:
     graph["alias_terms_by_slug"].setdefault(canonical_slug, set()).add(alias_name)
 
 
-def _add_runtime_edge(graph: dict, source_slug: str, target_slug: str, relation_type: str) -> None:
+def _add_runtime_edge(
+    graph: dict, source_slug: str, target_slug: str, relation_type: str
+) -> None:
     if not source_slug or not target_slug or source_slug == target_slug:
         return
     if relation_type == "parent":
@@ -292,7 +662,9 @@ def _add_runtime_edge(graph: dict, source_slug: str, target_slug: str, relation_
         graph["related_by_slug"].setdefault(target_slug, set()).add(source_slug)
     elif relation_type == "influenced_by":
         graph["influenced_by_by_slug"].setdefault(source_slug, set()).add(target_slug)
-        graph["influenced_genres_by_slug"].setdefault(target_slug, set()).add(source_slug)
+        graph["influenced_genres_by_slug"].setdefault(target_slug, set()).add(
+            source_slug
+        )
     elif relation_type == "fusion_of":
         graph["fusion_of_by_slug"].setdefault(source_slug, set()).add(target_slug)
         graph["fusion_genres_by_slug"].setdefault(target_slug, set()).add(source_slug)
@@ -322,16 +694,35 @@ def _build_static_runtime_graph() -> dict:
 
 def _clone_runtime_graph(base: dict) -> dict:
     return {
-        "nodes_by_slug": {slug: dict(meta) for slug, meta in base["nodes_by_slug"].items()},
+        "nodes_by_slug": {
+            slug: dict(meta) for slug, meta in base["nodes_by_slug"].items()
+        },
         "aliases_to_slug": dict(base["aliases_to_slug"]),
-        "alias_terms_by_slug": {slug: set(terms) for slug, terms in base["alias_terms_by_slug"].items()},
-        "parents_by_slug": {slug: set(values) for slug, values in base["parents_by_slug"].items()},
-        "children_by_slug": {slug: set(values) for slug, values in base["children_by_slug"].items()},
-        "related_by_slug": {slug: set(values) for slug, values in base["related_by_slug"].items()},
-        "influenced_by_by_slug": {slug: set(values) for slug, values in base["influenced_by_by_slug"].items()},
-        "influenced_genres_by_slug": {slug: set(values) for slug, values in base["influenced_genres_by_slug"].items()},
-        "fusion_of_by_slug": {slug: set(values) for slug, values in base["fusion_of_by_slug"].items()},
-        "fusion_genres_by_slug": {slug: set(values) for slug, values in base["fusion_genres_by_slug"].items()},
+        "alias_terms_by_slug": {
+            slug: set(terms) for slug, terms in base["alias_terms_by_slug"].items()
+        },
+        "parents_by_slug": {
+            slug: set(values) for slug, values in base["parents_by_slug"].items()
+        },
+        "children_by_slug": {
+            slug: set(values) for slug, values in base["children_by_slug"].items()
+        },
+        "related_by_slug": {
+            slug: set(values) for slug, values in base["related_by_slug"].items()
+        },
+        "influenced_by_by_slug": {
+            slug: set(values) for slug, values in base["influenced_by_by_slug"].items()
+        },
+        "influenced_genres_by_slug": {
+            slug: set(values)
+            for slug, values in base["influenced_genres_by_slug"].items()
+        },
+        "fusion_of_by_slug": {
+            slug: set(values) for slug, values in base["fusion_of_by_slug"].items()
+        },
+        "fusion_genres_by_slug": {
+            slug: set(values) for slug, values in base["fusion_genres_by_slug"].items()
+        },
         "eq_gains_by_slug": dict(base["eq_gains_by_slug"]),
     }
 
@@ -341,9 +732,9 @@ _STATIC_RUNTIME_GRAPH = _build_static_runtime_graph()
 
 def _load_shared_taxonomy_revision() -> str | None:
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if redis_client:
             value = redis_client.get(_RUNTIME_GRAPH_REVISION_KEY)
             if value:
@@ -367,9 +758,9 @@ def _publish_shared_taxonomy_revision(revision: str | None = None) -> str:
     revision_value = revision or datetime.now(timezone.utc).isoformat()
 
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if redis_client:
             redis_client.set(_RUNTIME_GRAPH_REVISION_KEY, revision_value)
     except Exception:
@@ -386,7 +777,10 @@ def _publish_shared_taxonomy_revision(revision: str | None = None) -> str:
 
 
 def invalidate_runtime_taxonomy_cache(*, broadcast: bool = False) -> None:
-    global _RUNTIME_GRAPH_CACHE, _RUNTIME_GRAPH_CACHE_REVISION, _RUNTIME_GRAPH_REVISION_CHECKED_AT
+    global \
+        _RUNTIME_GRAPH_CACHE, \
+        _RUNTIME_GRAPH_CACHE_REVISION, \
+        _RUNTIME_GRAPH_REVISION_CHECKED_AT
     _RUNTIME_GRAPH_CACHE = None
     _RUNTIME_GRAPH_CACHE_REVISION = None
     _RUNTIME_GRAPH_REVISION_CHECKED_AT = 0.0
@@ -403,24 +797,33 @@ def invalidate_runtime_taxonomy_cache_after_commit(session) -> None:
 
     from crate.db.tx import register_after_commit
 
-    register_after_commit(session, lambda: invalidate_runtime_taxonomy_cache(broadcast=True))
+    register_after_commit(
+        session, lambda: invalidate_runtime_taxonomy_cache(broadcast=True)
+    )
     session.info[_RUNTIME_GRAPH_INVALIDATION_SESSION_KEY] = True
 
 
 def _get_runtime_taxonomy_graph() -> dict:
-    global _RUNTIME_GRAPH_CACHE, _RUNTIME_GRAPH_CACHE_REVISION, _RUNTIME_GRAPH_REVISION_CHECKED_AT
+    global \
+        _RUNTIME_GRAPH_CACHE, \
+        _RUNTIME_GRAPH_CACHE_REVISION, \
+        _RUNTIME_GRAPH_REVISION_CHECKED_AT
 
     now = time.monotonic()
     if (
         _RUNTIME_GRAPH_CACHE is not None
-        and now - _RUNTIME_GRAPH_REVISION_CHECKED_AT < _RUNTIME_GRAPH_REVISION_CHECK_TTL_SECONDS
+        and now - _RUNTIME_GRAPH_REVISION_CHECKED_AT
+        < _RUNTIME_GRAPH_REVISION_CHECK_TTL_SECONDS
     ):
         return _RUNTIME_GRAPH_CACHE
 
     shared_revision = _load_shared_taxonomy_revision()
     _RUNTIME_GRAPH_REVISION_CHECKED_AT = now
 
-    if _RUNTIME_GRAPH_CACHE is not None and _RUNTIME_GRAPH_CACHE_REVISION == shared_revision:
+    if (
+        _RUNTIME_GRAPH_CACHE is not None
+        and _RUNTIME_GRAPH_CACHE_REVISION == shared_revision
+    ):
         return _RUNTIME_GRAPH_CACHE
 
     graph = _clone_runtime_graph(_STATIC_RUNTIME_GRAPH)
@@ -439,8 +842,12 @@ def _get_runtime_taxonomy_graph() -> dict:
             continue
         graph["nodes_by_slug"][slug] = {
             "slug": slug,
-            "name": re.sub(r"\s+", " ", (row.get("name") or slug.replace("-", " ")).strip().lower()),
-            "description": re.sub(r"\s+", " ", (row.get("description") or "").strip().lower()),
+            "name": re.sub(
+                r"\s+", " ", (row.get("name") or slug.replace("-", " ")).strip().lower()
+            ),
+            "description": re.sub(
+                r"\s+", " ", (row.get("description") or "").strip().lower()
+            ),
             "top_level": bool(row.get("is_top_level")),
         }
         _register_alias(graph, slug, slug.replace("-", " "))
@@ -608,7 +1015,8 @@ def resolve_genre_eq_preset(value: str) -> dict | None:
     # multiple parents we break ties alphabetically so the result is
     # deterministic.
     queue: deque[tuple[str, int]] = deque(
-        (parent_slug, 1) for parent_slug in sorted(graph["parents_by_slug"].get(canonical_slug, set()))
+        (parent_slug, 1)
+        for parent_slug in sorted(graph["parents_by_slug"].get(canonical_slug, set()))
     )
     seen: set[str] = {canonical_slug}
 
@@ -623,7 +1031,8 @@ def resolve_genre_eq_preset(value: str) -> dict | None:
                 "gains": list(gains),
                 "source": "inherited",
                 "slug": current_slug,
-                "name": graph["nodes_by_slug"].get(current_slug, {}).get("name") or current_slug.replace("-", " "),
+                "name": graph["nodes_by_slug"].get(current_slug, {}).get("name")
+                or current_slug.replace("-", " "),
             }
         for parent_slug in sorted(graph["parents_by_slug"].get(current_slug, set())):
             if parent_slug not in seen:
@@ -707,7 +1116,9 @@ def get_genre_ancestor_slugs(value: str, *, include_self: bool = True) -> list[s
 
     ordered: list[str] = []
     seen: set[str] = set()
-    queue: deque[str] = deque([slug] if include_self else sorted(graph["parents_by_slug"].get(slug, set())))
+    queue: deque[str] = deque(
+        [slug] if include_self else sorted(graph["parents_by_slug"].get(slug, set()))
+    )
 
     while queue:
         current_slug = queue.popleft()
@@ -723,7 +1134,9 @@ def get_genre_ancestor_slugs(value: str, *, include_self: bool = True) -> list[s
     return ordered
 
 
-def get_static_genre_ancestor_slugs(value: str, *, include_self: bool = True) -> list[str]:
+def get_static_genre_ancestor_slugs(
+    value: str, *, include_self: bool = True
+) -> list[str]:
     graph = _STATIC_RUNTIME_GRAPH
     slug = resolve_static_genre_slug(value)
     if not slug:
@@ -731,7 +1144,9 @@ def get_static_genre_ancestor_slugs(value: str, *, include_self: bool = True) ->
 
     ordered: list[str] = []
     seen: set[str] = set()
-    queue: deque[str] = deque([slug] if include_self else sorted(graph["parents_by_slug"].get(slug, set())))
+    queue: deque[str] = deque(
+        [slug] if include_self else sorted(graph["parents_by_slug"].get(slug, set()))
+    )
 
     while queue:
         current_slug = queue.popleft()
@@ -747,7 +1162,9 @@ def get_static_genre_ancestor_slugs(value: str, *, include_self: bool = True) ->
     return ordered
 
 
-def get_related_genre_terms(value: str, *, limit: int = 24, max_depth: int = 2) -> list[str]:
+def get_related_genre_terms(
+    value: str, *, limit: int = 24, max_depth: int = 2
+) -> list[str]:
     graph = _get_runtime_taxonomy_graph()
     seed_slug = resolve_genre_slug(value)
     if not seed_slug:
@@ -768,13 +1185,40 @@ def get_related_genre_terms(value: str, *, limit: int = 24, max_depth: int = 2) 
         if not current:
             continue
         neighbors: list[tuple[str, int]] = []
-        neighbors.extend((parent_slug, 170 - depth * 20) for parent_slug in graph["parents_by_slug"].get(current_slug, set()))
-        neighbors.extend((child_slug, 250 - depth * 30) for child_slug in graph["children_by_slug"].get(current_slug, set()))
-        neighbors.extend((related_slug, 225 - depth * 25) for related_slug in graph["related_by_slug"].get(current_slug, set()))
-        neighbors.extend((influence_slug, 195 - depth * 20) for influence_slug in graph["influenced_by_by_slug"].get(current_slug, set()))
-        neighbors.extend((influenced_slug, 175 - depth * 20) for influenced_slug in graph["influenced_genres_by_slug"].get(current_slug, set()))
-        neighbors.extend((fusion_slug, 205 - depth * 20) for fusion_slug in graph["fusion_of_by_slug"].get(current_slug, set()))
-        neighbors.extend((fusion_child_slug, 185 - depth * 20) for fusion_child_slug in graph["fusion_genres_by_slug"].get(current_slug, set()))
+        neighbors.extend(
+            (parent_slug, 170 - depth * 20)
+            for parent_slug in graph["parents_by_slug"].get(current_slug, set())
+        )
+        neighbors.extend(
+            (child_slug, 250 - depth * 30)
+            for child_slug in graph["children_by_slug"].get(current_slug, set())
+        )
+        neighbors.extend(
+            (related_slug, 225 - depth * 25)
+            for related_slug in graph["related_by_slug"].get(current_slug, set())
+        )
+        neighbors.extend(
+            (influence_slug, 195 - depth * 20)
+            for influence_slug in graph["influenced_by_by_slug"].get(
+                current_slug, set()
+            )
+        )
+        neighbors.extend(
+            (influenced_slug, 175 - depth * 20)
+            for influenced_slug in graph["influenced_genres_by_slug"].get(
+                current_slug, set()
+            )
+        )
+        neighbors.extend(
+            (fusion_slug, 205 - depth * 20)
+            for fusion_slug in graph["fusion_of_by_slug"].get(current_slug, set())
+        )
+        neighbors.extend(
+            (fusion_child_slug, 185 - depth * 20)
+            for fusion_child_slug in graph["fusion_genres_by_slug"].get(
+                current_slug, set()
+            )
+        )
         for neighbor_slug, base_score in neighbors:
             candidate_score = base_score - (depth * 10)
             if candidate_score <= scores.get(neighbor_slug, -1):
@@ -790,7 +1234,9 @@ def get_related_genre_terms(value: str, *, limit: int = 24, max_depth: int = 2) 
                 -item[1],
                 graph["nodes_by_slug"].get(item[0], {"top_level": False})["top_level"],
                 -_genre_depth(item[0]),
-                graph["nodes_by_slug"].get(item[0], {"name": item[0].replace("-", " ")})["name"],
+                graph["nodes_by_slug"].get(
+                    item[0], {"name": item[0].replace("-", " ")}
+                )["name"],
             ),
         )
     ]
@@ -882,14 +1328,16 @@ def _aggregate_genre_rows(rows: list[dict]) -> list[dict]:
                     "score": 0.0,
                     "canonical": canonical,
                     "top_level_slug": get_top_level_slug(bucket_slug) or bucket_slug,
-                    "is_top_level": graph["nodes_by_slug"].get(bucket_slug, {"top_level": False})["top_level"],
+                    "is_top_level": graph["nodes_by_slug"].get(
+                        bucket_slug, {"top_level": False}
+                    )["top_level"],
                     "sources": [],
                 },
             )
             bucket["score"] += score
             if raw_name not in bucket["sources"]:
                 bucket["sources"].append(raw_name)
-            if canonical:
+            if canonical and slug:
                 bucket["name"] = graph["nodes_by_slug"][slug]["name"]
                 bucket["canonical"] = True
                 bucket["top_level_slug"] = get_top_level_slug(slug) or slug

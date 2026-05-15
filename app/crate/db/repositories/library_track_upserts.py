@@ -11,7 +11,10 @@ from crate.db.orm.library import LibraryAlbum
 from crate.db.orm.library import LibraryTrack
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
 from crate.db.repositories.library_processing_state import ensure_track_processing_rows
-from crate.db.repositories.library_shared import allocate_unique_slug, coerce_uuid_or_none
+from crate.db.repositories.library_shared import (
+    allocate_unique_slug,
+    coerce_uuid_or_none,
+)
 from crate.db.tx import optional_scope
 from crate.slugs import build_track_slug
 
@@ -21,7 +24,11 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
         now = datetime.now(timezone.utc)
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
         path_match = LibraryTrack.path == data["path"]
-        entity_match = LibraryTrack.entity_uid == requested_entity_uid if requested_entity_uid is not None else false()
+        entity_match = (
+            LibraryTrack.entity_uid == requested_entity_uid
+            if requested_entity_uid is not None
+            else false()
+        )
         requested_track_mbid = (data.get("musicbrainz_trackid") or "").strip()
         existing = s.execute(
             select(
@@ -39,7 +46,9 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                 or_(
                     path_match,
                     entity_match,
-                    LibraryTrack.musicbrainz_trackid == requested_track_mbid if requested_track_mbid else false(),
+                    LibraryTrack.musicbrainz_trackid == requested_track_mbid
+                    if requested_track_mbid
+                    else false(),
                 )
             )
             .limit(1)
@@ -47,18 +56,27 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
         slug = (
             existing[1]
             if existing and existing[1]
-            else allocate_unique_slug(s, LibraryTrack, build_track_slug(data["artist"], data.get("title"), data.get("filename")))
+            else allocate_unique_slug(
+                s,
+                LibraryTrack,
+                build_track_slug(
+                    data["artist"], data.get("title"), data.get("filename")
+                ),
+            )
         )
         album_entity_uid = None
         album_id = data.get("album_id")
         if album_id is not None:
             album_entity_uid = s.execute(
-                select(LibraryAlbum.entity_uid).where(LibraryAlbum.id == album_id).limit(1)
+                select(LibraryAlbum.entity_uid)
+                .where(LibraryAlbum.id == album_id)
+                .limit(1)
             ).scalar_one_or_none()
         entity_uid = (
             existing[3]
             if existing and existing[3]
-            else requested_entity_uid or track_entity_uid(
+            else requested_entity_uid
+            or track_entity_uid(
                 album_uid=album_entity_uid,
                 artist_name=data["artist"],
                 album_name=data["album"],
@@ -105,18 +123,42 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                     albumartist=data.get("albumartist"),
                     musicbrainz_albumid=requested_album_mbid or existing_album_mbid,
                     musicbrainz_trackid=requested_track_mbid or existing_track_mbid,
-                    audio_fingerprint=data.get("audio_fingerprint") or existing_audio_fingerprint,
-                    audio_fingerprint_source=data.get("audio_fingerprint_source") or existing_audio_fingerprint_source,
-                    audio_fingerprint_computed_at=now if data.get("audio_fingerprint") else existing_audio_fingerprint_computed_at,
+                    audio_fingerprint=data.get("audio_fingerprint")
+                    or existing_audio_fingerprint,
+                    audio_fingerprint_source=data.get("audio_fingerprint_source")
+                    or existing_audio_fingerprint_source,
+                    audio_fingerprint_computed_at=now
+                    if data.get("audio_fingerprint")
+                    else existing_audio_fingerprint_computed_at,
                     path=data["path"],
                     updated_at=now,
                 )
             )
             scoped_key = f"{data['album']}::{data.get('disc_number', 1)}::{data.get('track_number', 0)}::{data.get('title') or data.get('filename')}"
-            upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="scoped_track", key_value=scoped_key, is_primary=True)
-            upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+            upsert_entity_identity_key(
+                s,
+                entity_type="track",
+                entity_uid=entity_uid,
+                key_type="scoped_track",
+                key_value=scoped_key,
+                is_primary=True,
+            )
+            upsert_entity_identity_key(
+                s,
+                entity_type="track",
+                entity_uid=entity_uid,
+                key_type="slug",
+                key_value=slug,
+                is_primary=True,
+            )
             if requested_track_mbid:
-                upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="musicbrainz_trackid", key_value=requested_track_mbid)
+                upsert_entity_identity_key(
+                    s,
+                    entity_type="track",
+                    entity_uid=entity_uid,
+                    key_type="musicbrainz_trackid",
+                    key_value=requested_track_mbid,
+                )
             ensure_track_processing_rows(s, track_id)
             return
         insert_stmt = pg_insert(LibraryTrack).values(
@@ -143,7 +185,9 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
             musicbrainz_trackid=data.get("musicbrainz_trackid"),
             audio_fingerprint=data.get("audio_fingerprint"),
             audio_fingerprint_source=data.get("audio_fingerprint_source"),
-            audio_fingerprint_computed_at=now if data.get("audio_fingerprint") else None,
+            audio_fingerprint_computed_at=now
+            if data.get("audio_fingerprint")
+            else None,
             path=data["path"],
             updated_at=now,
         )
@@ -151,8 +195,12 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
             insert_stmt.on_conflict_do_update(
                 index_elements=[LibraryTrack.path],
                 set_={
-                    "storage_id": func.coalesce(LibraryTrack.storage_id, insert_stmt.excluded.storage_id),
-                    "entity_uid": func.coalesce(LibraryTrack.entity_uid, insert_stmt.excluded.entity_uid),
+                    "storage_id": func.coalesce(
+                        LibraryTrack.storage_id, insert_stmt.excluded.storage_id
+                    ),
+                    "entity_uid": func.coalesce(
+                        LibraryTrack.entity_uid, insert_stmt.excluded.entity_uid
+                    ),
                     "album_id": insert_stmt.excluded.album_id,
                     "artist": insert_stmt.excluded.artist,
                     "album": insert_stmt.excluded.album,
@@ -178,8 +226,14 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
                         func.nullif(insert_stmt.excluded.musicbrainz_trackid, ""),
                         LibraryTrack.musicbrainz_trackid,
                     ),
-                    "audio_fingerprint": func.coalesce(insert_stmt.excluded.audio_fingerprint, LibraryTrack.audio_fingerprint),
-                    "audio_fingerprint_source": func.coalesce(insert_stmt.excluded.audio_fingerprint_source, LibraryTrack.audio_fingerprint_source),
+                    "audio_fingerprint": func.coalesce(
+                        insert_stmt.excluded.audio_fingerprint,
+                        LibraryTrack.audio_fingerprint,
+                    ),
+                    "audio_fingerprint_source": func.coalesce(
+                        insert_stmt.excluded.audio_fingerprint_source,
+                        LibraryTrack.audio_fingerprint_source,
+                    ),
                     "audio_fingerprint_computed_at": func.coalesce(
                         insert_stmt.excluded.audio_fingerprint_computed_at,
                         LibraryTrack.audio_fingerprint_computed_at,
@@ -189,12 +243,38 @@ def upsert_track(data: dict, *, session: Session | None = None) -> None:
             )
         )
 
-        track_id = int(s.execute(select(LibraryTrack.id).where(LibraryTrack.path == data["path"]).limit(1)).scalar_one())
+        track_id = int(
+            s.execute(
+                select(LibraryTrack.id)
+                .where(LibraryTrack.path == data["path"])
+                .limit(1)
+            ).scalar_one()
+        )
         scoped_key = f"{data['album']}::{data.get('disc_number', 1)}::{data.get('track_number', 0)}::{data.get('title') or data.get('filename')}"
-        upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="scoped_track", key_value=scoped_key, is_primary=True)
-        upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="slug", key_value=slug, is_primary=True)
+        upsert_entity_identity_key(
+            s,
+            entity_type="track",
+            entity_uid=entity_uid,
+            key_type="scoped_track",
+            key_value=scoped_key,
+            is_primary=True,
+        )
+        upsert_entity_identity_key(
+            s,
+            entity_type="track",
+            entity_uid=entity_uid,
+            key_type="slug",
+            key_value=slug,
+            is_primary=True,
+        )
         if requested_track_mbid:
-            upsert_entity_identity_key(s, entity_type="track", entity_uid=entity_uid, key_type="musicbrainz_trackid", key_value=requested_track_mbid)
+            upsert_entity_identity_key(
+                s,
+                entity_type="track",
+                entity_uid=entity_uid,
+                key_type="musicbrainz_trackid",
+                key_value=requested_track_mbid,
+            )
         ensure_track_processing_rows(s, track_id)
 
 

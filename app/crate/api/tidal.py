@@ -1,8 +1,14 @@
+from typing import Any, Mapping
+
 from fastapi import APIRouter, Request, HTTPException
 
 from crate.api.auth import _require_auth, _require_admin
 from crate.api._deps import artist_name_from_entity_uid, artist_name_from_id
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.tidal import (
     BatchDownloadRequest,
@@ -27,7 +33,10 @@ from crate.api.schemas.tidal import (
     WishlistResponse,
 )
 from crate.db.repositories.library import get_album_quality_map, get_library_albums
-from crate.db.repositories.tasks import create_task_dedup, find_active_task_by_type_params
+from crate.db.repositories.tasks import (
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
 from crate.db.tidal import (
     add_tidal_download,
     delete_tidal_download,
@@ -37,7 +46,11 @@ from crate.db.tidal import (
     set_monitored_artist,
     update_tidal_download,
 )
-from crate.acquisition_tasks import build_tidal_download_params, infer_tidal_entity_type, tidal_download_dedup_key
+from crate.acquisition_tasks import (
+    build_tidal_download_params,
+    infer_tidal_entity_type,
+    tidal_download_dedup_key,
+)
 from crate import tidal
 
 router = APIRouter(prefix="/api/tidal", tags=["tidal"])
@@ -67,6 +80,7 @@ _TIDAL_SSE_RESPONSES = merge_responses(
 
 
 # ── Auth ─────────────────────────────────────────────────────────
+
 
 @router.get(
     "/status",
@@ -128,6 +142,7 @@ def tidal_logout(request: Request):
 
 # ── Missing from Tidal ────────────────────────────────────────────
 
+
 def tidal_missing(request: Request, artist: str):
     """Find Tidal albums not in the local library for an artist."""
     _require_auth(request)
@@ -141,8 +156,10 @@ def tidal_missing(request: Request, artist: str):
 
     # Build set of normalized local album names
     local_albums = get_library_albums(artist)
+
     def _norm(s: str) -> str:
         return re.sub(r"[^a-z0-9]", "", s.lower())
+
     local_names = {_norm(a["name"]) for a in local_albums}
 
     missing = []
@@ -190,7 +207,9 @@ def tidal_missing_by_entity_uid(request: Request, artist_entity_uid: str):
     return tidal_missing(request, artist_name)
 
 
-def tidal_download_missing(request: Request, artist: str, body: TidalDownloadMissingRequest):
+def tidal_download_missing(
+    request: Request, artist: str, body: TidalDownloadMissingRequest
+):
     """Download multiple missing albums from Tidal."""
     _require_auth(request)
     if not body.albums:
@@ -205,12 +224,16 @@ def tidal_download_missing(request: Request, artist: str, body: TidalDownloadMis
         task_params = build_tidal_download_params(
             url=url,
             quality=body.quality,
-            content_type=album.content_type if hasattr(album, "content_type") else None,
+            content_type=getattr(album, "content_type", None),
             artist=artist,
             album=title,
             cover_url=album.cover_url,
         )
-        task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+        task_id = create_task_dedup(
+            "tidal_download",
+            task_params,
+            dedup_key=tidal_download_dedup_key(task_params),
+        )
         if task_id:
             queued += 1
 
@@ -223,7 +246,9 @@ def tidal_download_missing(request: Request, artist: str, body: TidalDownloadMis
     responses=_TIDAL_RESPONSES,
     summary="Queue downloads for multiple missing Tidal albums",
 )
-def tidal_download_missing_by_id(request: Request, artist_id: int, body: TidalDownloadMissingRequest):
+def tidal_download_missing_by_id(
+    request: Request, artist_id: int, body: TidalDownloadMissingRequest
+):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
@@ -236,7 +261,9 @@ def tidal_download_missing_by_id(request: Request, artist_id: int, body: TidalDo
     responses=_TIDAL_RESPONSES,
     summary="Queue downloads for multiple missing Tidal albums by artist entity UID",
 )
-def tidal_download_missing_by_entity_uid(request: Request, artist_entity_uid: str, body: TidalDownloadMissingRequest):
+def tidal_download_missing_by_entity_uid(
+    request: Request, artist_entity_uid: str, body: TidalDownloadMissingRequest
+):
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
@@ -245,13 +272,16 @@ def tidal_download_missing_by_entity_uid(request: Request, artist_entity_uid: st
 
 # ── Search ───────────────────────────────────────────────────────
 
+
 @router.get(
     "/search",
     response_model=TidalSearchResponse,
     responses=_TIDAL_RESPONSES,
     summary="Search the Tidal catalog",
 )
-def tidal_search(request: Request, q: str = "", type: str = "all", limit: int = 20, offset: int = 0):
+def tidal_search(
+    request: Request, q: str = "", type: str = "all", limit: int = 20, offset: int = 0
+):
     _require_auth(request)
     if len(q.strip()) < 2:
         return {"albums": [], "artists": [], "tracks": []}
@@ -262,6 +292,7 @@ def tidal_search(request: Request, q: str = "", type: str = "all", limit: int = 
 
 
 # ── Artist Browse ────────────────────────────────────────────────
+
 
 @router.get(
     "/artists/{tidal_artist_id}/albums",
@@ -286,10 +317,12 @@ def tidal_artist_albums(request: Request, tidal_artist_id: str):
 
         # Get representative quality per album (max bit_depth/sample_rate from tracks)
         album_ids = [a["id"] for a in local_albums if a.get("id")]
-        album_quality = get_album_quality_map(album_ids, include_format=True) if album_ids else {}
+        album_quality = (
+            get_album_quality_map(album_ids, include_format=True) if album_ids else {}
+        )
 
         # Build lookup: normalized name → (album row, quality)
-        local_by_name: dict[str, tuple[dict, dict]] = {}
+        local_by_name: dict[str, tuple[Mapping[str, Any], dict]] = {}
         for la in local_albums:
             q = album_quality.get(la["id"], {})
             local_by_name[la["name"].lower()] = (la, q)
@@ -359,6 +392,7 @@ def tidal_album_tracks(request: Request, tidal_album_id: str):
 
 # ── Download ─────────────────────────────────────────────────────
 
+
 @router.post(
     "/download",
     response_model=TidalDownloadResponse,
@@ -407,7 +441,9 @@ def tidal_download(request: Request, body: DownloadRequest):
         album=album_hint,
         upgrade_album_id=body.upgrade_album_id,
     )
-    task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+    task_id = create_task_dedup(
+        "tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params)
+    )
     if not task_id:
         task_id = find_active_task_by_type_params(
             "tidal_download",
@@ -460,7 +496,11 @@ def tidal_download_batch(request: Request, body: BatchDownloadRequest):
             album=title,
             cover_url=item.cover_url or "",
         )
-        task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+        task_id = create_task_dedup(
+            "tidal_download",
+            task_params,
+            dedup_key=tidal_download_dedup_key(task_params),
+        )
         if not task_id:
             task_id = find_active_task_by_type_params(
                 "tidal_download",
@@ -474,6 +514,7 @@ def tidal_download_batch(request: Request, body: BatchDownloadRequest):
 
 
 # ── Queue / Wishlist ─────────────────────────────────────────────
+
 
 @router.get(
     "/queue",
@@ -536,7 +577,11 @@ def update_queue_item(request: Request, dl_id: int, body: QueueUpdateRequest):
                     album=dl.get("title") or "",
                     cover_url=dl.get("cover_url") or "",
                 )
-                task_id = create_task_dedup("tidal_download", task_params, dedup_key=tidal_download_dedup_key(task_params))
+                task_id = create_task_dedup(
+                    "tidal_download",
+                    task_params,
+                    dedup_key=tidal_download_dedup_key(task_params),
+                )
                 if not task_id:
                     task_id = find_active_task_by_type_params(
                         "tidal_download",
@@ -563,6 +608,7 @@ def remove_queue_item(request: Request, dl_id: int):
 
 
 # ── Artist Discography ───────────────────────────────────────────
+
 
 def artist_discography(request: Request, name: str):
     """Cross-reference Tidal discography with local library."""
@@ -599,13 +645,17 @@ def artist_discography(request: Request, name: str):
         is_local = (
             title_lower in local_names
             or title_lower in local_tag_names
-            or any(fuzz.ratio(title_lower, ln) > 85 for ln in local_names | local_tag_names)
+            or any(
+                fuzz.ratio(title_lower, ln) > 85 for ln in local_names | local_tag_names
+            )
         )
 
-        result_albums.append({
-            **ta,
-            "status": "local" if is_local else "available",
-        })
+        result_albums.append(
+            {
+                **ta,
+                "status": "local" if is_local else "available",
+            }
+        )
 
     return {
         "artist": name,
@@ -628,6 +678,7 @@ def artist_discography_by_id(request: Request, artist_id: int):
 
 
 # ── Match Missing Albums ─────────────────────────────────────────
+
 
 def match_missing(request: Request, name: str):
     """Match missing albums (from MusicBrainz) with Tidal availability."""
@@ -664,13 +715,15 @@ def match_missing(request: Request, name: str):
                 best_score = combined
                 best_match = ta
 
-        matches.append({
-            "missing_title": title,
-            "missing_year": album.get("first_release_date", "")[:4],
-            "missing_type": album.get("type", ""),
-            "tidal_match": best_match if best_score >= 70 else None,
-            "match_score": best_score,
-        })
+        matches.append(
+            {
+                "missing_title": title,
+                "missing_year": album.get("first_release_date", "")[:4],
+                "missing_type": album.get("type", ""),
+                "tidal_match": best_match if best_score >= 70 else None,
+                "match_score": best_score,
+            }
+        )
 
     return {
         "artist": name,
@@ -695,6 +748,7 @@ def match_missing_by_id(request: Request, artist_id: int):
 
 # ── Monitor ──────────────────────────────────────────────────────
 
+
 def toggle_monitor(request: Request, name: str, body: MonitorRequest | None = None):
     _require_auth(request)
     enabled = body.enabled if body else True
@@ -708,7 +762,9 @@ def toggle_monitor(request: Request, name: str, body: MonitorRequest | None = No
     responses=_TIDAL_RESPONSES,
     summary="Enable or disable Tidal monitoring for an artist",
 )
-def toggle_monitor_by_id(request: Request, artist_id: int, body: MonitorRequest | None = None):
+def toggle_monitor_by_id(
+    request: Request, artist_id: int, body: MonitorRequest | None = None
+):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")

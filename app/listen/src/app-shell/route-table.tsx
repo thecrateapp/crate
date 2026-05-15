@@ -3,7 +3,10 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router";
 
 import { DeferredRoute } from "@/app-shell/AppFallbacks";
-import { ArtistChildRoute, LegacyArtistTopTracksRedirect } from "@/app-shell/LibraryRouteCompat";
+import {
+  ArtistChildRoute,
+  LegacyArtistTopTracksRedirect,
+} from "@/app-shell/LibraryRouteCompat";
 import { Home } from "@/pages/Home";
 
 const ServerSetup = React.lazy(() =>
@@ -34,7 +37,9 @@ const Artist = React.lazy(() =>
   import("@/pages/Artist").then((m) => ({ default: m.Artist })),
 );
 const ArtistTopTracks = React.lazy(() =>
-  import("@/pages/ArtistTopTracks").then((m) => ({ default: m.ArtistTopTracks })),
+  import("@/pages/ArtistTopTracks").then((m) => ({
+    default: m.ArtistTopTracks,
+  })),
 );
 const Album = React.lazy(() =>
   import("@/pages/Album").then((m) => ({ default: m.Album })),
@@ -43,7 +48,9 @@ const Playlist = React.lazy(() =>
   import("@/pages/Playlist").then((m) => ({ default: m.Playlist })),
 );
 const CuratedPlaylist = React.lazy(() =>
-  import("@/pages/CuratedPlaylist").then((m) => ({ default: m.CuratedPlaylist })),
+  import("@/pages/CuratedPlaylist").then((m) => ({
+    default: m.CuratedPlaylist,
+  })),
 );
 const HomePlaylist = React.lazy(() =>
   import("@/pages/HomePlaylist").then((m) => ({ default: m.HomePlaylist })),
@@ -76,7 +83,9 @@ const UserProfile = React.lazy(() =>
   import("@/pages/UserProfile").then((m) => ({ default: m.UserProfile })),
 );
 const UserConnections = React.lazy(() =>
-  import("@/pages/UserConnections").then((m) => ({ default: m.UserConnections })),
+  import("@/pages/UserConnections").then((m) => ({
+    default: m.UserConnections,
+  })),
 );
 const JamSession = React.lazy(() =>
   import("@/pages/JamSession").then((m) => ({ default: m.JamSession })),
@@ -126,9 +135,18 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "paths", element: deferred(<PathsPage />) },
   { path: "paths/:id", element: deferred(<PathDetailPage />) },
   { path: "radio", element: deferred(<RadioPage />) },
-  { path: "artists/:artistId/:legacySlug/top-tracks", element: deferred(<LegacyArtistTopTracksRedirect />) },
-  { path: "artists/:artistSlug/top-tracks", element: deferred(<ArtistTopTracks />) },
-  { path: "artists/:artistSlug/:albumSlug", element: deferred(<ArtistChildRoute />) },
+  {
+    path: "artists/:artistId/:legacySlug/top-tracks",
+    element: deferred(<LegacyArtistTopTracksRedirect />),
+  },
+  {
+    path: "artists/:artistSlug/top-tracks",
+    element: deferred(<ArtistTopTracks />),
+  },
+  {
+    path: "artists/:artistSlug/:albumSlug",
+    element: deferred(<ArtistChildRoute />),
+  },
   { path: "artists/:artistSlug", element: deferred(<Artist />) },
   { path: "albums/:albumId/:slug", element: deferred(<Album />) },
   { path: "playlist/:id", element: deferred(<Playlist />) },

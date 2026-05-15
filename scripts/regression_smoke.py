@@ -57,6 +57,9 @@ def main() -> int:
             body={"email": EMAIL, "password": PASSWORD},
         )
         _assert("email" in login, "login did not return user payload")
+        token = login.get("token")
+        _assert(isinstance(token, str) and token, "login did not return bearer token")
+        opener.addheaders = [("Authorization", f"Bearer {token}")]
 
         filters = _json_request(opener, "/api/browse/filters")
         _assert(isinstance(filters.get("genres"), list), "filters.genres must be a list")

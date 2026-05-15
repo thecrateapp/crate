@@ -9,7 +9,9 @@ def artist_dir(library_root: str | Path, artist_entity_uid: str) -> Path:
     return Path(library_root) / str(artist_entity_uid)
 
 
-def album_dir(library_root: str | Path, artist_entity_uid: str, album_entity_uid: str) -> Path:
+def album_dir(
+    library_root: str | Path, artist_entity_uid: str, album_entity_uid: str
+) -> Path:
     return artist_dir(library_root, artist_entity_uid) / str(album_entity_uid)
 
 
@@ -21,7 +23,10 @@ def track_path(
     extension: str,
 ) -> Path:
     suffix = extension if extension.startswith(".") else f".{extension}"
-    return album_dir(library_root, artist_entity_uid, album_entity_uid) / f"{track_entity_uid}{suffix.lower()}"
+    return (
+        album_dir(library_root, artist_entity_uid, album_entity_uid)
+        / f"{track_entity_uid}{suffix.lower()}"
+    )
 
 
 def is_storage_v2_artist_dir(path: str | Path) -> bool:
@@ -57,7 +62,7 @@ def entity_uid_for(record: Mapping[str, Any] | None, *keys: str) -> str | None:
 
 def resolve_artist_dir(
     library_root: str | Path,
-    artist: dict | None = None,
+    artist: Mapping[str, Any] | None = None,
     *,
     fallback_name: str | None = None,
     existing_only: bool = False,
@@ -96,9 +101,9 @@ def resolve_artist_dir(
 
 def resolve_album_dir(
     library_root: str | Path,
-    album: dict | None,
+    album: Mapping[str, Any] | None,
     *,
-    artist: dict | None = None,
+    artist: Mapping[str, Any] | None = None,
 ) -> Path | None:
     if not album:
         return None

@@ -11,9 +11,13 @@ from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.tx import optional_scope
 
 
-def update_artist_enrichment(name: str, data: dict, *, session: Session | None = None) -> None:
+def update_artist_enrichment(
+    name: str, data: dict, *, session: Session | None = None
+) -> None:
     def _impl(s: Session) -> None:
-        artist = s.execute(select(LibraryArtist).where(LibraryArtist.name == name).limit(1)).scalar_one_or_none()
+        artist = s.execute(
+            select(LibraryArtist).where(LibraryArtist.name == name).limit(1)
+        ).scalar_one_or_none()
         if artist is None:
             return
 
@@ -49,7 +53,9 @@ def update_artist_enrichment(name: str, data: dict, *, session: Session | None =
 
 def update_artist_has_photo(name: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
-        artist = s.execute(select(LibraryArtist).where(LibraryArtist.name == name).limit(1)).scalar_one_or_none()
+        artist = s.execute(
+            select(LibraryArtist).where(LibraryArtist.name == name).limit(1)
+        ).scalar_one_or_none()
         if artist is not None:
             artist.has_photo = 1
 
@@ -59,7 +65,11 @@ def update_artist_has_photo(name: str, *, session: Session | None = None) -> Non
 
 def delete_artist(name: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
-        album_ids = s.execute(select(LibraryAlbum.id).where(LibraryAlbum.artist == name)).scalars().all()
+        album_ids = (
+            s.execute(select(LibraryAlbum.id).where(LibraryAlbum.artist == name))
+            .scalars()
+            .all()
+        )
         if album_ids:
             s.execute(delete(LibraryTrack).where(LibraryTrack.album_id.in_(album_ids)))
         s.execute(delete(LibraryAlbum).where(LibraryAlbum.artist == name))
@@ -71,7 +81,9 @@ def delete_artist(name: str, *, session: Session | None = None) -> None:
 
 def delete_album(path: str, *, session: Session | None = None) -> None:
     def _impl(s: Session) -> None:
-        album_id = s.execute(select(LibraryAlbum.id).where(LibraryAlbum.path == path).limit(1)).scalar_one_or_none()
+        album_id = s.execute(
+            select(LibraryAlbum.id).where(LibraryAlbum.path == path).limit(1)
+        ).scalar_one_or_none()
         if album_id is not None:
             s.execute(delete(LibraryTrack).where(LibraryTrack.album_id == album_id))
             s.execute(delete(LibraryAlbum).where(LibraryAlbum.id == album_id))
@@ -88,7 +100,9 @@ def delete_track(path: str, *, session: Session | None = None) -> None:
         _impl(s)
 
 
-def set_track_rating(track_id: int, rating: int, *, session: Session | None = None) -> None:
+def set_track_rating(
+    track_id: int, rating: int, *, session: Session | None = None
+) -> None:
     def _impl(s: Session) -> None:
         track = s.get(LibraryTrack, track_id)
         if track is not None:

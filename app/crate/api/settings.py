@@ -1,10 +1,15 @@
 import json
 import os
+import sys
 
 from fastapi import APIRouter, Request, HTTPException
 
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.settings import (
     CacheClearRequest,
     CacheClearResponse,
@@ -21,15 +26,21 @@ from crate.api.schemas.settings import (
 )
 from crate.db.audit import get_db_table_stats
 from crate.db.cache_settings import get_setting, set_setting
-from crate.db.cache_store import clear_all_cache_tables, delete_cache, delete_cache_prefix, get_cache_stats
+from crate.db.cache_store import (
+    clear_all_cache_tables,
+    delete_cache,
+    delete_cache_prefix,
+    get_cache_stats,
+)
 from crate.db.repositories.library import get_library_stats, get_library_track_count
-from crate.db.repositories.tasks import create_task
 from crate.scheduler import get_schedules, set_schedules
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 VALID_ENRICHMENT_SOURCES = {"lastfm", "spotify", "fanart", "setlistfm", "musicbrainz"}
-DEFAULT_ENRICHMENT = '{"lastfm":true,"spotify":true,"fanart":true,"setlistfm":true,"musicbrainz":true}'
+DEFAULT_ENRICHMENT = (
+    '{"lastfm":true,"spotify":true,"fanart":true,"setlistfm":true,"musicbrainz":true}'
+)
 
 _SETTINGS_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -57,19 +68,31 @@ def get_settings(request: Request):
         "library": {
             "path": "/music",
             "storage_layout": "v2-uuid",
-            "audio_extensions": json.loads(get_setting("audio_extensions", '[".flac",".mp3",".m4a",".ogg",".opus"]')),
+            "audio_extensions": json.loads(
+                get_setting(
+                    "audio_extensions", '[".flac",".mp3",".m4a",".ogg",".opus"]'
+                )
+            ),
         },
         "processing": {
-            "mb_auto_apply_threshold": int(get_setting("mb_auto_apply_threshold", "95")),
-            "enrichment_min_age_hours": int(get_setting("enrichment_min_age_hours", "24")),
+            "mb_auto_apply_threshold": int(
+                get_setting("mb_auto_apply_threshold", "95")
+            ),
+            "enrichment_min_age_hours": int(
+                get_setting("enrichment_min_age_hours", "24")
+            ),
             "max_track_popularity": int(get_setting("max_track_popularity", "50")),
         },
         "shows": _get_shows_settings(),
         "soulseek": {
-            "url": get_setting("slskd_url", os.environ.get("SLSKD_URL", "http://slskd:5030")),
+            "url": get_setting(
+                "slskd_url", os.environ.get("SLSKD_URL", "http://slskd:5030")
+            ),
             "quality": get_setting("soulseek_quality", "flac"),
             "min_bitrate": int(get_setting("soulseek_min_bitrate", "320")),
-            "username": get_setting("slskd_username", os.environ.get("SLSKD_SLSK_USERNAME", "")),
+            "username": get_setting(
+                "slskd_username", os.environ.get("SLSKD_SLSK_USERNAME", "")
+            ),
             "shares_music": get_setting("slskd_shares_music", "true") == "true",
         },
         "telegram": {
@@ -90,6 +113,7 @@ def _mask_token(token: str) -> str:
 
 def _get_shows_settings() -> dict:
     from crate.db.queries.shows import get_unique_user_cities, get_upcoming_show_counts
+
     cities = []
     try:
         cities = get_unique_user_cities()
@@ -101,18 +125,24 @@ def _get_shows_settings() -> dict:
     except Exception:
         pass
     return {
-        "active_cities": [{"city": c["city"], "country": c.get("country", "")} for c in cities],
+        "active_cities": [
+            {"city": c["city"], "country": c.get("country", "")} for c in cities
+        ],
         "upcoming_shows": counts["show_count"],
     }
 
 
 def _get_about_info() -> dict:
-    import os
     import subprocess
 
     git_commit = "unknown"
     try:
-        result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, timeout=5)
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         if result.returncode == 0:
             git_commit = result.stdout.strip()
     except Exception:
@@ -122,6 +152,7 @@ def _get_about_info() -> dict:
     stats = get_library_stats() if track_count > 0 else {}
 
     import time
+
     _start_time = getattr(_get_about_info, "_start", None)
     if not _start_time:
         _get_about_info._start = time.time()
@@ -131,12 +162,14 @@ def _get_about_info() -> dict:
     return {
         "version": "1.0.0",
         "git_commit": git_commit,
-        "python": os.sys.version.split()[0],
+        "python": sys.version.split()[0],
         "uptime_seconds": uptime_sec,
         "artists": stats.get("artists", 0),
         "albums": stats.get("albums", 0),
         "tracks": stats.get("tracks", 0),
-        "total_size_gb": round(stats.get("total_size", 0) / (1024**3), 2) if stats.get("total_size") else 0,
+        "total_size_gb": round(stats.get("total_size", 0) / (1024**3), 2)
+        if stats.get("total_size")
+        else 0,
     }
 
 
@@ -151,7 +184,10 @@ def update_schedules(request: Request, body: ScheduleIntervalsRequest):
     payload = body.root
     for key, val in payload.items():
         if not isinstance(val, int) or val < 0:
-            raise HTTPException(status_code=422, detail=f"Invalid interval for '{key}': must be int >= 0")
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid interval for '{key}': must be int >= 0",
+            )
     set_schedules(payload)
     return {"ok": True}
 
@@ -165,7 +201,9 @@ def update_schedules(request: Request, body: ScheduleIntervalsRequest):
 def update_worker(request: Request, body: WorkerSettingsRequest):
     _require_admin(request)
     if body.max_workers < 1 or body.max_workers > 10:
-        raise HTTPException(status_code=422, detail="max_workers must be between 1 and 10")
+        raise HTTPException(
+            status_code=422, detail="max_workers must be between 1 and 10"
+        )
     set_setting("max_workers", str(body.max_workers))
     return {"ok": True}
 
@@ -181,7 +219,9 @@ def update_enrichment(request: Request, body: EnrichmentUpdateRequest):
     payload = body.root
     invalid = set(payload.keys()) - VALID_ENRICHMENT_SOURCES
     if invalid:
-        raise HTTPException(status_code=422, detail=f"Invalid sources: {', '.join(sorted(invalid))}")
+        raise HTTPException(
+            status_code=422, detail=f"Invalid sources: {', '.join(sorted(invalid))}"
+        )
     set_setting("enrichment_sources", json.dumps(payload))
     return {"ok": True}
 
@@ -197,15 +237,19 @@ def clear_cache(request: Request, body: CacheClearRequest):
     cache_type = body.type
     valid_types = {"all", "enrichment", "lastfm", "analytics"}
     if cache_type not in valid_types:
-        raise HTTPException(status_code=422, detail=f"Invalid cache type: must be one of {', '.join(sorted(valid_types))}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid cache type: must be one of {', '.join(sorted(valid_types))}",
+        )
 
     # Clear Redis + PostgreSQL
     if cache_type == "all":
         delete_cache_prefix("")  # all cache keys
         clear_all_cache_tables()
         # Clear all Redis mb: keys
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r:
             try:
                 cursor = 0
@@ -295,9 +339,13 @@ def update_telegram(request: Request, body: TelegramSettingsUpdateRequest):
 def test_telegram(request: Request):
     _require_admin(request)
     from crate.telegram import send_message
+
     ok = send_message("\u2705 Crate bot test — connection working!")
     if not ok:
-        raise HTTPException(status_code=400, detail="Failed to send message. Check bot token and chat ID.")
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to send message. Check bot token and chat ID.",
+        )
     return {"ok": True}
 
 
@@ -314,7 +362,9 @@ def update_soulseek(request: Request, body: SoulseekSettingsUpdateRequest):
     if body.quality is not None:
         valid = ("flac", "flac_320", "any")
         if body.quality not in valid:
-            raise HTTPException(status_code=422, detail=f"quality must be one of {valid}")
+            raise HTTPException(
+                status_code=422, detail=f"quality must be one of {valid}"
+            )
         set_setting("soulseek_quality", body.quality)
     if body.min_bitrate is not None:
         set_setting("soulseek_min_bitrate", str(int(body.min_bitrate)))

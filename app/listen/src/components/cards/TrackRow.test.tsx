@@ -8,7 +8,8 @@ const navigateMock = vi.hoisted(() => vi.fn());
 const toggleTrackLikeMock = vi.hoisted(() => vi.fn(async () => {}));
 
 vi.mock("react-router", async () => {
-  const actual = await vi.importActual<typeof import("react-router")>("react-router");
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -78,10 +79,7 @@ describe("TrackRow playback behavior", () => {
     const firstTrack = tracks[0]!;
 
     renderWithListenProviders(
-      <TrackRow
-        track={firstTrack}
-        queueTracks={tracks}
-      />,
+      <TrackRow track={firstTrack} queueTracks={tracks} />,
       {
         playerActions: {
           playAll,

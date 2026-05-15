@@ -15,19 +15,27 @@ Architecture:
 import asyncio
 import json
 import logging
-import os
 import re
 from time import time
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    OpenApiResponses,
+    error_response,
+    merge_responses,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
-from crate.api.schemas.utility import CacheInvalidationRequest, CacheInvalidationResponse
+from crate.api.schemas.utility import (
+    CacheInvalidationRequest,
+    CacheInvalidationResponse,
+)
+from crate.config import get_redis_url
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["events"])
@@ -49,8 +57,10 @@ _CACHE_EVENT_RESPONSES = merge_responses(
     },
 )
 
-_CACHE_INVALIDATION_RESPONSES = {
-    403: error_response("Only trusted internal peers may broadcast cache invalidations."),
+_CACHE_INVALIDATION_RESPONSES: OpenApiResponses = {
+    403: error_response(
+        "Only trusted internal peers may broadcast cache invalidations."
+    ),
     422: error_response("The request payload failed validation."),
 }
 
@@ -65,7 +75,7 @@ _EVENT_ID_KEY = "cache:invalidation:next_id"
 _LIVE_CHANNEL = "crate:sse:cache-invalidation"
 _MAX_EVENTS = 500
 
-_redis = None
+_redis: Any | None = None
 
 _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
@@ -78,12 +88,12 @@ _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
 )
 
 
-def _get_redis():
+def _get_redis() -> Any:
     global _redis
     if _redis is None:
         import redis as _redis_lib
-        url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-        _redis = _redis_lib.from_url(url, decode_responses=True)
+
+        _redis = _redis_lib.from_url(get_redis_url(), decode_responses=True)
     return _redis
 
 
@@ -103,15 +113,15 @@ def broadcast_invalidation(*scopes: str):
     logged but never propagate.
     """
     import threading
-    threading.Thread(
-        target=_do_broadcast, args=(scopes,), daemon=True
-    ).start()
+
+    threading.Thread(target=_do_broadcast, args=(scopes,), daemon=True).start()
 
 
 def _do_broadcast(scopes: tuple[str, ...] | list[str]):
     try:
         r = _get_redis()
         from crate.db.domain_events import append_domain_event
+
         for scope in scopes:
             event_id = r.incr(_EVENT_ID_KEY)
             event = json.dumps({"id": event_id, "scope": scope, "ts": time()})
@@ -171,7 +181,19 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
 
     try:
         if any(
-            scope in {"home", "follows", "likes", "saved_albums", "history", "library", "curation", "playlists", "shows", "upcoming"}
+            scope
+            in {
+                "home",
+                "follows",
+                "likes",
+                "saved_albums",
+                "history",
+                "library",
+                "curation",
+                "playlists",
+                "shows",
+                "upcoming",
+            }
             or scope.startswith(("artist:", "album:", "playlist:"))
             for scope in scopes
         ):
@@ -183,7 +205,9 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
         ):
             mark_ui_snapshots_stale(scope="ops", subject_key="dashboard")
     except Exception:
-        log.debug("Failed to mark ui snapshots stale for scopes: %s", scopes, exc_info=True)
+        log.debug(
+            "Failed to mark ui snapshots stale for scopes: %s", scopes, exc_info=True
+        )
 
 
 def get_invalidation_events_since(last_id: int) -> list[dict]:
@@ -258,7 +282,9 @@ async def _invalidation_stream(last_event_id: int) -> AsyncIterator[str]:
 
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 try:
                     event = json.loads(message["data"])
@@ -339,7 +365,11 @@ async def cache_invalidate_endpoint(request: Request, body: CacheInvalidationReq
     """Internal endpoint for worker processes to broadcast invalidation.
     Only accepts requests from Docker network peers (trusted proxy check)."""
     client_ip = request.client.host if request.client else ""
-    if not (client_ip.startswith("172.") or client_ip.startswith("10.") or client_ip == "127.0.0.1"):
+    if not (
+        client_ip.startswith("172.")
+        or client_ip.startswith("10.")
+        or client_ip == "127.0.0.1"
+    ):
         raise HTTPException(status_code=403, detail="Forbidden")
     scopes = body.scopes
     if scopes:
@@ -365,7 +395,10 @@ _INVALIDATION_RULES: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"^/api/playlists/(\d+)"), ["playlists", "playlist:{1}"]),
     (re.compile(r"^/api/curation"), ["curation"]),
     (re.compile(r"^/api/artists/(\d+)/enrich"), ["library", "artist:{1}"]),
-    (re.compile(r"^/api/manage/artists/(\d+)/delete"), ["library", "artist:{1}", "home"]),
+    (
+        re.compile(r"^/api/manage/artists/(\d+)/delete"),
+        ["library", "artist:{1}", "home"],
+    ),
     (re.compile(r"^/api/manage/artists/(\d+)/repair"), ["library", "artist:{1}"]),
     (re.compile(r"^/api/manage/artists/(\d+)"), ["library", "artist:{1}"]),
     (re.compile(r"^/api/albums/(\d+)/cover"), ["library", "album:{1}"]),

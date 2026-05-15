@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from crate.genre_taxonomy import get_genre_description, get_genre_display_name, get_top_level_slug
+from crate.genre_taxonomy import (
+    get_genre_description,
+    get_genre_display_name,
+    get_top_level_slug,
+)
 
 
 def build_genre_graph_payload(
@@ -27,7 +31,9 @@ def build_genre_graph_payload(
                 "mapped": True,
                 "artist_count": genre["artist_count"],
                 "album_count": genre["album_count"],
-                "description": genre.get("description") or center_taxonomy_stats.get("description") or "",
+                "description": genre.get("description")
+                or center_taxonomy_stats.get("description")
+                or "",
                 "page_slug": genre["slug"],
                 "is_center": True,
                 "is_top_level": False,
@@ -48,7 +54,9 @@ def build_genre_graph_payload(
             "id": f"taxonomy:{canonical_slug}",
             "slug": canonical_slug,
             "label": get_genre_display_name(canonical_slug),
-            "kind": "top-level" if center_taxonomy_stats.get("is_top_level") else "taxonomy",
+            "kind": "top-level"
+            if center_taxonomy_stats.get("is_top_level")
+            else "taxonomy",
             "mapped": True,
             "artist_count": center_taxonomy_stats.get("artist_count", 0),
             "album_count": center_taxonomy_stats.get("album_count", 0),
@@ -61,7 +69,11 @@ def build_genre_graph_payload(
     )
     direct_nodes.add(canonical_slug)
 
-    for neighbor_slug in list(dict.fromkeys(slug for slug in taxonomy_slugs if slug and slug != canonical_slug)):
+    for neighbor_slug in list(
+        dict.fromkeys(
+            slug for slug in taxonomy_slugs if slug and slug != canonical_slug
+        )
+    ):
         neighbor_stats = taxonomy_stats.get(neighbor_slug, {})
         if neighbor_slug in direct_nodes:
             continue
@@ -70,7 +82,9 @@ def build_genre_graph_payload(
                 "id": f"taxonomy:{neighbor_slug}",
                 "slug": neighbor_slug,
                 "label": get_genre_display_name(neighbor_slug),
-                "kind": "top-level" if neighbor_stats.get("is_top_level") else "taxonomy",
+                "kind": "top-level"
+                if neighbor_stats.get("is_top_level")
+                else "taxonomy",
                 "mapped": True,
                 "artist_count": neighbor_stats.get("artist_count", 0),
                 "album_count": neighbor_stats.get("album_count", 0),
@@ -98,7 +112,8 @@ def build_genre_graph_payload(
             "slug": canonical_slug,
             "name": get_genre_display_name(canonical_slug),
             "description": get_genre_description(canonical_slug),
-            "external_description": center_taxonomy_stats.get("external_description") or "",
+            "external_description": center_taxonomy_stats.get("external_description")
+            or "",
             "external_description_source": "",
             "musicbrainz_mbid": None,
             "wikidata_entity_id": None,
@@ -108,8 +123,12 @@ def build_genre_graph_payload(
             "canonical_name": get_genre_display_name(canonical_slug),
             "canonical_description": get_genre_description(canonical_slug),
             "top_level_slug": get_top_level_slug(canonical_slug) or canonical_slug,
-            "top_level_name": get_genre_display_name(get_top_level_slug(canonical_slug) or canonical_slug),
-            "top_level_description": get_genre_description(get_top_level_slug(canonical_slug) or canonical_slug),
+            "top_level_name": get_genre_display_name(
+                get_top_level_slug(canonical_slug) or canonical_slug
+            ),
+            "top_level_description": get_genre_description(
+                get_top_level_slug(canonical_slug) or canonical_slug
+            ),
         },
     }
 

@@ -10,7 +10,13 @@ interface ArtistAvatarProps {
   linked?: boolean;
 }
 
-export function ArtistAvatar({ name, artistId, artistSlug, size = 36, linked = false }: ArtistAvatarProps) {
+export function ArtistAvatar({
+  name,
+  artistId,
+  artistSlug,
+  size = 36,
+  linked = false,
+}: ArtistAvatarProps) {
   const [failed, setFailed] = useState(false);
   const letter = name.charAt(0).toUpperCase();
 
@@ -37,7 +43,10 @@ export function ArtistAvatar({ name, artistId, artistSlug, size = 36, linked = f
 
   if (linked && artistId != null) {
     return (
-      <Link to={artistPagePath({ artistId, artistSlug, artistName: name })} className="hover:ring-primary/50 rounded-md transition-all">
+      <Link
+        to={artistPagePath({ artistId, artistSlug, artistName: name })}
+        className="hover:ring-primary/50 rounded-md transition-all"
+      >
         {wrapper}
       </Link>
     );
@@ -45,7 +54,13 @@ export function ArtistAvatar({ name, artistId, artistSlug, size = 36, linked = f
   return wrapper;
 }
 
-export function ArtistAvatarStack({ names, size = 18 }: { names: string[]; size?: number }) {
+export function ArtistAvatarStack({
+  names,
+  size = 18,
+}: {
+  names: string[];
+  size?: number;
+}) {
   return (
     <div className="flex -space-x-1 flex-shrink-0">
       {names.map((n) => (

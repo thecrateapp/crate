@@ -30,7 +30,9 @@ def coerce_datetime(value: Any) -> datetime | None:
             parsed = datetime.fromisoformat(value)
         except ValueError:
             return None
-        return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+        return (
+            parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+        )
     return None
 
 

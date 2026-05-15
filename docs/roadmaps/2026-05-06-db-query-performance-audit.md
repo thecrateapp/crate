@@ -11,6 +11,7 @@ Consolidated findings from full codebase analysis. Ordered by severity.
 ### P0.1 — Home Discovery: 21-33 queries en cascada por carga fría
 
 **Archivos:**
+
 - `app/crate/db/home_personalized_discovery.py:113-168`
 - `app/crate/db/home_context.py:43-77`
 - `app/crate/db/home_builder_mix_generation.py:27-119`
@@ -33,6 +34,7 @@ Consolidated findings from full codebase analysis. Ordered by severity.
 | Replay mix | 1 |
 
 **Fix:**
+
 1. Consolidar `get_home_context` en un solo CTE (actualmente 6 queries)
 2. Eliminar la segunda llamada a `get_followed_artists` en `_build_home_upcoming` — reusar contexto ya cargado
 3. Batchear `_build_core_playlists` con `WHERE art.id = ANY(:artist_ids)` + `ROW_NUMBER() OVER (PARTITION BY art.id)`
@@ -45,6 +47,7 @@ Consolidated findings from full codebase analysis. Ordered by severity.
 **Archivo:** `app/crate/db/jobs/analysis_status.py:13-154`
 
 **Problema:** Llamada en cada rebuild del ops snapshot (cada 15s por admin viewer). Ejecuta:
+
 1. `COUNT(*) FROM library_tracks` — full scan 48K
 2. `GROUP BY pipeline, state FROM track_processing_state`
 3. Fallback masivo: `LEFT JOIN library_tracks + track_analysis_features + NOT EXISTS` — 48K rows
@@ -59,6 +62,7 @@ Consolidated findings from full codebase analysis. Ordered by severity.
 ### P0.3 — 5 queries de distribución escanean `library_tracks` secuencialmente en cada snapshot
 
 **Archivos:**
+
 - `app/crate/db/queries/analytics_overview_distributions.py:8-23` — genre distribution
 - `app/crate/db/queries/analytics_overview_distributions.py:41-46` — format distribution
 - `app/crate/db/queries/analytics_overview_distributions.py:49-69` — bitrate distribution
@@ -68,6 +72,7 @@ Consolidated findings from full codebase analysis. Ordered by severity.
 **Problema:** 5 full scans + hash aggregate consecutivos. 48K × 4 + 4.4K = ~196K filas por snapshot. En disco lento, 1-3 segundos solo de I/O.
 
 **Fix:** Consolidar en una sola query con subconsultas:
+
 ```sql
 SELECT 'genre' AS kind, genre AS label, COUNT(*) AS cnt
 FROM library_tracks WHERE genre IS NOT NULL GROUP BY genre
@@ -75,6 +80,7 @@ UNION ALL
 SELECT 'format', format, COUNT(*) FROM library_tracks WHERE format IS NOT NULL GROUP BY format
 UNION ALL ...
 ```
+
 Un solo scan de `library_tracks` en vez de 4.
 
 ---
@@ -86,6 +92,7 @@ Un solo scan de `library_tracks` en vez de 4.
 **Problema:** `get_insights_mood_distribution()` expande `mood_json` de cada track vía lateral join. 100K-250K filas intermedias antes del GROUP BY. Disparada en cada carga de `/api/insights`.
 
 **Fix:**
+
 1. Materializar `track_moods(track_id, mood, score)` como tabla separada, actualizada por el pipeline de análisis
 2. Short-term: añadir `WHERE bpm IS NOT NULL` para reducir el scan
 
@@ -98,6 +105,7 @@ Un solo scan de `library_tracks` en vez de 4.
 **Problema:** `get_home_context()` dispara secuencialmente: followed_artists, saved_albums, top_artists(90d), top_albums(90d), top_genres(90d), genre_fallback. Todas comparten ventana de 90 días pero son 6 round-trips independientes.
 
 **Fix:** Una sola query con CTEs que devuelva el contexto completo:
+
 ```sql
 WITH followed AS (...), saved AS (...), top_artists AS (...), top_albums AS (...), top_genres AS (...)
 SELECT ... FROM followed, saved, top_artists, top_albums, top_genres
@@ -110,6 +118,7 @@ SELECT ... FROM followed, saved, top_artists, top_albums, top_genres
 ### P1.1 — `get_overview_stat_summary()` llamada 2× por snapshot
 
 **Archivos:**
+
 - `app/crate/db/ops_snapshot_stats.py:35` — build_stats
 - `app/crate/db/ops_snapshot_stats.py:73` — build_analytics
 
@@ -122,12 +131,14 @@ SELECT ... FROM followed, saved, top_artists, top_albums, top_genres
 ### P1.2 — `get_latest_scan()` llamada 3×, `count_import_queue_items()` llamada 3× por snapshot
 
 **Archivos:**
+
 - `app/crate/db/ops_snapshot_stats.py:31-33`
 - `app/crate/db/ops_snapshot_activity.py:88-123`
 
 **Problema:** 4 round-trips redundantes por snapshot.
 
 **Fix:** Reestructurar `build_ops_snapshot_payload()` para computar resultados compartidos una vez:
+
 ```python
 scan = get_latest_scan()
 imports = count_import_queue_items(status="pending")
@@ -144,6 +155,7 @@ worker_live = get_worker_live_state()
 **Problema:** Itera 8 presets con `SELECT COUNT(*) FROM library_tracks WHERE energy >= X AND danceability >= Y`. 8 full scans de 48K = 384K filas escaneadas.
 
 **Fix:** Un solo scan con `COUNT(*) FILTER (WHERE ...)`:
+
 ```sql
 SELECT
     COUNT(*) FILTER (WHERE energy >= 0.7 AND danceability >= 0.5) AS energetic,
@@ -163,6 +175,7 @@ FROM library_tracks WHERE bpm IS NOT NULL
 **Problema:** Para cada uno de los top 7 artistas, dispara una query a `library_tracks JOIN library_albums JOIN library_artists` con su propio `read_scope()`. Hasta 7 queries separadas, cada una con `ORDER BY COALESCE(t.lastfm_playcount, 0) DESC`.
 
 **Fix:**
+
 ```sql
 SELECT * FROM (
     SELECT t.*, ROW_NUMBER() OVER (PARTITION BY art.id ORDER BY COALESCE(t.lastfm_playcount, 0) DESC) AS rn
@@ -177,17 +190,18 @@ SELECT * FROM (
 
 ### P1.5 — 5 streams SSE con refrescos independientes = 52+ queries/min por admin
 
-| Stream | Intervalo | Queries/refresh | Queries/min |
-|--------|-----------|-----------------|-------------|
-| ops-stream | 15s | 22-30 | 4 |
-| tasks-stream | 10s | 2-3 | 12-18 |
-| health-stream | 10s | 2 | 12 |
-| logs-stream | 5s | 2 | 24 |
-| stack-stream | 30s | 0 (Docker API) | 0 |
+| Stream        | Intervalo | Queries/refresh | Queries/min |
+| ------------- | --------- | --------------- | ----------- |
+| ops-stream    | 15s       | 22-30           | 4           |
+| tasks-stream  | 10s       | 2-3             | 12-18       |
+| health-stream | 10s       | 2               | 12          |
+| logs-stream   | 5s        | 2               | 24          |
+| stack-stream  | 30s       | 0 (Docker API)  | 0           |
 
 **Total:** 52-58 queries/min por admin. Con 3 admins = 150-174 queries/min. Varias sobre `library_tracks` (48K).
 
 **Fix:**
+
 1. Aumentar TTLs: ops 15s→60s, logs 5s→15s
 2. Unificar señales de refresco en un solo canal Redis en vez de 5 independientes
 3. Ops snapshot no necesita refresco cada 15s — 60s es suficiente para un dashboard
@@ -197,6 +211,7 @@ SELECT * FROM (
 ### P1.6 — `get_top_genres()` y `get_stats_top_genres()`: GROUP BY sobre 48K tracks
 
 **Archivos:**
+
 - `app/crate/db/queries/analytics_overview_stats.py:111-123` — top genres
 - `app/crate/db/queries/analytics_overview_distributions.py:8-23` — genre distribution (duplicado)
 
@@ -211,6 +226,7 @@ SELECT * FROM (
 ### P2.1 — `read_scope()` vs `transaction_scope()` mal usado
 
 **Archivos:**
+
 - `app/crate/db/worker_logs.py:56-88` — `query_logs()` usa `transaction_scope()` para SELECT
 - `app/crate/db/health.py:35-57` — `get_open_issues()` usa `transaction_scope()` para SELECT
 - `app/crate/db/health.py:51-57` — `get_issue_counts()` usa `transaction_scope()` para SELECT
@@ -354,29 +370,29 @@ SELECT * FROM (
 
 ## 🟢 P3 — Quick Wins (minutos de trabajo)
 
-| # | Qué | Archivo | Fix |
-|---|-----|---------|-----|
-| Q1 | `query_logs()` usa `transaction_scope()` | `worker_logs.py:56` | Cambiar a `read_scope()` |
-| Q2 | `get_open_issues()` usa `transaction_scope()` | `health.py:35` | Cambiar a `read_scope()` |
-| Q3 | `get_issue_counts()` usa `transaction_scope()` | `health.py:51` | Cambiar a `read_scope()` |
-| Q4 | Aumentar TTL de logs-stream | `admin_logs_surface.py:9` | 5s → 15s |
-| Q5 | Aumentar TTL de ops snapshot | `ops_snapshot.py:15` | 15s → 60s |
-| Q6 | Aumentar TTL de tasks-stream | `admin_tasks_surface.py:15` | 10s → 30s |
-| Q7 | Aumentar TTL de health-stream | `admin_health_surface.py:13` | 10s → 30s |
-| Q8 | Eliminar duplicado `get_latest_scan()` en `build_recent_activity` | `ops_snapshot_activity.py:90` | Pasar como parámetro |
-| Q9 | Eliminar duplicado `count_import_queue_items()` en `build_recent_activity` | `ops_snapshot_activity.py:102` | Pasar como parámetro |
-| Q10 | Eliminar duplicado `get_overview_stat_summary()` en `build_analytics` | `ops_snapshot_stats.py:73` | Pasar como parámetro |
+| #   | Qué                                                                        | Archivo                        | Fix                      |
+| --- | -------------------------------------------------------------------------- | ------------------------------ | ------------------------ |
+| Q1  | `query_logs()` usa `transaction_scope()`                                   | `worker_logs.py:56`            | Cambiar a `read_scope()` |
+| Q2  | `get_open_issues()` usa `transaction_scope()`                              | `health.py:35`                 | Cambiar a `read_scope()` |
+| Q3  | `get_issue_counts()` usa `transaction_scope()`                             | `health.py:51`                 | Cambiar a `read_scope()` |
+| Q4  | Aumentar TTL de logs-stream                                                | `admin_logs_surface.py:9`      | 5s → 15s                 |
+| Q5  | Aumentar TTL de ops snapshot                                               | `ops_snapshot.py:15`           | 15s → 60s                |
+| Q6  | Aumentar TTL de tasks-stream                                               | `admin_tasks_surface.py:15`    | 10s → 30s                |
+| Q7  | Aumentar TTL de health-stream                                              | `admin_health_surface.py:13`   | 10s → 30s                |
+| Q8  | Eliminar duplicado `get_latest_scan()` en `build_recent_activity`          | `ops_snapshot_activity.py:90`  | Pasar como parámetro     |
+| Q9  | Eliminar duplicado `count_import_queue_items()` en `build_recent_activity` | `ops_snapshot_activity.py:102` | Pasar como parámetro     |
+| Q10 | Eliminar duplicado `get_overview_stat_summary()` en `build_analytics`      | `ops_snapshot_stats.py:73`     | Pasar como parámetro     |
 
 ---
 
 ## 📊 Resumen
 
 | Severidad | Count | Queries/request afectadas | Filas escaneadas |
-|-----------|-------|--------------------------|-----------------|
-| P0 | 5 | 30-50 | 500K+ |
-| P1 | 6 | 10-20 | 300K+ |
-| P2 | 14 | 2-5 | variable |
-| P3 | 10 | 1-2 | mínimo |
+| --------- | ----- | ------------------------- | ---------------- |
+| P0        | 5     | 30-50                     | 500K+            |
+| P1        | 6     | 10-20                     | 300K+            |
+| P2        | 14    | 2-5                       | variable         |
+| P3        | 10    | 1-2                       | mínimo           |
 
 **Causa raíz:** El ops snapshot y el home discovery son los dos grandes agujeros negros. El primero dispara 22-30 queries cada 15s por admin con múltiples full scans de 48K tracks. El segundo dispara 21-33 queries por carga fría de home. Entre los dos, con 3 admins y 10 usuarios concurrentes, PostgreSQL recibe cientos de queries por minuto, muchas de ellas escaneando tablas enteras.
 

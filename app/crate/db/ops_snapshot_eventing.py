@@ -8,7 +8,7 @@ from crate.db.admin_health_surface import HEALTH_SURFACE_STREAM_CHANNEL
 from crate.db.admin_logs_surface import LOGS_SURFACE_STREAM_CHANNEL
 from crate.db.admin_stack_surface import STACK_SNAPSHOT_SCOPE
 from crate.db.admin_tasks_surface import TASKS_SURFACE_STREAM_CHANNEL
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.domain_events import get_domain_event_runtime
 from crate.db.snapshot_events import SNAPSHOT_CHANNEL_ALL, snapshot_channel
 
@@ -92,7 +92,7 @@ def _build_sse_surface_catalog() -> list[dict[str, str | None]]:
 
 
 def build_eventing_payload() -> dict[str, Any]:
-    redis = _get_redis()
+    redis = get_redis()
     cache_invalidation = {
         "redis_connected": bool(redis),
         "events_key": _CACHE_INVALIDATION_EVENTS_KEY,
@@ -107,7 +107,9 @@ def build_eventing_payload() -> dict[str, Any]:
         except Exception:
             cache_invalidation["latest_event_id"] = 0
         try:
-            cache_invalidation["retained_events"] = int(redis.llen(_CACHE_INVALIDATION_EVENTS_KEY) or 0)
+            cache_invalidation["retained_events"] = int(
+                redis.llen(_CACHE_INVALIDATION_EVENTS_KEY) or 0
+            )
         except Exception:
             cache_invalidation["retained_events"] = 0
 

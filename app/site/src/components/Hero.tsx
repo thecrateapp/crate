@@ -41,7 +41,9 @@ function InstallCommand() {
           type="button"
           onClick={copyInstallCommand}
           className="inline-flex h-8 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-2.5 text-[12px] font-medium text-white/55 transition hover:border-white/18 hover:bg-white/[0.07] hover:text-white/85"
-          aria-label={copied ? "Copied installer command" : "Copy installer command"}
+          aria-label={
+            copied ? "Copied installer command" : "Copy installer command"
+          }
         >
           {copied ? <Check size={13} /> : <Copy size={13} />}
           <span className="hidden sm:inline">{copied ? "copied" : "copy"}</span>
@@ -88,7 +90,6 @@ export function Hero() {
           <h1 className="fade-up fade-up-2 -mt-5 text-[40px] font-semibold leading-[1] tracking-[-0.04em] text-white sm:-mt-8 sm:text-[64px] lg:-mt-12 lg:text-[88px]">
             Own your music.
           </h1>
-
         </div>
 
         <div className="fade-up fade-up-3 mt-9 mx-auto max-w-3xl text-center">
@@ -104,15 +105,19 @@ export function Hero() {
             className="group mt-7 inline-flex items-center gap-2 rounded-full bg-cyan-400 px-5 py-3 text-sm font-semibold text-[#05161c] shadow-[0_0_24px_-6px_rgba(6,182,212,0.6)] transition hover:bg-cyan-300"
           >
             Read the manifesto
-            <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+            <ArrowRight
+              size={16}
+              className="transition group-hover:translate-x-0.5"
+            />
           </a>
         </div>
 
         <div className="fade-up fade-up-4 mx-auto mt-8 max-w-2xl text-center">
           <p className="text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
             Crate is an open-source project for people who want to stop renting
-            their listening life from platforms. Host it yourself, bring the files
-            you care about, invite whoever you trust, and keep the music close.
+            their listening life from platforms. Host it yourself, bring the
+            files you care about, invite whoever you trust, and keep the music
+            close.
           </p>
 
           <InstallCommand />

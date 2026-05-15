@@ -8,7 +8,9 @@ from crate.db.orm.releases import NewRelease
 from crate.db.tx import read_scope
 
 
-def get_release_by_id(release_id: int, *, session: Session | None = None) -> dict | None:
+def get_release_by_id(
+    release_id: int, *, session: Session | None = None
+) -> dict | None:
     def impl(s: Session) -> dict | None:
         row = s.get(NewRelease, release_id)
         if row is None:

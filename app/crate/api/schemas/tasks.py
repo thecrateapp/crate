@@ -5,7 +5,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, RootModel
 
-from crate.api.schemas.common import OkResponse, SnapshotMetadataResponse, TaskEnqueueResponse
+from crate.api.schemas.common import (
+    OkResponse,
+    SnapshotMetadataResponse,
+    TaskEnqueueResponse,
+)
 from crate.api.schemas.analytics import ActivityLiveResponse
 
 

@@ -13,9 +13,10 @@ def get_similar_artist_tracks_for_radio(
     if not similar_artist_keys or limit <= 0:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 WITH ranked AS (
                     SELECT
                         t.id AS track_id,
@@ -49,9 +50,12 @@ def get_similar_artist_tracks_for_radio(
                 WHERE artist_pick <= 8
                 LIMIT :limit
                 """
-            ),
-            {"similar_artist_keys": similar_artist_keys[:16], "limit": limit},
-        ).mappings().all()
+                ),
+                {"similar_artist_keys": similar_artist_keys[:16], "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 
@@ -59,9 +63,10 @@ def get_album_tracks_for_radio(session=None, album_id: int | None = None) -> lis
     if album_id is None:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy, t.danceability, t.valence, t.rating
                 FROM library_tracks t
@@ -69,19 +74,25 @@ def get_album_tracks_for_radio(session=None, album_id: int | None = None) -> lis
                 WHERE a.id = :album_id
                 ORDER BY t.disc_number, t.track_number
                 """
-            ),
-            {"album_id": album_id},
-        ).mappings().all()
+                ),
+                {"album_id": album_id},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 
-def get_playlist_tracks_for_radio(session=None, playlist_id: int | None = None) -> list[dict]:
+def get_playlist_tracks_for_radio(
+    session=None, playlist_id: int | None = None
+) -> list[dict]:
     if playlist_id is None:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 SELECT
                     lt.id AS track_id,
                     lt.path,
@@ -129,9 +140,12 @@ def get_playlist_tracks_for_radio(session=None, playlist_id: int | None = None) 
                 LEFT JOIN library_albums la ON la.id = lt.album_id
                 ORDER BY pt.position
                 """
-            ),
-            {"playlist_id": playlist_id},
-        ).mappings().all()
+                ),
+                {"playlist_id": playlist_id},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 

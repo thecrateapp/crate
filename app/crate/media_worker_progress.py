@@ -6,7 +6,7 @@ import os
 import socket
 from typing import Any
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 
 log = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def acquire_media_worker_slot(
     max_active = media_worker_max_active() if limit is None else max(0, int(limit))
     if max_active <= 0:
         return None
-    redis = _get_redis()
+    redis = get_redis()
     if not redis:
         return None
     ttl = max(1, int(ttl_seconds))
@@ -116,13 +116,18 @@ def media_worker_admission(
     limit: int | None = None,
     ttl_seconds: int = DEFAULT_SLOT_TTL_SECONDS,
 ):
-    return acquire_media_worker_slot(job_id, limit=limit, ttl_seconds=ttl_seconds) or _NoMediaWorkerSlot()
+    return (
+        acquire_media_worker_slot(job_id, limit=limit, ttl_seconds=ttl_seconds)
+        or _NoMediaWorkerSlot()
+    )
 
 
-def cancel_media_worker_job(job_id: str, *, ttl_seconds: int = DEFAULT_CANCEL_TTL_SECONDS) -> bool:
+def cancel_media_worker_job(
+    job_id: str, *, ttl_seconds: int = DEFAULT_CANCEL_TTL_SECONDS
+) -> bool:
     if not job_id:
         return False
-    redis = _get_redis()
+    redis = get_redis()
     if not redis:
         return False
     try:
@@ -136,7 +141,7 @@ def cancel_media_worker_job(job_id: str, *, ttl_seconds: int = DEFAULT_CANCEL_TT
 def get_media_worker_job(job_id: str) -> dict[str, Any] | None:
     if not job_id:
         return None
-    redis = _get_redis()
+    redis = get_redis()
     if not redis:
         return None
     try:
@@ -158,14 +163,16 @@ def get_media_worker_runtime(*, limit: int = 10) -> dict[str, Any]:
     runtime: dict[str, Any] = {
         "redis_connected": False,
         "stream_key": stream,
-        "consumer_group": os.environ.get("CRATE_MEDIA_WORKER_EVENTS_GROUP", DEFAULT_CONSUMER_GROUP),
+        "consumer_group": os.environ.get(
+            "CRATE_MEDIA_WORKER_EVENTS_GROUP", DEFAULT_CONSUMER_GROUP
+        ),
         "stream_length": 0,
         "pending": 0,
         "max_active": media_worker_max_active(),
         "active_slots": [],
         "recent_events": [],
     }
-    redis = _get_redis()
+    redis = get_redis()
     if not redis:
         return runtime
     runtime["redis_connected"] = True
@@ -175,13 +182,18 @@ def get_media_worker_runtime(*, limit: int = 10) -> dict[str, Any]:
         pass
     try:
         groups = redis.xinfo_groups(stream) or []
-        group = next((item for item in groups if item.get("name") == runtime["consumer_group"]), None)
+        group = next(
+            (item for item in groups if item.get("name") == runtime["consumer_group"]),
+            None,
+        )
         if group:
             runtime["pending"] = int(group.get("pending", 0) or 0)
     except Exception:
         pass
     try:
-        for msg_id, fields in redis.xrevrange(stream, "+", "-", count=max(1, min(limit, 50))):
+        for msg_id, fields in redis.xrevrange(
+            stream, "+", "-", count=max(1, min(limit, 50))
+        ):
             runtime["recent_events"].append(_normalise_stream_event(msg_id, fields))
     except Exception:
         pass
@@ -198,7 +210,14 @@ def _active_slots(redis) -> list[dict[str, Any]]:
             if not job_id:
                 continue
             ttl_ms = redis.pttl(key)
-            slots.append({"slot": index, "key": key, "job_id": str(job_id), "ttl_ms": int(ttl_ms or 0)})
+            slots.append(
+                {
+                    "slot": index,
+                    "key": key,
+                    "job_id": str(job_id),
+                    "ttl_ms": int(ttl_ms or 0),
+                }
+            )
         except Exception:
             continue
     return slots
@@ -218,7 +237,7 @@ def bridge_media_worker_task_events(
     the task log.
     """
 
-    redis = _get_redis()
+    redis = get_redis()
     if not redis:
         return {"read": 0, "bridged": 0, "ignored": 0}
     stream = media_worker_events_stream()
@@ -229,7 +248,9 @@ def bridge_media_worker_task_events(
     consumer = consumer_name or f"{socket.gethostname()}:{os.getpid()}"
     messages = _read_group(redis, stream, group, consumer, "0", limit=limit, block_ms=0)
     if not messages:
-        messages = _read_group(redis, stream, group, consumer, ">", limit=limit, block_ms=block_ms)
+        messages = _read_group(
+            redis, stream, group, consumer, ">", limit=limit, block_ms=block_ms
+        )
 
     stats = {"read": 0, "bridged": 0, "ignored": 0}
     for msg_id, fields in messages:
@@ -290,7 +311,9 @@ def _read_group(
 
 def _bridge_one_event(msg_id: str, fields: dict[str, Any]) -> bool:
     payload = _decode_payload(fields.get("payload_json"))
-    job_id = str(payload.get("task_id") or payload.get("job_id") or fields.get("job_id") or "")
+    job_id = str(
+        payload.get("task_id") or payload.get("job_id") or fields.get("job_id") or ""
+    )
     if not job_id:
         return False
 
@@ -305,12 +328,16 @@ def _bridge_one_event(msg_id: str, fields: dict[str, Any]) -> bool:
     if progress:
         from crate.db.repositories.tasks import update_task
 
-        update_task(job_id, progress=json.dumps(progress, ensure_ascii=False, default=str))
+        update_task(
+            job_id, progress=json.dumps(progress, ensure_ascii=False, default=str)
+        )
 
     from crate.db.events import emit_task_event
 
     event_type = _task_event_type(event_name)
-    emit_task_event(job_id, event_type, _task_event_payload(msg_id, event_name, payload))
+    emit_task_event(
+        job_id, event_type, _task_event_payload(msg_id, event_name, payload)
+    )
     return True
 
 
@@ -360,7 +387,12 @@ def _task_progress(event_name: str, payload: dict[str, Any]) -> dict[str, Any] |
     }.get(event_name, "media_worker")
     return {
         "phase": phase,
-        "item": str(payload.get("name") or payload.get("source_path") or payload.get("output_path") or ""),
+        "item": str(
+            payload.get("name")
+            or payload.get("source_path")
+            or payload.get("output_path")
+            or ""
+        ),
         "done": done,
         "total": total,
         "percent": round((done / total) * 100, 1) if total > 0 else 0.0,
@@ -380,14 +412,26 @@ def _task_event_type(event_name: str) -> str:
     return "progress"
 
 
-def _task_event_payload(msg_id: str, event_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+def _task_event_payload(
+    msg_id: str, event_name: str, payload: dict[str, Any]
+) -> dict[str, Any]:
     data = {
         "message": _message_for_event(event_name, payload),
         "media_worker_event": event_name,
         "media_worker_event_id": msg_id,
         "category": "media-worker",
     }
-    for key in ("kind", "name", "index", "total", "bytes", "duration_ms", "output_path", "source_path", "errors"):
+    for key in (
+        "kind",
+        "name",
+        "index",
+        "total",
+        "bytes",
+        "duration_ms",
+        "output_path",
+        "source_path",
+        "errors",
+    ):
         if key in payload:
             data[key] = payload[key]
     return data
@@ -395,7 +439,12 @@ def _task_event_payload(msg_id: str, event_name: str, payload: dict[str, Any]) -
 
 def _message_for_event(event_name: str, payload: dict[str, Any]) -> str:
     kind = str(payload.get("kind") or "media")
-    name = str(payload.get("name") or payload.get("source_path") or payload.get("output_path") or "").strip()
+    name = str(
+        payload.get("name")
+        or payload.get("source_path")
+        or payload.get("output_path")
+        or ""
+    ).strip()
     if event_name == "started":
         return f"Media worker started {kind} package"
     if event_name == "entry_started":

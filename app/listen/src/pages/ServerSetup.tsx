@@ -1,8 +1,18 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, ArrowRight, Server, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  ArrowRight,
+  Server,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 
-import { addServer, normaliseServerUrl, setCurrentServerId } from "@/lib/server-store";
+import {
+  addServer,
+  normaliseServerUrl,
+  setCurrentServerId,
+} from "@/lib/server-store";
 
 /**
  * First-run setup for Capacitor builds. Lets the user point the app at
@@ -41,7 +51,10 @@ async function probe(url: string): Promise<ProbeState> {
     const hasKnownField =
       "invite_only" in data || "google" in data || "apple" in data;
     if (!hasKnownField) return { status: "not-crate" };
-    return { status: "ok", inviteOnly: Boolean((data as { invite_only?: boolean }).invite_only) };
+    return {
+      status: "ok",
+      inviteOnly: Boolean((data as { invite_only?: boolean }).invite_only),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     return {
@@ -92,7 +105,8 @@ export function ServerSetup() {
             Connect to a Crate server
           </h1>
           <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
-            Enter the API URL for your Crate instance. You can add more servers later from Settings.
+            Enter the API URL for your Crate instance. You can add more servers
+            later from Settings.
           </p>
         </div>
 
@@ -137,7 +151,10 @@ export function ServerSetup() {
             ) : (
               <>
                 Continue
-                <ArrowRight size={16} className="transition group-hover:translate-x-0.5" />
+                <ArrowRight
+                  size={16}
+                  className="transition group-hover:translate-x-0.5"
+                />
               </>
             )}
           </button>

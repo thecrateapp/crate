@@ -26,7 +26,14 @@ export interface NormalizedShow {
 }
 
 export function formatShowDateParts(date: string, time: string) {
-  if (!date) return { dateLabel: "", monthLabel: "", dayLabel: "", weekdayLabel: "", timeLabel: "" };
+  if (!date)
+    return {
+      dateLabel: "",
+      monthLabel: "",
+      dayLabel: "",
+      weekdayLabel: "",
+      timeLabel: "",
+    };
   const value = new Date(`${date}T12:00:00`);
   return {
     dateLabel: value.toLocaleDateString("en-US", {
@@ -35,9 +42,13 @@ export function formatShowDateParts(date: string, time: string) {
       day: "numeric",
       year: "numeric",
     }),
-    monthLabel: value.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    monthLabel: value
+      .toLocaleDateString("en-US", { month: "short" })
+      .toUpperCase(),
     dayLabel: String(value.getDate()),
-    weekdayLabel: value.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+    weekdayLabel: value
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .toUpperCase(),
     timeLabel: time ? time.slice(0, 5) : "",
   };
 }

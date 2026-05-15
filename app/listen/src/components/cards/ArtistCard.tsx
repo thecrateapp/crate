@@ -3,7 +3,10 @@ import { useNavigate } from "react-router";
 import { Loader2, Play, UserMinus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
@@ -45,24 +48,32 @@ export function ArtistCard({
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
-  const photoUrl = photo || artistPhotoApiUrl(
-    { artistId, artistEntityUid, artistSlug, artistName: name },
-    { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
-  ) || undefined;
-  const targetHref = href || artistPagePath({ artistId, artistSlug, artistName: name });
+  const photoUrl =
+    photo ||
+    artistPhotoApiUrl(
+      { artistId, artistEntityUid, artistSlug, artistName: name },
+      { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
+    ) ||
+    undefined;
+  const targetHref =
+    href || artistPagePath({ artistId, artistSlug, artistName: name });
   const following = isFollowing(artistId);
   const actions = useArtistActionEntries({
     artistId,
     artistSlug,
     name,
   });
-  const actionMenu = useItemActionMenu(actions, { disabled: external || artistId == null });
+  const actionMenu = useItemActionMenu(actions, {
+    disabled: external || artistId == null,
+  });
   const imageSize = compact ? 100 : large ? 156 : 140;
   const wrapperClassName = cn(
     "group snap-start cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
     layout === "grid"
       ? "w-full min-w-0"
-      : `flex-shrink-0 ${compact ? "w-[100px]" : large ? "w-[156px]" : "w-[140px]"}`,
+      : `flex-shrink-0 ${
+          compact ? "w-[100px]" : large ? "w-[156px]" : "w-[140px]"
+        }`,
   );
   const content = (
     <>
@@ -80,7 +91,9 @@ export function ArtistCard({
             alt={name}
             loading="lazy"
             className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
           />
         ) : null}
         {!external && artistId != null ? (
@@ -101,10 +114,15 @@ export function ArtistCard({
                         name,
                       });
                       if (!tracks.length) {
-                        toast.info("No top tracks available for this artist yet");
+                        toast.info(
+                          "No top tracks available for this artist yet",
+                        );
                         return;
                       }
-                      playAll(tracks, 0, { type: "queue", name: `${name} Top Tracks` });
+                      playAll(tracks, 0, {
+                        type: "queue",
+                        name: `${name} Top Tracks`,
+                      });
                     } catch {
                       toast.error("Failed to load top tracks");
                     } finally {
@@ -133,7 +151,9 @@ export function ArtistCard({
                     setTogglingFollow(true);
                     try {
                       await toggleArtistFollow(artistId);
-                      toast.success(following ? `Unfollowed ${name}` : `Following ${name}`);
+                      toast.success(
+                        following ? `Unfollowed ${name}` : `Following ${name}`,
+                      );
                     } catch {
                       toast.error("Failed to update follow status");
                     } finally {
@@ -156,9 +176,13 @@ export function ArtistCard({
           </>
         ) : null}
       </div>
-      <div className="truncate text-sm font-medium text-foreground text-center">{name}</div>
+      <div className="truncate text-sm font-medium text-foreground text-center">
+        {name}
+      </div>
       {subtitle && (
-        <div className="truncate text-xs text-muted-foreground text-center">{subtitle}</div>
+        <div className="truncate text-xs text-muted-foreground text-center">
+          {subtitle}
+        </div>
       )}
     </>
   );

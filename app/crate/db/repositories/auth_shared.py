@@ -8,7 +8,9 @@ RECENT_SESSION_WINDOW = timedelta(days=7)
 
 
 def model_to_dict(model) -> dict:
-    return {column.key: getattr(model, column.key) for column in model.__mapper__.columns}
+    return {
+        column.key: getattr(model, column.key) for column in model.__mapper__.columns
+    }
 
 
 def coerce_datetime(value: str | datetime | None) -> datetime | None:
@@ -72,7 +74,9 @@ def parse_device_details(user_agent: str | None) -> dict[str, str | None]:
 def _device_display_from_parts(parts: dict[str, str | None]) -> str | None:
     label_parts: list[str] = []
 
-    device_name = " ".join(part for part in (parts.get("device_brand"), parts.get("device_model")) if part).strip()
+    device_name = " ".join(
+        part for part in (parts.get("device_brand"), parts.get("device_model")) if part
+    ).strip()
     if device_name and parts.get("device_model"):
         label_parts.append(device_name)
     else:
@@ -82,7 +86,9 @@ def _device_display_from_parts(parts: dict[str, str | None]) -> str | None:
         elif device_type:
             label_parts.append(device_type.title())
 
-    os_label = " ".join(part for part in (parts.get("os_name"), parts.get("os_version")) if part).strip()
+    os_label = " ".join(
+        part for part in (parts.get("os_name"), parts.get("os_version")) if part
+    ).strip()
     if os_label:
         label_parts.append(os_label)
 
@@ -155,7 +161,9 @@ def is_listen_app(app_id: str | None) -> bool:
 def enrich_auth_session(session: dict, *, now: datetime | None = None) -> dict:
     enriched = dict(session)
     parsed = parse_device_details(enriched.get("user_agent"))
-    display_label = _clean_device_part(enriched.get("device_label")) or _device_display_from_parts(parsed)
+    display_label = _clean_device_part(
+        enriched.get("device_label")
+    ) or _device_display_from_parts(parsed)
     stored_fingerprint = _clean_device_part(enriched.get("device_fingerprint"))
     activity_state = session_activity_state(
         created_at=enriched.get("created_at"),
@@ -174,7 +182,8 @@ def enrich_auth_session(session: dict, *, now: datetime | None = None) -> dict:
             "device_model": parsed.get("device_model"),
             "device_type": parsed.get("device_type"),
             "display_label": display_label,
-            "device_fingerprint": stored_fingerprint or build_device_fingerprint(
+            "device_fingerprint": stored_fingerprint
+            or build_device_fingerprint(
                 user_agent=enriched.get("user_agent"),
                 device_label=display_label,
                 last_seen_ip=enriched.get("last_seen_ip"),
@@ -213,7 +222,9 @@ def promote_now_playing_session(
         if expires_at is not None and expires_at <= current_time:
             continue
 
-        seen_at = coerce_datetime(session.get("last_seen_at")) or coerce_datetime(session.get("created_at"))
+        seen_at = coerce_datetime(session.get("last_seen_at")) or coerce_datetime(
+            session.get("created_at")
+        )
         if seen_at is None:
             continue
         if candidate_seen_at is None or seen_at > candidate_seen_at:

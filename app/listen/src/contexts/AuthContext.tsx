@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { user, loading, refetch, setUser } = useAuthSession();
 
   useAuthOAuthSync({ navigate, refetch });
+  useAuthTokenRefresh(user);
   useAuthHeartbeat(user);
   useAuthTokenRefresh(user);
   useListenWarmup(user);

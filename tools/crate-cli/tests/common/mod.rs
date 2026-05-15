@@ -1,6 +1,42 @@
-use hound::{SampleFormat, WavSpec, WavWriter};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+
+fn write_le_u16(buf: &mut Vec<u8>, value: u16) {
+    buf.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_le_u32(buf: &mut Vec<u8>, value: u32) {
+    buf.extend_from_slice(&value.to_le_bytes());
+}
+
+fn write_wav_header(
+    data_len: usize,
+    sample_rate: u32,
+    channels: u16,
+    bits_per_sample: u16,
+) -> Vec<u8> {
+    let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
+    let block_align = channels * bits_per_sample / 8;
+    let mut header = Vec::new();
+
+    header.extend_from_slice(b"RIFF");
+    write_le_u32(&mut header, (36 + data_len) as u32);
+    header.extend_from_slice(b"WAVE");
+
+    header.extend_from_slice(b"fmt ");
+    write_le_u32(&mut header, 16); // Subchunk1Size
+    write_le_u16(&mut header, 1); // AudioFormat (PCM)
+    write_le_u16(&mut header, channels);
+    write_le_u32(&mut header, sample_rate);
+    write_le_u32(&mut header, byte_rate);
+    write_le_u16(&mut header, block_align);
+    write_le_u16(&mut header, bits_per_sample);
+
+    header.extend_from_slice(b"data");
+    write_le_u32(&mut header, data_len as u32);
+
+    header
+}
 
 pub fn create_test_wav(
     dir: &TempDir,
@@ -11,29 +47,48 @@ pub fn create_test_wav(
     create_test_wav_at(dir.path(), filename, frequency, duration_secs)
 }
 
+#[allow(dead_code)]
+pub fn create_test_wav_with_amplitude(
+    dir: &TempDir,
+    filename: &str,
+    frequency: f32,
+    duration_secs: f32,
+    amplitude: f32,
+) -> PathBuf {
+    create_test_wav_at_with_amplitude(dir.path(), filename, frequency, duration_secs, amplitude)
+}
+
 pub fn create_test_wav_at(
-    dir: &std::path::Path,
+    dir: &Path,
     filename: &str,
     frequency: f32,
     duration_secs: f32,
 ) -> PathBuf {
+    create_test_wav_at_with_amplitude(dir, filename, frequency, duration_secs, 1.0)
+}
+
+pub fn create_test_wav_at_with_amplitude(
+    dir: &Path,
+    filename: &str,
+    frequency: f32,
+    duration_secs: f32,
+    amplitude: f32,
+) -> PathBuf {
     let path = dir.join(filename);
-    let spec = WavSpec {
-        channels: 1,
-        sample_rate: 22050,
-        bits_per_sample: 16,
-        sample_format: SampleFormat::Int,
-    };
-    let mut writer = WavWriter::create(&path, spec).unwrap();
-    let num_samples = (spec.sample_rate as f32 * duration_secs) as usize;
+    let sample_rate = 22050;
+    let channels = 1;
+    let bits_per_sample = 16;
+    let num_samples = (sample_rate as f32 * duration_secs) as usize;
+    let data_len = num_samples * channels * bits_per_sample as usize / 8;
+
+    let mut header = write_wav_header(data_len, sample_rate, channels as u16, bits_per_sample);
     for i in 0..num_samples {
-        let t = i as f32 / spec.sample_rate as f32;
-        let sample = (t * frequency * 2.0 * std::f32::consts::PI).sin();
-        writer
-            .write_sample((sample * i16::MAX as f32) as i16)
-            .unwrap();
+        let t = i as f32 / sample_rate as f32;
+        let sample = (t * frequency * 2.0 * std::f32::consts::PI).sin() * amplitude;
+        let sample_i16 = (sample * i16::MAX as f32) as i16;
+        header.extend_from_slice(&sample_i16.to_le_bytes());
     }
-    writer.finalize().unwrap();
+    std::fs::write(&path, header).unwrap();
     path
 }
 

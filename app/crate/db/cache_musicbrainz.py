@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy import text
 
-from crate.db.cache_runtime import _get_redis, _mem_get, _mem_set
+from crate.db.cache_runtime import get_redis, _mem_get, _mem_set
 from crate.db.tx import read_scope, transaction_scope
 
 
@@ -18,7 +18,7 @@ def get_mb_cache(key: str) -> Any | None:
     if val is not None:
         return val
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             raw = redis_client.get(cache_key)
@@ -31,7 +31,14 @@ def get_mb_cache(key: str) -> Any | None:
 
     try:
         with read_scope() as session:
-            row = session.execute(text("SELECT value_json FROM mb_cache WHERE key = :key"), {"key": key}).mappings().first()
+            row = (
+                session.execute(
+                    text("SELECT value_json FROM mb_cache WHERE key = :key"),
+                    {"key": key},
+                )
+                .mappings()
+                .first()
+            )
             if row:
                 val = row["value_json"]
                 if isinstance(val, str):
@@ -52,7 +59,7 @@ def set_mb_cache(key: str, value: Any) -> None:
     cache_key = f"mb:{key}"
     _mem_set(cache_key, value, ttl=3600)
 
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client:
         try:
             redis_client.set(cache_key, json.dumps(value, default=str))
@@ -68,7 +75,11 @@ def set_mb_cache(key: str, value: Any) -> None:
                     "INSERT INTO mb_cache (key, value_json, created_at) VALUES (:key, :value_json, :created_at) "
                     "ON CONFLICT (key) DO UPDATE SET value_json = EXCLUDED.value_json"
                 ),
-                {"key": key, "value_json": json.dumps(value, default=str), "created_at": now},
+                {
+                    "key": key,
+                    "value_json": json.dumps(value, default=str),
+                    "created_at": now,
+                },
             )
     except Exception:
         pass

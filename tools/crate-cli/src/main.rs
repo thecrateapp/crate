@@ -1,3 +1,5 @@
+//! CLI entry point for crate-cli: scan, analyze, fingerprint, diff, tags, and bliss commands.
+
 use clap::Parser;
 use std::path::PathBuf;
 

@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Request
 
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.operations import (
-    BatchAlbumItem,
     BatchFetchCoversRequest,
     BatchRetagRequest,
     BatchTaskEnqueueResponse,

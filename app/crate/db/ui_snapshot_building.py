@@ -28,7 +28,9 @@ def get_or_build_ui_snapshot(
 
     stale = None
     if allow_stale_on_error and stale_max_age_seconds is not None and not fresh:
-        stale = get_ui_snapshot(scope, subject_key, max_age_seconds=stale_max_age_seconds)
+        stale = get_ui_snapshot(
+            scope, subject_key, max_age_seconds=stale_max_age_seconds
+        )
 
     started = time.monotonic()
     source_seq = get_latest_domain_event_id()

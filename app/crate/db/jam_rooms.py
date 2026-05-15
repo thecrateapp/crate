@@ -23,6 +23,10 @@ _ROOM_GROUP_BY = """
 """
 
 
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def create_jam_room(
     host_user_id: int,
     name: str,
@@ -36,25 +40,31 @@ def create_jam_room(
     now = datetime.now(timezone.utc).isoformat()
     room_id = str(uuid.uuid4())
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO jam_rooms (id, host_user_id, name, visibility, is_permanent, description, tags, created_at)
                 VALUES (:id, :host_user_id, :name, :visibility, :is_permanent, :description, CAST(:tags AS jsonb), :created_at)
                 RETURNING *
                 """
-            ),
-            {
-                "id": room_id,
-                "host_user_id": host_user_id,
-                "name": name,
-                "visibility": visibility,
-                "is_permanent": is_permanent,
-                "description": description,
-                "tags": json.dumps(tags or []),
-                "created_at": now,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "id": room_id,
+                    "host_user_id": host_user_id,
+                    "name": name,
+                    "visibility": visibility,
+                    "is_permanent": is_permanent,
+                    "description": description,
+                    "tags": json.dumps(tags or []),
+                    "created_at": now,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise RuntimeError("Jam room insert did not return a row")
         room = dict(row)
         session.execute(
             text(
@@ -77,9 +87,10 @@ def create_jam_room(
 
 def get_jam_room(room_id: str) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     jr.*,
                     COUNT(DISTINCT jrm.user_id)::int AS member_count,
@@ -101,13 +112,18 @@ def get_jam_room(room_id: str) -> dict | None:
                     jr.created_at,
                     jr.ended_at
                 """
-            ),
-            {"id": room_id},
-        ).mappings().first()
+                ),
+                {"id": room_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
-def list_jam_rooms_for_user(user_id: int, *, limit: int = 50, query: str | None = None) -> list[dict]:
+def list_jam_rooms_for_user(
+    user_id: int, *, limit: int = 50, query: str | None = None
+) -> list[dict]:
     normalized_query = query.strip().lower() if query else ""
     search_clause = ""
     params: dict[str, object] = {"user_id": user_id, "limit": limit}
@@ -125,9 +141,10 @@ def list_jam_rooms_for_user(user_id: int, *, limit: int = 50, query: str | None 
         """
         params["query"] = f"%{normalized_query}%"
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                f"""
+        rows = (
+            session.execute(
+                text(
+                    f"""
                 SELECT
                     jr.*,
                     COUNT(DISTINCT jrm.user_id)::int AS member_count,
@@ -150,9 +167,12 @@ def list_jam_rooms_for_user(user_id: int, *, limit: int = 50, query: str | None 
                 ORDER BY (jr.status = 'active') DESC, COALESCE(MAX(jre.created_at), jr.created_at) DESC
                 LIMIT :limit
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
@@ -191,11 +211,18 @@ def update_jam_room_settings(
         idx += 1
     if not fields:
         return get_jam_room(room_id)
+    # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     with transaction_scope() as session:
-        row = session.execute(
-            text(f"UPDATE jam_rooms SET {', '.join(fields)} WHERE id = :room_id RETURNING *"),
-            params,
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    f"UPDATE jam_rooms SET {', '.join(fields)} WHERE id = :room_id RETURNING *"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
     return get_jam_room(room_id) if row else None
 
 
@@ -223,19 +250,27 @@ def update_jam_room_state(
         idx += 1
     if not fields:
         return get_jam_room(room_id)
+    # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     with transaction_scope() as session:
-        row = session.execute(
-            text(f"UPDATE jam_rooms SET {', '.join(fields)} WHERE id = :room_id RETURNING *"),
-            params,
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    f"UPDATE jam_rooms SET {', '.join(fields)} WHERE id = :room_id RETURNING *"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def reactivate_permanent_jam_room(room_id: str) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 UPDATE jam_rooms
                 SET status = 'active',
                     ended_at = NULL,
@@ -244,9 +279,12 @@ def reactivate_permanent_jam_room(room_id: str) -> dict | None:
                   AND is_permanent = true
                 RETURNING *
                 """
-            ),
-            {"room_id": room_id},
-        ).mappings().first()
+                ),
+                {"room_id": room_id},
+            )
+            .mappings()
+            .first()
+        )
     return get_jam_room(room_id) if row else None
 
 
@@ -256,7 +294,7 @@ def delete_jam_room(room_id: str) -> bool:
             text("DELETE FROM jam_rooms WHERE id = :room_id"),
             {"room_id": room_id},
         )
-    return result.rowcount > 0
+    return _rowcount(result) > 0
 
 
 __all__ = [

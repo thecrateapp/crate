@@ -17,7 +17,12 @@ def upgrade() -> None:
     op.create_table(
         "music_paths",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("user_id", sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Integer,
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.Text, nullable=False),
         sa.Column("origin_type", sa.Text, nullable=False),
         sa.Column("origin_value", sa.Text, nullable=False),
@@ -28,8 +33,12 @@ def upgrade() -> None:
         sa.Column("waypoints", JSONB, server_default="[]"),
         sa.Column("step_count", sa.Integer, server_default="20"),
         sa.Column("tracks", JSONB, server_default="[]"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+        ),
     )
     op.create_index("ix_music_paths_user_id", "music_paths", ["user_id"])
 

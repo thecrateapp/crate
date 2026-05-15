@@ -8,8 +8,13 @@ from crate.audio import get_audio_files
 
 
 class BaseScanner(ABC):
-    def __init__(self, library_path: Path, extensions: set[str], config: dict,
-                 progress_callback: Callable[[dict], None] | None = None):
+    def __init__(
+        self,
+        library_path: Path,
+        extensions: set[str],
+        config: dict,
+        progress_callback: Callable[[dict], None] | None = None,
+    ):
         self.library_path = library_path
         self.extensions = extensions
         self.config = config
@@ -18,24 +23,32 @@ class BaseScanner(ABC):
     @cached_property
     def artist_count(self) -> int:
         return sum(
-            1 for d in self.library_path.iterdir()
+            1
+            for d in self.library_path.iterdir()
             if d.is_dir() and not d.name.startswith(".")
         )
 
     @abstractmethod
-    def scan(self) -> list[Issue]:
-        ...
+    def scan(self) -> list[Issue]: ...
 
-    def _report_progress(self, scanner_name: str, artist: str,
-                         artists_done: int, artists_total: int, issues_found: int):
+    def _report_progress(
+        self,
+        scanner_name: str,
+        artist: str,
+        artists_done: int,
+        artists_total: int,
+        issues_found: int,
+    ):
         if self._progress_callback:
-            self._progress_callback({
-                "scanner": scanner_name,
-                "artist": artist,
-                "artists_done": artists_done,
-                "artists_total": artists_total,
-                "issues_found": issues_found,
-            })
+            self._progress_callback(
+                {
+                    "scanner": scanner_name,
+                    "artist": artist,
+                    "artists_done": artists_done,
+                    "artists_total": artists_total,
+                    "issues_found": issues_found,
+                }
+            )
 
     def iter_artists(self):
         """Yield (artist_name, artist_path) for each artist directory."""

@@ -1,6 +1,6 @@
-import { vec4, mat4 } from 'gl-matrix';
-import Drawable from './Drawable';
-import { gl } from '../globals';
+import { vec4, mat4 } from "gl-matrix";
+import Drawable from "./Drawable";
+import { gl } from "../globals";
 
 let activeProgram: WebGLProgram | null = null;
 
@@ -64,7 +64,10 @@ class ShaderProgram {
     this.unifTime = gl.getUniformLocation(this.prog, "u_Time");
 
     this.unifFBMScale = gl.getUniformLocation(this.prog, "u_FBMScale");
-    this.unifFBMPersistence = gl.getUniformLocation(this.prog, "u_FBMPersistence");
+    this.unifFBMPersistence = gl.getUniformLocation(
+      this.prog,
+      "u_FBMPersistence",
+    );
     this.unifFBMOctaves = gl.getUniformLocation(this.prog, "u_FBMOctaves");
     this.unifFBMOffset = gl.getUniformLocation(this.prog, "u_FBMOffset");
 
@@ -116,18 +119,27 @@ class ShaderProgram {
     }
   }
 
-  setNoise(scale: number, persistence: number, octaves: number, offset: number) {
+  setNoise(
+    scale: number,
+    persistence: number,
+    octaves: number,
+    offset: number,
+  ) {
     this.use();
     if (this.unifFBMScale !== null) gl.uniform1f(this.unifFBMScale, scale);
-    if (this.unifFBMPersistence !== null) gl.uniform1f(this.unifFBMPersistence, persistence);
-    if (this.unifFBMOctaves !== null) gl.uniform1f(this.unifFBMOctaves, octaves);
+    if (this.unifFBMPersistence !== null)
+      gl.uniform1f(this.unifFBMPersistence, persistence);
+    if (this.unifFBMOctaves !== null)
+      gl.uniform1f(this.unifFBMOctaves, octaves);
     if (this.unifFBMOffset !== null) gl.uniform1f(this.unifFBMOffset, offset);
   }
 
   setAudio(freqAvg: number, timeAvg: number) {
     this.use();
-    if (this.unifAudioFreqAvg !== null) gl.uniform1f(this.unifAudioFreqAvg, freqAvg);
-    if (this.unifAudioTimeAvg !== null) gl.uniform1f(this.unifAudioTimeAvg, timeAvg);
+    if (this.unifAudioFreqAvg !== null)
+      gl.uniform1f(this.unifAudioFreqAvg, freqAvg);
+    if (this.unifAudioTimeAvg !== null)
+      gl.uniform1f(this.unifAudioTimeAvg, timeAvg);
   }
 
   setBloom(glow: number) {

@@ -16,26 +16,32 @@ class TestSpotifySearchArtist:
         }
         with patch("crate.spotify.get_cache", return_value=cached_result):
             from crate.spotify import search_artist
+
             result = search_artist("Radiohead")
             assert result == cached_result
 
     def test_search_artist_api_call(self):
         api_response = {
             "artists": {
-                "items": [{
-                    "id": "sp123",
-                    "name": "Radiohead",
-                    "popularity": 80,
-                    "followers": {"total": 5000000},
-                    "genres": ["alternative rock"],
-                    "images": [{"url": "http://img.com/photo.jpg"}],
-                }]
+                "items": [
+                    {
+                        "id": "sp123",
+                        "name": "Radiohead",
+                        "popularity": 80,
+                        "followers": {"total": 5000000},
+                        "genres": ["alternative rock"],
+                        "images": [{"url": "http://img.com/photo.jpg"}],
+                    }
+                ]
             }
         }
-        with patch("crate.spotify.get_cache", return_value=None), \
-             patch("crate.spotify._api_get", return_value=api_response), \
-             patch("crate.spotify.set_cache") as mock_set:
+        with (
+            patch("crate.spotify.get_cache", return_value=None),
+            patch("crate.spotify._api_get", return_value=api_response),
+            patch("crate.spotify.set_cache") as mock_set,
+        ):
             from crate.spotify import search_artist
+
             result = search_artist("Radiohead")
             assert result["id"] == "sp123"
             assert result["name"] == "Radiohead"
@@ -43,16 +49,22 @@ class TestSpotifySearchArtist:
             mock_set.assert_called_once()
 
     def test_search_artist_no_results(self):
-        with patch("crate.spotify.get_cache", return_value=None), \
-             patch("crate.spotify._api_get", return_value={"artists": {"items": []}}):
+        with (
+            patch("crate.spotify.get_cache", return_value=None),
+            patch("crate.spotify._api_get", return_value={"artists": {"items": []}}),
+        ):
             from crate.spotify import search_artist
+
             result = search_artist("NonExistentBand12345")
             assert result is None
 
     def test_search_artist_api_failure(self):
-        with patch("crate.spotify.get_cache", return_value=None), \
-             patch("crate.spotify._api_get", return_value=None):
+        with (
+            patch("crate.spotify.get_cache", return_value=None),
+            patch("crate.spotify._api_get", return_value=None),
+        ):
             from crate.spotify import search_artist
+
             result = search_artist("Radiohead")
             assert result is None
 
@@ -62,6 +74,7 @@ class TestSetlistfmProbableSetlist:
         cached = {"songs": [{"title": "Creep", "frequency": 0.8}]}
         with patch("crate.setlistfm.get_cache", return_value=cached):
             from crate.setlistfm import get_probable_setlist
+
             result = get_probable_setlist("Radiohead")
             assert result == [{"title": "Creep", "frequency": 0.8}]
 
@@ -70,26 +83,41 @@ class TestSetlistfmProbableSetlist:
             "setlist": [
                 {
                     "eventDate": "2024-06-01",
-                    "sets": {"set": [{"song": [
-                        {"name": "Everything In Its Right Place"},
-                        {"name": "15 Step"},
-                        {"name": "Everything In Its Right Place"},
-                    ]}]}
+                    "sets": {
+                        "set": [
+                            {
+                                "song": [
+                                    {"name": "Everything In Its Right Place"},
+                                    {"name": "15 Step"},
+                                    {"name": "Everything In Its Right Place"},
+                                ]
+                            }
+                        ]
+                    },
                 },
                 {
                     "eventDate": "2024-05-15",
-                    "sets": {"set": [{"song": [
-                        {"name": "Everything In Its Right Place"},
-                        {"name": "Airbag"},
-                    ]}]}
+                    "sets": {
+                        "set": [
+                            {
+                                "song": [
+                                    {"name": "Everything In Its Right Place"},
+                                    {"name": "Airbag"},
+                                ]
+                            }
+                        ]
+                    },
                 },
             ]
         }
-        with patch("crate.setlistfm.get_cache", return_value=None), \
-             patch("crate.setlistfm.search_artist", return_value="mbid-123"), \
-             patch("crate.setlistfm.get_setlists", return_value=setlist_data), \
-             patch("crate.setlistfm.set_cache"):
+        with (
+            patch("crate.setlistfm.get_cache", return_value=None),
+            patch("crate.setlistfm.search_artist", return_value="mbid-123"),
+            patch("crate.setlistfm.get_setlists", return_value=setlist_data),
+            patch("crate.setlistfm.set_cache"),
+        ):
             from crate.setlistfm import get_probable_setlist
+
             result = get_probable_setlist("Radiohead", num_setlists=2)
             assert result is not None
             assert len(result) > 0
@@ -98,29 +126,47 @@ class TestSetlistfmProbableSetlist:
             assert result[0]["play_count"] == 3
 
     def test_get_probable_setlist_no_mbid(self):
-        with patch("crate.setlistfm.get_cache", return_value=None), \
-             patch("crate.setlistfm.search_artist", return_value=None):
+        with (
+            patch("crate.setlistfm.get_cache", return_value=None),
+            patch("crate.setlistfm.search_artist", return_value=None),
+        ):
             from crate.setlistfm import get_probable_setlist
+
             result = get_probable_setlist("Unknown Artist")
             assert result is None
 
 
 class TestArtistPageEnrichment:
     def test_artist_page_enrichment_uses_cached_setlist_when_available(self):
-        with patch("crate.api.enrichment.get_cache", return_value=None), \
-             patch("crate.api.enrichment.setlistfm.get_cached_probable_setlist", return_value=[{"title": "Creep"}]), \
-             patch("crate.api.enrichment.setlistfm.get_probable_setlist") as mock_live:
+        with (
+            patch("crate.api.enrichment.get_cache", return_value=None),
+            patch(
+                "crate.api.enrichment.setlistfm.get_cached_probable_setlist",
+                return_value=[{"title": "Creep"}],
+            ),
+            patch("crate.api.enrichment.setlistfm.get_probable_setlist") as mock_live,
+        ):
             from crate.api.enrichment import get_artist_page_enrichment
 
             result = get_artist_page_enrichment("Radiohead")
 
-        assert result == {"setlist": {"probable_setlist": [{"title": "Creep"}], "total_shows": 1}}
+        assert result == {
+            "setlist": {"probable_setlist": [{"title": "Creep"}], "total_shows": 1}
+        }
         mock_live.assert_not_called()
 
     def test_artist_page_enrichment_falls_back_to_live_setlist_when_cache_misses(self):
-        with patch("crate.api.enrichment.get_cache", return_value=None), \
-             patch("crate.api.enrichment.setlistfm.get_cached_probable_setlist", return_value=None), \
-             patch("crate.api.enrichment.setlistfm.get_probable_setlist", return_value=[{"title": "Paranoid Android"}]) as mock_live:
+        with (
+            patch("crate.api.enrichment.get_cache", return_value=None),
+            patch(
+                "crate.api.enrichment.setlistfm.get_cached_probable_setlist",
+                return_value=None,
+            ),
+            patch(
+                "crate.api.enrichment.setlistfm.get_probable_setlist",
+                return_value=[{"title": "Paranoid Android"}],
+            ) as mock_live,
+        ):
             from crate.api.enrichment import get_artist_page_enrichment
 
             result = get_artist_page_enrichment("Radiohead")
@@ -136,22 +182,36 @@ class TestArtistPageEnrichment:
 
 class TestGenreMetadataTasks:
     def test_enrich_genre_descriptions_reports_raw_focus_without_taxonomy_node(self):
-        with patch("crate.db.genres.list_genre_taxonomy_nodes_for_external_enrichment", return_value=[]), \
-             patch("crate.db.genres.get_genre_taxonomy_node_id", return_value=None):
+        with (
+            patch(
+                "crate.db.genres.list_genre_taxonomy_nodes_for_external_enrichment",
+                return_value=[],
+            ),
+            patch("crate.db.genres.get_genre_taxonomy_node_id", return_value=None),
+        ):
             from crate.genre_descriptions import enrich_genre_descriptions_batch
 
-            result = enrich_genre_descriptions_batch(limit=1, focus_slug="instrumental", force=True)
+            result = enrich_genre_descriptions_batch(
+                limit=1, focus_slug="instrumental", force=True
+            )
 
         assert result["processed"] == 0
         assert result["reason"] == "focus_slug_not_taxonomy_node"
         assert result["focus_slug"] == "instrumental"
 
     def test_sync_musicbrainz_genre_graph_reports_raw_focus_without_taxonomy_node(self):
-        with patch("crate.db.genres.list_genre_taxonomy_nodes_for_musicbrainz_sync", return_value=[]), \
-             patch("crate.db.genres.get_genre_taxonomy_node_id", return_value=None):
+        with (
+            patch(
+                "crate.db.genres.list_genre_taxonomy_nodes_for_musicbrainz_sync",
+                return_value=[],
+            ),
+            patch("crate.db.genres.get_genre_taxonomy_node_id", return_value=None),
+        ):
             from crate.genre_descriptions import sync_musicbrainz_genre_graph_batch
 
-            result = sync_musicbrainz_genre_graph_batch(limit=1, focus_slug="instrumental", force=True)
+            result = sync_musicbrainz_genre_graph_batch(
+                limit=1, focus_slug="instrumental", force=True
+            )
 
         assert result["processed"] == 0
         assert result["reason"] == "focus_slug_not_taxonomy_node"
@@ -167,6 +227,7 @@ class TestMusicBrainzGetArtistDetails:
         }
         with patch("crate.musicbrainz_ext.get_cache", return_value=cached):
             from crate.musicbrainz_ext import get_artist_details
+
             result = get_artist_details("Radiohead")
             assert result == cached
 
@@ -189,15 +250,24 @@ class TestMusicBrainzGetArtistDetails:
                     }
                 ],
                 "url-relation-list": [
-                    {"type": "wikipedia", "target": "https://en.wikipedia.org/wiki/Radiohead"},
+                    {
+                        "type": "wikipedia",
+                        "target": "https://en.wikipedia.org/wiki/Radiohead",
+                    },
                 ],
             }
         }
-        with patch("crate.musicbrainz_ext.get_cache", return_value=None), \
-             patch("crate.musicbrainz_ext._search_mbid", return_value="abc-123"), \
-             patch("crate.musicbrainz_ext.musicbrainzngs.get_artist_by_id", return_value=mock_artist), \
-             patch("crate.musicbrainz_ext.set_cache") as mock_set:
+        with (
+            patch("crate.musicbrainz_ext.get_cache", return_value=None),
+            patch("crate.musicbrainz_ext._search_mbid", return_value="abc-123"),
+            patch(
+                "crate.musicbrainz_ext.musicbrainzngs.get_artist_by_id",
+                return_value=mock_artist,
+            ),
+            patch("crate.musicbrainz_ext.set_cache") as mock_set,
+        ):
             from crate.musicbrainz_ext import get_artist_details
+
             result = get_artist_details("Radiohead")
             assert result is not None
             assert result["mbid"] == "abc-123"
@@ -209,9 +279,12 @@ class TestMusicBrainzGetArtistDetails:
             mock_set.assert_called_once()
 
     def test_get_artist_details_no_mbid(self):
-        with patch("crate.musicbrainz_ext.get_cache", return_value=None), \
-             patch("crate.musicbrainz_ext._search_mbid", return_value=None):
+        with (
+            patch("crate.musicbrainz_ext.get_cache", return_value=None),
+            patch("crate.musicbrainz_ext._search_mbid", return_value=None),
+        ):
             from crate.musicbrainz_ext import get_artist_details
+
             result = get_artist_details("Unknown")
             assert result is None
 
@@ -225,6 +298,7 @@ class TestLastfmGetArtistInfo:
         }
         with patch("crate.lastfm.get_cache", return_value=cached):
             from crate.lastfm import get_artist_info
+
             result = get_artist_info("Radiohead")
             assert result == cached
 
@@ -233,7 +307,9 @@ class TestLastfmGetArtistInfo:
         mock_response.json.return_value = {
             "artist": {
                 "name": "Radiohead",
-                "bio": {"summary": "English rock band <a href=\"https://www.last.fm/music/Radiohead\">Read more on Last.fm</a>."},
+                "bio": {
+                    "summary": 'English rock band <a href="https://www.last.fm/music/Radiohead">Read more on Last.fm</a>.'
+                },
                 "image": [{"#text": "http://img.com/photo.jpg", "size": "large"}],
                 "tags": {"tag": [{"name": "rock"}, {"name": "alternative"}]},
                 "similar": {"artist": [{"name": "Muse"}, {"name": "Coldplay"}]},
@@ -243,11 +319,14 @@ class TestLastfmGetArtistInfo:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch("crate.lastfm.get_cache", return_value=None), \
-             patch("crate.lastfm._lastfm_key", return_value="test_key"), \
-             patch("crate.lastfm.requests.get", return_value=mock_response), \
-             patch("crate.lastfm.set_cache") as mock_set:
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm._lastfm_key", return_value="test_key"),
+            patch("crate.lastfm.requests.get", return_value=mock_response),
+            patch("crate.lastfm.set_cache") as mock_set,
+        ):
             from crate.lastfm import get_artist_info
+
             result = get_artist_info("Radiohead")
             assert result is not None
             assert "rock" in result["tags"]
@@ -255,9 +334,12 @@ class TestLastfmGetArtistInfo:
             mock_set.assert_called_once()
 
     def test_get_artist_info_no_api_key(self):
-        with patch("crate.lastfm.get_cache", return_value=None), \
-             patch("crate.lastfm._lastfm_key", return_value=None):
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm._lastfm_key", return_value=None),
+        ):
             from crate.lastfm import get_artist_info
+
             result = get_artist_info("Radiohead")
             assert result is None
 
@@ -267,11 +349,16 @@ class TestCachingBehavior:
         """Second call should use cache, not hit API."""
         api_response = {
             "artists": {
-                "items": [{
-                    "id": "sp1", "name": "Tool", "popularity": 75,
-                    "followers": {"total": 3000000}, "genres": ["metal"],
-                    "images": [],
-                }]
+                "items": [
+                    {
+                        "id": "sp1",
+                        "name": "Tool",
+                        "popularity": 75,
+                        "followers": {"total": 3000000},
+                        "genres": ["metal"],
+                        "images": [],
+                    }
+                ]
             }
         }
         call_count = {"api": 0}
@@ -281,15 +368,22 @@ class TestCachingBehavior:
             return api_response
 
         cached_result = {
-            "id": "sp1", "name": "Tool", "popularity": 75,
-            "followers": 3000000, "genres": ["metal"], "images": [],
+            "id": "sp1",
+            "name": "Tool",
+            "popularity": 75,
+            "followers": 3000000,
+            "genres": ["metal"],
+            "images": [],
         }
 
         # First call: no cache, hits API
-        with patch("crate.spotify.get_cache", return_value=None), \
-             patch("crate.spotify._api_get", side_effect=mock_api_get), \
-             patch("crate.spotify.set_cache"):
+        with (
+            patch("crate.spotify.get_cache", return_value=None),
+            patch("crate.spotify._api_get", side_effect=mock_api_get),
+            patch("crate.spotify.set_cache"),
+        ):
             from crate.spotify import search_artist
+
             search_artist("Tool")
             assert call_count["api"] == 1
 
@@ -336,15 +430,20 @@ class TestArtistEnrichment:
                 return cached_lastfm
             return None
 
-        with patch("crate.enrichment.get_cache", side_effect=_get_cache), \
-             patch("crate.enrichment.set_cache") as mock_set_cache, \
-             patch("crate.enrichment.wait_for_provider_slot", return_value=0), \
-             patch("crate.enrichment._discogs_is_configured", return_value=False), \
-             patch("crate.enrichment._fetch_lastfm_payload") as mock_lastfm, \
-             patch("crate.enrichment._fetch_spotify_payload", return_value={"artist": {"id": "sp1"}}), \
-             patch("crate.enrichment._fetch_musicbrainz_payload", return_value=None), \
-             patch("crate.enrichment._fetch_setlist_payload", return_value=None), \
-             patch("crate.enrichment._fetch_fanart_payload", return_value=None):
+        with (
+            patch("crate.enrichment.get_cache", side_effect=_get_cache),
+            patch("crate.enrichment.set_cache") as mock_set_cache,
+            patch("crate.enrichment.wait_for_provider_slot", return_value=0),
+            patch("crate.enrichment._discogs_is_configured", return_value=False),
+            patch("crate.enrichment._fetch_lastfm_payload") as mock_lastfm,
+            patch(
+                "crate.enrichment._fetch_spotify_payload",
+                return_value={"artist": {"id": "sp1"}},
+            ),
+            patch("crate.enrichment._fetch_musicbrainz_payload", return_value=None),
+            patch("crate.enrichment._fetch_setlist_payload", return_value=None),
+            patch("crate.enrichment._fetch_fanart_payload", return_value=None),
+        ):
             result = _collect_enrichment_payloads("Radiohead", max_workers=1)
 
         assert result["lastfm"] == cached_lastfm
@@ -401,13 +500,26 @@ class TestArtistEnrichment:
             },
         }
 
-        with patch("crate.enrichment.get_library_artist", return_value={"folder_name": "Radiohead", "enriched_at": None}), \
-             patch("crate.enrichment._collect_enrichment_payloads", return_value=payloads), \
-             patch("crate.enrichment.set_cache") as mock_set_cache, \
-             patch("crate.enrichment.update_artist_enrichment") as mock_update_artist_enrichment, \
-             patch("crate.enrichment.bulk_upsert_similarities") as mock_bulk_upsert_similarities, \
-             patch("crate.enrichment.set_artist_genres") as mock_set_artist_genres, \
-             patch("crate.enrichment._download_artist_photo") as mock_download_artist_photo:
+        with (
+            patch(
+                "crate.enrichment.get_library_artist",
+                return_value={"folder_name": "Radiohead", "enriched_at": None},
+            ),
+            patch(
+                "crate.enrichment._collect_enrichment_payloads", return_value=payloads
+            ),
+            patch("crate.enrichment.set_cache") as mock_set_cache,
+            patch(
+                "crate.enrichment.update_artist_enrichment"
+            ) as mock_update_artist_enrichment,
+            patch(
+                "crate.enrichment.bulk_upsert_similarities"
+            ) as mock_bulk_upsert_similarities,
+            patch("crate.enrichment.set_artist_genres") as mock_set_artist_genres,
+            patch(
+                "crate.enrichment._download_artist_photo"
+            ) as mock_download_artist_photo,
+        ):
             from crate.enrichment import enrich_artist
 
             result = enrich_artist(
@@ -462,10 +574,20 @@ class TestArtistEnrichment:
             created.append((task_type, params or {}, parent_task_id))
             return f"task-{len(created)}"
 
-        monkeypatch.setattr(worker_enrichment, "get_library_artists", lambda per_page=10000: (artists, len(artists)))
-        monkeypatch.setattr(worker_enrichment, "get_setting", lambda name, default: default)
-        monkeypatch.setattr(worker_enrichment, "emit_task_event", lambda *args, **kwargs: None)
-        monkeypatch.setattr(worker_enrichment, "emit_progress", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            worker_enrichment,
+            "get_library_artists",
+            lambda per_page=10000: (artists, len(artists)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment, "get_setting", lambda name, default: default
+        )
+        monkeypatch.setattr(
+            worker_enrichment, "emit_task_event", lambda *args, **kwargs: None
+        )
+        monkeypatch.setattr(
+            worker_enrichment, "emit_progress", lambda *args, **kwargs: None
+        )
 
         with patch("crate.db.repositories.tasks.create_task", side_effect=_create_task):
             result = worker_enrichment._handle_enrich_artists(
@@ -475,6 +597,49 @@ class TestArtistEnrichment:
             )
 
         assert result == {"_delegated": True, "chunks": 3, "artists": 45}
-        assert [call[0] for call in created] == ["enrich_artists", "enrich_artists", "enrich_artists"]
+        assert [call[0] for call in created] == [
+            "enrich_artists",
+            "enrich_artists",
+            "enrich_artists",
+        ]
         assert [len(call[1]["artists"]) for call in created] == [20, 20, 5]
         assert {call[2] for call in created} == {"parent-task"}
+
+    def test_process_new_content_refreshes_artist_summary_in_finally(self, monkeypatch):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        calls: list[tuple[str, str]] = []
+
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_mark_processing",
+            lambda artist: calls.append(("mark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_unmark_processing",
+            lambda artist: calls.append(("unmark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_refresh_artist_summary",
+            lambda artist, config: calls.append(("refresh", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_inner",
+            lambda *args, **kwargs: {"artist": "VVV [Trippin'you]"},
+        )
+
+        result = worker_enrichment._handle_process_new_content(
+            "task-1",
+            {"artist": "VVV [Trippin'you]"},
+            {"library_path": "/tmp/music"},
+        )
+
+        assert result == {"artist": "VVV [Trippin'you]"}
+        assert calls == [
+            ("mark", "VVV [Trippin'you]"),
+            ("refresh", "VVV [Trippin'you]"),
+            ("unmark", "VVV [Trippin'you]"),
+        ]

@@ -9,10 +9,18 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from starlette.background import BackgroundTask
 
-from crate.api._deps import enrich_radio_tracks as _enrich_radio_tracks, library_path, safe_path
+from crate.api._deps import (
+    enrich_radio_tracks as _enrich_radio_tracks,
+    library_path,
+    safe_path,
+)
 from crate.api.auth import _require_auth
 from crate.api.browse_shared import fs_search, has_library_data
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.media import (
     DiscoverCompletenessRefreshResponse,
@@ -66,7 +74,12 @@ from crate.db.repositories.streaming import (
     mark_variant_missing,
 )
 from crate.streaming.policy import normalize_policy
-from crate.streaming.service import media_type_for_path, prepare_playback, resolution_to_payload, resolve_playback
+from crate.streaming.service import (
+    media_type_for_path,
+    prepare_playback,
+    resolution_to_payload,
+    resolve_playback,
+)
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +118,9 @@ _DOWNLOAD_RESPONSES = merge_responses(
         200: {
             "description": "Binary file download response.",
             "content": {
-                "application/octet-stream": {"schema": {"type": "string", "format": "binary"}},
+                "application/octet-stream": {
+                    "schema": {"type": "string", "format": "binary"}
+                },
             },
         },
         404: error_response("The requested download could not be found."),
@@ -186,7 +201,9 @@ def api_search(request: Request, q: str = "", limit: int = 20):
             "duration": row["duration"],
         }
         for row in track_rows
-        for entity_uid in [str(row["entity_uid"]) if row.get("entity_uid") is not None else None]
+        for entity_uid in [
+            str(row["entity_uid"]) if row.get("entity_uid") is not None else None
+        ]
     ]
     payload = {"artists": artists, "albums": albums, "tracks": tracks}
     set_cache(cache_key, payload, ttl=45)
@@ -219,7 +236,9 @@ def api_favorites_add(request: Request, body: FavoriteMutationRequest):
     if not item_id:
         raise HTTPException(status_code=400, detail="item_id is required")
     if item_type not in ("song", "album", "artist"):
-        raise HTTPException(status_code=400, detail="type must be song, album, or artist")
+        raise HTTPException(
+            status_code=400, detail="type must be song, album, or artist"
+        )
 
     now = datetime.now(timezone.utc).isoformat()
     add_favorite(item_type, item_id, now)
@@ -240,7 +259,9 @@ def api_favorites_remove(request: Request, body: FavoriteMutationRequest):
     if not item_id:
         raise HTTPException(status_code=400, detail="item_id is required")
     if item_type not in ("song", "album", "artist"):
-        raise HTTPException(status_code=400, detail="type must be song, album, or artist")
+        raise HTTPException(
+            status_code=400, detail="type must be song, album, or artist"
+        )
 
     remove_favorite(item_type, item_id)
 
@@ -323,17 +344,26 @@ def _serialize_track_info_row(row) -> dict:
         relative = raw_path
         lib_str = str(lib)
         if relative.startswith(lib_str):
-            relative = relative[len(lib_str):].lstrip("/")
+            relative = relative[len(lib_str) :].lstrip("/")
         elif relative.startswith("/music/"):
-            relative = relative[len("/music/"):].lstrip("/")
+            relative = relative[len("/music/") :].lstrip("/")
         resolved = safe_path(lib, relative)
         if resolved and resolved.is_file():
             quality = read_audio_quality(resolved)
-            if payload.get("bitrate") in (None, 0) and quality.get("bitrate") is not None:
+            if (
+                payload.get("bitrate") in (None, 0)
+                and quality.get("bitrate") is not None
+            ):
                 payload["bitrate"] = quality["bitrate"]
-            if payload.get("sample_rate") in (None, 0) and quality.get("sample_rate") is not None:
+            if (
+                payload.get("sample_rate") in (None, 0)
+                and quality.get("sample_rate") is not None
+            ):
                 payload["sample_rate"] = quality["sample_rate"]
-            if payload.get("bit_depth") in (None, 0) and quality.get("bit_depth") is not None:
+            if (
+                payload.get("bit_depth") in (None, 0)
+                and quality.get("bit_depth") is not None
+            ):
                 payload["bit_depth"] = quality["bit_depth"]
     if payload.get("entity_uid") is not None:
         payload["entity_uid"] = str(payload["entity_uid"])
@@ -426,7 +456,9 @@ def api_track_info_by_storage_id(request: Request, storage_id: str):
     _require_auth(request)
     entity_uid = _get_entity_uid_from_storage_alias(storage_id)
     if entity_uid:
-        return RedirectResponse(url=f"/api/tracks/by-entity/{entity_uid}/info", status_code=307)
+        return RedirectResponse(
+            url=f"/api/tracks/by-entity/{entity_uid}/info", status_code=307
+        )
     row = _get_track_info_cols_via_storage_alias(storage_id, _TRACK_INFO_QUERY_COLS)
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -514,7 +546,9 @@ def api_eq_features_by_storage_id(request: Request, storage_id: str):
     _require_auth(request)
     entity_uid = _get_entity_uid_from_storage_alias(storage_id)
     if entity_uid:
-        return RedirectResponse(url=f"/api/tracks/by-entity/{entity_uid}/eq-features", status_code=307)
+        return RedirectResponse(
+            url=f"/api/tracks/by-entity/{entity_uid}/eq-features", status_code=307
+        )
     row = _get_track_info_cols_via_storage_alias(storage_id, _EQ_FEATURES_QUERY_COLS)
     if not row:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -522,6 +556,7 @@ def api_eq_features_by_storage_id(request: Request, storage_id: str):
 
 
 # ── Track primary genre ─────────────────────────────────────────────
+
 
 def _pick_primary_genre(rows, *, canonical_only: bool = False):
     """Prefer the highest-weight canonical genre; fall back to the
@@ -573,7 +608,8 @@ def _pick_primary_genre(rows, *, canonical_only: bool = False):
             raw_pick = {
                 "primary": {
                     "slug": raw_slug or resolved or "",
-                    "name": raw_name or (raw_slug.replace("-", " ") if raw_slug else ""),
+                    "name": raw_name
+                    or (raw_slug.replace("-", " ") if raw_slug else ""),
                     "canonical": False,
                 },
                 "topLevel": None,
@@ -587,13 +623,17 @@ def _pick_primary_genre(rows, *, canonical_only: bool = False):
 
 def _resolve_track_genre(track_id: int) -> dict | None:
     album_rows = get_track_album_genres(track_id)
-    picked = _pick_primary_genre(album_rows, canonical_only=True) if album_rows else None
+    picked = (
+        _pick_primary_genre(album_rows, canonical_only=True) if album_rows else None
+    )
     if picked:
         picked["source"] = "album"
         return picked
 
     artist_rows = get_track_artist_genres(track_id)
-    picked = _pick_primary_genre(artist_rows, canonical_only=True) if artist_rows else None
+    picked = (
+        _pick_primary_genre(artist_rows, canonical_only=True) if artist_rows else None
+    )
     if picked:
         picked["source"] = "artist"
         return picked
@@ -618,7 +658,12 @@ def _track_genre_payload(track_id: int) -> dict:
         return cached
 
     result = _resolve_track_genre(track_id)
-    payload = result or {"primary": None, "topLevel": None, "source": None, "preset": None}
+    payload = result or {
+        "primary": None,
+        "topLevel": None,
+        "source": None,
+        "preset": None,
+    }
     set_cache(cache_key, payload, ttl=3600)
     return payload
 
@@ -662,7 +707,9 @@ def api_track_genre_by_storage_id(request: Request, storage_id: str):
     _require_auth(request)
     entity_uid = _get_entity_uid_from_storage_alias(storage_id)
     if entity_uid:
-        return RedirectResponse(url=f"/api/tracks/by-entity/{entity_uid}/genre", status_code=307)
+        return RedirectResponse(
+            url=f"/api/tracks/by-entity/{entity_uid}/genre", status_code=307
+        )
     tid = _get_track_id_via_storage_alias(storage_id)
     if tid is None:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -713,14 +760,20 @@ def _stream_file(request: Request, filepath: str):
     lib = library_path()
     lib_str = str(lib)
     if filepath.startswith(lib_str):
-        filepath = filepath[len(lib_str):].lstrip("/")
+        filepath = filepath[len(lib_str) :].lstrip("/")
     elif filepath.startswith("/music/"):
-        filepath = filepath[len("/music/"):].lstrip("/")
+        filepath = filepath[len("/music/") :].lstrip("/")
     file_path = safe_path(lib, filepath)
     return _stream_resolved_file(request, file_path)
 
 
-def _stream_resolved_file(request: Request, file_path, *, media_type: str | None = None, extra_headers: dict[str, str] | None = None):
+def _stream_resolved_file(
+    request: Request,
+    file_path,
+    *,
+    media_type: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+):
     _require_auth(request)
     from fastapi.responses import FileResponse
     from crate.metrics import record, record_counter
@@ -753,7 +806,9 @@ def _playback_headers(resolution) -> dict[str, str]:
         "X-Crate-Delivery-Bitrate": str(delivery.get("bitrate") or ""),
         "X-Crate-Source-Format": str(source.get("format") or ""),
         "X-Crate-Transcoded": "1" if resolution.transcoded else "0",
-        "X-Crate-Variant-Status": str(resolution.variant_status or ("preparing" if resolution.preparing else "")),
+        "X-Crate-Variant-Status": str(
+            resolution.variant_status or ("preparing" if resolution.preparing else "")
+        ),
     }
 
 
@@ -785,7 +840,9 @@ def _playback_payload_for_track(track: dict, delivery: str) -> dict:
     resolution = resolve_playback(track, delivery, enqueue=True)
     if resolution is None:
         raise HTTPException(status_code=404, detail="Track not found")
-    return resolution_to_payload(resolution, _stream_url_for_track(track, resolution.requested_policy))
+    return resolution_to_payload(
+        resolution, _stream_url_for_track(track, resolution.requested_policy)
+    )
 
 
 @router.get(
@@ -793,7 +850,9 @@ def _playback_payload_for_track(track: dict, delivery: str) -> dict:
     responses=_STREAM_RESPONSES,
     summary="Stream a track by track ID",
 )
-def api_stream_by_id(request: Request, track_id: int, delivery: str = Query("original")):
+def api_stream_by_id(
+    request: Request, track_id: int, delivery: str = Query("original")
+):
     _require_auth(request)
     track = get_track_delivery_row_by_id(track_id)
     if not track:
@@ -807,7 +866,9 @@ def api_stream_by_id(request: Request, track_id: int, delivery: str = Query("ori
     responses=_BROWSE_MEDIA_RESPONSES,
     summary="Resolve playback delivery for a track by track ID",
 )
-def api_playback_by_id(request: Request, track_id: int, delivery: str = Query("original")):
+def api_playback_by_id(
+    request: Request, track_id: int, delivery: str = Query("original")
+):
     _require_auth(request)
     track = get_track_delivery_row_by_id(track_id)
     if not track:
@@ -820,7 +881,9 @@ def api_playback_by_id(request: Request, track_id: int, delivery: str = Query("o
     responses=_STREAM_RESPONSES,
     summary="Stream a track by entity UID",
 )
-def api_stream_by_entity_uid(request: Request, entity_uid: str, delivery: str = Query("original")):
+def api_stream_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
     _require_auth(request)
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
@@ -834,7 +897,9 @@ def api_stream_by_entity_uid(request: Request, entity_uid: str, delivery: str = 
     responses=_BROWSE_MEDIA_RESPONSES,
     summary="Resolve playback delivery for a track by entity UID",
 )
-def api_playback_by_entity_uid(request: Request, entity_uid: str, delivery: str = Query("original")):
+def api_playback_by_entity_uid(
+    request: Request, entity_uid: str, delivery: str = Query("original")
+):
     _require_auth(request)
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
@@ -849,7 +914,9 @@ def api_playback_by_entity_uid(request: Request, entity_uid: str, delivery: str 
     deprecated=True,
     include_in_schema=False,
 )
-def api_stream_by_storage_id(request: Request, storage_id: str, delivery: str = Query("original")):
+def api_stream_by_storage_id(
+    request: Request, storage_id: str, delivery: str = Query("original")
+):
     _require_auth(request)
     track = _get_track_info_cols_via_storage_alias(
         storage_id,
@@ -884,7 +951,9 @@ def api_stream_playback_variant(request: Request, variant_id: str):
     if not row or row.get("status") != "ready":
         raise HTTPException(status_code=404, detail="Playback variant not found")
     track_id = row.get("track_id")
-    track = get_track_delivery_row_by_id(int(track_id)) if track_id is not None else None
+    track = (
+        get_track_delivery_row_by_id(int(track_id)) if track_id is not None else None
+    )
     if not track or track.get("path") != row.get("source_path"):
         raise HTTPException(status_code=404, detail="Playback variant not found")
     source_path = safe_path(library_path(), str(row.get("source_path") or ""))
@@ -892,7 +961,9 @@ def api_stream_playback_variant(request: Request, variant_id: str):
         mark_variant_missing(row["cache_key"])
         raise HTTPException(status_code=404, detail="Playback variant not found")
     source_stat = source_path.stat()
-    if source_stat.st_size != int(row.get("source_size") or 0) or source_stat.st_mtime_ns != int(row.get("source_mtime_ns") or 0):
+    if source_stat.st_size != int(
+        row.get("source_size") or 0
+    ) or source_stat.st_mtime_ns != int(row.get("source_mtime_ns") or 0):
         mark_variant_missing(row["cache_key"])
         raise HTTPException(status_code=404, detail="Playback variant not found")
     variant_path = resolve_data_file(row.get("relative_path"))
@@ -941,25 +1012,33 @@ def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
             continue
         try:
             resolution = prepare_playback(track, policy)
-            items.append({
-                "track_id": track.get("id"),
-                "entity_uid": str(track["entity_uid"]) if track.get("entity_uid") is not None else None,
-                "ok": resolution is not None,
-                "preparing": bool(resolution and resolution.preparing),
-                "cache_hit": bool(resolution and resolution.cache_hit),
-                "transcoded": bool(resolution and resolution.transcoded),
-                "task_id": resolution.task_id if resolution else None,
-                "variant_id": resolution.variant_id if resolution else None,
-                "variant_status": resolution.variant_status if resolution else None,
-            })
+            items.append(
+                {
+                    "track_id": track.get("id"),
+                    "entity_uid": str(track["entity_uid"])
+                    if track.get("entity_uid") is not None
+                    else None,
+                    "ok": resolution is not None,
+                    "preparing": bool(resolution and resolution.preparing),
+                    "cache_hit": bool(resolution and resolution.cache_hit),
+                    "transcoded": bool(resolution and resolution.transcoded),
+                    "task_id": resolution.task_id if resolution else None,
+                    "variant_id": resolution.variant_id if resolution else None,
+                    "variant_status": resolution.variant_status if resolution else None,
+                }
+            )
         except Exception as exc:
             log.debug("Failed to prepare playback variant", exc_info=True)
-            items.append({
-                "track_id": track.get("id"),
-                "entity_uid": str(track["entity_uid"]) if track.get("entity_uid") is not None else None,
-                "ok": False,
-                "error": str(exc),
-            })
+            items.append(
+                {
+                    "track_id": track.get("id"),
+                    "entity_uid": str(track["entity_uid"])
+                    if track.get("entity_uid") is not None
+                    else None,
+                    "ok": False,
+                    "error": str(exc),
+                }
+            )
     return {"policy": policy, "items": items}
 
 
@@ -969,7 +1048,9 @@ def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
     responses=_BROWSE_MEDIA_RESPONSES,
     summary="Find tracks similar to a seed track",
 )
-def api_similar_tracks_query(request: Request, path: str = "", track_id: int = 0, limit: int = 20):
+def api_similar_tracks_query(
+    request: Request, path: str = "", track_id: int = 0, limit: int = 20
+):
     _require_auth(request)
     from crate.bliss import get_similar_from_db
 
@@ -1010,15 +1091,17 @@ def _download_track(request: Request, filepath: str):
     lib = library_path()
     lib_str = str(lib)
     if filepath.startswith(lib_str):
-        filepath = filepath[len(lib_str):].lstrip("/")
+        filepath = filepath[len(lib_str) :].lstrip("/")
     elif filepath.startswith("/music/"):
-        filepath = filepath[len("/music/"):].lstrip("/")
+        filepath = filepath[len("/music/") :].lstrip("/")
     file_path = safe_path(lib, filepath)
     if not file_path or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Track not found")
 
     try:
-        from crate.db.queries.portable_metadata import get_portable_track_payload_by_path
+        from crate.db.queries.portable_metadata import (
+            get_portable_track_payload_by_path,
+        )
         from crate.download_cache import (
             cached_download_artifact_path,
             download_cache_lock,
@@ -1030,21 +1113,38 @@ def _download_track(request: Request, filepath: str):
             track_download_cache_key,
         )
         from crate.media_worker import build_track_download_artifact
-        from crate.portable_metadata import find_album_artwork_file, write_track_rich_tags
+        from crate.portable_metadata import (
+            find_album_artwork_file,
+            write_track_rich_tags,
+        )
 
         payload = get_portable_track_payload_by_path(str(file_path))
         if payload:
             album_payload = payload.get("album") or {}
             artwork_path = find_album_artwork_file(album_payload.get("path") or "")
-            cache_key = track_download_cache_key(payload, source_path=file_path, artwork_path=artwork_path)
+            cache_key = track_download_cache_key(
+                payload, source_path=file_path, artwork_path=artwork_path
+            )
             cache_filename = safe_download_filename(file_path.name, "track")
-            cached = get_cached_download("track", cache_key, cache_filename, ttl_seconds=track_cache_ttl_seconds())
+            cached = get_cached_download(
+                "track",
+                cache_key,
+                cache_filename,
+                ttl_seconds=track_cache_ttl_seconds(),
+            )
             if cached is None:
                 with download_cache_lock("track", cache_key, timeout_seconds=120):
-                    cached = get_cached_download("track", cache_key, cache_filename, ttl_seconds=track_cache_ttl_seconds())
+                    cached = get_cached_download(
+                        "track",
+                        cache_key,
+                        cache_filename,
+                        ttl_seconds=track_cache_ttl_seconds(),
+                    )
                     if cached is None:
                         if download_cache_enabled():
-                            worker_output_path = cached_download_artifact_path("track", cache_key, cache_filename)
+                            worker_output_path = cached_download_artifact_path(
+                                "track", cache_key, cache_filename
+                            )
                             worker_result = build_track_download_artifact(
                                 payload,
                                 source_path=file_path,
@@ -1057,7 +1157,9 @@ def _download_track(request: Request, filepath: str):
                                 cache_key=cache_key,
                                 cache_metadata={
                                     "track_id": (payload.get("track") or {}).get("id"),
-                                    "track_entity_uid": (payload.get("track") or {}).get("entity_uid"),
+                                    "track_entity_uid": (
+                                        payload.get("track") or {}
+                                    ).get("entity_uid"),
                                     "album_entity_uid": album_payload.get("entity_uid"),
                                     "engine": "crate-media-worker",
                                 },
@@ -1070,9 +1172,16 @@ def _download_track(request: Request, filepath: str):
                                     ttl_seconds=track_cache_ttl_seconds(),
                                 )
                             elif worker_result:
-                                log.debug("crate-media-worker track artifact failed: %s", worker_result)
+                                log.debug(
+                                    "crate-media-worker track artifact failed: %s",
+                                    worker_result,
+                                )
                         if cached is not None:
-                            return FileResponse(path=str(cached.path), filename=file_path.name, media_type="application/octet-stream")
+                            return FileResponse(
+                                path=str(cached.path),
+                                filename=file_path.name,
+                                media_type="application/octet-stream",
+                            )
                         tmp_dir = tempfile.mkdtemp(prefix="crate-track-download.")
                         tmp_path = Path(tmp_dir) / file_path.name
                         keep_tmp = False
@@ -1080,7 +1189,9 @@ def _download_track(request: Request, filepath: str):
                             shutil.copy2(file_path, tmp_path)
                             write_track_rich_tags(
                                 tmp_path,
-                                artist_uid=(payload.get("artist") or {}).get("entity_uid"),
+                                artist_uid=(payload.get("artist") or {}).get(
+                                    "entity_uid"
+                                ),
                                 album_uid=album_payload.get("entity_uid"),
                                 track_payload=payload.get("track") or {},
                                 artwork_path=artwork_path,
@@ -1092,7 +1203,9 @@ def _download_track(request: Request, filepath: str):
                                 tmp_path,
                                 metadata={
                                     "track_id": (payload.get("track") or {}).get("id"),
-                                    "track_entity_uid": (payload.get("track") or {}).get("entity_uid"),
+                                    "track_entity_uid": (
+                                        payload.get("track") or {}
+                                    ).get("entity_uid"),
                                     "album_entity_uid": album_payload.get("entity_uid"),
                                 },
                             )
@@ -1102,17 +1215,29 @@ def _download_track(request: Request, filepath: str):
                                     path=str(tmp_path),
                                     filename=file_path.name,
                                     media_type="application/octet-stream",
-                                    background=BackgroundTask(shutil.rmtree, tmp_dir, ignore_errors=True),
+                                    background=BackgroundTask(
+                                        shutil.rmtree, tmp_dir, ignore_errors=True
+                                    ),
                                 )
                         finally:
                             if not keep_tmp:
                                 shutil.rmtree(tmp_dir, ignore_errors=True)
             if cached is not None:
-                return FileResponse(path=str(cached.path), filename=file_path.name, media_type="application/octet-stream")
+                return FileResponse(
+                    path=str(cached.path),
+                    filename=file_path.name,
+                    media_type="application/octet-stream",
+                )
     except Exception:
-        log.debug("Falling back to original track download for %s", file_path, exc_info=True)
+        log.debug(
+            "Falling back to original track download for %s", file_path, exc_info=True
+        )
 
-    return FileResponse(path=str(file_path), filename=file_path.name, media_type="application/octet-stream")
+    return FileResponse(
+        path=str(file_path),
+        filename=file_path.name,
+        media_type="application/octet-stream",
+    )
 
 
 @router.get(
@@ -1152,7 +1277,9 @@ def api_download_track_by_storage_id(request: Request, storage_id: str):
     _require_auth(request)
     entity_uid = _get_entity_uid_from_storage_alias(storage_id)
     if entity_uid:
-        return RedirectResponse(url=f"/api/tracks/by-entity/{entity_uid}/download", status_code=307)
+        return RedirectResponse(
+            url=f"/api/tracks/by-entity/{entity_uid}/download", status_code=307
+        )
     path = _get_track_path_via_storage_alias(storage_id)
     if not path:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -1221,7 +1348,9 @@ def api_browse_moods(request: Request):
     responses=_BROWSE_MEDIA_RESPONSES,
     summary="List tracks matching a mood preset",
 )
-def api_browse_mood_tracks(request: Request, mood: str, limit: int = Query(50, ge=1, le=200)):
+def api_browse_mood_tracks(
+    request: Request, mood: str, limit: int = Query(50, ge=1, le=200)
+):
     """Return tracks matching a mood preset."""
     _require_auth(request)
     preset = MOOD_PRESETS.get(mood)

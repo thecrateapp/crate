@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_track_album_genres(track_id: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT g.name, g.slug, ag.weight
                 FROM library_tracks t
                 JOIN album_genres ag ON ag.album_id = t.album_id
@@ -18,17 +19,21 @@ def get_track_album_genres(track_id: int) -> list[dict]:
                 ORDER BY ag.weight DESC NULLS LAST, g.name ASC
                 LIMIT 10
                 """
-            ),
-            {"track_id": track_id},
-        ).mappings().all()
+                ),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def get_track_artist_genres(track_id: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT g.name, g.slug, MAX(arg.weight) AS weight
                 FROM library_tracks t
                 LEFT JOIN library_albums a ON a.id = t.album_id
@@ -39,9 +44,12 @@ def get_track_artist_genres(track_id: int) -> list[dict]:
                 ORDER BY MAX(arg.weight) DESC NULLS LAST, g.name ASC
                 LIMIT 10
                 """
-            ),
-            {"track_id": track_id},
-        ).mappings().all()
+                ),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 

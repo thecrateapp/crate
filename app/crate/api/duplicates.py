@@ -3,7 +3,11 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import (
     DuplicateAlbumCompareResponse,
@@ -48,33 +52,38 @@ def api_duplicates_compare(request: Request, path: list[str] = Query()):
         track_list = []
         for t in tracks:
             tags = read_tags(t)
-            info = mutagen.File(t)
+            mutagen_file = getattr(mutagen, "File")
+            info = mutagen_file(t)
             bitrate = getattr(info.info, "bitrate", 0) if info else 0
             length = getattr(info.info, "length", 0) if info else 0
-            track_list.append({
-                "filename": t.name,
-                "format": t.suffix.lower(),
-                "size_mb": round(t.stat().st_size / (1024**2), 1),
-                "bitrate": bitrate // 1000 if bitrate else None,
-                "length_sec": round(length) if length else 0,
-                "title": tags.get("title", t.stem),
-                "tracknumber": tags.get("tracknumber", ""),
-            })
+            track_list.append(
+                {
+                    "filename": t.name,
+                    "format": t.suffix.lower(),
+                    "size_mb": round(t.stat().st_size / (1024**2), 1),
+                    "bitrate": bitrate // 1000 if bitrate else None,
+                    "length_sec": round(length) if length else 0,
+                    "title": tags.get("title", t.stem),
+                    "tracknumber": tags.get("tracknumber", ""),
+                }
+            )
 
         has_cover = any((album_dir / c).exists() for c in COVER_NAMES)
         total_size = sum(t.stat().st_size for t in tracks)
         formats = list({t.suffix.lower() for t in tracks})
 
-        albums.append({
-            "path": p,
-            "name": album_dir.name,
-            "artist": album_dir.parent.name,
-            "track_count": len(tracks),
-            "total_size_mb": round(total_size / (1024**2)),
-            "formats": formats,
-            "has_cover": has_cover,
-            "tracks": track_list,
-        })
+        albums.append(
+            {
+                "path": p,
+                "name": album_dir.name,
+                "artist": album_dir.parent.name,
+                "track_count": len(tracks),
+                "total_size_mb": round(total_size / (1024**2)),
+                "formats": formats,
+                "has_cover": has_cover,
+                "tracks": track_list,
+            }
+        )
 
     return albums
 
@@ -88,10 +97,15 @@ def api_duplicates_compare(request: Request, path: list[str] = Query()):
 def api_duplicates_resolve(request: Request, data: ResolveRequest):
     _require_admin(request)
     if not data.keep or not data.remove:
-        return JSONResponse({"error": "Need 'keep' and 'remove' paths"}, status_code=400)
+        return JSONResponse(
+            {"error": "Need 'keep' and 'remove' paths"}, status_code=400
+        )
 
-    task_id = create_task("resolve_duplicates", {
-        "keep": data.keep,
-        "remove": data.remove,
-    })
+    task_id = create_task(
+        "resolve_duplicates",
+        {
+            "keep": data.keep,
+            "remove": data.remove,
+        },
+    )
     return {"task_id": task_id}

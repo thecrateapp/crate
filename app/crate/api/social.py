@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.social import (
     SocialFollowResponse,
     SocialMeResponse,
@@ -61,7 +65,11 @@ def my_social(request: Request):
     responses=_SOCIAL_RESPONSES,
     summary="Search users by username or display name",
 )
-def social_search(request: Request, q: str = Query("", min_length=1), limit: int = Query(20, ge=1, le=50)):
+def social_search(
+    request: Request,
+    q: str = Query("", min_length=1),
+    limit: int = Query(20, ge=1, le=50),
+):
     _require_auth(request)
     return search_users(q, limit=limit)
 
@@ -111,7 +119,9 @@ def social_profile_page(request: Request, username: str):
     responses=_SOCIAL_RESPONSES,
     summary="List a user's followers",
 )
-def social_followers(request: Request, username: str, limit: int = Query(100, ge=1, le=250)):
+def social_followers(
+    request: Request, username: str, limit: int = Query(100, ge=1, le=250)
+):
     _require_auth(request)
     profile = get_public_user_profile_by_username(username)
     if not profile:
@@ -125,7 +135,9 @@ def social_followers(request: Request, username: str, limit: int = Query(100, ge
     responses=_SOCIAL_RESPONSES,
     summary="List who a user follows",
 )
-def social_following(request: Request, username: str, limit: int = Query(100, ge=1, le=250)):
+def social_following(
+    request: Request, username: str, limit: int = Query(100, ge=1, le=250)
+):
     _require_auth(request)
     profile = get_public_user_profile_by_username(username)
     if not profile:

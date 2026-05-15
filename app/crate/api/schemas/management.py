@@ -240,8 +240,12 @@ class AnalysisStatusResponse(BaseModel):
     portable_tag_errors: int = 0
     rich_export_albums: int = 0
     rich_export_tracks: int = 0
-    last_analyzed: AnalysisTrackSummaryResponse = Field(default_factory=AnalysisTrackSummaryResponse)
-    last_bliss: BlissTrackSummaryResponse = Field(default_factory=BlissTrackSummaryResponse)
+    last_analyzed: AnalysisTrackSummaryResponse = Field(
+        default_factory=AnalysisTrackSummaryResponse
+    )
+    last_bliss: BlissTrackSummaryResponse = Field(
+        default_factory=BlissTrackSummaryResponse
+    )
 
 
 class AuditLogEntryResponse(BaseModel):

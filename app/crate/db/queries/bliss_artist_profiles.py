@@ -22,23 +22,28 @@ def build_user_radio_profile(
     with read_scope() as session:
         liked_track_ids: set[int] = set()
         if track_ids:
-            result = session.execute(
-                text(
-                    """
+            result = (
+                session.execute(
+                    text(
+                        """
                     SELECT track_id
                     FROM user_liked_tracks
                     WHERE user_id = :user_id AND track_id = ANY(:track_ids)
                     """
-                ),
-                {"user_id": user_id, "track_ids": track_ids},
-            ).mappings().all()
+                    ),
+                    {"user_id": user_id, "track_ids": track_ids},
+                )
+                .mappings()
+                .all()
+            )
             liked_track_ids = {row["track_id"] for row in result}
 
         recent_track_events: dict[int, dict] = {}
         if track_ids:
-            result = session.execute(
-                text(
-                    """
+            result = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         track_id,
                         COUNT(*)::INTEGER AS play_count,
@@ -50,16 +55,24 @@ def build_user_radio_profile(
                       AND ended_at >= :recency_cutoff
                     GROUP BY track_id
                     """
-                ),
-                {"user_id": user_id, "track_ids": track_ids, "recency_cutoff": recency_cutoff},
-            ).mappings().all()
+                    ),
+                    {
+                        "user_id": user_id,
+                        "track_ids": track_ids,
+                        "recency_cutoff": recency_cutoff,
+                    },
+                )
+                .mappings()
+                .all()
+            )
             recent_track_events = {row["track_id"]: dict(row) for row in result}
 
         artist_stats: dict[str, dict] = {}
         if artist_names:
-            result = session.execute(
-                text(
-                    """
+            result = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         artist_name,
                         play_count,
@@ -70,18 +83,22 @@ def build_user_radio_profile(
                       AND stat_window = '30d'
                       AND LOWER(artist_name) = ANY(:artist_name_keys)
                     """
-                ),
-                {"user_id": user_id, "artist_name_keys": artist_name_keys},
-            ).mappings().all()
+                    ),
+                    {"user_id": user_id, "artist_name_keys": artist_name_keys},
+                )
+                .mappings()
+                .all()
+            )
             artist_stats = {row["artist_name"].lower(): dict(row) for row in result}
 
         album_stats: dict[tuple[str, str], dict] = {}
         if album_pairs:
             artist_list = [artist.lower() for artist, _ in album_pairs]
             album_list = [album.lower() for _, album in album_pairs]
-            result = session.execute(
-                text(
-                    """
+            result = (
+                session.execute(
+                    text(
+                        """
                     WITH pairs(artist_key, album_key) AS (
                         SELECT *
                         FROM UNNEST(
@@ -102,9 +119,16 @@ def build_user_radio_profile(
                     WHERE s.user_id = :user_id
                       AND s.stat_window = '30d'
                     """
-                ),
-                {"artist_list": artist_list, "album_list": album_list, "user_id": user_id},
-            ).mappings().all()
+                    ),
+                    {
+                        "artist_list": artist_list,
+                        "album_list": album_list,
+                        "user_id": user_id,
+                    },
+                )
+                .mappings()
+                .all()
+            )
             album_stats = {
                 ((row["artist"] or "").lower(), (row["album"] or "").lower()): dict(row)
                 for row in result

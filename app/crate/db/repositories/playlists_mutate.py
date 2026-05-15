@@ -11,7 +11,9 @@ from crate.db.repositories.playlists_shared import emit_playlist_domain_event
 from crate.db.tx import optional_scope
 
 
-def update_playlist(playlist_id: int, *, session: Session | None = None, **kwargs) -> bool:
+def update_playlist(
+    playlist_id: int, *, session: Session | None = None, **kwargs
+) -> bool:
     def impl(s: Session) -> bool:
         playlist = s.get(Playlist, playlist_id)
         if playlist is None:

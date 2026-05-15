@@ -23,9 +23,21 @@ def test_process_domain_events_refreshes_ops_and_home(monkeypatch):
             },
         ],
     )
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: calls["ops"].append(fresh) or {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: calls["processed"].append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=50)
 
@@ -38,7 +50,9 @@ def test_process_domain_events_refreshes_ops_and_home(monkeypatch):
 def test_process_domain_events_noops_when_empty(monkeypatch):
     from crate import projector
 
-    monkeypatch.setattr(projector, "list_domain_events", lambda limit, unprocessed_only=True: [])
+    monkeypatch.setattr(
+        projector, "list_domain_events", lambda limit, unprocessed_only=True: []
+    )
 
     result = projector.process_domain_events(limit=10)
 
@@ -50,8 +64,16 @@ def test_warm_recent_home_discovery_snapshots_refreshes_recent_users(monkeypatch
 
     calls = []
 
-    monkeypatch.setattr(projector, "list_recent_home_user_ids", lambda window_minutes=30, limit=10: [7, 9])
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls.append((user_id, fresh)) or {})
+    monkeypatch.setattr(
+        projector,
+        "list_recent_home_user_ids",
+        lambda window_minutes=30, limit=10: [7, 9],
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls.append((user_id, fresh)) or {},
+    )
 
     warmed = projector.warm_recent_home_discovery_snapshots()
 
@@ -77,9 +99,21 @@ def test_process_domain_events_refreshes_home_for_semantic_user_event(monkeypatc
             },
         ],
     )
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: calls["ops"].append(fresh) or {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: calls["processed"].append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=50)
 
@@ -89,7 +123,9 @@ def test_process_domain_events_refreshes_home_for_semantic_user_event(monkeypatc
     assert calls["processed"] == [["1682349000010-0"]]
 
 
-def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_update(monkeypatch):
+def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_update(
+    monkeypatch,
+):
     from crate import projector
 
     calls = {"ops": [], "home": [], "processed": []}
@@ -114,9 +150,21 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
             },
         ],
     )
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: calls["ops"].append(fresh) or {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: calls["processed"].append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=50)
 
@@ -126,7 +174,9 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
     assert calls["processed"] == [["1682349000011-0", "1682349000012-0"]]
 
 
-def test_process_domain_events_does_not_refresh_ops_for_home_only_invalidation(monkeypatch):
+def test_process_domain_events_does_not_refresh_ops_for_home_only_invalidation(
+    monkeypatch,
+):
     from crate import projector
 
     calls = {"ops": [], "home": [], "processed": []}
@@ -144,9 +194,21 @@ def test_process_domain_events_does_not_refresh_ops_for_home_only_invalidation(m
             },
         ],
     )
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: calls["ops"].append(fresh) or {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: calls["processed"].append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=50)
 
@@ -174,9 +236,21 @@ def test_process_domain_events_refreshes_ops_for_ops_relevant_invalidation(monke
             },
         ],
     )
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: calls["ops"].append(fresh) or {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: calls["processed"].append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=50)
 
@@ -186,7 +260,9 @@ def test_process_domain_events_refreshes_ops_for_ops_relevant_invalidation(monke
     assert calls["processed"] == [["1682349000021-0"]]
 
 
-def test_process_domain_events_queues_post_acquisition_processing_when_artist_is_idle(monkeypatch):
+def test_process_domain_events_queues_post_acquisition_processing_when_artist_is_idle(
+    monkeypatch,
+):
     from crate import projector
 
     queued: list[tuple[str, bool]] = []
@@ -201,15 +277,38 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
                 "event_type": "library.acquisition.completed",
                 "scope": "library.acquisition",
                 "subject_key": "Terror",
-                "payload_json": {"task_id": "abc123", "artist": "Terror", "album": "Pain Into Power", "entity_type": "album"},
+                "payload_json": {
+                    "task_id": "abc123",
+                    "artist": "Terror",
+                    "album": "Pain Into Power",
+                    "entity_type": "album",
+                },
             },
         ],
     )
-    monkeypatch.setattr(projector, "has_inflight_acquisition_for_artist", lambda artist_name, exclude_task_id=None: False)
-    monkeypatch.setattr(projector, "queue_process_new_content_if_needed", lambda artist_name, force=False: queued.append((artist_name, force)) or "task123")
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: processed.append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "has_inflight_acquisition_for_artist",
+        lambda artist_name, exclude_task_id=None: False,
+    )
+    monkeypatch.setattr(
+        projector,
+        "queue_process_new_content_if_needed",
+        lambda artist_name, force=False: (
+            queued.append((artist_name, force)) or "task123"
+        ),
+    )
+    monkeypatch.setattr(
+        projector, "get_cached_ops_snapshot", lambda fresh=False: {"status": {}}
+    )
+    monkeypatch.setattr(
+        projector, "get_cached_home_discovery", lambda user_id, fresh=False: {}
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: processed.append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=10)
 
@@ -218,7 +317,9 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
     assert processed == [["1682349000030-0"]]
 
 
-def test_process_domain_events_skips_post_acquisition_processing_when_artist_still_busy(monkeypatch):
+def test_process_domain_events_skips_post_acquisition_processing_when_artist_still_busy(
+    monkeypatch,
+):
     from crate import projector
 
     queued: list[tuple[str, bool]] = []
@@ -233,15 +334,38 @@ def test_process_domain_events_skips_post_acquisition_processing_when_artist_sti
                 "event_type": "library.acquisition.completed",
                 "scope": "library.acquisition",
                 "subject_key": "Terror",
-                "payload_json": {"task_id": "abc123", "artist": "Terror", "album": "Pain Into Power", "entity_type": "album"},
+                "payload_json": {
+                    "task_id": "abc123",
+                    "artist": "Terror",
+                    "album": "Pain Into Power",
+                    "entity_type": "album",
+                },
             },
         ],
     )
-    monkeypatch.setattr(projector, "has_inflight_acquisition_for_artist", lambda artist_name, exclude_task_id=None: True)
-    monkeypatch.setattr(projector, "queue_process_new_content_if_needed", lambda artist_name, force=False: queued.append((artist_name, force)) or "task123")
-    monkeypatch.setattr(projector, "get_cached_ops_snapshot", lambda fresh=False: {"status": {}})
-    monkeypatch.setattr(projector, "get_cached_home_discovery", lambda user_id, fresh=False: {})
-    monkeypatch.setattr(projector, "mark_domain_events_processed", lambda event_ids: processed.append(event_ids))
+    monkeypatch.setattr(
+        projector,
+        "has_inflight_acquisition_for_artist",
+        lambda artist_name, exclude_task_id=None: True,
+    )
+    monkeypatch.setattr(
+        projector,
+        "queue_process_new_content_if_needed",
+        lambda artist_name, force=False: (
+            queued.append((artist_name, force)) or "task123"
+        ),
+    )
+    monkeypatch.setattr(
+        projector, "get_cached_ops_snapshot", lambda fresh=False: {"status": {}}
+    )
+    monkeypatch.setattr(
+        projector, "get_cached_home_discovery", lambda user_id, fresh=False: {}
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: processed.append(event_ids),
+    )
 
     result = projector.process_domain_events(limit=10)
 

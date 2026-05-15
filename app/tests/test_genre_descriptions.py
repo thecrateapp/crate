@@ -12,7 +12,10 @@ from crate.genre_descriptions import (
 
 
 def test_extract_wikidata_entity_id_from_url() -> None:
-    assert _extract_wikidata_entity_id("https://www.wikidata.org/wiki/Q1640319") == "Q1640319"
+    assert (
+        _extract_wikidata_entity_id("https://www.wikidata.org/wiki/Q1640319")
+        == "Q1640319"
+    )
     assert _extract_wikidata_entity_id("wikidata:Q123") == "Q123"
 
 
@@ -86,7 +89,9 @@ def test_parse_musicbrainz_genre_relationships_reads_multiple_sections() -> None
     }
 
 
-def test_parse_musicbrainz_genre_relationships_stops_before_external_links_and_filters_noise() -> None:
+def test_parse_musicbrainz_genre_relationships_stops_before_external_links_and_filters_noise() -> (
+    None
+):
     lines = [
         "Relationships",
         "related: melodic hardcore",
@@ -117,20 +122,51 @@ def test_map_musicbrainz_relationships_uses_direction_expected_by_local_model() 
 
     edges = _map_musicbrainz_relationships("punk rock", relationships)
 
-    assert {"source_name": "punk rock", "target_name": "punk", "relation_type": "parent"} in edges
-    assert {"source_name": "hardcore punk", "target_name": "punk rock", "relation_type": "parent"} in edges
-    assert {"source_name": "punk rock", "target_name": "garage rock", "relation_type": "influenced_by"} in edges
-    assert {"source_name": "post-punk", "target_name": "punk rock", "relation_type": "influenced_by"} in edges
-    assert {"source_name": "punk rock", "target_name": "ska", "relation_type": "fusion_of"} in edges
-    assert {"source_name": "ska punk", "target_name": "punk rock", "relation_type": "fusion_of"} in edges
+    assert {
+        "source_name": "punk rock",
+        "target_name": "punk",
+        "relation_type": "parent",
+    } in edges
+    assert {
+        "source_name": "hardcore punk",
+        "target_name": "punk rock",
+        "relation_type": "parent",
+    } in edges
+    assert {
+        "source_name": "punk rock",
+        "target_name": "garage rock",
+        "relation_type": "influenced_by",
+    } in edges
+    assert {
+        "source_name": "post-punk",
+        "target_name": "punk rock",
+        "relation_type": "influenced_by",
+    } in edges
+    assert {
+        "source_name": "punk rock",
+        "target_name": "ska",
+        "relation_type": "fusion_of",
+    } in edges
+    assert {
+        "source_name": "ska punk",
+        "target_name": "punk rock",
+        "relation_type": "fusion_of",
+    } in edges
 
 
 def test_normalize_musicbrainz_relation_name_strips_parenthetical_notes() -> None:
-    assert _normalize_musicbrainz_relation_name("beat rock (Japanese 1980s genre)") == "beat rock"
+    assert (
+        _normalize_musicbrainz_relation_name("beat rock (Japanese 1980s genre)")
+        == "beat rock"
+    )
 
 
-def test_musicbrainz_relation_candidate_filter_rejects_urls_and_wikidata_noise() -> None:
+def test_musicbrainz_relation_candidate_filter_rejects_urls_and_wikidata_noise() -> (
+    None
+):
     assert not _is_valid_musicbrainz_relation_candidate("wikidata:")
     assert not _is_valid_musicbrainz_relation_candidate("Q183862")
-    assert not _is_valid_musicbrainz_relation_candidate("https://rateyourmusic.com/genre/metalcore/")
+    assert not _is_valid_musicbrainz_relation_candidate(
+        "https://rateyourmusic.com/genre/metalcore/"
+    )
     assert _is_valid_musicbrainz_relation_candidate("melodic hardcore")

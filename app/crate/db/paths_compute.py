@@ -10,7 +10,12 @@ from crate.db.paths_scoring import (
     _load_shared_members_graph,
     compute_path,
 )
-from crate.db.paths_vectors import _centroid, _lerp, resolve_bliss_centroid, resolve_endpoint_label
+from crate.db.paths_vectors import (
+    _centroid,
+    _lerp,
+    resolve_bliss_centroid,
+    resolve_endpoint_label,
+)
 
 
 __all__ = [

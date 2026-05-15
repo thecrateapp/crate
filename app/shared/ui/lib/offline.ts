@@ -1,4 +1,10 @@
-export type OfflineItemState = "idle" | "queued" | "downloading" | "syncing" | "ready" | "error";
+export type OfflineItemState =
+  | "idle"
+  | "queued"
+  | "downloading"
+  | "syncing"
+  | "ready"
+  | "error";
 
 export function isOfflineBusy(state: OfflineItemState): boolean {
   return state === "queued" || state === "downloading" || state === "syncing";

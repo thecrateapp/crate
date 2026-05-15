@@ -6,29 +6,41 @@ from sqlalchemy import text
 
 def get_artist_album_paths(artist_name: str, limit: int = 5) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text("SELECT path FROM library_albums WHERE artist = :artist LIMIT :lim"),
-            {"artist": artist_name, "lim": limit},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT path FROM library_albums WHERE artist = :artist LIMIT :lim"
+                ),
+                {"artist": artist_name, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def get_album_tracks(album_id: int) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT id, entity_uid::text, path, filename "
-                "FROM library_tracks WHERE album_id = :album_id"
-            ),
-            {"album_id": album_id},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, entity_uid::text, path, filename "
+                    "FROM library_tracks WHERE album_id = :album_id"
+                ),
+                {"album_id": album_id},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def update_track_path(track_id: int, new_path: str, new_filename: str) -> None:
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_tracks SET path = :path, filename = :filename WHERE id = :id"),
+            text(
+                "UPDATE library_tracks SET path = :path, filename = :filename WHERE id = :id"
+            ),
             {"path": new_path, "filename": new_filename, "id": track_id},
         )
 
@@ -43,13 +55,17 @@ def update_album_path(album_id: int, new_path: str) -> None:
 
 def get_artist_albums_ordered(artist_name: str) -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT id, entity_uid::text, path, name "
-                "FROM library_albums WHERE artist = :artist ORDER BY name"
-            ),
-            {"artist": artist_name},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, entity_uid::text, path, name "
+                    "FROM library_albums WHERE artist = :artist ORDER BY name"
+                ),
+                {"artist": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
@@ -64,29 +80,41 @@ def update_artist_folder_name(artist_name: str, folder_name: str) -> None:
 def get_all_artists_for_migration(single_artist: str | None = None) -> list[dict]:
     with transaction_scope() as session:
         if single_artist:
-            rows = session.execute(
-                text(
-                    "SELECT id, name, entity_uid::text, folder_name "
-                    "FROM library_artists WHERE name = :name"
-                ),
-                {"name": single_artist},
-            ).mappings().all()
-        else:
-            rows = session.execute(
-                text(
-                    "SELECT id, name, entity_uid::text, folder_name "
-                    "FROM library_artists ORDER BY name"
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT id, name, entity_uid::text, folder_name "
+                        "FROM library_artists WHERE name = :name"
+                    ),
+                    {"name": single_artist},
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
+        else:
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT id, name, entity_uid::text, folder_name "
+                        "FROM library_artists ORDER BY name"
+                    )
+                )
+                .mappings()
+                .all()
+            )
         return [dict(row) for row in rows]
 
 
 def get_all_tracks_for_verification() -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT id, path, entity_uid::text, artist, title "
-                "FROM library_tracks"
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, path, entity_uid::text, artist, title "
+                    "FROM library_tracks"
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]

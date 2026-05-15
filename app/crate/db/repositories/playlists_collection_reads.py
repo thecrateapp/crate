@@ -6,21 +6,33 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from crate.db.orm.playlist import Playlist, PlaylistMember, UserFollowedPlaylist
-from crate.db.repositories.playlists_shared import attach_artwork_tracks, fetch_artwork_tracks_for_playlists, playlist_to_dict
+from crate.db.repositories.playlists_shared import (
+    attach_artwork_tracks,
+    fetch_artwork_tracks_for_playlists,
+    playlist_to_dict,
+)
 from crate.db.tx import read_scope
 
 
-def get_playlists(user_id: int | None = None, *, session: Session | None = None) -> list[dict]:
+def get_playlists(
+    user_id: int | None = None, *, session: Session | None = None
+) -> list[dict]:
     def _impl(s: Session) -> list[dict]:
         stmt = select(Playlist)
         if user_id is not None:
             stmt = (
-                stmt.outerjoin(PlaylistMember, PlaylistMember.playlist_id == Playlist.id)
-                .where(or_(Playlist.user_id == user_id, PlaylistMember.user_id == user_id))
+                stmt.outerjoin(
+                    PlaylistMember, PlaylistMember.playlist_id == Playlist.id
+                )
+                .where(
+                    or_(Playlist.user_id == user_id, PlaylistMember.user_id == user_id)
+                )
                 .distinct()
             )
         rows = s.execute(stmt.order_by(Playlist.updated_at.desc())).scalars().all()
-        return attach_artwork_tracks(s, [playlist_to_dict(row) for row in rows if row is not None])
+        return attach_artwork_tracks(
+            s, [playlist_to_dict(row) for row in rows if row is not None]
+        )
 
     if session is not None:
         return _impl(session)
@@ -34,7 +46,9 @@ def get_playlist(playlist_id: int, *, session: Session | None = None) -> dict | 
         if row is None:
             return None
         playlist = playlist_to_dict(row)
-        playlist["artwork_tracks"] = fetch_artwork_tracks_for_playlists(s, [playlist_id]).get(playlist_id, [])
+        playlist["artwork_tracks"] = fetch_artwork_tracks_for_playlists(
+            s, [playlist_id]
+        ).get(playlist_id, [])
         return playlist
 
     if session is not None:
@@ -86,7 +100,11 @@ def list_system_playlists(
             stmt = stmt.where(Playlist.is_active.is_(True))
         if category:
             stmt = stmt.where(Playlist.category == category)
-        rows = s.execute(stmt.order_by(Playlist.featured_rank.asc().nulls_last(), Playlist.updated_at.desc())).all()
+        rows = s.execute(
+            stmt.order_by(
+                Playlist.featured_rank.asc().nulls_last(), Playlist.updated_at.desc()
+            )
+        ).all()
 
         results: list[dict] = []
         for row in rows:
@@ -103,11 +121,15 @@ def list_system_playlists(
         return _impl(s)
 
 
-def get_playlist_followers_count(playlist_id: int, *, session: Session | None = None) -> int:
+def get_playlist_followers_count(
+    playlist_id: int, *, session: Session | None = None
+) -> int:
     def _impl(s: Session) -> int:
         return int(
             s.execute(
-                select(func.count()).select_from(UserFollowedPlaylist).where(UserFollowedPlaylist.playlist_id == playlist_id)
+                select(func.count())
+                .select_from(UserFollowedPlaylist)
+                .where(UserFollowedPlaylist.playlist_id == playlist_id)
             ).scalar_one()
             or 0
         )
@@ -118,7 +140,9 @@ def get_playlist_followers_count(playlist_id: int, *, session: Session | None = 
         return _impl(s)
 
 
-def get_followed_system_playlists(user_id: int, *, session: Session | None = None) -> list[dict]:
+def get_followed_system_playlists(
+    user_id: int, *, session: Session | None = None
+) -> list[dict]:
     def _impl(s: Session) -> list[dict]:
         followers = (
             select(
@@ -159,9 +183,16 @@ def get_followed_system_playlists(user_id: int, *, session: Session | None = Non
         return _impl(s)
 
 
-def is_playlist_followed(user_id: int, playlist_id: int, *, session: Session | None = None) -> bool:
+def is_playlist_followed(
+    user_id: int, playlist_id: int, *, session: Session | None = None
+) -> bool:
     def _impl(s: Session) -> bool:
-        return s.get(UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id}) is not None
+        return (
+            s.get(
+                UserFollowedPlaylist, {"user_id": user_id, "playlist_id": playlist_id}
+            )
+            is not None
+        )
 
     if session is not None:
         return _impl(session)
@@ -171,17 +202,25 @@ def is_playlist_followed(user_id: int, playlist_id: int, *, session: Session | N
 
 def get_smart_playlists_for_refresh() -> list[dict]:
     with read_scope() as s:
-        rows = s.execute(
-            select(Playlist)
-            .where(
-                Playlist.scope == "system",
-                Playlist.generation_mode == "smart",
-                Playlist.is_active.is_(True),
-                Playlist.auto_refresh_enabled.is_(True),
-                or_(Playlist.last_generated_at.is_(None), Playlist.last_generated_at < func.now() - text("interval '24 hours'")),
+        rows = (
+            s.execute(
+                select(Playlist)
+                .where(
+                    Playlist.scope == "system",
+                    Playlist.generation_mode == "smart",
+                    Playlist.is_active.is_(True),
+                    Playlist.auto_refresh_enabled.is_(True),
+                    or_(
+                        Playlist.last_generated_at.is_(None),
+                        Playlist.last_generated_at
+                        < func.now() - text("interval '24 hours'"),
+                    ),
+                )
+                .order_by(Playlist.last_generated_at.asc().nulls_first())
             )
-            .order_by(Playlist.last_generated_at.asc().nulls_first())
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         results = [playlist_to_dict(row) for row in rows]
         return attach_artwork_tracks(s, [row for row in results if row is not None])
 

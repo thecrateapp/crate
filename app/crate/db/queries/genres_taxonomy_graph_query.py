@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.queries.genres_shared import get_genre_summary_by_slug, get_taxonomy_node_stats
+from crate.db.queries.genres_shared import (
+    get_genre_summary_by_slug,
+    get_taxonomy_node_stats,
+)
 from crate.db.queries.genres_taxonomy_graph_edges import load_genre_graph_edge_rows
-from crate.db.queries.genres_taxonomy_graph_hierarchy import build_genre_graph_relationships
+from crate.db.queries.genres_taxonomy_graph_hierarchy import (
+    build_genre_graph_relationships,
+)
 from crate.db.queries.genres_taxonomy_graph_nodes import build_genre_graph_payload
 from crate.db.tx import read_scope
 from crate.genre_taxonomy import resolve_genre_slug
@@ -16,10 +21,16 @@ def get_genre_graph(slug: str) -> dict | None:
         canonical_slug = genre.get("canonical_slug") if genre else None
         if canonical_slug is None:
             resolved = resolve_genre_slug(slug)
-            taxonomy_row = session.execute(
-                text("SELECT slug, name, is_top_level FROM genre_taxonomy_nodes WHERE slug = :slug"),
-                {"slug": resolved},
-            ).mappings().first()
+            taxonomy_row = (
+                session.execute(
+                    text(
+                        "SELECT slug, name, is_top_level FROM genre_taxonomy_nodes WHERE slug = :slug"
+                    ),
+                    {"slug": resolved},
+                )
+                .mappings()
+                .first()
+            )
             canonical_slug = taxonomy_row["slug"] if taxonomy_row else None
 
         if not canonical_slug:
@@ -48,7 +59,9 @@ def get_genre_graph(slug: str) -> dict | None:
 
         edge_rows = load_genre_graph_edge_rows(session, canonical_slug)
         relationships = build_genre_graph_relationships(edge_rows, canonical_slug)
-        taxonomy_stats = get_taxonomy_node_stats(session, list(dict.fromkeys(relationships["taxonomy_slugs"])))
+        taxonomy_stats = get_taxonomy_node_stats(
+            session, list(dict.fromkeys(relationships["taxonomy_slugs"]))
+        )
         return build_genre_graph_payload(
             genre=genre,
             canonical_slug=canonical_slug,

@@ -7,15 +7,24 @@ from unittest.mock import patch
 
 import pytest
 
-from crate.worker_handlers.acquisition import _group_loose_audio_files, _safe_extract_zip
+from crate.worker_handlers.acquisition import (
+    _group_loose_audio_files,
+    _safe_extract_zip,
+)
 
 
 class TestUploadApiContract:
     def test_upload_queues_library_upload_task(self, test_app, tmp_path):
         uploads_root = tmp_path / "uploads"
 
-        with patch("crate.api.acquisition._upload_staging_root", return_value=uploads_root), \
-             patch("crate.api.acquisition.create_task", return_value="task-upload-1") as mock_create_task:
+        with (
+            patch(
+                "crate.api.acquisition._upload_staging_root", return_value=uploads_root
+            ),
+            patch(
+                "crate.api.acquisition.create_task", return_value="task-upload-1"
+            ) as mock_create_task,
+        ):
             resp = test_app.post(
                 "/api/acquisition/upload",
                 files=[
@@ -40,7 +49,9 @@ class TestUploadApiContract:
     def test_upload_rejects_unsupported_extension(self, test_app, tmp_path):
         uploads_root = tmp_path / "uploads"
 
-        with patch("crate.api.acquisition._upload_staging_root", return_value=uploads_root):
+        with patch(
+            "crate.api.acquisition._upload_staging_root", return_value=uploads_root
+        ):
             resp = test_app.post(
                 "/api/acquisition/upload",
                 files=[("files", ("notes.txt", b"not music", "text/plain"))],
@@ -51,7 +62,9 @@ class TestUploadApiContract:
 
 
 class TestUploadWorkerHelpers:
-    def test_group_loose_audio_files_uses_audio_tags_for_destination(self, tmp_path, monkeypatch):
+    def test_group_loose_audio_files_uses_audio_tags_for_destination(
+        self, tmp_path, monkeypatch
+    ):
         raw_dir = tmp_path / "raw"
         grouped_dir = tmp_path / "grouped"
         raw_dir.mkdir()
@@ -85,7 +98,9 @@ class TestUploadWorkerHelpers:
         with pytest.raises(ValueError):
             _safe_extract_zip(archive_path, dest_dir)
 
-    def test_import_queue_item_handler_marks_read_model_and_starts_scan(self, monkeypatch):
+    def test_import_queue_item_handler_marks_read_model_and_starts_scan(
+        self, monkeypatch
+    ):
         from crate.worker_handlers.acquisition import _handle_import_queue_item
 
         queue = type(
@@ -101,12 +116,20 @@ class TestUploadWorkerHelpers:
 
         monkeypatch.setattr("crate.importer.ImportQueue", lambda config: queue)
 
-        with patch("crate.worker_handlers.acquisition.start_scan") as mock_start_scan, \
-             patch("crate.db.import_queue_read_models.mark_import_queue_item_imported") as mock_mark, \
-             patch("crate.worker_handlers.acquisition.emit_task_event") as mock_event:
+        with (
+            patch("crate.worker_handlers.acquisition.start_scan") as mock_start_scan,
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_imported"
+            ) as mock_mark,
+            patch("crate.worker_handlers.acquisition.emit_task_event") as mock_event,
+        ):
             result = _handle_import_queue_item(
                 "task-1",
-                {"source_path": "/music/.imports/tidal/A/B", "artist": "A", "album": "B"},
+                {
+                    "source_path": "/music/.imports/tidal/A/B",
+                    "artist": "A",
+                    "album": "B",
+                },
                 {"library_path": "/music"},
             )
 
@@ -124,15 +147,17 @@ class TestUploadWorkerHelpers:
         queue = type(
             "Queue",
             (),
-            {
-                "remove_source": lambda self, source_path: True
-            },
+            {"remove_source": lambda self, source_path: True},
         )()
 
         monkeypatch.setattr("crate.importer.ImportQueue", lambda config: queue)
 
-        with patch("crate.worker_handlers.acquisition.emit_task_event"), \
-             patch("crate.db.import_queue_read_models.remove_import_queue_item") as mock_remove:
+        with (
+            patch("crate.worker_handlers.acquisition.emit_task_event"),
+            patch(
+                "crate.db.import_queue_read_models.remove_import_queue_item"
+            ) as mock_remove,
+        ):
             result = _handle_import_queue_remove(
                 "task-2",
                 {"source_path": "/music/.imports/tidal/A/B"},

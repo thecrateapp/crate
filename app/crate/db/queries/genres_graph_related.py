@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_genre_seed_artists(genre_slug: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH seed_artists AS (
                     SELECT DISTINCT ag.artist_name
                     FROM artist_genres ag
@@ -33,17 +34,21 @@ def get_genre_seed_artists(genre_slug: str) -> list[dict]:
                 ORDER BY MAX(ag.weight) DESC, MAX(COALESCE(la.listeners, 0)) DESC, ag.artist_name ASC
                 LIMIT 8
                 """
-            ),
-            {"slug": genre_slug},
-        ).mappings().all()
+                ),
+                {"slug": genre_slug},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def get_genre_cooccurring_artist_slugs(genre_slug: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH seed_artists AS (
                     SELECT DISTINCT ag.artist_name
                     FROM artist_genres ag
@@ -70,17 +75,21 @@ def get_genre_cooccurring_artist_slugs(genre_slug: str) -> list[dict]:
                 ORDER BY SUM(ag.weight) DESC, COUNT(DISTINCT ag.artist_name) DESC, tn.slug ASC
                 LIMIT 24
                 """
-            ),
-            {"slug": genre_slug},
-        ).mappings().all()
+                ),
+                {"slug": genre_slug},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def get_genre_cooccurring_album_slugs(genre_slug: str) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH seed_albums AS (
                     SELECT DISTINCT alg.album_id
                     FROM album_genres alg
@@ -101,9 +110,12 @@ def get_genre_cooccurring_album_slugs(genre_slug: str) -> list[dict]:
                 ORDER BY SUM(alg.weight) DESC, COUNT(DISTINCT alg.album_id) DESC, tn.slug ASC
                 LIMIT 24
                 """
-            ),
-            {"slug": genre_slug},
-        ).mappings().all()
+                ),
+                {"slug": genre_slug},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 

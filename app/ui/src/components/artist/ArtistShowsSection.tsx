@@ -34,12 +34,24 @@ interface ArtistShowsSectionProps {
   shows: ArtistShowEvent[];
 }
 
-export function ArtistShowsSection({ artistName, artistId, artistSlug, shows }: ArtistShowsSectionProps) {
+export function ArtistShowsSection({
+  artistName,
+  artistId,
+  artistSlug,
+  shows,
+}: ArtistShowsSectionProps) {
   return (
     <div className="space-y-1">
       {shows.map((show, i) => {
-        const dateObj = show.date ? new Date(show.date + (show.date.includes("T") ? "" : "T12:00:00")) : null;
-        const dateStr = dateObj ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : show.local_date;
+        const dateObj = show.date
+          ? new Date(show.date + (show.date.includes("T") ? "" : "T12:00:00"))
+          : null;
+        const dateStr = dateObj
+          ? dateObj.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })
+          : show.local_date;
         const location = [show.city, show.country].filter(Boolean).join(", ");
         return (
           <a
@@ -62,7 +74,9 @@ export function ArtistShowsSection({ artistName, artistId, artistSlug, shows }: 
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-sm truncate">{show.name || show.venue}</span>
+                <span className="font-medium text-sm truncate">
+                  {show.name || show.venue}
+                </span>
               </div>
               <div className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
                 <MapPin size={10} className="text-amber-400/60 flex-shrink-0" />
@@ -72,7 +86,13 @@ export function ArtistShowsSection({ artistName, artistId, artistSlug, shows }: 
               </div>
               {show.lineup.length > 1 && (
                 <div className="text-[10px] text-muted-foreground/60 mt-0.5 truncate">
-                  with {show.lineup.filter((lineupArtist) => lineupArtist.toLowerCase() !== artistName.toLowerCase()).join(", ")}
+                  with{" "}
+                  {show.lineup
+                    .filter(
+                      (lineupArtist) =>
+                        lineupArtist.toLowerCase() !== artistName.toLowerCase(),
+                    )
+                    .join(", ")}
                 </div>
               )}
             </div>
@@ -81,14 +101,18 @@ export function ArtistShowsSection({ artistName, artistId, artistSlug, shows }: 
               <div className="text-xs font-semibold">{dateStr}</div>
               {show.price_range && (
                 <div className="text-[10px] text-muted-foreground">
-                  {show.price_range.min}–{show.price_range.max} {show.price_range.currency}
+                  {show.price_range.min}–{show.price_range.max}{" "}
+                  {show.price_range.currency}
                 </div>
               )}
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
               {show.status === "onsale" && (
-                <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/30 text-amber-400">
+                <Badge
+                  variant="outline"
+                  className="text-[9px] px-1 py-0 border-amber-500/30 text-amber-400"
+                >
                   On Sale
                 </Badge>
               )}

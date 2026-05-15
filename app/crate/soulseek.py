@@ -2,7 +2,6 @@
 
 import os
 import re
-import time
 import logging
 import requests
 
@@ -52,7 +51,7 @@ def _post(endpoint: str, body=None) -> dict | list | None:
 def get_status() -> dict:
     """Get slskd connection status."""
     data = _get("application")
-    if not data:
+    if not isinstance(data, dict):
         return {"connected": False, "loggedIn": False}
     server = data.get("server", {})
     return {
@@ -66,15 +65,15 @@ def get_status() -> dict:
 def start_search(query: str) -> str | None:
     """Start a Soulseek search. Returns search ID (non-blocking)."""
     result = _post("searches", {"searchText": query})
-    if not result or "id" not in result:
+    if not isinstance(result, dict) or "id" not in result:
         return None
-    return result["id"]
+    return str(result["id"])
 
 
 def get_search_status(search_id: str) -> dict:
     """Get search status and counts (without responses)."""
     status = _get(f"searches/{search_id}")
-    if not status:
+    if not isinstance(status, dict):
         return {"state": "Unknown", "responseCount": 0, "fileCount": 0}
     return {
         "state": status.get("state", "Unknown"),
@@ -86,7 +85,8 @@ def get_search_status(search_id: str) -> dict:
 
 def get_search_results(search_id: str, quality_filter: str = "flac") -> list[dict]:
     """Get filtered and grouped results from a search."""
-    responses = _get(f"searches/{search_id}/responses") or []
+    raw_responses = _get(f"searches/{search_id}/responses")
+    responses = raw_responses if isinstance(raw_responses, list) else []
 
     min_bitrate = int(get_setting("soulseek_min_bitrate", "320"))
 
@@ -114,15 +114,17 @@ def get_search_results(search_id: str, quality_filter: str = "flac") -> list[dic
                     continue
             # "any" accepts everything
 
-            filtered_files.append({
-                "filename": filename,
-                "size": f.get("size", 0),
-                "length": f.get("length", 0),
-                "extension": ext,
-                "bitDepth": f.get("bitDepth"),
-                "sampleRate": f.get("sampleRate"),
-                "bitRate": f.get("bitRate"),
-            })
+            filtered_files.append(
+                {
+                    "filename": filename,
+                    "size": f.get("size", 0),
+                    "length": f.get("length", 0),
+                    "extension": ext,
+                    "bitDepth": f.get("bitDepth"),
+                    "sampleRate": f.get("sampleRate"),
+                    "bitRate": f.get("bitRate"),
+                }
+            )
 
         if not filtered_files:
             continue
@@ -131,16 +133,18 @@ def get_search_results(search_id: str, quality_filter: str = "flac") -> list[dic
         albums_in_response = _group_files_by_album(filtered_files)
 
         for album_group in albums_in_response:
-            results.append({
-                "username": username,
-                "speed": speed,
-                "freeSlot": free_slot,
-                "album": album_group["album"],
-                "artist": album_group["artist"],
-                "files": album_group["files"],
-                "quality": _detect_quality(album_group["files"]),
-                "totalSize": sum(f["size"] for f in album_group["files"]),
-            })
+            results.append(
+                {
+                    "username": username,
+                    "speed": speed,
+                    "freeSlot": free_slot,
+                    "album": album_group["album"],
+                    "artist": album_group["artist"],
+                    "files": album_group["files"],
+                    "quality": _detect_quality(album_group["files"]),
+                    "totalSize": sum(f["size"] for f in album_group["files"]),
+                }
+            )
 
     # Sort by quality score desc, then speed desc
     results.sort(key=lambda r: (_quality_score(r["quality"]), r["speed"]), reverse=True)
@@ -165,14 +169,20 @@ def _group_files_by_album(files: list[dict]) -> list[dict]:
         # Strip year prefix from album
         album_name = re.sub(r"^\d{4}\s*[-–]\s*", "", album_name)
         # Strip common suffixes like [FLAC], (FLAC), etc.
-        album_name = re.sub(r"\s*[\[\(](?:FLAC|flac|MP3|320|V0|16bit|24bit|44\.1|96).*?[\]\)]", "", album_name).strip()
+        album_name = re.sub(
+            r"\s*[\[\(](?:FLAC|flac|MP3|320|V0|16bit|24bit|44\.1|96).*?[\]\)]",
+            "",
+            album_name,
+        ).strip()
 
-        result.append({
-            "album": album_name,
-            "artist": artist_name,
-            "folder": folder,
-            "files": sorted(group_files, key=lambda f: f["filename"]),
-        })
+        result.append(
+            {
+                "album": album_name,
+                "artist": artist_name,
+                "folder": folder,
+                "files": sorted(group_files, key=lambda f: f["filename"]),
+            }
+        )
     return result
 
 
@@ -180,13 +190,15 @@ def _detect_quality(files: list[dict]) -> str:
     """Detect quality label from files."""
     exts = set(f.get("extension", "").lower() for f in files)
     if "flac" in exts:
-        depths = [f.get("bitDepth") for f in files if f.get("bitDepth")]
-        rates = [f.get("sampleRate") for f in files if f.get("sampleRate")]
+        depths = [int(bit_depth) for f in files if (bit_depth := f.get("bitDepth"))]
+        rates = [
+            int(sample_rate) for f in files if (sample_rate := f.get("sampleRate"))
+        ]
         depth = max(depths) if depths else 16
         rate = max(rates) if rates else 44100
         return f"FLAC {depth}/{rate // 1000}kHz"
     elif "mp3" in exts:
-        bitrates = [f.get("bitRate", 0) for f in files if f.get("bitRate")]
+        bitrates = [int(bit_rate) for f in files if (bit_rate := f.get("bitRate"))]
         avg_br = sum(bitrates) // len(bitrates) if bitrates else 0
         return f"MP3 {avg_br}kbps"
     return "Unknown"
@@ -195,11 +207,16 @@ def _detect_quality(files: list[dict]) -> str:
 def _quality_score(quality: str) -> int:
     """Score quality for sorting. Higher = better."""
     q = quality.lower()
-    if "flac 24" in q: return 100
-    if "flac" in q: return 80
-    if "320" in q: return 60
-    if "256" in q: return 40
-    if "mp3" in q: return 20
+    if "flac 24" in q:
+        return 100
+    if "flac" in q:
+        return 80
+    if "320" in q:
+        return 60
+    if "256" in q:
+        return 40
+    if "mp3" in q:
+        return 20
     return 10
 
 
@@ -209,7 +226,7 @@ def download_files(username: str, files: list[dict]) -> dict:
     """
     payload = [{"filename": f["filename"], "size": f.get("size", 0)} for f in files]
     result = _post(f"transfers/downloads/{username}", payload)
-    if not result:
+    if not isinstance(result, dict):
         return {"enqueued": [], "failed": []}
     return result
 
@@ -278,11 +295,14 @@ def get_downloads() -> list[dict]:
                         if "Queued" in state:
                             return 2
                         return 1
+
                     new_prio = _state_score(entry["state"])
                     old_prio = _state_score(existing["state"])
                     if new_prio >= old_prio:
                         by_path[full_path] = entry
 
     # Sort by speed desc
-    result = sorted(by_path.values(), key=lambda d: d.get("averageSpeed", 0), reverse=True)
+    result = sorted(
+        by_path.values(), key=lambda d: d.get("averageSpeed", 0), reverse=True
+    )
     return result

@@ -2,7 +2,9 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 
-def test_compute_audio_fingerprint_prefers_chromaprint_when_fpcalc_succeeds(monkeypatch, tmp_path):
+def test_compute_audio_fingerprint_prefers_chromaprint_when_fpcalc_succeeds(
+    monkeypatch, tmp_path
+):
     track = tmp_path / "track.flac"
     track.write_bytes(b"not-real-audio")
 
@@ -16,14 +18,19 @@ def test_compute_audio_fingerprint_prefers_chromaprint_when_fpcalc_succeeds(monk
 
     monkeypatch.setattr("crate.audio_fingerprint.subprocess.run", fake_run)
 
-    from crate.audio_fingerprint import CHROMAPRINT_V1, compute_audio_fingerprint_with_source
+    from crate.audio_fingerprint import (
+        CHROMAPRINT_V1,
+        compute_audio_fingerprint_with_source,
+    )
 
     payload = compute_audio_fingerprint_with_source(track)
 
     assert payload == (f"{CHROMAPRINT_V1}:AQAAE0mUaEkSZSoAAAAAAAA", CHROMAPRINT_V1)
 
 
-def test_compute_audio_fingerprint_falls_back_to_pcm_when_fpcalc_missing(monkeypatch, tmp_path):
+def test_compute_audio_fingerprint_falls_back_to_pcm_when_fpcalc_missing(
+    monkeypatch, tmp_path
+):
     track = tmp_path / "track.flac"
     track.write_bytes(b"not-real-audio")
 
@@ -50,22 +57,48 @@ def test_backfill_track_audio_fingerprints_handler_stores_successful_rows(monkey
     monkeypatch.setattr(
         "crate.worker_handlers.analysis.list_tracks_missing_audio_fingerprints",
         lambda **kwargs: [
-            {"id": 1, "path": "/music/a.flac", "artist": "Terror", "album": "Keepers", "title": "01"},
-            {"id": 2, "path": "/music/b.flac", "artist": "Terror", "album": "Keepers", "title": "02"},
+            {
+                "id": 1,
+                "path": "/music/a.flac",
+                "artist": "Terror",
+                "album": "Keepers",
+                "title": "01",
+            },
+            {
+                "id": 2,
+                "path": "/music/b.flac",
+                "artist": "Terror",
+                "album": "Keepers",
+                "title": "02",
+            },
         ],
     )
     monkeypatch.setattr(
         "crate.worker_handlers.analysis.compute_audio_fingerprint_with_source",
-        lambda path: ("chromaprint-v1:good", "chromaprint-v1") if Path(path).name == "a.flac" else None,
+        lambda path: (
+            ("chromaprint-v1:good", "chromaprint-v1")
+            if Path(path).name == "a.flac"
+            else None
+        ),
     )
     monkeypatch.setattr(
         "crate.worker_handlers.analysis.store_track_audio_fingerprint",
-        lambda track_id, fingerprint, fingerprint_source: stored.append((track_id, fingerprint, fingerprint_source)),
+        lambda track_id, fingerprint, fingerprint_source: stored.append(
+            (track_id, fingerprint, fingerprint_source)
+        ),
     )
-    monkeypatch.setattr("crate.worker_handlers.analysis.emit_progress", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.analysis.emit_task_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.analysis.is_cancelled", lambda task_id: False)
-    monkeypatch.setattr("crate.resource_governor.wait_while_pressured", lambda **kwargs: True)
+    monkeypatch.setattr(
+        "crate.worker_handlers.analysis.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.analysis.emit_task_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.analysis.is_cancelled", lambda task_id: False
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.wait_while_pressured", lambda **kwargs: True
+    )
 
     result = _handle_backfill_track_audio_fingerprints("task-1", {"limit": 10}, {})
 

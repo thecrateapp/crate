@@ -11,13 +11,16 @@ ACTIVE_STATUSES = {"running", "delegated", "completing"}
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
-def start_task(task_id: str, *, worker_id: str | None = None, session=None) -> dict | None:
+def start_task(
+    task_id: str, *, worker_id: str | None = None, session=None
+) -> dict | None:
     now = utc_now_iso()
     with optional_scope(session) as s:
         register_tasks_surface_signal(s)
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 UPDATE tasks
                 SET status = 'running',
                     started_at = COALESCE(started_at, :now),
@@ -29,9 +32,12 @@ def start_task(task_id: str, *, worker_id: str | None = None, session=None) -> d
                   AND status = 'pending'
                 RETURNING *
                 """
-            ),
-            {"now": now, "worker_id": worker_id, "id": task_id},
-        ).mappings().first()
+                ),
+                {"now": now, "worker_id": worker_id, "id": task_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
@@ -72,9 +78,12 @@ def update_task(
         fields.append("error = :set_error")
         params["set_error"] = error
 
+    # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     with optional_scope(session) as s:
         register_tasks_surface_signal_fn(s)
-        s.execute(text(f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id"), params)
+        s.execute(
+            text(f"UPDATE tasks SET {', '.join(fields)} WHERE id = :task_id"), params
+        )
 
 
 def heartbeat_task(task_id: str, *, session=None):
@@ -99,17 +108,21 @@ def fail_or_retry_task(task_id: str, error: str, *, session=None) -> str:
 
     with optional_scope(session) as s:
         register_tasks_surface_signal(s)
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 SELECT status, retry_count, max_retries
                 FROM tasks
                 WHERE id = :id
                 FOR UPDATE
                 """
-            ),
-            {"id": task_id},
-        ).mappings().first()
+                ),
+                {"id": task_id},
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             return "missing"
 

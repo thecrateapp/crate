@@ -10,7 +10,11 @@ from crate.db.repositories.library_enrichment_writes import (
     update_artist_enrichment,
     update_artist_has_photo,
 )
-from crate.db.repositories.library_quarantine import delete_quarantined_album, quarantine_album, unquarantine_album
+from crate.db.repositories.library_quarantine import (
+    delete_quarantined_album,
+    quarantine_album,
+    unquarantine_album,
+)
 from crate.db.repositories.library_upserts import (
     update_track_analysis,
     upsert_album,

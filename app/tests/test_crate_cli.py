@@ -15,7 +15,9 @@ def test_run_scan_supports_scan_only_binary(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  scan\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  scan\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout='{"artists":[]}', stderr="")
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
@@ -55,13 +57,20 @@ def test_run_quality_uses_quality_subcommand(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  quality\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  quality\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
 
     assert crate_cli.run_quality(file="/music/track.flac") == {"tracks": []}
-    assert calls[-1] == ["/usr/local/bin/crate-cli", "quality", "--file", "/music/track.flac"]
+    assert calls[-1] == [
+        "/usr/local/bin/crate-cli",
+        "quality",
+        "--file",
+        "/music/track.flac",
+    ]
 
 
 def test_run_diff_uses_diff_subcommand(monkeypatch):
@@ -76,12 +85,16 @@ def test_run_diff_uses_diff_subcommand(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  diff\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  diff\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout='{"added_count":0}', stderr="")
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
 
-    assert crate_cli.run_diff("/tmp/before.json", "/tmp/after.json") == {"added_count": 0}
+    assert crate_cli.run_diff("/tmp/before.json", "/tmp/after.json") == {
+        "added_count": 0
+    }
     assert calls[-1] == [
         "/usr/local/bin/crate-cli",
         "diff",
@@ -104,7 +117,9 @@ def test_run_tags_inspect_uses_tags_subcommand(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  tags\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  tags\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
@@ -131,8 +146,12 @@ def test_run_tags_write_identity_uses_tags_subcommand(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  tags\n", stderr="")
-        return SimpleNamespace(returncode=0, stdout='{"written":false,"dry_run":true}', stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  tags\n", stderr=""
+            )
+        return SimpleNamespace(
+            returncode=0, stdout='{"written":false,"dry_run":true}', stderr=""
+        )
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
 
@@ -179,12 +198,16 @@ def test_run_fingerprint_uses_fingerprint_subcommand(monkeypatch):
     def fake_run(args, **kwargs):
         calls.append(args)
         if args == ["/usr/local/bin/crate-cli", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="Commands:\n  fingerprint\n", stderr="")
+            return SimpleNamespace(
+                returncode=0, stdout="Commands:\n  fingerprint\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout='{"tracks":[]}', stderr="")
 
     monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
 
-    assert crate_cli.run_fingerprint(file="/music/track.flac", mode="full") == {"tracks": []}
+    assert crate_cli.run_fingerprint(file="/music/track.flac", mode="full") == {
+        "tracks": []
+    }
     assert calls[-1] == [
         "/usr/local/bin/crate-cli",
         "fingerprint",

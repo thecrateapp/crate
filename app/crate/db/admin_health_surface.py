@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.health import get_issue_counts, get_open_issues
 from crate.db.ui_snapshot_store import get_or_build_ui_snapshot
 
@@ -15,7 +15,9 @@ HEALTH_SNAPSHOT_STALE_MAX_AGE = 120
 HEALTH_SURFACE_STREAM_CHANNEL = "crate:sse:admin:health"
 
 
-def build_health_surface_payload(*, check_type: str | None = None, limit: int = 500) -> dict:
+def build_health_surface_payload(
+    *, check_type: str | None = None, limit: int = 500
+) -> dict:
     issues = get_open_issues(check_type=check_type, limit=limit)
     counts = get_issue_counts()
     return {
@@ -26,13 +28,17 @@ def build_health_surface_payload(*, check_type: str | None = None, limit: int = 
     }
 
 
-def get_health_surface_subject(*, check_type: str | None = None, limit: int = 500) -> str:
+def get_health_surface_subject(
+    *, check_type: str | None = None, limit: int = 500
+) -> str:
     safe_limit = min(max(int(limit or 500), 1), 1000)
     normalized_check = (check_type or "").strip() or "all"
     return f"surface:{normalized_check}:{safe_limit}"
 
 
-def get_cached_health_surface(*, check_type: str | None = None, limit: int = 500, fresh: bool = False) -> dict:
+def get_cached_health_surface(
+    *, check_type: str | None = None, limit: int = 500, fresh: bool = False
+) -> dict:
     safe_limit = min(max(int(limit or 500), 1), 1000)
     normalized_check = (check_type or "").strip() or "all"
     return get_or_build_ui_snapshot(
@@ -49,15 +55,19 @@ def get_cached_health_surface(*, check_type: str | None = None, limit: int = 500
     )
 
 
-def publish_health_surface_signal(*, check_type: str | None = None, limit: int = 500) -> None:
+def publish_health_surface_signal(
+    *, check_type: str | None = None, limit: int = 500
+) -> None:
     try:
-        redis = _get_redis()
+        redis = get_redis()
         if not redis:
             return
         payload = json.dumps(
             {
                 "kind": "health",
-                "subject_key": get_health_surface_subject(check_type=check_type, limit=limit),
+                "subject_key": get_health_surface_subject(
+                    check_type=check_type, limit=limit
+                ),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )

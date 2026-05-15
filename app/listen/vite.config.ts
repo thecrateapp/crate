@@ -19,7 +19,10 @@ export default defineConfig({
           if (id.includes("/node_modules/@nivo/")) {
             return "stats-vendor";
           }
-          if (id.includes("/node_modules/react-leaflet/") || id.includes("/node_modules/leaflet/")) {
+          if (
+            id.includes("/node_modules/react-leaflet/") ||
+            id.includes("/node_modules/leaflet/")
+          ) {
             return "maps-vendor";
           }
           if (id.includes("/node_modules/@capacitor/")) {

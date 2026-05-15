@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { Clock3, Play, Sparkles } from "lucide-react";
 
-import { ItemActionMenu, ItemActionMenuButton, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
@@ -10,7 +14,11 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
 import type { ReplayMix, ReplayTrack } from "./home-model";
-import { ContinueListeningCard, SectionHeader, SectionRail } from "./HomeSections";
+import {
+  ContinueListeningCard,
+  SectionHeader,
+  SectionRail,
+} from "./HomeSections";
 
 function HomeTrackRowAction({
   track,
@@ -56,8 +64,12 @@ function HomeTrackRowAction({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{track.title}</div>
-        <div className="truncate text-xs text-muted-foreground">{track.artist}</div>
+        <div className="truncate text-sm font-medium text-foreground">
+          {track.title}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {track.artist}
+        </div>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -84,18 +96,21 @@ function HomeReplayRowAction({
   onPlay: () => void;
 }) {
   const cover = replayCoverUrl(item);
-  const menuTrack = useMemo(() => ({
-    id: item.track_id ?? item.track_path ?? item.title,
-    title: item.title,
-    artist: item.artist,
-    artist_id: item.artist_id ?? undefined,
-    artist_slug: item.artist_slug ?? undefined,
-    album: item.album,
-    album_id: item.album_id ?? undefined,
-    album_slug: item.album_slug ?? undefined,
-    path: item.track_path ?? undefined,
-    library_track_id: item.track_id ?? undefined,
-  }), [item]);
+  const menuTrack = useMemo(
+    () => ({
+      id: item.track_id ?? item.track_path ?? item.title,
+      title: item.title,
+      artist: item.artist,
+      artist_id: item.artist_id ?? undefined,
+      artist_slug: item.artist_slug ?? undefined,
+      album: item.album,
+      album_id: item.album_id ?? undefined,
+      album_slug: item.album_slug ?? undefined,
+      path: item.track_path ?? undefined,
+      library_track_id: item.track_id ?? undefined,
+    }),
+    [item],
+  );
   const actions = useTrackActionEntries({
     track: menuTrack,
     albumCover: cover,
@@ -132,8 +147,12 @@ function HomeReplayRowAction({
         </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-foreground">{item.title}</div>
-        <div className="truncate text-xs text-muted-foreground">{item.artist}</div>
+        <div className="truncate text-sm font-medium text-foreground">
+          {item.title}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {item.artist}
+        </div>
       </div>
       <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {item.play_count}×
@@ -200,9 +219,17 @@ function HomeQueueCardAction({
           </div>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-foreground">{track.title}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">{track.artist}</div>
-          {track.album ? <div className="mt-1 truncate text-[11px] text-white/40">{track.album}</div> : null}
+          <div className="truncate text-sm font-semibold text-foreground">
+            {track.title}
+          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {track.artist}
+          </div>
+          {track.album ? (
+            <div className="mt-1 truncate text-[11px] text-white/40">
+              {track.album}
+            </div>
+          ) : null}
         </div>
         <ItemActionMenuButton
           buttonRef={actionMenu.triggerRef}
@@ -251,10 +278,13 @@ export function ContinueListeningSection({
             <Sparkles size={12} />
             Start listening
           </div>
-          <h2 className="text-2xl font-bold text-foreground">Your home should feel alive as soon as playback starts.</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            Your home should feel alive as soon as playback starts.
+          </h2>
           <p className="text-sm leading-6 text-muted-foreground">
-            Play an album, a playlist, or a curated mix and this screen will turn into your real listening surface:
-            continuity, smart picks, and system playlists from Crate.
+            Play an album, a playlist, or a curated mix and this screen will
+            turn into your real listening surface: continuity, smart picks, and
+            system playlists from Crate.
           </p>
         </div>
       </div>
@@ -274,13 +304,17 @@ export function ContinueListeningSection({
           Recent listens
         </div>
         <div className="space-y-1">
-          {continueRail.length > 0 ? continueRail.slice(0, 4).map((track) => (
-            <HomeTrackRowAction
-              key={track.id}
-              track={track}
-              onPlay={() => onPlayTrack(track, "Recent Listening")}
-            />
-          )) : (
+          {continueRail.length > 0 ? (
+            continueRail
+              .slice(0, 4)
+              .map((track) => (
+                <HomeTrackRowAction
+                  key={track.id}
+                  track={track}
+                  onPlay={() => onPlayTrack(track, "Recent Listening")}
+                />
+              ))
+          ) : (
             <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
               Start playing music and your listening history will show up here.
             </div>
@@ -311,7 +345,10 @@ export function HomeReplaySection({
     <section className="space-y-4">
       <SectionHeader
         title={replay?.title || "Replay this month"}
-        subtitle={replay?.subtitle || "A playable recap of your current listening window."}
+        subtitle={
+          replay?.subtitle ||
+          "A playable recap of your current listening window."
+        }
         actionLabel={isDesktop ? "Open Stats" : undefined}
         onAction={isDesktop ? onOpenStats : undefined}
       />
@@ -322,15 +359,25 @@ export function HomeReplaySection({
             <Sparkles size={12} />
             Replay
           </div>
-          <h2 className="mt-4 text-2xl font-bold text-foreground">{replay?.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{replay?.subtitle}</p>
+          <h2 className="mt-4 text-2xl font-bold text-foreground">
+            {replay?.title}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {replay?.subtitle}
+          </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Tracks</div>
-              <div className="mt-1 text-sm font-semibold text-foreground">{replay?.track_count ?? 0}</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Tracks
+              </div>
+              <div className="mt-1 text-sm font-semibold text-foreground">
+                {replay?.track_count ?? 0}
+              </div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">Time listened</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
+                Time listened
+              </div>
               <div className="mt-1 text-sm font-semibold text-foreground">
                 {Math.round(replay?.minutes_listened ?? 0)}m
               </div>

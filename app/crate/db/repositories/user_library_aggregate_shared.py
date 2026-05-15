@@ -12,7 +12,9 @@ def window_cutoff(days: int | None) -> str | None:
 def window_filter_sql(cutoff: str | None) -> tuple[str, dict]:
     if cutoff is None:
         return "upe.user_id = :filter_user_id", {}
-    return "upe.user_id = :filter_user_id AND upe.ended_at >= :cutoff", {"cutoff": cutoff}
+    return "upe.user_id = :filter_user_id AND upe.ended_at >= :cutoff", {
+        "cutoff": cutoff
+    }
 
 
 __all__ = ["window_cutoff", "window_filter_sql"]

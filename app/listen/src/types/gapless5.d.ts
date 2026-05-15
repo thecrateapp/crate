@@ -31,7 +31,11 @@ declare module "@/lib/gapless5/gapless5" {
     isPlaying(): boolean;
 
     // Navigation
-    next(uiEvent?: unknown, forcePlay?: boolean, crossfadeEnabled?: boolean): void;
+    next(
+      uiEvent?: unknown,
+      forcePlay?: boolean,
+      crossfadeEnabled?: boolean,
+    ): void;
     prev(uiEvent?: unknown, forceReset?: boolean): void;
     prevtrack(): void;
     gotoTrack(
@@ -84,7 +88,10 @@ declare module "@/lib/gapless5/gapless5" {
      * Splice an effect chain between masterOut and destination. Pass
      * (null, null) to remove the current chain and restore direct output.
      */
-    setOutputChain: (inputNode: AudioNode | null, outputNode: AudioNode | null) => void;
+    setOutputChain: (
+      inputNode: AudioNode | null,
+      outputNode: AudioNode | null,
+    ) => void;
 
     // Callbacks — signatures match gapless5.js runtime (NOT older TS hints)
     ontimeupdate: ((positionMs: number, trackIndex: number) => void) | null;
@@ -101,7 +108,9 @@ declare module "@/lib/gapless5/gapless5" {
     onfinishedtrack: ((trackPath: string) => void) | null;
     onfinishedall: (() => void) | null;
     // Runtime (gapless5.js:309) passes (trackPath, analyser).
-    onswitchtowebaudio: ((trackPath: string, analyser: AnalyserNode | null) => void) | null;
+    onswitchtowebaudio:
+      | ((trackPath: string, analyser: AnalyserNode | null) => void)
+      | null;
   }
 
   export { Gapless5 };

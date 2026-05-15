@@ -10,7 +10,15 @@ def test_handle_repair_revalidates_applied_checks(monkeypatch):
         def __init__(self, config):
             self.config = config
 
-        def repair(self, report, dry_run=True, auto_only=True, task_id=None, progress_callback=None, event_callback=None):
+        def repair(
+            self,
+            report,
+            dry_run=True,
+            auto_only=True,
+            task_id=None,
+            progress_callback=None,
+            event_callback=None,
+        ):
             assert dry_run is False
             assert auto_only is False
             if event_callback:
@@ -60,15 +68,43 @@ def test_handle_repair_revalidates_applied_checks(monkeypatch):
 
     monkeypatch.setattr("crate.repair.LibraryRepair", FakeRepair)
     monkeypatch.setattr("crate.health_check.LibraryHealthCheck", FakeHealthCheck)
-    monkeypatch.setattr("crate.worker_handlers.management.emit_progress", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", lambda task_id, event_type, payload: emitted.append((task_id, event_type, payload)))
-    monkeypatch.setattr("crate.db.domain_events.append_domain_event", lambda event_type, payload, scope=None, subject_key=None: domain_events.append((event_type, payload, scope, subject_key)))
-    monkeypatch.setattr("crate.worker_handlers.management.resolve_issue", lambda issue_id: resolved_issue_ids.append(issue_id))
-    monkeypatch.setattr("crate.db.admin_health_surface.publish_health_surface_signal", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management._mark_processing", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management._unmark_processing", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.start_scan", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.get_open_issues", lambda limit=10000: [])
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_task_event",
+        lambda task_id, event_type, payload: emitted.append(
+            (task_id, event_type, payload)
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.db.domain_events.append_domain_event",
+        lambda event_type, payload, scope=None, subject_key=None: domain_events.append(
+            (event_type, payload, scope, subject_key)
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.resolve_issue",
+        lambda issue_id: resolved_issue_ids.append(issue_id),
+    )
+    monkeypatch.setattr(
+        "crate.db.admin_health_surface.publish_health_surface_signal",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management._mark_processing",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management._unmark_processing",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.start_scan", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_open_issues", lambda limit=10000: []
+    )
 
     result = _handle_repair(
         "repair-task-1",
@@ -88,13 +124,25 @@ def test_handle_repair_revalidates_applied_checks(monkeypatch):
 
     assert resolved_issue_ids == [7]
     assert result["revalidated_checks"] == ["has_photo_desync"]
-    assert result["revalidation"] == {"issue_count": 0, "summary": {}, "duration_ms": 12}
+    assert result["revalidation"] == {
+        "issue_count": 0,
+        "summary": {},
+        "duration_ms": 12,
+    }
     assert "open after revalidation" in result["message"]
-    assert any("Revalidating 1 repaired check type" in payload.get("message", "") for _, _, payload in emitted)
-    assert any(event_type == "library.repair.completed" for event_type, _, _, _ in domain_events)
+    assert any(
+        "Revalidating 1 repaired check type" in payload.get("message", "")
+        for _, _, payload in emitted
+    )
+    assert any(
+        event_type == "library.repair.completed"
+        for event_type, _, _, _ in domain_events
+    )
 
 
-def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(monkeypatch):
+def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(
+    monkeypatch,
+):
     emitted: list[tuple[str, str, dict]] = []
     targeted_revalidations: list[tuple[set[str], list[str]]] = []
 
@@ -102,9 +150,19 @@ def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(monk
         def __init__(self, config):
             self.config = config
 
-        def repair(self, report, dry_run=True, auto_only=True, task_id=None, progress_callback=None, event_callback=None):
+        def repair(
+            self,
+            report,
+            dry_run=True,
+            auto_only=True,
+            task_id=None,
+            progress_callback=None,
+            event_callback=None,
+        ):
             return {
-                "actions": [{"action": "artist_layout_fix", "applied": True, "details": {}}],
+                "actions": [
+                    {"action": "artist_layout_fix", "applied": True, "details": {}}
+                ],
                 "item_results": [
                     {
                         "check_type": "artist_layout_fix",
@@ -123,13 +181,24 @@ def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(monk
             self.config = config
 
         def run_selected(self, check_types, *, progress_callback=None, persist=True):
-            raise AssertionError("artist-scoped repairs must not trigger global revalidation")
+            raise AssertionError(
+                "artist-scoped repairs must not trigger global revalidation"
+            )
 
-        def run_selected_for_artists(self, check_types, artist_names, *, progress_callback=None, persist=True):
+        def run_selected_for_artists(
+            self, check_types, artist_names, *, progress_callback=None, persist=True
+        ):
             targeted_revalidations.append((set(check_types), list(artist_names)))
             assert persist is True
             if progress_callback:
-                progress_callback({"check": "artist_layout_fix", "artist": "Birds In Row", "done": 1, "total": 1})
+                progress_callback(
+                    {
+                        "check": "artist_layout_fix",
+                        "artist": "Birds In Row",
+                        "done": 1,
+                        "total": 1,
+                    }
+                )
             return {
                 "issues": [],
                 "summary": {},
@@ -141,14 +210,36 @@ def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(monk
 
     monkeypatch.setattr("crate.repair.LibraryRepair", FakeRepair)
     monkeypatch.setattr("crate.health_check.LibraryHealthCheck", FakeHealthCheck)
-    monkeypatch.setattr("crate.worker_handlers.management.emit_progress", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", lambda task_id, event_type, payload: emitted.append((task_id, event_type, payload)))
-    monkeypatch.setattr("crate.db.domain_events.append_domain_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.resolve_issue", lambda issue_id: None)
-    monkeypatch.setattr("crate.db.admin_health_surface.publish_health_surface_signal", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management._mark_processing", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management._unmark_processing", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.management.start_scan", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.emit_task_event",
+        lambda task_id, event_type, payload: emitted.append(
+            (task_id, event_type, payload)
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.db.domain_events.append_domain_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.resolve_issue", lambda issue_id: None
+    )
+    monkeypatch.setattr(
+        "crate.db.admin_health_surface.publish_health_surface_signal",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management._mark_processing",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management._unmark_processing",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.start_scan", lambda *args, **kwargs: None
+    )
 
     result = _handle_repair(
         "repair-task-2",
@@ -170,4 +261,7 @@ def test_handle_repair_revalidates_artist_layout_fix_for_target_artist_only(monk
     assert result["revalidated_checks"] == ["artist_layout_fix"]
     assert result["skipped_revalidation_checks"] == []
     assert result["revalidation"] == {"issue_count": 0, "summary": {}, "duration_ms": 9}
-    assert any("Artist revalidation complete" in payload.get("message", "") for _, _, payload in emitted)
+    assert any(
+        "Artist revalidation complete" in payload.get("message", "")
+        for _, _, payload in emitted
+    )

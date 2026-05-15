@@ -31,7 +31,14 @@ export interface Track {
 
 export type RepeatMode = "off" | "one" | "all";
 
-type RadioSeedType = "track" | "album" | "artist" | "playlist" | "home-playlist" | "genre" | "discovery";
+type RadioSeedType =
+  | "track"
+  | "album"
+  | "artist"
+  | "playlist"
+  | "home-playlist"
+  | "genre"
+  | "discovery";
 
 interface RadioSession {
   seedType: RadioSeedType;

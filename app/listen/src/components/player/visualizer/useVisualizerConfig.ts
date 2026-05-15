@@ -18,7 +18,10 @@ import {
   type VisualizerSettingsPreference,
 } from "@/lib/player-visualizer-prefs";
 import type { MusicVisualizer } from "./MusicVisualizer";
-import { useTrackVisualizerProfile, type VisualizerTrackProfile } from "./useTrackVisualizerProfile";
+import {
+  useTrackVisualizerProfile,
+  type VisualizerTrackProfile,
+} from "./useTrackVisualizerProfile";
 
 type PaletteTriplet = [number, number, number];
 
@@ -46,12 +49,19 @@ function rgbToHsl([r, g, b]: PaletteTriplet): PaletteTriplet {
   const lightness = (max + min) / 2;
   if (max === min) return [0, 0, lightness];
   const delta = max - min;
-  const saturation = lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+  const saturation =
+    lightness > 0.5 ? delta / (2 - max - min) : delta / (max + min);
   let hue = 0;
   switch (max) {
-    case r: hue = (g - b) / delta + (g < b ? 6 : 0); break;
-    case g: hue = (b - r) / delta + 2; break;
-    default: hue = (r - g) / delta + 4; break;
+    case r:
+      hue = (g - b) / delta + (g < b ? 6 : 0);
+      break;
+    case g:
+      hue = (b - r) / delta + 2;
+      break;
+    default:
+      hue = (r - g) / delta + 4;
+      break;
   }
   return [hue / 6, saturation, lightness];
 }
@@ -70,7 +80,11 @@ function hslToRgb([h, s, l]: PaletteTriplet): PaletteTriplet {
   if (s === 0) return [l, l, l];
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
-  return [hueToRgb(p, q, h + 1 / 3), hueToRgb(p, q, h), hueToRgb(p, q, h - 1 / 3)];
+  return [
+    hueToRgb(p, q, h + 1 / 3),
+    hueToRgb(p, q, h),
+    hueToRgb(p, q, h - 1 / 3),
+  ];
 }
 
 function adjustPaletteColor(
@@ -119,22 +133,42 @@ export function useVisualizerConfig(
   crossfadeTransition: CrossfadeTransition | null = null,
   visualizerAllowed = true,
 ): VisualizerConfigState {
-  const [surfaceModePreference, setSurfaceModeState] = useState(getPlayerSurfaceModePreference);
-  const [useAlbumPalette, setUseAlbumPalette] = useState(getUseAlbumPalettePreference);
-  const [trackAdaptiveViz, setTrackAdaptiveViz] = useState(getTrackAdaptiveVisualizerPreference);
+  const [surfaceModePreference, setSurfaceModeState] = useState(
+    getPlayerSurfaceModePreference,
+  );
+  const [useAlbumPalette, setUseAlbumPalette] = useState(
+    getUseAlbumPalettePreference,
+  );
+  const [trackAdaptiveViz, setTrackAdaptiveViz] = useState(
+    getTrackAdaptiveVisualizerPreference,
+  );
   const [vizConfig, setVizConfig] = useState(getVisualizerSettingsPreference);
-  const surfaceMode = visualizerAllowed || surfaceModePreference !== "visualizer"
-    ? surfaceModePreference
-    : "cover";
-  const trackVizProfile = useTrackVisualizerProfile(currentTrack, visualizerAllowed && trackAdaptiveViz);
+  const surfaceMode =
+    visualizerAllowed || surfaceModePreference !== "visualizer"
+      ? surfaceModePreference
+      : "cover";
+  const trackVizProfile = useTrackVisualizerProfile(
+    currentTrack,
+    visualizerAllowed && trackAdaptiveViz,
+  );
   const vizEnabled = visualizerAllowed && surfaceMode === "visualizer";
 
-  const effectiveVizDelta = trackAdaptiveViz ? trackVizProfile.settingsDelta : ZERO_VIZ_DELTA;
+  const effectiveVizDelta = trackAdaptiveViz
+    ? trackVizProfile.settingsDelta
+    : ZERO_VIZ_DELTA;
   const effectiveVizConfig = {
-    separation: clamp(vizConfig.separation + effectiveVizDelta.separation, 0, 0.5),
+    separation: clamp(
+      vizConfig.separation + effectiveVizDelta.separation,
+      0,
+      0.5,
+    ),
     glow: clamp(vizConfig.glow + effectiveVizDelta.glow, 0, 15),
     scale: clamp(vizConfig.scale + effectiveVizDelta.scale, 0.2, 3),
-    persistence: clamp(vizConfig.persistence + effectiveVizDelta.persistence, 0, 2),
+    persistence: clamp(
+      vizConfig.persistence + effectiveVizDelta.persistence,
+      0,
+      2,
+    ),
     octaves: clamp(vizConfig.octaves + effectiveVizDelta.octaves, 1, 5),
   };
 
@@ -169,14 +203,24 @@ export function useVisualizerConfig(
       : { brightness: 0, coolness: 0, saturation: 0, hueShift: 0 };
     const timers: number[] = [];
 
-    const applyColors = (colors: [PaletteTriplet, PaletteTriplet, PaletteTriplet]) => {
+    const applyColors = (
+      colors: [PaletteTriplet, PaletteTriplet, PaletteTriplet],
+    ) => {
       const [c1, c2, c3] = colors.map((color) =>
-        adjustPaletteColor(color, paletteBias.brightness, paletteBias.coolness, paletteBias.saturation, paletteBias.hueShift),
+        adjustPaletteColor(
+          color,
+          paletteBias.brightness,
+          paletteBias.coolness,
+          paletteBias.saturation,
+          paletteBias.hueShift,
+        ),
       ) as [PaletteTriplet, PaletteTriplet, PaletteTriplet];
       return { c1, c2, c3 };
     };
 
-    const scheduleColorApply = (colors: [PaletteTriplet, PaletteTriplet, PaletteTriplet]) => {
+    const scheduleColorApply = (
+      colors: [PaletteTriplet, PaletteTriplet, PaletteTriplet],
+    ) => {
       const apply = (attempt = 0) => {
         const mapped = applyColors(colors);
         if (vizRef.current) {
@@ -197,7 +241,9 @@ export function useVisualizerConfig(
 
     if (!useAlbumPalette) {
       scheduleColorApply([defaultC1, defaultC2, defaultC3]);
-      return () => { for (const t of timers) window.clearTimeout(t); };
+      return () => {
+        for (const t of timers) window.clearTimeout(t);
+      };
     }
 
     if (!currentTrack?.albumCover) return;
@@ -214,7 +260,17 @@ export function useVisualizerConfig(
       cancelled = true;
       for (const t of timers) window.clearTimeout(t);
     };
-  }, [crossfadeTransition, currentTrack?.albumCover, currentTrack?.id, isOpen, trackAdaptiveViz, trackVizProfile.paletteBias, useAlbumPalette, vizEnabled, vizRef]);
+  }, [
+    crossfadeTransition,
+    currentTrack?.albumCover,
+    currentTrack?.id,
+    isOpen,
+    trackAdaptiveViz,
+    trackVizProfile.paletteBias,
+    useAlbumPalette,
+    vizEnabled,
+    vizRef,
+  ]);
 
   // Palette crossfade: during an audio crossfade transition, interpolate
   // the visualizer colors between the outgoing and incoming album
@@ -235,24 +291,44 @@ export function useVisualizerConfig(
 
     Promise.all([
       crossfadeTransition.outgoing.albumCover
-        ? extractPalette(crossfadeTransition.outgoing.albumCover).catch(() => null)
+        ? extractPalette(crossfadeTransition.outgoing.albumCover).catch(
+            () => null,
+          )
         : Promise.resolve(null),
       crossfadeTransition.incoming.albumCover
-        ? extractPalette(crossfadeTransition.incoming.albumCover).catch(() => null)
+        ? extractPalette(crossfadeTransition.incoming.albumCover).catch(
+            () => null,
+          )
         : Promise.resolve(null),
     ]).then(([fromPalette, toPalette]) => {
       if (cancelled || !vizRef.current) return;
       if (!fromPalette || !toPalette) return;
 
       const [fromC1, fromC2, fromC3] = fromPalette.map((c) =>
-        adjustPaletteColor(c, paletteBias.brightness, paletteBias.coolness, paletteBias.saturation, paletteBias.hueShift),
+        adjustPaletteColor(
+          c,
+          paletteBias.brightness,
+          paletteBias.coolness,
+          paletteBias.saturation,
+          paletteBias.hueShift,
+        ),
       ) as [PaletteTriplet, PaletteTriplet, PaletteTriplet];
       const [toC1, toC2, toC3] = toPalette.map((c) =>
-        adjustPaletteColor(c, paletteBias.brightness, paletteBias.coolness, paletteBias.saturation, paletteBias.hueShift),
+        adjustPaletteColor(
+          c,
+          paletteBias.brightness,
+          paletteBias.coolness,
+          paletteBias.saturation,
+          paletteBias.hueShift,
+        ),
       ) as [PaletteTriplet, PaletteTriplet, PaletteTriplet];
 
       const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-      const lerpTriplet = (a: PaletteTriplet, b: PaletteTriplet, t: number): PaletteTriplet => [
+      const lerpTriplet = (
+        a: PaletteTriplet,
+        b: PaletteTriplet,
+        t: number,
+      ): PaletteTriplet => [
         lerp(a[0], b[0], t),
         lerp(a[1], b[1], t),
         lerp(a[2], b[2], t),
@@ -261,7 +337,10 @@ export function useVisualizerConfig(
       const tick = () => {
         if (cancelled || !vizRef.current) return;
         const elapsed = performance.now() - crossfadeTransition.startedAt;
-        const p = Math.max(0, Math.min(1, elapsed / crossfadeTransition.durationMs));
+        const p = Math.max(
+          0,
+          Math.min(1, elapsed / crossfadeTransition.durationMs),
+        );
         vizRef.current.color1 = lerpTriplet(fromC1, toC1, p);
         vizRef.current.color2 = lerpTriplet(fromC2, toC2, p);
         vizRef.current.color3 = lerpTriplet(fromC3, toC3, p);
@@ -274,7 +353,15 @@ export function useVisualizerConfig(
       cancelled = true;
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [crossfadeTransition, isOpen, trackAdaptiveViz, trackVizProfile.paletteBias, useAlbumPalette, vizEnabled, vizRef]);
+  }, [
+    crossfadeTransition,
+    isOpen,
+    trackAdaptiveViz,
+    trackVizProfile.paletteBias,
+    useAlbumPalette,
+    vizEnabled,
+    vizRef,
+  ]);
 
   // Apply config to visualizer
   useEffect(() => {
@@ -290,20 +377,48 @@ export function useVisualizerConfig(
         vizRef.current.scale = effectiveVizConfig.scale;
         vizRef.current.persistence = effectiveVizConfig.persistence;
         vizRef.current.octaves = effectiveVizConfig.octaves;
-        vizRef.current.orbitSpeed = trackAdaptiveViz ? trackVizProfile.motion.orbitSpeed : 1;
-        vizRef.current.cameraDrift = trackAdaptiveViz ? trackVizProfile.motion.cameraDrift : 1;
-        vizRef.current.cameraDepth = trackAdaptiveViz ? trackVizProfile.motion.cameraDepth : 0;
-        vizRef.current.pulseGain = trackAdaptiveViz ? trackVizProfile.motion.pulseGain : 1;
-        vizRef.current.turbulence = trackAdaptiveViz ? trackVizProfile.motion.turbulence : 1;
-        vizRef.current.orbitPhase = trackAdaptiveViz ? trackVizProfile.motion.orbitPhase : 0;
-        vizRef.current.shellDensity = trackAdaptiveViz ? trackVizProfile.motion.shellDensity : 1;
-        vizRef.current.beatResponse = trackAdaptiveViz ? trackVizProfile.motion.beatResponse : 1;
-        vizRef.current.beatDecay = trackAdaptiveViz ? trackVizProfile.motion.beatDecay : 0.88;
-        vizRef.current.sectionRate = trackAdaptiveViz ? trackVizProfile.motion.sectionRate : 1;
-        vizRef.current.sectionDepth = trackAdaptiveViz ? trackVizProfile.motion.sectionDepth : 0.12;
-        vizRef.current.lowBandWeight = trackAdaptiveViz ? trackVizProfile.motion.lowBandWeight : 1;
-        vizRef.current.midBandWeight = trackAdaptiveViz ? trackVizProfile.motion.midBandWeight : 1;
-        vizRef.current.highBandWeight = trackAdaptiveViz ? trackVizProfile.motion.highBandWeight : 1;
+        vizRef.current.orbitSpeed = trackAdaptiveViz
+          ? trackVizProfile.motion.orbitSpeed
+          : 1;
+        vizRef.current.cameraDrift = trackAdaptiveViz
+          ? trackVizProfile.motion.cameraDrift
+          : 1;
+        vizRef.current.cameraDepth = trackAdaptiveViz
+          ? trackVizProfile.motion.cameraDepth
+          : 0;
+        vizRef.current.pulseGain = trackAdaptiveViz
+          ? trackVizProfile.motion.pulseGain
+          : 1;
+        vizRef.current.turbulence = trackAdaptiveViz
+          ? trackVizProfile.motion.turbulence
+          : 1;
+        vizRef.current.orbitPhase = trackAdaptiveViz
+          ? trackVizProfile.motion.orbitPhase
+          : 0;
+        vizRef.current.shellDensity = trackAdaptiveViz
+          ? trackVizProfile.motion.shellDensity
+          : 1;
+        vizRef.current.beatResponse = trackAdaptiveViz
+          ? trackVizProfile.motion.beatResponse
+          : 1;
+        vizRef.current.beatDecay = trackAdaptiveViz
+          ? trackVizProfile.motion.beatDecay
+          : 0.88;
+        vizRef.current.sectionRate = trackAdaptiveViz
+          ? trackVizProfile.motion.sectionRate
+          : 1;
+        vizRef.current.sectionDepth = trackAdaptiveViz
+          ? trackVizProfile.motion.sectionDepth
+          : 0.12;
+        vizRef.current.lowBandWeight = trackAdaptiveViz
+          ? trackVizProfile.motion.lowBandWeight
+          : 1;
+        vizRef.current.midBandWeight = trackAdaptiveViz
+          ? trackVizProfile.motion.midBandWeight
+          : 1;
+        vizRef.current.highBandWeight = trackAdaptiveViz
+          ? trackVizProfile.motion.highBandWeight
+          : 1;
         return;
       }
       if (attempt < 8) {
@@ -312,8 +427,18 @@ export function useVisualizerConfig(
     };
     apply();
     timers.push(window.setTimeout(() => apply(), 300));
-    return () => { for (const t of timers) window.clearTimeout(t); };
-  }, [currentTrack?.id, effectiveVizConfig, isOpen, trackAdaptiveViz, trackVizProfile, vizEnabled, vizRef]);
+    return () => {
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, [
+    currentTrack?.id,
+    effectiveVizConfig,
+    isOpen,
+    trackAdaptiveViz,
+    trackVizProfile,
+    vizEnabled,
+    vizRef,
+  ]);
 
   // Accent on track change
   useEffect(() => {

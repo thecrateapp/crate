@@ -13,16 +13,23 @@ from crate.db.tx import read_scope
 def get_analysis_status() -> dict:
     """Return current analysis progress for both daemons."""
     with read_scope() as session:
-        total = int(session.execute(text("SELECT COUNT(*) AS cnt FROM library_tracks")).scalar() or 0)
-        rows = session.execute(
-            text(
-                """
+        total = int(
+            session.execute(text("SELECT COUNT(*) AS cnt FROM library_tracks")).scalar()
+            or 0
+        )
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT pipeline, state, COUNT(*) AS cnt
                 FROM track_processing_state
                 GROUP BY pipeline, state
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         counts: dict[str, dict[str, int]] = {
             "analysis": {"done": 0, "pending": 0, "analyzing": 0, "failed": 0},
             "bliss": {"done": 0, "pending": 0, "analyzing": 0, "failed": 0},
@@ -36,9 +43,10 @@ def get_analysis_status() -> dict:
                 coverage[pipeline] += int(row["cnt"] or 0)
 
         if coverage["analysis"] < total:
-            missing = session.execute(
-                text(
-                    """
+            missing = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         COUNT(*) FILTER (WHERE inferred_state = 'done') AS done,
                         COUNT(*) FILTER (WHERE inferred_state = 'pending') AS pending,
@@ -73,16 +81,20 @@ def get_analysis_status() -> dict:
                         )
                     ) missing
                     """
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
             if missing:
                 for state in counts["analysis"]:
                     counts["analysis"][state] += int(missing[state] or 0)
 
         if coverage["bliss"] < total:
-            missing = session.execute(
-                text(
-                    """
+            missing = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         COUNT(*) FILTER (WHERE inferred_state = 'done') AS done,
                         COUNT(*) FILTER (WHERE inferred_state = 'pending') AS pending,
@@ -105,15 +117,19 @@ def get_analysis_status() -> dict:
                         )
                     ) missing
                     """
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
             if missing:
                 for state in counts["bliss"]:
                     counts["bliss"][state] += int(missing[state] or 0)
 
-        fingerprint_counts = session.execute(
-            text(
-                """
+        fingerprint_counts = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     COUNT(*) FILTER (WHERE audio_fingerprint IS NOT NULL) AS done,
                     COUNT(*) FILTER (WHERE audio_fingerprint IS NULL) AS pending,
@@ -121,8 +137,12 @@ def get_analysis_status() -> dict:
                     COUNT(*) FILTER (WHERE audio_fingerprint_source = 'pcm16-md5-v1') AS pcm
                 FROM library_tracks
                 """
+                )
             )
-        ).mappings().first() or {}
+            .mappings()
+            .first()
+            or {}
+        )
 
         chromaprint_available = shutil.which("fpcalc") is not None
         ffmpeg_available = shutil.which("ffmpeg") is not None
@@ -156,27 +176,35 @@ def get_analysis_status() -> dict:
 
 def get_artists_needing_analysis() -> set[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT al.artist FROM library_tracks t "
-                "JOIN library_albums al ON t.album_id = al.id "
-                "WHERE t.bpm IS NULL OR t.energy IS NULL "
-                "GROUP BY al.artist"
+        rows = (
+            session.execute(
+                text(
+                    "SELECT al.artist FROM library_tracks t "
+                    "JOIN library_albums al ON t.album_id = al.id "
+                    "WHERE t.bpm IS NULL OR t.energy IS NULL "
+                    "GROUP BY al.artist"
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {row["artist"] for row in rows}
 
 
 def get_artists_needing_bliss() -> set[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT al.artist FROM library_tracks t "
-                "JOIN library_albums al ON t.album_id = al.id "
-                "WHERE t.bliss_vector IS NULL "
-                "GROUP BY al.artist"
+        rows = (
+            session.execute(
+                text(
+                    "SELECT al.artist FROM library_tracks t "
+                    "JOIN library_albums al ON t.album_id = al.id "
+                    "WHERE t.bliss_vector IS NULL "
+                    "GROUP BY al.artist"
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {row["artist"] for row in rows}
 
 

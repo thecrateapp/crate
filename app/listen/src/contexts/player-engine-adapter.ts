@@ -13,7 +13,10 @@ export function toEngineTrack(track: Track, eqGains?: number[]): EngineTrack {
     artist: track.artist || "",
     album: track.album || undefined,
     artwork,
-    durationMs: track.duration && track.duration > 0 ? Math.round(track.duration * 1000) : undefined,
+    durationMs:
+      track.duration && track.duration > 0
+        ? Math.round(track.duration * 1000)
+        : undefined,
     storageId: undefined,
     entityUid: track.entityUid,
     sourcePath: track.path,
@@ -21,6 +24,11 @@ export function toEngineTrack(track: Track, eqGains?: number[]): EngineTrack {
   };
 }
 
-export function toEngineTracks(tracks: Track[], eqGainsByTrackId?: Map<string, number[]>): EngineTrack[] {
-  return tracks.map((track) => toEngineTrack(track, eqGainsByTrackId?.get(track.id)));
+export function toEngineTracks(
+  tracks: Track[],
+  eqGainsByTrackId?: Map<string, number[]>,
+): EngineTrack[] {
+  return tracks.map((track) =>
+    toEngineTrack(track, eqGainsByTrackId?.get(track.id)),
+  );
 }

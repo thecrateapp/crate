@@ -6,7 +6,7 @@ import logging
 import threading
 import time
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def reserve_provider_slot(provider: str, interval_seconds: float) -> float:
         return 0.0
 
     key = f"rate:provider:{provider.strip().lower()}"
-    redis_client = _get_redis()
+    redis_client = get_redis()
     if redis_client is not None:
         try:
             now_ms = int(time.time() * 1000)
@@ -58,7 +58,9 @@ def reserve_provider_slot(provider: str, interval_seconds: float) -> float:
             )
             return max(0.0, float(wait_ms or 0) / 1000.0)
         except Exception:
-            log.debug("Redis provider rate limiter failed for %s", provider, exc_info=True)
+            log.debug(
+                "Redis provider rate limiter failed for %s", provider, exc_info=True
+            )
 
     return _fallback_wait(key, interval)
 

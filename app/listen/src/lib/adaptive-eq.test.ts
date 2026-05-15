@@ -31,11 +31,13 @@ describe("computeAdaptiveGains", () => {
   });
 
   it("dampens highly dynamic tracks without erasing other strong signals", () => {
-    const gains = computeAdaptiveGains(mkFeatures({
-      brightness: 0.15,   // would normally lift highs
-      energy: 0.9,        // would normally push bass
-      dynamicRange: 18,   // preserve intent, but keep clear tonal correction
-    }));
+    const gains = computeAdaptiveGains(
+      mkFeatures({
+        brightness: 0.15, // would normally lift highs
+        energy: 0.9, // would normally push bass
+        dynamicRange: 18, // preserve intent, but keep clear tonal correction
+      }),
+    );
     expect(gains[1]!).toBeGreaterThan(0);
     expect(gains[1]!).toBeLessThan(1.5);
     expect(gains[8]!).toBeGreaterThan(0);
@@ -91,28 +93,32 @@ describe("computeAdaptiveGains", () => {
   it("adds warmth on acoustic-heavy tracks", () => {
     const gains = computeAdaptiveGains(mkFeatures({ acousticness: 0.8 }));
     expect(gains[3]!).toBeGreaterThan(0); // 250 (body)
-    expect(gains[7]!).toBeLessThan(0);    // 4K (gentle tame)
+    expect(gains[7]!).toBeLessThan(0); // 4K (gentle tame)
   });
 
   it("composes multiple heuristics additively", () => {
     // Dark + high energy + compressed → bass lift + high lift + V-shape.
-    const gains = computeAdaptiveGains(mkFeatures({
-      brightness: 0.2,
-      energy: 0.85,
-      dynamicRange: 5,
-    }));
+    const gains = computeAdaptiveGains(
+      mkFeatures({
+        brightness: 0.2,
+        energy: 0.85,
+        dynamicRange: 5,
+      }),
+    );
     expect(gains[1]!).toBeGreaterThan(1); // 64 gets multiple boosts
     expect(gains[8]!).toBeGreaterThan(1); // 8K gets brightness lift + V-shape
   });
 
   it("clamps total movement to ±4 dB even with piling-on heuristics", () => {
-    const gains = computeAdaptiveGains(mkFeatures({
-      brightness: 0.1,
-      energy: 0.95,
-      loudness: -24,
-      dynamicRange: 3,
-      acousticness: 0.9,
-    }));
+    const gains = computeAdaptiveGains(
+      mkFeatures({
+        brightness: 0.1,
+        energy: 0.95,
+        loudness: -24,
+        dynamicRange: 3,
+        acousticness: 0.9,
+      }),
+    );
     for (const g of gains) {
       expect(g).toBeGreaterThanOrEqual(-4);
       expect(g).toBeLessThanOrEqual(4);

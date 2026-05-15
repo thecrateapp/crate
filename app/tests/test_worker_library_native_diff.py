@@ -18,7 +18,9 @@ def _unchanged_diff(root: str) -> dict:
     }
 
 
-def test_library_sync_album_can_skip_when_native_diff_is_unchanged(monkeypatch, tmp_path):
+def test_library_sync_album_can_skip_when_native_diff_is_unchanged(
+    monkeypatch, tmp_path
+):
     from crate.worker_handlers.library import _handle_library_sync
 
     library_root = tmp_path / "music"
@@ -40,12 +42,17 @@ def test_library_sync_album_can_skip_when_native_diff_is_unchanged(monkeypatch, 
             raise AssertionError("artist sync should be skipped")
 
     monkeypatch.setattr("crate.worker_handlers.library.LibrarySync", FakeSync)
-    monkeypatch.setattr("crate.native_scan.maybe_compare_native_scan_file_set", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.native_scan.maybe_compare_native_scan_file_set",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(
         "crate.native_scan.maybe_update_native_scan_diff_snapshot",
         lambda root, *args, **kwargs: _unchanged_diff(str(root)),
     )
-    monkeypatch.setattr("crate.worker_handlers.library.emit_task_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.worker_handlers.library.emit_task_event", lambda *args, **kwargs: None
+    )
 
     result = _handle_library_sync(
         "task-1",
@@ -62,7 +69,60 @@ def test_library_sync_album_can_skip_when_native_diff_is_unchanged(monkeypatch, 
     assert result["native_scan_diff_shadow"]["diff"]["unchanged_count"] == 1
 
 
-def test_library_sync_full_can_skip_when_native_diff_is_unchanged(monkeypatch, tmp_path):
+def test_library_sync_album_refreshes_artist_with_canonical_name(monkeypatch, tmp_path):
+    from crate.worker_handlers.library import _handle_library_sync
+
+    library_root = tmp_path / "music"
+    artist_dir = library_root / "990073e3-4168-5043-a638-44f15728860e"
+    album_dir = artist_dir / "56cfcdb0-4906-54a1-ba50-f387c35977b3"
+    album_dir.mkdir(parents=True)
+
+    calls: dict[str, object] = {}
+
+    class FakeSync:
+        def __init__(self, config):
+            self.library_path = library_root
+            self.extensions = {".flac"}
+
+        def _canonical_artist_name(self, artist_dir, fallback):
+            calls["canonical_fallback"] = fallback
+            return "Lip Critic"
+
+        def sync_album(self, album_dir_arg, artist_name):
+            calls["sync_album"] = (album_dir_arg, artist_name)
+            return {"track_count": 9}
+
+        def sync_artist(self, *args, **kwargs):
+            raise AssertionError("scoped sync must not rediscover the artist")
+
+        def sync_artist_dirs(self, artist_name, artist_dirs):
+            calls["sync_artist_dirs"] = (artist_name, artist_dirs)
+            return 37
+
+    monkeypatch.setattr("crate.worker_handlers.library.LibrarySync", FakeSync)
+    monkeypatch.setattr(
+        "crate.native_scan.maybe_compare_native_scan_file_set",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.library.emit_task_event", lambda *args, **kwargs: None
+    )
+
+    result = _handle_library_sync(
+        "task-1",
+        {"album_dir": str(album_dir), "artist": "Lip Critic"},
+        {"library_path": str(library_root), "audio_extensions": [".flac"]},
+    )
+
+    assert calls["canonical_fallback"] == "Lip Critic"
+    assert calls["sync_album"] == (album_dir, "Lip Critic")
+    assert calls["sync_artist_dirs"] == ("Lip Critic", [artist_dir])
+    assert result["artist_tracks"] == 37
+
+
+def test_library_sync_full_can_skip_when_native_diff_is_unchanged(
+    monkeypatch, tmp_path
+):
     from crate.worker_handlers.library import _handle_library_sync
 
     library_root = tmp_path / "music"
@@ -77,12 +137,17 @@ def test_library_sync_full_can_skip_when_native_diff_is_unchanged(monkeypatch, t
             raise AssertionError("full sync should be skipped")
 
     monkeypatch.setattr("crate.worker_handlers.library.LibrarySync", FakeSync)
-    monkeypatch.setattr("crate.native_scan.maybe_compare_native_scan_file_set", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.native_scan.maybe_compare_native_scan_file_set",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(
         "crate.native_scan.maybe_update_native_scan_diff_snapshot",
         lambda root, *args, **kwargs: _unchanged_diff(str(root)),
     )
-    monkeypatch.setattr("crate.worker_handlers.library.emit_task_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "crate.worker_handlers.library.emit_task_event", lambda *args, **kwargs: None
+    )
 
     result = _handle_library_sync(
         "task-1",

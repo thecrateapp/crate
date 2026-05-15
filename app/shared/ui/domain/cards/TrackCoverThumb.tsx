@@ -8,7 +8,12 @@ interface TrackCoverThumbProps {
   alt?: string;
 }
 
-export function TrackCoverThumb({ src, className, iconSize = 18, alt = "" }: TrackCoverThumbProps) {
+export function TrackCoverThumb({
+  src,
+  className,
+  iconSize = 18,
+  alt = "",
+}: TrackCoverThumbProps) {
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {

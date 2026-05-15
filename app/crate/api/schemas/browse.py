@@ -190,6 +190,7 @@ class ArtistShowEventResponse(BaseModel):
     @classmethod
     def coerce_date_to_str(cls, v: Any) -> str | None:
         return str(v) if v is not None else None
+
     venue: str | None = None
     address_line1: str | None = None
     city: str | None = None
@@ -219,7 +220,9 @@ class ArtistPageResponse(BaseModel):
     info: ArtistInfoResponse = Field(default_factory=ArtistInfoResponse)
     top_tracks: list[ArtistTopTrackResponse] = Field(default_factory=list)
     shows: ArtistShowsResponse
-    enrichment: ArtistEnrichmentResponse = Field(default_factory=ArtistEnrichmentResponse)
+    enrichment: ArtistEnrichmentResponse = Field(
+        default_factory=ArtistEnrichmentResponse
+    )
     artist_hot_rank: int | None = None
 
 
@@ -268,7 +271,7 @@ class UpcomingResponse(BaseModel):
 
 
 class ArtistEnqueueResponse(TaskEnqueueResponse):
-    status: str
+    status: str = "queued"
 
 
 class ArtistTrackTitleResponse(BaseModel):

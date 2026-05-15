@@ -22,9 +22,24 @@ import {
 
 const TRACK_A: Track = { id: "a", title: "A", artist: "X" };
 const TRACK_B: Track = { id: "b", title: "B", artist: "Y" };
-const ALBUM_TRACK_A: Track = { id: "album-a", title: "A", artist: "Dredg", album: "El Cielo" };
-const ALBUM_TRACK_B: Track = { id: "album-b", title: "B", artist: "Dredg", album: "El Cielo" };
-const OTHER_TRACK: Track = { id: "other-a", title: "A", artist: "Quicksand", album: "Slip" };
+const ALBUM_TRACK_A: Track = {
+  id: "album-a",
+  title: "A",
+  artist: "Dredg",
+  album: "El Cielo",
+};
+const ALBUM_TRACK_B: Track = {
+  id: "album-b",
+  title: "B",
+  artist: "Dredg",
+  album: "El Cielo",
+};
+const OTHER_TRACK: Track = {
+  id: "other-a",
+  title: "A",
+  artist: "Quicksand",
+  album: "Slip",
+};
 const COMPATIBLE_TRACK_A: Track = {
   id: "compatible-a",
   title: "A",
@@ -62,7 +77,11 @@ const CLASHING_TRACK: Track = {
   blissVector: [-0.8, -0.6, -0.4, -0.2],
 };
 const ALBUM_SOURCE: PlaySource = { type: "album", name: "El Cielo", id: 1 };
-const PLAYLIST_SOURCE: PlaySource = { type: "playlist", name: "Post-hardcore forever", id: 1 };
+const PLAYLIST_SOURCE: PlaySource = {
+  type: "playlist",
+  name: "Post-hardcore forever",
+  id: 1,
+};
 
 beforeEach(() => {
   localStorage.clear();
@@ -115,12 +134,15 @@ describe("getStoredQueue / saveQueue round-trip", () => {
 
   it("treats legacy payloads (pre-shuffle fields) as shuffle=false", () => {
     // Older app version shape.
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      queue: [TRACK_A],
-      currentIndex: 0,
-      currentTime: 0,
-      wasPlaying: false,
-    }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        queue: [TRACK_A],
+        currentIndex: 0,
+        currentTime: 0,
+        wasPlaying: false,
+      }),
+    );
     const stored = getStoredQueue();
     expect(stored.shuffle).toBe(false);
     expect(stored.unshuffledQueue).toBeNull();
@@ -178,7 +200,9 @@ describe("getStreamUrl", () => {
   });
 
   it("prefers the native offline file URL when one exists", () => {
-    vi.mocked(getOfflineNativePlaybackUrl).mockReturnValueOnce("capacitor://localhost/_capacitor_file_/offline/song.flac");
+    vi.mocked(getOfflineNativePlaybackUrl).mockReturnValueOnce(
+      "capacitor://localhost/_capacitor_file_/offline/song.flac",
+    );
 
     const url = getStreamUrl({
       id: "t1",
@@ -187,20 +211,36 @@ describe("getStreamUrl", () => {
       artist: "Band",
     });
 
-    expect(url).toBe("capacitor://localhost/_capacitor_file_/offline/song.flac");
+    expect(url).toBe(
+      "capacitor://localhost/_capacitor_file_/offline/song.flac",
+    );
   });
 });
 
 describe("getEffectiveCrossfadeSeconds", () => {
   it("returns the configured duration when smart crossfade is disabled", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, ALBUM_TRACK_B, ALBUM_SOURCE, false, 6, false),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        ALBUM_TRACK_B,
+        ALBUM_SOURCE,
+        false,
+        6,
+        false,
+      ),
     ).toBe(6);
   });
 
   it("returns gapless for continuous album playback when smart crossfade is enabled", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, ALBUM_TRACK_B, ALBUM_SOURCE, false, 6, true),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        ALBUM_TRACK_B,
+        ALBUM_SOURCE,
+        false,
+        6,
+        true,
+      ),
     ).toBe(0);
   });
 
@@ -262,55 +302,118 @@ describe("getEffectiveCrossfadeSeconds", () => {
 
   it("uses the context fallback for album playback when shuffle is on and analysis is missing", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, ALBUM_TRACK_B, ALBUM_SOURCE, true, 6, true),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        ALBUM_TRACK_B,
+        ALBUM_SOURCE,
+        true,
+        6,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_BALANCED_SECONDS);
   });
 
   it("uses the playlist fallback when analysis is missing", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, ALBUM_TRACK_B, PLAYLIST_SOURCE, false, 6, true),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        ALBUM_TRACK_B,
+        PLAYLIST_SOURCE,
+        false,
+        6,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_BALANCED_SECONDS);
   });
 
   it("uses the mixed queue fallback when the next album track is unrelated and analysis is missing", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, OTHER_TRACK, ALBUM_SOURCE, false, 6, true),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        OTHER_TRACK,
+        ALBUM_SOURCE,
+        false,
+        6,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_MIXED_QUEUE_SECONDS);
   });
 
   it("uses a longer transition for strongly compatible analysed tracks", () => {
     expect(
-      getEffectiveCrossfadeSeconds(COMPATIBLE_TRACK_A, COMPATIBLE_TRACK_B, PLAYLIST_SOURCE, false, 8, true),
+      getEffectiveCrossfadeSeconds(
+        COMPATIBLE_TRACK_A,
+        COMPATIBLE_TRACK_B,
+        PLAYLIST_SOURCE,
+        false,
+        8,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_LONG_SECONDS);
   });
 
   it("uses a short transition for clashing analysed tracks", () => {
     expect(
-      getEffectiveCrossfadeSeconds(COMPATIBLE_TRACK_A, CLASHING_TRACK, PLAYLIST_SOURCE, false, 8, true),
+      getEffectiveCrossfadeSeconds(
+        COMPATIBLE_TRACK_A,
+        CLASHING_TRACK,
+        PLAYLIST_SOURCE,
+        false,
+        8,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_SHORT_SECONDS);
   });
 
   it("respects the configured crossfade as the ceiling", () => {
     expect(
-      getEffectiveCrossfadeSeconds(COMPATIBLE_TRACK_A, COMPATIBLE_TRACK_B, PLAYLIST_SOURCE, false, 3, true),
+      getEffectiveCrossfadeSeconds(
+        COMPATIBLE_TRACK_A,
+        COMPATIBLE_TRACK_B,
+        PLAYLIST_SOURCE,
+        false,
+        3,
+        true,
+      ),
     ).toBe(3);
   });
 
   it("falls back cleanly when only one track has analysis", () => {
     expect(
-      getEffectiveCrossfadeSeconds(COMPATIBLE_TRACK_A, TRACK_B, PLAYLIST_SOURCE, false, 6, true),
+      getEffectiveCrossfadeSeconds(
+        COMPATIBLE_TRACK_A,
+        TRACK_B,
+        PLAYLIST_SOURCE,
+        false,
+        6,
+        true,
+      ),
     ).toBe(SMART_TRANSITION_BALANCED_SECONDS);
   });
 
   it("returns zero when no next track is predictable", () => {
     expect(
-      getEffectiveCrossfadeSeconds(COMPATIBLE_TRACK_A, null, PLAYLIST_SOURCE, false, 6, true),
+      getEffectiveCrossfadeSeconds(
+        COMPATIBLE_TRACK_A,
+        null,
+        PLAYLIST_SOURCE,
+        false,
+        6,
+        true,
+      ),
     ).toBe(0);
   });
 
   it("returns zero when the configured crossfade is off", () => {
     expect(
-      getEffectiveCrossfadeSeconds(ALBUM_TRACK_A, ALBUM_TRACK_B, ALBUM_SOURCE, false, 0, true),
+      getEffectiveCrossfadeSeconds(
+        ALBUM_TRACK_A,
+        ALBUM_TRACK_B,
+        ALBUM_SOURCE,
+        false,
+        0,
+        true,
+      ),
     ).toBe(0);
   });
 });

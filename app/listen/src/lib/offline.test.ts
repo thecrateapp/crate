@@ -25,7 +25,9 @@ describe("offline metadata helpers", () => {
   it("derives a profile key from the persisted user id", () => {
     localStorage.setItem("listen-auth-user-id", "42");
 
-    const key = deriveOfflineProfileKeyFromStoredUser("https://api.example.test");
+    const key = deriveOfflineProfileKeyFromStoredUser(
+      "https://api.example.test",
+    );
 
     expect(key).toBeTruthy();
     expect(typeof key).toBe("string");
@@ -51,13 +53,15 @@ describe("offline metadata helpers", () => {
           trackCount: 1,
           readyTrackCount: 1,
           totalBytes: 1234,
-          tracks: [{
-            storage_id: "storage-1",
-            title: "Track",
-            artist: "Artist",
-            stream_url: "/api/tracks/by-storage/storage-1/stream",
-            download_url: "/api/tracks/by-storage/storage-1/download",
-          }],
+          tracks: [
+            {
+              storage_id: "storage-1",
+              title: "Track",
+              artist: "Artist",
+              stream_url: "/api/tracks/by-storage/storage-1/stream",
+              download_url: "/api/tracks/by-storage/storage-1/download",
+            },
+          ],
         },
       },
     };
@@ -79,13 +83,15 @@ describe("offline metadata helpers", () => {
           trackCount: 1,
           readyTrackCount: 1,
           totalBytes: 100,
-          tracks: [{
-            storage_id: "storage-1",
-            title: "Track A",
-            artist: "Artist",
-            stream_url: "/api/tracks/by-storage/storage-1/stream",
-            download_url: "/api/tracks/by-storage/storage-1/download",
-          }],
+          tracks: [
+            {
+              storage_id: "storage-1",
+              title: "Track A",
+              artist: "Artist",
+              stream_url: "/api/tracks/by-storage/storage-1/stream",
+              download_url: "/api/tracks/by-storage/storage-1/download",
+            },
+          ],
         },
         "album:14": {
           key: "album:14",
@@ -139,21 +145,25 @@ describe("offline metadata helpers", () => {
           readyTrackCount: 1,
           totalBytes: 1234,
           readyAssetKeys: ["storage-1"],
-          tracks: [{
-            entity_uid: "entity-1",
-            storage_id: "storage-1",
-            title: "Track",
-            artist: "Artist",
-            stream_url: "/api/tracks/by-entity/entity-1/stream",
-            download_url: "/api/tracks/by-entity/entity-1/download",
-          }],
+          tracks: [
+            {
+              entity_uid: "entity-1",
+              storage_id: "storage-1",
+              title: "Track",
+              artist: "Artist",
+              stream_url: "/api/tracks/by-entity/entity-1/stream",
+              download_url: "/api/tracks/by-entity/entity-1/download",
+            },
+          ],
         },
       },
     });
 
     expect(snapshot.items["track:entity-1"]).toBeTruthy();
     expect(snapshot.items["track:entity-1"]?.entityId).toBe("entity-1");
-    expect(snapshot.items["track:entity-1"]?.readyAssetKeys).toEqual(["entity-1"]);
+    expect(snapshot.items["track:entity-1"]?.readyAssetKeys).toEqual([
+      "entity-1",
+    ]);
     expect(snapshot.items["track:entity-1"]?.readyStorageIds).toBeUndefined();
   });
 
@@ -163,9 +173,7 @@ describe("offline metadata helpers", () => {
         entity_uid: "entity-1",
         storage_id: "storage-1",
       }),
-    ).toEqual([
-      "/api/offline/tracks/by-entity/entity-1/manifest",
-    ]);
+    ).toEqual(["/api/offline/tracks/by-entity/entity-1/manifest"]);
 
     expect(getOfflineTrackManifestPaths("entity-legacy")).toEqual([
       "/api/offline/tracks/by-entity/entity-legacy/manifest",

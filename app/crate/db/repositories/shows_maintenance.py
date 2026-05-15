@@ -14,7 +14,7 @@ def delete_past_shows(days_old: int = 30) -> int:
             text("DELETE FROM shows WHERE date < :cutoff"),
             {"cutoff": cutoff},
         )
-    return int(result.rowcount or 0)
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 __all__ = ["delete_past_shows"]

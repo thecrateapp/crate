@@ -10,7 +10,6 @@ from crate.audio import get_audio_files, read_tags
 log = logging.getLogger(__name__)
 
 
-
 def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
     """Compare local albums with MusicBrainz discography for an artist."""
     local_albums = []
@@ -21,12 +20,14 @@ def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
         tracks = get_audio_files(sub, extensions)
         if tracks:
             tags = read_tags(tracks[0])
-            local_albums.append({
-                "name": sub.name,
-                "album_tag": tags.get("album", ""),
-                "mbid": tags.get("musicbrainz_albumid"),
-                "track_count": len(tracks),
-            })
+            local_albums.append(
+                {
+                    "name": sub.name,
+                    "album_tag": tags.get("album", ""),
+                    "mbid": tags.get("musicbrainz_albumid"),
+                    "track_count": len(tracks),
+                }
+            )
         else:
             # Year subdirectory — check album dirs inside
             for album_dir in sorted(sub.iterdir()):
@@ -35,28 +36,39 @@ def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
                 tracks = get_audio_files(album_dir, extensions)
                 if tracks:
                     tags = read_tags(tracks[0])
-                    local_albums.append({
-                        "name": album_dir.name,
-                        "album_tag": tags.get("album", ""),
-                        "mbid": tags.get("musicbrainz_albumid"),
-                        "track_count": len(tracks),
-                    })
+                    local_albums.append(
+                        {
+                            "name": album_dir.name,
+                            "album_tag": tags.get("album", ""),
+                            "mbid": tags.get("musicbrainz_albumid"),
+                            "track_count": len(tracks),
+                        }
+                    )
 
     if not local_albums:
-        return {"artist": artist_dir.name, "local": [], "missing": [], "error": "No local albums"}
+        return {
+            "artist": artist_dir.name,
+            "local": [],
+            "missing": [],
+            "error": "No local albums",
+        }
 
     # Try to find artist on MusicBrainz
     artist_name = artist_dir.name
     mb_artist = _find_mb_artist(artist_name)
     if not mb_artist:
-        return {"artist": artist_name, "local": local_albums, "missing": [], "error": "Artist not found on MB"}
+        return {
+            "artist": artist_name,
+            "local": local_albums,
+            "missing": [],
+            "error": "Artist not found on MB",
+        }
 
     # Get discography
     mb_albums = _get_discography(mb_artist["id"])
 
     # Match local vs MB
     local_names = {_normalize(a["album_tag"] or a["name"]) for a in local_albums}
-    local_mbids = {a["mbid"] for a in local_albums if a["mbid"]}
 
     missing = []
     for mb_album in mb_albums:
@@ -125,12 +137,14 @@ def _get_discography(artist_id: str) -> list[dict]:
                 if primary != "Album" or secondary:
                     continue
 
-                albums.append({
-                    "release_group_id": rg["id"],
-                    "title": rg["title"],
-                    "type": primary,
-                    "first_release_date": rg.get("first-release-date", ""),
-                })
+                albums.append(
+                    {
+                        "release_group_id": rg["id"],
+                        "title": rg["title"],
+                        "type": primary,
+                        "first_release_date": rg.get("first-release-date", ""),
+                    }
+                )
 
             offset += len(groups)
             if offset >= int(result.get("release-group-count", 0)):
@@ -143,10 +157,11 @@ def _get_discography(artist_id: str) -> list[dict]:
 
 def _normalize(name: str) -> str:
     import re
+
     name = name.lower().strip()
     name = re.sub(r"\s*\(.*?\)\s*", "", name)  # Remove parenthetical
     name = re.sub(r"\s*\[.*?\]\s*", "", name)  # Remove brackets
-    name = re.sub(r"[^a-z0-9\s]", "", name)    # Remove non-alphanumeric
+    name = re.sub(r"[^a-z0-9\s]", "", name)  # Remove non-alphanumeric
     name = re.sub(r"\s+", " ", name).strip()
     return name
 

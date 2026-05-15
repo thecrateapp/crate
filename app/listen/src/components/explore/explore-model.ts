@@ -132,7 +132,14 @@ export interface GenreDetail {
 }
 
 export interface DecadeArtists {
-  items: { id?: number; slug?: string; name: string; albums: number; tracks: number; has_photo: boolean }[];
+  items: {
+    id?: number;
+    slug?: string;
+    name: string;
+    albums: number;
+    tracks: number;
+    has_photo: boolean;
+  }[];
   total: number;
 }
 
@@ -144,7 +151,9 @@ export async function loadSystemPlaylistTracks(playlistId: number): Promise<{
     radio: { seedType: "playlist"; seedId: number };
   };
 }> {
-  const data = await api<PlaylistDetailData>(`/api/curation/playlists/${playlistId}`);
+  const data = await api<PlaylistDetailData>(
+    `/api/curation/playlists/${playlistId}`,
+  );
   return {
     tracks: (data.tracks || []).map((track) =>
       toPlayableTrack(track, {

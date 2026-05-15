@@ -1,8 +1,16 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import {
+  useCallback,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { toEngineTracks } from "@/contexts/player-engine-adapter";
-import { clampIndex, resolveQueueFromUrls } from "@/contexts/player-queue-helpers";
+import {
+  clampIndex,
+  resolveQueueFromUrls,
+} from "@/contexts/player-queue-helpers";
 import {
   getEffectiveCrossfadeSeconds,
   getPredictableNextTrack,
@@ -125,208 +133,233 @@ export function usePlayerEngineSync({
     smartCrossfadeEnabledRef,
   ]);
 
-  const addToRecentlyPlayed = useCallback((track: Track) => {
-    setRecentlyPlayed((previous) => {
-      const filtered = previous.filter((candidate) => candidate.id !== track.id);
-      const updated = [track, ...filtered].slice(0, MAX_RECENT);
-      saveRecentlyPlayed(updated);
-      return updated;
-    });
-  }, [setRecentlyPlayed]);
+  const addToRecentlyPlayed = useCallback(
+    (track: Track) => {
+      setRecentlyPlayed((previous) => {
+        const filtered = previous.filter(
+          (candidate) => candidate.id !== track.id,
+        );
+        const updated = [track, ...filtered].slice(0, MAX_RECENT);
+        saveRecentlyPlayed(updated);
+        return updated;
+      });
+    },
+    [setRecentlyPlayed],
+  );
 
-  const rememberActiveTrack = useCallback((track: Track | undefined) => {
-    if (!track) {
-      activatedTrackKeyRef.current = null;
-      return;
-    }
-    const trackKey = getTrackCacheKey(track);
-    if (activatedTrackKeyRef.current === trackKey) return;
-    activatedTrackKeyRef.current = trackKey;
-    addToRecentlyPlayed(track);
-  }, [activatedTrackKeyRef, addToRecentlyPlayed]);
+  const rememberActiveTrack = useCallback(
+    (track: Track | undefined) => {
+      if (!track) {
+        activatedTrackKeyRef.current = null;
+        return;
+      }
+      const trackKey = getTrackCacheKey(track);
+      if (activatedTrackKeyRef.current === trackKey) return;
+      activatedTrackKeyRef.current = trackKey;
+      addToRecentlyPlayed(track);
+    },
+    [activatedTrackKeyRef, addToRecentlyPlayed],
+  );
 
-  const pullFromEngine = useCallback((sourceQueue?: Track[]) => {
-    const resolvedQueue = resolveQueueFromUrls(
-      gpGetTracks(),
-      sourceQueue ?? queueRef.current,
-      engineTrackMapRef.current,
-    );
-    const resolvedIndex = clampIndex(gpGetTrackIndex(), resolvedQueue.length);
-    const resolvedTrack = resolvedQueue[resolvedIndex];
-    const engineDuration = Math.max(gpGetCurrentTrackDuration() / 1000, 0);
-    const knownDuration =
-      typeof resolvedTrack?.duration === "number" && Number.isFinite(resolvedTrack.duration) && resolvedTrack.duration > 0
-        ? resolvedTrack.duration
-        : 0;
-    const resolvedDuration = engineDuration || knownDuration;
-
-    const previousQueue = queueRef.current;
-    const sameQueue =
-      resolvedQueue.length === previousQueue.length &&
-      resolvedQueue.every((track, index) => track === previousQueue[index]);
-    if (!sameQueue) {
-      commitQueue(resolvedQueue);
-    }
-
-    if (resolvedIndex !== currentIndexRef.current) {
-      commitCurrentIndex(resolvedIndex);
-    }
-    if (resolvedDuration !== durationRef.current) {
-      commitDuration(resolvedDuration);
-    }
-    rememberActiveTrack(resolvedTrack);
-
-    return {
-      resolvedQueue,
-      resolvedIndex,
-      resolvedTrack,
-    };
-  }, [
-    commitCurrentIndex,
-    commitDuration,
-    commitQueue,
-    currentIndexRef,
-    durationRef,
-    engineTrackMapRef,
-    queueRef,
-    rememberActiveTrack,
-  ]);
-
-  const pushToEngine = useCallback((
-    nextQueue: Track[],
-    requestedIndex: number,
-    options?: { autoplay?: boolean; positionMs?: number },
-  ) => {
-    const nextIndex = clampIndex(requestedIndex, nextQueue.length);
-    const autoplay = options?.autoplay ?? isPlayingRef.current;
-    const positionMs = options?.positionMs ?? 0;
-
-    if (nextQueue.length === 0) {
-      bufferingIntentRef.current = false;
-      stopNativeEngineIfAvailable("empty queue sync");
-      gpPause();
-      gpStop();
-      gpLoadQueue([], 0);
-      engineTrackMapRef.current = new Map();
-      commitQueue([]);
-      commitCurrentIndex(0);
-      commitCurrentTime(0);
-      commitDuration(0);
-      commitIsPlaying(false);
-      commitIsBuffering(false);
-      activatedTrackKeyRef.current = null;
-      return;
-    }
-
-    if (shouldUseAndroidNativePlayer()) {
-      silenceGaplessEngine();
-      const targetTrack = nextQueue[nextIndex];
+  const pullFromEngine = useCallback(
+    (sourceQueue?: Track[]) => {
+      const resolvedQueue = resolveQueueFromUrls(
+        gpGetTracks(),
+        sourceQueue ?? queueRef.current,
+        engineTrackMapRef.current,
+      );
+      const resolvedIndex = clampIndex(gpGetTrackIndex(), resolvedQueue.length);
+      const resolvedTrack = resolvedQueue[resolvedIndex];
+      const engineDuration = Math.max(gpGetCurrentTrackDuration() / 1000, 0);
       const knownDuration =
-        typeof targetTrack?.duration === "number" && Number.isFinite(targetTrack.duration) && targetTrack.duration > 0
-          ? targetTrack.duration
+        typeof resolvedTrack?.duration === "number" &&
+        Number.isFinite(resolvedTrack.duration) &&
+        resolvedTrack.duration > 0
+          ? resolvedTrack.duration
           : 0;
-      const positionSeconds = positionMs / 1000;
+      const resolvedDuration = engineDuration || knownDuration;
 
-      commitQueue(nextQueue);
-      commitCurrentIndex(nextIndex);
-      commitCurrentTime(positionSeconds);
-      commitDuration(knownDuration);
-      rememberActiveTrack(targetTrack);
-
-      if (positionMs > 0) {
-        markSeekPosition(positionSeconds);
+      const previousQueue = queueRef.current;
+      const sameQueue =
+        resolvedQueue.length === previousQueue.length &&
+        resolvedQueue.every((track, index) => track === previousQueue[index]);
+      if (!sameQueue) {
+        commitQueue(resolvedQueue);
       }
 
-      bufferingIntentRef.current = autoplay;
-      commitIsBuffering(autoplay);
-      commitIsPlaying(autoplay);
+      if (resolvedIndex !== currentIndexRef.current) {
+        commitCurrentIndex(resolvedIndex);
+      }
+      if (resolvedDuration !== durationRef.current) {
+        commitDuration(resolvedDuration);
+      }
+      rememberActiveTrack(resolvedTrack);
 
-      void androidNativeEngine.loadQueue({
-        revision: createQueueRevision(),
-        tracks: toEngineTracks(nextQueue),
-        currentIndex: nextIndex,
-        positionMs,
-        autoplay,
-        repeat: repeatRef.current,
-        crossfadeMs: effectiveCrossfadeMsRef.current,
-        volume: 1,
-      }).catch((error) => {
-        console.error("[native-player] failed to sync queue:", error);
-        commitIsBuffering(false);
+      return {
+        resolvedQueue,
+        resolvedIndex,
+        resolvedTrack,
+      };
+    },
+    [
+      commitCurrentIndex,
+      commitDuration,
+      commitQueue,
+      currentIndexRef,
+      durationRef,
+      engineTrackMapRef,
+      queueRef,
+      rememberActiveTrack,
+    ],
+  );
+
+  const pushToEngine = useCallback(
+    (
+      nextQueue: Track[],
+      requestedIndex: number,
+      options?: { autoplay?: boolean; positionMs?: number },
+    ) => {
+      const nextIndex = clampIndex(requestedIndex, nextQueue.length);
+      const autoplay = options?.autoplay ?? isPlayingRef.current;
+      const positionMs = options?.positionMs ?? 0;
+
+      if (nextQueue.length === 0) {
+        bufferingIntentRef.current = false;
+        stopNativeEngineIfAvailable("empty queue sync");
+        gpPause();
+        gpStop();
+        gpLoadQueue([], 0);
+        engineTrackMapRef.current = new Map();
+        commitQueue([]);
+        commitCurrentIndex(0);
+        commitCurrentTime(0);
+        commitDuration(0);
         commitIsPlaying(false);
-      });
-      return;
-    }
+        commitIsBuffering(false);
+        activatedTrackKeyRef.current = null;
+        return;
+      }
 
-    stopNativeEngineIfAvailable("before web engine sync");
-    gpLoadQueue(buildEngineUrls(nextQueue), nextIndex);
-    gpSetLoop(repeatRef.current === "all");
-    gpSetSingleMode(repeatRef.current === "one");
+      if (shouldUseAndroidNativePlayer()) {
+        silenceGaplessEngine();
+        const targetTrack = nextQueue[nextIndex];
+        const knownDuration =
+          typeof targetTrack?.duration === "number" &&
+          Number.isFinite(targetTrack.duration) &&
+          targetTrack.duration > 0
+            ? targetTrack.duration
+            : 0;
+        const positionSeconds = positionMs / 1000;
 
-    pullFromEngine(nextQueue);
+        commitQueue(nextQueue);
+        commitCurrentIndex(nextIndex);
+        commitCurrentTime(positionSeconds);
+        commitDuration(knownDuration);
+        rememberActiveTrack(targetTrack);
 
-    if (positionMs > 0) {
-      gpSeekTo(positionMs);
-      const positionSeconds = positionMs / 1000;
-      commitCurrentTime(positionSeconds);
-      markSeekPosition(positionSeconds);
-    } else {
+        if (positionMs > 0) {
+          markSeekPosition(positionSeconds);
+        }
+
+        bufferingIntentRef.current = autoplay;
+        commitIsBuffering(autoplay);
+        commitIsPlaying(autoplay);
+
+        void androidNativeEngine
+          .loadQueue({
+            revision: createQueueRevision(),
+            tracks: toEngineTracks(nextQueue),
+            currentIndex: nextIndex,
+            positionMs,
+            autoplay,
+            repeat: repeatRef.current,
+            crossfadeMs: effectiveCrossfadeMsRef.current,
+            volume: 1,
+          })
+          .catch((error) => {
+            console.error("[native-player] failed to sync queue:", error);
+            commitIsBuffering(false);
+            commitIsPlaying(false);
+          });
+        return;
+      }
+
+      stopNativeEngineIfAvailable("before web engine sync");
+      gpLoadQueue(buildEngineUrls(nextQueue), nextIndex);
+      gpSetLoop(repeatRef.current === "all");
+      gpSetSingleMode(repeatRef.current === "one");
+
+      pullFromEngine(nextQueue);
+
+      if (positionMs > 0) {
+        gpSeekTo(positionMs);
+        const positionSeconds = positionMs / 1000;
+        commitCurrentTime(positionSeconds);
+        markSeekPosition(positionSeconds);
+      } else {
+        commitCurrentTime(0);
+      }
+
+      if (autoplay) {
+        bufferingIntentRef.current = true;
+        commitIsBuffering(true);
+        gpPlay();
+      } else {
+        bufferingIntentRef.current = false;
+        gpPause();
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+      }
+    },
+    [
+      activatedTrackKeyRef,
+      buildEngineUrls,
+      bufferingIntentRef,
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsBuffering,
+      commitIsPlaying,
+      commitQueue,
+      effectiveCrossfadeMsRef,
+      engineTrackMapRef,
+      isPlayingRef,
+      markSeekPosition,
+      pullFromEngine,
+      rememberActiveTrack,
+      repeatRef,
+    ],
+  );
+
+  const advanceCursorTo = useCallback(
+    (index: number) => {
+      const targetTrack = queueRef.current[index];
+      const engineDuration = Math.max(gpGetCurrentTrackDuration() / 1000, 0);
+      const fallbackDuration =
+        typeof targetTrack?.duration === "number" &&
+        Number.isFinite(targetTrack.duration) &&
+        targetTrack.duration > 0
+          ? targetTrack.duration
+          : 0;
+      clearPrevRestartLatch();
+      commitCurrentIndex(index);
       commitCurrentTime(0);
-    }
-
-    if (autoplay) {
+      commitDuration(engineDuration || fallbackDuration);
+      rememberActiveTrack(targetTrack);
       bufferingIntentRef.current = true;
       commitIsBuffering(true);
-      gpPlay();
-    } else {
-      bufferingIntentRef.current = false;
-      gpPause();
-      commitIsPlaying(false);
-      commitIsBuffering(false);
-    }
-  }, [
-    activatedTrackKeyRef,
-    buildEngineUrls,
-    bufferingIntentRef,
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    commitIsPlaying,
-    commitQueue,
-    effectiveCrossfadeMsRef,
-    engineTrackMapRef,
-    isPlayingRef,
-    markSeekPosition,
-    pullFromEngine,
-    rememberActiveTrack,
-    repeatRef,
-  ]);
-
-  const advanceCursorTo = useCallback((index: number) => {
-    const targetTrack = queueRef.current[index];
-    const engineDuration = Math.max(gpGetCurrentTrackDuration() / 1000, 0);
-    const fallbackDuration =
-      typeof targetTrack?.duration === "number" && Number.isFinite(targetTrack.duration) && targetTrack.duration > 0
-        ? targetTrack.duration
-        : 0;
-    clearPrevRestartLatch();
-    commitCurrentIndex(index);
-    commitCurrentTime(0);
-    commitDuration(engineDuration || fallbackDuration);
-    rememberActiveTrack(targetTrack);
-    bufferingIntentRef.current = true;
-    commitIsBuffering(true);
-  }, [
-    bufferingIntentRef,
-    clearPrevRestartLatch,
-    commitCurrentIndex,
-    commitCurrentTime,
-    commitDuration,
-    commitIsBuffering,
-    queueRef,
-    rememberActiveTrack,
-  ]);
+    },
+    [
+      bufferingIntentRef,
+      clearPrevRestartLatch,
+      commitCurrentIndex,
+      commitCurrentTime,
+      commitDuration,
+      commitIsBuffering,
+      queueRef,
+      rememberActiveTrack,
+    ],
+  );
 
   return {
     syncEffectiveCrossfade,

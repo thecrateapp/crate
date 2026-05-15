@@ -32,7 +32,9 @@ def _convert_mood_params(conditions: list[str], params: list) -> tuple[list[str]
     return named_conditions, named_params
 
 
-def _mood_filter_expression(filters: Mapping[str, Any], prefix: str) -> tuple[str, dict[str, Any]]:
+def _mood_filter_expression(
+    filters: Mapping[str, Any], prefix: str
+) -> tuple[str, dict[str, Any]]:
     clauses = ["bpm IS NOT NULL"]
     params: dict[str, Any] = {}
     for index, (key, value) in enumerate(filters.items()):
@@ -50,13 +52,22 @@ def _mood_filter_expression(filters: Mapping[str, Any], prefix: str) -> tuple[st
 
 
 def count_mood_tracks(conditions: list[str], params: list) -> int:
+    # conditions originate from _mood_filter_expression which validates
+    # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
     with read_scope() as session:
-        row = session.execute(
-            text(f"SELECT COUNT(*) AS cnt FROM library_tracks WHERE {' AND '.join(named_conditions)}"),
-            named_params,
-        ).mappings().first()
-        return row["cnt"]
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*) AS cnt FROM library_tracks WHERE "
+                    + " AND ".join(named_conditions)
+                ),
+                named_params,
+            )
+            .mappings()
+            .first()
+        )
+        return int(row["cnt"] or 0) if row is not None else 0
 
 
 def count_mood_presets(presets: Mapping[str, Mapping[str, Any]]) -> dict[str, int]:
@@ -73,23 +84,36 @@ def count_mood_presets(presets: Mapping[str, Mapping[str, Any]]) -> dict[str, in
         params.update(expression_params)
         aliases[name] = alias
 
+    # select_parts are built internally from _mood_filter_expression
+    # which validates columns against the _MOOD_COLUMNS whitelist.
     with read_scope() as session:
-        row = session.execute(
-            text(f"SELECT {', '.join(select_parts)} FROM library_tracks WHERE bpm IS NOT NULL"),
-            params,
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT "
+                    + ", ".join(select_parts)
+                    + " FROM library_tracks WHERE bpm IS NOT NULL"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
 
     counts = dict(row or {})
     return {name: int(counts.get(alias) or 0) for name, alias in aliases.items()}
 
 
 def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dict]:
+    # conditions originate from _mood_filter_expression which validates
+    # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
     named_params["limit"] = limit
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                f"""SELECT t.id, t.title, t.artist, a.name AS album, t.path, t.duration,
+        rows = (
+            session.execute(
+                text(
+                    """SELECT t.id, t.title, t.artist, a.name AS album, t.path, t.duration,
                            t.entity_uid::text AS entity_uid,
                            ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
                            a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
@@ -97,21 +121,32 @@ def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dic
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = t.artist
-                    WHERE {' AND '.join(named_conditions)}
+                    WHERE """
+                    + " AND ".join(named_conditions)
+                    + """
                     ORDER BY RANDOM() LIMIT :limit"""
-            ),
-            named_params,
-        ).mappings().all()
+                ),
+                named_params,
+            )
+            .mappings()
+            .all()
+        )
         items: list[dict] = []
         for row in rows:
             item = dict(row)
-            entity_uid = str(item["entity_uid"]) if item.get("entity_uid") is not None else None
+            entity_uid = (
+                str(item["entity_uid"]) if item.get("entity_uid") is not None else None
+            )
             item["entity_uid"] = entity_uid
             item["artist_entity_uid"] = (
-                str(item["artist_entity_uid"]) if item.get("artist_entity_uid") is not None else None
+                str(item["artist_entity_uid"])
+                if item.get("artist_entity_uid") is not None
+                else None
             )
             item["album_entity_uid"] = (
-                str(item["album_entity_uid"]) if item.get("album_entity_uid") is not None else None
+                str(item["album_entity_uid"])
+                if item.get("album_entity_uid") is not None
+                else None
             )
             items.append(item)
         return items

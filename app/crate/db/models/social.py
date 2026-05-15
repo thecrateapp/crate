@@ -1,12 +1,12 @@
 """Typed models for social graph data."""
 
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
 class FollowedArtist(BaseModel):
     """An artist the user follows."""
+
     model_config = ConfigDict(from_attributes=True)
 
     artist_id: int | None = None
@@ -17,6 +17,7 @@ class FollowedArtist(BaseModel):
 
 class UserFollow(BaseModel):
     """A user-to-user follow relationship."""
+
     model_config = ConfigDict(from_attributes=True)
 
     follower_id: int
@@ -26,6 +27,7 @@ class UserFollow(BaseModel):
 
 class AffinityResult(BaseModel):
     """Computed affinity between two users."""
+
     model_config = ConfigDict(from_attributes=True)
 
     score: float = 0.0
@@ -35,6 +37,7 @@ class AffinityResult(BaseModel):
 
 class PublicProfile(BaseModel):
     """A user's public-facing profile."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

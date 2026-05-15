@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
-  resolveMaybeApiAssetUrl: vi.fn((url: string | null | undefined) => url ?? null),
+  resolveMaybeApiAssetUrl: vi.fn(
+    (url: string | null | undefined) => url ?? null,
+  ),
   ApiError: class ApiError extends Error {
     status: number;
     constructor(status: number) {
@@ -18,7 +20,12 @@ vi.mock("@/lib/library-routes", () => ({
 }));
 
 import { ApiError, api } from "@/lib/api";
-import { fetchArtistRadio, fetchHomePlaylistRadio, fetchRadioContinuation, startShapedRadio } from "@/lib/radio";
+import {
+  fetchArtistRadio,
+  fetchHomePlaylistRadio,
+  fetchRadioContinuation,
+  startShapedRadio,
+} from "@/lib/radio";
 import type { PlaySource } from "@/contexts/player-types";
 
 const mockApi = vi.mocked(api);
@@ -55,7 +62,9 @@ describe("fetchRadioContinuation", () => {
       },
     };
 
-    const tracks = await fetchRadioContinuation(source, 12, { signal: controller.signal });
+    const tracks = await fetchRadioContinuation(source, 12, {
+      signal: controller.signal,
+    });
 
     expect(mockApi).toHaveBeenCalledWith(
       "/api/radio/next",

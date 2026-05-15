@@ -1,4 +1,8 @@
-import { registerPlugin, type PermissionState, type PluginListenerHandle } from "@capacitor/core";
+import {
+  registerPlugin,
+  type PermissionState,
+  type PluginListenerHandle,
+} from "@capacitor/core";
 
 import { isAndroidNative } from "@/lib/capacitor-runtime";
 import { getCrossfadeDurationPreference } from "@/lib/player-playback-prefs";
@@ -28,14 +32,30 @@ type NativePlaybackPermissionStatus = {
 
 type CrateNativePlaybackPlugin = {
   checkPermissions(): Promise<NativePlaybackPermissionStatus>;
-  requestPermissions(options?: { permissions?: string[] }): Promise<NativePlaybackPermissionStatus>;
+  requestPermissions(options?: {
+    permissions?: string[];
+  }): Promise<NativePlaybackPermissionStatus>;
   getState(): Promise<EngineState>;
   drainEvents(): Promise<{ events?: NativeEventEnvelope[] }>;
   setQueue(options: EngineQueueSnapshot): Promise<EngineState>;
-  appendTracks(options: { revision: string; tracks: EngineTrack[] }): Promise<EngineState>;
-  insertTrack(options: { revision: string; index: number; track: EngineTrack }): Promise<EngineState>;
-  removeTrack(options: { revision: string; index: number }): Promise<EngineState>;
-  reorderTrack(options: { revision: string; fromIndex: number; toIndex: number }): Promise<EngineState>;
+  appendTracks(options: {
+    revision: string;
+    tracks: EngineTrack[];
+  }): Promise<EngineState>;
+  insertTrack(options: {
+    revision: string;
+    index: number;
+    track: EngineTrack;
+  }): Promise<EngineState>;
+  removeTrack(options: {
+    revision: string;
+    index: number;
+  }): Promise<EngineState>;
+  reorderTrack(options: {
+    revision: string;
+    fromIndex: number;
+    toIndex: number;
+  }): Promise<EngineState>;
   play(): Promise<EngineState>;
   pause(): Promise<EngineState>;
   stop(): Promise<EngineState>;
@@ -47,14 +67,20 @@ type CrateNativePlaybackPlugin = {
   setCrossfadeMs(options: { crossfadeMs: number }): Promise<EngineState>;
   setVolume(options: { volume: number }): Promise<EngineState>;
   setPlaybackRate(options: { rate: number }): Promise<EngineState>;
-  setEq(options: { enabled: boolean; gains: number[]; rampMs?: number }): Promise<EngineState>;
+  setEq(options: {
+    enabled: boolean;
+    gains: number[];
+    rampMs?: number;
+  }): Promise<EngineState>;
   addListener<K extends EngineEventName>(
     event: K,
     listener: EngineEventListener<K>,
   ): Promise<PluginListenerHandle>;
 };
 
-const nativePlayback = registerPlugin<CrateNativePlaybackPlugin>("CrateNativePlayback");
+const nativePlayback = registerPlugin<CrateNativePlaybackPlugin>(
+  "CrateNativePlayback",
+);
 
 export function isAndroidNativePlayerAvailable(): boolean {
   return isAndroidNative;
@@ -124,22 +150,25 @@ export class AndroidNativeEngine implements PlaybackEngine {
           reject(new Error("Native playback service did not become ready"));
         }, 3000);
 
-        void nativePlayback.addListener("ready", () => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(timeout);
-          void handle?.remove();
-          this.readyPromise = null;
-          resolve();
-        }).then((listenerHandle) => {
-          handle = listenerHandle;
-        }).catch((error) => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(timeout);
-          this.readyPromise = null;
-          reject(error);
-        });
+        void nativePlayback
+          .addListener("ready", () => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            void handle?.remove();
+            this.readyPromise = null;
+            resolve();
+          })
+          .then((listenerHandle) => {
+            handle = listenerHandle;
+          })
+          .catch((error) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            this.readyPromise = null;
+            reject(error);
+          });
       });
     }
 
@@ -153,7 +182,9 @@ export class AndroidNativeEngine implements PlaybackEngine {
     try {
       const permissions = await nativePlayback.checkPermissions();
       if (permissions.notifications === "granted") return;
-      await nativePlayback.requestPermissions({ permissions: ["notifications"] });
+      await nativePlayback.requestPermissions({
+        permissions: ["notifications"],
+      });
     } catch {
       // Notification permission is best-effort; playback must keep working if declined.
     }
@@ -206,12 +237,19 @@ export class AndroidNativeEngine implements PlaybackEngine {
 
   async appendTracks(tracks: EngineTrack[]): Promise<EngineState> {
     await this.ensureReady();
-    return nativePlayback.appendTracks({ revision: this.queueRevision, tracks });
+    return nativePlayback.appendTracks({
+      revision: this.queueRevision,
+      tracks,
+    });
   }
 
   async insertTrack(index: number, track: EngineTrack): Promise<EngineState> {
     await this.ensureReady();
-    return nativePlayback.insertTrack({ revision: this.queueRevision, index, track });
+    return nativePlayback.insertTrack({
+      revision: this.queueRevision,
+      index,
+      track,
+    });
   }
 
   async removeTrack(index: number): Promise<EngineState> {
@@ -221,7 +259,11 @@ export class AndroidNativeEngine implements PlaybackEngine {
 
   async reorderTrack(fromIndex: number, toIndex: number): Promise<EngineState> {
     await this.ensureReady();
-    return nativePlayback.reorderTrack({ revision: this.queueRevision, fromIndex, toIndex });
+    return nativePlayback.reorderTrack({
+      revision: this.queueRevision,
+      fromIndex,
+      toIndex,
+    });
   }
 
   async setRepeat(repeat: EngineRepeatMode): Promise<EngineState> {
@@ -244,7 +286,11 @@ export class AndroidNativeEngine implements PlaybackEngine {
     return nativePlayback.setPlaybackRate({ rate });
   }
 
-  async setEq(enabled: boolean, gains: number[], rampMs?: number): Promise<EngineState> {
+  async setEq(
+    enabled: boolean,
+    gains: number[],
+    rampMs?: number,
+  ): Promise<EngineState> {
     await this.ensureReady();
     if (!isAndroidNativeEqEnabled()) {
       return nativePlayback.setEq({ enabled: false, gains: [], rampMs: 0 });
@@ -262,7 +308,9 @@ export class AndroidNativeEngine implements PlaybackEngine {
     }
   }
 
-  async drainEvents(): Promise<Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>> {
+  async drainEvents(): Promise<
+    Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>
+  > {
     const response = await nativePlayback.drainEvents();
     return (response.events ?? []).flatMap((event) => {
       if (!event.event || !event.payload) return [];
@@ -270,7 +318,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
     });
   }
 
-  async on<K extends EngineEventName>(event: K, listener: EngineEventListener<K>): Promise<() => void> {
+  async on<K extends EngineEventName>(
+    event: K,
+    listener: EngineEventListener<K>,
+  ): Promise<() => void> {
     const handle = await nativePlayback.addListener(event, listener);
     return () => {
       void handle.remove();

@@ -17,9 +17,9 @@ export function WhyCrateTeaser() {
 
           <div className="max-w-2xl">
             <p className="text-[16px] leading-8 text-white/62">
-              Crate started with my own library, and with a growing discomfort around
-              renting music from platforms that do not care much about artists or listeners.
-              The longer story has its own page.
+              Crate started with my own library, and with a growing discomfort
+              around renting music from platforms that do not care much about
+              artists or listeners. The longer story has its own page.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a

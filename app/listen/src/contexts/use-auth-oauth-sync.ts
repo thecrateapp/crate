@@ -31,7 +31,10 @@ export function useAuthOAuthSync({
 
     window.addEventListener("crate:auth-token-received", handleTokenReceived);
     return () => {
-      window.removeEventListener("crate:auth-token-received", handleTokenReceived);
+      window.removeEventListener(
+        "crate:auth-token-received",
+        handleTokenReceived,
+      );
     };
   }, [navigate, refetch]);
 

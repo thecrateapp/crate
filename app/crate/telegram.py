@@ -14,10 +14,8 @@ import json
 import logging
 import os
 import shutil
-import threading
 import time
-from datetime import datetime, timezone
-from pathlib import Path
+from typing import Callable
 
 import requests
 
@@ -30,8 +28,15 @@ from crate.db.queries.telegram import (
     list_recent_albums,
     list_recently_played,
 )
-from crate.db.repositories.tasks import create_task_dedup, find_active_task_by_type_params, update_task
-from crate.acquisition_tasks import build_tidal_download_params, tidal_download_dedup_key
+from crate.db.repositories.tasks import (
+    create_task_dedup,
+    find_active_task_by_type_params,
+    update_task,
+)
+from crate.acquisition_tasks import (
+    build_tidal_download_params,
+    tidal_download_dedup_key,
+)
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +51,7 @@ _ALERT_COOLDOWN_SEC = 1800
 
 # ── Core API ──────────────────────────────────────────────────────
 
+
 def _api(method: str, **params) -> dict | None:
     token = _BOT_TOKEN or get_setting("telegram_bot_token")
     if not token:
@@ -58,7 +64,9 @@ def _api(method: str, **params) -> dict | None:
         )
         data = resp.json()
         if not data.get("ok"):
-            log.warning("Telegram API %s failed: %s", method, data.get("description", ""))
+            log.warning(
+                "Telegram API %s failed: %s", method, data.get("description", "")
+            )
             return None
         return data.get("result")
     except Exception:
@@ -66,7 +74,9 @@ def _api(method: str, **params) -> dict | None:
         return None
 
 
-def send_message(text: str, *, chat_id: str | None = None, parse_mode: str = "HTML") -> bool:
+def send_message(
+    text: str, *, chat_id: str | None = None, parse_mode: str = "HTML"
+) -> bool:
     """Send a message to Telegram.
 
     When chat_id is explicit (command reply) it always sends.
@@ -77,8 +87,13 @@ def send_message(text: str, *, chat_id: str | None = None, parse_mode: str = "HT
     cid = chat_id or _CHAT_ID or get_setting("telegram_chat_id")
     if not cid:
         return False
-    result = _api("sendMessage", chat_id=cid, text=text, parse_mode=parse_mode,
-                   disable_web_page_preview=True)
+    result = _api(
+        "sendMessage",
+        chat_id=cid,
+        text=text,
+        parse_mode=parse_mode,
+        disable_web_page_preview=True,
+    )
     return result is not None
 
 
@@ -94,6 +109,7 @@ def send_alert(alert_type: str, text: str) -> bool:
 
 
 # ── Notify helpers (called from task handlers) ────────────────────
+
 
 def notify_task_completed(task_type: str, task_id: str, result: dict | None = None):
     from crate.task_registry import task_label, task_icon
@@ -121,9 +137,8 @@ def notify_task_completed(task_type: str, task_id: str, result: dict | None = No
 
 
 def notify_task_failed(task_type: str, task_id: str, error: str = ""):
-    from crate.task_registry import task_label, task_icon
+    from crate.task_registry import task_label
 
-    icon = task_icon(task_type)
     label = task_label(task_type)
     parts = [f"\u274c <b>{label}</b> FAILED", f"<code>{task_id[:8]}</code>"]
     if error:
@@ -134,12 +149,14 @@ def notify_task_failed(task_type: str, task_id: str, error: str = ""):
 
 def notify_new_release(artist: str, album: str, year: str = ""):
     send_message(
-        f"\U0001f195 New release detected\n<b>{artist}</b> — {album}"
-        f" ({year})" if year else ""
+        f"\U0001f195 New release detected\n<b>{artist}</b> — {album} ({year})"
+        if year
+        else ""
     )
 
 
 # ── Commands ──────────────────────────────────────────────────────
+
 
 def _cmd_start(chat_id: str, _args: str):
     set_setting("telegram_chat_id", chat_id)
@@ -169,7 +186,7 @@ def _cmd_start(chat_id: str, _args: str):
 def _cmd_status(chat_id: str, _args: str):
     summary = get_library_status_summary()
 
-    size_gb = summary["size_bytes"] / (1024 ** 3)
+    size_gb = summary["size_bytes"] / (1024**3)
     disk = _disk_usage()
 
     send_message(
@@ -222,7 +239,7 @@ def _cmd_tasks(chat_id: str, _args: str):
                 pass
         lines.append(f"{icon} <code>{row['id'][:8]}</code> {row['type']}{progress}")
 
-    send_message(f"\u2699\ufe0f <b>Tasks</b>\n\n" + "\n".join(lines), chat_id=chat_id)
+    send_message("\u2699\ufe0f <b>Tasks</b>\n\n" + "\n".join(lines), chat_id=chat_id)
 
 
 def _cmd_playing(chat_id: str, _args: str):
@@ -249,9 +266,13 @@ def _cmd_playing(chat_id: str, _args: str):
                 quality = f" [{fmt} {bd}/{sr // 1000 if sr >= 1000 else sr}]"
             else:
                 quality = f" [{fmt}]"
-        lines.append(f"\U0001f3b6 <b>{name}</b>: {row['artist']} — {row['title']}{quality}")
+        lines.append(
+            f"\U0001f3b6 <b>{name}</b>: {row['artist']} — {row['title']}{quality}"
+        )
 
-    send_message("\U0001f3a7 <b>Now Playing</b>\n\n" + "\n".join(lines), chat_id=chat_id)
+    send_message(
+        "\U0001f3a7 <b>Now Playing</b>\n\n" + "\n".join(lines), chat_id=chat_id
+    )
 
 
 def _cmd_recent(chat_id: str, args: str):
@@ -270,14 +291,20 @@ def _cmd_recent(chat_id: str, args: str):
         year = f" ({row['year']})" if row.get("year") else ""
         fmt = ""
         try:
-            formats = json.loads(row["formats_json"]) if isinstance(row["formats_json"], str) else (row["formats_json"] or [])
+            formats = (
+                json.loads(row["formats_json"])
+                if isinstance(row["formats_json"], str)
+                else (row["formats_json"] or [])
+            )
             if formats:
                 fmt = f" [{', '.join(f.upper() for f in formats)}]"
         except (json.JSONDecodeError, TypeError):
             pass
         lines.append(f"\u2022 <b>{row['artist']}</b> — {row['name']}{year}{fmt}")
 
-    send_message(f"\U0001f4e6 <b>Recent additions</b>\n\n" + "\n".join(lines), chat_id=chat_id)
+    send_message(
+        "\U0001f4e6 <b>Recent additions</b>\n\n" + "\n".join(lines), chat_id=chat_id
+    )
 
 
 def _cmd_download(chat_id: str, args: str):
@@ -290,20 +317,34 @@ def _cmd_download(chat_id: str, args: str):
     dedup_key = tidal_download_dedup_key(task_params)
     task_id = create_task_dedup("tidal_download", task_params, dedup_key=dedup_key)
     if not task_id:
-        task_id = find_active_task_by_type_params("tidal_download", task_params, dedup_key=dedup_key) or "duplicate"
-    send_message(f"\U0001f4e5 Download queued\n<code>{task_id[:8]}</code>\n{url}", chat_id=chat_id)
+        task_id = (
+            find_active_task_by_type_params(
+                "tidal_download", task_params, dedup_key=dedup_key
+            )
+            or "duplicate"
+        )
+    send_message(
+        f"\U0001f4e5 Download queued\n<code>{task_id[:8]}</code>\n{url}",
+        chat_id=chat_id,
+    )
 
 
 def _cmd_cancel(chat_id: str, args: str):
     task_id_prefix = args.strip()
     if not task_id_prefix:
-        send_message("\u26a0\ufe0f Usage: /cancel &lt;task_id&gt; (first 8 chars are enough)", chat_id=chat_id)
+        send_message(
+            "\u26a0\ufe0f Usage: /cancel &lt;task_id&gt; (first 8 chars are enough)",
+            chat_id=chat_id,
+        )
         return
 
     row = find_active_task_by_prefix(task_id_prefix)
 
     if not row:
-        send_message(f"\u26a0\ufe0f No active task matching <code>{task_id_prefix}</code>", chat_id=chat_id)
+        send_message(
+            f"\u26a0\ufe0f No active task matching <code>{task_id_prefix}</code>",
+            chat_id=chat_id,
+        )
         return
 
     update_task(row["id"], status="cancelled")
@@ -321,6 +362,7 @@ def _cmd_search(chat_id: str, args: str):
 
     try:
         from crate.tidal import search
+
         results = search(query, limit=5)
         albums = results.get("albums", [])[:5]
         artists = results.get("artists", [])[:3]
@@ -329,7 +371,7 @@ def _cmd_search(chat_id: str, args: str):
         return
 
     if not albums and not artists:
-        send_message(f"\U0001f50d No results for \"{query}\"", chat_id=chat_id)
+        send_message(f'\U0001f50d No results for "{query}"', chat_id=chat_id)
         return
 
     lines = []
@@ -340,23 +382,31 @@ def _cmd_search(chat_id: str, args: str):
     if albums:
         lines.append("\n<b>Albums:</b>")
         for a in albums:
-            artist = a.get("artist", {}).get("name", "?") if isinstance(a.get("artist"), dict) else a.get("artist", "?")
+            artist = (
+                a.get("artist", {}).get("name", "?")
+                if isinstance(a.get("artist"), dict)
+                else a.get("artist", "?")
+            )
             year = f" ({a['year']})" if a.get("year") else ""
             url = a.get("url", "")
             lines.append(f"  \u2022 {artist} — {a.get('title', '?')}{year}")
             if url:
                 lines.append(f"    /download {url}")
 
-    send_message(f"\U0001f50d <b>Tidal search:</b> {query}\n\n" + "\n".join(lines), chat_id=chat_id)
+    send_message(
+        f"\U0001f50d <b>Tidal search:</b> {query}\n\n" + "\n".join(lines),
+        chat_id=chat_id,
+    )
 
 
 # ── System monitoring helpers ─────────────────────────────────────
 
+
 def _disk_usage() -> str:
     try:
         usage = shutil.disk_usage("/music")
-        free_gb = usage.free / (1024 ** 3)
-        total_gb = usage.total / (1024 ** 3)
+        free_gb = usage.free / (1024**3)
+        total_gb = usage.total / (1024**3)
         pct = (usage.used / usage.total) * 100
         return f"{free_gb:.0f} GB free / {total_gb:.0f} GB ({pct:.0f}%)"
     except Exception:
@@ -385,11 +435,19 @@ def _memory_info() -> dict:
             "percent": round(used / total * 100) if total > 0 else 0,
             "swap_total_gb": swap_total,
             "swap_used_gb": swap_used,
-            "swap_percent": round(swap_used / swap_total * 100) if swap_total > 0 else 0,
+            "swap_percent": round(swap_used / swap_total * 100)
+            if swap_total > 0
+            else 0,
         }
     except Exception:
-        return {"total_gb": 0, "used_gb": 0, "percent": 0,
-                "swap_total_gb": 0, "swap_used_gb": 0, "swap_percent": 0}
+        return {
+            "total_gb": 0,
+            "used_gb": 0,
+            "percent": 0,
+            "swap_total_gb": 0,
+            "swap_used_gb": 0,
+            "swap_percent": 0,
+        }
 
 
 def _api_health() -> str:
@@ -406,10 +464,12 @@ def _api_health() -> str:
 
 # ── Health check alerts (metrics-driven) ─────────────────────────
 
+
 def _check_alerts():
     """Evaluate health via the alerting engine and send alerts."""
     try:
         from crate.alerting import check_and_alert
+
         check_and_alert()
     except Exception:
         log.debug("Alerting check failed", exc_info=True)
@@ -417,9 +477,11 @@ def _check_alerts():
 
 # ── Command router ────────────────────────────────────────────────
 
+
 def _cmd_health(chat_id: str, _args: str):
     try:
         from crate.alerting import evaluate_health
+
         status = evaluate_health()
         score = status.score
         if score >= 80:
@@ -428,7 +490,10 @@ def _cmd_health(chat_id: str, _args: str):
             icon = "\U0001f7e1"
         else:
             icon = "\U0001f534"
-        send_message(f"{icon} <b>Health: {score}/100</b>\n\n{status.summary_text()}", chat_id=chat_id)
+        send_message(
+            f"{icon} <b>Health: {score}/100</b>\n\n{status.summary_text()}",
+            chat_id=chat_id,
+        )
     except Exception as e:
         send_message(f"\u274c Health check failed: {str(e)[:200]}", chat_id=chat_id)
 
@@ -447,6 +512,7 @@ def _cmd_task(chat_id: str, args: str):
         # Try completed tasks too
         try:
             from crate.db.queries.tasks import list_tasks
+
             for t in list_tasks(limit=50):
                 if t["id"].startswith(task_id_prefix):
                     row = t
@@ -455,19 +521,25 @@ def _cmd_task(chat_id: str, args: str):
             pass
 
     if not row:
-        send_message(f"\u26a0\ufe0f No task matching <code>{task_id_prefix}</code>", chat_id=chat_id)
+        send_message(
+            f"\u26a0\ufe0f No task matching <code>{task_id_prefix}</code>",
+            chat_id=chat_id,
+        )
         return
 
     task = get_task(row["id"]) if row.get("id") else row
     if not task:
-        send_message(f"\u26a0\ufe0f Task not found", chat_id=chat_id)
+        send_message("\u26a0\ufe0f Task not found", chat_id=chat_id)
         return
 
     icon = task_icon(task["type"])
     label = task_label(task["type"])
     status_icon = {
-        "running": "\U0001f7e2", "pending": "\U0001f7e1",
-        "completed": "\u2705", "failed": "\u274c", "cancelled": "\U0001f6d1",
+        "running": "\U0001f7e2",
+        "pending": "\U0001f7e1",
+        "completed": "\u2705",
+        "failed": "\u274c",
+        "cancelled": "\U0001f6d1",
     }.get(task.get("status", ""), "\u2753")
 
     lines = [f"{icon} <b>{label}</b> {status_icon} {task.get('status', '?')}"]
@@ -477,11 +549,14 @@ def _cmd_task(chat_id: str, args: str):
     progress = task.get("progress")
     if progress:
         from crate.task_progress import TaskProgress
+
         p = TaskProgress.from_json(progress)
         if p.total > 0:
             pct = p.percent()
             bar = "\u2588" * int(pct / 10) + "\u2591" * (10 - int(pct / 10))
-            lines.append(f"\nPhase: {p.phase_index + 1}/{p.phase_count} \u2014 {p.phase}")
+            lines.append(
+                f"\nPhase: {p.phase_index + 1}/{p.phase_count} \u2014 {p.phase}"
+            )
             lines.append(f"Progress: {bar} {pct:.0f}% ({p.done}/{p.total})")
             if p.rate > 0:
                 lines.append(f"Rate: {p.rate:.1f} items/sec \u00b7 ETA: {p.eta_sec}s")
@@ -493,6 +568,7 @@ def _cmd_task(chat_id: str, args: str):
     # Show recent events
     try:
         from crate.db.events import get_task_events
+
         events = get_task_events(task["id"], limit=5)
         if events:
             lines.append("\n\U0001f4cb Last events:")
@@ -505,9 +581,15 @@ def _cmd_task(chat_id: str, args: str):
                         data = {}
                 level = data.get("level", "info")
                 level_icon = {
-                    "error": "\U0001f534", "warn": "\U0001f7e1", "info": "\U0001f7e2"
+                    "error": "\U0001f534",
+                    "warn": "\U0001f7e1",
+                    "info": "\U0001f7e2",
                 }.get(level, "\u2022")
-                msg = data.get("message") or data.get("label") or evt.get("event_type", "")
+                msg = (
+                    data.get("message")
+                    or data.get("label")
+                    or evt.get("event_type", "")
+                )
                 lines.append(f"  {level_icon} {msg[:80]}")
     except Exception:
         pass
@@ -525,16 +607,25 @@ def _cmd_logs(chat_id: str, args: str):
 
     try:
         from crate.db.worker_logs import query_logs
+
         logs = query_logs(level=level, limit=10)
     except Exception as e:
         send_message(f"\u274c Failed to query logs: {str(e)[:200]}", chat_id=chat_id)
         return
 
     if not logs:
-        send_message("\u2705 No recent worker logs" + (f" (level={level})" if level else ""), chat_id=chat_id)
+        send_message(
+            "\u2705 No recent worker logs" + (f" (level={level})" if level else ""),
+            chat_id=chat_id,
+        )
         return
 
-    level_icons = {"error": "\U0001f534", "warn": "\U0001f7e1", "info": "\U0001f7e2", "debug": "\u26aa"}
+    level_icons = {
+        "error": "\U0001f534",
+        "warn": "\U0001f7e1",
+        "info": "\U0001f7e2",
+        "debug": "\u26aa",
+    }
     lines = ["\U0001f4cb <b>Recent logs</b>"]
     for entry in logs:
         icon = level_icons.get(entry.get("level", "info"), "\u2022")
@@ -548,6 +639,7 @@ def _cmd_logs(chat_id: str, args: str):
 def _cmd_workers(chat_id: str, _args: str):
     try:
         from crate.db.worker_logs import list_known_workers
+
         workers = list_known_workers()
     except Exception:
         send_message("\u274c Failed to query workers", chat_id=chat_id)
@@ -559,12 +651,14 @@ def _cmd_workers(chat_id: str, _args: str):
 
     lines = ["\U0001f527 <b>Workers</b>"]
     for w in workers:
-        lines.append(f"  \u2022 <code>{w['worker_id']}</code>: {w['log_count']} logs, last seen {w.get('last_seen', '?')}")
+        lines.append(
+            f"  \u2022 <code>{w['worker_id']}</code>: {w['log_count']} logs, last seen {w.get('last_seen', '?')}"
+        )
 
     send_message("\n".join(lines), chat_id=chat_id)
 
 
-_COMMANDS: dict[str, callable] = {
+_COMMANDS: dict[str, Callable[[str, str], None]] = {
     "start": _cmd_start,
     "help": _cmd_start,
     "status": _cmd_status,
@@ -625,12 +719,21 @@ def _handle_update(update: dict):
 
 # ── Main loop ─────────────────────────────────────────────────────
 
+
 def telegram_bot_loop(config: dict):
     """Main bot loop — runs as a daemon thread in the worker."""
     global _BOT_TOKEN, _CHAT_ID, _LAST_UPDATE_ID
 
-    _BOT_TOKEN = config.get("telegram_bot_token") or get_setting("telegram_bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN")
-    _CHAT_ID = config.get("telegram_chat_id") or get_setting("telegram_chat_id") or os.environ.get("TELEGRAM_CHAT_ID")
+    _BOT_TOKEN = (
+        config.get("telegram_bot_token")
+        or get_setting("telegram_bot_token")
+        or os.environ.get("TELEGRAM_BOT_TOKEN")
+    )
+    _CHAT_ID = (
+        config.get("telegram_chat_id")
+        or get_setting("telegram_chat_id")
+        or os.environ.get("TELEGRAM_CHAT_ID")
+    )
 
     if not _BOT_TOKEN:
         log.info("Telegram bot token not configured, bot disabled")

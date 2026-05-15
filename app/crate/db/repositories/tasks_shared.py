@@ -48,7 +48,9 @@ def dispatch_task(task_type: str, task_id: str) -> None:
 
 def publish_tasks_surface_signal() -> None:
     try:
-        from crate.db.admin_tasks_surface import publish_tasks_surface_signal as _publish
+        from crate.db.admin_tasks_surface import (
+            publish_tasks_surface_signal as _publish,
+        )
 
         _publish()
     except Exception:

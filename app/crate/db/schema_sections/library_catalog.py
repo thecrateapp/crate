@@ -42,7 +42,9 @@ def create_library_catalog_schema(cur) -> None:
             content_hash TEXT
         )
     """)
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_id ON library_artists(id)")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_id ON library_artists(id)"
+    )
     cur.execute("""
         DO $$ BEGIN
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='library_artists' AND column_name='storage_id') THEN
@@ -57,8 +59,12 @@ def create_library_catalog_schema(cur) -> None:
             END IF;
         END $$
     """)
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_slug ON library_artists(slug)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_artists_name_trgm ON library_artists USING gin(name gin_trgm_ops)")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_slug ON library_artists(slug)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artists_name_trgm ON library_artists USING gin(name gin_trgm_ops)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS library_albums (
@@ -88,7 +94,9 @@ def create_library_catalog_schema(cur) -> None:
             UNIQUE(artist, name)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_albums_artist ON library_albums(artist)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_albums_artist ON library_albums(artist)"
+    )
     cur.execute("""
         DO $$ BEGIN
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='library_albums' AND column_name='storage_id') THEN
@@ -103,9 +111,15 @@ def create_library_catalog_schema(cur) -> None:
             END IF;
         END $$
     """)
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_albums_slug ON library_albums(slug)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_albums_name_trgm ON library_albums USING gin(name gin_trgm_ops)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_albums_artist_name ON library_albums(artist, name)")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_albums_slug ON library_albums(slug)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_albums_name_trgm ON library_albums USING gin(name gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_albums_artist_name ON library_albums(artist, name)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS library_tracks (
@@ -173,18 +187,42 @@ def create_library_catalog_schema(cur) -> None:
             END IF;
         END $$
     """)
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_tracks_slug ON library_tracks(slug)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_tracks_album ON library_tracks(album_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_tracks_artist ON library_tracks(artist)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_tracks_genre ON library_tracks(genre)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_tracks_year ON library_tracks(year)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_analysis_pending ON library_tracks(updated_at DESC) WHERE analysis_state = 'pending'")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_bliss_pending ON library_tracks(updated_at DESC) WHERE bliss_state = 'pending'")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_title_trgm ON library_tracks USING gin(title gin_trgm_ops)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON library_tracks(album_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_bpm ON library_tracks(bpm) WHERE bpm IS NOT NULL")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_tracks_energy ON library_tracks(energy) WHERE energy IS NOT NULL")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_lib_tracks_lastfm_playcount ON library_tracks(lastfm_playcount DESC NULLS LAST)")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_tracks_slug ON library_tracks(slug)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_tracks_album ON library_tracks(album_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_tracks_artist ON library_tracks(artist)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_tracks_genre ON library_tracks(genre)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_tracks_year ON library_tracks(year)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_analysis_pending ON library_tracks(updated_at DESC) WHERE analysis_state = 'pending'"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_bliss_pending ON library_tracks(updated_at DESC) WHERE bliss_state = 'pending'"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_title_trgm ON library_tracks USING gin(title gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON library_tracks(album_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_bpm ON library_tracks(bpm) WHERE bpm IS NOT NULL"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_energy ON library_tracks(energy) WHERE energy IS NOT NULL"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_lib_tracks_lastfm_playcount ON library_tracks(lastfm_playcount DESC NULLS LAST)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS artist_bliss_centroids (
@@ -195,8 +233,12 @@ def create_library_catalog_schema(cur) -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_artist_bliss_centroids_name ON artist_bliss_centroids(LOWER(artist_name))")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_artist_bliss_centroids_updated ON artist_bliss_centroids(updated_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artist_bliss_centroids_name ON artist_bliss_centroids(LOWER(artist_name))"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artist_bliss_centroids_updated ON artist_bliss_centroids(updated_at DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS track_lyrics (
@@ -220,9 +262,15 @@ def create_library_catalog_schema(cur) -> None:
         CREATE UNIQUE INDEX IF NOT EXISTS idx_track_lyrics_lookup
         ON track_lyrics(provider, artist_key, title_key)
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_track ON track_lyrics(track_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_entity ON track_lyrics(track_entity_uid)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_track_lyrics_updated ON track_lyrics(updated_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_track ON track_lyrics(track_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_entity ON track_lyrics(track_entity_uid)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_track_lyrics_updated ON track_lyrics(updated_at DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS album_portable_metadata (
@@ -239,9 +287,15 @@ def create_library_catalog_schema(cur) -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_sidecar ON album_portable_metadata(sidecar_written_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_tags ON album_portable_metadata(audio_tags_written_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_sidecar ON album_portable_metadata(sidecar_written_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_tags ON album_portable_metadata(audio_tags_written_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)"
+    )
 
 
 __all__ = ["create_library_catalog_schema"]

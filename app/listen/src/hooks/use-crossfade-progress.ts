@@ -11,7 +11,9 @@ import type { CrossfadeTransition } from "@/contexts/PlayerContext";
  * Uses requestAnimationFrame so the fade is smooth regardless of the
  * React render cadence.
  */
-export function useCrossfadeProgress(transition: CrossfadeTransition | null): number {
+export function useCrossfadeProgress(
+  transition: CrossfadeTransition | null,
+): number {
   const [progress, setProgress] = useState(transition ? 0 : 1);
 
   useEffect(() => {

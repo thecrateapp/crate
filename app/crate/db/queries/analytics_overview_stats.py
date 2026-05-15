@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_top_artists_by_albums(limit: int = 25) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT la.id, la.slug, la.name, COUNT(DISTINCT alb.id) AS albums
                 FROM library_artists la
                 JOIN library_albums alb ON alb.artist = la.name
@@ -17,17 +18,29 @@ def get_top_artists_by_albums(limit: int = 25) -> list[dict]:
                 ORDER BY albums DESC
                 LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
-        return [{"id": row["id"], "slug": row["slug"], "name": row["name"], "albums": row["albums"]} for row in rows]
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
+        return [
+            {
+                "id": row["id"],
+                "slug": row["slug"],
+                "name": row["name"],
+                "albums": row["albums"],
+            }
+            for row in rows
+        ]
 
 
 def get_overview_stat_summary() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 WITH track_stats AS (
                     SELECT
                         COUNT(*) AS track_count,
@@ -54,8 +67,11 @@ def get_overview_stat_summary() -> dict:
                 FROM track_stats
                 CROSS JOIN album_stats
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     if not row:
         return {
@@ -75,81 +91,139 @@ def get_overview_stat_summary() -> dict:
     return {
         "track_count": track_count,
         "album_count": album_count,
-        "duration_hours": round(total_duration_seconds / 3600, 1) if total_duration_seconds else 0,
+        "duration_hours": round(total_duration_seconds / 3600, 1)
+        if total_duration_seconds
+        else 0,
         "avg_bitrate": round(row["avg_bitrate"]) if row["avg_bitrate"] else 0,
         "analyzed_tracks": int(row["analyzed_tracks"] or 0),
-        "avg_album_duration_min": round(float(avg_album_duration_seconds) / 60, 1) if avg_album_duration_seconds else 0,
-        "avg_tracks_per_album": round(track_count / album_count, 1) if album_count else 0,
+        "avg_album_duration_min": round(float(avg_album_duration_seconds) / 60, 1)
+        if avg_album_duration_seconds
+        else 0,
+        "avg_tracks_per_album": round(track_count / album_count, 1)
+        if album_count
+        else 0,
     }
 
 
 def get_total_duration_hours() -> float:
     with read_scope() as session:
-        row = session.execute(text("SELECT COALESCE(SUM(duration), 0) as total FROM library_tracks")).mappings().first()
-        return round(row["total"] / 3600, 1) if row["total"] else 0
+        row = (
+            session.execute(
+                text("SELECT COALESCE(SUM(duration), 0) as total FROM library_tracks")
+            )
+            .mappings()
+            .first()
+        )
+        return round(row["total"] / 3600, 1) if row and row["total"] else 0
 
 
 def get_avg_tracks_per_album() -> float:
     with read_scope() as session:
-        album_count = session.execute(text("SELECT COUNT(*) AS cnt FROM library_albums")).mappings().first()["cnt"]
-        track_count = session.execute(text("SELECT COUNT(*) AS cnt FROM library_tracks")).mappings().first()["cnt"]
+        album_row = (
+            session.execute(text("SELECT COUNT(*) AS cnt FROM library_albums"))
+            .mappings()
+            .first()
+        )
+        track_row = (
+            session.execute(text("SELECT COUNT(*) AS cnt FROM library_tracks"))
+            .mappings()
+            .first()
+        )
+        album_count = int(album_row["cnt"] or 0) if album_row else 0
+        track_count = int(track_row["cnt"] or 0) if track_row else 0
         return round(track_count / album_count, 1) if album_count else 0
 
 
 def get_stats_duration_hours() -> float:
     with read_scope() as session:
-        row = session.execute(text("SELECT COALESCE(SUM(duration), 0) / 3600.0 AS val FROM library_tracks")).mappings().first()
-        return round(row["val"], 1)
+        row = (
+            session.execute(
+                text(
+                    "SELECT COALESCE(SUM(duration), 0) / 3600.0 AS val FROM library_tracks"
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return round(row["val"], 1) if row and row["val"] else 0
 
 
 def get_stats_avg_bitrate() -> int:
     with read_scope() as session:
-        row = session.execute(text("SELECT AVG(bitrate) AS val FROM library_tracks WHERE bitrate IS NOT NULL")).mappings().first()
-        return round(row["val"]) if row["val"] else 0
+        row = (
+            session.execute(
+                text(
+                    "SELECT AVG(bitrate) AS val FROM library_tracks WHERE bitrate IS NOT NULL"
+                )
+            )
+            .mappings()
+            .first()
+        )
+        return round(row["val"]) if row and row["val"] else 0
 
 
 def get_stats_top_genres(limit: int = 10) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT genre, COUNT(*) AS c FROM library_tracks
                 WHERE genre IS NOT NULL AND genre != ''
                 GROUP BY genre ORDER BY c DESC LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [{"name": row["genre"], "count": row["c"]} for row in rows]
 
 
 def get_stats_recent_albums(limit: int = 10) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT a.id, a.slug, a.artist, ar.id AS artist_id, ar.slug AS artist_slug, a.name, a.year, a.dir_mtime
                 FROM library_albums a
                 LEFT JOIN library_artists ar ON ar.name = a.artist
                 ORDER BY dir_mtime DESC NULLS LAST LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
 def get_stats_analyzed_track_count() -> int:
     with read_scope() as session:
-        row = session.execute(text("SELECT COUNT(*) AS c FROM library_tracks WHERE bpm IS NOT NULL")).mappings().first()
-        return row["c"]
+        row = (
+            session.execute(
+                text("SELECT COUNT(*) AS c FROM library_tracks WHERE bpm IS NOT NULL")
+            )
+            .mappings()
+            .first()
+        )
+        return int(row["c"] or 0) if row else 0
 
 
 def get_stats_avg_album_duration_min() -> float:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT AVG(total_duration) AS val FROM library_albums WHERE total_duration IS NOT NULL AND total_duration > 0")
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT AVG(total_duration) AS val FROM library_albums WHERE total_duration IS NOT NULL AND total_duration > 0"
+                )
+            )
+            .mappings()
+            .first()
+        )
         return round(row["val"] / 60, 1) if row and row["val"] else 0
 
 

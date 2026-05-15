@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 
-def test_library_watcher_queues_scoped_sync_instead_of_syncing_inline(monkeypatch, tmp_path):
+def test_library_watcher_queues_scoped_sync_instead_of_syncing_inline(
+    monkeypatch, tmp_path
+):
     from crate.library_watcher import LibraryWatcher
 
     library_path = tmp_path / "music"
@@ -16,7 +18,9 @@ def test_library_watcher_queues_scoped_sync_instead_of_syncing_inline(monkeypatc
         captured["dedup_key"] = dedup_key
         return "task-1"
 
-    monkeypatch.setattr("crate.db.repositories.tasks.create_task_dedup", fake_create_task_dedup)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.create_task_dedup", fake_create_task_dedup
+    )
 
     watcher = LibraryWatcher({"library_path": str(library_path)}, sync=object())
     watcher._sync_album(album_dir, "Artist", True)

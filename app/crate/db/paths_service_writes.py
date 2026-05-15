@@ -5,7 +5,10 @@ from __future__ import annotations
 from crate.db.paths_service_payloads import build_endpoint_payload
 from crate.db.paths_service_planning import build_music_path_plan
 from crate.db.paths_service_reads import get_music_path
-from crate.db.repositories.paths import create_music_path_record, update_music_path_tracks
+from crate.db.repositories.paths import (
+    create_music_path_record,
+    update_music_path_tracks,
+)
 
 
 def create_music_path(
@@ -48,8 +51,12 @@ def create_music_path(
     return {
         "id": row["id"],
         "name": name,
-        "origin": build_endpoint_payload(origin_type, origin_value, plan["origin_label"]),
-        "destination": build_endpoint_payload(dest_type, dest_value, plan["dest_label"]),
+        "origin": build_endpoint_payload(
+            origin_type, origin_value, plan["origin_label"]
+        ),
+        "destination": build_endpoint_payload(
+            dest_type, dest_value, plan["dest_label"]
+        ),
         "waypoints": plan["resolved_waypoints"],
         "step_count": step_count,
         "tracks": plan["tracks"],
@@ -101,8 +108,12 @@ def preview_music_path(
 
     return {
         "name": f"{plan['origin_label']} -> {plan['dest_label']}",
-        "origin": build_endpoint_payload(origin_type, origin_value, plan["origin_label"]),
-        "destination": build_endpoint_payload(dest_type, dest_value, plan["dest_label"]),
+        "origin": build_endpoint_payload(
+            origin_type, origin_value, plan["origin_label"]
+        ),
+        "destination": build_endpoint_payload(
+            dest_type, dest_value, plan["dest_label"]
+        ),
         "waypoints": plan["resolved_waypoints"],
         "step_count": step_count,
         "tracks": plan["tracks"],

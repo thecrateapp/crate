@@ -2,14 +2,30 @@
 
 from __future__ import annotations
 
+from typing import overload
+
 from sqlalchemy import text
 
 from crate.db.tx import read_scope, transaction_scope
 
 
+@overload
+def get_setting(key: str, default: str) -> str: ...
+
+
+@overload
+def get_setting(key: str, default: None = None) -> str | None: ...
+
+
 def get_setting(key: str, default: str | None = None) -> str | None:
     with read_scope() as session:
-        row = session.execute(text("SELECT value FROM settings WHERE key = :key"), {"key": key}).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT value FROM settings WHERE key = :key"), {"key": key}
+            )
+            .mappings()
+            .first()
+        )
     return row["value"] if row else default
 
 

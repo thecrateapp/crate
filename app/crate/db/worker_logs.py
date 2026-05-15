@@ -90,8 +90,9 @@ def query_logs(
 
 def list_known_workers() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text("""
+        rows = (
+            session.execute(
+                text("""
                 SELECT worker_id,
                        MAX(created_at) AS last_seen,
                        COUNT(*)::INTEGER AS log_count
@@ -100,7 +101,10 @@ def list_known_workers() -> list[dict]:
                 GROUP BY worker_id
                 ORDER BY last_seen DESC
             """)
-        ).mappings().all()
+            )
+            .mappings()
+            .all()
+        )
     return serialize_rows(rows)
 
 
@@ -108,10 +112,12 @@ def cleanup_old_logs(max_age_days: int = 7):
     try:
         with transaction_scope() as session:
             result = session.execute(
-                text("DELETE FROM worker_logs WHERE created_at < now() - (:days * interval '1 day')"),
+                text(
+                    "DELETE FROM worker_logs WHERE created_at < now() - (:days * interval '1 day')"
+                ),
                 {"days": max_age_days},
             )
-            deleted = result.rowcount
+            deleted = int(getattr(result, "rowcount", 0) or 0)
         if deleted:
             _log.debug("Cleaned up %d old worker log entries", deleted)
     except Exception:
@@ -120,15 +126,17 @@ def cleanup_old_logs(max_age_days: int = 7):
 
 def _publish_logs_signal() -> None:
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        redis = _get_redis()
+        redis = get_redis()
         if not redis:
             return
-        payload = json.dumps({
-            "kind": "worker_log",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        payload = json.dumps(
+            {
+                "kind": "worker_log",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         redis.publish(_ADMIN_LOGS_STREAM_CHANNEL, payload)
     except Exception:
         _log.debug("Failed to publish worker log signal", exc_info=True)
@@ -137,13 +145,18 @@ def _publish_logs_signal() -> None:
 def _row_to_log(row) -> dict:
     d = dict(row)
     meta_raw = d.pop("metadata_json", None)
-    d["metadata"] = meta_raw if isinstance(meta_raw, dict) else (json.loads(meta_raw) if meta_raw else None)
+    d["metadata"] = (
+        meta_raw
+        if isinstance(meta_raw, dict)
+        else (json.loads(meta_raw) if meta_raw else None)
+    )
     if hasattr(d.get("created_at"), "isoformat"):
         d["created_at"] = d["created_at"].isoformat()
     return d
 
 
 # ── Convenience interface ────────────────────────────────────────
+
 
 class _WorkerLogger:
     """Facade that emits structured logs to worker_logs table.
@@ -154,16 +167,34 @@ class _WorkerLogger:
                   meta={"artist": "Birds In Row"})
     """
 
-    def info(self, message: str, *, task_id: str | None = None,
-             category: str = "general", meta: dict | None = None):
+    def info(
+        self,
+        message: str,
+        *,
+        task_id: str | None = None,
+        category: str = "general",
+        meta: dict | None = None,
+    ):
         insert_log("info", message, task_id=task_id, category=category, metadata=meta)
 
-    def warn(self, message: str, *, task_id: str | None = None,
-             category: str = "general", meta: dict | None = None):
+    def warn(
+        self,
+        message: str,
+        *,
+        task_id: str | None = None,
+        category: str = "general",
+        meta: dict | None = None,
+    ):
         insert_log("warn", message, task_id=task_id, category=category, metadata=meta)
 
-    def error(self, message: str, *, task_id: str | None = None,
-              category: str = "general", meta: dict | None = None):
+    def error(
+        self,
+        message: str,
+        *,
+        task_id: str | None = None,
+        category: str = "general",
+        meta: dict | None = None,
+    ):
         insert_log("error", message, task_id=task_id, category=category, metadata=meta)
 
 

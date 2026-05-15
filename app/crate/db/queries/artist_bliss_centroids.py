@@ -10,9 +10,10 @@ def get_artist_bliss_centroid(artist_ref: str, *, session=None) -> dict | None:
         return None
 
     with optional_scope(session) as s:
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 SELECT
                     c.artist_id,
                     c.artist_name,
@@ -33,9 +34,12 @@ def get_artist_bliss_centroid(artist_ref: str, *, session=None) -> dict | None:
                     END
                 LIMIT 1
                 """
-            ),
-            {"artist_ref": artist_ref},
-        ).mappings().first()
+                ),
+                {"artist_ref": artist_ref},
+            )
+            .mappings()
+            .first()
+        )
 
     if not row:
         return None

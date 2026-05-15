@@ -20,19 +20,25 @@ function normalizeArtistName(value: string | null | undefined) {
     .toLowerCase();
 }
 
-export function useResolvedPlayerArtist(currentTrack: Track | undefined, queue: Track[]) {
+export function useResolvedPlayerArtist(
+  currentTrack: Track | undefined,
+  queue: Track[],
+) {
   const [artistPhotoFailed, setArtistPhotoFailed] = useState(false);
-  const [resolvedArtist, setResolvedArtist] = useState<ResolvedArtistMeta | null>(null);
+  const [resolvedArtist, setResolvedArtist] =
+    useState<ResolvedArtistMeta | null>(null);
 
-  const artistPhotoUrl = resolvedArtist?.id != null
-    ? artistPhotoApiUrl({
-        artistId: resolvedArtist.id,
-        artistSlug: resolvedArtist.slug,
-        artistName: resolvedArtist.name,
-      })
-    : null;
+  const artistPhotoUrl =
+    resolvedArtist?.id != null
+      ? artistPhotoApiUrl({
+          artistId: resolvedArtist.id,
+          artistSlug: resolvedArtist.slug,
+          artistName: resolvedArtist.name,
+        })
+      : null;
 
-  const artistAvatarUrl = !artistPhotoFailed && artistPhotoUrl ? artistPhotoUrl : null;
+  const artistAvatarUrl =
+    !artistPhotoFailed && artistPhotoUrl ? artistPhotoUrl : null;
 
   useEffect(() => {
     setArtistPhotoFailed(false);
@@ -61,7 +67,10 @@ export function useResolvedPlayerArtist(currentTrack: Track | undefined, queue: 
     }
 
     const queueMatch = queue.find((track) => {
-      return track.artistId != null && normalizeArtistName(track.artist) === normalizedArtist;
+      return (
+        track.artistId != null &&
+        normalizeArtistName(track.artist) === normalizedArtist
+      );
     });
     if (queueMatch?.artistId != null) {
       setResolvedArtist({
@@ -74,13 +83,25 @@ export function useResolvedPlayerArtist(currentTrack: Track | undefined, queue: 
 
     let cancelled = false;
 
-    api<{ artists?: { id: number; name: string; slug?: string; has_photo?: boolean }[] }>(
-      `/api/search?q=${encodeURIComponent(artistName)}&limit=5`,
-    )
+    api<{
+      artists?: {
+        id: number;
+        name: string;
+        slug?: string;
+        has_photo?: boolean;
+      }[];
+    }>(`/api/search?q=${encodeURIComponent(artistName)}&limit=5`)
       .then((result) => {
         if (cancelled) return;
-        const exactMatches = result.artists?.filter((artist) => normalizeArtistName(artist.name) === normalizedArtist) ?? [];
-        const bestMatch = exactMatches.find((artist) => artist.has_photo) ?? exactMatches[0] ?? result.artists?.[0] ?? null;
+        const exactMatches =
+          result.artists?.filter(
+            (artist) => normalizeArtistName(artist.name) === normalizedArtist,
+          ) ?? [];
+        const bestMatch =
+          exactMatches.find((artist) => artist.has_photo) ??
+          exactMatches[0] ??
+          result.artists?.[0] ??
+          null;
         setResolvedArtist(
           bestMatch
             ? {
@@ -99,7 +120,12 @@ export function useResolvedPlayerArtist(currentTrack: Track | undefined, queue: 
     return () => {
       cancelled = true;
     };
-  }, [currentTrack?.artist, currentTrack?.artistId, currentTrack?.artistSlug, queue]);
+  }, [
+    currentTrack?.artist,
+    currentTrack?.artistId,
+    currentTrack?.artistSlug,
+    queue,
+  ]);
 
   return {
     resolvedArtist,

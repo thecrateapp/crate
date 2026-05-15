@@ -13,7 +13,11 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 
-import { artistGenreSlug, type ArtistData, type ArtistInfo } from "@/components/artist/artist-model";
+import {
+  artistGenreSlug,
+  type ArtistData,
+  type ArtistInfo,
+} from "@/components/artist/artist-model";
 import { AppMenuButton, AppPopover } from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
@@ -60,7 +64,9 @@ export function ArtistHeroSection({
   const menuRef = useRef<HTMLDivElement>(null);
   const bio = artistInfo?.bio ?? "";
   const heroBackgroundSrc = backgroundUrl
-    ? `${backgroundUrl}${backgroundUrl.includes("?") ? "&" : "?"}v=artist-hero-bg-v1`
+    ? `${backgroundUrl}${
+        backgroundUrl.includes("?") ? "&" : "?"
+      }v=artist-hero-bg-v1`
     : undefined;
   const closeMenu = () => setMenuOpen(false);
 
@@ -76,12 +82,34 @@ export function ArtistHeroSection({
       photoUrl={photoUrl}
       following={following}
       hasSetlist={hasSetlist}
-      onPlay={() => { onPlay(); closeMenu(); }}
-      onShuffle={() => { onShuffle(); closeMenu(); }}
-      onArtistRadio={() => { onArtistRadio(); closeMenu(); }}
-      onPlaySetlist={onPlaySetlist ? () => { onPlaySetlist(); closeMenu(); } : undefined}
-      onToggleFollow={() => { onToggleFollow(); closeMenu(); }}
-      onShare={() => { onShare(); closeMenu(); }}
+      onPlay={() => {
+        onPlay();
+        closeMenu();
+      }}
+      onShuffle={() => {
+        onShuffle();
+        closeMenu();
+      }}
+      onArtistRadio={() => {
+        onArtistRadio();
+        closeMenu();
+      }}
+      onPlaySetlist={
+        onPlaySetlist
+          ? () => {
+              onPlaySetlist();
+              closeMenu();
+            }
+          : undefined
+      }
+      onToggleFollow={() => {
+        onToggleFollow();
+        closeMenu();
+      }}
+      onShare={() => {
+        onShare();
+        closeMenu();
+      }}
     />
   );
 
@@ -120,9 +148,7 @@ export function ArtistHeroSection({
 
             <div className="max-w-3xl pb-1">
               <div className="flex items-center gap-3 sm:block">
-                <div
-                  className="sm:hidden h-14 w-14 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-xl ring-2 ring-white/10"
-                >
+                <div className="sm:hidden h-14 w-14 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-xl ring-2 ring-white/10">
                   <img
                     src={photoUrl}
                     alt={artist.name}
@@ -133,7 +159,9 @@ export function ArtistHeroSection({
                   />
                 </div>
                 <div>
-                  <h1 className="mb-1 text-2xl font-bold text-foreground sm:mb-2 sm:text-4xl">{artist.name}</h1>
+                  <h1 className="mb-1 text-2xl font-bold text-foreground sm:mb-2 sm:text-4xl">
+                    {artist.name}
+                  </h1>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:hidden">
                     {artistInfo?.listeners ? (
                       <span className="flex items-center gap-1">
@@ -141,8 +169,12 @@ export function ArtistHeroSection({
                         {formatCompact(artistInfo.listeners)}
                       </span>
                     ) : null}
-                    {artist.total_tracks > 0 ? <span>{artist.total_tracks} tracks</span> : null}
-                    {artist.albums.length > 0 ? <span>{artist.albums.length} albums</span> : null}
+                    {artist.total_tracks > 0 ? (
+                      <span>{artist.total_tracks} tracks</span>
+                    ) : null}
+                    {artist.albums.length > 0 ? (
+                      <span>{artist.albums.length} albums</span>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -154,8 +186,12 @@ export function ArtistHeroSection({
                     {formatCompact(artistInfo.listeners)} listeners
                   </span>
                 ) : null}
-                {artist.total_tracks > 0 ? <span>{artist.total_tracks} tracks</span> : null}
-                {artist.albums.length > 0 ? <span>{artist.albums.length} albums</span> : null}
+                {artist.total_tracks > 0 ? (
+                  <span>{artist.total_tracks} tracks</span>
+                ) : null}
+                {artist.albums.length > 0 ? (
+                  <span>{artist.albums.length} albums</span>
+                ) : null}
               </div>
 
               {bio ? (
@@ -179,7 +215,13 @@ export function ArtistHeroSection({
                   items={artist.genre_profile}
                   max={6}
                   className="mt-4"
-                  onSelect={(item) => navigate(`/explore?genre=${encodeURIComponent(item.slug || artistGenreSlug(item.name))}`)}
+                  onSelect={(item) =>
+                    navigate(
+                      `/explore?genre=${encodeURIComponent(
+                        item.slug || artistGenreSlug(item.name),
+                      )}`,
+                    )
+                  }
                 />
               ) : tags.length > 0 ? (
                 <div className="mt-4 flex flex-wrap gap-1.5">
@@ -187,7 +229,13 @@ export function ArtistHeroSection({
                     <button
                       key={tag}
                       className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-white/12 hover:text-white"
-                      onClick={() => navigate(`/explore?genre=${encodeURIComponent(artistGenreSlug(tag))}`)}
+                      onClick={() =>
+                        navigate(
+                          `/explore?genre=${encodeURIComponent(
+                            artistGenreSlug(tag),
+                          )}`,
+                        )
+                      }
                     >
                       {tag}
                     </button>
@@ -256,10 +304,12 @@ export function ArtistHeroSection({
               </AppPopover>
             ) : null}
             {menuOpen && !isDesktop ? (
-              <AppModal open={menuOpen} onClose={() => setMenuOpen(false)} maxWidthClassName="sm:max-w-sm">
-                <ModalBody className="pb-4">
-                  {menuContent}
-                </ModalBody>
+              <AppModal
+                open={menuOpen}
+                onClose={() => setMenuOpen(false)}
+                maxWidthClassName="sm:max-w-sm"
+              >
+                <ModalBody className="pb-4">{menuContent}</ModalBody>
               </AppModal>
             ) : null}
           </div>
@@ -270,8 +320,16 @@ export function ArtistHeroSection({
 }
 
 function ArtistMenuContent({
-  artist, photoUrl, following, hasSetlist,
-  onPlay, onShuffle, onArtistRadio, onPlaySetlist, onToggleFollow, onShare,
+  artist,
+  photoUrl,
+  following,
+  hasSetlist,
+  onPlay,
+  onShuffle,
+  onArtistRadio,
+  onPlaySetlist,
+  onToggleFollow,
+  onShare,
 }: {
   artist: ArtistData;
   photoUrl: string;
@@ -288,11 +346,19 @@ function ArtistMenuContent({
     <>
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <div className="w-12 h-12 rounded-full overflow-hidden bg-white/5 flex-shrink-0">
-          <img src={photoUrl} alt={artist.name} className="w-full h-full object-cover" />
+          <img
+            src={photoUrl}
+            alt={artist.name}
+            className="w-full h-full object-cover"
+          />
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-foreground truncate">{artist.name}</div>
-          <div className="text-xs text-muted-foreground">{artist.total_tracks} tracks · {artist.albums.length} albums</div>
+          <div className="text-sm font-semibold text-foreground truncate">
+            {artist.name}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {artist.total_tracks} tracks · {artist.albums.length} albums
+          </div>
         </div>
       </div>
       <div className="p-1.5">

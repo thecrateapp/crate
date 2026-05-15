@@ -6,18 +6,24 @@ from crate.db.tx import transaction_scope
 from crate.genre_taxonomy import invalidate_runtime_taxonomy_cache_after_commit
 
 
-def set_genre_eq_gains(slug: str, gains: list[float] | None, *, reasoning: str | None = None, session=None) -> None:
+def set_genre_eq_gains(
+    slug: str, gains: list[float] | None, *, reasoning: str | None = None, session=None
+) -> None:
     if session is None:
         with transaction_scope() as s:
             return set_genre_eq_gains(slug, gains, reasoning=reasoning, session=s)
     if reasoning is not None:
         session.execute(
-            text("UPDATE genre_taxonomy_nodes SET eq_gains = :gains, eq_reasoning = :reasoning WHERE slug = :slug"),
+            text(
+                "UPDATE genre_taxonomy_nodes SET eq_gains = :gains, eq_reasoning = :reasoning WHERE slug = :slug"
+            ),
             {"gains": gains, "reasoning": reasoning, "slug": slug},
         )
     else:
         session.execute(
-            text("UPDATE genre_taxonomy_nodes SET eq_gains = :gains WHERE slug = :slug"),
+            text(
+                "UPDATE genre_taxonomy_nodes SET eq_gains = :gains WHERE slug = :slug"
+            ),
             {"gains": gains, "slug": slug},
         )
 
@@ -73,6 +79,7 @@ def update_genre_external_metadata(
                 external_description_source=external_description_source,
                 session=s,
             )
+    # SQL_SAFE: fields are built internally from hardcoded column names; values use SQL params.
     result = session.execute(
         text(f"UPDATE genre_taxonomy_nodes SET {', '.join(fields)} WHERE slug = :slug"),
         params,

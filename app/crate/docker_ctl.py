@@ -19,7 +19,9 @@ def _request(method: str, path: str, body: bytes | None = None) -> dict | list |
 
         headers = f"{method} {path} HTTP/1.1\r\nHost: localhost\r\n"
         if body:
-            headers += f"Content-Type: application/json\r\nContent-Length: {len(body)}\r\n"
+            headers += (
+                f"Content-Type: application/json\r\nContent-Length: {len(body)}\r\n"
+            )
         headers += "Connection: close\r\n\r\n"
 
         sock.sendall(headers.encode())
@@ -63,7 +65,7 @@ def _decode_chunked(data: bytes) -> bytes:
             break
         size_str = data[:line_end].decode().strip()
         if not size_str:
-            data = data[line_end + 2:]
+            data = data[line_end + 2 :]
             continue
         try:
             chunk_size = int(size_str, 16)
@@ -72,8 +74,8 @@ def _decode_chunked(data: bytes) -> bytes:
         if chunk_size == 0:
             break
         start = line_end + 2
-        result += data[start:start + chunk_size]
-        data = data[start + chunk_size + 2:]
+        result += data[start : start + chunk_size]
+        data = data[start + chunk_size + 2 :]
     return result
 
 
@@ -91,9 +93,13 @@ def is_available() -> bool:
 
 def _detect_project_name() -> str:
     """Detect the compose project name from this container's own labels."""
-    data = _request("GET", "/containers/json?filters=%7B%22label%22%3A%5B%22com.docker.compose.service%22%5D%7D")
+    data = _request(
+        "GET",
+        "/containers/json?filters=%7B%22label%22%3A%5B%22com.docker.compose.service%22%5D%7D",
+    )
     if isinstance(data, list):
         import os
+
         hostname = os.environ.get("HOSTNAME", "")
         for c in data:
             cid = c.get("Id", "")
@@ -107,8 +113,14 @@ def list_containers(all_containers: bool = False) -> list[dict]:
     """List Docker containers from the same compose project."""
     project = _detect_project_name()
     if project:
-        label_filter = quote(json.dumps({"label": [f"com.docker.compose.project={project}"]}), safe="")
-        path = f"/containers/json?all=true&filters={label_filter}" if all_containers else f"/containers/json?filters={label_filter}"
+        label_filter = quote(
+            json.dumps({"label": [f"com.docker.compose.project={project}"]}), safe=""
+        )
+        path = (
+            f"/containers/json?all=true&filters={label_filter}"
+            if all_containers
+            else f"/containers/json?filters={label_filter}"
+        )
     else:
         path = "/containers/json?all=true" if all_containers else "/containers/json"
     data = _request("GET", path)
@@ -129,15 +141,17 @@ def list_containers(all_containers: bool = False) -> list[dict]:
             if p.get("PublicPort"):
                 ports.append(f"{p['PublicPort']}:{p['PrivatePort']}")
 
-        containers.append({
-            "id": c.get("Id", "")[:12],
-            "name": name,
-            "image": image,
-            "state": state,
-            "status": status,
-            "created": created,
-            "ports": ports,
-        })
+        containers.append(
+            {
+                "id": c.get("Id", "")[:12],
+                "name": name,
+                "image": image,
+                "state": state,
+                "status": status,
+                "created": created,
+                "ports": ports,
+            }
+        )
 
     containers.sort(key=lambda x: x["name"])
     return containers
@@ -162,7 +176,9 @@ def get_container(name: str) -> dict | None:
         "started_at": state.get("StartedAt", ""),
         "finished_at": state.get("FinishedAt", ""),
         "restart_count": data.get("RestartCount", 0),
-        "env": [e.split("=", 1)[0] for e in config.get("Env", [])],  # keys only, no values
+        "env": [
+            e.split("=", 1)[0] for e in config.get("Env", [])
+        ],  # keys only, no values
         "mounts": [m.get("Destination", "") for m in data.get("Mounts", [])],
         "memory_limit": host_config.get("Memory", 0),
     }
@@ -222,10 +238,10 @@ def get_container_logs(name: str, tail: int = 50) -> str:
         lines = []
         i = 0
         while i + 8 <= len(raw):
-            size = int.from_bytes(raw[i + 4:i + 8], "big")
+            size = int.from_bytes(raw[i + 4 : i + 8], "big")
             if size == 0 or i + 8 + size > len(raw):
                 break
-            line = raw[i + 8:i + 8 + size]
+            line = raw[i + 8 : i + 8 + size]
             lines.append(line.decode("utf-8", errors="replace").rstrip())
             i += 8 + size
 

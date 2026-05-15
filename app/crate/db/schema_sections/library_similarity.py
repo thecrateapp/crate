@@ -14,8 +14,12 @@ def create_library_similarity_schema(cur) -> None:
             UNIQUE(artist_name, similar_name)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_similarities_artist ON artist_similarities(artist_name)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_similarities_similar ON artist_similarities(similar_name)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_similarities_artist ON artist_similarities(artist_name)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_similarities_similar ON artist_similarities(similar_name)"
+    )
 
 
 __all__ = ["create_library_similarity_schema"]

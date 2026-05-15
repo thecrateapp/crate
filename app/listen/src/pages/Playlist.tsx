@@ -1,18 +1,46 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { AlertCircle, ArrowDownToLine, CheckCircle2, Play, Shuffle, Loader2, Sparkles, RefreshCw, Pencil, Trash2, Share2, Radio, Users, Copy, UserMinus } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  CheckCircle2,
+  Play,
+  Shuffle,
+  Loader2,
+  Sparkles,
+  RefreshCw,
+  Pencil,
+  Trash2,
+  Share2,
+  Radio,
+  Users,
+  Copy,
+  UserMinus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
-import { PlaylistTrackFilterBar, filterPlaylistTracks } from "@/components/playlists/PlaylistTrackFilterBar";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistTrackFilterBar,
+  filterPlaylistTracks,
+} from "@/components/playlists/PlaylistTrackFilterBar";
 import {
   PlaylistCreateModal,
   type PlaylistComposerTrack,
 } from "@/components/playlists/PlaylistCreateModal";
-import { AppModal, ModalBody, ModalFooter, ModalHeader, ModalCloseButton } from "@crate/ui/primitives/AppModal";
+import {
+  AppModal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalCloseButton,
+} from "@crate/ui/primitives/AppModal";
 import { QrCodeImage } from "@crate/ui/primitives/QrCodeImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -20,7 +48,10 @@ import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { isOfflineBusy } from "@/lib/offline";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
+import {
+  hasTrackReference,
+  toTrackReferencePayload,
+} from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { fetchPlaylistRadio } from "@/lib/radio";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
@@ -92,8 +123,6 @@ interface PlaylistInvite {
   expires_at?: string | null;
 }
 
-
-
 export function Playlist() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -104,10 +133,16 @@ export function Playlist() {
     undefined,
     { safetyNetMs: 120_000 },
   );
-  const { playlistOptions, ensurePlaylistOptionsLoaded } = useLazyPlaylistOptions();
+  const { playlistOptions, ensurePlaylistOptionsLoaded } =
+    useLazyPlaylistOptions();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
-  const { supported: offlineSupported, getPlaylistState, getPlaylistRecord, togglePlaylistOffline } = useOffline();
+  const {
+    supported: offlineSupported,
+    getPlaylistState,
+    getPlaylistRecord,
+    togglePlaylistOffline,
+  } = useOffline();
   const [editorOpen, setEditorOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -121,59 +156,69 @@ export function Playlist() {
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
-    return data.tracks.map((t): Track =>
-      toPlayableTrack(t, {
-        cover:
-          t.artist && t.album
-            ? albumCoverApiUrl({
-                albumId: t.album_id,
-                albumEntityUid: t.album_entity_uid,
-                artistEntityUid: t.artist_entity_uid,
-                albumSlug: t.album_slug,
-                artistName: t.artist,
-                albumName: t.album,
-              })
-            : undefined,
-      }),
+    return data.tracks.map(
+      (t): Track =>
+        toPlayableTrack(t, {
+          cover:
+            t.artist && t.album
+              ? albumCoverApiUrl({
+                  albumId: t.album_id,
+                  albumEntityUid: t.album_entity_uid,
+                  artistEntityUid: t.artist_entity_uid,
+                  albumSlug: t.album_slug,
+                  artistName: t.artist,
+                  albumName: t.album,
+                })
+              : undefined,
+        }),
     );
   }, [data]);
 
   const members = data?.members || [];
-  const isOwner = Boolean(user && members.some((member) => member.user_id === user.id && member.role === "owner"));
-  const inviteLink = inviteData ? `${window.location.origin}${inviteData.join_url}` : null;
+  const isOwner = Boolean(
+    user &&
+      members.some(
+        (member) => member.user_id === user.id && member.role === "owner",
+      ),
+  );
+  const inviteLink = inviteData
+    ? `${window.location.origin}${inviteData.join_url}`
+    : null;
   const offlineState = getPlaylistState(data?.id);
   const offlineRecord = getPlaylistRecord(data?.id);
   const offlineBusy = isOfflineBusy(offlineState);
-  const offlineProgress =
-    offlineRecord?.trackCount
-      ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount}`
-      : null;
-  const offlineButtonLabel =
-    data?.is_smart
-      ? "Static only"
-      : offlineState === "ready"
-        ? "Available offline"
+  const offlineProgress = offlineRecord?.trackCount
+    ? `${Math.min(
+        offlineRecord.readyTrackCount || 0,
+        offlineRecord.trackCount,
+      )}/${offlineRecord.trackCount}`
+    : null;
+  const offlineButtonLabel = data?.is_smart
+    ? "Static only"
+    : offlineState === "ready"
+      ? "Available offline"
+      : offlineState === "error"
+        ? "Retry offline"
+        : offlineState === "syncing"
+          ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
+          : offlineBusy
+            ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
+            : "Make available offline";
+  const offlineStatusDetail = data?.is_smart
+    ? "Offline mirror is only available for static playlists."
+    : offlineState === "ready"
+      ? offlineRecord?.trackCount
+        ? `${offlineRecord.trackCount} track${
+            offlineRecord.trackCount === 1 ? "" : "s"
+          } available offline`
+        : "Available offline"
+      : offlineBusy && offlineProgress
+        ? `${offlineProgress} tracks saved for offline`
         : offlineState === "error"
-          ? "Retry offline"
-          : offlineState === "syncing"
-            ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
-            : offlineBusy
-              ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
-              : "Make available offline";
-  const offlineStatusDetail =
-    data?.is_smart
-      ? "Offline mirror is only available for static playlists."
-      : offlineState === "ready"
-        ? offlineRecord?.trackCount
-          ? `${offlineRecord.trackCount} track${offlineRecord.trackCount === 1 ? "" : "s"} available offline`
-          : "Available offline"
-        : offlineBusy && offlineProgress
-          ? `${offlineProgress} tracks saved for offline`
-          : offlineState === "error"
-            ? offlineRecord?.readyTrackCount
-              ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
-              : "Offline copy failed. Retry to finish the playlist mirror."
-            : null;
+          ? offlineRecord?.readyTrackCount
+            ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
+            : "Offline copy failed. Retry to finish the playlist mirror."
+          : null;
 
   const editableTracks = useMemo<PlaylistComposerTrack[]>(() => {
     if (!data?.tracks?.length) return [];
@@ -210,7 +255,9 @@ export function Playlist() {
 
   function handlePlayTrack(trackEntryId: number) {
     if (!data || playerTracks.length === 0) return;
-    const startIndex = data.tracks.findIndex((track) => track.id === trackEntryId);
+    const startIndex = data.tracks.findIndex(
+      (track) => track.id === trackEntryId,
+    );
     if (startIndex < 0) return;
     playAll(playerTracks, startIndex, {
       type: "playlist",
@@ -252,7 +299,11 @@ export function Playlist() {
     const shareUrl = `${window.location.origin}/playlist/${data.id}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: data.name, text: data.name, url: shareUrl });
+        await navigator.share({
+          title: data.name,
+          text: data.name,
+          url: shareUrl,
+        });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         toast.success("Playlist link copied");
@@ -270,7 +321,11 @@ export function Playlist() {
         title: data.name,
         isSmart: data.is_smart,
       });
-      toast.success(result === "removed" ? "Offline copy removed" : "Playlist available offline");
+      toast.success(
+        result === "removed"
+          ? "Offline copy removed"
+          : "Playlist available offline",
+      );
     } catch (error) {
       toast.error((error as Error).message || "Failed to update offline copy");
     }
@@ -283,11 +338,13 @@ export function Playlist() {
     if (!hasTrackReference(track)) return;
     try {
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
-        tracks: [toTrackReferencePayload({
-          ...track,
-          album: track.album || "",
-          duration: track.duration || 0,
-        })],
+        tracks: [
+          toTrackReferencePayload({
+            ...track,
+            album: track.album || "",
+            duration: track.duration || 0,
+          }),
+        ],
       });
       toast.success("Track added to playlist");
     } catch {
@@ -349,18 +406,25 @@ export function Playlist() {
 
       for (const track of removedTracks) {
         if (track.playlistPosition != null) {
-          await api(`/api/playlists/${id}/tracks/${track.playlistPosition}`, "DELETE");
+          await api(
+            `/api/playlists/${id}/tracks/${track.playlistPosition}`,
+            "DELETE",
+          );
         }
       }
 
-      const newTracks = payload.tracks.filter((track) => track.playlistEntryId == null && hasTrackReference(track));
+      const newTracks = payload.tracks.filter(
+        (track) => track.playlistEntryId == null && hasTrackReference(track),
+      );
       if (newTracks.length > 0) {
         await api(`/api/playlists/${id}/tracks`, "POST", {
-          tracks: newTracks.map((track) => toTrackReferencePayload({
-            ...track,
-            album: track.album || "",
-            duration: track.duration || 0,
-          })),
+          tracks: newTracks.map((track) =>
+            toTrackReferencePayload({
+              ...track,
+              album: track.album || "",
+              duration: track.duration || 0,
+            }),
+          ),
         });
       }
 
@@ -393,7 +457,11 @@ export function Playlist() {
     if (!data) return;
     setCreatingInvite(true);
     try {
-      const invite = await api<PlaylistInvite>(`/api/playlists/${data.id}/invites`, "POST", {});
+      const invite = await api<PlaylistInvite>(
+        `/api/playlists/${data.id}/invites`,
+        "POST",
+        {},
+      );
       setInviteData(invite);
       toast.success("Collaborator invite created");
     } catch {
@@ -455,7 +523,9 @@ export function Playlist() {
           />
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl font-bold text-foreground truncate">{data.name}</h1>
+              <h1 className="text-2xl font-bold text-foreground truncate">
+                {data.name}
+              </h1>
               <OfflineBadge state={offlineState} />
               {data.is_smart && (
                 <span className="inline-flex items-center rounded-md border border-primary/30 text-primary text-[10px] px-1.5 py-0 font-medium">
@@ -473,7 +543,9 @@ export function Playlist() {
               ) : null}
             </div>
             {data.description && (
-              <p className="text-sm text-muted-foreground mb-2">{data.description}</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                {data.description}
+              </p>
             )}
             <div className="text-xs text-muted-foreground">
               {data.track_count} track{data.track_count !== 1 ? "s" : ""}
@@ -492,60 +564,64 @@ export function Playlist() {
             <Play size={16} fill="currentColor" />
             Play
           </button>
-        <button
-          onClick={handleShuffle}
-          disabled={playerTracks.length === 0}
-          className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
-        >
-          <Shuffle size={16} />
-          Shuffle
-        </button>
-        <button
-          onClick={handlePlaylistRadio}
-          disabled={playerTracks.length === 0}
-          className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
-        >
-          <Radio size={16} />
-          Playlist Radio
-        </button>
-        <button
-          onClick={handleToggleOffline}
-          disabled={!offlineSupported || data.is_smart || offlineBusy}
-          className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors disabled:opacity-50 ${
-            offlineState === "ready"
-              ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-              : offlineBusy
-                ? "border border-primary/25 bg-primary/10 text-primary"
-                : offlineState === "error"
-                  ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                  : "border-white/20 text-foreground hover:bg-white/10"
-          }`}
-          aria-label={offlineState === "ready" ? "Remove offline copy" : "Make available offline"}
-          title={offlineButtonLabel}
-        >
-          {offlineState === "ready" ? (
-            <CheckCircle2 size={16} />
-          ) : offlineBusy ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : offlineState === "error" ? (
-            <AlertCircle size={16} />
-          ) : (
-            <ArrowDownToLine size={16} />
-          )}
-        </button>
-        {data.is_collaborative ? (
           <button
-            onClick={() => setMembersOpen(true)}
+            onClick={handleShuffle}
+            disabled={playerTracks.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            <Shuffle size={16} />
+            Shuffle
+          </button>
+          <button
+            onClick={handlePlaylistRadio}
+            disabled={playerTracks.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
+          >
+            <Radio size={16} />
+            Playlist Radio
+          </button>
+          <button
+            onClick={handleToggleOffline}
+            disabled={!offlineSupported || data.is_smart || offlineBusy}
+            className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors disabled:opacity-50 ${
+              offlineState === "ready"
+                ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                : offlineBusy
+                  ? "border border-primary/25 bg-primary/10 text-primary"
+                  : offlineState === "error"
+                    ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
+                    : "border-white/20 text-foreground hover:bg-white/10"
+            }`}
+            aria-label={
+              offlineState === "ready"
+                ? "Remove offline copy"
+                : "Make available offline"
+            }
+            title={offlineButtonLabel}
+          >
+            {offlineState === "ready" ? (
+              <CheckCircle2 size={16} />
+            ) : offlineBusy ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : offlineState === "error" ? (
+              <AlertCircle size={16} />
+            ) : (
+              <ArrowDownToLine size={16} />
+            )}
+          </button>
+          {data.is_collaborative ? (
+            <button
+              onClick={() => setMembersOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+            >
+              <Users size={16} />
+              Collaborators
+            </button>
+          ) : null}
+          <button
+            onClick={() => setEditorOpen(true)}
             className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
           >
-            <Users size={16} />
-            Collaborators
-          </button>
-        ) : null}
-        <button
-          onClick={() => setEditorOpen(true)}
-          className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-        >
             <Pencil size={16} />
             Edit
           </button>
@@ -640,17 +716,30 @@ export function Playlist() {
         onSubmit={handleSavePlaylist}
       />
 
-      <AppModal open={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} maxWidthClassName="sm:max-w-md">
+      <AppModal
+        open={deleteOpen}
+        onClose={() => !deleting && setDeleteOpen(false)}
+        maxWidthClassName="sm:max-w-md"
+      >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Delete playlist</h2>
-            <p className="text-xs text-muted-foreground">This action cannot be undone.</p>
+            <h2 className="text-lg font-semibold text-foreground">
+              Delete playlist
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              This action cannot be undone.
+            </p>
           </div>
-          <ModalCloseButton onClick={() => setDeleteOpen(false)} disabled={deleting} />
+          <ModalCloseButton
+            onClick={() => setDeleteOpen(false)}
+            disabled={deleting}
+          />
         </ModalHeader>
         <ModalBody className="px-5 py-5">
           <p className="text-sm text-muted-foreground">
-            Delete <span className="text-foreground font-medium">{data.name}</span> and remove all its track entries?
+            Delete{" "}
+            <span className="text-foreground font-medium">{data.name}</span> and
+            remove all its track entries?
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
@@ -674,10 +763,16 @@ export function Playlist() {
         </ModalFooter>
       </AppModal>
 
-      <AppModal open={membersOpen} onClose={() => setMembersOpen(false)} maxWidthClassName="sm:max-w-lg">
+      <AppModal
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        maxWidthClassName="sm:max-w-lg"
+      >
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Collaborators</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Collaborators
+            </h2>
             <p className="text-xs text-muted-foreground">
               {data.is_collaborative
                 ? "Share a private invite link and manage the people who can edit this playlist."
@@ -691,9 +786,12 @@ export function Playlist() {
             <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-foreground">Invite a collaborator</div>
+                  <div className="text-sm font-medium text-foreground">
+                    Invite a collaborator
+                  </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Owners can create share links and QR codes for private beta-style collaboration.
+                    Owners can create share links and QR codes for private
+                    beta-style collaboration.
                   </div>
                 </div>
                 <button
@@ -702,7 +800,11 @@ export function Playlist() {
                   disabled={creatingInvite}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60"
                 >
-                  {creatingInvite ? <Loader2 size={15} className="animate-spin" /> : <Users size={15} />}
+                  {creatingInvite ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Users size={15} />
+                  )}
                   Create invite
                 </button>
               </div>
@@ -735,7 +837,10 @@ export function Playlist() {
 
           <div className="space-y-3">
             {members.map((member) => {
-              const label = member.display_name || member.username || `User ${member.user_id}`;
+              const label =
+                member.display_name ||
+                member.username ||
+                `User ${member.user_id}`;
               const isCurrentUser = user?.id === member.user_id;
               return (
                 <div
@@ -743,9 +848,12 @@ export function Playlist() {
                   className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{label}</div>
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {label}
+                    </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {member.username ? `@${member.username}` : "Profile"} · {member.role}
+                      {member.username ? `@${member.username}` : "Profile"} ·{" "}
+                      {member.role}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -759,7 +867,11 @@ export function Playlist() {
                         disabled={removingMemberId === member.user_id}
                         className="inline-flex items-center gap-1 rounded-full border border-red-500/20 px-2.5 py-1 text-[11px] text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-60"
                       >
-                        {removingMemberId === member.user_id ? <Loader2 size={12} className="animate-spin" /> : <UserMinus size={12} />}
+                        {removingMemberId === member.user_id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <UserMinus size={12} />
+                        )}
                         Remove
                       </button>
                     ) : null}

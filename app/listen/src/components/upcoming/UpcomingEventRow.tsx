@@ -1,12 +1,19 @@
 import { Link } from "react-router";
 import { Check, Loader2, MapPin, Play, Ticket } from "lucide-react";
 
-import { ItemActionMenu, ItemActionMenuButton, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { cn } from "@/lib/utils";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
-import { UpcomingActionButton, UpcomingActionLink } from "./UpcomingActionButtons";
+import {
+  UpcomingActionButton,
+  UpcomingActionLink,
+} from "./UpcomingActionButtons";
 import { useUpcomingShowActions } from "./use-upcoming-show-actions";
 import type { UpcomingItem } from "./upcoming-model";
 
@@ -25,11 +32,14 @@ export function UpcomingEventRow({
     ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
   const timeStr = item.time ? item.time.slice(0, 5) : "";
-  const artistImageUrl = artistPhotoApiUrl({
-    artistId: item.artist_id,
-    artistSlug: item.artist_slug,
-    artistName: item.artist,
-  }) || item.cover_url || undefined;
+  const artistImageUrl =
+    artistPhotoApiUrl({
+      artistId: item.artist_id,
+      artistSlug: item.artist_slug,
+      artistName: item.artist,
+    }) ||
+    item.cover_url ||
+    undefined;
   const {
     attending,
     savingAttendance,
@@ -58,11 +68,7 @@ export function UpcomingEventRow({
     >
       <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-white/5">
         <img
-          src={
-            isShow
-              ? artistImageUrl
-              : item.cover_url || artistImageUrl
-          }
+          src={isShow ? artistImageUrl : item.cover_url || artistImageUrl}
           alt=""
           loading="lazy"
           className="h-full w-full object-cover"
@@ -92,12 +98,17 @@ export function UpcomingEventRow({
                 <span className="truncate">{item.venue}</span>
               </span>
               <span className="text-white/20">&middot;</span>
-              <span className="truncate">{item.city}, {item.country}</span>
+              <span className="truncate">
+                {item.city}, {item.country}
+              </span>
             </>
           ) : (
             <>
               <Link
-                to={artistPagePath({ artistId: item.artist_id, artistSlug: item.artist_slug })}
+                to={artistPagePath({
+                  artistId: item.artist_id,
+                  artistSlug: item.artist_slug,
+                })}
                 className="truncate text-muted-foreground transition-colors hover:text-foreground"
               >
                 {item.artist}
@@ -112,7 +123,9 @@ export function UpcomingEventRow({
       <div className="flex flex-shrink-0 items-center gap-2">
         <div className="text-right text-primary">
           <div className="text-xs font-semibold">{dateStr}</div>
-          {timeStr ? <div className="text-[10px] text-white/40">{timeStr}</div> : null}
+          {timeStr ? (
+            <div className="text-[10px] text-white/40">{timeStr}</div>
+          ) : null}
         </div>
         {isShow ? (
           <>

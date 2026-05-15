@@ -5,34 +5,50 @@ from crate.db.tx import transaction_scope
 
 def get_albums_without_popularity() -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(
-            text("SELECT id, artist, name, tag_album FROM library_albums WHERE lastfm_listeners IS NULL")
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, artist, name, tag_album FROM library_albums WHERE lastfm_listeners IS NULL"
+                )
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def update_album_lastfm(album_id: int, listeners: int, playcount: int) -> None:
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_albums SET lastfm_listeners = :listeners, lastfm_playcount = :playcount WHERE id = :id"),
+            text(
+                "UPDATE library_albums SET lastfm_listeners = :listeners, lastfm_playcount = :playcount WHERE id = :id"
+            ),
             {"listeners": listeners, "playcount": playcount, "id": album_id},
         )
 
 
 def get_tracks_without_popularity() -> list[dict]:
     with transaction_scope() as session:
-        rows = session.execute(text("""
+        rows = (
+            session.execute(
+                text("""
             SELECT t.id, t.artist, t.title, t.album
             FROM library_tracks t
             WHERE t.title IS NOT NULL AND t.title != '' AND t.lastfm_listeners IS NULL
-        """)).mappings().all()
+        """)
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 
 def update_track_lastfm(track_id: int, listeners: int, playcount: int) -> None:
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_tracks SET lastfm_listeners = :listeners, lastfm_playcount = :playcount WHERE id = :id"),
+            text(
+                "UPDATE library_tracks SET lastfm_listeners = :listeners, lastfm_playcount = :playcount WHERE id = :id"
+            ),
             {"listeners": listeners, "playcount": playcount, "id": track_id},
         )
 
@@ -55,8 +71,9 @@ def reset_track_popularity_signals(artist_name: str) -> None:
 
 def get_artist_track_popularity_context(artist_name: str) -> dict:
     with transaction_scope() as session:
-        artist = session.execute(
-            text("""
+        artist = (
+            session.execute(
+                text("""
                 SELECT
                     name,
                     listeners,
@@ -69,11 +86,15 @@ def get_artist_track_popularity_context(artist_name: str) -> dict:
                 ORDER BY id NULLS LAST
                 LIMIT 1
             """),
-            {"artist_name": artist_name},
-        ).mappings().first()
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .first()
+        )
 
-        tracks = session.execute(
-            text("""
+        tracks = (
+            session.execute(
+                text("""
                 SELECT
                     t.id,
                     t.title,
@@ -93,8 +114,11 @@ def get_artist_track_popularity_context(artist_name: str) -> dict:
                 WHERE LOWER(a.artist) = LOWER(:artist_name)
                 ORDER BY a.year NULLS LAST, a.name, t.disc_number NULLS LAST, t.track_number NULLS LAST, t.id
             """),
-            {"artist_name": artist_name},
-        ).mappings().all()
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
 
     return {
         "artist": dict(artist) if artist else None,

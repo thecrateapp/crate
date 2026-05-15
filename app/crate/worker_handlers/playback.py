@@ -4,7 +4,7 @@ import logging
 import os
 import time
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.cache_settings import get_setting
 from crate.db.events import emit_task_event
 from crate.db.repositories.streaming import mark_variant_running
@@ -27,36 +27,44 @@ def _max_concurrent_transcodes(config: dict) -> int:
     except Exception:
         pass
     try:
-        return max(1, min(int(raw), 4))
+        return max(1, min(int(raw or 1), 4))
     except (TypeError, ValueError):
         return 1
 
 
 def prune_stream_transcode_slots() -> None:
-    redis = _get_redis()
+    redis = get_redis()
     if redis is None:
         return
     try:
-        redis.zremrangebyscore(_TRANSCODE_SLOT_KEY, 0, time.time() - _TRANSCODE_SLOT_TTL_SECONDS)
+        redis.zremrangebyscore(
+            _TRANSCODE_SLOT_KEY, 0, time.time() - _TRANSCODE_SLOT_TTL_SECONDS
+        )
     except Exception:
         log.debug("Failed to prune stream transcode slots", exc_info=True)
 
 
 def get_stream_transcode_runtime(config: dict | None = None) -> dict:
-    redis = _get_redis()
+    redis = get_redis()
     active = 0
     slots: list[dict] = []
     now = time.time()
     if redis is not None:
         try:
-            redis.zremrangebyscore(_TRANSCODE_SLOT_KEY, 0, now - _TRANSCODE_SLOT_TTL_SECONDS)
+            redis.zremrangebyscore(
+                _TRANSCODE_SLOT_KEY, 0, now - _TRANSCODE_SLOT_TTL_SECONDS
+            )
             active = int(redis.zcard(_TRANSCODE_SLOT_KEY) or 0)
             slots = [
                 {
-                    "task_id": task_id.decode("utf-8", "replace") if isinstance(task_id, bytes) else str(task_id),
+                    "task_id": task_id.decode("utf-8", "replace")
+                    if isinstance(task_id, bytes)
+                    else str(task_id),
                     "started_at": float(started_at),
                 }
-                for task_id, started_at in redis.zrange(_TRANSCODE_SLOT_KEY, 0, -1, withscores=True)
+                for task_id, started_at in redis.zrange(
+                    _TRANSCODE_SLOT_KEY, 0, -1, withscores=True
+                )
             ]
         except Exception:
             log.debug("Failed to read stream transcode runtime", exc_info=True)
@@ -68,7 +76,7 @@ def get_stream_transcode_runtime(config: dict | None = None) -> dict:
 
 
 def _acquire_slot(task_id: str, limit: int) -> bool:
-    redis = _get_redis()
+    redis = get_redis()
     if redis is None:
         return True
 
@@ -114,7 +122,7 @@ def _acquire_slot(task_id: str, limit: int) -> bool:
 
 
 def _release_slot(task_id: str) -> None:
-    redis = _get_redis()
+    redis = get_redis()
     if redis is None:
         return
     try:
@@ -130,7 +138,11 @@ def _handle_prepare_stream_variant(task_id: str, params: dict, config: dict) -> 
 
     progress = TaskProgress(phase="waiting", total=1, done=0, item=cache_key[:12])
     emit_progress(task_id, progress)
-    emit_task_event(task_id, "info", {"message": "Preparing playback variant", "cache_key": cache_key})
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": "Preparing playback variant", "cache_key": cache_key},
+    )
 
     limit = _max_concurrent_transcodes(config)
     if not _acquire_slot(task_id, limit):
@@ -148,10 +160,18 @@ def _handle_prepare_stream_variant(task_id: str, params: dict, config: dict) -> 
                 from crate.metrics import record
 
                 preset = str(row.get("preset") or params.get("preset") or "unknown")
-                record("stream.transcode.duration", elapsed, {"preset": preset, "status": "completed"})
+                record(
+                    "stream.transcode.duration",
+                    elapsed,
+                    {"preset": preset, "status": "completed"},
+                )
                 record("stream.transcode.completed", 1, {"preset": preset})
                 if row.get("bytes"):
-                    record("stream.transcode.bytes", float(row["bytes"]), {"preset": preset})
+                    record(
+                        "stream.transcode.bytes",
+                        float(row["bytes"]),
+                        {"preset": preset},
+                    )
             except Exception:
                 pass
         except Exception:
@@ -159,7 +179,11 @@ def _handle_prepare_stream_variant(task_id: str, params: dict, config: dict) -> 
             try:
                 from crate.metrics import record
 
-                record("stream.transcode.duration", elapsed, {"preset": "unknown", "status": "failed"})
+                record(
+                    "stream.transcode.duration",
+                    elapsed,
+                    {"preset": "unknown", "status": "failed"},
+                )
                 record("stream.transcode.failed", 1, {"preset": "unknown"})
             except Exception:
                 pass

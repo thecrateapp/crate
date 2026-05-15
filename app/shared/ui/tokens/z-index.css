@@ -15,14 +15,36 @@
   --z-upcoming-overlay: 1510;
 }
 
-.z-app-header { z-index: var(--z-header); }
-.z-app-sidebar { z-index: var(--z-sidebar); }
-.z-app-player { z-index: var(--z-player); }
-.z-app-player-drawer { z-index: var(--z-player-drawer); }
-.z-app-extended-player { z-index: var(--z-extended-player); }
-.z-fullscreen-player { z-index: var(--z-fullscreen-player); }
-.z-app-popover { z-index: var(--z-popover); }
-.z-app-player-overlay { z-index: var(--z-player-overlay); }
-.z-app-dropdown { z-index: var(--z-dropdown); }
-.z-app-modal { z-index: var(--z-modal); }
-.z-app-upcoming-overlay { z-index: var(--z-upcoming-overlay); }
+.z-app-header {
+  z-index: var(--z-header);
+}
+.z-app-sidebar {
+  z-index: var(--z-sidebar);
+}
+.z-app-player {
+  z-index: var(--z-player);
+}
+.z-app-player-drawer {
+  z-index: var(--z-player-drawer);
+}
+.z-app-extended-player {
+  z-index: var(--z-extended-player);
+}
+.z-fullscreen-player {
+  z-index: var(--z-fullscreen-player);
+}
+.z-app-popover {
+  z-index: var(--z-popover);
+}
+.z-app-player-overlay {
+  z-index: var(--z-player-overlay);
+}
+.z-app-dropdown {
+  z-index: var(--z-dropdown);
+}
+.z-app-modal {
+  z-index: var(--z-modal);
+}
+.z-app-upcoming-overlay {
+  z-index: var(--z-upcoming-overlay);
+}

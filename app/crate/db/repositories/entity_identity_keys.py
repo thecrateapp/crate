@@ -71,7 +71,9 @@ def upsert_entity_identity_key(
             "key_type": key_type,
             "key_value": normalized_key,
             "is_primary": bool(is_primary),
-            "metadata_json": json.dumps(metadata or {}) if metadata is not None else None,
+            "metadata_json": json.dumps(metadata or {})
+            if metadata is not None
+            else None,
         },
     )
 

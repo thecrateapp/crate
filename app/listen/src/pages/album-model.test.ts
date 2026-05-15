@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAlbumPlayerTracks, buildAlbumQualityBadges } from "@/pages/album-model";
+import {
+  buildAlbumPlayerTracks,
+  buildAlbumQualityBadges,
+} from "@/pages/album-model";
 
 const BASE_ALBUM = {
   id: 81,
@@ -16,17 +19,19 @@ describe("album model", () => {
   it("normalizes album API payloads into playable tracks with quality metadata", () => {
     const tracks = buildAlbumPlayerTracks({
       ...BASE_ALBUM,
-      tracks: [{
-        id: 1,
-        entity_uid: "track-entity-1",
-        filename: "01-track.m4a",
-        format: "m4a",
-        bitrate: 320,
-        sample_rate: 44100,
-        bit_depth: null,
-        path: "/music/Artist/Album/01-track.m4a",
-        tags: { title: "Track One" },
-      }],
+      tracks: [
+        {
+          id: 1,
+          entity_uid: "track-entity-1",
+          filename: "01-track.m4a",
+          format: "m4a",
+          bitrate: 320,
+          sample_rate: 44100,
+          bit_depth: null,
+          path: "/music/Artist/Album/01-track.m4a",
+          tags: { title: "Track One" },
+        },
+      ],
     });
 
     expect(tracks).toEqual([

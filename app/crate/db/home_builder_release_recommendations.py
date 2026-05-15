@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from crate.db.home_builder_shared import _coerce_datetime, _merge_track_rows, _select_diverse_tracks
+from crate.db.home_builder_shared import (
+    _coerce_datetime,
+    _merge_track_rows,
+    _select_diverse_tracks,
+)
 from crate.db.home_builder_discovery_queries import track_candidates_for_album_ids
 
 
@@ -25,13 +29,19 @@ def filter_interesting_releases(
             continue
         if interest_artists_lower and artist_name.lower() not in interest_artists_lower:
             continue
-        key_dt = _coerce_datetime(row.get("release_date")) or _coerce_datetime(row.get("detected_at"))
+        key_dt = _coerce_datetime(row.get("release_date")) or _coerce_datetime(
+            row.get("detected_at")
+        )
         if days is not None and key_dt and key_dt < now - timedelta(days=days):
             continue
         seen_album_ids.add(album_id)
         items.append(dict(row))
     items.sort(
-        key=lambda item: _coerce_datetime(item.get("release_date")) or _coerce_datetime(item.get("detected_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda item: (
+            _coerce_datetime(item.get("release_date"))
+            or _coerce_datetime(item.get("detected_at"))
+            or datetime.min.replace(tzinfo=timezone.utc)
+        ),
         reverse=True,
     )
     return items
@@ -77,12 +87,20 @@ def build_recommended_tracks(
         if row.get("album_id") is not None
     ]
     if not fresh_release_album_ids:
-        fresh_release_album_ids = [row["album_id"] for row in recent_releases[:24] if row.get("album_id") is not None]
+        fresh_release_album_ids = [
+            row["album_id"]
+            for row in recent_releases[:24]
+            if row.get("album_id") is not None
+        ]
 
     candidate_limit = max(limit * 6, 120)
-    recommended_track_rows = track_candidates_for_album_ids(user_id, fresh_release_album_ids[:24], limit=candidate_limit)
+    recommended_track_rows = track_candidates_for_album_ids(
+        user_id, fresh_release_album_ids[:24], limit=candidate_limit
+    )
     recommended_track_rows = [
-        row for row in recommended_track_rows if not row.get("user_play_count") and not row.get("is_liked")
+        row
+        for row in recommended_track_rows
+        if not row.get("user_play_count") and not row.get("is_liked")
     ]
     if len(recommended_track_rows) < limit:
         fallback_rows = [
@@ -90,8 +108,12 @@ def build_recommended_tracks(
             for track in (fallback_tracks or [])
             if not track.get("user_play_count") and not track.get("is_liked")
         ]
-        recommended_track_rows = _merge_track_rows(recommended_track_rows, fallback_rows)
-    return _select_diverse_tracks(recommended_track_rows, limit=limit, max_per_artist=2, max_per_album=2)
+        recommended_track_rows = _merge_track_rows(
+            recommended_track_rows, fallback_rows
+        )
+    return _select_diverse_tracks(
+        recommended_track_rows, limit=limit, max_per_artist=2, max_per_album=2
+    )
 
 
 __all__ = [

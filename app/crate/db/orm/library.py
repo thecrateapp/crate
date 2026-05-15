@@ -62,7 +62,9 @@ class LibraryAlbum(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     storage_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     entity_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    artist: Mapped[str] = mapped_column(Text, ForeignKey("library_artists.name"), nullable=False)
+    artist: Mapped[str] = mapped_column(
+        Text, ForeignKey("library_artists.name"), nullable=False
+    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     path: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     track_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -94,7 +96,9 @@ class LibraryTrack(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     storage_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     entity_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    album_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("library_albums.id", ondelete="CASCADE"))
+    album_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("library_albums.id", ondelete="CASCADE")
+    )
     artist: Mapped[str] = mapped_column(Text, nullable=False)
     album: Mapped[str] = mapped_column(Text, nullable=False)
     filename: Mapped[str] = mapped_column(Text, nullable=False)
@@ -114,7 +118,9 @@ class LibraryTrack(Base):
     musicbrainz_trackid: Mapped[str | None] = mapped_column(Text)
     audio_fingerprint: Mapped[str | None] = mapped_column(Text)
     audio_fingerprint_source: Mapped[str | None] = mapped_column(Text)
-    audio_fingerprint_computed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    audio_fingerprint_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     path: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     bpm: Mapped[float | None] = mapped_column(Float)
@@ -132,7 +138,9 @@ class LibraryTrack(Base):
     spectral_complexity: Mapped[float | None] = mapped_column(Float)
     analysis_state: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
     bliss_state: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
-    analysis_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    analysis_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     bliss_computed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     bliss_vector: Mapped[list[float] | None] = mapped_column(ARRAY(Float))
     lastfm_listeners: Mapped[int | None] = mapped_column(Integer)

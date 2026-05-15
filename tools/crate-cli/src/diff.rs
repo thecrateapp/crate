@@ -1,3 +1,5 @@
+//! Diff two scan snapshots to detect added, removed, moved, and changed tracks.
+
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};

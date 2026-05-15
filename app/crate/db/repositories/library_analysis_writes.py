@@ -29,7 +29,9 @@ def update_track_analysis(
     session: Session | None = None,
 ) -> None:
     def _impl(s: Session) -> None:
-        track = s.execute(select(LibraryTrack).where(LibraryTrack.path == path).limit(1)).scalar_one_or_none()
+        track = s.execute(
+            select(LibraryTrack).where(LibraryTrack.path == path).limit(1)
+        ).scalar_one_or_none()
         if track is None:
             return
 

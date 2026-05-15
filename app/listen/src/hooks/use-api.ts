@@ -1,7 +1,19 @@
-import { startTransition, useState, useEffect, useCallback, useRef } from "react";
+import {
+  startTransition,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 
 import { api } from "@/lib/api";
-import { cacheGet, cacheSet, onCacheInvalidation, onCacheReconnect, scopesForUrl } from "@/lib/cache";
+import {
+  cacheGet,
+  cacheSet,
+  onCacheInvalidation,
+  onCacheReconnect,
+  scopesForUrl,
+} from "@/lib/cache";
 
 export interface UseApiState<T> {
   data: T | null;
@@ -19,15 +31,23 @@ interface UseApiOptions {
 }
 
 type IdleWindow = Window & {
-  requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number;
+  requestIdleCallback?: (
+    cb: () => void,
+    options?: { timeout: number },
+  ) => number;
   cancelIdleCallback?: (handle: number) => void;
 };
 
-function scheduleIdleRevalidate(callback: () => void, timeoutMs: number): () => void {
+function scheduleIdleRevalidate(
+  callback: () => void,
+  timeoutMs: number,
+): () => void {
   if (typeof window === "undefined") return () => {};
   const idleWindow = window as IdleWindow;
   if (idleWindow.requestIdleCallback) {
-    const handle = idleWindow.requestIdleCallback(callback, { timeout: timeoutMs });
+    const handle = idleWindow.requestIdleCallback(callback, {
+      timeout: timeoutMs,
+    });
     return () => idleWindow.cancelIdleCallback?.(handle);
   }
   const handle = window.setTimeout(callback, Math.min(timeoutMs, 2_000));
@@ -54,7 +74,9 @@ export function useApi<T>(
     revalidateIfCached = "immediate",
     idleRevalidateMs = 8_000,
   } = options;
-  const initialStateRef = useRef<{ data: T | null; loading: boolean } | null>(null);
+  const initialStateRef = useRef<{ data: T | null; loading: boolean } | null>(
+    null,
+  );
   if (initialStateRef.current == null) {
     const initialData = url ? cacheGet<T>(url) : null;
     initialStateRef.current = {
@@ -90,7 +112,8 @@ export function useApi<T>(
     const controller = new AbortController();
     let cancelled = false;
     let cancelScheduledFetch: (() => void) | null = null;
-    const hasCachedPayload = method === "GET" ? cacheGet<T>(requestUrl) !== null : false;
+    const hasCachedPayload =
+      method === "GET" ? cacheGet<T>(requestUrl) !== null : false;
 
     // Only show loading if no cached data
     if (!data) setLoading(true);
@@ -119,9 +142,7 @@ export function useApi<T>(
     };
 
     const canDeferInitialRevalidate =
-      trigger === 0 &&
-      hasCachedPayload &&
-      revalidateIfCached !== "immediate";
+      trigger === 0 && hasCachedPayload && revalidateIfCached !== "immediate";
 
     if (canDeferInitialRevalidate && revalidateIfCached === "never") {
       setLoading(false);
@@ -156,8 +177,17 @@ export function useApi<T>(
   useEffect(() => {
     if (!url || !reactive || !revalidateOnReconnect) return;
     return onCacheReconnect(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      )
+        return;
       refetch();
     });
   }, [reactive, revalidateOnReconnect, url, refetch]);
@@ -165,15 +195,25 @@ export function useApi<T>(
   useEffect(() => {
     if (!url || safetyNetMs <= 0) return;
     const timer = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      if (typeof navigator !== "undefined" && "onLine" in navigator && !navigator.onLine) return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      )
+        return;
       refetch();
     }, safetyNetMs);
     return () => window.clearInterval(timer);
   }, [safetyNetMs, url, refetch]);
 
   const stateMatchesCurrentUrl = dataUrlRef.current === url;
-  const cachedForCurrentUrl = !stateMatchesCurrentUrl && url ? cacheGet<T>(url) : null;
+  const cachedForCurrentUrl =
+    !stateMatchesCurrentUrl && url ? cacheGet<T>(url) : null;
 
   return {
     data: stateMatchesCurrentUrl ? data : cachedForCurrentUrl,

@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
 
 
-def _serialize_popularity_row(row: dict) -> dict:
+def _serialize_popularity_row(row: Mapping[Any, Any]) -> dict:
     popularity_score = row.get("popularity_score")
     popularity = row.get("popularity")
     listeners = row.get("listeners") or 0
     return {
         "artist": row["name"],
-        "popularity": popularity if popularity is not None else min(100, listeners // 10000),
-        "popularity_score": round(popularity_score, 4) if popularity_score is not None else None,
+        "popularity": popularity
+        if popularity is not None
+        else min(100, listeners // 10000),
+        "popularity_score": round(popularity_score, 4)
+        if popularity_score is not None
+        else None,
         "listeners": listeners,
         "albums": row.get("albums") or 0,
     }
@@ -20,9 +26,10 @@ def _serialize_popularity_row(row: dict) -> dict:
 
 def get_insights_popularity(limit: int = 20) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     la.name,
                     la.popularity,
@@ -36,17 +43,21 @@ def get_insights_popularity(limit: int = 20) -> list[dict]:
                 ORDER BY la.popularity_score DESC NULLS LAST, la.popularity DESC NULLS LAST, la.listeners DESC NULLS LAST
                 LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [_serialize_popularity_row(row) for row in rows]
 
 
 def get_insights_artist_depth(limit: int = 120) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     la.name,
                     la.popularity,
@@ -59,9 +70,12 @@ def get_insights_artist_depth(limit: int = 120) -> list[dict]:
                 ORDER BY la.popularity_score DESC NULLS LAST, la.popularity DESC NULLS LAST, la.listeners DESC NULLS LAST
                 LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
 
     results: list[dict] = []
     for row in rows:

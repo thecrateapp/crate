@@ -10,9 +10,11 @@ from tests.conftest import PG_AVAILABLE
 class TestAuthMaintenanceIntegration:
     def test_auth_invite_can_be_consumed_only_up_to_max_uses(self, pg_db):
         inviter = pg_db.create_user("inviter@test.com")
-        invite = pg_db.create_auth_invite(inviter["id"], email="guest@test.com", max_uses=1)
+        invite = pg_db.create_auth_invite(
+            inviter["id"], email="guest@test.com", max_uses=1
+        )
 
-        consumed = pg_db.consume_auth_invite(invite["token"])
+        consumed = pg_db.consume_auth_invite(invite["token"], email="guest@test.com")
         consumed_again = pg_db.consume_auth_invite(invite["token"])
         stored = pg_db.get_auth_invite(invite["token"])
 
@@ -23,18 +25,43 @@ class TestAuthMaintenanceIntegration:
         assert stored["use_count"] == 1
         assert stored["accepted_at"] is not None
 
+    def test_email_scoped_auth_invite_rejects_different_email(self, pg_db):
+        inviter = pg_db.create_user("invite-scope-owner@test.com")
+        invite = pg_db.create_auth_invite(
+            inviter["id"], email="expected@test.com", max_uses=1
+        )
+
+        rejected = pg_db.consume_auth_invite(invite["token"], email="other@test.com")
+        stored = pg_db.get_auth_invite(invite["token"])
+
+        assert rejected is None
+        assert stored["use_count"] == 0
+        assert stored["accepted_at"] is None
+
     def test_cleanup_expired_sessions_prunes_closed_and_stale_sessions(self, pg_db):
         from crate.db.tx import transaction_scope
 
         user = pg_db.create_user("cleanup-sessions@test.com")
         now = datetime.now(timezone.utc)
 
-        expired_old = pg_db.create_session("expired-old-session", user["id"], (now - timedelta(days=10)).isoformat())
-        expired_recent = pg_db.create_session("expired-recent-session", user["id"], (now - timedelta(days=1)).isoformat())
-        revoked_old = pg_db.create_session("revoked-old-session", user["id"], (now + timedelta(days=10)).isoformat())
-        revoked_recent = pg_db.create_session("revoked-recent-session", user["id"], (now + timedelta(days=10)).isoformat())
-        active = pg_db.create_session("active-session", user["id"], (now + timedelta(days=10)).isoformat())
-        stale_history = pg_db.create_session("stale-history-session", user["id"], (now + timedelta(days=10)).isoformat())
+        expired_old = pg_db.create_session(
+            "expired-old-session", user["id"], (now - timedelta(days=10)).isoformat()
+        )
+        expired_recent = pg_db.create_session(
+            "expired-recent-session", user["id"], (now - timedelta(days=1)).isoformat()
+        )
+        revoked_old = pg_db.create_session(
+            "revoked-old-session", user["id"], (now + timedelta(days=10)).isoformat()
+        )
+        revoked_recent = pg_db.create_session(
+            "revoked-recent-session", user["id"], (now + timedelta(days=10)).isoformat()
+        )
+        active = pg_db.create_session(
+            "active-session", user["id"], (now + timedelta(days=10)).isoformat()
+        )
+        stale_history = pg_db.create_session(
+            "stale-history-session", user["id"], (now + timedelta(days=10)).isoformat()
+        )
 
         assert expired_old["id"] == "expired-old-session"
         assert active["id"] == "active-session"
@@ -45,7 +72,10 @@ class TestAuthMaintenanceIntegration:
         with transaction_scope() as session:
             session.execute(
                 text("UPDATE sessions SET revoked_at = :revoked_at WHERE id = :id"),
-                {"revoked_at": (now - timedelta(days=10)).isoformat(), "id": revoked_old["id"]},
+                {
+                    "revoked_at": (now - timedelta(days=10)).isoformat(),
+                    "id": revoked_old["id"],
+                },
             )
             session.execute(
                 text(
@@ -64,7 +94,10 @@ class TestAuthMaintenanceIntegration:
             )
 
         deleted = pg_db.cleanup_expired_sessions(max_age_days=3, stale_age_days=30)
-        remaining = {session["id"] for session in pg_db.list_sessions(user["id"], include_revoked=True)}
+        remaining = {
+            session["id"]
+            for session in pg_db.list_sessions(user["id"], include_revoked=True)
+        }
 
         assert deleted == 3
         assert expired_old["id"] not in remaining
@@ -90,10 +123,16 @@ class TestAuthMaintenanceIntegration:
         deleted = pg_db.cleanup_ended_jam_rooms(max_age_days=30)
 
         with transaction_scope() as session:
-            invites_left = session.execute(
-                text("SELECT COUNT(*) AS cnt FROM jam_room_invites WHERE room_id = :room_id"),
-                {"room_id": room["id"]},
-            ).mappings().first()["cnt"]
+            invites_left = (
+                session.execute(
+                    text(
+                        "SELECT COUNT(*) AS cnt FROM jam_room_invites WHERE room_id = :room_id"
+                    ),
+                    {"room_id": room["id"]},
+                )
+                .mappings()
+                .first()["cnt"]
+            )
 
         assert invite["room_id"] == room["id"]
         assert deleted == 1

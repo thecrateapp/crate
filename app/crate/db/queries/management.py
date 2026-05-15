@@ -7,9 +7,10 @@ from crate.db.tx import read_scope
 
 def get_last_analyzed_track() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     t.title,
                     t.artist,
@@ -25,12 +26,16 @@ def get_last_analyzed_track() -> dict:
                 ORDER BY f.updated_at DESC NULLS LAST
                 LIMIT 1
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         if not row:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         lt.title,
                         lt.artist,
@@ -70,16 +75,20 @@ def get_last_analyzed_track() -> dict:
                     ORDER BY COALESCE(ps.completed_at, lt.analysis_completed_at, lt.updated_at) DESC NULLS LAST
                     LIMIT 1
                     """
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
     return dict(row) if row else {}
 
 
 def get_last_bliss_track() -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     t.title,
                     t.artist,
@@ -90,12 +99,16 @@ def get_last_bliss_track() -> dict:
                 ORDER BY b.updated_at DESC NULLS LAST
                 LIMIT 1
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         if not row:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         lt.title,
                         lt.artist,
@@ -118,14 +131,17 @@ def get_last_bliss_track() -> dict:
                     ORDER BY COALESCE(ps.completed_at, lt.bliss_computed_at, lt.updated_at) DESC NULLS LAST
                     LIMIT 1
                     """
+                    )
                 )
-            ).mappings().first()
+                .mappings()
+                .first()
+            )
     return dict(row) if row else {}
 
 
 def get_storage_v2_status() -> dict:
     with read_scope() as session:
-        artist_stats = dict(
+        artist_row = (
             session.execute(
                 text(
                     """
@@ -138,9 +154,12 @@ def get_storage_v2_status() -> dict:
                     FROM library_artists
                     """
                 )
-            ).mappings().first()
+            )
+            .mappings()
+            .first()
         )
-        album_stats = dict(
+        artist_stats = dict(artist_row) if artist_row else {}
+        album_row = (
             session.execute(
                 text(
                     """
@@ -153,9 +172,12 @@ def get_storage_v2_status() -> dict:
                     FROM library_albums
                     """
                 )
-            ).mappings().first()
+            )
+            .mappings()
+            .first()
         )
-        track_stats = dict(
+        album_stats = dict(album_row) if album_row else {}
+        track_row = (
             session.execute(
                 text(
                     """
@@ -168,38 +190,49 @@ def get_storage_v2_status() -> dict:
                     FROM library_tracks
                     """
                 )
-            ).mappings().first()
+            )
+            .mappings()
+            .first()
         )
+        track_stats = dict(track_row) if track_row else {}
     return {**artist_stats, **album_stats, **track_stats}
 
 
 def count_recent_active_users(window_minutes: int = 5) -> int:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT COUNT(DISTINCT user_id)::INTEGER AS cnt
                 FROM user_play_events
                 WHERE ended_at > now() - (:window_minutes * interval '1 minute')
                 """
-            ),
-            {"window_minutes": max(window_minutes, 0)},
-        ).mappings().first()
+                ),
+                {"window_minutes": max(window_minutes, 0)},
+            )
+            .mappings()
+            .first()
+        )
     return int(row["cnt"]) if row else 0
 
 
 def count_recent_streams(window_minutes: int = 3) -> int:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT COUNT(*)::INTEGER AS cnt
                 FROM user_play_events
                 WHERE ended_at > now() - (:window_minutes * interval '1 minute')
                 """
-            ),
-            {"window_minutes": max(window_minutes, 0)},
-        ).mappings().first()
+                ),
+                {"window_minutes": max(window_minutes, 0)},
+            )
+            .mappings()
+            .first()
+        )
     return int(row["cnt"]) if row else 0
 
 

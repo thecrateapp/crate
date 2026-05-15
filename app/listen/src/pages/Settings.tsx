@@ -17,7 +17,23 @@ import {
 } from "@/lib/player-playback-prefs";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ArrowDownToLine, BarChart3, Loader2, LogOut, Lock, MapPin, Moon, Navigation, Radio, RefreshCw, Shield, Smartphone, Trash2, Upload, Users } from "lucide-react";
+import {
+  ArrowDownToLine,
+  BarChart3,
+  Loader2,
+  LogOut,
+  Lock,
+  MapPin,
+  Moon,
+  Navigation,
+  Radio,
+  RefreshCw,
+  Shield,
+  Smartphone,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
@@ -65,7 +81,9 @@ function formatBytes(bytes: number): string {
     value /= 1024;
     unitIndex += 1;
   }
-  return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+  return `${
+    value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)
+  } ${units[unitIndex]}`;
 }
 
 function Section({
@@ -81,7 +99,9 @@ function Section({
     <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
       <div className="mb-5">
         <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       <div className="space-y-5">{children}</div>
     </section>
@@ -114,7 +134,11 @@ function RangeRow({
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-medium text-foreground">{label}</div>
-          {description ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p> : null}
+          {description ? (
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
         </div>
         <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">
           {displayValue ?? value}
@@ -149,7 +173,11 @@ function ToggleRow({
     <div className="flex items-start justify-between gap-4">
       <div>
         <div className="text-sm font-medium text-foreground">{label}</div>
-        {description ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
       </div>
       <button
         type="button"
@@ -171,10 +199,18 @@ function ToggleRow({
   );
 }
 
-const PLAYBACK_DELIVERY_OPTIONS: { value: PlaybackDeliveryPolicy; label: string; description: string }[] = [
+const PLAYBACK_DELIVERY_OPTIONS: {
+  value: PlaybackDeliveryPolicy;
+  label: string;
+  description: string;
+}[] = [
   { value: "balanced", label: "Balanced", description: "AAC 192 when useful" },
   { value: "original", label: "Original", description: "Library file" },
-  { value: "data_saver", label: "Data Saver", description: "AAC 128 when useful" },
+  {
+    value: "data_saver",
+    label: "Data Saver",
+    description: "AAC 128 when useful",
+  },
 ];
 
 export function Settings() {
@@ -186,17 +222,25 @@ export function Settings() {
     syncAll,
     clearActiveProfile,
   } = useOffline();
-  const [crossfadeSeconds, setCrossfadeSeconds] = useState(getCrossfadeDurationPreference);
-  const [smartCrossfadeEnabled, setSmartCrossfadeEnabled] = useState(getSmartCrossfadePreference);
-  const [infinitePlaybackEnabled, setInfinitePlaybackEnabled] = useState(getInfinitePlaybackPreference);
-  const [smartPlaylistSuggestionsEnabled, setSmartPlaylistSuggestionsEnabled] = useState(
-    getSmartPlaylistSuggestionsPreference,
+  const [crossfadeSeconds, setCrossfadeSeconds] = useState(
+    getCrossfadeDurationPreference,
   );
-  const [smartPlaylistSuggestionsCadence, setSmartPlaylistSuggestionsCadence] = useState(
-    getSmartPlaylistSuggestionsCadencePreference,
+  const [smartCrossfadeEnabled, setSmartCrossfadeEnabled] = useState(
+    getSmartCrossfadePreference,
   );
-  const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] = useState(getPlaybackDeliveryPolicyPreference);
-  const [mobileEnhancedAudioEnabled, setMobileEnhancedAudioEnabled] = useState(getMobileEnhancedAudioPreference);
+  const [infinitePlaybackEnabled, setInfinitePlaybackEnabled] = useState(
+    getInfinitePlaybackPreference,
+  );
+  const [smartPlaylistSuggestionsEnabled, setSmartPlaylistSuggestionsEnabled] =
+    useState(getSmartPlaylistSuggestionsPreference);
+  const [smartPlaylistSuggestionsCadence, setSmartPlaylistSuggestionsCadence] =
+    useState(getSmartPlaylistSuggestionsCadencePreference);
+  const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] = useState(
+    getPlaybackDeliveryPolicyPreference,
+  );
+  const [mobileEnhancedAudioEnabled, setMobileEnhancedAudioEnabled] = useState(
+    getMobileEnhancedAudioPreference,
+  );
   const publicProfilePath = useMemo(() => {
     return user?.username ? `/users/${user.username}` : "/people";
   }, [user?.username]);
@@ -216,12 +260,19 @@ export function Settings() {
       >
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium text-foreground">Stream quality</div>
+            <div className="text-sm font-medium text-foreground">
+              Stream quality
+            </div>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Choose whether this device asks the server for the original file or a lighter cached playback variant.
+              Choose whether this device asks the server for the original file
+              or a lighter cached playback variant.
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Stream quality">
+          <div
+            className="grid gap-2 sm:grid-cols-3"
+            role="radiogroup"
+            aria-label="Stream quality"
+          >
             {PLAYBACK_DELIVERY_OPTIONS.map((option) => {
               const selected = playbackDeliveryPolicy === option.value;
               return (
@@ -240,8 +291,12 @@ export function Settings() {
                       : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
                   }`}
                 >
-                  <span className="block text-sm font-semibold">{option.label}</span>
-                  <span className="mt-1 block text-xs text-muted-foreground">{option.description}</span>
+                  <span className="block text-sm font-semibold">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {option.description}
+                  </span>
                 </button>
               );
             })}
@@ -325,57 +380,88 @@ export function Settings() {
       >
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">Items</div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">{offlineSummary.itemCount}</div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+              Items
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-foreground">
+              {offlineSummary.itemCount}
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {offlineSummary.readyItemCount} ready
-              {offlineSummary.errorItemCount ? ` · ${offlineSummary.errorItemCount} need attention` : ""}
+              {offlineSummary.errorItemCount
+                ? ` · ${offlineSummary.errorItemCount} need attention`
+                : ""}
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">Tracks</div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+              Tracks
+            </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Mirrored on this device</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Mirrored on this device
+            </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">Storage</div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+              Storage
+            </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {formatBytes(offlineSummary.totalBytes)}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Approximate offline footprint</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Approximate offline footprint
+            </p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            disabled={!offlineSupported || offlineSyncing || offlineSummary.itemCount === 0}
+            disabled={
+              !offlineSupported ||
+              offlineSyncing ||
+              offlineSummary.itemCount === 0
+            }
             onClick={() => {
               void syncAll()
                 .then(() => {
                   toast.success("Offline copies synced");
                 })
                 .catch((error) => {
-                  toast.error((error as Error).message || "Failed to sync offline copies");
+                  toast.error(
+                    (error as Error).message || "Failed to sync offline copies",
+                  );
                 });
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {offlineSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {offlineSyncing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
             Sync offline copy now
           </button>
           <button
             type="button"
-            disabled={!offlineSupported || offlineSyncing || offlineSummary.itemCount === 0}
+            disabled={
+              !offlineSupported ||
+              offlineSyncing ||
+              offlineSummary.itemCount === 0
+            }
             onClick={() => {
               void clearActiveProfile()
                 .then(() => {
                   toast.success("Offline copies removed from this device");
                 })
                 .catch((error) => {
-                  toast.error((error as Error).message || "Failed to clear offline copies");
+                  toast.error(
+                    (error as Error).message ||
+                      "Failed to clear offline copies",
+                  );
                 });
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
@@ -409,22 +495,41 @@ export function Settings() {
 
       <Section title="Quick links">
         <div className="flex flex-col gap-2">
-          <Link to={publicProfilePath} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors">
+          <Link
+            to={publicProfilePath}
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+          >
             <Users size={18} className="text-muted-foreground" /> Public profile
           </Link>
-          <Link to="/people" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors">
+          <Link
+            to="/people"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+          >
             <Users size={18} className="text-muted-foreground" /> Find people
           </Link>
-          <Link to="/jam" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors">
+          <Link
+            to="/jam"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+          >
             <Radio size={18} className="text-muted-foreground" /> Jam sessions
           </Link>
-          <Link to="/upload" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors">
+          <Link
+            to="/upload"
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
+          >
             <Upload size={18} className="text-muted-foreground" /> Upload music
           </Link>
-          <Link to="/stats" className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-white/5 md:flex">
-            <BarChart3 size={18} className="text-muted-foreground" /> Listening stats
+          <Link
+            to="/stats"
+            className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-white/5 md:flex"
+          >
+            <BarChart3 size={18} className="text-muted-foreground" /> Listening
+            stats
           </Link>
-          <button onClick={logout} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors w-full text-left">
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors w-full text-left"
+          >
             <LogOut size={18} /> Sign out
           </button>
         </div>
@@ -443,11 +548,18 @@ const SLEEP_MODES: { mode: SleepTimerMode; label: string }[] = [
 
 function SleepTimerSection() {
   const { pause } = usePlayerActions();
-  const [timer, setTimer] = useState<SleepTimerState>({ active: false, remainingSeconds: 0, mode: null });
+  const [timer, setTimer] = useState<SleepTimerState>({
+    active: false,
+    remainingSeconds: 0,
+    mode: null,
+  });
   useEffect(() => subscribeSleepTimer(setTimer), []);
 
   return (
-    <Section title="Sleep Timer" description="Automatically pause playback after a set duration.">
+    <Section
+      title="Sleep Timer"
+      description="Automatically pause playback after a set duration."
+    >
       <div className="flex flex-wrap gap-2">
         {SLEEP_MODES.map(({ mode, label }) => (
           <button
@@ -468,7 +580,10 @@ function SleepTimerSection() {
           <div className="flex items-center gap-2">
             <Moon size={16} className="text-primary" />
             <span className="text-sm text-foreground">
-              Pausing in <span className="font-mono font-semibold text-primary">{formatRemaining(timer.remainingSeconds)}</span>
+              Pausing in{" "}
+              <span className="font-mono font-semibold text-primary">
+                {formatRemaining(timer.remainingSeconds)}
+              </span>
             </span>
           </div>
           <button
@@ -484,12 +599,16 @@ function SleepTimerSection() {
 }
 
 function ScrobbleSection() {
-  const [status, setStatus] = useState<Record<string, { connected: boolean; username?: string }>>({});
+  const [status, setStatus] = useState<
+    Record<string, { connected: boolean; username?: string }>
+  >({});
   const [lbToken, setLbToken] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
 
   useEffect(() => {
-    api<Record<string, { connected: boolean; username?: string }>>("/api/me/scrobble/status")
+    api<Record<string, { connected: boolean; username?: string }>>(
+      "/api/me/scrobble/status",
+    )
       .then(setStatus)
       .catch(() => {});
   }, []);
@@ -497,8 +616,12 @@ function ScrobbleSection() {
   const handleLastfmConnect = async () => {
     setConnecting("lastfm");
     try {
-      const { api_key } = await api<{ api_key: string }>("/api/me/scrobble/lastfm/auth-url");
-      const cb = encodeURIComponent(`${window.location.origin}/settings?lastfm=callback`);
+      const { api_key } = await api<{ api_key: string }>(
+        "/api/me/scrobble/lastfm/auth-url",
+      );
+      const cb = encodeURIComponent(
+        `${window.location.origin}/settings?lastfm=callback`,
+      );
       window.location.href = `https://www.last.fm/api/auth/?api_key=${api_key}&cb=${cb}`;
     } catch {
       toast.error("Last.fm is not configured on this server");
@@ -511,7 +634,9 @@ function ScrobbleSection() {
     try {
       await api("/api/me/scrobble/lastfm", "POST", { token });
       toast.success("Last.fm connected");
-      const updated = await api<Record<string, { connected: boolean; username?: string }>>("/api/me/scrobble/status");
+      const updated = await api<
+        Record<string, { connected: boolean; username?: string }>
+      >("/api/me/scrobble/status");
       setStatus(updated);
     } catch {
       toast.error("Failed to connect Last.fm — token may have expired");
@@ -524,10 +649,16 @@ function ScrobbleSection() {
     if (!lbToken.trim()) return;
     setConnecting("listenbrainz");
     try {
-      const result = await api<{ ok: boolean; username: string }>("/api/me/scrobble/listenbrainz", "POST", { token: lbToken.trim() });
+      const result = await api<{ ok: boolean; username: string }>(
+        "/api/me/scrobble/listenbrainz",
+        "POST",
+        { token: lbToken.trim() },
+      );
       toast.success(`ListenBrainz connected as ${result.username}`);
       setLbToken("");
-      const updated = await api<Record<string, { connected: boolean; username?: string }>>("/api/me/scrobble/status");
+      const updated = await api<
+        Record<string, { connected: boolean; username?: string }>
+      >("/api/me/scrobble/status");
       setStatus(updated);
     } catch {
       toast.error("Invalid ListenBrainz token");
@@ -540,7 +671,9 @@ function ScrobbleSection() {
     try {
       await api(`/api/me/scrobble/${provider}`, "DELETE");
       setStatus((prev) => ({ ...prev, [provider]: { connected: false } }));
-      toast.success(`${provider === "lastfm" ? "Last.fm" : "ListenBrainz"} disconnected`);
+      toast.success(
+        `${provider === "lastfm" ? "Last.fm" : "ListenBrainz"} disconnected`,
+      );
     } catch {
       toast.error("Failed to disconnect");
     }
@@ -560,13 +693,18 @@ function ScrobbleSection() {
   const listenbrainz = status.listenbrainz;
 
   return (
-    <Section title="Scrobbling" description="Sync your listening activity to external services.">
+    <Section
+      title="Scrobbling"
+      description="Sync your listening activity to external services."
+    >
       {/* Last.fm */}
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">Last.fm</p>
           {lastfm?.connected ? (
-            <p className="text-xs text-green-400">Connected{lastfm.username ? ` as ${lastfm.username}` : ""}</p>
+            <p className="text-xs text-green-400">
+              Connected{lastfm.username ? ` as ${lastfm.username}` : ""}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground">Not connected</p>
           )}
@@ -594,7 +732,10 @@ function ScrobbleSection() {
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">ListenBrainz</p>
           {listenbrainz?.connected ? (
-            <p className="text-xs text-green-400">Connected{listenbrainz.username ? ` as ${listenbrainz.username}` : ""}</p>
+            <p className="text-xs text-green-400">
+              Connected
+              {listenbrainz.username ? ` as ${listenbrainz.username}` : ""}
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground">Not connected</p>
           )}
@@ -614,7 +755,9 @@ function ScrobbleSection() {
               onChange={(e) => setLbToken(e.target.value)}
               placeholder="API token"
               className="w-36 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-foreground placeholder:text-white/40 focus:outline-none focus:border-primary/50"
-              onKeyDown={(e) => e.key === "Enter" && handleListenBrainzConnect()}
+              onKeyDown={(e) =>
+                e.key === "Enter" && handleListenBrainzConnect()
+              }
             />
             <button
               onClick={handleListenBrainzConnect}
@@ -640,14 +783,20 @@ function AccountSection() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [providers, setProviders] = useState<Record<string, AuthProviderState>>({});
+  const [providers, setProviders] = useState<Record<string, AuthProviderState>>(
+    {},
+  );
   const [authConfig, setAuthConfig] = useState<AuthPublicConfig>({});
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
-  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
+    null,
+  );
   const [revokingOthers, setRevokingOthers] = useState(false);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
-  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setName(user?.name || "");
@@ -706,7 +855,10 @@ function AccountSection() {
     }
     setSaving(true);
     try {
-      await api("/api/me/password", "PUT", { current_password: currentPassword, new_password: newPassword });
+      await api("/api/me/password", "PUT", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
       toast.success("Password changed");
       setShowPassword(false);
       setCurrentPassword("");
@@ -722,9 +874,13 @@ function AccountSection() {
   async function handleLinkProvider(provider: string) {
     setLinkingProvider(provider);
     try {
-      const response = await api<{ login_url: string }>(`/api/auth/oauth/${provider}/link`, "POST", {
-        return_to: `${window.location.origin}/settings`,
-      });
+      const response = await api<{ login_url: string }>(
+        `/api/auth/oauth/${provider}/link`,
+        "POST",
+        {
+          return_to: `${window.location.origin}/settings`,
+        },
+      );
       window.location.href = response.login_url;
     } catch {
       toast.error(`Failed to start ${provider} link flow`);
@@ -766,9 +922,18 @@ function AccountSection() {
   async function handleRevokeOthers() {
     setRevokingOthers(true);
     try {
-      const result = await api<{ revoked: number }>("/api/auth/sessions/revoke-all", "POST");
-      setSessions((prev) => prev.filter((session) => session.id === user?.session_id));
-      toast.success(`Revoked ${result.revoked} other session${result.revoked === 1 ? "" : "s"}`);
+      const result = await api<{ revoked: number }>(
+        "/api/auth/sessions/revoke-all",
+        "POST",
+      );
+      setSessions((prev) =>
+        prev.filter((session) => session.id === user?.session_id),
+      );
+      toast.success(
+        `Revoked ${result.revoked} other session${
+          result.revoked === 1 ? "" : "s"
+        }`,
+      );
     } catch {
       toast.error("Failed to revoke other sessions");
     } finally {
@@ -783,11 +948,15 @@ function AccountSection() {
       .map((item) => item.provider),
   );
   const socialProviders = Object.entries(providers).filter(
-    ([provider, state]) => provider !== "password" && state.configured && state.enabled,
+    ([provider, state]) =>
+      provider !== "password" && state.configured && state.enabled,
   );
 
   return (
-    <Section title="Account" description="Manage your profile, social identity, and credentials.">
+    <Section
+      title="Account"
+      description="Manage your profile, social identity, and credentials."
+    >
       <div className="space-y-4">
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">Display name</label>
@@ -830,11 +999,10 @@ function AccountSection() {
           <button
             onClick={handleSaveName}
             disabled={
-              saving || (
-                name.trim() === (user?.name || "")
-                && username.trim() === (user?.username || "")
-                && bio.trim() === (user?.bio || "")
-              )
+              saving ||
+              (name.trim() === (user?.name || "") &&
+                username.trim() === (user?.username || "") &&
+                bio.trim() === (user?.bio || ""))
             }
             className="h-10 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40 transition-opacity"
           >
@@ -850,18 +1018,27 @@ function AccountSection() {
         {socialProviders.length > 0 ? (
           <div className="space-y-3 rounded-xl bg-white/5 p-4">
             <div>
-              <div className="text-sm font-medium text-foreground">Connected accounts</div>
+              <div className="text-sm font-medium text-foreground">
+                Connected accounts
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Link Google or Apple so this profile can use social sign-in directly from Listen.
+                Link Google or Apple so this profile can use social sign-in
+                directly from Listen.
               </p>
             </div>
             {socialProviders.map(([provider]) => {
               const linked = linkedProviders.has(provider);
-              const busy = linkingProvider === provider || unlinkingProvider === provider;
+              const busy =
+                linkingProvider === provider || unlinkingProvider === provider;
               return (
-                <div key={provider} className="flex items-center justify-between gap-4 rounded-lg border border-white/10 px-3 py-3">
+                <div
+                  key={provider}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
+                >
                   <div>
-                    <div className="text-sm font-medium text-foreground capitalize">{provider}</div>
+                    <div className="text-sm font-medium text-foreground capitalize">
+                      {provider}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {linked ? "Linked to this account" : "Not linked yet"}
                     </div>
@@ -869,7 +1046,11 @@ function AccountSection() {
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => linked ? void handleUnlinkProvider(provider) : void handleLinkProvider(provider)}
+                    onClick={() =>
+                      linked
+                        ? void handleUnlinkProvider(provider)
+                        : void handleLinkProvider(provider)
+                    }
                     className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
                   >
                     {busy ? "Working..." : linked ? "Unlink" : "Link"}
@@ -883,14 +1064,21 @@ function AccountSection() {
         <div className="space-y-3 rounded-xl bg-white/5 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-sm font-medium text-foreground">Active sessions</div>
+              <div className="text-sm font-medium text-foreground">
+                Active sessions
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Review where this account is signed in and revoke devices you no longer trust.
+                Review where this account is signed in and revoke devices you no
+                longer trust.
               </p>
             </div>
             <button
               type="button"
-              disabled={revokingOthers || sessions.filter((session) => session.id !== user?.session_id).length === 0}
+              disabled={
+                revokingOthers ||
+                sessions.filter((session) => session.id !== user?.session_id)
+                  .length === 0
+              }
               onClick={() => void handleRevokeOthers()}
               className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
             >
@@ -899,19 +1087,28 @@ function AccountSection() {
           </div>
 
           {loadingSessions ? (
-            <div className="text-sm text-muted-foreground">Loading sessions…</div>
+            <div className="text-sm text-muted-foreground">
+              Loading sessions…
+            </div>
           ) : (
             <div className="space-y-2">
               {sessions.map((session) => {
                 const isCurrent = session.id === user?.session_id;
                 const lastSeen = session.last_seen_at || session.created_at;
-                const label = session.device_label || session.app_id || "Unknown device";
+                const label =
+                  session.device_label || session.app_id || "Unknown device";
                 return (
-                  <div key={session.id} className="flex items-start justify-between gap-4 rounded-lg border border-white/10 px-3 py-3">
+                  <div
+                    key={session.id}
+                    className="flex items-start justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
+                  >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                          <Smartphone size={14} className="text-muted-foreground" />
+                          <Smartphone
+                            size={14}
+                            className="text-muted-foreground"
+                          />
                           {label}
                         </div>
                         {isCurrent ? (
@@ -921,13 +1118,20 @@ function AccountSection() {
                         ) : null}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Last seen {lastSeen ? new Date(lastSeen).toLocaleString() : "recently"}
+                        Last seen{" "}
+                        {lastSeen
+                          ? new Date(lastSeen).toLocaleString()
+                          : "recently"}
                       </div>
                       {session.user_agent ? (
-                        <div className="mt-1 truncate text-xs text-muted-foreground">{session.user_agent}</div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                          {session.user_agent}
+                        </div>
                       ) : null}
                       {session.last_seen_ip ? (
-                        <div className="mt-1 text-[11px] text-white/40">IP {session.last_seen_ip}</div>
+                        <div className="mt-1 text-[11px] text-white/40">
+                          IP {session.last_seen_ip}
+                        </div>
                       ) : null}
                     </div>
                     <button
@@ -936,13 +1140,19 @@ function AccountSection() {
                       onClick={() => void handleRevokeSession(session.id)}
                       className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/15 transition-colors disabled:opacity-50"
                     >
-                      {revokingSessionId === session.id ? "Revoking…" : isCurrent ? "Sign out" : "Revoke"}
+                      {revokingSessionId === session.id
+                        ? "Revoking…"
+                        : isCurrent
+                          ? "Sign out"
+                          : "Revoke"}
                     </button>
                   </div>
                 );
               })}
               {sessions.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No active sessions found.</div>
+                <div className="text-sm text-muted-foreground">
+                  No active sessions found.
+                </div>
               ) : null}
             </div>
           )}
@@ -952,7 +1162,8 @@ function AccountSection() {
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
             <Shield size={16} className="mt-0.5 flex-shrink-0" />
             <div>
-              This instance is currently invite-only for new accounts. Existing accounts can still sign in normally.
+              This instance is currently invite-only for new accounts. Existing
+              accounts can still sign in normally.
             </div>
           </div>
         ) : null}
@@ -991,10 +1202,22 @@ function AccountSection() {
               autoComplete="new-password"
             />
             <div className="flex gap-2 pt-1">
-              <button onClick={handleChangePassword} disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40">
+              <button
+                onClick={handleChangePassword}
+                disabled={saving}
+                className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40"
+              >
                 Change
               </button>
-              <button onClick={() => { setShowPassword(false); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); }} className="h-9 px-4 rounded-lg bg-white/5 text-sm text-white/60">
+              <button
+                onClick={() => {
+                  setShowPassword(false);
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+                className="h-9 px-4 rounded-lg bg-white/5 text-sm text-white/60"
+              >
                 Cancel
               </button>
             </div>
@@ -1004,7 +1227,6 @@ function AccountSection() {
     </Section>
   );
 }
-
 
 const RADIUS_OPTIONS = [20, 40, 60, 100, 150, 200];
 
@@ -1054,11 +1276,19 @@ function ShowsLocationSection() {
   }, [location?.city]);
 
   useEffect(() => {
-    if (searchQuery.length < 2) { setSearchResults([]); return; }
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
     const timer = setTimeout(() => {
       setSearching(true);
-      api<CityResult[]>(`/api/me/cities/search?q=${encodeURIComponent(searchQuery)}`)
-        .then((results) => { setSearchResults(results); setShowDropdown(true); })
+      api<CityResult[]>(
+        `/api/me/cities/search?q=${encodeURIComponent(searchQuery)}`,
+      )
+        .then((results) => {
+          setSearchResults(results);
+          setShowDropdown(true);
+        })
         .catch(() => setSearchResults([]))
         .finally(() => setSearching(false));
     }, 400);
@@ -1068,13 +1298,28 @@ function ShowsLocationSection() {
   async function detectFromIp(silent = false) {
     setDetecting(true);
     try {
-      const geo = await api<{ city: string; country: string; country_code: string; latitude: number; longitude: number }>("/api/me/geolocation");
+      const geo = await api<{
+        city: string;
+        country: string;
+        country_code: string;
+        latitude: number;
+        longitude: number;
+      }>("/api/me/geolocation");
       setCity(geo.city);
-      await api("/api/me/location", "PUT", { city: geo.city, country: geo.country, country_code: geo.country_code, latitude: geo.latitude, longitude: geo.longitude });
-      setLocation((prev) => prev ? { ...prev, ...geo } : null);
+      await api("/api/me/location", "PUT", {
+        city: geo.city,
+        country: geo.country,
+        country_code: geo.country_code,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+      });
+      setLocation((prev) => (prev ? { ...prev, ...geo } : null));
       if (!silent) toast.success(`Detected: ${geo.city}, ${geo.country}`);
-    } catch { if (!silent) toast.error("Could not detect your location"); }
-    finally { setDetecting(false); }
+    } catch {
+      if (!silent) toast.error("Could not detect your location");
+    } finally {
+      setDetecting(false);
+    }
   }
 
   function selectCity(result: CityResult) {
@@ -1082,9 +1327,26 @@ function ShowsLocationSection() {
     setSearchQuery("");
     setSearchResults([]);
     setShowDropdown(false);
-    api("/api/me/location", "PUT", { city: result.city, country: result.country, country_code: result.country_code, latitude: result.latitude, longitude: result.longitude })
+    api("/api/me/location", "PUT", {
+      city: result.city,
+      country: result.country,
+      country_code: result.country_code,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    })
       .then(() => {
-        setLocation((prev) => prev ? { ...prev, city: result.city, country: result.country, country_code: result.country_code, latitude: result.latitude, longitude: result.longitude } : null);
+        setLocation((prev) =>
+          prev
+            ? {
+                ...prev,
+                city: result.city,
+                country: result.country,
+                country_code: result.country_code,
+                latitude: result.latitude,
+                longitude: result.longitude,
+              }
+            : null,
+        );
         toast.success(`City set to ${result.display_name}`);
       })
       .catch(() => toast.error("Failed to save city"));
@@ -1092,54 +1354,109 @@ function ShowsLocationSection() {
 
   async function saveMode(newMode: "fixed" | "near_me") {
     setMode(newMode);
-    try { await api("/api/me/location", "PUT", { show_location_mode: newMode }); }
-    catch { toast.error("Failed to save"); }
+    try {
+      await api("/api/me/location", "PUT", { show_location_mode: newMode });
+    } catch {
+      toast.error("Failed to save");
+    }
   }
 
   async function saveRadius(newRadius: number) {
     setRadius(newRadius);
-    try { await api("/api/me/location", "PUT", { show_radius_km: newRadius }); }
-    catch { toast.error("Failed to save"); }
+    try {
+      await api("/api/me/location", "PUT", { show_radius_km: newRadius });
+    } catch {
+      toast.error("Failed to save");
+    }
   }
 
   const displayCity = city || location?.city;
   const displayCountry = location?.country;
 
   return (
-    <Section title="Shows" description="Configure how upcoming shows are found near you.">
+    <Section
+      title="Shows"
+      description="Configure how upcoming shows are found near you."
+    >
       <div className="space-y-3">
-        <div className="text-sm font-medium text-foreground">Location for shows</div>
+        <div className="text-sm font-medium text-foreground">
+          Location for shows
+        </div>
         <div className="flex flex-col gap-2">
           <button
             onClick={() => saveMode("fixed")}
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-              mode === "fixed" ? "border-primary/30 bg-primary/8" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+              mode === "fixed"
+                ? "border-primary/30 bg-primary/8"
+                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
             }`}
           >
-            <MapPin size={16} className={mode === "fixed" ? "text-primary" : "text-white/40"} />
+            <MapPin
+              size={16}
+              className={mode === "fixed" ? "text-primary" : "text-white/40"}
+            />
             <div className="min-w-0 flex-1">
-              <div className={`text-sm font-medium ${mode === "fixed" ? "text-primary" : "text-foreground"}`}>Fixed city</div>
+              <div
+                className={`text-sm font-medium ${
+                  mode === "fixed" ? "text-primary" : "text-foreground"
+                }`}
+              >
+                Fixed city
+              </div>
               <div className="text-xs text-muted-foreground">
-                {displayCity ? `${displayCity}${displayCountry ? `, ${displayCountry}` : ""}` : "Not set yet"}
+                {displayCity
+                  ? `${displayCity}${
+                      displayCountry ? `, ${displayCountry}` : ""
+                    }`
+                  : "Not set yet"}
               </div>
             </div>
-            <div className={`h-4 w-4 rounded-full border-2 ${mode === "fixed" ? "border-primary bg-primary" : "border-white/20"}`}>
-              {mode === "fixed" && <div className="h-full w-full rounded-full bg-white scale-[0.4]" />}
+            <div
+              className={`h-4 w-4 rounded-full border-2 ${
+                mode === "fixed"
+                  ? "border-primary bg-primary"
+                  : "border-white/20"
+              }`}
+            >
+              {mode === "fixed" && (
+                <div className="h-full w-full rounded-full bg-white scale-[0.4]" />
+              )}
             </div>
           </button>
           <button
             onClick={() => saveMode("near_me")}
             className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-              mode === "near_me" ? "border-primary/30 bg-primary/8" : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
+              mode === "near_me"
+                ? "border-primary/30 bg-primary/8"
+                : "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]"
             }`}
           >
-            <Navigation size={16} className={mode === "near_me" ? "text-primary" : "text-white/40"} />
+            <Navigation
+              size={16}
+              className={mode === "near_me" ? "text-primary" : "text-white/40"}
+            />
             <div className="min-w-0 flex-1">
-              <div className={`text-sm font-medium ${mode === "near_me" ? "text-primary" : "text-foreground"}`}>Near me</div>
-              <div className="text-xs text-muted-foreground">Detect automatically from your connection</div>
+              <div
+                className={`text-sm font-medium ${
+                  mode === "near_me" ? "text-primary" : "text-foreground"
+                }`}
+              >
+                Near me
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Detect automatically from your connection
+              </div>
             </div>
-            <div className={`h-4 w-4 rounded-full border-2 ${mode === "near_me" ? "border-primary bg-primary" : "border-white/20"}`}>
-              {mode === "near_me" && <div className="h-full w-full rounded-full bg-white scale-[0.4]" />}
+            <div
+              className={`h-4 w-4 rounded-full border-2 ${
+                mode === "near_me"
+                  ? "border-primary bg-primary"
+                  : "border-white/20"
+              }`}
+            >
+              {mode === "near_me" && (
+                <div className="h-full w-full rounded-full bg-white scale-[0.4]" />
+              )}
             </div>
           </button>
         </div>
@@ -1149,8 +1466,16 @@ function ShowsLocationSection() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-xs text-muted-foreground">City</label>
-            <button onClick={() => detectFromIp()} disabled={detecting} className="flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-50">
-              {detecting ? <Loader2 size={10} className="animate-spin" /> : <Navigation size={10} />}
+            <button
+              onClick={() => detectFromIp()}
+              disabled={detecting}
+              className="flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-50"
+            >
+              {detecting ? (
+                <Loader2 size={10} className="animate-spin" />
+              ) : (
+                <Navigation size={10} />
+              )}
               Detect from IP
             </button>
           </div>
@@ -1158,13 +1483,21 @@ function ShowsLocationSection() {
             <input
               type="text"
               value={searchQuery || city}
-              onChange={(e) => { setSearchQuery(e.target.value); if (!e.target.value) setCity(""); }}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!e.target.value) setCity("");
+              }}
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               placeholder="Search for a city..."
               className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white outline-none focus:border-primary/40 placeholder:text-white/40"
             />
-            {searching && <Loader2 size={14} className="absolute right-3 top-3 animate-spin text-white/40" />}
+            {searching && (
+              <Loader2
+                size={14}
+                className="absolute right-3 top-3 animate-spin text-white/40"
+              />
+            )}
             {showDropdown && searchResults.length > 0 && (
               <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a2e] shadow-xl">
                 {searchResults.map((result) => (
@@ -1173,7 +1506,10 @@ function ShowsLocationSection() {
                     onMouseDown={() => selectCity(result)}
                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-white/5 transition-colors"
                   >
-                    <MapPin size={12} className="flex-shrink-0 text-primary/60" />
+                    <MapPin
+                      size={12}
+                      className="flex-shrink-0 text-primary/60"
+                    />
                     <span>{result.display_name}</span>
                   </button>
                 ))}
@@ -1185,8 +1521,12 @@ function ShowsLocationSection() {
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-sm font-medium text-foreground">Search radius</div>
-          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">{radius} km</div>
+          <div className="text-sm font-medium text-foreground">
+            Search radius
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">
+            {radius} km
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {RADIUS_OPTIONS.map((r) => (
@@ -1194,7 +1534,9 @@ function ShowsLocationSection() {
               key={r}
               onClick={() => saveRadius(r)}
               className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                radius === r ? "bg-primary text-white" : "bg-white/5 text-muted-foreground hover:bg-white/10"
+                radius === r
+                  ? "bg-primary text-white"
+                  : "bg-white/5 text-muted-foreground hover:bg-white/10"
               }`}
             >
               {r} km

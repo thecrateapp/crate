@@ -65,15 +65,22 @@ def build_album_download_package(
     )
     try:
         timeout = media_worker_timeout_seconds()
-        with media_worker_admission(str(job.get("job_id") or output_path), ttl_seconds=timeout + 60) as lease:
+        with media_worker_admission(
+            str(job.get("job_id") or output_path), ttl_seconds=timeout + 60
+        ) as lease:
             if lease is None:
-                _record_media_worker_metric("media_worker.admission.denied", tags={"kind": "album"})
+                _record_media_worker_metric(
+                    "media_worker.admission.denied", tags={"kind": "album"}
+                )
                 return None
             result = _post_json(f"{base_url}/v1/packages/album", job, timeout=timeout)
             _record_media_worker_result("album", result)
             return result
     except Exception:
-        log.debug("crate-media-worker album package failed; falling back to Python", exc_info=True)
+        log.debug(
+            "crate-media-worker album package failed; falling back to Python",
+            exc_info=True,
+        )
         return None
 
 
@@ -112,20 +119,31 @@ def build_track_download_artifact(
     )
     try:
         timeout = media_worker_timeout_seconds()
-        with media_worker_admission(str(job.get("job_id") or output_path), ttl_seconds=timeout + 60) as lease:
+        with media_worker_admission(
+            str(job.get("job_id") or output_path), ttl_seconds=timeout + 60
+        ) as lease:
             if lease is None:
-                _record_media_worker_metric("media_worker.admission.denied", tags={"kind": "track"})
+                _record_media_worker_metric(
+                    "media_worker.admission.denied", tags={"kind": "track"}
+                )
                 return None
             result = _post_json(f"{base_url}/v1/packages/track", job, timeout=timeout)
             _record_media_worker_result("track", result)
             return result
     except Exception:
-        log.debug("crate-media-worker track artifact failed; falling back to Python", exc_info=True)
+        log.debug(
+            "crate-media-worker track artifact failed; falling back to Python",
+            exc_info=True,
+        )
         return None
 
 
-def _post_json(url: str, payload: dict[str, Any], *, timeout: int) -> dict[str, Any] | None:
-    body = json.dumps(payload, ensure_ascii=False, default=_json_default).encode("utf-8")
+def _post_json(
+    url: str, payload: dict[str, Any], *, timeout: int
+) -> dict[str, Any] | None:
+    body = json.dumps(payload, ensure_ascii=False, default=_json_default).encode(
+        "utf-8"
+    )
     request = urllib.request.Request(
         url,
         data=body,
@@ -144,7 +162,9 @@ def _post_json(url: str, payload: dict[str, Any], *, timeout: int) -> dict[str, 
         return payload
 
 
-def _record_media_worker_metric(name: str, value: float = 1.0, tags: dict[str, str] | None = None) -> None:
+def _record_media_worker_metric(
+    name: str, value: float = 1.0, tags: dict[str, str] | None = None
+) -> None:
     try:
         from crate.metrics import record_later
 
@@ -160,13 +180,27 @@ def _record_media_worker_result(kind: str, result: dict[str, Any] | None) -> Non
         return
     if result.get("ok"):
         _record_media_worker_metric("media_worker.package.completed", tags=tags)
-        _record_media_worker_metric("media_worker.package.duration", float(result.get("duration_ms") or 0), tags=tags)
-        _record_media_worker_metric("media_worker.package.bytes", float(result.get("bytes") or 0), tags=tags)
+        _record_media_worker_metric(
+            "media_worker.package.duration",
+            float(result.get("duration_ms") or 0),
+            tags=tags,
+        )
+        _record_media_worker_metric(
+            "media_worker.package.bytes", float(result.get("bytes") or 0), tags=tags
+        )
         cache = result.get("cache") or {}
         pruned = cache.get("pruned") if isinstance(cache, dict) else None
         if isinstance(pruned, dict):
-            _record_media_worker_metric("media_worker.cache.pruned", float(pruned.get("removed") or 0), tags=tags)
-            _record_media_worker_metric("media_worker.cache.bytes_removed", float(pruned.get("bytes_removed") or 0), tags=tags)
+            _record_media_worker_metric(
+                "media_worker.cache.pruned",
+                float(pruned.get("removed") or 0),
+                tags=tags,
+            )
+            _record_media_worker_metric(
+                "media_worker.cache.bytes_removed",
+                float(pruned.get("bytes_removed") or 0),
+                tags=tags,
+            )
     else:
         _record_media_worker_metric("media_worker.package.failed", tags=tags)
 
@@ -203,7 +237,9 @@ def _album_package_job(
         tracks.append(
             {
                 "source_path": source_path,
-                "relative_path": track_payload.get("relative_path") or track_payload.get("filename") or Path(source_path).name,
+                "relative_path": track_payload.get("relative_path")
+                or track_payload.get("filename")
+                or Path(source_path).name,
                 "filename": track_payload.get("filename") or Path(source_path).name,
                 "metadata": track_payload,
                 "artwork_path": primary_artwork,
@@ -217,7 +253,9 @@ def _album_package_job(
         "progress_path": str(progress_path) if progress_path else None,
         "cancel_path": str(cancel_path) if cancel_path else None,
         "write_rich_tags": write_rich_tags,
-        "cache": _download_cache_policy(cache_kind, cache_key, filename, cache_metadata),
+        "cache": _download_cache_policy(
+            cache_kind, cache_key, filename, cache_metadata
+        ),
         "primary_artwork_path": primary_artwork,
         "tracks": tracks,
         "artwork_files": _artwork_entries(album, primary_artwork),
@@ -260,7 +298,9 @@ def _track_artifact_job(
         "metadata": track,
         "package_json": {"artist": artist, "album": album},
         "write_rich_tags": write_rich_tags,
-        "cache": _download_cache_policy(cache_kind, cache_key, filename, cache_metadata),
+        "cache": _download_cache_policy(
+            cache_kind, cache_key, filename, cache_metadata
+        ),
     }
 
 
@@ -291,7 +331,9 @@ def _download_cache_policy(
     }
 
 
-def _artwork_entries(album: dict[str, Any], primary_artwork: str | None) -> list[dict[str, str]]:
+def _artwork_entries(
+    album: dict[str, Any], primary_artwork: str | None
+) -> list[dict[str, str]]:
     seen: set[str] = set()
     entries: list[dict[str, str]] = []
     album_dir = Path(str(album.get("path") or ""))
@@ -299,13 +341,25 @@ def _artwork_entries(album: dict[str, Any], primary_artwork: str | None) -> list
         path = album_dir / str(name)
         if path.is_file() and path.suffix.lower() in _ARTWORK_EXTENSIONS:
             seen.add(str(path))
-            entries.append({"source_path": str(path), "relative_path": path.name, "kind": "artwork"})
+            entries.append(
+                {
+                    "source_path": str(path),
+                    "relative_path": path.name,
+                    "kind": "artwork",
+                }
+            )
 
     if primary_artwork:
         path = Path(primary_artwork)
         if path.is_file() and str(path) not in seen:
             seen.add(str(path))
-            entries.append({"source_path": str(path), "relative_path": path.name, "kind": "artwork"})
+            entries.append(
+                {
+                    "source_path": str(path),
+                    "relative_path": path.name,
+                    "kind": "artwork",
+                }
+            )
 
     if not entries and album_dir.is_dir():
         for child in sorted(album_dir.iterdir()):
@@ -313,7 +367,13 @@ def _artwork_entries(album: dict[str, Any], primary_artwork: str | None) -> list
                 continue
             stem = child.stem.lower().strip()
             if stem in _ARTWORK_NAMES or stem.startswith("cover"):
-                entries.append({"source_path": str(child), "relative_path": child.name, "kind": "artwork"})
+                entries.append(
+                    {
+                        "source_path": str(child),
+                        "relative_path": child.name,
+                        "kind": "artwork",
+                    }
+                )
                 break
     return entries
 

@@ -93,7 +93,14 @@ export function getStoredQueue(): StoredQueue {
   } catch {
     /* ignore */
   }
-  return { queue: [], currentIndex: 0, currentTime: 0, wasPlaying: false, shuffle: false, unshuffledQueue: null };
+  return {
+    queue: [],
+    currentIndex: 0,
+    currentTime: 0,
+    wasPlaying: false,
+    shuffle: false,
+    unshuffledQueue: null,
+  };
 }
 
 function normalizeStoredTrack(track: Track): Track {
@@ -153,7 +160,7 @@ export function saveRecentlyPlayed(tracks: Track[]) {
 export function getStreamUrl(track: Track): string {
   if (track.entityUid || track.path) {
     const localOfflineUrl = getOfflineNativePlaybackUrl(
-      track.entityUid ? { entityUid: track.entityUid } : (track.path ?? null),
+      track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,
     );
     if (localOfflineUrl) return localOfflineUrl;
   }
@@ -162,18 +169,22 @@ export function getStreamUrl(track: Track): string {
   const path = trackStreamApiPath(track);
   const streamPath = path || `/api/tracks/${track.id}/stream`;
   const url = withStreamQuery(`${base}${streamPath}`);
-  recordDevLog("stream", "resolved stream url", {
-    track: track.title,
-    artist: track.artist,
-    policy: getPlaybackDeliveryPolicyPreference(),
-    url: redactUrl(url),
-  }, "debug");
+  recordDevLog(
+    "stream",
+    "resolved stream url",
+    {
+      track: track.title,
+      artist: track.artist,
+      policy: getPlaybackDeliveryPolicyPreference(),
+      url: redactUrl(url),
+    },
+    "debug",
+  );
   return url;
 }
 
-/** Append playback-delivery policy and auth token. Gapless-5 creates
- *  its own Audio elements that don't inherit browser cookies, so always
- *  include token when present. */
+/** Append playback-delivery policy and native auth token. Same-origin web
+ *  playback uses the httpOnly session cookie instead of tokenized URLs. */
 function withStreamQuery(url: string): string {
   const params = new URLSearchParams();
   const delivery = getPlaybackDeliveryPolicyPreference();
@@ -181,7 +192,7 @@ function withStreamQuery(url: string): string {
     params.set("delivery", delivery);
   }
   try {
-    const token = getAuthToken();
+    const token = isNative ? getAuthToken() : null;
     if (token) params.set("token", token);
   } catch {
     // ignore token lookup failures
@@ -204,7 +215,10 @@ export function getTrackCacheKey(track: Track): string {
   ].join("::");
 }
 
-export function areTracksFromSameAlbum(currentTrack: Track | undefined, nextTrack: Track | null | undefined): boolean {
+export function areTracksFromSameAlbum(
+  currentTrack: Track | undefined,
+  nextTrack: Track | null | undefined,
+): boolean {
   if (!currentTrack || !nextTrack) return false;
   return (
     !!currentTrack.album &&
@@ -252,24 +266,35 @@ function finiteNumber(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function normalizeScale(scale: string | null | undefined): "major" | "minor" | null {
+function normalizeScale(
+  scale: string | null | undefined,
+): "major" | "minor" | null {
   const normalized = scale?.trim().toLowerCase();
   if (normalized === "major" || normalized === "minor") return normalized;
   return null;
 }
 
 function pitchClass(key: string | null | undefined): number | null {
-  const normalized = key?.trim().toLowerCase().replace("\u266f", "#").replace("\u266d", "b");
+  const normalized = key
+    ?.trim()
+    .toLowerCase()
+    .replace("\u266f", "#")
+    .replace("\u266d", "b");
   if (!normalized) return null;
   return KEY_TO_PITCH_CLASS[normalized] ?? null;
 }
 
-function bpmCompatibility(currentBpm: number | null | undefined, nextBpm: number | null | undefined): number | null {
+function bpmCompatibility(
+  currentBpm: number | null | undefined,
+  nextBpm: number | null | undefined,
+): number | null {
   const current = finiteNumber(currentBpm);
   const next = finiteNumber(nextBpm);
   if (!current || !next || current <= 0 || next <= 0) return null;
   const candidates = [next, next / 2, next * 2];
-  const diff = Math.min(...candidates.map((candidate) => Math.abs(current - candidate)));
+  const diff = Math.min(
+    ...candidates.map((candidate) => Math.abs(current - candidate)),
+  );
   return Math.max(0, 1 - diff / 32);
 }
 
@@ -283,7 +308,10 @@ function scalarCompatibility(
   return Math.max(0, 1 - Math.abs(current - next));
 }
 
-function keyCompatibility(currentTrack: Track, nextTrack: Track): number | null {
+function keyCompatibility(
+  currentTrack: Track,
+  nextTrack: Track,
+): number | null {
   const currentKey = pitchClass(currentTrack.audioKey);
   const nextKey = pitchClass(nextTrack.audioKey);
   if (currentKey == null || nextKey == null) return null;
@@ -297,17 +325,36 @@ function keyCompatibility(currentTrack: Track, nextTrack: Track): number | null 
 
   if (distance === 0 && currentScale === nextScale) return 1;
   if (distance === 0) return 0.72;
-  if (currentScale === "major" && nextScale === "minor" && nextKey === (currentKey + 9) % 12) return 0.9;
-  if (currentScale === "minor" && nextScale === "major" && nextKey === (currentKey + 3) % 12) return 0.9;
-  if (distance === 5 || distance === 7) return currentScale === nextScale ? 0.78 : 0.62;
+  if (
+    currentScale === "major" &&
+    nextScale === "minor" &&
+    nextKey === (currentKey + 9) % 12
+  )
+    return 0.9;
+  if (
+    currentScale === "minor" &&
+    nextScale === "major" &&
+    nextKey === (currentKey + 3) % 12
+  )
+    return 0.9;
+  if (distance === 5 || distance === 7)
+    return currentScale === nextScale ? 0.78 : 0.62;
   if (distance <= 2) return 0.58;
   return 0.28;
 }
 
-function blissCompatibility(currentTrack: Track, nextTrack: Track): number | null {
+function blissCompatibility(
+  currentTrack: Track,
+  nextTrack: Track,
+): number | null {
   const current = currentTrack.blissVector;
   const next = nextTrack.blissVector;
-  if (!Array.isArray(current) || !Array.isArray(next) || current.length < 3 || current.length !== next.length) {
+  if (
+    !Array.isArray(current) ||
+    !Array.isArray(next) ||
+    current.length < 3 ||
+    current.length !== next.length
+  ) {
     return null;
   }
 
@@ -327,13 +374,19 @@ function blissCompatibility(currentTrack: Track, nextTrack: Track): number | nul
   return Math.max(0, Math.min(1, (cosine + 1) / 2));
 }
 
-function smartTransitionFeatureScore(currentTrack: Track, nextTrack: Track): number | null {
+function smartTransitionFeatureScore(
+  currentTrack: Track,
+  nextTrack: Track,
+): number | null {
   const signals: Array<[number, number | null]> = [
     [0.4, blissCompatibility(currentTrack, nextTrack)],
     [0.2, bpmCompatibility(currentTrack.bpm, nextTrack.bpm)],
     [0.15, keyCompatibility(currentTrack, nextTrack)],
     [0.15, scalarCompatibility(currentTrack.energy, nextTrack.energy)],
-    [0.05, scalarCompatibility(currentTrack.danceability, nextTrack.danceability)],
+    [
+      0.05,
+      scalarCompatibility(currentTrack.danceability, nextTrack.danceability),
+    ],
     [0.05, scalarCompatibility(currentTrack.valence, nextTrack.valence)],
   ];
 
@@ -358,7 +411,8 @@ function fallbackSmartTransitionSeconds(
   if (playSource?.type === "radio") return SMART_TRANSITION_BALANCED_SECONDS;
   if (playSource?.type === "playlist") return SMART_TRANSITION_BALANCED_SECONDS;
   if (shuffle) return SMART_TRANSITION_BALANCED_SECONDS;
-  if (currentTrack.isSuggested || nextTrack.isSuggested) return SMART_TRANSITION_BALANCED_SECONDS;
+  if (currentTrack.isSuggested || nextTrack.isSuggested)
+    return SMART_TRANSITION_BALANCED_SECONDS;
   return SMART_TRANSITION_MIXED_QUEUE_SECONDS;
 }
 
@@ -369,11 +423,21 @@ function smartTransitionSeconds(
   shuffle: boolean,
 ): number {
   if (!currentTrack || !nextTrack) {
-    return fallbackSmartTransitionSeconds(currentTrack, nextTrack, playSource, shuffle);
+    return fallbackSmartTransitionSeconds(
+      currentTrack,
+      nextTrack,
+      playSource,
+      shuffle,
+    );
   }
   const featureScore = smartTransitionFeatureScore(currentTrack, nextTrack);
   if (featureScore == null) {
-    return fallbackSmartTransitionSeconds(currentTrack, nextTrack, playSource, shuffle);
+    return fallbackSmartTransitionSeconds(
+      currentTrack,
+      nextTrack,
+      playSource,
+      shuffle,
+    );
   }
   if (featureScore >= 0.78) return SMART_TRANSITION_LONG_SECONDS;
   if (featureScore >= 0.55) return SMART_TRANSITION_BALANCED_SECONDS;
@@ -387,18 +451,30 @@ export function getEffectiveCrossfadeSeconds(
   shuffle: boolean,
   configuredSeconds: number,
   smartCrossfadeEnabled: boolean,
-  options: { androidNative?: boolean; html5OnlyPlayback?: boolean; mobileEnhancedAudio?: boolean } = {},
+  options: {
+    androidNative?: boolean;
+    html5OnlyPlayback?: boolean;
+    mobileEnhancedAudio?: boolean;
+  } = {},
 ): number {
   const clampedSeconds = Math.max(0, configuredSeconds || 0);
-  const continuousAlbumTransition = isContinuousAlbumTransition(currentTrack, nextTrack, playSource, shuffle);
-  const mobileHtml5Pipeline = (options.androidNative || stableMobileAudioPipeline)
-    && !options.mobileEnhancedAudio;
+  const continuousAlbumTransition = isContinuousAlbumTransition(
+    currentTrack,
+    nextTrack,
+    playSource,
+    shuffle,
+  );
+  const mobileHtml5Pipeline =
+    (options.androidNative || stableMobileAudioPipeline) &&
+    !options.mobileEnhancedAudio;
   const shouldMaskHtml5Gap = options.html5OnlyPlayback ?? mobileHtml5Pipeline;
 
   if (smartCrossfadeEnabled && continuousAlbumTransition) {
     if (shouldMaskHtml5Gap) {
       return Math.min(
-        clampedSeconds > 0 ? clampedSeconds : ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
+        clampedSeconds > 0
+          ? clampedSeconds
+          : ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
         ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS,
       );
     }
@@ -406,7 +482,12 @@ export function getEffectiveCrossfadeSeconds(
   if (clampedSeconds <= 0) return 0;
   if (!smartCrossfadeEnabled) return clampedSeconds;
   if (continuousAlbumTransition) {
-    return shouldMaskHtml5Gap ? Math.min(clampedSeconds, ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS) : 0;
+    return shouldMaskHtml5Gap
+      ? Math.min(clampedSeconds, ANDROID_CONTINUOUS_ALBUM_CROSSFADE_SECONDS)
+      : 0;
   }
-  return Math.min(clampedSeconds, smartTransitionSeconds(currentTrack, nextTrack, playSource, shuffle));
+  return Math.min(
+    clampedSeconds,
+    smartTransitionSeconds(currentTrack, nextTrack, playSource, shuffle),
+  );
 }

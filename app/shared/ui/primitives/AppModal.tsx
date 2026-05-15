@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { X } from "lucide-react";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -13,6 +20,7 @@ interface AppModalProps {
   closeOnOverlay?: boolean;
   closeOnEscape?: boolean;
   lockBodyScroll?: boolean;
+  mobileSafeArea?: boolean;
 }
 
 interface ModalSectionProps extends HTMLAttributes<HTMLDivElement> {
@@ -29,6 +37,7 @@ export function AppModal({
   closeOnOverlay = true,
   closeOnEscape = true,
   lockBodyScroll = true,
+  mobileSafeArea = false,
 }: AppModalProps) {
   useEffect(() => {
     if (!open) return undefined;
@@ -91,7 +100,10 @@ export function AppModal({
     >
       <div
         className={cn(
-          "bg-modal-surface max-h-[92vh] w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl animate-sheet-up sm:rounded-3xl sm:animate-pop-in",
+          "bg-modal-surface w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl animate-sheet-up sm:rounded-3xl sm:animate-pop-in",
+          mobileSafeArea
+            ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
+            : "max-h-[92vh]",
           maxWidthClassName,
           panelClassName,
         )}
@@ -105,7 +117,13 @@ export function AppModal({
         onTouchEnd={onSwipeEnd}
       >
         {/* Drag handle — visible on mobile only */}
-        <div ref={dragHandleRef} className="flex justify-center pt-2 pb-1 sm:hidden">
+        <div
+          ref={dragHandleRef}
+          className={cn(
+            "flex justify-center sm:hidden",
+            mobileSafeArea ? "touch-pan-y pt-4 pb-3" : "pt-2 pb-1",
+          )}
+        >
           <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
         {children}
@@ -114,7 +132,11 @@ export function AppModal({
   );
 }
 
-export function ModalHeader({ children, className, ...props }: ModalSectionProps) {
+export function ModalHeader({
+  children,
+  className,
+  ...props
+}: ModalSectionProps) {
   return (
     <div
       {...props}
@@ -128,18 +150,23 @@ export function ModalHeader({ children, className, ...props }: ModalSectionProps
   );
 }
 
-export function ModalBody({ children, className, ...props }: ModalSectionProps) {
+export function ModalBody({
+  children,
+  className,
+  ...props
+}: ModalSectionProps) {
   return (
-    <div
-      {...props}
-      className={cn("overflow-y-auto", className)}
-    >
+    <div {...props} className={cn("overflow-y-auto", className)}>
       {children}
     </div>
   );
 }
 
-export function ModalFooter({ children, className, ...props }: ModalSectionProps) {
+export function ModalFooter({
+  children,
+  className,
+  ...props
+}: ModalSectionProps) {
   return (
     <div
       {...props}
@@ -159,7 +186,11 @@ interface ModalCloseButtonProps {
   className?: string;
 }
 
-export function ModalCloseButton({ onClick, disabled = false, className }: ModalCloseButtonProps) {
+export function ModalCloseButton({
+  onClick,
+  disabled = false,
+  className,
+}: ModalCloseButtonProps) {
   return (
     <button
       type="button"

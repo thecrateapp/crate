@@ -17,7 +17,9 @@ function getServerScope(serverOrigin?: string): string {
 
 export function getAuthUserIdStorageKey(serverOrigin?: string): string {
   if (!usesConfigurableServer) return AUTH_USER_ID_KEY;
-  return `${AUTH_USER_ID_KEY}:${encodeURIComponent(getServerScope(serverOrigin))}`;
+  return `${AUTH_USER_ID_KEY}:${encodeURIComponent(
+    getServerScope(serverOrigin),
+  )}`;
 }
 
 function safeGetStorageItem(key: string): string | null {

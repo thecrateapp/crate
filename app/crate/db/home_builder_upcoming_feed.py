@@ -34,7 +34,9 @@ def _load_probable_setlists(artist_names: list[str]) -> dict[str, list[dict]]:
 
     probable_setlists: dict[str, list[dict]] = {}
     for artist_name in artist_names:
-        cached = get_cache(f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7)
+        cached = get_cache(
+            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
+        )
         songs = cached.get("songs") if isinstance(cached, dict) else None
         if songs:
             probable_setlists[artist_name] = songs
@@ -60,7 +62,9 @@ def _build_show_items(
                 "artist_id": show.get("artist_id"),
                 "artist_slug": show.get("artist_slug"),
                 "title": show.get("venue", ""),
-                "subtitle": ", ".join(part for part in [show.get("city"), show.get("country")] if part),
+                "subtitle": ", ".join(
+                    part for part in [show.get("city"), show.get("country")] if part
+                ),
                 "is_upcoming": True,
                 "user_attending": show.get("id") in attending_show_ids,
                 "probable_setlist": probable_setlists.get(artist_name),
@@ -106,9 +110,15 @@ def _build_home_upcoming(
     releases = get_upcoming_releases(followed_names, today, recent_cutoff, lookup_limit)
     items = _build_release_items(releases, today=today)
 
-    shows = get_upcoming_shows(followed_names, today, user_lat, user_lon, user_radius, lookup_limit)
-    attending_show_ids = get_attending_show_ids(user_id, [show["id"] for show in shows if show.get("id") is not None])
-    show_artists = sorted({show["artist_name"] for show in shows if show.get("artist_name")})
+    shows = get_upcoming_shows(
+        followed_names, today, user_lat, user_lon, user_radius, lookup_limit
+    )
+    attending_show_ids = get_attending_show_ids(
+        user_id, [show["id"] for show in shows if show.get("id") is not None]
+    )
+    show_artists = sorted(
+        {show["artist_name"] for show in shows if show.get("artist_name")}
+    )
     probable_setlists = _load_probable_setlists(show_artists) if show_artists else {}
     items.extend(
         _build_show_items(
@@ -118,7 +128,9 @@ def _build_home_upcoming(
         )
     )
 
-    items.sort(key=lambda item: ((item.get("date") or "9999-12-31"), item.get("artist") or ""))
+    items.sort(
+        key=lambda item: ((item.get("date") or "9999-12-31"), item.get("artist") or "")
+    )
     insights = _build_upcoming_insights_home(user_id, shows, attending_show_ids)
     show_count = sum(1 for item in items if item.get("type") == "show")
     release_count = sum(1 for item in items if item.get("type") == "release")

@@ -6,7 +6,10 @@ export function useUserAvatarUrl(
   avatar: string | null | undefined,
   userId?: number | null,
 ) {
-  const sources = useMemo(() => resolveUserAvatarSources(avatar, userId), [avatar, userId]);
+  const sources = useMemo(
+    () => resolveUserAvatarSources(avatar, userId),
+    [avatar, userId],
+  );
   const [avatarUrl, setAvatarUrl] = useState(sources.primary);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 package snapshots
 
 import (
+	"container/list"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -19,6 +20,9 @@ var ErrNotFound = errors.New("snapshot not found")
 
 const defaultCacheTTL = 2 * time.Second
 
+const defaultCacheMaxEntries = 1000
+
+// SnapshotMeta contains metadata about a ui_snapshots row.
 type SnapshotMeta struct {
 	Scope        string     `json:"scope"`
 	SubjectKey   string     `json:"subject_key"`
@@ -30,41 +34,51 @@ type SnapshotMeta struct {
 	GenerationMS int64      `json:"generation_ms"`
 }
 
+// Row is a snapshot record combining payload data with metadata.
 type Row struct {
 	Payload map[string]any
 	Meta    SnapshotMeta
 }
 
+// Store reads and caches ui_snapshots from PostgreSQL with a small LRU layer.
 type Store struct {
-	pool         *pgxpool.Pool
-	queryTimeout time.Duration
-	maxAge       time.Duration
-	staleMaxAge  time.Duration
-	cacheTTL     time.Duration
-	mu           sync.RWMutex
-	cache        map[string]cacheEntry
+	pool            *pgxpool.Pool
+	queryTimeout    time.Duration
+	maxAge          time.Duration
+	staleMaxAge     time.Duration
+	cacheTTL        time.Duration
+	cacheMaxEntries int
+	mu              sync.Mutex
+	cache           map[string]*list.Element
+	cacheList       *list.List
 }
 
-type cacheEntry struct {
+type lruEntry struct {
+	key       string
 	row       *Row
 	expiresAt time.Time
 }
 
+// NewStore creates a snapshot Store with the given pool, timeout, and cache ages.
 func NewStore(pool *pgxpool.Pool, queryTimeout time.Duration, maxAge time.Duration, staleMaxAge time.Duration) *Store {
 	return &Store{
-		pool:         pool,
-		queryTimeout: queryTimeout,
-		maxAge:       maxAge,
-		staleMaxAge:  staleMaxAge,
-		cacheTTL:     defaultCacheTTL,
-		cache:        make(map[string]cacheEntry),
+		pool:            pool,
+		queryTimeout:    queryTimeout,
+		maxAge:          maxAge,
+		staleMaxAge:     staleMaxAge,
+		cacheTTL:        defaultCacheTTL,
+		cacheMaxEntries: defaultCacheMaxEntries,
+		cache:           make(map[string]*list.Element),
+		cacheList:       list.New(),
 	}
 }
 
+// Get returns a cached or freshly loaded snapshot for the given scope and subject.
 func (s *Store) Get(ctx context.Context, scope string, subjectKey string) (*Row, error) {
 	return s.get(ctx, scope, subjectKey, false)
 }
 
+// GetFresh bypasses the in-memory cache and loads the snapshot directly from the database.
 func (s *Store) GetFresh(ctx context.Context, scope string, subjectKey string) (*Row, error) {
 	return s.get(ctx, scope, subjectKey, true)
 }
@@ -136,19 +150,19 @@ func (s *Store) cacheGet(key string, now time.Time) *Row {
 	if s.cacheTTL <= 0 {
 		return nil
 	}
-	s.mu.RLock()
-	entry, ok := s.cache[key]
-	s.mu.RUnlock()
-	if !ok || !entry.expiresAt.After(now) {
-		if ok {
-			s.mu.Lock()
-			if current, exists := s.cache[key]; exists && !current.expiresAt.After(now) {
-				delete(s.cache, key)
-			}
-			s.mu.Unlock()
-		}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	elem, ok := s.cache[key]
+	if !ok {
 		return nil
 	}
+	entry := elem.Value.(*lruEntry)
+	if !entry.expiresAt.After(now) {
+		s.cacheList.Remove(elem)
+		delete(s.cache, key)
+		return nil
+	}
+	s.cacheList.MoveToFront(elem)
 	return cloneRow(entry.row)
 }
 
@@ -157,8 +171,23 @@ func (s *Store) cacheSet(key string, row *Row, now time.Time) {
 		return
 	}
 	s.mu.Lock()
-	s.cache[key] = cacheEntry{row: cloneRow(row), expiresAt: now.Add(s.cacheTTL)}
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	if elem, ok := s.cache[key]; ok {
+		s.cacheList.MoveToFront(elem)
+		elem.Value.(*lruEntry).row = cloneRow(row)
+		elem.Value.(*lruEntry).expiresAt = now.Add(s.cacheTTL)
+		return
+	}
+	entry := &lruEntry{key: key, row: cloneRow(row), expiresAt: now.Add(s.cacheTTL)}
+	elem := s.cacheList.PushFront(entry)
+	s.cache[key] = elem
+	if s.cacheMaxEntries > 0 && s.cacheList.Len() > s.cacheMaxEntries {
+		back := s.cacheList.Back()
+		if back != nil {
+			s.cacheList.Remove(back)
+			delete(s.cache, back.Value.(*lruEntry).key)
+		}
+	}
 }
 
 func cloneRow(row *Row) *Row {
@@ -170,6 +199,7 @@ func cloneRow(row *Row) *Row {
 	return &clone
 }
 
+// DecoratedPayload returns the payload with embedded snapshot metadata.
 func (r Row) DecoratedPayload() map[string]any {
 	payload := cloneMap(r.Payload)
 	payload["snapshot"] = r.Meta
@@ -199,6 +229,7 @@ func cloneValue(value any) any {
 	}
 }
 
+// DecodePayload unmarshals snapshot JSON into a map, wrapping scalars when needed.
 func DecodePayload(raw []byte) (map[string]any, error) {
 	if len(raw) == 0 {
 		return map[string]any{}, nil
@@ -217,6 +248,7 @@ func DecodePayload(raw []byte) (map[string]any, error) {
 	return payload, nil
 }
 
+// SnapshotFreshness evaluates whether a snapshot is fresh, stale-but-usable, or expired.
 func SnapshotFreshness(
 	builtAt time.Time,
 	staleAfter *time.Time,

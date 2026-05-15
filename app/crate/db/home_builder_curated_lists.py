@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from crate.db.home_builder_discovery import _build_artist_core_rows
-from crate.db.home_builder_shared import _artwork_artists, _artwork_tracks, _select_diverse_tracks_with_backfill
+from crate.db.home_builder_shared import (
+    _artwork_artists,
+    _artwork_tracks,
+    _select_diverse_tracks_with_backfill,
+)
 from crate.db.queries.home import get_artists_core_track_rows
 
 
-def _build_radio_stations(top_artists: list[dict], top_albums: list[dict], limit: int) -> list[dict]:
+def _build_radio_stations(
+    top_artists: list[dict], top_albums: list[dict], limit: int
+) -> list[dict]:
     radio_stations: list[dict] = []
     seen: set[tuple[str, object]] = set()
 
@@ -73,16 +79,24 @@ def _build_favorite_artists(top_artists: list[dict], limit: int) -> list[dict]:
     ]
 
 
-def _build_core_playlists(user_id: int, top_artists: list[dict], limit: int, track_limit: int = 8) -> list[dict]:
+def _build_core_playlists(
+    user_id: int, top_artists: list[dict], limit: int, track_limit: int = 8
+) -> list[dict]:
     essentials: list[dict] = []
     candidates = [
         row
         for row in top_artists
         if row.get("artist_id") is not None and (row.get("artist_name") or "")
     ]
-    artist_ids = [int(row["artist_id"]) for row in candidates[: max(limit * 2, limit)]]
+    artist_ids = [
+        int(artist_id)
+        for row in candidates[: max(limit * 2, limit)]
+        if (artist_id := row.get("artist_id")) is not None
+    ]
     rows_by_artist: dict[int, list[dict]] = {}
-    for track in get_artists_core_track_rows(artist_ids=artist_ids, per_artist_limit=track_limit):
+    for track in get_artists_core_track_rows(
+        artist_ids=artist_ids, per_artist_limit=track_limit
+    ):
         artist_id = track.get("artist_id")
         if artist_id is None:
             continue
@@ -90,9 +104,12 @@ def _build_core_playlists(user_id: int, top_artists: list[dict], limit: int, tra
 
     for row in candidates:
         artist_id = row.get("artist_id")
+        if artist_id is None:
+            continue
+        artist_id_int = int(artist_id)
         artist_name = row.get("artist_name") or ""
         rows = _select_diverse_tracks_with_backfill(
-            rows_by_artist.get(int(artist_id), []),
+            rows_by_artist.get(artist_id_int, []),
             limit=track_limit,
             max_per_artist=track_limit,
             max_per_album=2,
@@ -100,7 +117,7 @@ def _build_core_playlists(user_id: int, top_artists: list[dict], limit: int, tra
         if not rows:
             rows = _build_artist_core_rows(
                 user_id,
-                artist_id=artist_id,
+                artist_id=artist_id_int,
                 artist_name=artist_name,
                 limit=track_limit,
             )
@@ -108,7 +125,7 @@ def _build_core_playlists(user_id: int, top_artists: list[dict], limit: int, tra
             continue
         essentials.append(
             {
-                "id": f"core-tracks-artist-{artist_id}",
+                "id": f"core-tracks-artist-{artist_id_int}",
                 "name": artist_name,
                 "description": f"The defining tracks from {artist_name}.",
                 "artwork_tracks": _artwork_tracks(rows),

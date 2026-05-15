@@ -13,7 +13,11 @@ from crate.api.cache_events import (
     get_invalidation_events_since,
     get_latest_invalidation_event_id,
 )
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.me import (
@@ -173,7 +177,9 @@ def _get_home_discovery_payload(user_id: int, *, fresh: bool = False) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
-def _get_home_discovery_items(user_id: int, key: str, *, fresh: bool = False) -> list[dict]:
+def _get_home_discovery_items(
+    user_id: int, key: str, *, fresh: bool = False
+) -> list[dict]:
     payload = _get_home_discovery_payload(user_id, fresh=fresh)
     items = payload.get(key)
     return items if isinstance(items, list) else []
@@ -202,7 +208,9 @@ def _is_home_discovery_invalidation(scope: str, user_id: int) -> bool:
     return scope.startswith(_HOME_DISCOVERY_INVALIDATION_PREFIXES)
 
 
-async def _home_discovery_stream(user_id: int, last_event_id: int, *, include_initial: bool = True):
+async def _home_discovery_stream(
+    user_id: int, last_event_id: int, *, include_initial: bool = True
+):
     heartbeat_counter = 0
 
     def heartbeat_payload() -> str:
@@ -216,7 +224,9 @@ async def _home_discovery_stream(user_id: int, last_event_id: int, *, include_in
     try:
         pubsub = await open_pubsub(channel)
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(_get_home_discovery_payload(user_id))}\n\n"
                 heartbeat_counter = 0
@@ -252,7 +262,9 @@ def _probable_setlists_for_artists(artist_names: list[str]) -> dict[str, list[di
     result: dict[str, list[dict]] = {}
     missing: list[str] = []
     for artist_name in artist_names:
-        cached = get_cache(f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7)
+        cached = get_cache(
+            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
+        )
         songs = cached.get("songs") if isinstance(cached, dict) else None
         if songs:
             result[artist_name] = songs
@@ -262,6 +274,7 @@ def _probable_setlists_for_artists(artist_names: list[str]) -> dict[str, list[di
     # Lazy-fetch from setlist.fm for artists not yet cached
     if missing:
         from crate.setlistfm import get_probable_setlist
+
         for artist_name in missing:
             try:
                 songs = get_probable_setlist(artist_name)
@@ -295,10 +308,22 @@ def _get_cached_stats_dashboard(
         "window": window,
         "overview": get_stats_overview(user_id, window=window),
         "trends": get_stats_trends(user_id, window=window),
-        "top_tracks": {"window": window, "items": get_top_tracks(user_id, window=window, limit=tracks_limit)},
-        "top_artists": {"window": window, "items": get_top_artists(user_id, window=window, limit=artists_limit)},
-        "top_albums": {"window": window, "items": get_top_albums(user_id, window=window, limit=albums_limit)},
-        "top_genres": {"window": window, "items": get_top_genres(user_id, window=window, limit=genres_limit)},
+        "top_tracks": {
+            "window": window,
+            "items": get_top_tracks(user_id, window=window, limit=tracks_limit),
+        },
+        "top_artists": {
+            "window": window,
+            "items": get_top_artists(user_id, window=window, limit=artists_limit),
+        },
+        "top_albums": {
+            "window": window,
+            "items": get_top_albums(user_id, window=window, limit=albums_limit),
+        },
+        "top_genres": {
+            "window": window,
+            "items": get_top_genres(user_id, window=window, limit=genres_limit),
+        },
         "replay": get_replay_mix(user_id, window=window, limit=replay_limit),
     }
     set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
@@ -313,7 +338,9 @@ def _build_upcoming_insights(
     if not shows:
         return []
 
-    reminders = get_show_reminders(user_id, [show["id"] for show in shows if show.get("id") is not None])
+    reminders = get_show_reminders(
+        user_id, [show["id"] for show in shows if show.get("id") is not None]
+    )
     reminder_keys = {(row["show_id"], row["reminder_type"]) for row in reminders}
     hot_artists = {
         row["artist_name"]
@@ -339,54 +366,65 @@ def _build_upcoming_insights(
         has_setlist = bool(show.get("probable_setlist"))
 
         if 7 < days_until <= 30 and (show_id, "one_month") not in reminder_keys:
-            insights.append({
-                "type": "one_month",
-                "show_id": show_id,
-                "artist": artist_name,
-                "artist_id": show.get("artist_id"),
-                "artist_slug": show.get("artist_slug"),
-                "date": date_str,
-                "title": show.get("venue") or artist_name,
-                "subtitle": f"{days_until} days to go",
-                "message": f"{artist_name} is coming up in about a month.",
-                "has_setlist": has_setlist,
-            })
+            insights.append(
+                {
+                    "type": "one_month",
+                    "show_id": show_id,
+                    "artist": artist_name,
+                    "artist_id": show.get("artist_id"),
+                    "artist_slug": show.get("artist_slug"),
+                    "date": date_str,
+                    "title": show.get("venue") or artist_name,
+                    "subtitle": f"{days_until} days to go",
+                    "message": f"{artist_name} is coming up in about a month.",
+                    "has_setlist": has_setlist,
+                }
+            )
 
         if 1 < days_until <= 7 and (show_id, "one_week") not in reminder_keys:
-            insights.append({
-                "type": "one_week",
-                "show_id": show_id,
-                "artist": artist_name,
-                "artist_id": show.get("artist_id"),
-                "artist_slug": show.get("artist_slug"),
-                "date": date_str,
-                "title": show.get("venue") or artist_name,
-                "subtitle": f"{days_until} days to go",
-                "message": f"{artist_name} is coming up this week.",
-                "has_setlist": has_setlist,
-            })
+            insights.append(
+                {
+                    "type": "one_week",
+                    "show_id": show_id,
+                    "artist": artist_name,
+                    "artist_id": show.get("artist_id"),
+                    "artist_slug": show.get("artist_slug"),
+                    "date": date_str,
+                    "title": show.get("venue") or artist_name,
+                    "subtitle": f"{days_until} days to go",
+                    "message": f"{artist_name} is coming up this week.",
+                    "has_setlist": has_setlist,
+                }
+            )
 
-        if has_setlist and days_until <= 30 and (show_id, "show_prep") not in reminder_keys:
+        if (
+            has_setlist
+            and days_until <= 30
+            and (show_id, "show_prep") not in reminder_keys
+        ):
             weight = "high" if artist_name in hot_artists else "normal"
-            insights.append({
-                "type": "show_prep",
-                "show_id": show_id,
-                "artist": artist_name,
-                "artist_id": show.get("artist_id"),
-                "artist_slug": show.get("artist_slug"),
-                "date": date_str,
-                "title": f"{artist_name} probable setlist",
-                "subtitle": "Show prep",
-                "message": "Warm up with the likely setlist before the show.",
-                "has_setlist": True,
-                "weight": weight,
-            })
+            insights.append(
+                {
+                    "type": "show_prep",
+                    "show_id": show_id,
+                    "artist": artist_name,
+                    "artist_id": show.get("artist_id"),
+                    "artist_slug": show.get("artist_slug"),
+                    "date": date_str,
+                    "title": f"{artist_name} probable setlist",
+                    "subtitle": "Show prep",
+                    "message": "Warm up with the likely setlist before the show.",
+                    "has_setlist": True,
+                    "weight": weight,
+                }
+            )
 
     insights.sort(key=lambda item: (item.get("date", ""), item.get("type", "")))
     return insights[:8]
 
 
 # ── Library Summary ──────────────────────────────────────────
+
 
 @router.get(
     "",
@@ -446,6 +484,7 @@ def my_playlists_page(request: Request):
 
 # ── Follows ──────────────────────────────────────────────────
 
+
 @router.get(
     "/follows",
     response_model=list[FollowedArtistResponse],
@@ -455,6 +494,7 @@ def my_playlists_page(request: Request):
 def list_follows(request: Request):
     user = _require_auth(request)
     return get_followed_artists(user["id"])
+
 
 @router.post(
     "/follows",
@@ -479,6 +519,7 @@ def follow_by_id(request: Request, artist_id: int):
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return follow(request, FollowRequest(artist_name=artist_name))
+
 
 @router.delete(
     "/follows/{artist_name}",
@@ -506,6 +547,7 @@ def unfollow_by_id(request: Request, artist_id: int):
         raise HTTPException(status_code=404, detail="Artist not found")
     return unfollow(request, artist_name)
 
+
 @router.get(
     "/follows/{artist_name}",
     response_model=FollowingStateResponse,
@@ -532,6 +574,7 @@ def is_following_check_by_id(request: Request, artist_id: int):
 
 # ── Saved Albums ─────────────────────────────────────────────
 
+
 @router.get(
     "/albums",
     response_model=list[SavedAlbumResponse],
@@ -541,6 +584,7 @@ def is_following_check_by_id(request: Request, artist_id: int):
 def list_saved_albums(request: Request):
     user = _require_auth(request)
     return get_saved_albums(user["id"])
+
 
 @router.post(
     "/albums",
@@ -552,6 +596,7 @@ def save_album_endpoint(request: Request, body: SaveAlbumRequest):
     user = _require_auth(request)
     added = save_album(user["id"], body.album_id)
     return {"ok": True, "added": added}
+
 
 @router.delete(
     "/albums/{album_id}",
@@ -569,6 +614,7 @@ def unsave_album_endpoint(request: Request, album_id: int):
 
 # ── Liked Tracks ─────────────────────────────────────────────
 
+
 @router.get(
     "/likes",
     response_model=list[LikedTrackResponse],
@@ -578,6 +624,7 @@ def unsave_album_endpoint(request: Request, album_id: int):
 def list_likes(request: Request, limit: int = 100):
     user = _require_auth(request)
     return get_liked_tracks(user["id"], limit=limit)
+
 
 @router.post(
     "/likes",
@@ -596,6 +643,7 @@ def like(request: Request, body: LikeTrackRequest):
     if added is None:
         raise HTTPException(status_code=404, detail="Track not found")
     return {"ok": True, "added": added}
+
 
 @router.delete(
     "/likes",
@@ -616,6 +664,7 @@ def unlike(request: Request, body: LikeTrackRequest):
 
 # ── Play History ─────────────────────────────────────────────
 
+
 @router.get(
     "/history",
     response_model=list[PlayHistoryEntryResponse],
@@ -625,6 +674,7 @@ def unlike(request: Request, body: LikeTrackRequest):
 def history(request: Request, limit: int = 50):
     user = _require_auth(request)
     return get_play_history(user["id"], limit=limit)
+
 
 @router.post(
     "/history",
@@ -671,9 +721,13 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
                 track_path=body.track_path,
             )
 
-    track_entity_uid = body.track_entity_uid or (resolved_track or {}).get("track_entity_uid")
+    track_entity_uid = body.track_entity_uid or (resolved_track or {}).get(
+        "track_entity_uid"
+    )
     payload = {
-        "track_id": body.track_id if body.track_id is not None else (resolved_track or {}).get("track_id"),
+        "track_id": body.track_id
+        if body.track_id is not None
+        else (resolved_track or {}).get("track_id"),
         "track_entity_uid": track_entity_uid,
         "track_path": body.track_path or (resolved_track or {}).get("track_path"),
         "title": body.title,
@@ -686,6 +740,7 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
     }
     set_cache(cache_key, payload, ttl=90)
     return {"ok": True}
+
 
 @router.get(
     "/stats",
@@ -732,10 +787,15 @@ def stats_trends(request: Request, window: str = Query("30d")):
     responses=_ME_RESPONSES,
     summary="Get top tracks for a time window",
 )
-def stats_top_tracks(request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)):
+def stats_top_tracks(
+    request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)
+):
     user = _require_auth(request)
     try:
-        return {"window": window, "items": get_top_tracks(user["id"], window=window, limit=limit)}
+        return {
+            "window": window,
+            "items": get_top_tracks(user["id"], window=window, limit=limit),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -746,10 +806,15 @@ def stats_top_tracks(request: Request, window: str = Query("30d"), limit: int = 
     responses=_ME_RESPONSES,
     summary="Get top artists for a time window",
 )
-def stats_top_artists(request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)):
+def stats_top_artists(
+    request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)
+):
     user = _require_auth(request)
     try:
-        return {"window": window, "items": get_top_artists(user["id"], window=window, limit=limit)}
+        return {
+            "window": window,
+            "items": get_top_artists(user["id"], window=window, limit=limit),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -760,10 +825,15 @@ def stats_top_artists(request: Request, window: str = Query("30d"), limit: int =
     responses=_ME_RESPONSES,
     summary="Get top albums for a time window",
 )
-def stats_top_albums(request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)):
+def stats_top_albums(
+    request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)
+):
     user = _require_auth(request)
     try:
-        return {"window": window, "items": get_top_albums(user["id"], window=window, limit=limit)}
+        return {
+            "window": window,
+            "items": get_top_albums(user["id"], window=window, limit=limit),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -774,10 +844,15 @@ def stats_top_albums(request: Request, window: str = Query("30d"), limit: int = 
     responses=_ME_RESPONSES,
     summary="Get top genres for a time window",
 )
-def stats_top_genres(request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)):
+def stats_top_genres(
+    request: Request, window: str = Query("30d"), limit: int = Query(20, ge=1, le=100)
+):
     user = _require_auth(request)
     try:
-        return {"window": window, "items": get_top_genres(user["id"], window=window, limit=limit)}
+        return {
+            "window": window,
+            "items": get_top_genres(user["id"], window=window, limit=limit),
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -788,7 +863,9 @@ def stats_top_genres(request: Request, window: str = Query("30d"), limit: int = 
     responses=_ME_RESPONSES,
     summary="Build a replay mix from recent listening",
 )
-def stats_replay(request: Request, window: str = Query("30d"), limit: int = Query(30, ge=1, le=100)):
+def stats_replay(
+    request: Request, window: str = Query("30d"), limit: int = Query(30, ge=1, le=100)
+):
     user = _require_auth(request)
     try:
         return get_replay_mix(user["id"], window=window, limit=limit)
@@ -833,7 +910,9 @@ def stats_dashboard(
 )
 def home_hero(request: Request):
     user = _require_auth(request)
-    payload = _get_home_discovery_payload(user["id"], fresh=request.query_params.get("fresh") == "1")
+    payload = _get_home_discovery_payload(
+        user["id"], fresh=request.query_params.get("fresh") == "1"
+    )
     return payload.get("hero")
 
 
@@ -844,7 +923,13 @@ def home_hero(request: Request):
 )
 def home_recently_played(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "recently_played", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"],
+            "recently_played",
+            fresh=request.query_params.get("fresh") == "1",
+        )
+    }
 
 
 @router.get(
@@ -854,7 +939,11 @@ def home_recently_played(request: Request):
 )
 def home_mixes(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "custom_mixes", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"], "custom_mixes", fresh=request.query_params.get("fresh") == "1"
+        )
+    }
 
 
 @router.get(
@@ -864,7 +953,13 @@ def home_mixes(request: Request):
 )
 def home_suggested_albums(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "suggested_albums", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"],
+            "suggested_albums",
+            fresh=request.query_params.get("fresh") == "1",
+        )
+    }
 
 
 @router.get(
@@ -874,7 +969,13 @@ def home_suggested_albums(request: Request):
 )
 def home_recommended_tracks(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "recommended_tracks", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"],
+            "recommended_tracks",
+            fresh=request.query_params.get("fresh") == "1",
+        )
+    }
 
 
 @router.get(
@@ -884,7 +985,11 @@ def home_recommended_tracks(request: Request):
 )
 def home_radio_stations(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "radio_stations", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"], "radio_stations", fresh=request.query_params.get("fresh") == "1"
+        )
+    }
 
 
 @router.get(
@@ -894,7 +999,13 @@ def home_radio_stations(request: Request):
 )
 def home_favorite_artists(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "favorite_artists", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"],
+            "favorite_artists",
+            fresh=request.query_params.get("fresh") == "1",
+        )
+    }
 
 
 @router.get(
@@ -904,7 +1015,11 @@ def home_favorite_artists(request: Request):
 )
 def home_essentials(request: Request):
     user = _require_auth(request)
-    return {"items": _get_home_discovery_items(user["id"], "essentials", fresh=request.query_params.get("fresh") == "1")}
+    return {
+        "items": _get_home_discovery_items(
+            user["id"], "essentials", fresh=request.query_params.get("fresh") == "1"
+        )
+    }
 
 
 @router.get(
@@ -964,7 +1079,9 @@ def home_mix_detail(request: Request, mix_id: str, limit: int = Query(40, ge=1, 
     responses=_ME_RESPONSES,
     summary="Get one personalized home playlist",
 )
-def home_playlist_detail(request: Request, playlist_id: str, limit: int = Query(40, ge=1, le=80)):
+def home_playlist_detail(
+    request: Request, playlist_id: str, limit: int = Query(40, ge=1, le=80)
+):
     user = _require_auth(request)
     playlist = _get_cached_home_endpoint_response(
         cache_key=f"home_playlist:v2:{user['id']}:{playlist_id}:{limit}",
@@ -983,7 +1100,9 @@ def home_playlist_detail(request: Request, playlist_id: str, limit: int = Query(
     responses=_ME_RESPONSES,
     summary="Get one expanded home section",
 )
-def home_section_detail(request: Request, section_id: str, limit: int = Query(42, ge=1, le=120)):
+def home_section_detail(
+    request: Request, section_id: str, limit: int = Query(42, ge=1, le=120)
+):
     user = _require_auth(request)
     section = _get_cached_home_endpoint_response(
         cache_key=f"home_section:{user['id']}:{section_id}:{limit}",
@@ -1033,6 +1152,7 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
 
 
 # ── Feed ─────────────────────────────────────────────────────
+
 
 @router.get(
     "/feed",
@@ -1101,6 +1221,7 @@ def upcoming(request: Request, limit: int = 120):
     location_mode = full_user.get("show_location_mode") or "fixed"
     if location_mode == "near_me":
         from crate.geolocation import detect_location_from_ip, get_client_ip
+
         geo = detect_location_from_ip(get_client_ip(request))
         if geo:
             user_lat, user_lon = geo["latitude"], geo["longitude"]
@@ -1133,7 +1254,9 @@ def upcoming(request: Request, limit: int = 120):
             }
         )
 
-    shows = get_upcoming_shows(followed_names, today, user_lat, user_lon, user_radius, limit)
+    shows = get_upcoming_shows(
+        followed_names, today, user_lat, user_lon, user_radius, limit
+    )
     attending_show_ids = get_attending_show_ids(
         user["id"],
         [show["id"] for show in shows if show.get("id") is not None],
@@ -1141,7 +1264,9 @@ def upcoming(request: Request, limit: int = 120):
 
     genre_map = get_artist_genres_for_names(followed_names)
 
-    show_artists = sorted({show["artist_name"] for show in shows if show.get("artist_name")})
+    show_artists = sorted(
+        {show["artist_name"] for show in shows if show.get("artist_name")}
+    )
     if show_artists:
         setlist_map = _probable_setlists_for_artists(show_artists)
 
@@ -1157,7 +1282,9 @@ def upcoming(request: Request, limit: int = 120):
                 "artist_id": show.get("artist_id"),
                 "artist_slug": show.get("artist_slug"),
                 "title": show.get("venue") or "",
-                "subtitle": f"{show.get('city', '')}, {show.get('country', '')}".strip(", "),
+                "subtitle": f"{show.get('city', '')}, {show.get('country', '')}".strip(
+                    ", "
+                ),
                 "cover_url": show.get("image_url"),
                 "status": "onsale",
                 "url": show.get("url"),
@@ -1185,7 +1312,9 @@ def upcoming(request: Request, limit: int = 120):
     enriched_shows = [
         {
             **dict(show),
-            "probable_setlist": (setlist_map.get(show.get("artist_name", "")) or [])[:8],
+            "probable_setlist": (setlist_map.get(show.get("artist_name", "")) or [])[
+                :8
+            ],
         }
         for show in shows
     ]
@@ -1232,15 +1361,21 @@ def unattend_show_endpoint(request: Request, show_id: int):
     responses=_ME_RESPONSES,
     summary="Create a reminder for an upcoming show",
 )
-def create_show_reminder_endpoint(request: Request, show_id: int, body: ShowReminderRequest):
+def create_show_reminder_endpoint(
+    request: Request, show_id: int, body: ShowReminderRequest
+):
     user = _require_auth(request)
     if body.reminder_type not in {"one_month", "one_week", "show_prep"}:
         raise HTTPException(status_code=400, detail="Unsupported reminder type")
 
-    return {"ok": True, "added": create_show_reminder(user["id"], show_id, body.reminder_type)}
+    return {
+        "ok": True,
+        "added": create_show_reminder(user["id"], show_id, body.reminder_type),
+    }
 
 
 # ── Profile ─────────────────────────────────────────────────────
+
 
 @router.put(
     "/profile",
@@ -1269,12 +1404,17 @@ def change_password(request: Request, body: ChangePasswordRequest):
     current = body.current_password
     new_pw = body.new_password
     if not new_pw or len(new_pw) < 8:
-        raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
+        raise HTTPException(
+            status_code=422, detail="Password must be at least 8 characters"
+        )
 
     import bcrypt
+
     db_user = get_user_by_id(user["id"])
     if not db_user or not db_user.get("password_hash"):
-        raise HTTPException(status_code=400, detail="Cannot change password for this account")
+        raise HTTPException(
+            status_code=400, detail="Cannot change password for this account"
+        )
     if not bcrypt.checkpw(current.encode(), db_user["password_hash"].encode()):
         raise HTTPException(status_code=403, detail="Current password is incorrect")
 
@@ -1306,6 +1446,7 @@ def scrobble_status(request: Request):
         }
     return result
 
+
 @router.post(
     "/scrobble/listenbrainz",
     response_model=ListenBrainzConnectResponse,
@@ -1330,7 +1471,9 @@ def connect_listenbrainz(request: Request, body: ListenBrainzConnectRequest):
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=502, detail="Could not validate token with ListenBrainz")
+        raise HTTPException(
+            status_code=502, detail="Could not validate token with ListenBrainz"
+        )
 
     upsert_user_external_identity(
         user_id=user["id"],
@@ -1365,11 +1508,13 @@ def disconnect_listenbrainz(request: Request):
 def lastfm_auth_url(request: Request):
     """Return the Last.fm API key so the frontend can build the auth URL."""
     import os
+
     _require_auth(request)
     api_key = os.environ.get("LASTFM_APIKEY", "")
     if not api_key:
         raise HTTPException(status_code=501, detail="Last.fm API key not configured")
     return {"api_key": api_key}
+
 
 @router.post(
     "/scrobble/lastfm",
@@ -1380,6 +1525,7 @@ def lastfm_auth_url(request: Request):
 def connect_lastfm(request: Request, body: LastfmCallbackRequest):
     """Exchange Last.fm auth token for a session key and store it."""
     import os
+
     user = _require_auth(request)
     api_key = os.environ.get("LASTFM_APIKEY", "")
     api_secret = os.environ.get("LASTFM_API_SECRET", "")
@@ -1387,9 +1533,13 @@ def connect_lastfm(request: Request, body: LastfmCallbackRequest):
         raise HTTPException(status_code=501, detail="Last.fm API not fully configured")
 
     from crate.scrobble import lastfm_get_session
+
     session_key = lastfm_get_session(api_key, api_secret, body.token)
     if not session_key:
-        raise HTTPException(status_code=400, detail="Failed to get Last.fm session — token may have expired")
+        raise HTTPException(
+            status_code=400,
+            detail="Failed to get Last.fm session — token may have expired",
+        )
 
     upsert_user_external_identity(
         user_id=user["id"],
@@ -1428,6 +1578,7 @@ def detect_geolocation(request: Request):
     """Detect user's city from their IP address."""
     _require_auth(request)
     from crate.geolocation import detect_location_from_ip, get_client_ip
+
     ip = get_client_ip(request)
     result = detect_location_from_ip(ip)
     if not result:
@@ -1454,6 +1605,7 @@ def get_location(request: Request):
         "show_location_mode": user.get("show_location_mode") or "fixed",
     }
 
+
 @router.put(
     "/location",
     response_model=OkResponse,
@@ -1475,6 +1627,7 @@ def update_location(request: Request, body: UpdateLocationBody):
     # Geocode if city provided without coordinates
     if city and (lat is None or lon is None):
         from crate.geolocation import geocode_city
+
         geo = geocode_city(city)
         if geo:
             lat = geo["latitude"]
@@ -1488,7 +1641,9 @@ def update_location(request: Request, body: UpdateLocationBody):
 
     mode = body.show_location_mode
     if mode and mode not in ("fixed", "near_me"):
-        raise HTTPException(status_code=422, detail="show_location_mode must be 'fixed' or 'near_me'")
+        raise HTTPException(
+            status_code=422, detail="show_location_mode must be 'fixed' or 'near_me'"
+        )
 
     updates: dict[str, object] = {}
     if city is not None:
@@ -1522,4 +1677,5 @@ def search_cities_endpoint(request: Request, q: str = Query("", min_length=2)):
     """Search cities for autocomplete."""
     _require_auth(request)
     from crate.geolocation import search_cities
+
     return search_cities(q, limit=5)

@@ -16,9 +16,10 @@ def get_bliss_candidates(
         return []
     probe_vector = to_pgvector_literal(bliss_vector)
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence, t.rating,
@@ -29,9 +30,16 @@ def get_bliss_candidates(
                 ORDER BY bliss_dist ASC
                 LIMIT :limit
                 """
-            ),
-            {"probe_vector": probe_vector, "exclude_path": exclude_path, "limit": limit},
-        ).mappings().all()
+                ),
+                {
+                    "probe_vector": probe_vector,
+                    "exclude_path": exclude_path,
+                    "limit": limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in result]
 
 
@@ -45,9 +53,10 @@ def get_recommend_without_bliss_candidates(
     if not seed_paths or artist_pick_limit <= 0 or row_limit <= 0:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 WITH ranked AS (
                     SELECT
                         t.id AS track_id,
@@ -86,14 +95,17 @@ def get_recommend_without_bliss_candidates(
                 WHERE artist_pick <= :artist_pick_limit
                 LIMIT :row_limit
                 """
-            ),
-            {
-                "seed_paths": seed_paths,
-                "similar_artist_names": similar_artist_names or ["__no_similar__"],
-                "artist_pick_limit": artist_pick_limit,
-                "row_limit": row_limit,
-            },
-        ).mappings().all()
+                ),
+                {
+                    "seed_paths": seed_paths,
+                    "similar_artist_names": similar_artist_names or ["__no_similar__"],
+                    "artist_pick_limit": artist_pick_limit,
+                    "row_limit": row_limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 
@@ -106,9 +118,10 @@ def get_multi_seed_bliss_candidates(
     if not bliss_seed_paths or not all_seed_paths or per_seed_limit <= 0:
         return []
     with bliss_session_scope(session) as active_session:
-        result = active_session.execute(
-            text(
-                """
+        result = (
+            active_session.execute(
+                text(
+                    """
                 WITH seeds AS (
                     SELECT
                         t.path AS seed_path,
@@ -150,9 +163,16 @@ def get_multi_seed_bliss_candidates(
                 FROM ranked
                 WHERE seed_rank <= :per_seed_limit
                 """
-            ),
-            {"bliss_seed_paths": bliss_seed_paths, "all_seed_paths": all_seed_paths, "per_seed_limit": per_seed_limit},
-        ).mappings().all()
+                ),
+                {
+                    "bliss_seed_paths": bliss_seed_paths,
+                    "all_seed_paths": all_seed_paths,
+                    "per_seed_limit": per_seed_limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in result]
 
 

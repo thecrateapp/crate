@@ -7,10 +7,16 @@ from crate.db.tx import transaction_scope
 
 def find_artist_canonical(artist_name: str) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text("SELECT name FROM library_artists WHERE LOWER(name) = LOWER(:artist) LIMIT 1"),
-            {"artist": artist_name},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT name FROM library_artists WHERE LOWER(name) = LOWER(:artist) LIMIT 1"
+                ),
+                {"artist": artist_name},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
@@ -26,10 +32,14 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
     if not old_name:
         return
     with transaction_scope() as session:
-        existing = session.execute(
-            text("SELECT 1 FROM library_artists WHERE name = :name"),
-            {"name": old_name},
-        ).mappings().first()
+        existing = (
+            session.execute(
+                text("SELECT 1 FROM library_artists WHERE name = :name"),
+                {"name": old_name},
+            )
+            .mappings()
+            .first()
+        )
         if not existing:
             return
 
@@ -46,10 +56,14 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             )
             return
 
-        target = session.execute(
-            text("SELECT 1 FROM library_artists WHERE name = :name"),
-            {"name": new_name},
-        ).mappings().first()
+        target = (
+            session.execute(
+                text("SELECT 1 FROM library_artists WHERE name = :name"),
+                {"name": new_name},
+            )
+            .mappings()
+            .first()
+        )
         temp_name = f"__crate_tmp__{uuid4().hex}"
 
         session.execute(
@@ -62,11 +76,15 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             {"name": temp_name, "folder_name": folder_name or None},
         )
         session.execute(
-            text("UPDATE library_albums SET artist = :temp_name WHERE artist = :old_name"),
+            text(
+                "UPDATE library_albums SET artist = :temp_name WHERE artist = :old_name"
+            ),
             {"temp_name": temp_name, "old_name": old_name},
         )
         session.execute(
-            text("UPDATE artist_genres SET artist_name = :temp_name WHERE artist_name = :old_name"),
+            text(
+                "UPDATE artist_genres SET artist_name = :temp_name WHERE artist_name = :old_name"
+            ),
             {"temp_name": temp_name, "old_name": old_name},
         )
 
@@ -99,7 +117,9 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
                 {"temp_name": temp_name},
             )
             session.execute(
-                text("UPDATE library_albums SET artist = :new_name WHERE artist = :temp_name"),
+                text(
+                    "UPDATE library_albums SET artist = :new_name WHERE artist = :temp_name"
+                ),
                 {"new_name": new_name, "temp_name": temp_name},
             )
             session.execute(
@@ -119,11 +139,15 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
                 {"new_name": new_name, "folder": folder_name, "old_name": old_name},
             )
             session.execute(
-                text("UPDATE library_albums SET artist = :new_name WHERE artist = :temp_name"),
+                text(
+                    "UPDATE library_albums SET artist = :new_name WHERE artist = :temp_name"
+                ),
                 {"new_name": new_name, "temp_name": temp_name},
             )
             session.execute(
-                text("UPDATE artist_genres SET artist_name = :new_name WHERE artist_name = :temp_name"),
+                text(
+                    "UPDATE artist_genres SET artist_name = :new_name WHERE artist_name = :temp_name"
+                ),
                 {"new_name": new_name, "temp_name": temp_name},
             )
 
@@ -132,32 +156,42 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
             {"temp_name": temp_name},
         )
         session.execute(
-            text("UPDATE library_tracks SET artist = :new_name WHERE artist = :old_name"),
+            text(
+                "UPDATE library_tracks SET artist = :new_name WHERE artist = :old_name"
+            ),
             {"new_name": new_name, "old_name": old_name},
         )
 
 
 def find_canonical_artist_by_folder(folder_name: str) -> dict | None:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                "SELECT name FROM library_artists "
-                "WHERE folder_name = :folder OR LOWER(name) = LOWER(:name) LIMIT 1"
-            ),
-            {"folder": folder_name, "name": folder_name},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT name FROM library_artists "
+                    "WHERE folder_name = :folder OR LOWER(name) = LOWER(:name) LIMIT 1"
+                ),
+                {"folder": folder_name, "name": folder_name},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def count_artist_tracks(artist_name: str) -> int:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                "SELECT COUNT(*) AS c FROM library_tracks t "
-                "JOIN library_albums a ON t.album_id = a.id WHERE a.artist = :artist"
-            ),
-            {"artist": artist_name},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*) AS c FROM library_tracks t "
+                    "JOIN library_albums a ON t.album_id = a.id WHERE a.artist = :artist"
+                ),
+                {"artist": artist_name},
+            )
+            .mappings()
+            .first()
+        )
     return int(row["c"]) if row else 0
 
 

@@ -9,11 +9,14 @@ from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.tx import read_scope
 
 
-def get_artist_analysis_tracks(artist_name: str, *, session: Session | None = None) -> list[dict]:
+def get_artist_analysis_tracks(
+    artist_name: str, *, session: Session | None = None
+) -> list[dict]:
     def _impl(s: Session) -> list[dict]:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.title,
                        t.bpm AS tempo,
                        t.audio_key AS key,
@@ -31,9 +34,12 @@ def get_artist_analysis_tracks(artist_name: str, *, session: Session | None = No
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE a.artist = :artist_name AND t.bpm IS NOT NULL
                 """
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
     if session is not None:
@@ -42,7 +48,9 @@ def get_artist_analysis_tracks(artist_name: str, *, session: Session | None = No
         return _impl(s)
 
 
-def get_artist_refs_by_names(names: list[str], *, session: Session | None = None) -> dict[str, dict]:
+def get_artist_refs_by_names(
+    names: list[str], *, session: Session | None = None
+) -> dict[str, dict]:
     if not names:
         return {}
 
@@ -50,7 +58,9 @@ def get_artist_refs_by_names(names: list[str], *, session: Session | None = None
 
     def _impl(s: Session) -> dict[str, dict]:
         rows = s.execute(
-            select(LibraryArtist.id, LibraryArtist.slug, LibraryArtist.name).where(func.lower(LibraryArtist.name).in_(lowered))
+            select(LibraryArtist.id, LibraryArtist.slug, LibraryArtist.name).where(
+                func.lower(LibraryArtist.name).in_(lowered)
+            )
         ).all()
         return {row.name.lower(): {"id": row.id, "slug": row.slug} for row in rows}
 
@@ -60,11 +70,14 @@ def get_artist_refs_by_names(names: list[str], *, session: Session | None = None
         return _impl(s)
 
 
-def get_artist_tracks_for_setlist(artist_name: str, *, session: Session | None = None) -> list[dict]:
+def get_artist_tracks_for_setlist(
+    artist_name: str, *, session: Session | None = None
+) -> list[dict]:
     def _impl(s: Session) -> list[dict]:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT
                     t.id,
                     t.entity_uid::text AS track_entity_uid,
@@ -78,9 +91,12 @@ def get_artist_tracks_for_setlist(artist_name: str, *, session: Session | None =
                 WHERE a.artist = :artist_name
                 ORDER BY a.year NULLS LAST, a.name, t.disc_number NULLS LAST, t.track_number NULLS LAST, t.title
                 """
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
     if session is not None:
@@ -89,11 +105,14 @@ def get_artist_tracks_for_setlist(artist_name: str, *, session: Session | None =
         return _impl(s)
 
 
-def find_user_playlist_by_name(user_id: int, playlist_name: str, *, session: Session | None = None) -> dict | None:
+def find_user_playlist_by_name(
+    user_id: int, playlist_name: str, *, session: Session | None = None
+) -> dict | None:
     def _impl(s: Session) -> dict | None:
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 SELECT id
                 FROM playlists
                 WHERE user_id = :user_id
@@ -102,9 +121,12 @@ def find_user_playlist_by_name(user_id: int, playlist_name: str, *, session: Ses
                 ORDER BY updated_at DESC NULLS LAST, id DESC
                 LIMIT 1
                 """
-            ),
-            {"user_id": user_id, "playlist_name": playlist_name},
-        ).mappings().first()
+                ),
+                {"user_id": user_id, "playlist_name": playlist_name},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     if session is not None:
@@ -113,33 +135,45 @@ def find_user_playlist_by_name(user_id: int, playlist_name: str, *, session: Ses
         return _impl(s)
 
 
-def enrich_track_refs(track_ids: list[int], *, session: Session | None = None) -> dict[int, dict]:
+def enrich_track_refs(
+    track_ids: list[int], *, session: Session | None = None
+) -> dict[int, dict]:
     if not track_ids:
         return {}
 
     def _impl(s: Session) -> dict[int, dict]:
-        rows = s.execute(
-            select(
-                LibraryTrack.id.label("track_id"),
-                LibraryTrack.entity_uid.label("track_entity_uid"),
-                LibraryTrack.slug.label("track_slug"),
-                LibraryAlbum.id.label("album_id"),
-                LibraryAlbum.entity_uid.label("album_entity_uid"),
-                LibraryAlbum.slug.label("album_slug"),
-                LibraryArtist.id.label("artist_id"),
-                LibraryArtist.entity_uid.label("artist_entity_uid"),
-                LibraryArtist.slug.label("artist_slug"),
+        rows = (
+            s.execute(
+                select(
+                    LibraryTrack.id.label("track_id"),
+                    LibraryTrack.entity_uid.label("track_entity_uid"),
+                    LibraryTrack.slug.label("track_slug"),
+                    LibraryAlbum.id.label("album_id"),
+                    LibraryAlbum.entity_uid.label("album_entity_uid"),
+                    LibraryAlbum.slug.label("album_slug"),
+                    LibraryArtist.id.label("artist_id"),
+                    LibraryArtist.entity_uid.label("artist_entity_uid"),
+                    LibraryArtist.slug.label("artist_slug"),
+                )
+                .join(LibraryAlbum, LibraryTrack.album_id == LibraryAlbum.id)
+                .outerjoin(LibraryArtist, LibraryArtist.name == LibraryAlbum.artist)
+                .where(LibraryTrack.id.in_(track_ids))
             )
-            .join(LibraryAlbum, LibraryTrack.album_id == LibraryAlbum.id)
-            .outerjoin(LibraryArtist, LibraryArtist.name == LibraryAlbum.artist)
-            .where(LibraryTrack.id.in_(track_ids))
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {
             row["track_id"]: {
                 **dict(row),
-                "track_entity_uid": str(row["track_entity_uid"]) if row.get("track_entity_uid") is not None else None,
-                "album_entity_uid": str(row["album_entity_uid"]) if row.get("album_entity_uid") is not None else None,
-                "artist_entity_uid": str(row["artist_entity_uid"]) if row.get("artist_entity_uid") is not None else None,
+                "track_entity_uid": str(row["track_entity_uid"])
+                if row.get("track_entity_uid") is not None
+                else None,
+                "album_entity_uid": str(row["album_entity_uid"])
+                if row.get("album_entity_uid") is not None
+                else None,
+                "artist_entity_uid": str(row["artist_entity_uid"])
+                if row.get("artist_entity_uid") is not None
+                else None,
             }
             for row in rows
         }

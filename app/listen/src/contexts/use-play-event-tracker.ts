@@ -27,10 +27,15 @@ function nowIso(): string {
 }
 
 function generateClientEventId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
 }
 
 function buildSession(
@@ -44,7 +49,9 @@ function buildSession(
     playSource: source,
     startedAt: nowIso(),
     trackDurationSeconds:
-      Number.isFinite(snapshot.duration) && snapshot.duration > 0 ? snapshot.duration : null,
+      Number.isFinite(snapshot.duration) && snapshot.duration > 0
+        ? snapshot.duration
+        : null,
     lastKnownTime: snapshot.currentTime || 0,
     listenedSeconds: 0,
     maxProgressSeconds: snapshot.currentTime || 0,
@@ -60,9 +67,10 @@ function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
     return;
   }
 
-  const completionRatio = trackDurationSeconds && trackDurationSeconds > 0
-    ? Math.min(1, playedSeconds / trackDurationSeconds)
-    : null;
+  const completionRatio =
+    trackDurationSeconds && trackDurationSeconds > 0
+      ? Math.min(1, playedSeconds / trackDurationSeconds)
+      : null;
   const wasCompleted = reason === "completed";
   const wasSkipped = reason === "skipped";
 
@@ -82,12 +90,14 @@ function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
     was_skipped: wasSkipped,
     was_completed: wasCompleted,
     play_source_type: session.playSource?.type ?? null,
-    play_source_id: session.playSource?.id != null ? String(session.playSource.id) : null,
+    play_source_id:
+      session.playSource?.id != null ? String(session.playSource.id) : null,
     play_source_name: session.playSource?.name ?? null,
     context_artist: session.track.artist,
     context_album: session.track.album || null,
     context_playlist_id:
-      session.playSource?.type === "playlist" && typeof session.playSource.id === "number"
+      session.playSource?.type === "playlist" &&
+      typeof session.playSource.id === "number"
         ? session.playSource.id
         : null,
     device_type: getListenDeviceType(),
@@ -147,20 +157,23 @@ export function usePlayEventTracker(
     [getPlaybackSnapshot],
   );
 
-  const flushCurrentPlayEvent = useCallback((reason: FlushReason, expectedTrack?: Track) => {
-    const session = sessionRef.current;
-    if (!session) return;
-    if (expectedTrack) {
-      // Defensive: if the caller names the track it expects to flush
-      // and the active session is for a different track, drop the flush
-      // rather than credit the wrong song. A passing guard means our
-      // session rotation is correctly ordered.
-      const expectedKey = getTrackCacheKey(expectedTrack);
-      if (session.trackKey !== expectedKey) return;
-    }
-    sessionRef.current = null;
-    dispatchPlayEvent(session, reason);
-  }, []);
+  const flushCurrentPlayEvent = useCallback(
+    (reason: FlushReason, expectedTrack?: Track) => {
+      const session = sessionRef.current;
+      if (!session) return;
+      if (expectedTrack) {
+        // Defensive: if the caller names the track it expects to flush
+        // and the active session is for a different track, drop the flush
+        // rather than credit the wrong song. A passing guard means our
+        // session rotation is correctly ordered.
+        const expectedKey = getTrackCacheKey(expectedTrack);
+        if (session.trackKey !== expectedKey) return;
+      }
+      sessionRef.current = null;
+      dispatchPlayEvent(session, reason);
+    },
+    [],
+  );
 
   const rotateSession = useCallback(
     (
@@ -172,7 +185,11 @@ export function usePlayEventTracker(
       const session = sessionRef.current;
       if (!session) {
         if (nextTrack) {
-          sessionRef.current = buildSession(nextTrack, nextSource, getPlaybackSnapshot());
+          sessionRef.current = buildSession(
+            nextTrack,
+            nextSource,
+            getPlaybackSnapshot(),
+          );
         }
         return;
       }
@@ -190,32 +207,52 @@ export function usePlayEventTracker(
     [getPlaybackSnapshot],
   );
 
-  const recordProgress = useCallback((nextTime: number) => {
-    const session = sessionRef.current;
-    if (!session) return;
-    const snapshot = getPlaybackSnapshot();
-    if (session.trackDurationSeconds === null && Number.isFinite(snapshot.duration) && snapshot.duration > 0) {
-      session.trackDurationSeconds = snapshot.duration;
-    }
+  const recordProgress = useCallback(
+    (nextTime: number) => {
+      const session = sessionRef.current;
+      if (!session) return;
+      const snapshot = getPlaybackSnapshot();
+      if (
+        session.trackDurationSeconds === null &&
+        Number.isFinite(snapshot.duration) &&
+        snapshot.duration > 0
+      ) {
+        session.trackDurationSeconds = snapshot.duration;
+      }
 
-    const delta = nextTime - session.lastKnownTime;
-    if (delta > 0 && delta <= PLAY_EVENT_DELTA_CAP_SECONDS) {
-      session.listenedSeconds += delta;
-    }
-    session.lastKnownTime = nextTime;
-    session.maxProgressSeconds = Math.max(session.maxProgressSeconds, nextTime);
-  }, [getPlaybackSnapshot]);
+      const delta = nextTime - session.lastKnownTime;
+      if (delta > 0 && delta <= PLAY_EVENT_DELTA_CAP_SECONDS) {
+        session.listenedSeconds += delta;
+      }
+      session.lastKnownTime = nextTime;
+      session.maxProgressSeconds = Math.max(
+        session.maxProgressSeconds,
+        nextTime,
+      );
+    },
+    [getPlaybackSnapshot],
+  );
 
-  const markSeekPosition = useCallback((nextTime: number) => {
-    const session = sessionRef.current;
-    if (!session) return;
-    const snapshot = getPlaybackSnapshot();
-    if (session.trackDurationSeconds === null && Number.isFinite(snapshot.duration) && snapshot.duration > 0) {
-      session.trackDurationSeconds = snapshot.duration;
-    }
-    session.lastKnownTime = nextTime;
-    session.maxProgressSeconds = Math.max(session.maxProgressSeconds, nextTime);
-  }, [getPlaybackSnapshot]);
+  const markSeekPosition = useCallback(
+    (nextTime: number) => {
+      const session = sessionRef.current;
+      if (!session) return;
+      const snapshot = getPlaybackSnapshot();
+      if (
+        session.trackDurationSeconds === null &&
+        Number.isFinite(snapshot.duration) &&
+        snapshot.duration > 0
+      ) {
+        session.trackDurationSeconds = snapshot.duration;
+      }
+      session.lastKnownTime = nextTime;
+      session.maxProgressSeconds = Math.max(
+        session.maxProgressSeconds,
+        nextTime,
+      );
+    },
+    [getPlaybackSnapshot],
+  );
 
   /**
    * Start a session only if none is active. Safe to call from engine

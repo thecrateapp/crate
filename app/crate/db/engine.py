@@ -44,10 +44,10 @@ def _default_pool_settings() -> tuple[int, int]:
     """Return (pool_size, max_overflow) based on runtime context."""
     runtime = os.environ.get("CRATE_RUNTIME", "").lower()
     if runtime == "api":
-        return 8, 4   # API: enough headroom for radio start/next under concurrency
+        return 8, 4  # API: enough headroom for radio start/next under concurrency
     elif runtime == "worker":
-        return 2, 1   # Worker: background tasks should be conservative
-    return 4, 2       # Fallback (dev, tests)
+        return 2, 1  # Worker: background tasks should be conservative
+    return 4, 2  # Fallback (dev, tests)
 
 
 def get_engine():
@@ -56,7 +56,9 @@ def get_engine():
     if _engine is None:
         default_size, default_overflow = _default_pool_settings()
         pool_size = _get_pool_setting("CRATE_SQLALCHEMY_POOL_SIZE", default_size)
-        max_overflow = _get_pool_setting("CRATE_SQLALCHEMY_MAX_OVERFLOW", default_overflow)
+        max_overflow = _get_pool_setting(
+            "CRATE_SQLALCHEMY_MAX_OVERFLOW", default_overflow
+        )
         _engine = create_engine(
             _build_dsn(),
             pool_size=pool_size,
@@ -92,6 +94,7 @@ class Base(DeclarativeBase):
     as anyone wants to create a mapped class. Keeping it next to the
     engine avoids circular imports.
     """
+
     pass
 
 

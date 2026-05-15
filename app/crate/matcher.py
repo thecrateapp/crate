@@ -11,7 +11,6 @@ from crate.audio import get_audio_files, read_tags
 log = logging.getLogger(__name__)
 
 
-
 def match_album(album_dir: Path, extensions: set[str]) -> list[dict]:
     """Find MusicBrainz release candidates for a local album.
 
@@ -30,6 +29,7 @@ def match_album(album_dir: Path, extensions: set[str]) -> list[dict]:
     if not artist and not album:
         # Fallback to directory names (skip entity-managed UUID folders)
         from crate.storage_layout import looks_like_entity_uid
+
         parent_name = album_dir.parent.name
         dir_name = album_dir.name
         if not looks_like_entity_uid(parent_name):
@@ -48,11 +48,13 @@ def match_album(album_dir: Path, extensions: set[str]) -> list[dict]:
             continue
 
         score = _score_match(local_info, release_detail)
-        scored.append({
-            **release_detail,
-            "match_score": score,
-            "tag_preview": _build_tag_preview(local_info, release_detail),
-        })
+        scored.append(
+            {
+                **release_detail,
+                "match_score": score,
+                "tag_preview": _build_tag_preview(local_info, release_detail),
+            }
+        )
 
     scored.sort(key=lambda x: x["match_score"], reverse=True)
     return scored[:5]
@@ -77,11 +79,13 @@ def apply_match(album_dir: Path, extensions: set[str], release: dict) -> dict:
             tn = int(str(tn_raw).split("/")[0])
         except (ValueError, TypeError):
             tn = 9999
-        local_with_path.append({
-            "path": t,
-            "tracknumber": tn,
-            "title": tags.get("title", t.stem),
-        })
+        local_with_path.append(
+            {
+                "path": t,
+                "tracknumber": tn,
+                "title": tags.get("title", t.stem),
+            }
+        )
     local_with_path.sort(key=lambda x: (x["tracknumber"], x["path"].name))
 
     updated = 0
@@ -101,7 +105,8 @@ def apply_match(album_dir: Path, extensions: set[str], release: dict) -> dict:
             continue
 
         try:
-            audio = mutagen.File(local_track["path"], easy=True)
+            mutagen_file = getattr(mutagen, "File")
+            audio = mutagen_file(local_track["path"], easy=True)
             if audio is None:
                 continue
 
@@ -141,17 +146,20 @@ def _gather_local_info(tracks: list[Path]) -> dict:
 
     for t in tracks:
         tags = read_tags(t)
-        info = mutagen.File(t)
+        mutagen_file = getattr(mutagen, "File")
+        info = mutagen_file(t)
         length = getattr(info.info, "length", 0) if info else 0
 
         artists.append(tags.get("albumartist") or tags.get("artist", ""))
         albums.append(tags.get("album", ""))
-        track_info.append({
-            "filename": t.name,
-            "title": tags.get("title", t.stem),
-            "tracknumber": tags.get("tracknumber", ""),
-            "length_sec": round(length),
-        })
+        track_info.append(
+            {
+                "filename": t.name,
+                "title": tags.get("title", t.stem),
+                "tracknumber": tags.get("tracknumber", ""),
+                "length_sec": round(length),
+            }
+        )
 
     # Most common artist/album
     artist = max(set(artists), key=artists.count) if artists else ""
@@ -198,13 +206,15 @@ def _search_musicbrainz(artist: str, album: str, track_count: int) -> list[dict]
                 if mbid in seen_mbids:
                     continue
                 seen_mbids.add(mbid)
-                candidates.append({
-                    "mbid": mbid,
-                    "title": r.get("title"),
-                    "artist": r.get("artist-credit-phrase", ""),
-                    "date": r.get("date", ""),
-                    "score": int(r.get("ext:score", 0)),
-                })
+                candidates.append(
+                    {
+                        "mbid": mbid,
+                        "title": r.get("title"),
+                        "artist": r.get("artist-credit-phrase", ""),
+                        "date": r.get("date", ""),
+                        "score": int(r.get("ext:score", 0)),
+                    }
+                )
         except Exception as e:
             log.error("MB search failed: %s", e)
 
@@ -226,13 +236,15 @@ def _get_release_detail(mbid: str) -> dict | None:
             for t in medium.get("track-list", []):
                 rec = t.get("recording", {})
                 length = int(rec.get("length", 0)) // 1000 if rec.get("length") else 0
-                tracks.append({
-                    "disc": disc,
-                    "number": t.get("number", ""),
-                    "title": rec.get("title", ""),
-                    "length_sec": length,
-                    "mbid": rec.get("id"),
-                })
+                tracks.append(
+                    {
+                        "disc": disc,
+                        "number": t.get("number", ""),
+                        "title": rec.get("title", ""),
+                        "length_sec": length,
+                        "mbid": rec.get("id"),
+                    }
+                )
 
         return {
             "mbid": mbid,
@@ -252,6 +264,7 @@ def _get_release_detail(mbid: str) -> dict | None:
 def _best_title_match(title: str, candidates: list[dict]) -> tuple[int, dict | None]:
     """Find the best matching MB track for a local title. Returns (score, track)."""
     from thefuzz import fuzz
+
     best_score = 0
     best_track = None
     title_lower = title.lower()
@@ -322,12 +335,16 @@ def _score_match(local: dict, release: dict) -> int:
     # Album name match (0-25)
     # Use token_set_ratio so "Album (Deluxe Edition)" matches "Album"
     if local["album"]:
-        album_ratio = fuzz.token_set_ratio(local["album"].lower(), release["title"].lower())
+        album_ratio = fuzz.token_set_ratio(
+            local["album"].lower(), release["title"].lower()
+        )
         score += int(album_ratio * 0.25)
 
     # Artist name match (0-10)
     if local["artist"] and release.get("artist"):
-        artist_ratio = fuzz.token_set_ratio(local["artist"].lower(), release["artist"].lower())
+        artist_ratio = fuzz.token_set_ratio(
+            local["artist"].lower(), release["artist"].lower()
+        )
         score += int(artist_ratio * 0.10)
 
     return min(score, 100)
@@ -336,6 +353,7 @@ def _score_match(local: dict, release: dict) -> int:
 def _build_tag_preview(local: dict, release: dict) -> list[dict]:
     """Build a side-by-side preview using best-match pairing (not positional)."""
     from thefuzz import fuzz
+
     preview = []
     local_tracks = local["tracks"]
     mb_tracks = list(release["tracks"])
@@ -353,13 +371,17 @@ def _build_tag_preview(local: dict, release: dict) -> list[dict]:
             remaining.remove(best_mb)
         else:
             best_mb = {}
-        preview.append({
-            "filename": lt["filename"],
-            "current_title": lt["title"],
-            "new_title": best_mb.get("title", ""),
-            "current_track": lt["tracknumber"],
-            "new_track": best_mb.get("number", ""),
-            "duration_diff": abs(lt["length_sec"] - best_mb.get("length_sec", 0)) if best_mb else None,
-        })
+        preview.append(
+            {
+                "filename": lt["filename"],
+                "current_title": lt["title"],
+                "new_title": best_mb.get("title", ""),
+                "current_track": lt["tracknumber"],
+                "new_track": best_mb.get("number", ""),
+                "duration_diff": abs(lt["length_sec"] - best_mb.get("length_sec", 0))
+                if best_mb
+                else None,
+            }
+        )
 
     return preview

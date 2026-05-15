@@ -2,13 +2,20 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import MatchApplyRequest, MatchCandidateResponse
 from crate.matcher import match_album
 from crate.api._deps import library_path, extensions
 from crate.api.browse_shared import find_album_dir
-from crate.db.repositories.library import get_library_album_by_entity_uid, get_library_album_by_id
+from crate.db.repositories.library import (
+    get_library_album_by_entity_uid,
+    get_library_album_by_id,
+)
 from crate.db.repositories.tasks import create_task
 
 router = APIRouter(tags=["matcher"])
@@ -81,10 +88,13 @@ def api_match_apply(request: Request, data: MatchApplyRequest):
     if not album_dir:
         return JSONResponse({"error": "Album not found"}, status_code=404)
 
-    task_id = create_task("match_apply", {
-        "artist_folder": album["artist"],
-        "album_folder": album["name"],
-        "album_path": str(album_dir),
-        "release": data.release,
-    })
+    task_id = create_task(
+        "match_apply",
+        {
+            "artist_folder": album["artist"],
+            "album_folder": album["name"],
+            "album_path": str(album_dir),
+            "release": data.release,
+        },
+    )
     return {"task_id": task_id}

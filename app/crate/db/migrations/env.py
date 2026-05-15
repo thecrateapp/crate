@@ -1,7 +1,7 @@
 """Alembic migration environment for Crate.
 
 Reads the PostgreSQL DSN from the same environment variables that
-``crate.db.core`` uses (``CRATE_POSTGRES_*``). This keeps Alembic and
+``crate.db.engine`` uses (``CRATE_POSTGRES_*``). This keeps Alembic and
 the runtime app in sync without duplicating configuration.
 
 Both online (connected) and offline (SQL-script) modes are supported,

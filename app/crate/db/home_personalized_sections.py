@@ -12,7 +12,10 @@ from crate.db.home_personalized_collections import (
     get_home_recommended_tracks,
     get_home_suggested_albums,
 )
-from crate.db.home_personalized_discovery import build_home_discovery_payload, get_home_section
+from crate.db.home_personalized_discovery import (
+    build_home_discovery_payload,
+    get_home_section,
+)
 
 
 __all__ = [

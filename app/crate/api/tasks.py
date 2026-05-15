@@ -8,7 +8,11 @@ from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_auth, _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.tasks import (
     AdminTasksSnapshotResponse,
@@ -28,11 +32,19 @@ from crate.api.schemas.tasks import (
     WorkerSlotsResponse,
     WorkerStatusResponse,
 )
-from crate.db.admin_tasks_surface import TASKS_SURFACE_STREAM_CHANNEL, get_cached_tasks_surface
+from crate.db.admin_tasks_surface import (
+    TASKS_SURFACE_STREAM_CHANNEL,
+    get_cached_tasks_surface,
+)
 from crate.db.cache_settings import get_setting, set_setting
 from crate.db.cache_store import get_cache
 from crate.db.queries.tasks import get_task, list_tasks
-from crate.db.repositories.tasks import create_task, delete_old_finished_tasks, delete_tasks_by_status, update_task
+from crate.db.repositories.tasks import (
+    create_task,
+    delete_old_finished_tasks,
+    delete_tasks_by_status,
+    update_task,
+)
 from crate.docker_ctl import restart_container
 from crate.media_worker_progress import cancel_media_worker_job
 from crate.scheduler import get_schedules, set_schedules
@@ -62,7 +74,9 @@ async def _tasks_stream(limit: int) -> AsyncIterator[str]:
         pubsub = await open_pubsub(TASKS_SURFACE_STREAM_CHANNEL)
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
                 heartbeat_counter = 0
@@ -112,31 +126,39 @@ async def api_admin_tasks_stream(request: Request, limit: int = 100):
     responses=AUTH_ERROR_RESPONSES,
     summary="List background tasks",
 )
-def api_tasks(request: Request, status: str | None = None, limit: int = 50, fresh: bool = False):
+def api_tasks(
+    request: Request, status: str | None = None, limit: int = 50, fresh: bool = False
+):
     _require_auth(request)
     snapshot = get_cached_tasks_surface(limit=200 if status else limit, fresh=fresh)
     tasks = snapshot.get("history") or []
     if status:
         if status == "running":
-            tasks = [task for task in tasks if task.get("status") in {"running", "delegated", "completing"}]
+            tasks = [
+                task
+                for task in tasks
+                if task.get("status") in {"running", "delegated", "completing"}
+            ]
         else:
             tasks = [task for task in tasks if task.get("status") == status]
     result = []
     for t in tasks:
-        result.append({
-            "id": t["id"],
-            "type": t["type"],
-            "status": t["status"],
-            "progress": t.get("progress"),
-            "error": t.get("error"),
-            "result": t.get("result"),
-            "params": t.get("params"),
-            "priority": t.get("priority", 2),
-            "pool": t.get("pool", "default"),
-            "created_at": t.get("created_at"),
-            "started_at": t.get("started_at"),
-            "updated_at": t.get("updated_at"),
-        })
+        result.append(
+            {
+                "id": t["id"],
+                "type": t["type"],
+                "status": t["status"],
+                "progress": t.get("progress"),
+                "error": t.get("error"),
+                "result": t.get("result"),
+                "params": t.get("params"),
+                "priority": t.get("priority", 2),
+                "pool": t.get("pool", "default"),
+                "created_at": t.get("created_at"),
+                "started_at": t.get("started_at"),
+                "updated_at": t.get("updated_at"),
+            }
+        )
     return result
 
 
@@ -149,8 +171,12 @@ def api_tasks(request: Request, status: str | None = None, limit: int = 50, fres
 def api_backfill_track_fingerprints(request: Request):
     """Populate entity-stable audio fingerprints for tracks missing them."""
     _require_admin(request)
-    pending = list_tasks(status="pending", task_type="backfill_track_audio_fingerprints", limit=1)
-    running = list_tasks(status="running", task_type="backfill_track_audio_fingerprints", limit=1)
+    pending = list_tasks(
+        status="pending", task_type="backfill_track_audio_fingerprints", limit=1
+    )
+    running = list_tasks(
+        status="running", task_type="backfill_track_audio_fingerprints", limit=1
+    )
     if pending or running:
         return JSONResponse({"error": "Already running"}, status_code=409)
     task_id = create_task("backfill_track_audio_fingerprints")
@@ -203,7 +229,9 @@ def api_sync_library(request: Request):
     running = list_tasks(status="running", task_type="library_sync", limit=1)
     pending = list_tasks(status="pending", task_type="library_sync", limit=1)
     if running or pending:
-        return JSONResponse({"error": "Library sync already in progress"}, status_code=409)
+        return JSONResponse(
+            {"error": "Library sync already in progress"}, status_code=409
+        )
     task_id = create_task("library_sync")
     return {"task_id": task_id, "status": "started"}
 
@@ -222,7 +250,9 @@ def api_task_detail(request: Request, task_id: str):
 
     progress = task.get("progress", "")
     try:
-        progress_parsed = _json.loads(progress) if progress and progress.startswith("{") else progress
+        progress_parsed = (
+            _json.loads(progress) if progress and progress.startswith("{") else progress
+        )
     except (_json.JSONDecodeError, TypeError):
         progress_parsed = progress
 
@@ -276,8 +306,14 @@ def api_worker_status(request: Request):
         "engine": cached_status.get("engine", "dramatiq"),
         "running": len(running),
         "pending": len(pending),
-        "running_tasks": [{"id": t["id"], "type": t["type"], "pool": t.get("pool", "default")} for t in running],
-        "pending_tasks": [{"id": t["id"], "type": t["type"], "pool": t.get("pool", "default")} for t in pending],
+        "running_tasks": [
+            {"id": t["id"], "type": t["type"], "pool": t.get("pool", "default")}
+            for t in running
+        ],
+        "pending_tasks": [
+            {"id": t["id"], "type": t["type"], "pool": t.get("pool", "default")}
+            for t in pending
+        ],
     }
 
 
@@ -301,7 +337,9 @@ def api_set_worker_slots(request: Request, body: WorkerSlotsRequest):
             return JSONResponse({"error": "min_slots must be 1-10"}, status_code=400)
         set_setting("min_workers", str(min_slots))
     return {
-        "max_slots": int(get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS),
+        "max_slots": int(
+            get_setting("max_workers", str(DEFAULT_MAX_WORKERS)) or DEFAULT_MAX_WORKERS
+        ),
         "min_slots": int(get_setting("min_workers", "2") or 2),
     }
 
@@ -403,9 +441,12 @@ def api_clean_tasks_by_status(request: Request, status: str):
     """Delete all tasks with the given status. Allowed: completed, cancelled, failed."""
     _require_admin(request)
     from fastapi import HTTPException
+
     allowed = {"completed", "cancelled", "failed"}
     if status not in allowed:
-        raise HTTPException(status_code=400, detail=f"Status must be one of: {', '.join(allowed)}")
+        raise HTTPException(
+            status_code=400, detail=f"Status must be one of: {', '.join(allowed)}"
+        )
     deleted = delete_tasks_by_status(status)
     return {"deleted": deleted, "status": status}
 
@@ -420,6 +461,7 @@ def api_cleanup_tasks(request: Request, body: TaskCleanupRequest | None = None):
     """Delete completed/failed/cancelled tasks older than N days."""
     _require_admin(request)
     from datetime import datetime, timezone, timedelta
+
     days = body.older_than_days if body else 7
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     deleted = delete_old_finished_tasks(cutoff)
@@ -466,7 +508,10 @@ def api_cancel_task(request: Request, task_id: str):
         return JSONResponse({"error": "Task not found"}, status_code=404)
 
     if task["status"] not in ("pending", "running", "delegated"):
-        return JSONResponse({"error": f"Cannot cancel task in '{task['status']}' status"}, status_code=400)
+        return JSONResponse(
+            {"error": f"Cannot cancel task in '{task['status']}' status"},
+            status_code=400,
+        )
 
     update_task(task_id, status="cancelled")
     cancel_media_worker_job(task_id)

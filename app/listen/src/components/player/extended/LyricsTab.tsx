@@ -45,15 +45,22 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
     setLyrics(null);
     setLoading(true);
 
-    api<{ syncedLyrics: string | null; plainLyrics: string | null }>(`/api/lyrics?artist=${encodeURIComponent(currentTrack.artist)}&title=${encodeURIComponent(currentTrack.title)}`)
+    api<{ syncedLyrics: string | null; plainLyrics: string | null }>(
+      `/api/lyrics?artist=${encodeURIComponent(
+        currentTrack.artist,
+      )}&title=${encodeURIComponent(currentTrack.title)}`,
+    )
       .then((data) => {
         setLyrics({
-          synced: data.syncedLyrics ? parseSyncedLyrics(data.syncedLyrics) : null,
+          synced: data.syncedLyrics
+            ? parseSyncedLyrics(data.syncedLyrics)
+            : null,
           plain: data.plainLyrics || null,
         });
       })
       .catch((error) => {
-        if (controller.signal.aborted || (error as Error).name === "AbortError") return;
+        if (controller.signal.aborted || (error as Error).name === "AbortError")
+          return;
         setLyrics({ synced: null, plain: null });
       })
       .finally(() => {
@@ -102,11 +109,15 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
       ref={containerRef}
       className="lyrics-mask relative flex-1 overflow-y-auto pr-1"
       style={{
-        background: "linear-gradient(180deg, rgba(6,182,212,0.12) 0%, transparent 28%, transparent 72%, rgba(6,182,212,0.06) 100%)",
+        background:
+          "linear-gradient(180deg, rgba(6,182,212,0.12) 0%, transparent 28%, transparent 72%, rgba(6,182,212,0.06) 100%)",
       }}
     >
       {lyrics?.synced ? (
-        <div className="space-y-1 px-1" style={{ paddingTop: "34vh", paddingBottom: "34vh" }}>
+        <div
+          className="space-y-1 px-1"
+          style={{ paddingTop: "34vh", paddingBottom: "34vh" }}
+        >
           {lyrics.synced.map((line, index) => {
             const isActive = index === activeIndex;
             const isPast = index < activeIndex;

@@ -8,6 +8,8 @@ CRATE_INSTALL_DIR="${CRATE_INSTALL_DIR:-${HOME}/crate}"
 CRATE_ASSUME_YES="${CRATE_ASSUME_YES:-0}"
 CRATE_DRY_RUN="${CRATE_DRY_RUN:-0}"
 CRATE_SKIP_START="${CRATE_SKIP_START:-0}"
+CRATE_ACCESS_MODE="${CRATE_ACCESS_MODE:-${CRATE_INSTALL_MODE:-}}"
+CRATE_LOCAL_DOMAIN="${CRATE_LOCAL_DOMAIN:-crate.local}"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   CYAN=$'\033[0;36m'
@@ -125,6 +127,42 @@ confirm() {
     y|Y|yes|YES|Yes) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+normalize_access_mode() {
+  local mode="$1"
+  case "${mode}" in
+    cloudflare|cf|https)
+      printf "cloudflare"
+      ;;
+    dnsmasq|dns)
+      printf "dnsmasq"
+      ;;
+    hosts|host)
+      printf "hosts"
+      ;;
+    ports|port|localhost|local-only|"")
+      printf "ports"
+      ;;
+    *)
+      die "Unknown CRATE_ACCESS_MODE='${mode}'. Use cloudflare, dnsmasq, hosts, or ports."
+      ;;
+  esac
+}
+
+default_access_mode() {
+  if [[ -n "${CRATE_DOMAIN:-}" || -n "${CF_DNS_API_TOKEN:-}" ]]; then
+    printf "cloudflare"
+  else
+    printf "ports"
+  fi
+}
+
+prompt_access_mode() {
+  local default mode
+  default="$(default_access_mode)"
+  mode="$(prompt_default "Access mode (cloudflare, dnsmasq, hosts, ports)" "${default}")"
+  normalize_access_mode "${mode}"
 }
 
 expand_path() {
@@ -317,11 +355,168 @@ ensure_docker() {
   success "Compose is ready: $("${COMPOSE_CMD[@]}" version --short 2>/dev/null || "${COMPOSE_CMD[@]}" version)"
 }
 
+validate_domain() {
+  local domain="$1"
+  if [[ "${domain}" == "localhost" ]]; then
+    return
+  fi
+  if [[ ! "${domain}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+    die "Invalid domain '${domain}'. Use a plain hostname such as crate.local or example.com."
+  fi
+}
+
+local_domain_hosts() {
+  local domain="$1"
+  printf "admin.%s listen.%s api.%s traefik.%s" "${domain}" "${domain}" "${domain}" "${domain}"
+}
+
+install_dnsmasq_if_missing() {
+  if command -v dnsmasq >/dev/null 2>&1; then
+    success "dnsmasq is already installed."
+    return
+  fi
+
+  info "dnsmasq is missing; installing it for local wildcard DNS."
+  case "${OS_FAMILY}" in
+    macos)
+      if ! command -v brew >/dev/null 2>&1; then
+        die "dnsmasq mode on macOS requires Homebrew. Install Homebrew or use CRATE_ACCESS_MODE=hosts."
+      fi
+      run brew install dnsmasq
+      ;;
+    linux)
+      case "${OS_ID}" in
+        ubuntu|debian|raspbian)
+          run sudo apt-get update
+          run sudo apt-get install -y dnsmasq
+          ;;
+        fedora)
+          run sudo dnf install -y dnsmasq
+          ;;
+        arch|manjaro)
+          run sudo pacman -Sy --noconfirm dnsmasq
+          ;;
+        *)
+          die "Automatic dnsmasq installation is not supported for ${OS_ID}. Install dnsmasq or use CRATE_ACCESS_MODE=hosts."
+          ;;
+      esac
+      ;;
+    *)
+      die "dnsmasq mode supports Linux and macOS only."
+      ;;
+  esac
+}
+
+configure_hosts_domain() {
+  local domain="$1"
+  local hosts line
+
+  validate_domain "${domain}"
+  hosts="$(local_domain_hosts "${domain}")"
+  if grep -q "admin.${domain}" /etc/hosts 2>/dev/null; then
+    success "/etc/hosts already contains Crate entries for ${domain}."
+    return
+  fi
+
+  info "Adding Crate local hostnames to /etc/hosts."
+  line="127.0.0.1 ${hosts}"
+  run sudo sh -c "printf '\n# Crate local domains (${domain})\n${line}\n' >> /etc/hosts"
+}
+
+configure_dnsmasq_macos() {
+  local domain="$1"
+  local prefix dnsmasq_conf resolver_file rule
+
+  prefix="$(brew --prefix)"
+  dnsmasq_conf="${prefix}/etc/dnsmasq.conf"
+  resolver_file="/etc/resolver/${domain}"
+  rule="address=/.${domain}/127.0.0.1"
+
+  run mkdir -p "${prefix}/etc"
+  if [[ ! -f "${dnsmasq_conf}" ]] || ! grep -Fxq "${rule}" "${dnsmasq_conf}"; then
+    info "Adding wildcard DNS rule for *.${domain} to dnsmasq."
+    run sh -c "printf '\n# Crate local domain\n${rule}\n' >> '${dnsmasq_conf}'"
+  fi
+
+  run sudo mkdir -p /etc/resolver
+  run sudo sh -c "printf 'nameserver 127.0.0.1\n' > '${resolver_file}'"
+  if ! run sudo brew services restart dnsmasq; then
+    warn "Could not restart dnsmasq via Homebrew services. Start it manually with: sudo brew services restart dnsmasq"
+  fi
+  run sudo killall -HUP mDNSResponder 2>/dev/null || true
+}
+
+configure_dnsmasq_linux_resolver() {
+  local domain="$1"
+  local resolved_conf="/etc/systemd/resolved.conf.d/crate-${domain//./-}.conf"
+
+  if command -v resolvectl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
+    info "Routing *.${domain} through local dnsmasq via systemd-resolved."
+    run sudo mkdir -p /etc/systemd/resolved.conf.d
+    run sudo sh -c "printf '[Resolve]\nDNS=127.0.0.1\nDomains=~${domain}\n' > '${resolved_conf}'"
+    if ! run sudo systemctl restart systemd-resolved; then
+      warn "Could not restart systemd-resolved; DNS may require a manual restart."
+    fi
+    return
+  fi
+
+  if ! grep -q '^nameserver 127\.0\.0\.1' /etc/resolv.conf 2>/dev/null; then
+    warn "Prepending 127.0.0.1 to /etc/resolv.conf so *.${domain} resolves locally."
+    run sudo cp /etc/resolv.conf /etc/resolv.conf.crate-backup
+    run sudo sh -c "printf 'nameserver 127.0.0.1\n' | cat - /etc/resolv.conf > /tmp/crate-resolv.conf && cp /tmp/crate-resolv.conf /etc/resolv.conf"
+  fi
+}
+
+configure_dnsmasq_domain() {
+  local domain="$1"
+  local conf_path rule
+
+  validate_domain "${domain}"
+  install_dnsmasq_if_missing
+
+  case "${OS_FAMILY}" in
+    macos)
+      configure_dnsmasq_macos "${domain}"
+      ;;
+    linux)
+      conf_path="/etc/dnsmasq.d/crate-${domain//./-}.conf"
+      rule="address=/.${domain}/127.0.0.1"
+      info "Adding wildcard DNS rule for *.${domain} to dnsmasq."
+      run sudo mkdir -p /etc/dnsmasq.d
+      run sudo sh -c "printf '# Crate local domain\n${rule}\n' > '${conf_path}'"
+      if command -v systemctl >/dev/null 2>&1; then
+        run sudo systemctl enable --now dnsmasq
+        run sudo systemctl restart dnsmasq
+      else
+        run sudo service dnsmasq restart
+      fi
+      configure_dnsmasq_linux_resolver "${domain}"
+      ;;
+  esac
+
+  success "Local wildcard DNS is configured for *.${domain}."
+}
+
+configure_local_name_resolution() {
+  local domain="$1"
+  local access_mode="$2"
+
+  case "${access_mode}" in
+    hosts)
+      configure_hosts_domain "${domain}"
+      ;;
+    dnsmasq)
+      configure_dnsmasq_domain "${domain}"
+      ;;
+  esac
+}
+
 write_env_file() {
   local env_path="$1"
   local install_dir="$2"
   local default_tz default_music_dir default_data_dir default_downloads_dir
-  local domain cf_token admin_password jwt_secret postgres_password puid pgid docker_gid image_owner image_registry
+  local access_mode domain cf_token admin_password jwt_secret postgres_password puid pgid docker_gid image_owner image_registry
+  local tls_enabled secure_entrypoint cert_resolver
 
   default_tz="$(detect_timezone)"
   default_music_dir="${install_dir}/media/music"
@@ -332,15 +527,44 @@ write_env_file() {
   CRATE_DATA_DIR="${CRATE_DATA_DIR:-$(prompt_default "Crate data path" "${default_data_dir}")}"
   CRATE_DOWNLOADS_DIR="${CRATE_DOWNLOADS_DIR:-$(prompt_default "Download/import path" "${default_downloads_dir}")}"
   TZ_VALUE="${TZ:-$(prompt_default "Timezone" "${default_tz}")}"
-  domain="${CRATE_DOMAIN:-$(prompt_default "Base domain for HTTPS (empty = local-only)" "")}"
+
+  if [[ -z "${CRATE_ACCESS_MODE}" ]]; then
+    access_mode="$(prompt_access_mode)"
+  else
+    access_mode="$(normalize_access_mode "${CRATE_ACCESS_MODE}")"
+  fi
+  CRATE_ACCESS_MODE="${access_mode}"
 
   cf_token="${CF_DNS_API_TOKEN:-}"
-  if [[ -n "${domain}" && -z "${cf_token}" ]]; then
-    cf_token="$(prompt_secret_optional "Cloudflare DNS API token")"
-    if [[ -z "${cf_token}" ]]; then
-      warn "No Cloudflare token configured. Local ports will work, but HTTPS certificates will not be issued yet."
-    fi
-  fi
+  tls_enabled="false"
+  secure_entrypoint="web"
+  cert_resolver=""
+  case "${access_mode}" in
+    cloudflare)
+      domain="${CRATE_DOMAIN:-$(prompt_default "Base domain for HTTPS" "")}"
+      if [[ -z "${domain}" ]]; then
+        die "Cloudflare mode requires a base domain. Use CRATE_ACCESS_MODE=ports for local-only installs."
+      fi
+      validate_domain "${domain}"
+      tls_enabled="true"
+      secure_entrypoint="websecure"
+      cert_resolver="letsencrypt"
+      if [[ -z "${cf_token}" ]]; then
+        cf_token="$(prompt_secret_optional "Cloudflare DNS API token")"
+        if [[ -z "${cf_token}" ]]; then
+          warn "No Cloudflare token configured. Local ports will work, but HTTPS certificates will not be issued yet."
+        fi
+      fi
+      ;;
+    dnsmasq|hosts)
+      domain="${CRATE_DOMAIN:-$(prompt_default "Local domain" "${CRATE_LOCAL_DOMAIN}")}"
+      domain="${domain:-${CRATE_LOCAL_DOMAIN}}"
+      validate_domain "${domain}"
+      ;;
+    ports)
+      domain="${CRATE_DOMAIN:-localhost}"
+      ;;
+  esac
 
   admin_password="${DEFAULT_ADMIN_PASSWORD:-$(prompt_secret_optional "Initial admin password")}"
   if [[ -z "${admin_password}" ]]; then
@@ -386,6 +610,8 @@ CRATE_IMAGE_TAG=$(quote_env_value "${CRATE_IMAGE_TAG:-latest}")
 CRATE_IMAGE_OWNER=$(quote_env_value "${image_owner}")
 CRATE_IMAGE_REGISTRY=$(quote_env_value "${image_registry}")
 DOMAIN=$(quote_env_value "${domain:-localhost}")
+CRATE_ACCESS_MODE=$(quote_env_value "${access_mode}")
+CRATE_LOCAL_DOMAIN=$(quote_env_value "${CRATE_LOCAL_DOMAIN}")
 CRATE_CONFIG_FILE=$(quote_env_value "${CRATE_CONFIG_FILE:-./config.yaml}")
 
 DATA_DIR=$(quote_env_value "${CRATE_DATA_DIR}")
@@ -394,6 +620,9 @@ DOWNLOADS_DIR=$(quote_env_value "${CRATE_DOWNLOADS_DIR}")
 
 TRAEFIK_HTTP_PORT=$(quote_env_value "${TRAEFIK_HTTP_PORT:-80}")
 TRAEFIK_HTTPS_PORT=$(quote_env_value "${TRAEFIK_HTTPS_PORT:-443}")
+TRAEFIK_TLS_ENABLED=$(quote_env_value "${tls_enabled}")
+TRAEFIK_SECURE_ENTRYPOINT=$(quote_env_value "${secure_entrypoint}")
+TRAEFIK_CERT_RESOLVER=$(quote_env_value "${cert_resolver}")
 CRATE_API_PORT=$(quote_env_value "${CRATE_API_PORT:-8585}")
 CRATE_ADMIN_PORT=$(quote_env_value "${CRATE_ADMIN_PORT:-8580}")
 CRATE_LISTEN_PORT=$(quote_env_value "${CRATE_LISTEN_PORT:-8581}")
@@ -436,6 +665,7 @@ EOF
 write_traefik_config() {
   local data_dir="$1"
   local domain="$2"
+  local access_mode="${3:-cloudflare}"
   local email="${CRATE_ACME_EMAIL:-admin@${domain:-localhost}}"
   local traefik_dir="${data_dir}/traefik"
 
@@ -446,7 +676,8 @@ write_traefik_config() {
     return
   fi
 
-  cat > "${traefik_dir}/traefik.yml" <<EOF
+  if [[ "${access_mode}" == "cloudflare" ]]; then
+    cat > "${traefik_dir}/traefik.yml" <<EOF
 global:
   checkNewVersion: true
   sendAnonymousUsage: false
@@ -502,6 +733,41 @@ tls:
     default:
       minVersion: VersionTLS12
 EOF
+  else
+    cat > "${traefik_dir}/traefik.yml" <<'EOF'
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+log:
+  level: INFO
+  filePath: "/var/log/traefik/traefik.log"
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 100
+
+api:
+  dashboard: true
+
+entryPoints:
+  web:
+    address: ":80"
+
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    network: crate
+    exposedByDefault: false
+
+  file:
+    directory: /conf
+    watch: true
+EOF
+  fi
 
   cat > "${traefik_dir}/conf/dynamic.yml" <<'EOF'
 http:
@@ -539,9 +805,12 @@ start_crate() {
 
 print_next_steps() {
   local domain="$1"
+  local access_mode="${2:-ports}"
   local admin_port="${CRATE_ADMIN_PORT:-8580}"
   local listen_port="${CRATE_LISTEN_PORT:-8581}"
   local api_port="${CRATE_API_PORT:-8585}"
+  local http_port="${TRAEFIK_HTTP_PORT:-80}"
+  local http_scheme="http"
   local install_dir_display
   printf -v install_dir_display "%q" "${CRATE_INSTALL_DIR}"
 
@@ -553,12 +822,22 @@ print_next_steps() {
   log "  Listen: http://localhost:${listen_port}"
   log "  API:    http://localhost:${api_port}/api/status"
 
-  if [[ -n "${domain}" && "${domain}" != "localhost" ]]; then
+  if [[ "${access_mode}" == "cloudflare" && -n "${domain}" && "${domain}" != "localhost" ]]; then
     log ""
     log "${BOLD}Public URLs:${NC}"
     log "  Admin:  https://admin.${domain}"
     log "  Listen: https://listen.${domain}"
     log "  API:    https://api.${domain}"
+  elif [[ "${access_mode}" == "hosts" || "${access_mode}" == "dnsmasq" ]]; then
+    local suffix=""
+    if [[ "${http_port}" != "80" ]]; then
+      suffix=":${http_port}"
+    fi
+    log ""
+    log "${BOLD}Local domain URLs:${NC}"
+    log "  Admin:  ${http_scheme}://admin.${domain}${suffix}"
+    log "  Listen: ${http_scheme}://listen.${domain}${suffix}"
+    log "  API:    ${http_scheme}://api.${domain}${suffix}/api/status"
   fi
 
   log ""
@@ -601,9 +880,10 @@ main() {
   . "${CRATE_INSTALL_DIR}/.env"
   set +a
 
-  write_traefik_config "${DATA_DIR}" "${DOMAIN}"
+  write_traefik_config "${DATA_DIR}" "${DOMAIN}" "${CRATE_ACCESS_MODE}"
+  configure_local_name_resolution "${DOMAIN}" "${CRATE_ACCESS_MODE}"
   start_crate "${CRATE_INSTALL_DIR}"
-  print_next_steps "${DOMAIN}"
+  print_next_steps "${DOMAIN}" "${CRATE_ACCESS_MODE}"
 }
 
 main "$@"

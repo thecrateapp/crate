@@ -1,6 +1,7 @@
 package snapshots
 
 import (
+	"container/list"
 	"testing"
 	"time"
 )
@@ -53,8 +54,10 @@ func TestSnapshotFreshnessRejectsTooOldSnapshot(t *testing.T) {
 func TestSnapshotCacheExpiresAndReturnsCopy(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	store := &Store{
-		cacheTTL: time.Second,
-		cache:    make(map[string]cacheEntry),
+		cacheTTL:        time.Second,
+		cacheMaxEntries: 1000,
+		cache:           make(map[string]*list.Element),
+		cacheList:       list.New(),
 	}
 	key := cacheKey("home:discovery", "7")
 	store.cacheSet(key, &Row{Payload: map[string]any{"title": "Home"}}, now)
@@ -76,6 +79,36 @@ func TestSnapshotCacheExpiresAndReturnsCopy(t *testing.T) {
 	expired := store.cacheGet(key, now.Add(2*time.Second))
 	if expired != nil {
 		t.Fatalf("expected expired cache entry, got %+v", expired)
+	}
+}
+
+func TestSnapshotCacheLRUEvictsOldest(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	store := &Store{
+		cacheTTL:        time.Hour,
+		cacheMaxEntries: 3,
+		cache:           make(map[string]*list.Element),
+		cacheList:       list.New(),
+	}
+
+	store.cacheSet("a", &Row{Payload: map[string]any{"k": "a"}}, now)
+	store.cacheSet("b", &Row{Payload: map[string]any{"k": "b"}}, now)
+	store.cacheSet("c", &Row{Payload: map[string]any{"k": "c"}}, now)
+	// access a so b becomes LRU
+	_ = store.cacheGet("a", now)
+	store.cacheSet("d", &Row{Payload: map[string]any{"k": "d"}}, now)
+
+	if store.cacheGet("b", now) != nil {
+		t.Fatal("expected b to be evicted")
+	}
+	if store.cacheGet("a", now) == nil {
+		t.Fatal("expected a to still be present")
+	}
+	if store.cacheGet("c", now) == nil {
+		t.Fatal("expected c to still be present")
+	}
+	if store.cacheGet("d", now) == nil {
+		t.Fatal("expected d to be present")
 	}
 }
 

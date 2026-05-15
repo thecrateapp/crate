@@ -11,7 +11,14 @@ from crate.db.tx import read_scope, transaction_scope
 
 def get_dir_mtime(path: str) -> tuple[float, dict | None] | None:
     with read_scope() as session:
-        row = session.execute(text("SELECT mtime, data_json FROM dir_mtimes WHERE path = :path"), {"path": path}).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT mtime, data_json FROM dir_mtimes WHERE path = :path"),
+                {"path": path},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         return None
     data = row["data_json"]
@@ -35,12 +42,22 @@ def set_dir_mtime(path: str, mtime: float, data: dict | None = None) -> None:
 def get_all_dir_mtimes(prefix: str = "") -> dict[str, tuple[float, dict | None]]:
     with read_scope() as session:
         if prefix:
-            rows = session.execute(
-                text("SELECT path, mtime, data_json FROM dir_mtimes WHERE path LIKE :prefix"),
-                {"prefix": prefix + "%"},
-            ).mappings().all()
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT path, mtime, data_json FROM dir_mtimes WHERE path LIKE :prefix"
+                    ),
+                    {"prefix": prefix + "%"},
+                )
+                .mappings()
+                .all()
+            )
         else:
-            rows = session.execute(text("SELECT path, mtime, data_json FROM dir_mtimes")).mappings().all()
+            rows = (
+                session.execute(text("SELECT path, mtime, data_json FROM dir_mtimes"))
+                .mappings()
+                .all()
+            )
     result = {}
     for row in rows:
         data = row["data_json"]
@@ -52,7 +69,9 @@ def get_all_dir_mtimes(prefix: str = "") -> dict[str, tuple[float, dict | None]]
 
 def delete_dir_mtime(path: str) -> None:
     with transaction_scope() as session:
-        session.execute(text("DELETE FROM dir_mtimes WHERE path = :path"), {"path": path})
+        session.execute(
+            text("DELETE FROM dir_mtimes WHERE path = :path"), {"path": path}
+        )
 
 
 __all__ = ["delete_dir_mtime", "get_all_dir_mtimes", "get_dir_mtime", "set_dir_mtime"]

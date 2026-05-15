@@ -24,13 +24,8 @@ import { EQ_PRESETS, type EqPresetName } from "@/lib/equalizer";
 export function useEqualizer() {
   const [snapshot, setSnapshot] = useEqualizerSnapshotState();
   const { currentTrack } = usePlayerActions();
-  const {
-    effectiveGains,
-    featuresState,
-    features,
-    genreState,
-    trackGenre,
-  } = useResolvedEqualizer(snapshot, currentTrack);
+  const { effectiveGains, featuresState, features, genreState, trackGenre } =
+    useResolvedEqualizer(snapshot, currentTrack);
 
   const toggleEnabled = useCallback((enabled: boolean) => {
     setEqualizerEnabled(enabled);
@@ -39,7 +34,13 @@ export function useEqualizer() {
 
   const applyPreset = useCallback((preset: EqPresetName) => {
     const gains = applyEqualizerPreset(preset);
-    setSnapshot((prev) => ({ ...prev, preset, gains: [...gains], adaptive: false, genreAdaptive: false }));
+    setSnapshot((prev) => ({
+      ...prev,
+      preset,
+      gains: [...gains],
+      adaptive: false,
+      genreAdaptive: false,
+    }));
   }, []);
 
   const updateBand = useCallback((bandIndex: number, dB: number) => {
@@ -47,7 +48,13 @@ export function useEqualizer() {
       const nextGains = [...prev.gains];
       nextGains[bandIndex] = dB;
       setCustomEqualizerGains(nextGains);
-      return { ...prev, preset: "custom", gains: nextGains, adaptive: false, genreAdaptive: false };
+      return {
+        ...prev,
+        preset: "custom",
+        gains: nextGains,
+        adaptive: false,
+        genreAdaptive: false,
+      };
     });
   }, []);
 

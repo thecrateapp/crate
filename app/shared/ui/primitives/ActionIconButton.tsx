@@ -34,45 +34,47 @@ function actionVariantClassName(variant: ActionVariant) {
   return "h-10 min-h-11 w-10 min-w-11 md:min-h-0 md:min-w-0";
 }
 
-interface ActionIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ActionIconButtonProps
+  extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
   tone?: ActionTone;
   variant?: ActionVariant;
   children: ReactNode;
 }
 
-export const ActionIconButton = forwardRef<HTMLButtonElement, ActionIconButtonProps>(
-  function ActionIconButton(
-    {
-      active = false,
-      className,
-      disabled = false,
-      tone = "default",
-      type = "button",
-      variant = "row",
-      children,
-      ...props
-    },
-    ref,
-  ) {
-    return (
-      <button
-        ref={ref}
-        type={type}
-        disabled={disabled}
-        className={cn(
-          "flex items-center justify-center rounded-full transition-colors",
-          actionVariantClassName(variant),
-          actionToneClassName(active ? "primary" : tone, disabled),
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </button>
-    );
+export const ActionIconButton = forwardRef<
+  HTMLButtonElement,
+  ActionIconButtonProps
+>(function ActionIconButton(
+  {
+    active = false,
+    className,
+    disabled = false,
+    tone = "default",
+    type = "button",
+    variant = "row",
+    children,
+    ...props
   },
-);
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type={type}
+      disabled={disabled}
+      className={cn(
+        "flex items-center justify-center rounded-full transition-colors",
+        actionVariantClassName(variant),
+        actionToneClassName(active ? "primary" : tone, disabled),
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
 
 interface ActionIconLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
   active?: boolean;

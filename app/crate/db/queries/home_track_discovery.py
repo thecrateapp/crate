@@ -3,7 +3,13 @@ from __future__ import annotations
 from crate.db.queries.home_track_rows import _fetch_rows
 
 
-def get_discovery_track_rows(*, user_id: int, genres: list[str], excluded_artist_names: list[str], limit: int = 240) -> list[dict]:
+def get_discovery_track_rows(
+    *,
+    user_id: int,
+    genres: list[str],
+    excluded_artist_names: list[str],
+    limit: int = 240,
+) -> list[dict]:
     if not genres:
         return []
     capped_genres = genres[:20]
@@ -62,7 +68,12 @@ def get_discovery_track_rows(*, user_id: int, genres: list[str], excluded_artist
             t.title ASC
         LIMIT :lim
         """,
-        {"user_id": user_id, "genres": capped_genres, "excluded": capped_excluded, "lim": limit},
+        {
+            "user_id": user_id,
+            "genres": capped_genres,
+            "excluded": capped_excluded,
+            "lim": limit,
+        },
     )
 
 

@@ -22,7 +22,9 @@ def _make_mock_session(fetchall_side_effects: list[list[dict]]):
         def execute(self, *args, **kwargs):
             idx = call_index[0]
             call_index[0] += 1
-            rows = fetchall_side_effects[idx] if idx < len(fetchall_side_effects) else []
+            rows = (
+                fetchall_side_effects[idx] if idx < len(fetchall_side_effects) else []
+            )
             return MagicMock(mappings=lambda: MockMappings(rows))
 
     @contextmanager
@@ -34,35 +36,64 @@ def _make_mock_session(fetchall_side_effects: list[list[dict]]):
 
 class TestExploreFiltersContract:
     def test_browse_filters_exposes_genres_and_decades(self, test_app):
-        mock_scope = _make_mock_session([
-            [{"name": "Metalcore", "cnt": 4}, {"name": "Post-Hardcore", "cnt": 2}],
-            [{"country": "US", "cnt": 3}],
-            [{"formed": "1994-01-01"}, {"formed": "2005"}, {"formed": "2001-08-09"}],
-            [{"format": "FLAC", "cnt": 12}],
-        ])
+        mock_scope = _make_mock_session(
+            [
+                [{"name": "Metalcore", "cnt": 4}, {"name": "Post-Hardcore", "cnt": 2}],
+                [{"country": "US", "cnt": 3}],
+                [
+                    {"formed": "1994-01-01"},
+                    {"formed": "2005"},
+                    {"formed": "2001-08-09"},
+                ],
+                [{"format": "FLAC", "cnt": 12}],
+            ]
+        )
 
         with patch("crate.db.queries.browse_artist_filters.read_scope", mock_scope):
             resp = test_app.get("/api/browse/filters")
             assert resp.status_code == 200
             data = resp.json()
-            assert [genre["name"] for genre in data["genres"]] == ["Metalcore", "Post-Hardcore"]
+            assert [genre["name"] for genre in data["genres"]] == [
+                "Metalcore",
+                "Post-Hardcore",
+            ]
             assert data["decades"] == ["1990s", "2000s"]
             assert data["formats"][0]["name"] == "FLAC"
 
     def test_explore_page_bundles_filters_playlists_and_moods(self, test_app):
         playlist_rows = [
-            {"id": index, "name": f"Playlist {index}", "track_count": 12, "is_smart": False, "follower_count": 0, "is_followed": False}
+            {
+                "id": index,
+                "name": f"Playlist {index}",
+                "track_count": 12,
+                "is_smart": False,
+                "follower_count": 0,
+                "is_followed": False,
+            }
             for index in range(1, 11)
         ]
 
-        with patch("crate.api.browse.api_browse_filters", return_value={
-            "genres": [{"name": "Metalcore", "count": 4}],
-            "countries": [],
-            "decades": ["2000s"],
-            "formats": [],
-        }), patch("crate.api.browse.curated_playlists", return_value=playlist_rows), patch(
-            "crate.api.browse.api_browse_moods",
-            return_value=[{"name": "energetic", "track_count": 42, "filters": {"energy_min": 0.7}}],
+        with (
+            patch(
+                "crate.api.browse.api_browse_filters",
+                return_value={
+                    "genres": [{"name": "Metalcore", "count": 4}],
+                    "countries": [],
+                    "decades": ["2000s"],
+                    "formats": [],
+                },
+            ),
+            patch("crate.api.browse.curated_playlists", return_value=playlist_rows),
+            patch(
+                "crate.api.browse.api_browse_moods",
+                return_value=[
+                    {
+                        "name": "energetic",
+                        "track_count": 42,
+                        "filters": {"energy_min": 0.7},
+                    }
+                ],
+            ),
         ):
             resp = test_app.get("/api/browse/explore-page")
             assert resp.status_code == 200
@@ -80,28 +111,52 @@ class TestExploreSearchContract:
         assert resp.json() == {"artists": [], "albums": [], "tracks": []}
 
     def test_search_returns_full_payload_shape(self, test_app):
-        mock_scope = _make_mock_session([
-            [{"id": 1, "slug": "converge", "name": "Converge", "album_count": 10, "has_photo": 1}],
-            [{"id": 5, "slug": "jane-doe", "artist": "Converge", "name": "Jane Doe", "year": "2001",
-              "has_cover": 1, "artist_id": 1, "artist_slug": "converge"}],
-            [{
-                "id": 99,
-                "storage_id": None,
-                "slug": "concubine",
-                "title": "Concubine",
-                "artist": "Converge",
-                "album_id": 5,
-                "album_slug": "jane-doe",
-                "album": "Jane Doe",
-                "artist_id": 1,
-                "artist_slug": "converge",
-                "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
-                "duration": 94.0,
-            }],
-        ])
+        mock_scope = _make_mock_session(
+            [
+                [
+                    {
+                        "id": 1,
+                        "slug": "converge",
+                        "name": "Converge",
+                        "album_count": 10,
+                        "has_photo": 1,
+                    }
+                ],
+                [
+                    {
+                        "id": 5,
+                        "slug": "jane-doe",
+                        "artist": "Converge",
+                        "name": "Jane Doe",
+                        "year": "2001",
+                        "has_cover": 1,
+                        "artist_id": 1,
+                        "artist_slug": "converge",
+                    }
+                ],
+                [
+                    {
+                        "id": 99,
+                        "storage_id": None,
+                        "slug": "concubine",
+                        "title": "Concubine",
+                        "artist": "Converge",
+                        "album_id": 5,
+                        "album_slug": "jane-doe",
+                        "album": "Jane Doe",
+                        "artist_id": 1,
+                        "artist_slug": "converge",
+                        "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
+                        "duration": 94.0,
+                    }
+                ],
+            ]
+        )
 
-        with patch("crate.api.browse_media.has_library_data", return_value=True), \
-             patch("crate.db.queries.browse_media_search.read_scope", mock_scope):
+        with (
+            patch("crate.api.browse_media.has_library_data", return_value=True),
+            patch("crate.db.queries.browse_media_search.read_scope", mock_scope),
+        ):
             resp = test_app.get("/api/search?q=converge&limit=10")
             assert resp.status_code == 200
             data = resp.json()

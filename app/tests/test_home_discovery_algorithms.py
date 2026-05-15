@@ -17,11 +17,27 @@ def _home_context(top_artists=None):
 def test_home_essentials_builds_seven_core_track_cards():
     from crate.db.home_personalized_collections import get_home_essentials
 
-    context = _home_context(top_artists=[{"artist_id": index, "artist_name": f"Artist {index}"} for index in range(10)])
+    context = _home_context(
+        top_artists=[
+            {"artist_id": index, "artist_name": f"Artist {index}"}
+            for index in range(10)
+        ]
+    )
 
-    with patch("crate.db.home_personalized_collections.get_cached_home_context", return_value=context), \
-         patch("crate.db.home_personalized_collections.merged_artists_from_context", return_value=context["top_artists"]), \
-         patch("crate.db.home_personalized_collections._build_core_playlists", return_value=[]) as build_core:
+    with (
+        patch(
+            "crate.db.home_personalized_collections.get_cached_home_context",
+            return_value=context,
+        ),
+        patch(
+            "crate.db.home_personalized_collections.merged_artists_from_context",
+            return_value=context["top_artists"],
+        ),
+        patch(
+            "crate.db.home_personalized_collections._build_core_playlists",
+            return_value=[],
+        ) as build_core,
+    ):
         get_home_essentials(1)
 
     build_core.assert_called_once_with(1, context["top_artists"], 7)
@@ -30,11 +46,27 @@ def test_home_essentials_builds_seven_core_track_cards():
 def test_home_core_tracks_section_caps_at_seven_cards():
     from crate.db.home_personalized_discovery import get_home_section
 
-    context = _home_context(top_artists=[{"artist_id": index, "artist_name": f"Artist {index}"} for index in range(10)])
+    context = _home_context(
+        top_artists=[
+            {"artist_id": index, "artist_name": f"Artist {index}"}
+            for index in range(10)
+        ]
+    )
 
-    with patch("crate.db.home_personalized_discovery.get_cached_home_context", return_value=context), \
-         patch("crate.db.home_personalized_discovery.recent_releases_from_context", return_value=[]), \
-         patch("crate.db.home_personalized_discovery._build_core_playlists", return_value=[]) as build_core:
+    with (
+        patch(
+            "crate.db.home_personalized_discovery.get_cached_home_context",
+            return_value=context,
+        ),
+        patch(
+            "crate.db.home_personalized_discovery.recent_releases_from_context",
+            return_value=[],
+        ),
+        patch(
+            "crate.db.home_personalized_discovery._build_core_playlists",
+            return_value=[],
+        ) as build_core,
+    ):
         section = get_home_section(1, "core-tracks", limit=42)
 
     assert section is not None
@@ -119,7 +151,7 @@ def test_recent_interest_rows_include_user_feedback_signals(monkeypatch):
 
 
 def test_daily_discovery_rotates_candidates_before_selection(monkeypatch):
-    from crate.db import home_builder_mix_generation
+    import crate.db.home_builder_mix_generation as home_builder_mix_generation
 
     rows = [
         {
@@ -134,8 +166,16 @@ def test_daily_discovery_rotates_candidates_before_selection(monkeypatch):
         for index in range(5)
     ]
 
-    monkeypatch.setattr(home_builder_mix_generation, "_query_discovery_tracks", lambda *args, **kwargs: rows)
-    monkeypatch.setattr(home_builder_mix_generation, "_daily_rotation_index", lambda pool_size, user_id: 2)
+    monkeypatch.setattr(
+        home_builder_mix_generation,
+        "_query_discovery_tracks",
+        lambda *args, **kwargs: rows,
+    )
+    monkeypatch.setattr(
+        home_builder_mix_generation,
+        "_daily_rotation_index",
+        lambda pool_size, user_id: 2,
+    )
 
     _, _, selected = home_builder_mix_generation._build_mix_rows(
         1,

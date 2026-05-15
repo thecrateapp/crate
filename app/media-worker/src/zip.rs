@@ -1,3 +1,5 @@
+//! ZIP64 writer with stored (uncompressed) entries and cancel-safe streaming.
+
 use std::fs::File;
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;

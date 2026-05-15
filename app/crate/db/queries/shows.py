@@ -9,7 +9,10 @@ from crate.db.queries.shows_upcoming_queries import (
     get_upcoming_shows,
     get_upcoming_shows_near,
 )
-from crate.db.queries.shows_user_queries import get_attending_show_ids, get_show_reminders
+from crate.db.queries.shows_user_queries import (
+    get_attending_show_ids,
+    get_show_reminders,
+)
 
 
 __all__ = [

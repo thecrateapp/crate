@@ -12,9 +12,10 @@ from crate.db.tx import read_scope
 def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     uts.track_id,
                     COALESCE(lt.entity_uid::text, uts.track_entity_uid::text) AS track_entity_uid,
@@ -52,9 +53,12 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                 ORDER BY uts.play_count DESC, uts.minutes_listened DESC, uts.last_played_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "window": normalized, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "window": normalized, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     payload = [dict(row) for row in rows]
     for item in payload:
         if item.get("bliss_vector") is not None:
@@ -65,9 +69,10 @@ def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[d
 def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     uas.artist_name,
                     la.id AS artist_id,
@@ -83,18 +88,22 @@ def get_top_artists(user_id: int, window: str = "30d", limit: int = 20) -> list[
                 ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "window": normalized, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "window": normalized, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     uas.artist,
                     art.id AS artist_id,
@@ -114,18 +123,22 @@ def get_top_albums(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                 ORDER BY uas.play_count DESC, uas.minutes_listened DESC, uas.last_played_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "window": normalized, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "window": normalized, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:
     normalized = normalize_stats_window(window)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     genre_name,
                     play_count,
@@ -138,18 +151,22 @@ def get_top_genres(user_id: int, window: str = "30d", limit: int = 20) -> list[d
                 ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "window": normalized, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "window": normalized, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
     normalized = normalize_stats_window(window)
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH ranked AS (
                     SELECT
                         uts.track_id,
@@ -196,9 +213,12 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
                 ORDER BY play_count DESC, minutes_listened DESC, last_played_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "window": normalized, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "window": normalized, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
 
     items = [dict(row) for row in rows]
     for item in items:
@@ -222,7 +242,9 @@ def get_replay_mix(user_id: int, window: str = "30d", limit: int = 30) -> dict:
         title = "All-time replay"
         subtitle = "Your enduring favorites across the whole library."
 
-    total_minutes = round(sum(float(item.get("minutes_listened") or 0) for item in items), 1)
+    total_minutes = round(
+        sum(float(item.get("minutes_listened") or 0) for item in items), 1
+    )
 
     return {
         "window": normalized,
@@ -255,9 +277,10 @@ def _history_subtitle(top_artists: list[str]) -> str:
 
 def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     upe.ended_at,
                     COALESCE(lt.title, upe.title) AS title,
@@ -285,9 +308,12 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
                 ORDER BY upe.ended_at DESC
                 LIMIT :row_limit
                 """
-            ),
-            {"user_id": user_id, "row_limit": 5000},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "row_limit": 5000},
+            )
+            .mappings()
+            .all()
+        )
 
     buckets: dict[tuple[int, int], dict] = {}
     for row in rows:
@@ -313,7 +339,12 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
         bucket["play_count"] += 1
         bucket["minutes_listened"] += float(row.get("played_seconds") or 0) / 60
         album_key = row.get("album_id") or (artist.lower(), album.lower())
-        if artist and album and album_key not in bucket["seen_albums"] and len(bucket["artwork_tracks"]) < 4:
+        if (
+            artist
+            and album
+            and album_key not in bucket["seen_albums"]
+            and len(bucket["artwork_tracks"]) < 4
+        ):
             bucket["seen_albums"].add(album_key)
             bucket["artwork_tracks"].append(
                 {
@@ -339,7 +370,9 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
             {
                 "id": f"month-{year}-{month:02d}",
                 "kind": "month",
-                "title": "My Most Listened" if year == now.year and month == now.month else f"{month_name} {year}",
+                "title": "My Most Listened"
+                if year == now.year and month == now.month
+                else f"{month_name} {year}",
                 "period_label": month_name.upper(),
                 "period_start": period_start.isoformat(),
                 "subtitle": _history_subtitle(top_artists),

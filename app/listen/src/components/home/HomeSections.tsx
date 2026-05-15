@@ -1,9 +1,29 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import { ArrowRight, ChevronLeft, ChevronRight, Clock3, Loader2, Play } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Loader2,
+  Play,
+} from "lucide-react";
 
-import { ItemActionMenu, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -47,7 +67,11 @@ export function SectionHeader({
     <div className="flex items-end justify-between gap-3">
       <div className="min-w-0">
         <h2 className="text-lg font-bold text-foreground">{title}</h2>
-        {subtitle ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+            {subtitle}
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {railControls ? (
@@ -180,8 +204,12 @@ export function UpcomingPreviewRow({
       className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-2 text-left transition-colors hover:border-white/10 hover:bg-white/5"
     >
       <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-white/[0.03]">
-        <span className="text-[10px] uppercase tracking-wide text-white/40">{dateLabel.split(" ")[0]}</span>
-        <span className="text-sm font-semibold text-foreground">{dateLabel.split(" ")[1] || ""}</span>
+        <span className="text-[10px] uppercase tracking-wide text-white/40">
+          {dateLabel.split(" ")[0]}
+        </span>
+        <span className="text-sm font-semibold text-foreground">
+          {dateLabel.split(" ")[1] || ""}
+        </span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -195,7 +223,9 @@ export function UpcomingPreviewRow({
           ) : null}
         </div>
         <div className="truncate text-xs text-muted-foreground">
-          {item.type === "show" ? `${item.title} · ${item.subtitle}` : `${item.artist} · ${item.title}`}
+          {item.type === "show"
+            ? `${item.title} · ${item.subtitle}`
+            : `${item.artist} · ${item.title}`}
         </div>
       </div>
       <div className="shrink-0 rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
@@ -274,7 +304,9 @@ export function FeaturedPlaylistCard({
         <div className="mt-1 line-clamp-2 min-h-[2.5rem] text-xs leading-5 text-muted-foreground">
           {description || meta}
         </div>
-        <div className="mt-2 text-[11px] uppercase tracking-wider text-white/40">{meta}</div>
+        <div className="mt-2 text-[11px] uppercase tracking-wider text-white/40">
+          {meta}
+        </div>
       </div>
       <ItemActionMenu
         actions={actions}
@@ -308,9 +340,15 @@ export function ContinueListeningCard({
             <Clock3 size={11} />
             Continue listening
           </div>
-          <h2 className="truncate text-xl font-bold text-foreground">{track.title}</h2>
-          <p className="mt-1 truncate text-sm text-muted-foreground">{track.artist}</p>
-          {track.album ? <p className="mt-1 truncate text-xs text-white/40">{track.album}</p> : null}
+          <h2 className="truncate text-xl font-bold text-foreground">
+            {track.title}
+          </h2>
+          <p className="mt-1 truncate text-sm text-muted-foreground">
+            {track.artist}
+          </p>
+          {track.album ? (
+            <p className="mt-1 truncate text-xs text-white/40">{track.album}</p>
+          ) : null}
         </div>
         <button
           onClick={onPlay}

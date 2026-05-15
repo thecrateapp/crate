@@ -11,12 +11,20 @@ from crate.db.read_model_shared import coerce_datetime, coerce_json, utc_now
 from crate.db.tx import optional_scope, read_scope
 
 
-def get_ops_runtime_state(key: str, *, max_age_seconds: int | None = None) -> dict[str, Any] | None:
+def get_ops_runtime_state(
+    key: str, *, max_age_seconds: int | None = None
+) -> dict[str, Any] | None:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT key, payload_json, updated_at FROM ops_runtime_state WHERE key = :key"),
-            {"key": key},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT key, payload_json, updated_at FROM ops_runtime_state WHERE key = :key"
+                ),
+                {"key": key},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         return None
     record = dict(row)

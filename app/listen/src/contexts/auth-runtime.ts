@@ -16,9 +16,13 @@ const RECENTLY_PLAYED_KEY = "listen-recently-played";
 
 export const AUTH_RUNTIME_RESET_EVENT = "crate:auth-runtime-reset";
 
-function notifyAuthRuntimeReset(reason: "logout" | "user-change" | "unauthenticated") {
+function notifyAuthRuntimeReset(
+  reason: "logout" | "user-change" | "unauthenticated",
+) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(AUTH_RUNTIME_RESET_EVENT, { detail: { reason } }));
+  window.dispatchEvent(
+    new CustomEvent(AUTH_RUNTIME_RESET_EVENT, { detail: { reason } }),
+  );
 }
 
 function safeRemoveStorageItem(key: string) {
@@ -56,7 +60,12 @@ export function applyAuthenticatedUser(user: AuthUser | null) {
   notifyAuthRuntimeReset("unauthenticated");
 }
 
-export function clearAuthRuntime(options: { clearStoredUser?: boolean; reason?: "logout" | "user-change" | "unauthenticated" } = {}) {
+export function clearAuthRuntime(
+  options: {
+    clearStoredUser?: boolean;
+    reason?: "logout" | "user-change" | "unauthenticated";
+  } = {},
+) {
   notifyAuthRuntimeReset(options.reason ?? "logout");
   const { clearStoredUser = true } = options;
   resetPlaybackPersistence();

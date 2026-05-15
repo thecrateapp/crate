@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -22,6 +24,7 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
 )
 
+// Server is the readplane HTTP server with routing, auth, and fallback support.
 type Server struct {
 	cfg       config.Config
 	pool      *pgxpool.Pool
@@ -33,6 +36,7 @@ type Server struct {
 	logger    *slog.Logger
 }
 
+// NewServer assembles a Server from its dependencies.
 func NewServer(
 	cfg config.Config,
 	pool *pgxpool.Pool,
@@ -55,6 +59,7 @@ func NewServer(
 	}
 }
 
+// Handler returns the complete HTTP handler with routing and middleware.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.route(http.MethodGet, s.healthz))
@@ -85,10 +90,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/artist-slugs/", s.route(http.MethodGet, s.artistSlugRoute))
 	mux.HandleFunc("/api/artists/", s.route(http.MethodGet, s.artistRoute))
 	mux.HandleFunc("/api/tracks/", s.route(http.MethodGet, s.trackRoute))
-	return s.withCommonHeaders(s.withAccessLog(mux))
+	return s.withCommonHeaders(s.withTraceID(s.withAccessLog(mux)))
 }
 
+type contextKey string
+
+const traceIDKey contextKey = "trace_id"
+
 type handlerFunc func(http.ResponseWriter, *http.Request)
+
+func generateTraceID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 func (s *Server) route(method string, handler handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -111,11 +126,24 @@ func (s *Server) withCommonHeaders(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) withTraceID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceID := r.Header.Get("X-Trace-ID")
+		if traceID == "" {
+			traceID = generateTraceID()
+		}
+		w.Header().Set("X-Trace-ID", traceID)
+		ctx := context.WithValue(r.Context(), traceIDKey, traceID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (s *Server) withAccessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
+		traceID, _ := r.Context().Value(traceIDKey).(string)
 		s.logger.Info(
 			"readplane request",
 			"method", r.Method,
@@ -123,6 +151,7 @@ func (s *Server) withAccessLog(next http.Handler) http.Handler {
 			"status", recorder.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"route_source", recorder.Header().Get("X-Crate-Readplane"),
+			"trace_id", traceID,
 		)
 	})
 }
@@ -145,7 +174,7 @@ func (r *statusRecorder) Flush() {
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
 	httpx.MarkReadplane(w, "hit")
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+	_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"service": "crate-readplane",
 		"version": s.cfg.Version,
@@ -160,14 +189,14 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	if err := s.pool.Ping(ctx); err != nil {
 		httpx.MarkReadplane(w, "miss")
 		details["error"] = err.Error()
-		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
+		_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
 		return
 	}
 	details["postgres"] = true
 	if err := postgres.RequiredTablesReady(ctx, s.pool); err != nil {
 		httpx.MarkReadplane(w, "miss")
 		details["error"] = err.Error()
-		httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
+		_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
 		return
 	}
 	details["schema"] = true
@@ -177,20 +206,20 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 		if s.redis == nil {
 			httpx.MarkReadplane(w, "miss")
 			details["error"] = "redis client is nil"
-			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
+			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
 			return
 		}
 		if err := redisx.Ping(ctx, s.redis); err != nil {
 			httpx.MarkReadplane(w, "miss")
 			details["error"] = err.Error()
-			httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
+			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
 			return
 		}
 		details["redis"] = true
 	}
 
 	httpx.MarkReadplane(w, "hit")
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "details": details})
+	_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "details": details})
 }
 
 func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +229,9 @@ func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.MarkReadplane(w, "hit")
-	httpx.WriteJSON(w, http.StatusOK, user)
+	if err := httpx.WriteJSON(w, http.StatusOK, user); err != nil {
+		s.logger.Warn("failed to write auth JSON", "error", err)
+	}
 }
 
 func (s *Server) homeDiscovery(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +264,10 @@ func (s *Server) homeDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.MarkReadplane(w, "hit")
-	httpx.WriteJSON(w, http.StatusOK, homeDiscoveryHTTPPayload(row))
+	if err := httpx.WriteJSON(w, http.StatusOK, homeDiscoveryHTTPPayload(row)); err != nil {
+		s.logger.Warn("failed to write home discovery JSON", "error", err)
+		_ = httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
+	}
 }
 
 func (s *Server) homeDiscoveryStream(w http.ResponseWriter, r *http.Request) {
@@ -362,6 +396,7 @@ func (s *Server) fallbackOrAuthError(w http.ResponseWriter, r *http.Request, err
 	httpx.WriteError(w, http.StatusServiceUnavailable, "Readplane authentication unavailable")
 }
 
+// Shutdown gracefully closes Redis and database connections.
 func (s *Server) Shutdown(ctx context.Context) error {
 	if s.redis != nil {
 		if err := s.redis.Close(); err != nil {

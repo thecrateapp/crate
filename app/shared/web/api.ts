@@ -63,7 +63,8 @@ export function createApiClient(options: ApiClientOptions = {}) {
     body?: unknown,
     options: ApiRequestOptions = {},
   ): Promise<T> {
-    const resolved = typeof defaultHeaders === "function" ? defaultHeaders() : defaultHeaders;
+    const resolved =
+      typeof defaultHeaders === "function" ? defaultHeaders() : defaultHeaders;
     const headers: Record<string, string> = { ...resolved };
     const requestOptions: RequestInit = {
       method,
@@ -89,7 +90,11 @@ export function createApiClient(options: ApiClientOptions = {}) {
         signal,
       });
       if (!res.ok) {
-        if (res.status === 401 && onUnauthorized && !url.includes("/auth/login")) {
+        if (
+          res.status === 401 &&
+          onUnauthorized &&
+          !url.includes("/auth/login")
+        ) {
           onUnauthorized();
         }
         const text = await res.text().catch(() => "Request failed");

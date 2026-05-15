@@ -34,7 +34,9 @@ export function ExplorePill({
       className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 transition-colors hover:border-primary/40 hover:bg-primary/5"
     >
       <span className="text-sm font-medium text-primary">{label}</span>
-      {count != null && count > 0 ? <span className="text-xs text-muted-foreground">{count}</span> : null}
+      {count != null && count > 0 ? (
+        <span className="text-xs text-muted-foreground">{count}</span>
+      ) : null}
     </button>
   );
 }
@@ -54,7 +56,9 @@ export function ExploreSectionHeader({
     <div className="flex items-end justify-between gap-4">
       <div>
         <h2 className="text-lg font-bold text-foreground">{title}</h2>
-        {subtitle ? <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? (
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        ) : null}
       </div>
       {actionLabel && onAction ? (
         <button
@@ -89,18 +93,21 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
   const hasArtists = results.artists.length > 0;
   const hasAlbums = results.albums.length > 0;
   const hasTracks = results.tracks.length > 0;
-  const trackRows = useMemo<TrackRowData[]>(() =>
-    results.tracks.slice(0, 10).map((track) => ({
-      ...track,
-      path: track.path || "",
-      duration: track.duration || 0,
-      library_track_id: track.id,
-    })),
+  const trackRows = useMemo<TrackRowData[]>(
+    () =>
+      results.tracks.slice(0, 10).map((track) => ({
+        ...track,
+        path: track.path || "",
+        duration: track.duration || 0,
+        library_track_id: track.id,
+      })),
     [results.tracks],
   );
 
   if (!hasArtists && !hasAlbums && !hasTracks) {
-    return <p className="mt-8 text-sm text-muted-foreground">No results found.</p>;
+    return (
+      <p className="mt-8 text-sm text-muted-foreground">No results found.</p>
+    );
   }
 
   return (
@@ -115,7 +122,11 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
                 name={artist.name}
                 artistId={artist.id}
                 artistSlug={artist.slug}
-                subtitle={artist.album_count ? `${artist.album_count} albums` : undefined}
+                subtitle={
+                  artist.album_count
+                    ? `${artist.album_count} albums`
+                    : undefined
+                }
               />
             ))}
           </ExploreSectionRail>
@@ -161,11 +172,18 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
   );
 }
 
-export function GenreDetailView({ slug, onBack }: { slug: string; onBack: () => void }) {
+export function GenreDetailView({
+  slug,
+  onBack,
+}: {
+  slug: string;
+  onBack: () => void;
+}) {
   const { data, loading } = useApi<GenreDetail>(`/api/genres/${slug}`);
 
   if (loading) return <ExploreLoadingState />;
-  if (!data) return <p className="text-sm text-muted-foreground">Genre not found.</p>;
+  if (!data)
+    return <p className="text-sm text-muted-foreground">Genre not found.</p>;
 
   return (
     <div className="space-y-6">
@@ -178,7 +196,9 @@ export function GenreDetailView({ slug, onBack }: { slug: string; onBack: () => 
         </button>
         <div>
           <h1 className="text-2xl font-bold">{data.name}</h1>
-          <p className="text-sm text-muted-foreground">{data.artists.length} artists, {data.albums.length} albums</p>
+          <p className="text-sm text-muted-foreground">
+            {data.artists.length} artists, {data.albums.length} albums
+          </p>
         </div>
       </div>
 
@@ -223,8 +243,16 @@ export function GenreDetailView({ slug, onBack }: { slug: string; onBack: () => 
   );
 }
 
-export function DecadeDetailView({ decade, onBack }: { decade: string; onBack: () => void }) {
-  const { data, loading } = useApi<DecadeArtists>(`/api/artists?decade=${decade}&limit=50`);
+export function DecadeDetailView({
+  decade,
+  onBack,
+}: {
+  decade: string;
+  onBack: () => void;
+}) {
+  const { data, loading } = useApi<DecadeArtists>(
+    `/api/artists?decade=${decade}&limit=50`,
+  );
 
   if (loading) return <ExploreLoadingState />;
 
@@ -239,7 +267,9 @@ export function DecadeDetailView({ decade, onBack }: { decade: string; onBack: (
         </button>
         <div>
           <h1 className="text-2xl font-bold">{decade}</h1>
-          <p className="text-sm text-muted-foreground">{data?.total ?? 0} artists</p>
+          <p className="text-sm text-muted-foreground">
+            {data?.total ?? 0} artists
+          </p>
         </div>
       </div>
 
@@ -258,7 +288,9 @@ export function DecadeDetailView({ decade, onBack }: { decade: string; onBack: (
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">No artists found for this decade.</p>
+        <p className="text-sm text-muted-foreground">
+          No artists found for this decade.
+        </p>
       )}
     </div>
   );
@@ -290,8 +322,13 @@ export function PlaylistCategoryView({
 
   async function handleToggleFollow(playlistId: number, isFollowed: boolean) {
     try {
-      await api(`/api/curation/playlists/${playlistId}/follow`, isFollowed ? "DELETE" : "POST");
-      toast.success(isFollowed ? "Removed from your library" : "Added to your library");
+      await api(
+        `/api/curation/playlists/${playlistId}/follow`,
+        isFollowed ? "DELETE" : "POST",
+      );
+      toast.success(
+        isFollowed ? "Removed from your library" : "Added to your library",
+      );
       refetch();
     } catch {
       toast.error("Failed to update playlist");
@@ -311,7 +348,9 @@ export function PlaylistCategoryView({
         </button>
         <div>
           <h1 className="text-2xl font-bold capitalize">{category}</h1>
-          <p className="text-sm text-muted-foreground">{data?.length ?? 0} playlists</p>
+          <p className="text-sm text-muted-foreground">
+            {data?.length ?? 0} playlists
+          </p>
         </div>
       </div>
 
@@ -329,15 +368,21 @@ export function PlaylistCategoryView({
               meta={[
                 playlist.category || null,
                 `${playlist.track_count} tracks`,
-                playlist.follower_count > 0 ? `${playlist.follower_count} followers` : null,
-              ].filter(Boolean).join(" · ")}
+                playlist.follower_count > 0
+                  ? `${playlist.follower_count} followers`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
               systemPlaylist
               crateManaged
               isFollowed={playlist.is_followed}
               layout="grid"
               href={`/curation/playlist/${playlist.id}`}
               onPlay={() => handlePlayPlaylist(playlist.id, playlist.name)}
-              onToggleFollow={() => handleToggleFollow(playlist.id, playlist.is_followed)}
+              onToggleFollow={() =>
+                handleToggleFollow(playlist.id, playlist.is_followed)
+              }
               onClick={() => navigate(`/curation/playlist/${playlist.id}`)}
             />
           ))}

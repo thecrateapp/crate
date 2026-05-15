@@ -7,7 +7,12 @@
 
 import { Gapless5 } from "@/lib/gapless5/gapless5";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
-import { createEqChain, isFlatGains, type EqChain, type EqGains } from "@/lib/equalizer";
+import {
+  createEqChain,
+  isFlatGains,
+  type EqChain,
+  type EqGains,
+} from "@/lib/equalizer";
 import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { getCrossfadeDurationPreference } from "./player-playback-prefs";
 
@@ -39,7 +44,11 @@ export interface GaplessPlayerCallbacks {
   onAllFinished?: () => void;
   onPrev?: (from: string, to: string) => void;
   onNext?: (from: string, to: string) => void;
-  onLoad?: (trackPath: string, fullyLoaded: boolean, durationMs: number) => void;
+  onLoad?: (
+    trackPath: string,
+    fullyLoaded: boolean,
+    durationMs: number,
+  ) => void;
   onError?: (trackPath: string, error: unknown) => void;
   onBuffering?: (trackPath: string) => void;
   onAnalyserReady?: (analyser: AnalyserNode) => void;
@@ -97,7 +106,9 @@ export function isCurrentTrackFullyBuffered(): boolean {
 export function isPlaybackGestureRequiredError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as Partial<PlaybackGestureRequiredError>;
-  return candidate.type === "not_allowed" || candidate.name === "NotAllowedError";
+  return (
+    candidate.type === "not_allowed" || candidate.name === "NotAllowedError"
+  );
 }
 
 function setAnalyser(analyser: AnalyserNode | null) {
@@ -169,17 +180,23 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
-  const probe = typeof document !== "undefined" ? document.createElement("audio") : null;
-  recordDevLog("audio", "runtime capabilities", {
-    useHTML5Audio: true,
-    useWebAudio: !preferHtml5Audio,
-    flac: probe?.canPlayType("audio/flac") || "",
-    xFlac: probe?.canPlayType("audio/x-flac") || "",
-    mp4Aac: probe?.canPlayType('audio/mp4; codecs="mp4a.40.2"') || "",
-    aac: probe?.canPlayType("audio/aac") || "",
-    mp3: probe?.canPlayType("audio/mpeg") || "",
-    wav: probe?.canPlayType("audio/wav") || "",
-  }, "info");
+  const probe =
+    typeof document !== "undefined" ? document.createElement("audio") : null;
+  recordDevLog(
+    "audio",
+    "runtime capabilities",
+    {
+      useHTML5Audio: true,
+      useWebAudio: !preferHtml5Audio,
+      flac: probe?.canPlayType("audio/flac") || "",
+      xFlac: probe?.canPlayType("audio/x-flac") || "",
+      mp4Aac: probe?.canPlayType('audio/mp4; codecs="mp4a.40.2"') || "",
+      aac: probe?.canPlayType("audio/aac") || "",
+      mp3: probe?.canPlayType("audio/mpeg") || "",
+      wav: probe?.canPlayType("audio/wav") || "",
+    },
+    "info",
+  );
 
   instance = new Gapless5({
     useHTML5Audio: true,
@@ -238,7 +255,12 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onerror = (path, err) => {
-    recordDevLog("gapless", "error", { path: redactUrl(path), error: String(err) }, "error");
+    recordDevLog(
+      "gapless",
+      "error",
+      { path: redactUrl(path), error: String(err) },
+      "error",
+    );
     currentCallbacks.onError?.(path, err);
   };
 
@@ -249,10 +271,15 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
 
   instance.onload = (path, fullyLoaded) => {
     const durationMs = getCurrentTrackDuration();
-    recordDevLog("gapless", fullyLoaded ? "loaded webaudio" : "loaded html5", {
-      path: redactUrl(path),
-      durationMs,
-    }, "info");
+    recordDevLog(
+      "gapless",
+      fullyLoaded ? "loaded webaudio" : "loaded html5",
+      {
+        path: redactUrl(path),
+        durationMs,
+      },
+      "info",
+    );
     currentCallbacks.onLoad?.(path, fullyLoaded, durationMs);
     currentCallbacks.onDurationChange?.(durationMs);
   };
@@ -280,7 +307,9 @@ export function destroyPlayer(): void {
     try {
       instance.stop();
       instance.removeAllTracks();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     instance = null;
     currentAnalyser = null;
   }
@@ -294,12 +323,17 @@ export function loadQueue(
   options: { restartIfSameIndex?: boolean } = {},
 ): void {
   if (!instance) return;
-  recordDevLog("gapless", "load queue", {
-    count: urls.length,
-    startIndex,
-    firstUrl: urls[0] ? redactUrl(urls[0]) : null,
-    restartIfSameIndex: options.restartIfSameIndex === true,
-  }, "debug");
+  recordDevLog(
+    "gapless",
+    "load queue",
+    {
+      count: urls.length,
+      startIndex,
+      firstUrl: urls[0] ? redactUrl(urls[0]) : null,
+      restartIfSameIndex: options.restartIfSameIndex === true,
+    },
+    "debug",
+  );
 
   // Idempotent: if the incoming URL list is identical to what the engine
   // already has, don't rebuild the queue — just align the current track.
@@ -379,12 +413,14 @@ export function replaceTrack(index: number, url: string): void {
  * user-initiated play path so the first tap always unlocks audio.
  */
 function ensureContextResumed(): void {
-  const patched = instance as (Gapless5 & {
-    context?: AudioContext;
-    masterOut?: GainNode;
-    _outputChainInput?: AudioNode | null;
-    _outputChainOutput?: AudioNode | null;
-  }) | null;
+  const patched = instance as
+    | (Gapless5 & {
+        context?: AudioContext;
+        masterOut?: GainNode;
+        _outputChainInput?: AudioNode | null;
+        _outputChainOutput?: AudioNode | null;
+      })
+    | null;
   const ctx = patched?.context;
   if (ctx?.state === "closed") {
     const audioWindow = window as unknown as {
@@ -392,7 +428,8 @@ function ensureContextResumed(): void {
       webkitAudioContext?: typeof AudioContext;
       gapless5AudioContext?: AudioContext;
     };
-    const MaybeContext = audioWindow.AudioContext || audioWindow.webkitAudioContext;
+    const MaybeContext =
+      audioWindow.AudioContext || audioWindow.webkitAudioContext;
     if (!MaybeContext || !patched) return;
     const nextContext = new MaybeContext();
     audioWindow.gapless5AudioContext = nextContext;
@@ -444,7 +481,10 @@ export function prev(): void {
  * Jump to an arbitrary track. Does NOT crossfade — use next()/prev()
  * for sequential skips that should respect the crossfade setting.
  */
-export function gotoTrack(indexOrUrl: number | string, forcePlay = false): void {
+export function gotoTrack(
+  indexOrUrl: number | string,
+  forcePlay = false,
+): void {
   if (forcePlay) ensureContextResumed();
   instance?.gotoTrack(indexOrUrl, forcePlay);
 }

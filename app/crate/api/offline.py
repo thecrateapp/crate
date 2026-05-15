@@ -1,12 +1,18 @@
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.offline import OfflineManifestResponse
 from crate.db.repositories.library import (
     get_library_album_by_id,
@@ -17,8 +23,15 @@ from crate.db.repositories.library import (
     get_library_tracks_by_entity_uids,
     get_library_tracks,
 )
-from crate.db.repositories.library_track_reads import get_library_track_by_storage_id, get_library_tracks_by_storage_ids
-from crate.db.repositories.playlists import can_view_playlist, get_playlist, get_playlist_tracks
+from crate.db.repositories.library_track_reads import (
+    get_library_track_by_storage_id,
+    get_library_tracks_by_storage_ids,
+)
+from crate.db.repositories.playlists import (
+    can_view_playlist,
+    get_playlist,
+    get_playlist_tracks,
+)
 
 router = APIRouter(prefix="/api/offline", tags=["offline"])
 
@@ -40,11 +53,15 @@ def _iso(dt: datetime | str | None) -> str | None:
 
 
 def _hash_payload(parts: list[object]) -> str:
-    payload = json.dumps(parts, ensure_ascii=True, sort_keys=False, separators=(",", ":"))
+    payload = json.dumps(
+        parts, ensure_ascii=True, sort_keys=False, separators=(",", ":")
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def _artist_cache_lookup(cache: dict[str, dict | None], artist_name: str | None) -> dict | None:
+def _artist_cache_lookup(
+    cache: dict[str, Mapping[str, Any] | None], artist_name: str | None
+) -> Mapping[str, Any] | None:
     key = (artist_name or "").strip()
     if not key:
         return None
@@ -54,10 +71,10 @@ def _artist_cache_lookup(cache: dict[str, dict | None], artist_name: str | None)
 
 
 def _track_manifest_row(
-    track: dict,
+    track: Mapping[str, Any],
     *,
     album_slug: str | None = None,
-    artist_cache: dict[str, dict | None] | None = None,
+    artist_cache: dict[str, Mapping[str, Any] | None] | None = None,
 ) -> dict:
     artist_cache = artist_cache or {}
     artist_row = _artist_cache_lookup(artist_cache, track.get("artist"))
@@ -65,7 +82,9 @@ def _track_manifest_row(
     raw_storage_id = track.get("storage_id")
     storage_id = None if entity_uid else raw_storage_id
     if not entity_uid and not storage_id:
-        raise HTTPException(status_code=404, detail="Track entity_uid/storage_id missing")
+        raise HTTPException(
+            status_code=404, detail="Track entity_uid/storage_id missing"
+        )
 
     stream_ref = entity_uid or raw_storage_id
     stream_prefix = "by-entity" if entity_uid else "by-storage"
@@ -92,7 +111,7 @@ def _track_manifest_row(
     }
 
 
-def _track_manifest_identity(track: dict) -> str | None:
+def _track_manifest_identity(track: Mapping[str, Any]) -> str | None:
     entity_uid = track.get("entity_uid")
     if entity_uid:
         return str(entity_uid)
@@ -100,9 +119,12 @@ def _track_manifest_identity(track: dict) -> str | None:
     return str(storage_id) if storage_id else None
 
 
-def _build_track_manifest(track: dict) -> dict:
-    album = get_library_album_by_id(track.get("album_id")) if track.get("album_id") else None
-    manifest_track = _track_manifest_row(track, album_slug=album.get("slug") if album else None)
+def _build_track_manifest(track: Mapping[str, Any]) -> dict:
+    album_id = track.get("album_id")
+    album = get_library_album_by_id(int(album_id)) if album_id is not None else None
+    manifest_track = _track_manifest_row(
+        track, album_slug=album.get("slug") if album else None
+    )
     manifest_id = _track_manifest_identity(track)
     parts = [
         manifest_id,
@@ -136,13 +158,28 @@ def _build_track_manifest(track: dict) -> dict:
     }
 
 
-def _build_album_manifest(album: dict, tracks: list[dict]) -> dict:
-    artist_cache: dict[str, dict | None] = {}
-    manifest_tracks = [_track_manifest_row(track, album_slug=album.get("slug"), artist_cache=artist_cache) for track in tracks]
+def _build_album_manifest(
+    album: Mapping[str, Any], tracks: Sequence[Mapping[str, Any]]
+) -> dict:
+    artist_cache: dict[str, Mapping[str, Any] | None] = {}
+    manifest_tracks = [
+        _track_manifest_row(
+            track, album_slug=album.get("slug"), artist_cache=artist_cache
+        )
+        for track in tracks
+    ]
+    updated_values = [
+        str(updated_at)
+        for updated_at in (
+            [track.get("updated_at") for track in manifest_tracks]
+            + [_iso(album.get("updated_at"))]
+        )
+        if updated_at
+    ]
     parts = [
         album.get("id"),
         [_track_manifest_identity(track) for track in tracks],
-        max([track.get("updated_at") for track in manifest_tracks] + [_iso(album.get("updated_at"))]),
+        max(updated_values) if updated_values else None,
     ]
     total_bytes = sum(int(track.get("byte_length") or 0) for track in manifest_tracks)
     return {
@@ -166,19 +203,29 @@ def _build_album_manifest(album: dict, tracks: list[dict]) -> dict:
     }
 
 
-def _build_playlist_manifest(playlist: dict, tracks: list[dict]) -> dict:
-    artist_cache: dict[str, dict | None] = {}
+def _build_playlist_manifest(
+    playlist: Mapping[str, Any], tracks: Sequence[Mapping[str, Any]]
+) -> dict:
+    artist_cache: dict[str, Mapping[str, Any] | None] = {}
     manifest_tracks: list[dict] = []
     version_parts: list[object] = [playlist.get("id")]
     total_bytes = 0
-    entity_uids = [track.get("track_entity_uid") for track in tracks if track.get("track_entity_uid")]
+    entity_uids = [
+        str(track.get("track_entity_uid"))
+        for track in tracks
+        if track.get("track_entity_uid")
+    ]
     storage_ids = [
-        track.get("track_storage_id")
+        str(track.get("track_storage_id"))
         for track in tracks
         if track.get("track_storage_id") and not track.get("track_entity_uid")
     ]
-    tracks_by_entity = get_library_tracks_by_entity_uids(entity_uids) if entity_uids else {}
-    tracks_by_storage = get_library_tracks_by_storage_ids(storage_ids) if storage_ids else {}
+    tracks_by_entity = (
+        get_library_tracks_by_entity_uids(entity_uids) if entity_uids else {}
+    )
+    tracks_by_storage = (
+        get_library_tracks_by_storage_ids(storage_ids) if storage_ids else {}
+    )
 
     for track in tracks:
         entity_uid = track.get("track_entity_uid")
@@ -195,11 +242,21 @@ def _build_playlist_manifest(playlist: dict, tracks: list[dict]) -> dict:
             album_slug=track.get("album_slug"),
             artist_cache=artist_cache,
         )
-        manifest_track["artist_id"] = track.get("artist_id") or manifest_track.get("artist_id")
-        manifest_track["artist_slug"] = track.get("artist_slug") or manifest_track.get("artist_slug")
-        manifest_track["album_id"] = track.get("album_id") or manifest_track.get("album_id")
-        manifest_track["album_slug"] = track.get("album_slug") or manifest_track.get("album_slug")
-        manifest_track["duration"] = track.get("duration") or manifest_track.get("duration")
+        manifest_track["artist_id"] = track.get("artist_id") or manifest_track.get(
+            "artist_id"
+        )
+        manifest_track["artist_slug"] = track.get("artist_slug") or manifest_track.get(
+            "artist_slug"
+        )
+        manifest_track["album_id"] = track.get("album_id") or manifest_track.get(
+            "album_id"
+        )
+        manifest_track["album_slug"] = track.get("album_slug") or manifest_track.get(
+            "album_slug"
+        )
+        manifest_track["duration"] = track.get("duration") or manifest_track.get(
+            "duration"
+        )
         manifest_tracks.append(manifest_track)
         total_bytes += int(manifest_track.get("byte_length") or 0)
         version_parts.append(
@@ -221,7 +278,9 @@ def _build_playlist_manifest(playlist: dict, tracks: list[dict]) -> dict:
         "total_bytes": total_bytes,
         "tracks": manifest_tracks,
         "artwork": {
-            "cover_url": f"/api/playlists/{playlist['id']}/cover" if playlist.get("cover_path") else None,
+            "cover_url": f"/api/playlists/{playlist['id']}/cover"
+            if playlist.get("cover_path")
+            else None,
         },
         "metadata": {
             "playlist_id": playlist.get("id"),
@@ -289,7 +348,9 @@ def get_track_manifest(request: Request, storage_id: str):
         raise HTTPException(status_code=404, detail="Track not found")
     entity_uid = track.get("entity_uid")
     if entity_uid:
-        return RedirectResponse(url=f"/api/offline/tracks/by-entity/{entity_uid}/manifest", status_code=307)
+        return RedirectResponse(
+            url=f"/api/offline/tracks/by-entity/{entity_uid}/manifest", status_code=307
+        )
     return _build_track_manifest(track)
 
 
@@ -324,7 +385,9 @@ def get_playlist_manifest(request: Request, playlist_id: int):
     if user.get("role") != "admin" and not can_view_playlist(playlist, user["id"]):
         raise HTTPException(status_code=403, detail="Playlist is private")
     if playlist.get("generation_mode") == "smart" or playlist.get("is_smart"):
-        raise HTTPException(status_code=409, detail="Offline is only available for static playlists")
+        raise HTTPException(
+            status_code=409, detail="Offline is only available for static playlists"
+        )
 
     tracks = get_playlist_tracks(playlist_id)
     if not tracks:

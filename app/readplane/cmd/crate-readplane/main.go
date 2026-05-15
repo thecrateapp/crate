@@ -25,6 +25,11 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		runHealthcheck()
+		return
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	cfg := config.Load(version)
 	if !cfg.Enabled {
@@ -45,6 +50,17 @@ func main() {
 	if err != nil {
 		logger.Error("failed to configure fallback proxy", "error", err)
 		os.Exit(1)
+	}
+
+	catalog.LoadDefaultTaxonomy()
+	taxonomyPath := os.Getenv("READPLANE_TAXONOMY_PATH")
+	if taxonomyPath == "" {
+		taxonomyPath = "data/librarian/taxonomy.json"
+	}
+	if err := catalog.LoadTaxonomy(taxonomyPath); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warn("failed to load taxonomy override; using built-in defaults", "path", taxonomyPath, "error", err)
+		}
 	}
 
 	authenticator := auth.NewAuthenticator(pool, cfg.JWTSecret, cfg.QueryTimeout)
@@ -74,6 +90,22 @@ func main() {
 	}
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("readplane shutdown failed", "error", err)
+	}
+}
+
+func runHealthcheck() {
+	url := os.Getenv("READPLANE_HEALTHCHECK_URL")
+	if url == "" {
+		url = "http://127.0.0.1:8686/readyz"
+	}
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		os.Exit(1)
 	}
 }
 

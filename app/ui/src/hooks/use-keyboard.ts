@@ -6,11 +6,18 @@ interface KeyboardShortcuts {
   onShowHelp: () => void;
 }
 
-export function useKeyboard({ onFocusSearch, onBlurSearch, onShowHelp }: KeyboardShortcuts) {
+export function useKeyboard({
+  onFocusSearch,
+  onBlurSearch,
+  onShowHelp,
+}: KeyboardShortcuts) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable;
 
       if (e.key === "Escape") {
         onBlurSearch();

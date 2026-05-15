@@ -8,9 +8,10 @@ from crate.db.tx import read_scope
 
 def get_followed_artists(user_id: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     uf.artist_name,
                     uf.created_at,
@@ -25,17 +26,21 @@ def get_followed_artists(user_id: int) -> list[dict]:
                 WHERE uf.user_id = :user_id
                 ORDER BY uf.created_at DESC
                 """
-            ),
-            {"user_id": user_id},
-        ).mappings().all()
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_saved_albums(user_id: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     usa.created_at AS saved_at,
                     la.id,
@@ -56,35 +61,51 @@ def get_saved_albums(user_id: int) -> list[dict]:
                 WHERE usa.user_id = :user_id
                 ORDER BY usa.created_at DESC
                 """
-            ),
-            {"user_id": user_id},
-        ).mappings().all()
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def is_following(user_id: int, artist_name: str) -> bool:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT 1 FROM user_follows WHERE user_id = :user_id AND artist_name = :artist_name"),
-            {"user_id": user_id, "artist_name": artist_name},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT 1 FROM user_follows WHERE user_id = :user_id AND artist_name = :artist_name"
+                ),
+                {"user_id": user_id, "artist_name": artist_name},
+            )
+            .mappings()
+            .first()
+        )
     return row is not None
 
 
 def is_album_saved(user_id: int, album_id: int) -> bool:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT 1 FROM user_saved_albums WHERE user_id = :user_id AND album_id = :album_id"),
-            {"user_id": user_id, "album_id": album_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT 1 FROM user_saved_albums WHERE user_id = :user_id AND album_id = :album_id"
+                ),
+                {"user_id": user_id, "album_id": album_id},
+            )
+            .mappings()
+            .first()
+        )
     return row is not None
 
 
 def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     ult.track_id,
                     lt.entity_uid AS track_entity_uid,
@@ -115,9 +136,12 @@ def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
                 ORDER BY ult.created_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     payload = [dict(row) for row in rows]
     for item in payload:
         if item.get("track_entity_uid") is not None:
@@ -134,27 +158,37 @@ def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
 
 def is_track_liked(user_id: int, track_id: int) -> bool:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT 1 FROM user_liked_tracks WHERE user_id = :user_id AND track_id = :track_id"),
-            {"user_id": user_id, "track_id": track_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT 1 FROM user_liked_tracks WHERE user_id = :user_id AND track_id = :track_id"
+                ),
+                {"user_id": user_id, "track_id": track_id},
+            )
+            .mappings()
+            .first()
+        )
     return row is not None
 
 
 def get_user_library_counts(user_id: int) -> dict:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     (SELECT COUNT(*) FROM user_follows WHERE user_id = :uid1) AS followed_artists,
                     (SELECT COUNT(*) FROM user_saved_albums WHERE user_id = :uid2) AS saved_albums,
                     (SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = :uid3) AS liked_tracks,
                     (SELECT COUNT(*) FROM playlists WHERE user_id = :uid4) AS playlists
                 """
-            ),
-            {"uid1": user_id, "uid2": user_id, "uid3": user_id, "uid4": user_id},
-        ).mappings().first()
+                ),
+                {"uid1": user_id, "uid2": user_id, "uid3": user_id, "uid4": user_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row or {})
 
 

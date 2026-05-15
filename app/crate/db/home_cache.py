@@ -5,6 +5,7 @@ import secrets
 import time
 from collections.abc import Callable
 from threading import Event, Lock
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ def _get_or_compute_home_cache(
 ) -> dict:
     from crate.db.cache_store import get_cache, set_cache
 
-    def _close_wait_pubsub(pubsub: object | None, channel: str) -> None:
+    def _close_wait_pubsub(pubsub: Any | None, channel: str) -> None:
         if pubsub is None:
             return
         try:
@@ -60,16 +61,18 @@ def _get_or_compute_home_cache(
         except Exception:
             log.debug("Failed to close home cache pubsub", exc_info=True)
 
-    def _wait_for_cached_value(*, redis_client: object | None = None) -> dict | None:
+    def _wait_for_cached_value(*, redis_client: Any | None = None) -> dict | None:
         deadline = time.time() + wait_timeout_seconds
         poll_sleep_seconds = 0.1
         channel = _home_cache_ready_channel(cache_key)
-        pubsub = None
+        pubsub: Any | None = None
 
         if redis_client is not None:
             try:
-                pubsub = redis_client.pubsub()
-                pubsub.subscribe(channel)
+                candidate_pubsub = redis_client.pubsub()
+                if candidate_pubsub is not None:
+                    candidate_pubsub.subscribe(channel)
+                    pubsub = candidate_pubsub
             except Exception:
                 pubsub = None
 
@@ -101,23 +104,25 @@ def _get_or_compute_home_cache(
         finally:
             _close_wait_pubsub(pubsub, channel)
 
-    def _acquire_distributed_lock() -> tuple[object, str, str] | None | bool:
-        from crate.db.cache_runtime import _get_redis
+    def _acquire_distributed_lock() -> tuple[Any, str, str] | None | bool:
+        from crate.db.cache_runtime import get_redis
 
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if not redis_client:
             return None
         lock_key = f"lock:{cache_key}"
         token = secrets.token_urlsafe(12)
         try:
-            acquired = redis_client.set(lock_key, token, ex=max(int(wait_timeout_seconds) + 5, 15), nx=True)
+            acquired = redis_client.set(
+                lock_key, token, ex=max(int(wait_timeout_seconds) + 5, 15), nx=True
+            )
         except Exception:
             return None
         if acquired:
             return redis_client, lock_key, token
         return False
 
-    def _release_distributed_lock(lock_state: tuple[object, str, str] | None):
+    def _release_distributed_lock(lock_state: tuple[Any, str, str] | None):
         if not lock_state:
             return
         redis_client, lock_key, token = lock_state
@@ -136,7 +141,7 @@ def _get_or_compute_home_cache(
         except Exception:
             return
 
-    def _publish_cache_ready(lock_state: tuple[object, str, str] | None):
+    def _publish_cache_ready(lock_state: tuple[Any, str, str] | None):
         if not lock_state:
             return
         redis_client, _, _ = lock_state
@@ -153,13 +158,14 @@ def _get_or_compute_home_cache(
     _record_home_metric("home.cache.miss", cache_key=cache_key)
 
     is_owner = False
-    wait_event: Event
     with _home_cache_singleflight_guard:
-        wait_event = _home_cache_singleflight_events.get(cache_key)
-        if wait_event is None:
+        existing_event = _home_cache_singleflight_events.get(cache_key)
+        if existing_event is None:
             wait_event = Event()
             _home_cache_singleflight_events[cache_key] = wait_event
             is_owner = True
+        else:
+            wait_event = existing_event
 
     if not is_owner:
         if wait_event.wait(wait_timeout_seconds):
@@ -174,9 +180,9 @@ def _get_or_compute_home_cache(
 
     distributed_lock = _acquire_distributed_lock()
     if distributed_lock is False:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        waited = _wait_for_cached_value(redis_client=_get_redis())
+        waited = _wait_for_cached_value(redis_client=get_redis())
         if waited is not None:
             _record_home_metric("home.cache.waited", cache_key=cache_key)
             return waited

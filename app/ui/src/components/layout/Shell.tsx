@@ -1,10 +1,22 @@
-import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  type CSSProperties,
+} from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { VisuallyHidden } from "radix-ui";
 
 import { Button } from "@crate/ui/shadcn/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@crate/ui/shadcn/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@crate/ui/shadcn/dialog";
 import { Sheet, SheetContent, SheetTitle } from "@crate/ui/shadcn/sheet";
 import { useKeyboard } from "@/hooks/use-keyboard";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -26,7 +38,9 @@ export function Shell() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarExpanded, setSidebarExpanded] = useState(getStoredSidebarExpanded);
+  const [sidebarExpanded, setSidebarExpanded] = useState(
+    getStoredSidebarExpanded,
+  );
 
   const focusSearch = useCallback(() => {
     searchInputRef.current?.focus();
@@ -70,11 +84,16 @@ export function Shell() {
   const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-[4.5rem]";
   const desktopHeaderOffsetClass = overlayHeader ? "md:pt-0" : "md:pt-24";
   const shellStyle = {
-    "--sidebar-w": sidebarExpanded ? `${SIDEBAR_EXPANDED_WIDTH}px` : `${SIDEBAR_COLLAPSED_WIDTH}px`,
+    "--sidebar-w": sidebarExpanded
+      ? `${SIDEBAR_EXPANDED_WIDTH}px`
+      : `${SIDEBAR_COLLAPSED_WIDTH}px`,
   } as CSSProperties;
 
   return (
-    <div className="min-h-screen bg-app-surface text-foreground [--sidebar-w:0px]" style={shellStyle}>
+    <div
+      className="min-h-screen bg-app-surface text-foreground [--sidebar-w:0px]"
+      style={shellStyle}
+    >
       <div className="hidden md:block">
         <Sidebar />
       </div>
@@ -87,7 +106,11 @@ export function Shell() {
       </div>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-[240px] p-0" showCloseButton={false}>
+        <SheetContent
+          side="left"
+          className="w-[240px] p-0"
+          showCloseButton={false}
+        >
           <VisuallyHidden.Root>
             <SheetTitle>Navigation</SheetTitle>
           </VisuallyHidden.Root>
@@ -126,8 +149,18 @@ export function Shell() {
         </div>
       </div>
 
-      <main className={`overflow-x-hidden transition-all duration-200 ${sidebarWidthClass}`}>
-        <div className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${overlayHeader ? "md:px-0" : sidebarExpanded ? "md:px-6 lg:px-8" : "md:px-10 lg:px-12"} ${desktopHeaderOffsetClass}`}>
+      <main
+        className={`overflow-x-hidden transition-all duration-200 ${sidebarWidthClass}`}
+      >
+        <div
+          className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${
+            overlayHeader
+              ? "md:px-0"
+              : sidebarExpanded
+                ? "md:px-6 lg:px-8"
+                : "md:px-10 lg:px-12"
+          } ${desktopHeaderOffsetClass}`}
+        >
           <div key={location.pathname} className="animate-page-in">
             <Outlet />
           </div>
@@ -140,7 +173,9 @@ export function Shell() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Keyboard Shortcuts</DialogTitle>
-            <DialogDescription>Navigate the admin console quickly with your keyboard.</DialogDescription>
+            <DialogDescription>
+              Navigate the admin console quickly with your keyboard.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 text-sm">
             <Shortcut keys={["/"]} label="Focus search" />

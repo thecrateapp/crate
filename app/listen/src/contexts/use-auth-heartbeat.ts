@@ -15,7 +15,9 @@ export function useAuthHeartbeat(user: AuthUser | null) {
       const now = Date.now();
       if (!force && now - lastHeartbeatAtRef.current < 55_000) return;
       lastHeartbeatAtRef.current = now;
-      await api("/api/auth/heartbeat", "POST", { app_id: getListenAppPlatform() }).catch(() => {});
+      await api("/api/auth/heartbeat", "POST", {
+        app_id: getListenAppPlatform(),
+      }).catch(() => {});
     }
 
     const timer = window.setInterval(() => {

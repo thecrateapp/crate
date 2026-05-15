@@ -439,7 +439,7 @@ does not show hot lookup paths that filter on those columns alone:
 
 In other words: these are schema-level FK gaps, but not compelling performance gaps today.
 
-By contrast, the app-facing FK coverage that *did* matter is now covered by `010`, including:
+By contrast, the app-facing FK coverage that _did_ matter is now covered by `010`, including:
 
 - `favorites.user_id`
 - `playlists.user_id`

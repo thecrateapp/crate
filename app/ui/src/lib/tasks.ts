@@ -10,13 +10,16 @@ interface TaskDetailResponse extends TaskCompletion {
 
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "cancelled"]);
 
-async function fetchTaskCompletion(taskId: string, signal?: AbortSignal): Promise<TaskCompletion | null> {
+async function fetchTaskCompletion(
+  taskId: string,
+  signal?: AbortSignal,
+): Promise<TaskCompletion | null> {
   const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
     credentials: "include",
     signal,
   });
   if (!response.ok) return null;
-  const payload = await response.json() as TaskDetailResponse;
+  const payload = (await response.json()) as TaskDetailResponse;
   if (!TERMINAL_TASK_STATUSES.has(String(payload.status || ""))) return null;
   return {
     status: payload.status,
@@ -25,7 +28,11 @@ async function fetchTaskCompletion(taskId: string, signal?: AbortSignal): Promis
   };
 }
 
-export function waitForTask(taskId: string, timeoutMs = 120000, signal?: AbortSignal): Promise<TaskCompletion> {
+export function waitForTask(
+  taskId: string,
+  timeoutMs = 120000,
+  signal?: AbortSignal,
+): Promise<TaskCompletion> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const source = new EventSource(`/api/events/task/${taskId}`);
@@ -44,7 +51,7 @@ export function waitForTask(taskId: string, timeoutMs = 120000, signal?: AbortSi
       if (settled) return;
       settled = true;
       window.clearTimeout(timeout);
-       if (pollTimer != null) {
+      if (pollTimer != null) {
         window.clearTimeout(pollTimer);
         pollTimer = null;
       }
@@ -62,7 +69,8 @@ export function waitForTask(taskId: string, timeoutMs = 120000, signal?: AbortSi
         })
         .catch((error: unknown) => {
           if (settled) return;
-          if (error instanceof DOMException && error.name === "AbortError") return;
+          if (error instanceof DOMException && error.name === "AbortError")
+            return;
           // Ignore transient polling failures; SSE may still complete the flow.
         })
         .finally(() => {

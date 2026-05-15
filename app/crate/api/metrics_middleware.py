@@ -15,18 +15,30 @@ log = logging.getLogger(__name__)
 _PATH_NORMALIZERS = [
     (re.compile(r"/api/tracks/(\d+)"), "/api/tracks/{id}"),
     (re.compile(r"/api/tracks/by-entity/[^/]+"), "/api/tracks/by-entity/{entity_uid}"),
-    (re.compile(r"/api/tracks/by-storage/[^/]+"), "/api/tracks/by-storage/{storage_id}"),
+    (
+        re.compile(r"/api/tracks/by-storage/[^/]+"),
+        "/api/tracks/by-storage/{storage_id}",
+    ),
     (re.compile(r"/api/albums/(\d+)"), "/api/albums/{id}"),
     (re.compile(r"/api/albums/by-entity/[^/]+"), "/api/albums/by-entity/{entity_uid}"),
     (re.compile(r"/api/artists/(\d+)"), "/api/artists/{id}"),
-    (re.compile(r"/api/artists/by-entity/[^/]+"), "/api/artists/by-entity/{entity_uid}"),
+    (
+        re.compile(r"/api/artists/by-entity/[^/]+"),
+        "/api/artists/by-entity/{entity_uid}",
+    ),
     (re.compile(r"/api/playlists/(\d+)"), "/api/playlists/{id}"),
     (re.compile(r"/api/genres/[^/]+"), "/api/genres/{slug}"),
     (re.compile(r"/api/tasks/[a-f0-9]+"), "/api/tasks/{id}"),
     (re.compile(r"/api/curation/playlists/(\d+)"), "/api/curation/playlists/{id}"),
     (re.compile(r"/api/manage/artists/(\d+)"), "/api/manage/artists/{id}"),
-    (re.compile(r"/api/manage/artists/by-entity/[^/]+"), "/api/manage/artists/by-entity/{entity_uid}"),
-    (re.compile(r"/api/manage/albums/by-entity/[^/]+"), "/api/manage/albums/by-entity/{entity_uid}"),
+    (
+        re.compile(r"/api/manage/artists/by-entity/[^/]+"),
+        "/api/manage/artists/by-entity/{entity_uid}",
+    ),
+    (
+        re.compile(r"/api/manage/albums/by-entity/[^/]+"),
+        "/api/manage/albums/by-entity/{entity_uid}",
+    ),
     (re.compile(r"/api/stream/.+"), "/api/stream/{path}"),
     (re.compile(r"/api/me/home/section/.+"), "/api/me/home/section/{id}"),
     (re.compile(r"/api/events/task/[a-f0-9]+"), "/api/events/task/{id}"),
@@ -63,9 +75,13 @@ def _should_skip_metrics(path: str) -> bool:
         return True
     if path.startswith("/api/tracks/") and path.endswith(("/stream", "/download")):
         return True
-    if path.startswith("/api/tracks/by-entity/") and path.endswith(("/stream", "/download")):
+    if path.startswith("/api/tracks/by-entity/") and path.endswith(
+        ("/stream", "/download")
+    ):
         return True
-    if path.startswith("/api/tracks/by-storage/") and path.endswith(("/stream", "/download")):
+    if path.startswith("/api/tracks/by-storage/") and path.endswith(
+        ("/stream", "/download")
+    ):
         return True
     if path.startswith("/api/albums/") and path.endswith("/download"):
         return True
@@ -82,7 +98,9 @@ def _get_header(headers: list[tuple[bytes, bytes]] | None, name: str) -> str | N
     return None
 
 
-def _classify_metric_target(path: str, headers: list[tuple[bytes, bytes]] | None) -> str | None:
+def _classify_metric_target(
+    path: str, headers: list[tuple[bytes, bytes]] | None
+) -> str | None:
     if _should_skip_metrics(path):
         return None
     content_type = (_get_header(headers, "content-type") or "").lower()
@@ -126,13 +144,20 @@ class MetricsMiddleware:
             if message["type"] == "http.response.start":
                 status_code = int(message["status"])
                 response_headers = message.get("headers", [])
-                if _classify_metric_target(path, response_headers) == "stream" and not stream_started:
+                if (
+                    _classify_metric_target(path, response_headers) == "stream"
+                    and not stream_started
+                ):
                     stream_started = True
                     concurrent = _increment_active_streams()
                     record_later(
                         _STREAM_CONCURRENT_METRIC,
                         float(concurrent),
-                        {"method": scope.get("method", "GET"), "path": normalized_path, "status": str(status_code)},
+                        {
+                            "method": scope.get("method", "GET"),
+                            "path": normalized_path,
+                            "status": str(status_code),
+                        },
                     )
             await send(message)
 
@@ -144,9 +169,19 @@ class MetricsMiddleware:
                 record_later(
                     _STREAM_CONCURRENT_METRIC,
                     float(concurrent),
-                    {"method": scope.get("method", "GET"), "path": normalized_path, "status": str(status_code)},
+                    {
+                        "method": scope.get("method", "GET"),
+                        "path": normalized_path,
+                        "status": str(status_code),
+                    },
                 )
-            self._record(scope, path, status_code, (time.monotonic() - start) * 1000, response_headers)
+            self._record(
+                scope,
+                path,
+                status_code,
+                (time.monotonic() - start) * 1000,
+                response_headers,
+            )
             raise
 
         if stream_started:
@@ -154,10 +189,20 @@ class MetricsMiddleware:
             record_later(
                 _STREAM_CONCURRENT_METRIC,
                 float(concurrent),
-                {"method": scope.get("method", "GET"), "path": normalized_path, "status": str(status_code)},
+                {
+                    "method": scope.get("method", "GET"),
+                    "path": normalized_path,
+                    "status": str(status_code),
+                },
             )
 
-        self._record(scope, path, status_code, (time.monotonic() - start) * 1000, response_headers)
+        self._record(
+            scope,
+            path,
+            status_code,
+            (time.monotonic() - start) * 1000,
+            response_headers,
+        )
 
     def _record(
         self,
@@ -172,7 +217,11 @@ class MetricsMiddleware:
             return
 
         template = _normalize_path(path)
-        tags = {"method": scope.get("method", "GET"), "path": template, "status": str(status_code)}
+        tags = {
+            "method": scope.get("method", "GET"),
+            "path": template,
+            "status": str(status_code),
+        }
 
         if target == "stream":
             record_counter_later(_STREAM_REQUESTS_METRIC, tags)

@@ -61,7 +61,9 @@ func (s *Server) homeSlice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpx.MarkReadplane(w, "hit")
-	httpx.WriteJSON(w, http.StatusOK, homeSlicePayload(row, def))
+	if err := httpx.WriteJSON(w, http.StatusOK, homeSlicePayload(row, def)); err != nil {
+		_ = httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
+	}
 }
 
 func homeSlicePayload(row *snapshots.Row, def homeSliceDef) any {

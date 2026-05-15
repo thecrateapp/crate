@@ -20,6 +20,7 @@ class PlaylistTrackInput(IdentityFieldsMixin):
     track_id: int | None = None
     libraryTrackId: int | None = None
 
+
 class CreatePlaylistRequest(BaseModel):
     name: str
     description: str = ""

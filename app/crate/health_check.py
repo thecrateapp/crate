@@ -6,7 +6,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from crate.audio import read_tags
-from crate.db.health import upsert_health_issue, resolve_stale_artist_issues, resolve_stale_issues
+from crate.db.health import (
+    upsert_health_issue,
+    resolve_stale_artist_issues,
+    resolve_stale_issues,
+)
 from crate.db.queries.health import (
     get_albums_with_year,
     get_all_albums,
@@ -24,10 +28,17 @@ from crate.db.queries.health import (
     get_zombie_artists,
 )
 from crate.db.repositories.library import get_library_artist
-from crate.repair_catalog import REPAIR_CATALOG, REPAIR_CATALOG_BY_CHECK, RepairCatalogEntry
+from crate.repair_catalog import (
+    REPAIR_CATALOG,
+    REPAIR_CATALOG_BY_CHECK,
+    RepairCatalogEntry,
+)
 from crate.storage_layout import looks_like_entity_uid
 from crate.utils import PHOTO_NAMES, normalize_key
-from crate.worker_handlers.migration import build_artist_layout_fix_issue, preview_fix_artist
+from crate.worker_handlers.migration import (
+    build_artist_layout_fix_issue,
+    preview_fix_artist,
+)
 
 log = logging.getLogger(__name__)
 
@@ -44,7 +55,9 @@ class LibraryHealthCheck:
         )
 
     def run(self, progress_callback=None, persist: bool = True) -> dict:
-        return self._run_entries(REPAIR_CATALOG, progress_callback=progress_callback, persist=persist)
+        return self._run_entries(
+            REPAIR_CATALOG, progress_callback=progress_callback, persist=persist
+        )
 
     def run_selected(
         self,
@@ -58,7 +71,9 @@ class LibraryHealthCheck:
             entry = REPAIR_CATALOG_BY_CHECK.get(str(check_type))
             if entry is not None:
                 selected.append(entry)
-        return self._run_entries(selected, progress_callback=progress_callback, persist=persist)
+        return self._run_entries(
+            selected, progress_callback=progress_callback, persist=persist
+        )
 
     def run_selected_for_artists(
         self,
@@ -80,25 +95,46 @@ class LibraryHealthCheck:
         total = max(1, len(selected) * max(1, len(artists)))
         done = 0
         for check_type in selected:
-            entry = REPAIR_CATALOG_BY_CHECK[check_type]
             for artist_name in artists:
                 if progress_callback:
-                    progress_callback({"check": check_type, "artist": artist_name, "done": done, "total": total})
+                    progress_callback(
+                        {
+                            "check": check_type,
+                            "artist": artist_name,
+                            "done": done,
+                            "total": total,
+                        }
+                    )
                 if check_type == "artist_layout_fix":
-                    issues.extend(self._check_artist_layout_fix_for_artists([artist_name]))
+                    issues.extend(
+                        self._check_artist_layout_fix_for_artists([artist_name])
+                    )
                 else:
-                    log.debug("No artist-scoped revalidation implemented for %s", check_type)
+                    log.debug(
+                        "No artist-scoped revalidation implemented for %s", check_type
+                    )
                 done += 1
                 if progress_callback:
-                    progress_callback({"check": check_type, "artist": artist_name, "done": done, "total": total})
+                    progress_callback(
+                        {
+                            "check": check_type,
+                            "artist": artist_name,
+                            "done": done,
+                            "total": total,
+                        }
+                    )
 
         if persist:
             self._persist_targeted_issues(issues)
             descriptions_by_check: dict[str, set[str]] = defaultdict(set)
             for issue in issues:
-                descriptions_by_check[issue["check"]].add(self._issue_description(issue))
+                descriptions_by_check[issue["check"]].add(
+                    self._issue_description(issue)
+                )
             for check_type in selected:
-                resolve_stale_artist_issues(descriptions_by_check.get(check_type, set()), check_type, artists)
+                resolve_stale_artist_issues(
+                    descriptions_by_check.get(check_type, set()), check_type, artists
+                )
 
         summary: dict[str, int] = {}
         for issue in issues:
@@ -114,7 +150,9 @@ class LibraryHealthCheck:
             "artist_count": len(artists),
         }
 
-    def _persist_issues(self, issues: list[dict], entries: list[RepairCatalogEntry]) -> None:
+    def _persist_issues(
+        self, issues: list[dict], entries: list[RepairCatalogEntry]
+    ) -> None:
         by_type: dict[str, set[str]] = defaultdict(set)
         for issue in issues:
             desc = self._issue_description(issue)
@@ -142,19 +180,30 @@ class LibraryHealthCheck:
             )
 
     def _issue_description(self, issue: dict) -> str:
-        return issue.get("description") or str(issue.get("details", {})).replace("{", "").replace("}", "").replace("'", "")[:200]
+        return (
+            issue.get("description")
+            or str(issue.get("details", {}))
+            .replace("{", "")
+            .replace("}", "")
+            .replace("'", "")[:200]
+        )
 
-    def _run_entries(self, entries: list[RepairCatalogEntry] | tuple[RepairCatalogEntry, ...], *, progress_callback=None, persist: bool = True) -> dict:
+    def _run_entries(
+        self,
+        entries: list[RepairCatalogEntry] | tuple[RepairCatalogEntry, ...],
+        *,
+        progress_callback=None,
+        persist: bool = True,
+    ) -> dict:
         start = time.monotonic()
         issues = []
-        checks = [
-            (entry, getattr(self, entry.scanner_method))
-            for entry in entries
-        ]
+        checks = [(entry, getattr(self, entry.scanner_method)) for entry in entries]
 
         for i, (entry, check_fn) in enumerate(checks):
             if progress_callback:
-                progress_callback({"check": entry.check_type, "done": i, "total": len(checks)})
+                progress_callback(
+                    {"check": entry.check_type, "done": i, "total": len(checks)}
+                )
             try:
                 found = [self._normalize_issue(entry, issue) for issue in check_fn()]
                 issues.extend(found)
@@ -210,12 +259,14 @@ class LibraryHealthCheck:
         issues = []
         for norm, folders in groups.items():
             if len(folders) > 1:
-                issues.append({
-                    "check": "duplicate_folders",
-                    "severity": "high",
-                    "auto_fixable": True,
-                    "details": {"folders": sorted(folders), "normalized": norm},
-                })
+                issues.append(
+                    {
+                        "check": "duplicate_folders",
+                        "severity": "high",
+                        "auto_fixable": True,
+                        "details": {"folders": sorted(folders), "normalized": norm},
+                    }
+                )
         return issues
 
     def _check_canonical_mismatch(self) -> list[dict]:
@@ -229,16 +280,18 @@ class LibraryHealthCheck:
                 continue
             tag_name = self._first_audio_albumartist(folder_path)
             if tag_name and tag_name != db_name:
-                issues.append({
-                    "check": "canonical_mismatch",
-                    "severity": "medium",
-                    "auto_fixable": True,
-                    "details": {
-                        "artist": db_name,
-                        "folder": folder_name,
-                        "tag_name": tag_name,
-                    },
-                })
+                issues.append(
+                    {
+                        "check": "canonical_mismatch",
+                        "severity": "medium",
+                        "auto_fixable": True,
+                        "details": {
+                            "artist": db_name,
+                            "folder": folder_name,
+                            "tag_name": tag_name,
+                        },
+                    }
+                )
         return issues
 
     def _check_artist_layout_fix(self) -> list[dict]:
@@ -258,7 +311,9 @@ class LibraryHealthCheck:
                 issues.append(issue)
         return issues
 
-    def _check_artist_layout_fix_for_artists(self, artist_names: list[str]) -> list[dict]:
+    def _check_artist_layout_fix_for_artists(
+        self, artist_names: list[str]
+    ) -> list[dict]:
         issues = []
         preview_config = {
             "library_path": str(self.library_path),
@@ -275,7 +330,11 @@ class LibraryHealthCheck:
                 continue
             issue = build_artist_layout_fix_issue(preview)
             if issue:
-                issues.append(self._normalize_issue(REPAIR_CATALOG_BY_CHECK["artist_layout_fix"], issue))
+                issues.append(
+                    self._normalize_issue(
+                        REPAIR_CATALOG_BY_CHECK["artist_layout_fix"], issue
+                    )
+                )
         return issues
 
     def _check_fk_orphan_albums(self) -> list[dict]:
@@ -285,7 +344,11 @@ class LibraryHealthCheck:
                 "check": "fk_orphan_albums",
                 "severity": "critical",
                 "auto_fixable": True,
-                "details": {"album": r["name"], "artist": r["artist"], "path": r["path"]},
+                "details": {
+                    "album": r["name"],
+                    "artist": r["artist"],
+                    "path": r["path"],
+                },
             }
             for r in rows
         ]
@@ -309,12 +372,17 @@ class LibraryHealthCheck:
             folder = row["folder_name"] or row["name"]
             expected = self.library_path / folder
             if not expected.is_dir():
-                issues.append({
-                    "check": "stale_artists",
-                    "severity": "medium",
-                    "auto_fixable": True,
-                    "details": {"artist": row["name"], "expected_path": str(expected)},
-                })
+                issues.append(
+                    {
+                        "check": "stale_artists",
+                        "severity": "medium",
+                        "auto_fixable": True,
+                        "details": {
+                            "artist": row["name"],
+                            "expected_path": str(expected),
+                        },
+                    }
+                )
         return issues
 
     def _check_stale_albums(self) -> list[dict]:
@@ -322,16 +390,18 @@ class LibraryHealthCheck:
         issues = []
         for row in albums:
             if not Path(row["path"]).is_dir():
-                issues.append({
-                    "check": "stale_albums",
-                    "severity": "medium",
-                    "auto_fixable": True,
-                    "details": {
-                        "album": row["name"],
-                        "artist": row["artist"],
-                        "path": row["path"],
-                    },
-                })
+                issues.append(
+                    {
+                        "check": "stale_albums",
+                        "severity": "medium",
+                        "auto_fixable": True,
+                        "details": {
+                            "album": row["name"],
+                            "artist": row["artist"],
+                            "path": row["path"],
+                        },
+                    }
+                )
         return issues
 
     def _check_stale_tracks(self) -> list[dict]:
@@ -339,12 +409,14 @@ class LibraryHealthCheck:
         issues = []
         for row in tracks:
             if not Path(row["path"]).is_file():
-                issues.append({
-                    "check": "stale_tracks",
-                    "severity": "low",
-                    "auto_fixable": True,
-                    "details": {"track_path": row["path"], "artist": row["artist"]},
-                })
+                issues.append(
+                    {
+                        "check": "stale_tracks",
+                        "severity": "low",
+                        "auto_fixable": True,
+                        "details": {"track_path": row["path"], "artist": row["artist"]},
+                    }
+                )
         return issues
 
     def _check_zombie_artists(self) -> list[dict]:
@@ -367,21 +439,21 @@ class LibraryHealthCheck:
             artist_dir = self.library_path / folder
             if not artist_dir.is_dir():
                 continue
-            fs_has_photo = any(
-                (artist_dir / p).is_file() for p in PHOTO_NAMES
-            )
+            fs_has_photo = any((artist_dir / p).is_file() for p in PHOTO_NAMES)
             db_has_photo = bool(row["has_photo"])
             if fs_has_photo != db_has_photo:
-                issues.append({
-                    "check": "has_photo_desync",
-                    "severity": "low",
-                    "auto_fixable": True,
-                    "details": {
-                        "artist": row["name"],
-                        "db_has_photo": db_has_photo,
-                        "fs_has_photo": fs_has_photo,
-                    },
-                })
+                issues.append(
+                    {
+                        "check": "has_photo_desync",
+                        "severity": "low",
+                        "auto_fixable": True,
+                        "details": {
+                            "artist": row["name"],
+                            "db_has_photo": db_has_photo,
+                            "fs_has_photo": fs_has_photo,
+                        },
+                    }
+                )
         return issues
 
     def _check_duplicate_albums(self) -> list[dict]:
@@ -427,7 +499,10 @@ class LibraryHealthCheck:
 
         unindexed_by_dir: dict[str, int] = defaultdict(int)
         for audio_file in self.library_path.rglob("*"):
-            if not audio_file.is_file() or audio_file.suffix.lower() not in self.extensions:
+            if (
+                not audio_file.is_file()
+                or audio_file.suffix.lower() not in self.extensions
+            ):
                 continue
             # Skip hidden dirs and trash
             if any(part.startswith(".") for part in audio_file.parts):
@@ -456,16 +531,18 @@ class LibraryHealthCheck:
             tags = read_tags(track_path)
             tag_artist = tags.get("albumartist")
             if tag_artist and tag_artist != row["artist"]:
-                issues.append({
-                    "check": "tag_mismatch",
-                    "severity": "medium",
-                    "auto_fixable": True,
-                    "details": {
-                        "track_path": row["path"],
-                        "db_artist": row["artist"],
-                        "tag_artist": tag_artist,
-                    },
-                })
+                issues.append(
+                    {
+                        "check": "tag_mismatch",
+                        "severity": "medium",
+                        "auto_fixable": True,
+                        "details": {
+                            "track_path": row["path"],
+                            "db_artist": row["artist"],
+                            "tag_artist": tag_artist,
+                        },
+                    }
+                )
         return issues
 
     def _check_folder_naming(self) -> list[dict]:
@@ -509,27 +586,31 @@ class LibraryHealthCheck:
 
             # Determine what's wrong
             if m:
-                reason = f"Year prefix in folder name — should be under {year}/ subdirectory"
+                reason = (
+                    f"Year prefix in folder name — should be under {year}/ subdirectory"
+                )
             elif current_dir.parent == artist_dir:
                 reason = f"Album directly under artist — should be under {year}/ subdirectory"
             else:
-                reason = f"Unexpected structure"
+                reason = "Unexpected structure"
 
-            issues.append({
-                "check": "folder_naming",
-                "severity": "low",
-                "auto_fixable": True,
-                "details": {
-                    "artist": artist,
-                    "current_folder": folder_name,
-                    "clean_name": clean_name,
-                    "year": year,
-                    "current_path": str(current_dir),
-                    "expected_path": str(expected_dir),
-                    "reason": reason,
-                    "path": album_path,
-                },
-            })
+            issues.append(
+                {
+                    "check": "folder_naming",
+                    "severity": "low",
+                    "auto_fixable": True,
+                    "details": {
+                        "artist": artist,
+                        "current_folder": folder_name,
+                        "clean_name": clean_name,
+                        "year": year,
+                        "current_path": str(current_dir),
+                        "expected_path": str(expected_dir),
+                        "reason": reason,
+                        "path": album_path,
+                    },
+                }
+            )
 
         return issues
 
@@ -569,7 +650,8 @@ class LibraryHealthCheck:
                 if not f.is_file() or f.suffix.lower() not in self.extensions:
                     continue
                 try:
-                    audio = mutagen.File(f)
+                    mutagen_file = getattr(mutagen, "File")
+                    audio = mutagen_file(f)
                 except Exception:
                     return False
                 if audio is None:
@@ -581,7 +663,9 @@ class LibraryHealthCheck:
                 tags = getattr(audio, "tags", None)
                 if tags:
                     try:
-                        keys = list(tags.keys()) if hasattr(tags, "keys") else list(tags)
+                        keys = (
+                            list(tags.keys()) if hasattr(tags, "keys") else list(tags)
+                        )
                     except Exception:
                         return False
                     for key in keys:
@@ -602,9 +686,7 @@ class LibraryHealthCheck:
         executor = ThreadPoolExecutor(max_workers=8)
         budget_seconds = max(60.0, len(candidates) * 0.5)
         try:
-            futures = {
-                executor.submit(_has_embedded, c["_dir"]): c for c in candidates
-            }
+            futures = {executor.submit(_has_embedded, c["_dir"]): c for c in candidates}
             done, not_done = wait(futures.keys(), timeout=budget_seconds)
         finally:
             # Don't wait for stragglers; if a mutagen call hung, the thread
@@ -633,16 +715,18 @@ class LibraryHealthCheck:
             if has_cover:
                 continue
             album_dir = row["_dir"]
-            issues.append({
-                "check": "missing_cover",
-                "severity": "low",
-                "auto_fixable": True,
-                "description": f"Missing cover: {row['artist']} / {row['name']}",
-                "details": {
-                    "artist": row["artist"],
-                    "album": row["name"],
-                    "path": str(album_dir),
-                },
-            })
+            issues.append(
+                {
+                    "check": "missing_cover",
+                    "severity": "low",
+                    "auto_fixable": True,
+                    "description": f"Missing cover: {row['artist']} / {row['name']}",
+                    "details": {
+                        "artist": row["artist"],
+                        "album": row["name"],
+                        "path": str(album_dir),
+                    },
+                }
+            )
 
         return issues

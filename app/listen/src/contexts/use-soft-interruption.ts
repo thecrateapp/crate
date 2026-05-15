@@ -21,7 +21,8 @@ const RECOVERY_RETRY_MS = 3000;
 const STREAM_PROBE_TIMEOUT_MS = 4000;
 const SOFT_PAUSE_FADE_MS = 220;
 
-export const PLAYBACK_NEEDS_USER_GESTURE_EVENT = "crate:playback-needs-user-gesture";
+export const PLAYBACK_NEEDS_USER_GESTURE_EVENT =
+  "crate:playback-needs-user-gesture";
 
 interface UseSoftInterruptionOptions {
   currentTrackRef: MutableRefObject<Track | undefined>;
@@ -86,82 +87,92 @@ export function useSoftInterruption({
     }
   }, []);
 
-  const probeCurrentTrackAvailability = useCallback(async (): Promise<boolean> => {
-    const track = currentTrackRef.current;
-    if (!track) return false;
+  const probeCurrentTrackAvailability =
+    useCallback(async (): Promise<boolean> => {
+      const track = currentTrackRef.current;
+      if (!track) return false;
 
-    const online = await isRuntimeOnline();
-    if (!online) return false;
+      const online = await isRuntimeOnline();
+      if (!online) return false;
 
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), STREAM_PROBE_TIMEOUT_MS);
-    try {
-      const response = await fetch(getStreamUrl(track), {
-        method: "GET",
-        headers: { Range: "bytes=0-0" },
-        credentials: "include",
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      response.body?.cancel().catch(() => {});
-      return response.ok || response.status === 206;
-    } catch {
-      return false;
-    } finally {
-      window.clearTimeout(timeout);
-    }
-  }, [currentTrackRef]);
-
-  const scheduleRecoveryCheck = useCallback((delay: number = RECOVERY_RETRY_MS) => {
-    clearRecoveryTimer();
-    if (!shouldAutoResumeAfterInterruptionRef.current) return;
-    recoveryTimerRef.current = window.setTimeout(() => {
-      void maybeResumeRef.current();
-    }, delay);
-  }, [clearRecoveryTimer]);
-
-  const beginSoftInterruption = useCallback((reason: "offline" | "stream") => {
-    if (!currentTrackRef.current) return;
-    // The audio is already in RAM — no network dependency. Interrupting
-    // would pause a perfectly-playing track. Defensive guard so every
-    // caller (offline event, error, stall timer) is consistent.
-    if (isCurrentTrackFullyBuffered()) return;
-    if (softInterruptionReasonRef.current) {
-      // Upgrade to "offline" if a stream interruption is later revealed
-      // to be a network issue.
-      if (reason === "offline") {
-        softInterruptionReasonRef.current = reason;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(
+        () => controller.abort(),
+        STREAM_PROBE_TIMEOUT_MS,
+      );
+      try {
+        const response = await fetch(getStreamUrl(track), {
+          method: "GET",
+          headers: { Range: "bytes=0-0" },
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        response.body?.cancel().catch(() => {});
+        return response.ok || response.status === 206;
+      } catch {
+        return false;
+      } finally {
+        window.clearTimeout(timeout);
       }
+    }, [currentTrackRef]);
+
+  const scheduleRecoveryCheck = useCallback(
+    (delay: number = RECOVERY_RETRY_MS) => {
+      clearRecoveryTimer();
+      if (!shouldAutoResumeAfterInterruptionRef.current) return;
+      recoveryTimerRef.current = window.setTimeout(() => {
+        void maybeResumeRef.current();
+      }, delay);
+    },
+    [clearRecoveryTimer],
+  );
+
+  const beginSoftInterruption = useCallback(
+    (reason: "offline" | "stream") => {
+      if (!currentTrackRef.current) return;
+      // The audio is already in RAM — no network dependency. Interrupting
+      // would pause a perfectly-playing track. Defensive guard so every
+      // caller (offline event, error, stall timer) is consistent.
+      if (isCurrentTrackFullyBuffered()) return;
+      if (softInterruptionReasonRef.current) {
+        // Upgrade to "offline" if a stream interruption is later revealed
+        // to be a network issue.
+        if (reason === "offline") {
+          softInterruptionReasonRef.current = reason;
+        }
+        scheduleRecoveryCheck(reason === "offline" ? 0 : RECOVERY_RETRY_MS);
+        return;
+      }
+
+      softInterruptionReasonRef.current = reason;
+      shouldAutoResumeAfterInterruptionRef.current = true;
+      recoveryProbeInFlightRef.current = false;
+      clearStallTimer();
+      clearRecoveryTimer();
+      bufferingIntentRef.current = false;
+      commitIsBuffering(true);
+
+      if (shouldUseAndroidNativePlayer()) {
+        void androidNativeEngine.pause().catch(() => {});
+      } else if (isPlayingRef.current) {
+        void gpFadeOutAndPause(SOFT_PAUSE_FADE_MS).catch(() => {});
+      } else {
+        gpPause();
+      }
+
       scheduleRecoveryCheck(reason === "offline" ? 0 : RECOVERY_RETRY_MS);
-      return;
-    }
-
-    softInterruptionReasonRef.current = reason;
-    shouldAutoResumeAfterInterruptionRef.current = true;
-    recoveryProbeInFlightRef.current = false;
-    clearStallTimer();
-    clearRecoveryTimer();
-    bufferingIntentRef.current = false;
-    commitIsBuffering(true);
-
-    if (shouldUseAndroidNativePlayer()) {
-      void androidNativeEngine.pause().catch(() => {});
-    } else if (isPlayingRef.current) {
-      void gpFadeOutAndPause(SOFT_PAUSE_FADE_MS).catch(() => {});
-    } else {
-      gpPause();
-    }
-
-    scheduleRecoveryCheck(reason === "offline" ? 0 : RECOVERY_RETRY_MS);
-  }, [
-    bufferingIntentRef,
-    clearRecoveryTimer,
-    clearStallTimer,
-    commitIsBuffering,
-    currentTrackRef,
-    isPlayingRef,
-    scheduleRecoveryCheck,
-  ]);
+    },
+    [
+      bufferingIntentRef,
+      clearRecoveryTimer,
+      clearStallTimer,
+      commitIsBuffering,
+      currentTrackRef,
+      isPlayingRef,
+      scheduleRecoveryCheck,
+    ],
+  );
 
   const cancelSoftInterruption = useCallback(() => {
     softInterruptionReasonRef.current = null;
@@ -215,14 +226,29 @@ export function useSoftInterruption({
 
   const scheduleStallProtection = useCallback(() => {
     clearStallTimer();
-    if (bufferingIntentRef.current || !isPlayingRef.current || softInterruptionReasonRef.current) return;
+    if (
+      bufferingIntentRef.current ||
+      !isPlayingRef.current ||
+      softInterruptionReasonRef.current
+    )
+      return;
     stallTimerRef.current = window.setTimeout(() => {
-      if (bufferingIntentRef.current || !isPlayingRef.current || softInterruptionReasonRef.current) return;
+      if (
+        bufferingIntentRef.current ||
+        !isPlayingRef.current ||
+        softInterruptionReasonRef.current
+      )
+        return;
       void isRuntimeOnline().then((online) => {
         beginSoftInterruption(online ? "stream" : "offline");
       });
     }, STREAM_STALL_GRACE_MS);
-  }, [beginSoftInterruption, bufferingIntentRef, clearStallTimer, isPlayingRef]);
+  }, [
+    beginSoftInterruption,
+    bufferingIntentRef,
+    clearStallTimer,
+    isPlayingRef,
+  ]);
 
   maybeResumeRef.current = async () => {
     if (!shouldAutoResumeAfterInterruptionRef.current) return;
@@ -282,16 +308,34 @@ export function useSoftInterruption({
 
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleRestored);
-    window.addEventListener("crate:network-restored", handleRestored as EventListener);
-    window.addEventListener("crate:app-paused", handleAppPaused as EventListener);
-    window.addEventListener("crate:app-resumed", handleAppResumed as EventListener);
+    window.addEventListener(
+      "crate:network-restored",
+      handleRestored as EventListener,
+    );
+    window.addEventListener(
+      "crate:app-paused",
+      handleAppPaused as EventListener,
+    );
+    window.addEventListener(
+      "crate:app-resumed",
+      handleAppResumed as EventListener,
+    );
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleRestored);
-      window.removeEventListener("crate:network-restored", handleRestored as EventListener);
-      window.removeEventListener("crate:app-paused", handleAppPaused as EventListener);
-      window.removeEventListener("crate:app-resumed", handleAppResumed as EventListener);
+      window.removeEventListener(
+        "crate:network-restored",
+        handleRestored as EventListener,
+      );
+      window.removeEventListener(
+        "crate:app-paused",
+        handleAppPaused as EventListener,
+      );
+      window.removeEventListener(
+        "crate:app-resumed",
+        handleAppResumed as EventListener,
+      );
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [
@@ -304,10 +348,13 @@ export function useSoftInterruption({
   ]);
 
   // Cleanup timers on unmount.
-  useEffect(() => () => {
-    clearStallTimer();
-    clearRecoveryTimer();
-  }, [clearRecoveryTimer, clearStallTimer]);
+  useEffect(
+    () => () => {
+      clearStallTimer();
+      clearRecoveryTimer();
+    },
+    [clearRecoveryTimer, clearStallTimer],
+  );
 
   const isSoftInterrupted = useCallback(
     () => softInterruptionReasonRef.current !== null,

@@ -11,7 +11,7 @@ def get_artists_count(joins: str, where_sql: str, params: dict) -> int:
         count_expr = "COUNT(DISTINCT la.name)" if joins.strip() else "COUNT(*)"
         count_sql = f"SELECT {count_expr} AS cnt FROM library_artists la {joins} WHERE {where_sql}"
         row = session.execute(text(count_sql), params).mappings().first()
-        return row["cnt"]
+        return int(row["cnt"] or 0) if row is not None else 0
 
 
 def get_artists_page(

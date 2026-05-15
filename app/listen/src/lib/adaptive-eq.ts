@@ -51,23 +51,21 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
   const { brightness, loudness, dynamicRange, energy, acousticness } = features;
 
   const dynamicRangeScale =
-    typeof dynamicRange === "number" && dynamicRange > 14
-      ? 0.35
-      : 1;
+    typeof dynamicRange === "number" && dynamicRange > 14 ? 0.35 : 1;
 
   // Brightness correction — tilt the upper shelf toward neutral.
   if (typeof brightness === "number") {
     if (brightness < 0.25) {
       // Dark track — lift air & presence so the mix opens up.
-      add(7, 1.5);  // 4K
-      add(8, 2);    // 8K
-      add(9, 1.5);  // 16K
+      add(7, 1.5); // 4K
+      add(8, 2); // 8K
+      add(9, 1.5); // 16K
     } else if (brightness < 0.4) {
-      add(8, 1);    // gentle 8K lift
+      add(8, 1); // gentle 8K lift
     } else if (brightness > 0.7) {
       // Already sharp — tame before it gets fatiguing.
       add(7, -1.5); // 4K
-      add(8, -2);   // 8K
+      add(8, -2); // 8K
     } else if (brightness > 0.55) {
       add(8, -1);
     }
@@ -77,12 +75,12 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
   if (typeof energy === "number") {
     if (energy > 0.7) {
       // High-energy mix — reinforce kick punch without muddying.
-      add(0, 1);    // 32  (sub weight)
-      add(1, 1.5);  // 64  (kick body)
+      add(0, 1); // 32  (sub weight)
+      add(1, 1.5); // 64  (kick body)
       add(4, -0.5); // 500 (keep mid clean)
     } else if (energy < 0.3) {
       // Mellow/ambient — gentle warmth in low-mids.
-      add(3, 1);    // 250
+      add(3, 1); // 250
     }
   }
 
@@ -95,8 +93,8 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
       add(6, -0.5); // 2K
     } else if (loudness < -20) {
       // Quiet / dynamic — small boost to parity.
-      add(4, 0.5);  // 500
-      add(5, 0.5);  // 1K
+      add(4, 0.5); // 500
+      add(5, 0.5); // 1K
     }
   }
 
@@ -108,7 +106,7 @@ export function computeAdaptiveGains(features: EqFeatures | null): EqGains {
 
   // Acoustic material — warmth over sparkle.
   if (typeof acousticness === "number" && acousticness > 0.6) {
-    add(3, 1);   // 250 (body of guitars/piano)
+    add(3, 1); // 250 (body of guitars/piano)
     add(7, -0.5); // 4K (ease the pick attack / transients)
   }
 

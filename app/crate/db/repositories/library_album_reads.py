@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryAlbum
-from crate.db.repositories.library_shared import album_to_dict
+from crate.db.repositories.library_shared import album_to_dict, LibraryAlbumRow
 from crate.db.tx import read_scope
 
 
@@ -15,13 +15,19 @@ def get_library_albums(
     include_quarantined: bool = False,
     *,
     session: Session | None = None,
-) -> list[dict]:
-    def impl(s: Session) -> list[dict]:
-        stmt = select(LibraryAlbum).where(func.lower(LibraryAlbum.artist) == func.lower(artist))
+) -> list[LibraryAlbumRow]:
+    def impl(s: Session) -> list[LibraryAlbumRow]:
+        stmt = select(LibraryAlbum).where(
+            func.lower(LibraryAlbum.artist) == func.lower(artist)
+        )
         if not include_quarantined:
             stmt = stmt.where(LibraryAlbum.quarantined_at.is_(None))
-        rows = s.execute(stmt.order_by(LibraryAlbum.year, LibraryAlbum.name)).scalars().all()
-        return [album_to_dict(row) for row in rows]
+        rows = (
+            s.execute(stmt.order_by(LibraryAlbum.year, LibraryAlbum.name))
+            .scalars()
+            .all()
+        )
+        return [album for row in rows if (album := album_to_dict(row)) is not None]
 
     if session is not None:
         return impl(session)
@@ -29,13 +35,17 @@ def get_library_albums(
         return impl(s)
 
 
-def get_library_album(artist: str, album: str, *, session: Session | None = None) -> dict | None:
-    def impl(s: Session) -> dict | None:
+def get_library_album(
+    artist: str, album: str, *, session: Session | None = None
+) -> LibraryAlbumRow | None:
+    def impl(s: Session) -> LibraryAlbumRow | None:
         row = s.execute(
-            select(LibraryAlbum).where(
+            select(LibraryAlbum)
+            .where(
                 func.lower(LibraryAlbum.artist) == func.lower(artist),
                 func.lower(LibraryAlbum.name) == func.lower(album),
-            ).limit(1)
+            )
+            .limit(1)
         ).scalar_one_or_none()
         return album_to_dict(row)
 
@@ -45,8 +55,10 @@ def get_library_album(artist: str, album: str, *, session: Session | None = None
         return impl(s)
 
 
-def get_library_album_by_id(album_id: int, *, session: Session | None = None) -> dict | None:
-    def impl(s: Session) -> dict | None:
+def get_library_album_by_id(
+    album_id: int, *, session: Session | None = None
+) -> LibraryAlbumRow | None:
+    def impl(s: Session) -> LibraryAlbumRow | None:
         row = s.get(LibraryAlbum, album_id)
         return album_to_dict(row)
 
@@ -56,16 +68,15 @@ def get_library_album_by_id(album_id: int, *, session: Session | None = None) ->
         return impl(s)
 
 
-def get_library_album_by_entity_uid(album_entity_uid: str, *, session: Session | None = None) -> dict | None:
-    def impl(s: Session) -> dict | None:
-        row = (
-            s.execute(
-                select(LibraryAlbum)
-                .where(LibraryAlbum.entity_uid == album_entity_uid)
-                .limit(1)
-            )
-            .scalar_one_or_none()
-        )
+def get_library_album_by_entity_uid(
+    album_entity_uid: str, *, session: Session | None = None
+) -> LibraryAlbumRow | None:
+    def impl(s: Session) -> LibraryAlbumRow | None:
+        row = s.execute(
+            select(LibraryAlbum)
+            .where(LibraryAlbum.entity_uid == album_entity_uid)
+            .limit(1)
+        ).scalar_one_or_none()
         return album_to_dict(row)
 
     if session is not None:

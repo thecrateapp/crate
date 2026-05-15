@@ -90,7 +90,10 @@ function serializeBodyKey(body: unknown): string {
   if (body == null) return "";
   if (body instanceof FormData) {
     return Array.from(body.entries())
-      .map(([key, value]) => `${key}:${typeof value === "string" ? value : value.name}`)
+      .map(
+        ([key, value]) =>
+          `${key}:${typeof value === "string" ? value : value.name}`,
+      )
       .join("&");
   }
   try {

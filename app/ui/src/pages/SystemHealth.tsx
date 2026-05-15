@@ -17,7 +17,11 @@ import {
   Zap,
 } from "lucide-react";
 
-import { OpsPageHero, OpsPanel, OpsStatTile } from "@/components/admin/ops-surfaces";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+} from "@/components/admin/ops-surfaces";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { useApi } from "@/hooks/use-api";
@@ -122,7 +126,13 @@ interface SystemMetrics {
     analysis?: { pending: number; done: number; failed: number };
     bliss?: { pending: number; done: number; failed: number };
   };
-  load: { load_1m: number; load_5m: number; load_15m: number; cpu_count: number; load_percent: number };
+  load: {
+    load_1m: number;
+    load_5m: number;
+    load_15m: number;
+    cpu_count: number;
+    load_percent: number;
+  };
   resource_pressure?: ResourcePressure;
   media_worker?: MediaWorkerRuntime;
 }
@@ -134,7 +144,12 @@ interface MediaWorkerRuntime {
   stream_length: number;
   pending: number;
   max_active: number;
-  active_slots: Array<{ slot: number; key: string; job_id: string; ttl_ms: number }>;
+  active_slots: Array<{
+    slot: number;
+    key: string;
+    job_id: string;
+    ttl_ms: number;
+  }>;
   recent_events?: Array<{
     id: string;
     job_id?: string | null;
@@ -246,7 +261,9 @@ function formatBytes(bytes: number | null | undefined) {
     size /= 1024;
     unitIndex += 1;
   }
-  return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+  return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${
+    units[unitIndex]
+  }`;
 }
 
 function formatMs(value: number | null | undefined) {
@@ -271,7 +288,9 @@ function ChartTooltip({
 }) {
   return (
     <div className="min-w-[180px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-cyan-200/65">Metric slice</div>
+      <div className="text-[10px] uppercase tracking-[0.14em] text-cyan-200/65">
+        Metric slice
+      </div>
       <div className="mt-2 font-medium text-white">{title}</div>
       <div className="mt-3 space-y-1.5">
         {items.map((item) => (
@@ -288,15 +307,13 @@ function ChartTooltip({
   );
 }
 
-function HealthSignal({
-  score,
-  summary,
-}: {
-  score: number;
-  summary: string;
-}) {
+function HealthSignal({ score, summary }: { score: number; summary: string }) {
   const color =
-    score >= 80 ? "text-emerald-300" : score >= 50 ? "text-amber-200" : "text-red-200";
+    score >= 80
+      ? "text-emerald-300"
+      : score >= 50
+        ? "text-amber-200"
+        : "text-red-200";
   const bg =
     score >= 80
       ? "border-emerald-400/25 bg-emerald-500/[0.08]"
@@ -305,14 +322,20 @@ function HealthSignal({
         : "border-red-400/25 bg-red-500/[0.08]";
 
   return (
-    <div className={`rounded-md border px-5 py-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)] ${bg}`}>
+    <div
+      className={`rounded-md border px-5 py-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)] ${bg}`}
+    >
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-black/20">
           <Gauge size={20} className={color} />
         </div>
         <div>
-          <div className={`text-3xl font-bold tabular-nums ${color}`}>{score}</div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">Health Score</div>
+          <div className={`text-3xl font-bold tabular-nums ${color}`}>
+            {score}
+          </div>
+          <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
+            Health Score
+          </div>
         </div>
       </div>
       <div className="mt-3 text-xs text-white/45">{summary}</div>
@@ -337,7 +360,9 @@ function ResourceCard({
         <Icon size={12} />
         {label}
       </div>
-      <div className="mt-2 text-lg font-semibold text-white tabular-nums">{value}</div>
+      <div className="mt-2 text-lg font-semibold text-white tabular-nums">
+        {value}
+      </div>
       <div className="mt-3 space-y-2">{children}</div>
     </div>
   );
@@ -360,11 +385,16 @@ function ProgressBar({
       {label ? (
         <div className="flex min-w-0 justify-between gap-2 text-[11px]">
           <span className="min-w-0 truncate text-white/40">{label}</span>
-          <span className="shrink-0 text-white/60 tabular-nums">{pct.toFixed(0)}%</span>
+          <span className="shrink-0 text-white/60 tabular-nums">
+            {pct.toFixed(0)}%
+          </span>
         </div>
       ) : null}
       <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-full transition-all ${color}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -384,7 +414,10 @@ function MetricChart({
   const { chartData, tickValues } = useMemo(() => {
     if (!data?.length) return { chartData: [], tickValues: [] as string[] };
     const labels = data.map((point) =>
-      new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      new Date(point.timestamp).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     );
     const maxTicks = 6;
     const step = Math.max(1, Math.floor(labels.length / maxTicks));
@@ -415,7 +448,9 @@ function MetricChart({
     return (
       <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
         <div className="mb-2 text-sm font-medium text-white">{title}</div>
-        <div className="flex h-48 items-center justify-center text-sm text-white/30">No data yet</div>
+        <div className="flex h-48 items-center justify-center text-sm text-white/30">
+          No data yet
+        </div>
       </div>
     );
   }
@@ -430,7 +465,12 @@ function MetricChart({
           xScale={{ type: "point" }}
           yScale={{ type: "linear", min: 0, max: "auto" }}
           curve="monotoneX"
-          colors={["#06b6d4", "rgba(6,182,212,0.3)", "#f59e0b", "rgba(245,158,11,0.3)"]}
+          colors={[
+            "#06b6d4",
+            "rgba(6,182,212,0.3)",
+            "#f59e0b",
+            "rgba(245,158,11,0.3)",
+          ]}
           lineWidth={2}
           pointSize={0}
           enableArea={true}
@@ -481,13 +521,19 @@ function MetricChart({
 function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
   const visibleRoutes = routes.slice(0, 8);
   const maxP95 = Math.max(1, ...visibleRoutes.map((route) => route.p95 || 0));
-  const totalRequests = routes.reduce((acc, route) => acc + (route.count || 0), 0);
+  const totalRequests = routes.reduce(
+    (acc, route) => acc + (route.count || 0),
+    0,
+  );
   const slowest = visibleRoutes[0];
   const highestP99 = visibleRoutes.reduce<RouteLatencyRow | null>(
     (current, route) => (!current || route.p99 > current.p99 ? route : current),
     null,
   );
-  const failing = routes.reduce((acc, route) => acc + (route.status_5xx || 0), 0);
+  const failing = routes.reduce(
+    (acc, route) => acc + (route.status_5xx || 0),
+    0,
+  );
 
   return (
     <OpsPanel
@@ -508,14 +554,22 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
             icon={Clock}
             label="Slowest p95"
             value={formatMs(slowest?.p95)}
-            caption={slowest ? `${slowest.method} ${slowest.path}` : "Waiting for route samples"}
+            caption={
+              slowest
+                ? `${slowest.method} ${slowest.path}`
+                : "Waiting for route samples"
+            }
             tone={slowest && slowest.p95 > 1000 ? "warning" : "default"}
           />
           <OpsStatTile
             icon={Gauge}
             label="Highest p99"
             value={formatMs(highestP99?.p99)}
-            caption={highestP99 ? `${highestP99.method} ${highestP99.path}` : "Waiting for route samples"}
+            caption={
+              highestP99
+                ? `${highestP99.method} ${highestP99.path}`
+                : "Waiting for route samples"
+            }
             tone={highestP99 && highestP99.p99 > 3000 ? "warning" : "default"}
           />
           <OpsStatTile
@@ -533,36 +587,77 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               {visibleRoutes.map((route) => {
                 const isSlow = route.p95 >= 1000;
                 const isVerySlow = route.p95 >= 3000 || route.error_rate > 0.01;
-                const barColor = isVerySlow ? "bg-red-400" : isSlow ? "bg-amber-400" : "bg-cyan-400";
+                const barColor = isVerySlow
+                  ? "bg-red-400"
+                  : isSlow
+                    ? "bg-amber-400"
+                    : "bg-cyan-400";
 
                 return (
-                  <div key={route.route_id} className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center">
+                  <div
+                    key={route.route_id}
+                    className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center"
+                  >
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-center gap-2">
-                        <CrateChip className="shrink-0 font-mono">{route.method}</CrateChip>
-                        <span className="min-w-0 truncate font-mono text-sm text-white/85">{route.path}</span>
+                        <CrateChip className="shrink-0 font-mono">
+                          {route.method}
+                        </CrateChip>
+                        <span className="min-w-0 truncate font-mono text-sm text-white/85">
+                          {route.path}
+                        </span>
                       </div>
                       <div className="mt-2 max-w-xl">
-                        <ProgressBar value={route.p95} max={maxP95} color={barColor} />
+                        <ProgressBar
+                          value={route.p95}
+                          max={maxP95}
+                          color={barColor}
+                        />
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">Count</span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">{route.count.toLocaleString()}</span>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                        Count
+                      </span>
+                      <span className="text-sm font-medium tabular-nums text-white/75">
+                        {route.count.toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">Avg</span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">{formatMs(route.avg)}</span>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                        Avg
+                      </span>
+                      <span className="text-sm font-medium tabular-nums text-white/75">
+                        {formatMs(route.avg)}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">p95 / p99</span>
-                      <span className={`text-sm font-medium tabular-nums ${isVerySlow ? "text-red-100" : isSlow ? "text-amber-100" : "text-white/80"}`}>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                        p95 / p99
+                      </span>
+                      <span
+                        className={`text-sm font-medium tabular-nums ${
+                          isVerySlow
+                            ? "text-red-100"
+                            : isSlow
+                              ? "text-amber-100"
+                              : "text-white/80"
+                        }`}
+                      >
                         {formatMs(route.p95)} · {formatMs(route.p99)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">5xx</span>
-                      <span className={`text-sm font-medium tabular-nums ${route.error_rate > 0 ? "text-red-100" : "text-white/65"}`}>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                        5xx
+                      </span>
+                      <span
+                        className={`text-sm font-medium tabular-nums ${
+                          route.error_rate > 0
+                            ? "text-red-100"
+                            : "text-white/65"
+                        }`}
+                      >
                         {formatRouteErrorRate(route.error_rate)}
                       </span>
                     </div>
@@ -604,9 +699,16 @@ function PlaybackTranscodingOverview({
   ];
   const completed = completedSummary?.count ?? 0;
   const failed = failedSummary?.count ?? 0;
-  const failRate = completed + failed > 0 ? (failed / (completed + failed)) * 100 : 0;
-  const avgTranscode = durationSummary && durationSummary.count > 0 ? `${durationSummary.avg.toFixed(1)}s` : "—";
-  const avgPrepare = stats?.avg_prepare_seconds != null ? `${stats.avg_prepare_seconds.toFixed(1)}s` : "—";
+  const failRate =
+    completed + failed > 0 ? (failed / (completed + failed)) * 100 : 0;
+  const avgTranscode =
+    durationSummary && durationSummary.count > 0
+      ? `${durationSummary.avg.toFixed(1)}s`
+      : "—";
+  const avgPrepare =
+    stats?.avg_prepare_seconds != null
+      ? `${stats.avg_prepare_seconds.toFixed(1)}s`
+      : "—";
 
   return (
     <OpsPanel
@@ -620,7 +722,11 @@ function PlaybackTranscodingOverview({
             icon={Headphones}
             label="Lossless Coverage"
             value={stats ? `${stats.coverage_percent}%` : "—"}
-            caption={stats ? `${stats.ready_tracks.toLocaleString()} / ${stats.lossless_tracks.toLocaleString()} tracks` : "Waiting for cache stats"}
+            caption={
+              stats
+                ? `${stats.ready_tracks.toLocaleString()} / ${stats.lossless_tracks.toLocaleString()} tracks`
+                : "Waiting for cache stats"
+            }
             tone={stats && stats.coverage_percent > 0 ? "success" : "default"}
           />
           <OpsStatTile
@@ -634,7 +740,9 @@ function PlaybackTranscodingOverview({
             icon={HardDrive}
             label="Cache Size"
             value={formatBytes(stats?.cached_bytes)}
-            caption={`${formatBytes(stats?.estimated_saved_bytes)} avoided vs source`}
+            caption={`${formatBytes(
+              stats?.estimated_saved_bytes,
+            )} avoided vs source`}
           />
           <OpsStatTile
             icon={Clock}
@@ -647,7 +755,9 @@ function PlaybackTranscodingOverview({
             label="Transcode Failures"
             value={`${failRate.toFixed(0)}%`}
             caption={`${failed} failed / ${completed} completed samples`}
-            tone={failRate > 5 || (stats?.failed ?? 0) > 0 ? "warning" : "default"}
+            tone={
+              failRate > 5 || (stats?.failed ?? 0) > 0 ? "warning" : "default"
+            }
           />
         </div>
 
@@ -655,10 +765,17 @@ function PlaybackTranscodingOverview({
           <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-white">Variant Status</div>
-                <div className="mt-1 text-xs text-white/35">{(stats?.variants ?? 0).toLocaleString()} cached variant records</div>
+                <div className="text-sm font-medium text-white">
+                  Variant Status
+                </div>
+                <div className="mt-1 text-xs text-white/35">
+                  {(stats?.variants ?? 0).toLocaleString()} cached variant
+                  records
+                </div>
               </div>
-              <CrateChip>{(stats?.variant_tracks ?? 0).toLocaleString()} tracks</CrateChip>
+              <CrateChip>
+                {(stats?.variant_tracks ?? 0).toLocaleString()} tracks
+              </CrateChip>
             </div>
             <div className="space-y-3">
               {statuses.map((status) => (
@@ -676,21 +793,34 @@ function PlaybackTranscodingOverview({
           <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-medium text-white">Recent Variants</div>
-                <div className="mt-1 text-xs text-white/35">Latest playback cache writes and retries.</div>
+                <div className="text-sm font-medium text-white">
+                  Recent Variants
+                </div>
+                <div className="mt-1 text-xs text-white/35">
+                  Latest playback cache writes and retries.
+                </div>
               </div>
-              <CrateChip>{(stats?.hires_tracks ?? 0).toLocaleString()} hi-res sources</CrateChip>
+              <CrateChip>
+                {(stats?.hires_tracks ?? 0).toLocaleString()} hi-res sources
+              </CrateChip>
             </div>
             <div className="space-y-2">
               {(delivery?.recent_variants ?? []).length > 0 ? (
                 delivery?.recent_variants.map((variant) => (
-                  <div key={variant.id} className="flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.03] px-3 py-2">
+                  <div
+                    key={variant.id}
+                    className="flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.03] px-3 py-2"
+                  >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm text-white/80">
-                        {[variant.artist, variant.title].filter(Boolean).join(" - ") || variant.id}
+                        {[variant.artist, variant.title]
+                          .filter(Boolean)
+                          .join(" - ") || variant.id}
                       </div>
                       <div className="mt-0.5 text-xs text-white/35">
-                        {variant.preset} · {variant.delivery_format} {variant.delivery_bitrate}k · {formatBytes(variant.bytes)}
+                        {variant.preset} · {variant.delivery_format}{" "}
+                        {variant.delivery_bitrate}k ·{" "}
+                        {formatBytes(variant.bytes)}
                       </div>
                     </div>
                     <CrateChip
@@ -723,9 +853,10 @@ export function SystemHealth() {
   const [period, setPeriod] = useState<Period>("minute");
   const minutes = period === "minute" ? 60 : 1440;
 
-  const { data: dashboard, refetch: refetchDashboard } = useApi<SystemHealthDashboardResponse>(
-    `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
-  );
+  const { data: dashboard, refetch: refetchDashboard } =
+    useApi<SystemHealthDashboardResponse>(
+      `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
+    );
 
   const summary = dashboard?.summary ?? null;
   const system = dashboard?.system ?? null;
@@ -735,14 +866,18 @@ export function SystemHealth() {
   const errorsTs = dashboard?.timeseries?.["api.errors"] ?? [];
   const apiSlowTs = dashboard?.timeseries?.["api.slow"] ?? [];
   const streamTs = dashboard?.timeseries?.["stream.requests"] ?? [];
-  const transcodeDurationTs = dashboard?.timeseries?.["stream.transcode.duration"] ?? [];
+  const transcodeDurationTs =
+    dashboard?.timeseries?.["stream.transcode.duration"] ?? [];
   const homeComputeTs = dashboard?.timeseries?.["home.compute.ms"] ?? [];
-  const homeEndpointComputeTs = dashboard?.timeseries?.["home.endpoint_compute.ms"] ?? [];
+  const homeEndpointComputeTs =
+    dashboard?.timeseries?.["home.endpoint_compute.ms"] ?? [];
   const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
   const taskDurationTs = dashboard?.timeseries?.["worker.task.duration"] ?? [];
   const queueWaitTs = dashboard?.timeseries?.["worker.queue.wait"] ?? [];
-  const resourceDeferredTs = dashboard?.timeseries?.["worker.resource.deferred"] ?? [];
-  const resourceLoadTs = dashboard?.timeseries?.["worker.resource.load_ratio"] ?? [];
+  const resourceDeferredTs =
+    dashboard?.timeseries?.["worker.resource.deferred"] ?? [];
+  const resourceLoadTs =
+    dashboard?.timeseries?.["worker.resource.load_ratio"] ?? [];
   const playbackDelivery = dashboard?.playback_delivery;
   const routeLatency = dashboard?.route_latency ?? [];
 
@@ -756,23 +891,37 @@ export function SystemHealth() {
       else if (errRate > 0.01) next -= 5;
     }
     if (system?.load?.load_percent && system.load.load_percent > 80) next -= 10;
-    if (system?.db_pool?.checked_out && system.db_pool.checked_out >= (system.db_pool.size || 8)) next -= 10;
-    if (system?.resource_pressure && !system.resource_pressure.allowed) next -= 10;
+    if (
+      system?.db_pool?.checked_out &&
+      system.db_pool.checked_out >= (system.db_pool.size || 8)
+    )
+      next -= 10;
+    if (system?.resource_pressure && !system.resource_pressure.allowed)
+      next -= 10;
     return Math.max(0, next);
   }, [summary, system]);
 
   const errorRate =
     summary && summary.api_requests.count > 0
-      ? (summary.api_errors.count / summary.api_requests.count * 100).toFixed(2)
+      ? ((summary.api_errors.count / summary.api_requests.count) * 100).toFixed(
+          2,
+        )
       : "0";
-  const homeCacheTotal = (summary?.home_cache_hit.count ?? 0) + (summary?.home_cache_miss.count ?? 0);
+  const homeCacheTotal =
+    (summary?.home_cache_hit.count ?? 0) +
+    (summary?.home_cache_miss.count ?? 0);
   const homeCacheHitRate =
-    homeCacheTotal > 0 ? ((summary?.home_cache_hit.count ?? 0) / homeCacheTotal) * 100 : 0;
+    homeCacheTotal > 0
+      ? ((summary?.home_cache_hit.count ?? 0) / homeCacheTotal) * 100
+      : 0;
   const homeEndpointCacheTotal =
-    (summary?.home_endpoint_cache_hit.count ?? 0) + (summary?.home_endpoint_cache_miss.count ?? 0);
+    (summary?.home_endpoint_cache_hit.count ?? 0) +
+    (summary?.home_endpoint_cache_miss.count ?? 0);
   const homeEndpointCacheHitRate =
     homeEndpointCacheTotal > 0
-      ? ((summary?.home_endpoint_cache_hit.count ?? 0) / homeEndpointCacheTotal) * 100
+      ? ((summary?.home_endpoint_cache_hit.count ?? 0) /
+          homeEndpointCacheTotal) *
+        100
       : 0;
 
   const scoreSummary =
@@ -783,10 +932,7 @@ export function SystemHealth() {
         : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
   const runningTasks = tasks.length;
-  const queueDepth =
-    queueTs.length
-      ? queueTs[queueTs.length - 1]?.max ?? 0
-      : 0;
+  const queueDepth = queueTs.length ? queueTs[queueTs.length - 1]?.max ?? 0 : 0;
 
   return (
     <div className="space-y-6">
@@ -800,41 +946,71 @@ export function SystemHealth() {
               <button
                 type="button"
                 onClick={() => setPeriod("minute")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${period === "minute" ? "bg-primary text-primary-foreground" : "text-white/50 hover:text-white"}`}
+                className={`rounded-sm px-3 py-1.5 transition-colors ${
+                  period === "minute"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/50 hover:text-white"
+                }`}
               >
                 1h
               </button>
               <button
                 type="button"
                 onClick={() => setPeriod("hour")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${period === "hour" ? "bg-primary text-primary-foreground" : "text-white/50 hover:text-white"}`}
+                className={`rounded-sm px-3 py-1.5 transition-colors ${
+                  period === "hour"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/50 hover:text-white"
+                }`}
               >
                 24h
               </button>
             </div>
-            <ActionIconButton variant="card" onClick={() => refetchDashboard()} title="Refresh metrics">
+            <ActionIconButton
+              variant="card"
+              onClick={() => refetchDashboard()}
+              title="Refresh metrics"
+            >
               <RefreshCw size={15} />
             </ActionIconButton>
           </div>
         }
       >
-        <CrateChip icon={Activity}>{summary ? `${summary.api_requests.count} requests` : "Metrics loading"}</CrateChip>
+        <CrateChip icon={Activity}>
+          {summary
+            ? `${summary.api_requests.count} requests`
+            : "Metrics loading"}
+        </CrateChip>
         <CrateChip icon={Zap}>{runningTasks} running tasks</CrateChip>
         <CrateChip icon={Clock}>{queueDepth} queued depth</CrateChip>
         {summary ? (
-          <CrateChip className={Number(errorRate) > 1 ? "border-red-500/25 bg-red-500/10 text-red-100" : undefined}>
+          <CrateChip
+            className={
+              Number(errorRate) > 1
+                ? "border-red-500/25 bg-red-500/10 text-red-100"
+                : undefined
+            }
+          >
             {errorRate}% error rate
           </CrateChip>
         ) : null}
-        {summary && homeCacheTotal > 0 ? <CrateChip>{homeCacheHitRate.toFixed(0)}% home core hit</CrateChip> : null}
+        {summary && homeCacheTotal > 0 ? (
+          <CrateChip>{homeCacheHitRate.toFixed(0)}% home core hit</CrateChip>
+        ) : null}
         {summary && homeEndpointCacheTotal > 0 ? (
-          <CrateChip>{homeEndpointCacheHitRate.toFixed(0)}% home endpoint hit</CrateChip>
+          <CrateChip>
+            {homeEndpointCacheHitRate.toFixed(0)}% home endpoint hit
+          </CrateChip>
         ) : null}
         {playbackDelivery?.stats ? (
-          <CrateChip icon={Headphones}>{playbackDelivery.stats.coverage_percent}% playback coverage</CrateChip>
+          <CrateChip icon={Headphones}>
+            {playbackDelivery.stats.coverage_percent}% playback coverage
+          </CrateChip>
         ) : null}
         {summary?.worker_resource_deferred?.count ? (
-          <CrateChip icon={Gauge}>{summary.worker_resource_deferred.count} batch deferrals</CrateChip>
+          <CrateChip icon={Gauge}>
+            {summary.worker_resource_deferred.count} batch deferrals
+          </CrateChip>
         ) : null}
         {system?.resource_pressure ? (
           <CrateChip
@@ -856,14 +1032,24 @@ export function SystemHealth() {
           icon={Activity}
           label="API p95"
           value={summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
-          caption={summary ? `avg ${summary.api_latency.avg.toFixed(0)}ms` : "Waiting for metrics"}
-          tone={summary && summary.api_latency.max > 3000 ? "warning" : "default"}
+          caption={
+            summary
+              ? `avg ${summary.api_latency.avg.toFixed(0)}ms`
+              : "Waiting for metrics"
+          }
+          tone={
+            summary && summary.api_latency.max > 3000 ? "warning" : "default"
+          }
         />
         <OpsStatTile
           icon={AlertTriangle}
           label="Error Rate"
           value={`${errorRate}%`}
-          caption={summary ? `${summary.api_errors.count} / ${summary.api_requests.count} requests` : "Waiting for metrics"}
+          caption={
+            summary
+              ? `${summary.api_errors.count} / ${summary.api_requests.count} requests`
+              : "Waiting for metrics"
+          }
           tone={Number(errorRate) > 1 ? "danger" : "default"}
         />
         <OpsStatTile
@@ -891,7 +1077,11 @@ export function SystemHealth() {
         <OpsStatTile
           icon={Radio}
           label="Home Endpoint Cache"
-          value={homeEndpointCacheTotal > 0 ? `${homeEndpointCacheHitRate.toFixed(0)}%` : "—"}
+          value={
+            homeEndpointCacheTotal > 0
+              ? `${homeEndpointCacheHitRate.toFixed(0)}%`
+              : "—"
+          }
           caption={
             summary
               ? `${summary.home_endpoint_cache_hit.count} hits, ${summary.home_endpoint_cache_miss.count} misses`
@@ -908,7 +1098,11 @@ export function SystemHealth() {
               ? `${system.load.load_percent}% of ${system.load.cpu_count} cores`
               : "Waiting for system metrics"
           }
-          tone={system?.load && system.load.load_percent > 80 ? "warning" : "default"}
+          tone={
+            system?.load && system.load.load_percent > 80
+              ? "warning"
+              : "default"
+          }
         />
       </div>
 
@@ -974,24 +1168,31 @@ export function SystemHealth() {
               <ResourceCard
                 icon={Database}
                 label="DB Pools"
-                value={`${system.db_pool.checked_out} / ${system.db_pool.size + (system.db_pool.overflow > 0 ? system.db_pool.overflow : 0)}`}
+                value={`${system.db_pool.checked_out} / ${
+                  system.db_pool.size +
+                  (system.db_pool.overflow > 0 ? system.db_pool.overflow : 0)
+                }`}
               >
                 <ProgressBar
                   value={system.db_pool.checked_out}
                   max={system.db_pool.size}
-                  color={system.db_pool.checked_out >= system.db_pool.size ? "bg-red-500" : "bg-primary"}
+                  color={
+                    system.db_pool.checked_out >= system.db_pool.size
+                      ? "bg-red-500"
+                      : "bg-primary"
+                  }
                   label={`${system.db_pool.checked_in} idle, ${system.db_pool.checked_out} active`}
                 />
                 {system.db_pools?.sqlalchemy?.size ? (
                   <div className="text-[10px] text-white/30">
-                    SQLAlchemy: {system.db_pools.sqlalchemy.checked_out}/{system.db_pools.sqlalchemy.size}
-                    {" "}checked out
+                    SQLAlchemy: {system.db_pools.sqlalchemy.checked_out}/
+                    {system.db_pools.sqlalchemy.size} checked out
                   </div>
                 ) : null}
                 {system.db_pools?.legacy?.size ? (
                   <div className="text-[10px] text-white/30">
-                    Legacy: {system.db_pools.legacy.checked_out}/{system.db_pools.legacy.size}
-                    {" "}checked out
+                    Legacy: {system.db_pools.legacy.checked_out}/
+                    {system.db_pools.legacy.size} checked out
                   </div>
                 ) : null}
               </ResourceCard>
@@ -1001,16 +1202,27 @@ export function SystemHealth() {
               <ResourceCard
                 icon={Disc3}
                 label="Analysis"
-                value={`${system.analysis.analysis.done} / ${system.analysis.analysis.done + system.analysis.analysis.pending}`}
+                value={`${system.analysis.analysis.done} / ${
+                  system.analysis.analysis.done +
+                  system.analysis.analysis.pending
+                }`}
               >
                 <ProgressBar
                   value={system.analysis.analysis.done}
-                  max={system.analysis.analysis.done + system.analysis.analysis.pending}
-                  label={`${system.analysis.analysis.pending} pending${system.analysis.analysis.failed > 0 ? `, ${system.analysis.analysis.failed} failed` : ""}`}
+                  max={
+                    system.analysis.analysis.done +
+                    system.analysis.analysis.pending
+                  }
+                  label={`${system.analysis.analysis.pending} pending${
+                    system.analysis.analysis.failed > 0
+                      ? `, ${system.analysis.analysis.failed} failed`
+                      : ""
+                  }`}
                 />
                 {system.analysis.bliss && system.analysis.bliss.pending > 0 ? (
                   <div className="text-[10px] text-white/30">
-                    Bliss: {system.analysis.bliss.done} done, {system.analysis.bliss.pending} pending
+                    Bliss: {system.analysis.bliss.done} done,{" "}
+                    {system.analysis.bliss.pending} pending
                   </div>
                 ) : null}
               </ResourceCard>
@@ -1023,9 +1235,15 @@ export function SystemHealth() {
                 value={system.resource_pressure.allowed ? "Open" : "Deferring"}
               >
                 <ProgressBar
-                  value={(system.resource_pressure.snapshot?.load_ratio ?? 0) * 100}
+                  value={
+                    (system.resource_pressure.snapshot?.load_ratio ?? 0) * 100
+                  }
                   max={100}
-                  color={system.resource_pressure.allowed ? "bg-primary" : "bg-amber-500"}
+                  color={
+                    system.resource_pressure.allowed
+                      ? "bg-primary"
+                      : "bg-amber-500"
+                  }
                   label={
                     system.resource_pressure.reason
                       ? system.resource_pressure.reason
@@ -1033,16 +1251,33 @@ export function SystemHealth() {
                   }
                 />
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
-                  <span>IO wait: {system.resource_pressure.snapshot?.iowait_percent ?? "—"}%</span>
-                  <span>Swap: {system.resource_pressure.snapshot?.swap_used_percent ?? "—"}%</span>
-                  <span>Listeners: {system.resource_pressure.snapshot?.active_users ?? "—"}</span>
-                  <span>Streams: {system.resource_pressure.snapshot?.active_streams ?? "—"}</span>
+                  <span>
+                    IO wait:{" "}
+                    {system.resource_pressure.snapshot?.iowait_percent ?? "—"}%
+                  </span>
+                  <span>
+                    Swap:{" "}
+                    {system.resource_pressure.snapshot?.swap_used_percent ??
+                      "—"}
+                    %
+                  </span>
+                  <span>
+                    Listeners:{" "}
+                    {system.resource_pressure.snapshot?.active_users ?? "—"}
+                  </span>
+                  <span>
+                    Streams:{" "}
+                    {system.resource_pressure.snapshot?.active_streams ?? "—"}
+                  </span>
                 </div>
                 {system.resource_pressure.window?.enabled ? (
                   <div className="text-[10px] text-white/30">
-                    Window {system.resource_pressure.window.start}-{system.resource_pressure.window.end}
+                    Window {system.resource_pressure.window.start}-
+                    {system.resource_pressure.window.end}
                     {" · "}
-                    {system.resource_pressure.window.in_window ? "inside" : "outside"}
+                    {system.resource_pressure.window.in_window
+                      ? "inside"
+                      : "outside"}
                   </div>
                 ) : null}
               </ResourceCard>
@@ -1054,27 +1289,47 @@ export function SystemHealth() {
                 label="Media Worker"
                 value={
                   system.media_worker.redis_connected
-                    ? `${system.media_worker.active_slots?.length ?? 0} / ${system.media_worker.max_active ?? 1} active`
+                    ? `${system.media_worker.active_slots?.length ?? 0} / ${
+                        system.media_worker.max_active ?? 1
+                      } active`
                     : "Redis offline"
                 }
               >
                 <ProgressBar
                   value={system.media_worker.active_slots?.length ?? 0}
                   max={Math.max(1, system.media_worker.max_active ?? 1)}
-                  color={system.media_worker.pending > 0 ? "bg-amber-500" : "bg-primary"}
-                  label={`${system.media_worker.pending ?? 0} pending bridge events`}
+                  color={
+                    system.media_worker.pending > 0
+                      ? "bg-amber-500"
+                      : "bg-primary"
+                  }
+                  label={`${
+                    system.media_worker.pending ?? 0
+                  } pending bridge events`}
                 />
                 <div className="text-[10px] text-white/30">
                   {system.media_worker.recent_events?.[0]?.event
-                    ? `Latest: ${String(system.media_worker.recent_events[0].event).replace(/_/g, " ")}`
+                    ? `Latest: ${String(
+                        system.media_worker.recent_events[0].event,
+                      ).replace(/_/g, " ")}`
                     : system.media_worker.consumer_group}
                 </div>
                 {summary?.media_worker_completed ? (
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
                     <span>Done: {summary.media_worker_completed.count}</span>
-                    <span>Failed: {summary.media_worker_failed?.count ?? 0}</span>
-                    <span>Denied: {summary.media_worker_admission_denied?.count ?? 0}</span>
-                    <span>Pruned: {formatBytes(summary.media_worker_cache_bytes_removed?.sum ?? 0)}</span>
+                    <span>
+                      Failed: {summary.media_worker_failed?.count ?? 0}
+                    </span>
+                    <span>
+                      Denied:{" "}
+                      {summary.media_worker_admission_denied?.count ?? 0}
+                    </span>
+                    <span>
+                      Pruned:{" "}
+                      {formatBytes(
+                        summary.media_worker_cache_bytes_removed?.sum ?? 0,
+                      )}
+                    </span>
                   </div>
                 ) : null}
               </ResourceCard>
@@ -1103,12 +1358,36 @@ export function SystemHealth() {
             yLabel="slow"
             series={[{ id: "slow", field: "count" }]}
           />
-          <MetricChart title="Stream Activity" data={streamTs} yLabel="streams" />
-          <MetricChart title="Transcode Duration" data={transcodeDurationTs} yLabel="sec" />
-          <MetricChart title="Home Core Compute" data={homeComputeTs} yLabel="ms" />
-          <MetricChart title="Home Endpoint Compute" data={homeEndpointComputeTs} yLabel="ms" />
-          <MetricChart title="Task Duration" data={taskDurationTs} yLabel="sec" />
-          <MetricChart title="Queue Wait Time" data={queueWaitTs} yLabel="sec" />
+          <MetricChart
+            title="Stream Activity"
+            data={streamTs}
+            yLabel="streams"
+          />
+          <MetricChart
+            title="Transcode Duration"
+            data={transcodeDurationTs}
+            yLabel="sec"
+          />
+          <MetricChart
+            title="Home Core Compute"
+            data={homeComputeTs}
+            yLabel="ms"
+          />
+          <MetricChart
+            title="Home Endpoint Compute"
+            data={homeEndpointComputeTs}
+            yLabel="ms"
+          />
+          <MetricChart
+            title="Task Duration"
+            data={taskDurationTs}
+            yLabel="sec"
+          />
+          <MetricChart
+            title="Queue Wait Time"
+            data={queueWaitTs}
+            yLabel="sec"
+          />
           <MetricChart title="Queue Depth" data={queueTs} yLabel="tasks" />
           <MetricChart
             title="Resource Deferrals"
@@ -1116,7 +1395,11 @@ export function SystemHealth() {
             yLabel="deferrals"
             series={[{ id: "deferred", field: "count" }]}
           />
-          <MetricChart title="Resource Load Ratio" data={resourceLoadTs} yLabel="ratio" />
+          <MetricChart
+            title="Resource Load Ratio"
+            data={resourceLoadTs}
+            yLabel="ratio"
+          />
         </div>
       </OpsPanel>
 
@@ -1140,16 +1423,20 @@ export function SystemHealth() {
                 progress = null;
               }
               const pct =
-                Number(progress?.percent ?? 0)
-                || (progress?.done && progress?.total
+                Number(progress?.percent ?? 0) ||
+                (progress?.done && progress?.total
                   ? (Number(progress.done) / Number(progress.total)) * 100
                   : 0);
               const elapsed = task.created_at
-                ? Math.round((Date.now() - new Date(task.created_at).getTime()) / 1000)
+                ? Math.round(
+                    (Date.now() - new Date(task.created_at).getTime()) / 1000,
+                  )
                 : 0;
               const elapsedStr =
                 elapsed > 3600
-                  ? `${Math.floor(elapsed / 3600)}h ${Math.floor((elapsed % 3600) / 60)}m`
+                  ? `${Math.floor(elapsed / 3600)}h ${Math.floor(
+                      (elapsed % 3600) / 60,
+                    )}m`
                   : elapsed > 60
                     ? `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
                     : `${elapsed}s`;
@@ -1164,14 +1451,21 @@ export function SystemHealth() {
                       {task.label || taskLabel(task.type)}
                     </div>
                     <div className="mt-0.5 text-xs text-white/40">
-                      {progress?.phase ? <span>{String(progress.phase)}</span> : null}
-                      {progress?.item ? <span> — {String(progress.item)}</span> : null}
+                      {progress?.phase ? (
+                        <span>{String(progress.phase)}</span>
+                      ) : null}
+                      {progress?.item ? (
+                        <span> — {String(progress.item)}</span>
+                      ) : null}
                     </div>
                   </div>
                   {pct > 0 ? (
                     <div className="flex w-32 items-center gap-2">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                       <span className="w-8 text-right text-[10px] tabular-nums text-white/40">
                         {pct.toFixed(0)}%
@@ -1182,7 +1476,9 @@ export function SystemHealth() {
                     <Clock size={10} />
                     <span className="tabular-nums">{elapsedStr}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-white/20">{task.id.slice(0, 8)}</span>
+                  <span className="font-mono text-[10px] text-white/20">
+                    {task.id.slice(0, 8)}
+                  </span>
                 </div>
               );
             })}

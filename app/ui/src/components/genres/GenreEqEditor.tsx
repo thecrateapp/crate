@@ -45,8 +45,10 @@ export function GenreEqEditor({
   onSaved,
 }: Props) {
   const seeded = useMemo<number[]>(() => {
-    if (initialGains && initialGains.length === EQ_BAND_COUNT) return [...initialGains];
-    if (initialResolved?.gains.length === EQ_BAND_COUNT) return [...initialResolved.gains];
+    if (initialGains && initialGains.length === EQ_BAND_COUNT)
+      return [...initialGains];
+    if (initialResolved?.gains.length === EQ_BAND_COUNT)
+      return [...initialResolved.gains];
     return [...FLAT_GAINS];
   }, [initialGains, initialResolved]);
 
@@ -57,7 +59,9 @@ export function GenreEqEditor({
   const [reasoning, setReasoning] = useState(eqReasoning || "");
   const llmAvailable = useLLMAvailable();
 
-  useEffect(() => { setGains(seeded); }, [seeded]);
+  useEffect(() => {
+    setGains(seeded);
+  }, [seeded]);
 
   const dirty = !arraysEqual(gains, seeded);
   const hasOwnPreset = initialGains !== null;
@@ -89,8 +93,12 @@ export function GenreEqEditor({
     if (saving || clearing) return;
     setClearing(true);
     try {
-      await api(`/api/genres/${canonicalSlug}/eq-preset`, "PATCH", { gains: null });
-      toast.success(`Cleared preset for ${canonicalName} — will inherit from parent`);
+      await api(`/api/genres/${canonicalSlug}/eq-preset`, "PATCH", {
+        gains: null,
+      });
+      toast.success(
+        `Cleared preset for ${canonicalName} — will inherit from parent`,
+      );
       onSaved?.();
     } catch {
       toast.error("Failed to clear preset");
@@ -103,7 +111,10 @@ export function GenreEqEditor({
     if (generating) return;
     setGenerating(true);
     try {
-      const result = await api<{ gains: number[]; reasoning: string }>(`/api/genres/${canonicalSlug}/generate-eq?apply=true`, "POST");
+      const result = await api<{ gains: number[]; reasoning: string }>(
+        `/api/genres/${canonicalSlug}/generate-eq?apply=true`,
+        "POST",
+      );
       setGains(result.gains);
       setReasoning(result.reasoning);
       toast.success(`AI generated EQ for ${canonicalName}`);
@@ -132,24 +143,36 @@ export function GenreEqEditor({
           </button>
         </div>
         {hasOwnPreset ? (
-          <Badge variant="outline" className="border-primary/40 bg-primary/10 text-primary">Direct preset</Badge>
+          <Badge
+            variant="outline"
+            className="border-primary/40 bg-primary/10 text-primary"
+          >
+            Direct preset
+          </Badge>
         ) : inherited && initialResolved ? (
-          <Badge variant="outline" className="border-white/15 bg-black/15 text-white/80">Inherits from {initialResolved.name}</Badge>
+          <Badge
+            variant="outline"
+            className="border-white/15 bg-black/15 text-white/80"
+          >
+            Inherits from {initialResolved.name}
+          </Badge>
         ) : (
-          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-100">No preset</Badge>
+          <Badge
+            variant="outline"
+            className="border-amber-500/30 bg-amber-500/10 text-amber-100"
+          >
+            No preset
+          </Badge>
         )}
       </div>
 
       <p className="mb-4 text-xs leading-5 text-white/55">
-        {reasoning || "Curve applied when a track in this genre plays with \"Genre Adaptive\" on. Saving stores gains on this taxonomy node directly. Clearing drops back to the first ancestor that has a preset."}
+        {reasoning ||
+          'Curve applied when a track in this genre plays with "Genre Adaptive" on. Saving stores gains on this taxonomy node directly. Clearing drops back to the first ancestor that has a preset.'}
       </p>
 
       <div className="rounded-md border border-white/10 bg-black/30 p-3">
-        <EqBands
-          gains={gains}
-          onBandChange={updateBand}
-          trackHeight={112}
-        />
+        <EqBands gains={gains} onBandChange={updateBand} trackHeight={112} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
@@ -173,7 +196,11 @@ export function GenreEqEditor({
             disabled={saving || clearing || generating || !hasOwnPreset}
             className="text-xs"
           >
-            {clearing ? <Loader2 size={13} className="mr-1 animate-spin" /> : <RotateCcw size={13} className="mr-1" />}
+            {clearing ? (
+              <Loader2 size={13} className="mr-1 animate-spin" />
+            ) : (
+              <RotateCcw size={13} className="mr-1" />
+            )}
             Clear (inherit)
           </Button>
           <Button
@@ -182,7 +209,11 @@ export function GenreEqEditor({
             disabled={saving || clearing || generating || !dirty}
             className="text-xs"
           >
-            {saving ? <Loader2 size={13} className="mr-1 animate-spin" /> : <Save size={13} className="mr-1" />}
+            {saving ? (
+              <Loader2 size={13} className="mr-1 animate-spin" />
+            ) : (
+              <Save size={13} className="mr-1" />
+            )}
             Save preset
           </Button>
         </div>

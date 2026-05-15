@@ -40,50 +40,212 @@ _QUERY_TOKEN_PATH_PREFIXES = (
     "/api/download/",
 )
 _TAG_METADATA = [
-    {"name": "auth", "x-displayName": "Authentication", "description": "Authentication, sessions, and identity provider flows."},
-    {"name": "admin-auth", "x-displayName": "Admin Access", "description": "Administrator authentication and invite management."},
-    {"name": "me", "x-displayName": "My Library", "description": "Personal library, listening history, feed, and home surfaces."},
-    {"name": "offline", "x-displayName": "Offline Mirror", "description": "Offline manifests and mirrored playback assets."},
-    {"name": "social", "x-displayName": "Social Graph", "description": "User profiles, follows, and social graph operations."},
-    {"name": "jam", "x-displayName": "Jam Rooms", "description": "Collaborative listening rooms and invite flows."},
-    {"name": "browse", "x-displayName": "Browse & Search", "description": "Library browsing, media metadata, and streaming endpoints."},
-    {"name": "playlists", "x-displayName": "Playlists", "description": "User playlists and sharing flows."},
-    {"name": "radio", "x-displayName": "Radio & Similar", "description": "Radio and recommendation building endpoints."},
-    {"name": "genres", "x-displayName": "Genres", "description": "Genre taxonomy, graph, presets, and genre maintenance."},
-    {"name": "curation", "x-displayName": "Curation", "description": "Curated and system playlist discovery."},
-    {"name": "analytics", "x-displayName": "Analytics", "description": "Insights, statistics, and quality reporting."},
-    {"name": "lyrics", "x-displayName": "Lyrics", "description": "Lyrics lookup and synchronization data."},
-    {"name": "enrichment", "x-displayName": "Enrichment", "description": "Artist enrichment snapshots, analysis data, and setlist helpers."},
-    {"name": "artwork", "x-displayName": "Artwork", "description": "Artwork discovery, upload, extraction, and repair workflows."},
-    {"name": "metadata", "x-displayName": "Tags & Metadata", "description": "Album and track metadata editing endpoints."},
-    {"name": "imports", "x-displayName": "Imports", "description": "Pending filesystem import inspection and ingestion actions."},
-    {"name": "scanner", "x-displayName": "Scanner", "description": "Library scan status and issue fixing."},
-    {"name": "organizer", "x-displayName": "File Organizer", "description": "File-organization preview and apply workflows."},
-    {"name": "matcher", "x-displayName": "Album Matching", "description": "Album matching and metadata assistance."},
-    {"name": "duplicates", "x-displayName": "Duplicates", "description": "Duplicate detection and comparison tools."},
-    {"name": "batch", "x-displayName": "Batch Ops", "description": "Batch retagging and bulk maintenance tasks."},
-    {"name": "acquisition", "x-displayName": "Acquisition", "description": "Soulseek and release acquisition workflows."},
-    {"name": "tidal", "x-displayName": "Tidal", "description": "Tidal authentication, search, download, and monitoring."},
-    {"name": "management", "x-displayName": "Health & Repair", "description": "Administrative health checks, repair, and analysis jobs."},
-    {"name": "settings", "x-displayName": "Settings", "description": "Application settings and cache controls."},
-    {"name": "tasks", "x-displayName": "Background Tasks", "description": "Background task inspection and worker status."},
-    {"name": "events", "x-displayName": "Event Streams", "description": "Task, cache, and activity event streams."},
-    {"name": "stack", "x-displayName": "Docker Stack", "description": "Managed Docker stack inspection and container control."},
-    {"name": "setup", "x-displayName": "Setup", "description": "First-run setup and bootstrap helpers."},
-    {"name": "admin", "x-displayName": "System Playlists", "description": "Administrator-only curated/system playlist surfaces."},
-    {"name": "subsonic", "x-displayName": "Subsonic Compatibility", "description": "Open Subsonic-compatible browsing and streaming API."},
+    {
+        "name": "auth",
+        "x-displayName": "Authentication",
+        "description": "Authentication, sessions, and identity provider flows.",
+    },
+    {
+        "name": "admin-auth",
+        "x-displayName": "Admin Access",
+        "description": "Administrator authentication and invite management.",
+    },
+    {
+        "name": "me",
+        "x-displayName": "My Library",
+        "description": "Personal library, listening history, feed, and home surfaces.",
+    },
+    {
+        "name": "offline",
+        "x-displayName": "Offline Mirror",
+        "description": "Offline manifests and mirrored playback assets.",
+    },
+    {
+        "name": "social",
+        "x-displayName": "Social Graph",
+        "description": "User profiles, follows, and social graph operations.",
+    },
+    {
+        "name": "jam",
+        "x-displayName": "Jam Rooms",
+        "description": "Collaborative listening rooms and invite flows.",
+    },
+    {
+        "name": "browse",
+        "x-displayName": "Browse & Search",
+        "description": "Library browsing, media metadata, and streaming endpoints.",
+    },
+    {
+        "name": "playlists",
+        "x-displayName": "Playlists",
+        "description": "User playlists and sharing flows.",
+    },
+    {
+        "name": "radio",
+        "x-displayName": "Radio & Similar",
+        "description": "Radio and recommendation building endpoints.",
+    },
+    {
+        "name": "genres",
+        "x-displayName": "Genres",
+        "description": "Genre taxonomy, graph, presets, and genre maintenance.",
+    },
+    {
+        "name": "curation",
+        "x-displayName": "Curation",
+        "description": "Curated and system playlist discovery.",
+    },
+    {
+        "name": "analytics",
+        "x-displayName": "Analytics",
+        "description": "Insights, statistics, and quality reporting.",
+    },
+    {
+        "name": "lyrics",
+        "x-displayName": "Lyrics",
+        "description": "Lyrics lookup and synchronization data.",
+    },
+    {
+        "name": "enrichment",
+        "x-displayName": "Enrichment",
+        "description": "Artist enrichment snapshots, analysis data, and setlist helpers.",
+    },
+    {
+        "name": "artwork",
+        "x-displayName": "Artwork",
+        "description": "Artwork discovery, upload, extraction, and repair workflows.",
+    },
+    {
+        "name": "metadata",
+        "x-displayName": "Tags & Metadata",
+        "description": "Album and track metadata editing endpoints.",
+    },
+    {
+        "name": "imports",
+        "x-displayName": "Imports",
+        "description": "Pending filesystem import inspection and ingestion actions.",
+    },
+    {
+        "name": "scanner",
+        "x-displayName": "Scanner",
+        "description": "Library scan status and issue fixing.",
+    },
+    {
+        "name": "organizer",
+        "x-displayName": "File Organizer",
+        "description": "File-organization preview and apply workflows.",
+    },
+    {
+        "name": "matcher",
+        "x-displayName": "Album Matching",
+        "description": "Album matching and metadata assistance.",
+    },
+    {
+        "name": "duplicates",
+        "x-displayName": "Duplicates",
+        "description": "Duplicate detection and comparison tools.",
+    },
+    {
+        "name": "batch",
+        "x-displayName": "Batch Ops",
+        "description": "Batch retagging and bulk maintenance tasks.",
+    },
+    {
+        "name": "acquisition",
+        "x-displayName": "Acquisition",
+        "description": "Soulseek and release acquisition workflows.",
+    },
+    {
+        "name": "tidal",
+        "x-displayName": "Tidal",
+        "description": "Tidal authentication, search, download, and monitoring.",
+    },
+    {
+        "name": "management",
+        "x-displayName": "Health & Repair",
+        "description": "Administrative health checks, repair, and analysis jobs.",
+    },
+    {
+        "name": "settings",
+        "x-displayName": "Settings",
+        "description": "Application settings and cache controls.",
+    },
+    {
+        "name": "tasks",
+        "x-displayName": "Background Tasks",
+        "description": "Background task inspection and worker status.",
+    },
+    {
+        "name": "events",
+        "x-displayName": "Event Streams",
+        "description": "Task, cache, and activity event streams.",
+    },
+    {
+        "name": "stack",
+        "x-displayName": "Docker Stack",
+        "description": "Managed Docker stack inspection and container control.",
+    },
+    {
+        "name": "setup",
+        "x-displayName": "Setup",
+        "description": "First-run setup and bootstrap helpers.",
+    },
+    {
+        "name": "admin",
+        "x-displayName": "System Playlists",
+        "description": "Administrator-only curated/system playlist surfaces.",
+    },
+    {
+        "name": "subsonic",
+        "x-displayName": "Subsonic Compatibility",
+        "description": "Open Subsonic-compatible browsing and streaming API.",
+    },
 ]
 _TAG_GROUPS = [
-    {"name": "Identity", "tags": ["auth", "me", "offline", "social", "jam", "admin-auth"]},
+    {
+        "name": "Identity",
+        "tags": ["auth", "me", "offline", "social", "jam", "admin-auth"],
+    },
     {
         "name": "Listening & Discovery",
-        "tags": ["browse", "playlists", "radio", "genres", "curation", "analytics", "lyrics"],
+        "tags": [
+            "browse",
+            "playlists",
+            "radio",
+            "genres",
+            "curation",
+            "analytics",
+            "lyrics",
+        ],
     },
     {
         "name": "Collection Operations",
-        "tags": ["enrichment", "artwork", "metadata", "imports", "scanner", "organizer", "matcher", "duplicates", "batch", "acquisition", "tidal"],
+        "tags": [
+            "enrichment",
+            "artwork",
+            "metadata",
+            "imports",
+            "scanner",
+            "organizer",
+            "matcher",
+            "duplicates",
+            "batch",
+            "acquisition",
+            "tidal",
+        ],
     },
-    {"name": "Admin & System", "tags": ["management", "settings", "tasks", "events", "stack", "setup", "admin"]},
+    {
+        "name": "Admin & System",
+        "tags": [
+            "management",
+            "settings",
+            "tasks",
+            "events",
+            "stack",
+            "setup",
+            "admin",
+        ],
+    },
     {"name": "Compatibility", "tags": ["subsonic"]},
 ]
 
@@ -129,7 +291,9 @@ def _filter_schema_by_tags(
     }
 
     filtered["paths"] = filtered_paths
-    filtered["tags"] = [entry for entry in schema.get("tags", []) if entry.get("name") in active_tags]
+    filtered["tags"] = [
+        entry for entry in schema.get("tags", []) if entry.get("name") in active_tags
+    ]
     filtered["x-tagGroups"] = [
         {
             **group,
@@ -161,24 +325,56 @@ def _openapi_servers() -> list[dict[str, str]]:
     ]
 
 
-_AUTH_REQUIRED_PREFIXES = frozenset({
-    "/api/admin/auth", "/api/admin/system-playlists",
-    "/api/admin",
-    "/api/me", "/api/offline", "/api/users", "/api/jam", "/api/curation",
-    "/api/artwork", "/api/manage",
-    "/api/acquisition", "/api/tidal",
-    "/api/imports", "/api/organize", "/api/stack",
-    "/api/events", "/api/lyrics",
-    "/api/browse", "/api/artists", "/api/albums",
-    "/api/search", "/api/favorites", "/api/track", "/api/tracks",
-    "/api/discover", "/api/similar-tracks", "/api/stream", "/api/download",
-    "/api/analytics", "/api/activity", "/api/stats", "/api/timeline",
-    "/api/quality", "/api/missing-search", "/api/insights",
-    "/api/shows", "/api/upcoming", "/api/network",
-    "/api/batch", "/api/match", "/api/duplicates",
-    "/api/settings", "/api/tasks", "/api/worker",
-    "/api/genres", "/api/radio",
-})
+_AUTH_REQUIRED_PREFIXES = frozenset(
+    {
+        "/api/admin/auth",
+        "/api/admin/system-playlists",
+        "/api/admin",
+        "/api/me",
+        "/api/offline",
+        "/api/users",
+        "/api/jam",
+        "/api/curation",
+        "/api/artwork",
+        "/api/manage",
+        "/api/acquisition",
+        "/api/tidal",
+        "/api/imports",
+        "/api/organize",
+        "/api/stack",
+        "/api/events",
+        "/api/lyrics",
+        "/api/browse",
+        "/api/artists",
+        "/api/albums",
+        "/api/search",
+        "/api/favorites",
+        "/api/track",
+        "/api/tracks",
+        "/api/discover",
+        "/api/similar-tracks",
+        "/api/stream",
+        "/api/download",
+        "/api/analytics",
+        "/api/activity",
+        "/api/stats",
+        "/api/timeline",
+        "/api/quality",
+        "/api/missing-search",
+        "/api/insights",
+        "/api/shows",
+        "/api/upcoming",
+        "/api/network",
+        "/api/batch",
+        "/api/match",
+        "/api/duplicates",
+        "/api/settings",
+        "/api/tasks",
+        "/api/worker",
+        "/api/genres",
+        "/api/radio",
+    }
+)
 
 _AUTH_REQUIRED_EXACT = frozenset({"/api/scan", "/api/issues", "/api/fix"})
 
@@ -200,10 +396,7 @@ def _should_attach_auth(path: str, operation: dict) -> bool:
         return True
     if any(path.startswith(prefix) for prefix in _AUTH_REQUIRED_PREFIXES):
         return True
-    return (
-        path in _SECURED_PATHS
-        or bool(tags & _SECURED_TAGS)
-    )
+    return path in _SECURED_PATHS or bool(tags & _SECURED_TAGS)
 
 
 def _supports_query_token(path: str) -> bool:
@@ -213,7 +406,9 @@ def _supports_query_token(path: str) -> bool:
         return True
     if path.startswith("/api/tracks/") and path.endswith(("/stream", "/download")):
         return True
-    if path.startswith("/api/tracks/by-storage/") and path.endswith(("/stream", "/download")):
+    if path.startswith("/api/tracks/by-storage/") and path.endswith(
+        ("/stream", "/download")
+    ):
         return True
     if path.startswith("/api/albums/") and path.endswith("/download"):
         return True

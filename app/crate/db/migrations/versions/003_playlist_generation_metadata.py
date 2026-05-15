@@ -4,6 +4,7 @@ Revision ID: 003
 Revises: 002
 Create Date: 2026-04-20
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -52,5 +53,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute("DROP TABLE IF EXISTS playlist_generation_log")
-    for col in ["auto_refresh_enabled", "generation_error", "generation_status", "last_generated_at"]:
+    for col in [
+        "auto_refresh_enabled",
+        "generation_error",
+        "generation_status",
+        "last_generated_at",
+    ]:
         op.execute(f"ALTER TABLE playlists DROP COLUMN IF EXISTS {col}")

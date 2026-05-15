@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
-from crate.db.paths_compute import compute_path, resolve_bliss_centroid, resolve_endpoint_label
+from crate.db.paths_compute import (
+    compute_path,
+    resolve_bliss_centroid,
+    resolve_endpoint_label,
+)
 
 
-def resolve_waypoints(waypoints: list[dict] | None) -> tuple[list[list[float]], list[dict]]:
+def resolve_waypoints(
+    waypoints: list[dict] | None,
+) -> tuple[list[list[float]], list[dict]]:
     waypoint_vecs: list[list[float]] = []
     resolved_waypoints: list[dict] = []
-    for waypoint in (waypoints or []):
+    for waypoint in waypoints or []:
         waypoint_vec = resolve_bliss_centroid(waypoint["type"], waypoint["value"])
         if waypoint_vec:
             waypoint_vecs.append(waypoint_vec)
             resolved_waypoints.append(
                 {
                     **waypoint,
-                    "label": resolve_endpoint_label(waypoint["type"], waypoint["value"]),
+                    "label": resolve_endpoint_label(
+                        waypoint["type"], waypoint["value"]
+                    ),
                 }
             )
     return waypoint_vecs, resolved_waypoints

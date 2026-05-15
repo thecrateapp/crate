@@ -43,7 +43,7 @@ scanners:
     match_method: tags
     # Cuando hay duplicado, preferir por calidad
     prefer: [flac, m4a, mp3]
-    prefer_complete: true  # Preferir el album con mas tracks
+    prefer_complete: true # Preferir el album con mas tracks
 
   incomplete:
     enabled: true
@@ -73,4 +73,4 @@ import_sources:
 # Reportes
 reports:
   output_dir: /data/reports
-  format: json  # json o text
+  format: json # json o text

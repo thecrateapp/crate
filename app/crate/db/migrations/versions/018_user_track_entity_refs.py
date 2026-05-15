@@ -16,9 +16,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE play_history ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    op.execute("ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    op.execute("ALTER TABLE user_track_stats ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
+    op.execute(
+        "ALTER TABLE play_history ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    op.execute(
+        "ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    op.execute(
+        "ALTER TABLE user_track_stats ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
 
     op.execute(
         """
@@ -77,9 +83,15 @@ def upgrade() -> None:
         """
     )
 
-    op.execute("CREATE INDEX IF NOT EXISTS idx_play_history_track_entity_uid ON play_history(track_entity_uid)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_track_entity_uid ON user_play_events(track_entity_uid)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_user_track_stats_entity_uid ON user_track_stats(track_entity_uid)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_play_history_track_entity_uid ON play_history(track_entity_uid)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_track_entity_uid ON user_play_events(track_entity_uid)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_track_stats_entity_uid ON user_track_stats(track_entity_uid)"
+    )
 
 
 def downgrade() -> None:

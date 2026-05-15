@@ -29,7 +29,9 @@ def get_relationship_state(viewer_user_id: int, target_user_id: int) -> dict:
                     """
                 ),
                 {"viewer": viewer_user_id, "target": target_user_id},
-            ).mappings().first()
+            )
+            .mappings()
+            .first()
             or {}
         )
     row["is_friend"] = bool(row.get("following") and row.get("followed_by"))

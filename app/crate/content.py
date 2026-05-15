@@ -62,16 +62,24 @@ def compute_dir_hash(directory: Path) -> str:
                 if content_hash:
                     return content_hash
     except Exception:
-        log.debug("crate-cli scan failed for %s, falling back to md5", directory, exc_info=True)
+        log.debug(
+            "crate-cli scan failed for %s, falling back to md5",
+            directory,
+            exc_info=True,
+        )
 
     digest = hashlib.md5(usedforsecurity=False)
     for file_path in sorted(directory.rglob("*")):
         if file_path.is_file():
-            digest.update(f"{file_path.relative_to(directory)}:{file_path.stat().st_size}\n".encode())
+            digest.update(
+                f"{file_path.relative_to(directory)}:{file_path.stat().st_size}\n".encode()
+            )
     return digest.hexdigest()
 
 
-def should_process_artist(artist_name: str, library_path: Path | str | None = None) -> bool:
+def should_process_artist(
+    artist_name: str, library_path: Path | str | None = None
+) -> bool:
     """Return True iff the filesystem content for ``artist_name`` differs from
     the stored ``library_artists.content_hash``.
 
@@ -86,11 +94,15 @@ def should_process_artist(artist_name: str, library_path: Path | str | None = No
     if library_path is None:
         from crate.config import load_config
 
-        library_path = load_config()["library_path"]
+        library_path = str(load_config().get("library_path") or "")
+    if not library_path:
+        return False
     lib = Path(library_path)
 
     artist_row = _get_library_artist(artist_name)
-    artist_dir = resolve_artist_dir(lib, artist_row, fallback_name=artist_name, existing_only=True)
+    artist_dir = resolve_artist_dir(
+        lib, artist_row, fallback_name=artist_name, existing_only=True
+    )
     if not artist_dir or not artist_dir.is_dir():
         return False
 
@@ -121,7 +133,9 @@ def queue_process_new_content_if_needed(
         return None
 
     if not force and not should_process_artist(artist_name, library_path=library_path):
-        log.debug("Skip queuing process_new_content for %s — content unchanged", artist_name)
+        log.debug(
+            "Skip queuing process_new_content for %s — content unchanged", artist_name
+        )
         return None
 
     params: dict = {"artist": artist_name}

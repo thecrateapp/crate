@@ -11,7 +11,12 @@ import {
   type ArtistAlbum,
   type ArtistTopTrack,
 } from "@/components/artist/artist-model";
-import { groupByMonth, itemKey, UpcomingMonthGroup, type UpcomingItem } from "@/components/upcoming/UpcomingRows";
+import {
+  groupByMonth,
+  itemKey,
+  UpcomingMonthGroup,
+  type UpcomingItem,
+} from "@/components/upcoming/UpcomingRows";
 import { artistPagePath, artistTopTracksPath } from "@/lib/library-routes";
 
 interface ArtistTopTracksSectionProps {
@@ -28,17 +33,18 @@ export function ArtistTopTracksSection({
   coverFallback,
 }: ArtistTopTracksSectionProps) {
   const navigate = useNavigate();
-  const trackRows = useMemo<TrackRowData[]>(() =>
-    tracks.map((track) => ({
-      id: track.id,
-      title: track.title,
-      artist: track.artist,
-      album: track.album,
-      album_id: track.album_id,
-      album_slug: track.album_slug,
-      duration: track.duration,
-      path: track.id.includes("/") ? track.id : undefined,
-    })),
+  const trackRows = useMemo<TrackRowData[]>(
+    () =>
+      tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        album_id: track.album_id,
+        album_slug: track.album_slug,
+        duration: track.duration,
+        path: track.id.includes("/") ? track.id : undefined,
+      })),
     [tracks],
   );
   if (!tracks.length) return null;
@@ -49,7 +55,9 @@ export function ArtistTopTracksSection({
         <h2 className="text-lg font-semibold text-foreground">Top Tracks</h2>
         <button
           className="text-sm text-primary hover:underline"
-          onClick={() => navigate(artistTopTracksPath({ artistId, artistSlug }))}
+          onClick={() =>
+            navigate(artistTopTracksPath({ artistId, artistSlug }))
+          }
         >
           View all
         </button>
@@ -61,9 +69,16 @@ export function ArtistTopTracksSection({
             track={trackRows[index]!}
             index={track.track || index + 1}
             showAlbum
-            albumCover={track.album_id
-              ? buildArtistAlbumCover(track.artist, track.album, track.album_id, track.album_slug)
-              : coverFallback}
+            albumCover={
+              track.album_id
+                ? buildArtistAlbumCover(
+                    track.artist,
+                    track.album,
+                    track.album_id,
+                    track.album_slug,
+                  )
+                : coverFallback
+            }
             showCoverThumb
             queueTracks={trackRows}
           />
@@ -78,7 +93,10 @@ interface ArtistAlbumsSectionProps {
   albums: ArtistAlbum[];
 }
 
-export function ArtistAlbumsSection({ artistName, albums }: ArtistAlbumsSectionProps) {
+export function ArtistAlbumsSection({
+  artistName,
+  albums,
+}: ArtistAlbumsSectionProps) {
   if (!albums.length) return null;
 
   return (
@@ -93,7 +111,12 @@ export function ArtistAlbumsSection({ artistName, albums }: ArtistAlbumsSectionP
             albumId={album.id}
             albumSlug={album.slug}
             year={album.year?.slice(0, 4)}
-            cover={buildArtistAlbumCover(artistName, album.name, album.id, album.slug)}
+            cover={buildArtistAlbumCover(
+              artistName,
+              album.name,
+              album.id,
+              album.slug,
+            )}
             layout="grid"
           />
         ))}
@@ -140,10 +163,14 @@ export function ArtistShowsSection({
                   <Calendar size={12} />
                   Show prep
                 </div>
-                <h3 className="mt-3 text-xl font-bold text-foreground">{nextAttendingShow.title}</h3>
+                <h3 className="mt-3 text-xl font-bold text-foreground">
+                  {nextAttendingShow.title}
+                </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {nextAttendingShow.subtitle} ·{" "}
-                  {new Date(`${nextAttendingShow.date}T12:00:00`).toLocaleDateString("en-US", {
+                  {new Date(
+                    `${nextAttendingShow.date}T12:00:00`,
+                  ).toLocaleDateString("en-US", {
                     month: "long",
                     day: "numeric",
                     year: "numeric",
@@ -197,14 +224,14 @@ interface RelatedArtistsSectionProps {
   artists: { name: string; match: number; id?: number; slug?: string }[];
 }
 
-export function RelatedArtistsSection({
-  artists,
-}: RelatedArtistsSectionProps) {
+export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
   if (!artists.length) return null;
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">Related Artists</h2>
+      <h2 className="mb-4 text-lg font-semibold text-foreground">
+        Related Artists
+      </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {artists.slice(0, 15).map((artist) => (
           <ArtistCard
@@ -212,9 +239,24 @@ export function RelatedArtistsSection({
             name={artist.name}
             artistId={artist.id}
             artistSlug={artist.slug}
-            photo={artist.id ? buildArtistPhotoUrl(artist.name, artist.id, artist.slug) : undefined}
-            subtitle={artist.match ? `${Math.round(artist.match * 100)}% match` : undefined}
-            href={artist.id ? artistPagePath({ artistId: artist.id, artistSlug: artist.slug }) : `https://www.last.fm/music/${encodeURIComponent(artist.name)}`}
+            photo={
+              artist.id
+                ? buildArtistPhotoUrl(artist.name, artist.id, artist.slug)
+                : undefined
+            }
+            subtitle={
+              artist.match
+                ? `${Math.round(artist.match * 100)}% match`
+                : undefined
+            }
+            href={
+              artist.id
+                ? artistPagePath({
+                    artistId: artist.id,
+                    artistSlug: artist.slug,
+                  })
+                : `https://www.last.fm/music/${encodeURIComponent(artist.name)}`
+            }
             external={!artist.id}
             large
             layout="grid"

@@ -1,6 +1,14 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2, Play, Radio, Share2, Shuffle, Sparkles } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Play,
+  Radio,
+  Share2,
+  Shuffle,
+  Sparkles,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -8,7 +16,10 @@ import { CoreTracksArtwork } from "@/components/home/CoreTracksArtwork";
 import { MixArtwork } from "@/components/home/MixArtwork";
 import type { HomeGeneratedPlaylistDetail } from "@/components/home/home-model";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
-import { PlaylistTrackFilterBar, filterPlaylistTracks } from "@/components/playlists/PlaylistTrackFilterBar";
+import {
+  PlaylistTrackFilterBar,
+  filterPlaylistTracks,
+} from "@/components/playlists/PlaylistTrackFilterBar";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
@@ -16,7 +27,10 @@ import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-import { hasTrackReference, toTrackReferencePayload } from "@/lib/track-reference";
+import {
+  hasTrackReference,
+  toTrackReferencePayload,
+} from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { fetchHomePlaylistRadio } from "@/lib/radio";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
@@ -29,29 +43,33 @@ export function HomePlaylist() {
   const [filterQuery, setFilterQuery] = useState("");
   const deferredFilterQuery = useDeferredValue(filterQuery);
   const { data, loading } = useApi<HomeGeneratedPlaylistDetail>(
-    playlistId ? `/api/me/home/playlists/${encodeURIComponent(playlistId)}?v=2` : null,
+    playlistId
+      ? `/api/me/home/playlists/${encodeURIComponent(playlistId)}?v=2`
+      : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
   );
-  const { playlistOptions, ensurePlaylistOptionsLoaded } = useLazyPlaylistOptions();
+  const { playlistOptions, ensurePlaylistOptionsLoaded } =
+    useLazyPlaylistOptions();
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
-    return data.tracks.map((track): Track =>
-      toPlayableTrack(track, {
-        cover:
-          track.artist && track.album
-            ? albumCoverApiUrl({
-                albumId: track.album_id || undefined,
-                albumEntityUid: track.album_entity_uid || undefined,
-                artistEntityUid: track.artist_entity_uid || undefined,
-                albumSlug: track.album_slug || undefined,
-                artistName: track.artist,
-                albumName: track.album,
-              }) || undefined
-            : undefined,
-      }),
+    return data.tracks.map(
+      (track): Track =>
+        toPlayableTrack(track, {
+          cover:
+            track.artist && track.album
+              ? albumCoverApiUrl({
+                  albumId: track.album_id || undefined,
+                  albumEntityUid: track.album_entity_uid || undefined,
+                  artistEntityUid: track.artist_entity_uid || undefined,
+                  albumSlug: track.album_slug || undefined,
+                  artistName: track.artist,
+                  albumName: track.album,
+                }) || undefined
+              : undefined,
+        }),
     );
   }, [data]);
 
@@ -60,14 +78,15 @@ export function HomePlaylist() {
     [data?.tracks, deferredFilterQuery],
   );
 
-  const trackRows = useMemo<TrackRowData[]>(() =>
-    filteredTracks.map((track) =>
-      toTrackRowData({
-        ...track,
-        id: track.track_id ?? track.track_path ?? track.title,
-        library_track_id: track.track_id,
-      }),
-    ),
+  const trackRows = useMemo<TrackRowData[]>(
+    () =>
+      filteredTracks.map((track) =>
+        toTrackRowData({
+          ...track,
+          id: track.track_id ?? track.track_path ?? track.title,
+          library_track_id: track.track_id,
+        }),
+      ),
     [filteredTracks],
   );
 
@@ -91,10 +110,16 @@ export function HomePlaylist() {
 
   async function handleShare() {
     if (!data) return;
-    const shareUrl = `${window.location.origin}/home/playlist/${encodeURIComponent(data.id)}`;
+    const shareUrl = `${
+      window.location.origin
+    }/home/playlist/${encodeURIComponent(data.id)}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: data.name, text: data.name, url: shareUrl });
+        await navigator.share({
+          title: data.name,
+          text: data.name,
+          url: shareUrl,
+        });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         toast.success("Playlist link copied");
@@ -128,11 +153,13 @@ export function HomePlaylist() {
     if (!hasTrackReference(track)) return;
     try {
       await api(`/api/playlists/${targetPlaylistId}/tracks`, "POST", {
-        tracks: [toTrackReferencePayload({
-          ...track,
-          album: track.album || "",
-          duration: track.duration || 0,
-        })],
+        tracks: [
+          toTrackReferencePayload({
+            ...track,
+            album: track.album || "",
+            duration: track.duration || 0,
+          }),
+        ],
       });
       toast.success("Track added to playlist");
     } catch {
@@ -201,12 +228,16 @@ export function HomePlaylist() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">{data.name}</h1>
             {data.description ? (
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{data.description}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                {data.description}
+              </p>
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>{data.track_count} tracks</span>
-            {data.total_duration > 0 ? <span>{formatTotalDuration(data.total_duration)}</span> : null}
+            {data.total_duration > 0 ? (
+              <span>{formatTotalDuration(data.total_duration)}</span>
+            ) : null}
             <span>Generated for you</span>
           </div>
         </div>
@@ -255,11 +286,15 @@ export function HomePlaylist() {
 
       {data.tracks.length === 0 ? (
         <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">This playlist has no tracks yet</p>
+          <p className="text-sm text-muted-foreground">
+            This playlist has no tracks yet
+          </p>
         </div>
       ) : filteredTracks.length === 0 ? (
         <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">No tracks match this filter</p>
+          <p className="text-sm text-muted-foreground">
+            No tracks match this filter
+          </p>
         </div>
       ) : (
         <div className="space-y-1">

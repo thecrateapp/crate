@@ -5,8 +5,8 @@ async function loadStorage(options: { native: boolean; apiBase?: string }) {
   vi.doMock("@/lib/api", () => ({
     getApiBase: () => options.apiBase ?? "",
   }));
-  vi.doMock("@/lib/capacitor-runtime", () => ({
-    isNative: options.native,
+  vi.doMock("@/lib/platform", () => ({
+    usesConfigurableServer: options.native,
   }));
   return import("./auth-user-storage");
 }
@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear();
   vi.doUnmock("@/lib/api");
-  vi.doUnmock("@/lib/capacitor-runtime");
+  vi.doUnmock("@/lib/platform");
   vi.resetModules();
 });
 
@@ -56,6 +56,10 @@ describe("auth user storage", () => {
 
     expect(storage.getStoredAuthUserId()).toBe("11");
     expect(localStorage.getItem("listen-auth-user-id")).toBeNull();
-    expect(localStorage.getItem("listen-auth-user-id:https%3A%2F%2Fapi-two.example.test")).toBe("11");
+    expect(
+      localStorage.getItem(
+        "listen-auth-user-id:https%3A%2F%2Fapi-two.example.test",
+      ),
+    ).toBe("11");
   });
 });

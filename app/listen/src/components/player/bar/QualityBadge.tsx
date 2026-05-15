@@ -1,7 +1,10 @@
 import { Sparkles, Disc3, AudioLines } from "lucide-react";
 import type { QualityBadge as QualityBadgeData } from "./player-bar-utils";
 
-const tierStyles: Record<QualityBadgeData["tier"], { border: string; text: string; bg: string; glow?: string }> = {
+const tierStyles: Record<
+  QualityBadgeData["tier"],
+  { border: string; text: string; bg: string; glow?: string }
+> = {
   "hi-res": {
     border: "border-amber-400/50",
     text: "text-amber-300",
@@ -60,7 +63,9 @@ export function QualityBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-bold tracking-wider leading-none whitespace-nowrap border ${style.border} ${style.text} ${style.bg} ${style.glow || ""} ${streamTone}`}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[10px] font-bold tracking-wider leading-none whitespace-nowrap border ${
+        style.border
+      } ${style.text} ${style.bg} ${style.glow || ""} ${streamTone}`}
       title={title}
     >
       {Icon && <Icon size={9} />}

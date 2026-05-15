@@ -6,7 +6,10 @@ vi.mock("@/lib/api", () => ({
   apiFetch: apiFetchMock,
 }));
 
-import { preparePlaybackDelivery, upcomingDeliveryTracks } from "@/lib/playback-delivery";
+import {
+  preparePlaybackDelivery,
+  upcomingDeliveryTracks,
+} from "@/lib/playback-delivery";
 import type { Track } from "@/contexts/player-types";
 
 function makeTrack(index: number): Track {
@@ -26,22 +29,27 @@ function mockMatchMedia(matches: boolean): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
-      matches,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(() => true),
-    } satisfies MediaQueryList)),
+    value: vi.fn().mockImplementation(
+      (query: string) =>
+        ({
+          matches,
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(() => true),
+        }) satisfies MediaQueryList,
+    ),
   });
 }
 
 describe("upcomingDeliveryTracks", () => {
   it("keeps the desktop prepare window by default", () => {
-    const tracks = Array.from({ length: 7 }, (_, index) => makeTrack(index + 1));
+    const tracks = Array.from({ length: 7 }, (_, index) =>
+      makeTrack(index + 1),
+    );
     expect(upcomingDeliveryTracks(tracks, 0).map((item) => item.id)).toEqual([
       "track-1",
       "track-2",
@@ -53,12 +61,12 @@ describe("upcomingDeliveryTracks", () => {
   });
 
   it("supports a smaller runtime prepare window", () => {
-    const tracks = Array.from({ length: 6 }, (_, index) => makeTrack(index + 1));
-    expect(upcomingDeliveryTracks(tracks, 0, 3).map((item) => item.id)).toEqual([
-      "track-1",
-      "track-2",
-      "track-3",
-    ]);
+    const tracks = Array.from({ length: 6 }, (_, index) =>
+      makeTrack(index + 1),
+    );
+    expect(upcomingDeliveryTracks(tracks, 0, 3).map((item) => item.id)).toEqual(
+      ["track-1", "track-2", "track-3"],
+    );
   });
 });
 
@@ -78,7 +86,9 @@ describe("preparePlaybackDelivery", () => {
   });
 
   it("prepares a smaller batch on mobile viewports", async () => {
-    const tracks = Array.from({ length: 6 }, (_, index) => makeTrack(index + 1));
+    const tracks = Array.from({ length: 6 }, (_, index) =>
+      makeTrack(index + 1),
+    );
     apiFetchMock.mockResolvedValueOnce({});
     mockMatchMedia(true);
 
@@ -93,13 +103,17 @@ describe("preparePlaybackDelivery", () => {
   it("can prepare the active track immediately on user-initiated playback", async () => {
     apiFetchMock.mockResolvedValueOnce({});
 
-    preparePlaybackDelivery([makeTrack(43)], 0, "balanced", { immediate: true });
+    preparePlaybackDelivery([makeTrack(43)], 0, "balanced", {
+      immediate: true,
+    });
 
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("retries the same batch after a transient prepare failure", async () => {
-    apiFetchMock.mockRejectedValueOnce(new Error("network")).mockResolvedValueOnce({});
+    apiFetchMock
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce({});
 
     preparePlaybackDelivery([track], 0, "balanced");
     await vi.advanceTimersByTimeAsync(300);

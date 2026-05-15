@@ -13,9 +13,10 @@ def get_track_distribution_summary(genre_limit: int = 30) -> dict[str, dict]:
     chart.
     """
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH track_rollups AS MATERIALIZED (
                     SELECT
                         genre,
@@ -87,9 +88,12 @@ def get_track_distribution_summary(genre_limit: int = 30) -> dict[str, dict]:
                 ) rows
                 ORDER BY kind, count_value DESC, label
                 """
-            ),
-            {"genre_limit": genre_limit},
-        ).mappings().all()
+                ),
+                {"genre_limit": genre_limit},
+            )
+            .mappings()
+            .all()
+        )
 
     summary: dict[str, dict] = {
         "genres": {},
@@ -109,54 +113,71 @@ def get_track_distribution_summary(genre_limit: int = 30) -> dict[str, dict]:
         elif kind == "bitrate":
             summary["bitrates"][label] = int(row["count_value"] or 0)
         elif kind == "size_by_format":
-            summary["sizes_by_format_gb"][label] = round(float(row["size_value"] or 0) / (1024**3), 2)
+            summary["sizes_by_format_gb"][label] = round(
+                float(row["size_value"] or 0) / (1024**3), 2
+            )
     return summary
 
 
 def get_genre_distribution(limit: int = 30) -> dict[str, int]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT genre, COUNT(*) as c
                 FROM library_tracks
                 WHERE genre IS NOT NULL AND genre != ''
                 GROUP BY genre ORDER BY c DESC LIMIT :limit
                 """
-            ),
-            {"limit": limit},
-        ).mappings().all()
+                ),
+                {"limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return {row["genre"]: row["c"] for row in rows}
 
 
 def get_decade_distribution() -> dict[str, int]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT (CAST(year AS INTEGER)/10)*10 || 's' as decade, COUNT(*) as c
                 FROM library_albums
                 WHERE year IS NOT NULL AND year != '' AND length(year) >= 4
                 GROUP BY decade ORDER BY decade
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {row["decade"]: row["c"] for row in rows}
 
 
 def get_format_distribution() -> dict[str, int]:
     with read_scope() as session:
-        rows = session.execute(
-            text("SELECT format, COUNT(*) as c FROM library_tracks WHERE format IS NOT NULL GROUP BY format")
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT format, COUNT(*) as c FROM library_tracks WHERE format IS NOT NULL GROUP BY format"
+                )
+            )
+            .mappings()
+            .all()
+        )
         return {row["format"]: row["c"] for row in rows}
 
 
 def get_bitrate_distribution() -> dict[str, int]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     CASE
                         WHEN bitrate IS NULL OR bitrate = 0 THEN 'unknown'
@@ -171,24 +192,33 @@ def get_bitrate_distribution() -> dict[str, int]:
                 FROM library_tracks
                 GROUP BY bucket
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return {row["bucket"]: row["c"] for row in rows}
 
 
 def get_sizes_by_format_gb() -> dict[str, float]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT format, SUM(size) AS bytes
                 FROM library_tracks
                 WHERE format IS NOT NULL
                 GROUP BY format
                 """
+                )
             )
-        ).mappings().all()
-        return {row["format"]: round((row["bytes"] or 0) / (1024**3), 2) for row in rows}
+            .mappings()
+            .all()
+        )
+        return {
+            row["format"]: round((row["bytes"] or 0) / (1024**3), 2) for row in rows
+        }
 
 
 __all__ = [

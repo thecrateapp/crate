@@ -27,7 +27,9 @@ export function useDismissibleLayer({
     if (!active) return;
 
     const isInside = (target: Node | null) =>
-      refsRef.current.some((ref) => ref.current && target && ref.current.contains(target));
+      refsRef.current.some(
+        (ref) => ref.current && target && ref.current.contains(target),
+      );
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       if (!closeOnPointerDownOutside) return;
@@ -47,7 +49,9 @@ export function useDismissibleLayer({
     };
 
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown, { passive: true });
+    document.addEventListener("touchstart", handlePointerDown, {
+      passive: true,
+    });
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {

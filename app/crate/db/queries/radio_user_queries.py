@@ -13,11 +13,14 @@ def _vectors_from_rows(rows) -> list[list[float]]:
     return [list(row["bliss_vector"]) for row in rows]
 
 
-def get_recent_liked_seed_rows(user_id: int, limit: int = 10, *, session=None) -> list[dict]:
+def get_recent_liked_seed_rows(
+    user_id: int, limit: int = 10, *, session=None
+) -> list[dict]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.artist, t.bliss_vector
                 FROM user_liked_tracks lt
                 JOIN library_tracks t ON t.id = lt.track_id
@@ -26,21 +29,31 @@ def get_recent_liked_seed_rows(user_id: int, limit: int = 10, *, session=None) -
                 ORDER BY lt.created_at DESC
                 LIMIT :limit
                 """
-            ),
-            {"user_id": user_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def get_recent_liked_vectors(user_id: int, limit: int = 10, *, session=None) -> list[list[float]]:
-    return _vectors_from_rows(get_recent_liked_seed_rows(user_id, limit, session=session))
+def get_recent_liked_vectors(
+    user_id: int, limit: int = 10, *, session=None
+) -> list[list[float]]:
+    return _vectors_from_rows(
+        get_recent_liked_seed_rows(user_id, limit, session=session)
+    )
 
 
-def get_followed_artist_seed_rows(user_id: int, limit: int = 30, *, session=None) -> list[dict]:
+def get_followed_artist_seed_rows(
+    user_id: int, limit: int = 30, *, session=None
+) -> list[dict]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT DISTINCT ON (t.id) t.id AS track_id, t.artist, t.bliss_vector
                 FROM user_follows af
                 JOIN library_albums a ON LOWER(a.artist) = LOWER(af.artist_name)
@@ -50,21 +63,31 @@ def get_followed_artist_seed_rows(user_id: int, limit: int = 30, *, session=None
                 ORDER BY t.id
                 LIMIT :limit
                 """
-            ),
-            {"user_id": user_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def get_followed_artist_vectors(user_id: int, limit: int = 30, *, session=None) -> list[list[float]]:
-    return _vectors_from_rows(get_followed_artist_seed_rows(user_id, limit, session=session))
+def get_followed_artist_vectors(
+    user_id: int, limit: int = 30, *, session=None
+) -> list[list[float]]:
+    return _vectors_from_rows(
+        get_followed_artist_seed_rows(user_id, limit, session=session)
+    )
 
 
-def get_saved_album_seed_rows(user_id: int, limit: int = 30, *, session=None) -> list[dict]:
+def get_saved_album_seed_rows(
+    user_id: int, limit: int = 30, *, session=None
+) -> list[dict]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.artist, t.bliss_vector
                 FROM user_saved_albums sa
                 JOIN library_tracks t ON t.album_id = sa.album_id
@@ -72,21 +95,31 @@ def get_saved_album_seed_rows(user_id: int, limit: int = 30, *, session=None) ->
                   AND t.bliss_vector IS NOT NULL
                 LIMIT :limit
                 """
-            ),
-            {"user_id": user_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def get_saved_album_vectors(user_id: int, limit: int = 30, *, session=None) -> list[list[float]]:
-    return _vectors_from_rows(get_saved_album_seed_rows(user_id, limit, session=session))
+def get_saved_album_vectors(
+    user_id: int, limit: int = 30, *, session=None
+) -> list[list[float]]:
+    return _vectors_from_rows(
+        get_saved_album_seed_rows(user_id, limit, session=session)
+    )
 
 
-def get_recent_play_seed_rows(user_id: int, limit: int = 20, *, session=None) -> list[dict]:
+def get_recent_play_seed_rows(
+    user_id: int, limit: int = 20, *, session=None
+) -> list[dict]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id AS track_id, t.artist, t.bliss_vector
                 FROM user_play_events pe
                 LEFT JOIN library_tracks t
@@ -97,29 +130,40 @@ def get_recent_play_seed_rows(user_id: int, limit: int = 20, *, session=None) ->
                 ORDER BY pe.ended_at DESC
                 LIMIT :limit
                 """
-            ),
-            {"user_id": user_id, "limit": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def get_recent_play_vectors(user_id: int, limit: int = 20, *, session=None) -> list[list[float]]:
-    return _vectors_from_rows(get_recent_play_seed_rows(user_id, limit, session=session))
+def get_recent_play_vectors(
+    user_id: int, limit: int = 20, *, session=None
+) -> list[list[float]]:
+    return _vectors_from_rows(
+        get_recent_play_seed_rows(user_id, limit, session=session)
+    )
 
 
 def count_user_radio_signals(user_id: int, *, session=None) -> dict:
     with optional_scope(session) as s:
-        row = s.execute(
-            text(
-                """
+        row = (
+            s.execute(
+                text(
+                    """
                 SELECT
                     (SELECT count(*) FROM user_liked_tracks WHERE user_id = :uid) AS likes,
                     (SELECT count(*) FROM user_follows WHERE user_id = :uid) AS follows,
                     (SELECT count(*) FROM user_saved_albums WHERE user_id = :uid) AS saved_albums
                 """
-            ),
-            {"uid": user_id},
-        ).mappings().first()
+                ),
+                {"uid": user_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else {"likes": 0, "follows": 0, "saved_albums": 0}
 
 
@@ -136,9 +180,10 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
     highest-priority group that meets its minimum-vector threshold.
     """
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 WITH liked AS (
                     SELECT
                         t.id AS track_id,
@@ -207,9 +252,12 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                 ) sources
                 ORDER BY priority, source_rank
                 """
-            ),
-            {"uid": user_id},
-        ).mappings().all()
+                ),
+                {"uid": user_id},
+            )
+            .mappings()
+            .all()
+        )
 
     grouped: dict[int, list[dict]] = {}
     for row in rows:
@@ -217,11 +265,14 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
     return grouped
 
 
-def load_feedback_history(user_id: int, max_age_days: int = 90, *, session=None) -> tuple[list[list[float]], list[list[float]]]:
+def load_feedback_history(
+    user_id: int, max_age_days: int = 90, *, session=None
+) -> tuple[list[list[float]], list[list[float]]]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 (
                     SELECT action, bliss_vector
                     FROM radio_feedback
@@ -244,13 +295,16 @@ def load_feedback_history(user_id: int, max_age_days: int = 90, *, session=None)
                     LIMIT :per_action_limit
                 )
                 """
-            ),
-            {
-                "user_id": user_id,
-                "max_age_days": int(max_age_days),
-                "per_action_limit": _FEEDBACK_SAMPLE_PER_ACTION,
-            },
-        ).mappings().all()
+                ),
+                {
+                    "user_id": user_id,
+                    "max_age_days": int(max_age_days),
+                    "per_action_limit": _FEEDBACK_SAMPLE_PER_ACTION,
+                },
+            )
+            .mappings()
+            .all()
+        )
 
     liked: list[list[float]] = []
     disliked: list[list[float]] = []

@@ -10,7 +10,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, artist_name)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_follows_user ON user_follows(user_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_follows_user ON user_follows(user_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_saved_albums (
@@ -20,7 +22,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, album_id)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_saved_albums_user ON user_saved_albums(user_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_saved_albums_user ON user_saved_albums(user_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_liked_tracks (
@@ -30,7 +34,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, track_id)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_liked_tracks_user ON user_liked_tracks(user_id)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_liked_tracks_user ON user_liked_tracks(user_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS play_history (
@@ -45,10 +51,18 @@ def create_activity_schema(cur) -> None:
             played_at TIMESTAMPTZ NOT NULL
         )
     """)
-    cur.execute("ALTER TABLE play_history ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_play_history_user ON play_history(user_id, played_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_play_history_track_entity_uid ON play_history(track_entity_uid)")
+    cur.execute(
+        "ALTER TABLE play_history ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_play_history_user ON play_history(user_id, played_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_play_history_track_entity_uid ON play_history(track_entity_uid)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_play_events (
@@ -79,14 +93,30 @@ def create_activity_schema(cur) -> None:
             created_at TIMESTAMPTZ NOT NULL
         )
     """)
-    cur.execute("ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS client_event_id TEXT")
-    cur.execute("ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_user ON user_play_events(user_id, ended_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_track ON user_play_events(track_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_track_entity_uid ON user_play_events(track_entity_uid)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_source ON user_play_events(user_id, play_source_type, ended_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_user_artist ON user_play_events(user_id, artist, ended_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_play_events_user_album ON user_play_events(user_id, album, ended_at DESC)")
+    cur.execute(
+        "ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS client_event_id TEXT"
+    )
+    cur.execute(
+        "ALTER TABLE user_play_events ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_user ON user_play_events(user_id, ended_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_track ON user_play_events(track_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_track_entity_uid ON user_play_events(track_entity_uid)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_source ON user_play_events(user_id, play_source_type, ended_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_user_artist ON user_play_events(user_id, artist, ended_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_play_events_user_album ON user_play_events(user_id, album, ended_at DESC)"
+    )
     cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_user_play_events_user_client_event
@@ -109,7 +139,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, day)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_daily_listening_user ON user_daily_listening(user_id, day DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_daily_listening_user ON user_daily_listening(user_id, day DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_track_stats (
@@ -130,9 +162,15 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, stat_window, entity_key)
         )
     """)
-    cur.execute("ALTER TABLE user_track_stats ADD COLUMN IF NOT EXISTS track_entity_uid UUID")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_track_stats_lookup ON user_track_stats(user_id, stat_window, play_count DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_track_stats_entity_uid ON user_track_stats(track_entity_uid)")
+    cur.execute(
+        "ALTER TABLE user_track_stats ADD COLUMN IF NOT EXISTS track_entity_uid UUID"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_track_stats_lookup ON user_track_stats(user_id, stat_window, play_count DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_track_stats_entity_uid ON user_track_stats(track_entity_uid)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_artist_stats (
@@ -147,7 +185,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, stat_window, artist_name)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_artist_stats_lookup ON user_artist_stats(user_id, stat_window, play_count DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_artist_stats_lookup ON user_artist_stats(user_id, stat_window, play_count DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_album_stats (
@@ -164,7 +204,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, stat_window, entity_key)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_album_stats_lookup ON user_album_stats(user_id, stat_window, play_count DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_album_stats_lookup ON user_album_stats(user_id, stat_window, play_count DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_genre_stats (
@@ -179,7 +221,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (user_id, stat_window, genre_name)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_genre_stats_lookup ON user_genre_stats(user_id, stat_window, play_count DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_genre_stats_lookup ON user_genre_stats(user_id, stat_window, play_count DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS jam_rooms (
@@ -196,13 +240,25 @@ def create_activity_schema(cur) -> None:
             ended_at TIMESTAMPTZ
         )
     """)
-    cur.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'")
-    cur.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN NOT NULL DEFAULT FALSE")
+    cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'"
+    )
+    cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN NOT NULL DEFAULT FALSE"
+    )
     cur.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS description TEXT")
-    cur.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_rooms_host ON jam_rooms(host_user_id, created_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_rooms_visibility_status ON jam_rooms(status, visibility, created_at DESC)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_rooms_tags ON jam_rooms USING GIN (tags)")
+    cur.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'::jsonb"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_rooms_host ON jam_rooms(host_user_id, created_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_rooms_visibility_status ON jam_rooms(status, visibility, created_at DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_rooms_tags ON jam_rooms USING GIN (tags)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS jam_room_members (
@@ -214,7 +270,9 @@ def create_activity_schema(cur) -> None:
             PRIMARY KEY (room_id, user_id)
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_room_members_user ON jam_room_members(user_id, joined_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_room_members_user ON jam_room_members(user_id, joined_at DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS jam_room_invites (
@@ -227,7 +285,9 @@ def create_activity_schema(cur) -> None:
             created_at TIMESTAMPTZ NOT NULL
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_room_invites_room ON jam_room_invites(room_id, created_at DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_room_invites_room ON jam_room_invites(room_id, created_at DESC)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS jam_room_events (
@@ -239,4 +299,6 @@ def create_activity_schema(cur) -> None:
             created_at TIMESTAMPTZ NOT NULL
         )
     """)
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_jam_room_events_room ON jam_room_events(room_id, id DESC)")
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_jam_room_events_room ON jam_room_events(room_id, id DESC)"
+    )

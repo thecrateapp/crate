@@ -46,68 +46,94 @@ def _artist_genres_from_rows(rows) -> dict[str, dict[str, float]]:
 
 def load_artist_similarity_graph(*, session=None) -> dict[str, dict[str, float]]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text("SELECT artist_name, similar_name, score FROM artist_similarities")
-        ).mappings().all()
+        rows = (
+            s.execute(
+                text("SELECT artist_name, similar_name, score FROM artist_similarities")
+            )
+            .mappings()
+            .all()
+        )
     return _similarity_graph_from_rows(rows)
 
 
 def load_shared_members_graph(*, session=None) -> dict[str, set[str]]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT a.name AS artist, m->>'name' AS member
                 FROM library_artists a, jsonb_array_elements(a.members_json) AS m
                 WHERE a.members_json IS NOT NULL
                   AND a.members_json != 'null'
                   AND a.members_json != '[]'
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return _member_graph_from_rows(rows)
 
 
 def load_artist_genres(*, session=None) -> dict[str, dict[str, float]]:
     with optional_scope(session) as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT ag.artist_name, g.name, ag.weight
                 FROM artist_genres ag JOIN genres g ON g.id = ag.genre_id
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return _artist_genres_from_rows(rows)
 
 
 def load_artist_radio_graphs(
     *,
     session=None,
-) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]]:
+) -> tuple[
+    dict[str, dict[str, float]], dict[str, dict[str, float]], dict[str, set[str]]
+]:
     with optional_scope(session) as s:
-        similarity_rows = s.execute(
-            text("SELECT artist_name, similar_name, score FROM artist_similarities")
-        ).mappings().all()
-        genre_rows = s.execute(
-            text(
-                """
+        similarity_rows = (
+            s.execute(
+                text("SELECT artist_name, similar_name, score FROM artist_similarities")
+            )
+            .mappings()
+            .all()
+        )
+        genre_rows = (
+            s.execute(
+                text(
+                    """
                 SELECT ag.artist_name, g.name, ag.weight
                 FROM artist_genres ag JOIN genres g ON g.id = ag.genre_id
                 """
+                )
             )
-        ).mappings().all()
-        member_rows = s.execute(
-            text(
-                """
+            .mappings()
+            .all()
+        )
+        member_rows = (
+            s.execute(
+                text(
+                    """
                 SELECT a.name AS artist, m->>'name' AS member
                 FROM library_artists a, jsonb_array_elements(a.members_json) AS m
                 WHERE a.members_json IS NOT NULL
                   AND a.members_json != 'null'
                   AND a.members_json != '[]'
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
     return (
         _similarity_graph_from_rows(similarity_rows),
         _artist_genres_from_rows(genre_rows),

@@ -16,7 +16,7 @@ def get_home_hero(
     followed_names_lower: list[str],
     similar_target_names_lower: list[str],
     top_genres_lower: list[str],
-) -> dict | None:
+) -> list[dict] | None:
     rows = get_home_hero_rows(
         followed_names_lower=followed_names_lower,
         similar_target_names_lower=similar_target_names_lower,
@@ -36,8 +36,12 @@ def get_home_hero(
     return rows[offset:] + rows[:offset]
 
 
-def track_candidates_for_album_ids(user_id: int, album_ids: list[int], limit: int = 240) -> list[dict]:
-    return get_track_candidates_for_album_ids(user_id=user_id, album_ids=album_ids, limit=limit)
+def track_candidates_for_album_ids(
+    user_id: int, album_ids: list[int], limit: int = 240
+) -> list[dict]:
+    return get_track_candidates_for_album_ids(
+        user_id=user_id, album_ids=album_ids, limit=limit
+    )
 
 
 def query_discovery_tracks(
@@ -58,8 +62,12 @@ def query_discovery_tracks(
     )
 
 
-def fallback_recent_interest_tracks(user_id: int, interest_artists_lower: list[str], limit: int = 240) -> list[dict]:
-    return get_recent_interest_track_rows(user_id=user_id, interest_artists_lower=interest_artists_lower, limit=limit)
+def fallback_recent_interest_tracks(
+    user_id: int, interest_artists_lower: list[str], limit: int = 240
+) -> list[dict]:
+    return get_recent_interest_track_rows(
+        user_id=user_id, interest_artists_lower=interest_artists_lower, limit=limit
+    )
 
 
 __all__ = [

@@ -1,10 +1,16 @@
 import logging
+from collections.abc import Mapping
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _require_admin, _require_auth
 from crate.api._deps import artist_name_from_entity_uid, artist_name_from_id
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.utility import (
     ArtistAnalysisDataResponse,
     ArtistEnrichmentResponse,
@@ -35,7 +41,7 @@ _ENRICHMENT_RESPONSES = merge_responses(
 
 
 def _enrich_artist_refs(items: list[dict]) -> list[dict]:
-    names = [item.get("name") for item in items if item.get("name")]
+    names = [str(item.get("name")) for item in items if item.get("name")]
     if not names:
         return items
 
@@ -63,7 +69,9 @@ def _enrich_enrichment_artist_refs(result: dict) -> dict:
 
     spotify_data = dict(enriched.get("spotify") or {})
     if isinstance(spotify_data.get("related_artists"), list):
-        spotify_data["related_artists"] = _enrich_artist_refs(spotify_data["related_artists"])
+        spotify_data["related_artists"] = _enrich_artist_refs(
+            spotify_data["related_artists"]
+        )
     if spotify_data:
         enriched["spotify"] = spotify_data
 
@@ -153,6 +161,7 @@ def get_artist_analysis_data(request: Request, artist_id: int):
         mood = entry.pop("mood_json", None)
         if isinstance(mood, str):
             import json as _json
+
             try:
                 mood = _json.loads(mood)
             except Exception:
@@ -183,6 +192,7 @@ def get_artist_analysis_data_by_entity_uid(request: Request, artist_entity_uid: 
         mood = entry.pop("mood_json", None)
         if isinstance(mood, str):
             import json as _json
+
             try:
                 mood = _json.loads(mood)
             except Exception:
@@ -218,9 +228,10 @@ def get_artist_enrichment_by_entity_uid(request: Request, artist_entity_uid: str
     return get_artist_enrichment(request, artist_name)
 
 
-def _build_from_db(artist: dict) -> dict:
+def _build_from_db(artist: Mapping[str, Any]) -> dict:
     """Reconstruct enrichment dict from persisted DB columns."""
     import json
+
     result: dict = {}
 
     bio = artist.get("bio")
@@ -232,9 +243,13 @@ def _build_from_db(artist: dict) -> dict:
         if bio:
             lastfm["bio"] = bio
         if tags:
-            lastfm["tags"] = tags if isinstance(tags, list) else json.loads(tags or "[]")
+            lastfm["tags"] = (
+                tags if isinstance(tags, list) else json.loads(tags or "[]")
+            )
         if similar:
-            lastfm["similar"] = similar if isinstance(similar, list) else json.loads(similar or "[]")
+            lastfm["similar"] = (
+                similar if isinstance(similar, list) else json.loads(similar or "[]")
+            )
         if listeners:
             lastfm["listeners"] = listeners
         result["lastfm"] = lastfm
@@ -259,7 +274,9 @@ def _build_from_db(artist: dict) -> dict:
             mb["type"] = artist["artist_type"]
         members = artist.get("members_json")
         if members:
-            mb["members"] = members if isinstance(members, list) else json.loads(members or "[]")
+            mb["members"] = (
+                members if isinstance(members, list) else json.loads(members or "[]")
+            )
         urls = artist.get("urls_json")
         if urls:
             mb["urls"] = urls if isinstance(urls, dict) else json.loads(urls or "{}")

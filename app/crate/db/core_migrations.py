@@ -13,11 +13,15 @@ def run_alembic_upgrade() -> None:
     from alembic import command
     from alembic.config import Config
 
-    app_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    app_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
     ini_path = os.path.join(app_dir, "alembic.ini")
 
     if not os.path.exists(ini_path):
-        log.warning("alembic.ini not found at %s — skipping Alembic migrations", ini_path)
+        log.warning(
+            "alembic.ini not found at %s — skipping Alembic migrations", ini_path
+        )
         return
 
     alembic_cfg = Config(ini_path)

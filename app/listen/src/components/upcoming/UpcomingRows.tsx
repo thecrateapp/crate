@@ -32,7 +32,9 @@ export function UpcomingMonthGroup({
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
 }) {
-  const [attendanceOverrides, setAttendanceOverrides] = useState<Record<string, boolean>>({});
+  const [attendanceOverrides, setAttendanceOverrides] = useState<
+    Record<string, boolean>
+  >({});
 
   return (
     <div className="space-y-2">
@@ -42,9 +44,10 @@ export function UpcomingMonthGroup({
       <div className="space-y-2">
         {items.map((item, index) => {
           const key = itemKey(item, index);
-          const itemWithOverrides = attendanceOverrides[key] == null
-            ? item
-            : { ...item, user_attending: attendanceOverrides[key] };
+          const itemWithOverrides =
+            attendanceOverrides[key] == null
+              ? item
+              : { ...item, user_attending: attendanceOverrides[key] };
 
           if (item.type === "show") {
             return (
@@ -54,7 +57,10 @@ export function UpcomingMonthGroup({
                 expanded={expandedId === key}
                 onToggle={() => onToggleExpand(expandedId === key ? null : key)}
                 onAttendanceChange={(attending) => {
-                  setAttendanceOverrides((current) => ({ ...current, [key]: attending }));
+                  setAttendanceOverrides((current) => ({
+                    ...current,
+                    [key]: attending,
+                  }));
                 }}
               />
             );
@@ -65,7 +71,10 @@ export function UpcomingMonthGroup({
               key={key}
               item={itemWithOverrides}
               onAttendanceChange={(attending) => {
-                setAttendanceOverrides((current) => ({ ...current, [key]: attending }));
+                setAttendanceOverrides((current) => ({
+                  ...current,
+                  [key]: attending,
+                }));
               }}
             />
           );

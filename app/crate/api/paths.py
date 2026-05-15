@@ -1,6 +1,6 @@
 """Music Paths — acoustic route planning API."""
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -53,7 +53,9 @@ def api_create_path(request: Request, body: CreatePathRequest):
     name = body.name
     if not name:
         origin_label = resolve_endpoint_label(body.origin.type, body.origin.value)
-        dest_label = resolve_endpoint_label(body.destination.type, body.destination.value)
+        dest_label = resolve_endpoint_label(
+            body.destination.type, body.destination.value
+        )
         name = f"{origin_label} → {dest_label}"
 
     result = create_music_path(
@@ -82,6 +84,7 @@ def api_create_path(request: Request, body: CreatePathRequest):
 def api_list_paths(request: Request):
     user = _require_auth(request)
     from crate.db.paths import list_music_paths
+
     return list_music_paths(user["id"])
 
 
@@ -93,6 +96,7 @@ def api_list_paths(request: Request):
 def api_get_path(request: Request, path_id: int):
     user = _require_auth(request)
     from crate.db.paths import get_music_path
+
     result = get_music_path(path_id, user["id"])
     if not result:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -107,6 +111,7 @@ def api_get_path(request: Request, path_id: int):
 def api_delete_path(request: Request, path_id: int):
     user = _require_auth(request)
     from crate.db.paths import delete_music_path
+
     if delete_music_path(path_id, user["id"]):
         return {"status": "deleted"}
     return JSONResponse({"error": "Not found"}, status_code=404)
@@ -120,9 +125,12 @@ def api_delete_path(request: Request, path_id: int):
 def api_regenerate_path(request: Request, path_id: int):
     user = _require_auth(request)
     from crate.db.paths import regenerate_music_path
+
     result = regenerate_music_path(path_id, user["id"])
     if not result:
-        return JSONResponse({"error": "Not found or computation failed"}, status_code=404)
+        return JSONResponse(
+            {"error": "Not found or computation failed"}, status_code=404
+        )
     return result
 
 
@@ -134,6 +142,7 @@ def api_regenerate_path(request: Request, path_id: int):
 def api_preview_path(request: Request, body: PreviewPathRequest):
     _require_auth(request)
     from crate.db.paths import preview_music_path
+
     result = preview_music_path(
         origin_type=body.origin.type,
         origin_value=body.origin.value,

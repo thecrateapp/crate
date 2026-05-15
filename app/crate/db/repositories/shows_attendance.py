@@ -7,6 +7,10 @@ from sqlalchemy import text
 from crate.db.tx import transaction_scope
 
 
+def _rowcount(result: object) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def attend_show(user_id: int, show_id: int) -> bool:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
@@ -20,16 +24,18 @@ def attend_show(user_id: int, show_id: int) -> bool:
             ),
             {"user_id": user_id, "show_id": show_id, "now": now},
         )
-    return bool(result.rowcount)
+    return bool(_rowcount(result))
 
 
 def unattend_show(user_id: int, show_id: int) -> bool:
     with transaction_scope() as session:
         result = session.execute(
-            text("DELETE FROM user_show_attendance WHERE user_id = :user_id AND show_id = :show_id"),
+            text(
+                "DELETE FROM user_show_attendance WHERE user_id = :user_id AND show_id = :show_id"
+            ),
             {"user_id": user_id, "show_id": show_id},
         )
-    return bool(result.rowcount)
+    return bool(_rowcount(result))
 
 
 def create_show_reminder(user_id: int, show_id: int, reminder_type: str) -> bool:
@@ -43,9 +49,14 @@ def create_show_reminder(user_id: int, show_id: int, reminder_type: str) -> bool
                 ON CONFLICT (user_id, show_id, reminder_type) DO NOTHING
                 """
             ),
-            {"user_id": user_id, "show_id": show_id, "reminder_type": reminder_type, "now": now},
+            {
+                "user_id": user_id,
+                "show_id": show_id,
+                "reminder_type": reminder_type,
+                "now": now,
+            },
         )
-    return bool(result.rowcount)
+    return bool(_rowcount(result))
 
 
 __all__ = ["attend_show", "create_show_reminder", "unattend_show"]

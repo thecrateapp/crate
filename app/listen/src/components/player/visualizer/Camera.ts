@@ -1,4 +1,4 @@
-import { vec3, mat4 } from 'gl-matrix';
+import { vec3, mat4 } from "gl-matrix";
 
 class Camera {
   projectionMatrix: mat4 = mat4.create();
@@ -13,7 +13,12 @@ class Camera {
   constructor(position: vec3, target: vec3) {
     this.position = vec3.clone(position);
     this.target = vec3.clone(target);
-    mat4.lookAt(this.viewMatrix, this.position, this.target, vec3.fromValues(0, 1, 0));
+    mat4.lookAt(
+      this.viewMatrix,
+      this.position,
+      this.target,
+      vec3.fromValues(0, 1, 0),
+    );
   }
 
   setAspectRatio(aspectRatio: number) {
@@ -21,11 +26,22 @@ class Camera {
   }
 
   updateProjectionMatrix() {
-    mat4.perspective(this.projectionMatrix, this.fovy, this.aspectRatio, this.near, this.far);
+    mat4.perspective(
+      this.projectionMatrix,
+      this.fovy,
+      this.aspectRatio,
+      this.near,
+      this.far,
+    );
   }
 
   update() {
-    mat4.lookAt(this.viewMatrix, this.position, this.target, vec3.fromValues(0, 1, 0));
+    mat4.lookAt(
+      this.viewMatrix,
+      this.position,
+      this.target,
+      vec3.fromValues(0, 1, 0),
+    );
   }
 }
 

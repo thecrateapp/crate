@@ -72,10 +72,18 @@ def upgrade() -> None:
         END $$;
         """
     )
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_track ON stream_variants(track_id)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_entity ON stream_variants(track_entity_uid)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_status ON stream_variants(status, updated_at)")
-    op.execute("CREATE INDEX IF NOT EXISTS idx_stream_variants_preset ON stream_variants(preset, status)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_track ON stream_variants(track_id)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_entity ON stream_variants(track_entity_uid)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_status ON stream_variants(status, updated_at)"
+    )
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_variants_preset ON stream_variants(preset, status)"
+    )
 
 
 def downgrade() -> None:

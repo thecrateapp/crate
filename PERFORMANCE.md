@@ -13,6 +13,7 @@
 This document identifies performance bottlenecks across the Crate stack and provides actionable recommendations organized by priority and ROI. Critical issues include unpaginated database queries, N+1 query patterns, lack of database indexes, and frontend re-rendering problems.
 
 **Key Metrics:**
+
 - Current: 4400+ queries per artist page load (N+1 pattern)
 - Target: <50 queries per page
 - Current API response time: 200-800ms (average)
@@ -39,6 +40,7 @@ This document identifies performance bottlenecks across the Crate stack and prov
 **Location:** `app/crate/api/browse.py:218-224`
 
 **Problem:**
+
 ```python
 cur.execute("""
     SELECT genre, COUNT(*) as cnt
@@ -51,11 +53,13 @@ genres = [{"name": r["genre"], "count": r["cnt"]} for r in cur.fetchall()]
 ```
 
 **Impact:**
+
 - Can return thousands of distinct genre values
 - Blocks database connection during full table scan
 - Slows down /browse/stats endpoint
 
 **Fix:**
+
 ```python
 cur.execute("""
     SELECT genre, COUNT(*) as cnt
@@ -77,6 +81,7 @@ genres = [{"name": r["genre"], "count": r["cnt"]} for r in cur.fetchall()]
 **Location:** `app/crate/api/browse.py:660-716`
 
 **Problem:**
+
 ```python
 # First query: get artist
 cur.execute("SELECT * FROM library_artists WHERE name = %s", (artist,))
@@ -94,12 +99,14 @@ cur.execute("SELECT * FROM genres WHERE id IN (%s)", (genre_ids,))
 ```
 
 **Impact:**
+
 - ~5 queries per artist
 - With 900 artists: 4500+ queries per page load
 - Database connection pool exhaustion
 - High latency on artist detail pages
 
 **Fix:**
+
 ```python
 # Single JOIN query
 cur.execute("""
@@ -129,17 +136,20 @@ cur.execute("""
 **Location:** `app/crate/db/library.py:15`
 
 **Problem:**
+
 ```python
 query += " AND name ILIKE %s"
 # Results in full table scan for every search
 ```
 
 **Impact:**
+
 - Search queries scan entire library_artists table
 - O(n) complexity instead of O(log n)
 - Search latency increases with library size
 
 **Fix:**
+
 ```sql
 -- Install extension
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -161,6 +171,7 @@ CREATE INDEX idx_albums_name_trgm
 **Location:** `app/crate/db/core.py:30`
 
 **Problem:**
+
 ```python
 _pool = psycopg2.pool.ThreadedConnectionPool(
     minconn=2, maxconn=30, dsn=_get_dsn()
@@ -168,11 +179,13 @@ _pool = psycopg2.pool.ThreadedConnectionPool(
 ```
 
 **Impact:**
+
 - With 5 worker threads + concurrent user requests
 - Pool exhaustion under load
 - Request queuing and timeouts
 
 **Fix:**
+
 ```python
 _pool = psycopg2.pool.ThreadedConnectionPool(
     minconn=5,      # Match worker count
@@ -192,6 +205,7 @@ _pool = psycopg2.pool.ThreadedConnectionPool(
 **Location:** `app/ui/src/components/album/AlbumCard.tsx`
 
 **Problem:**
+
 ```tsx
 export function AlbumCard({ artist, name, ... }: AlbumCardProps) {
   const navigate = useNavigate();
@@ -200,11 +214,13 @@ export function AlbumCard({ artist, name, ... }: AlbumCardProps) {
 ```
 
 **Impact:**
+
 - Every parent state change triggers re-render of all cards
 - 20+ cards × 4-5 props = 100+ component updates per state change
 - Janky scrolling and UI lag
 
 **Fix:**
+
 ```tsx
 export const AlbumCard = React.memo(function AlbumCard({ artist, name, ... }: AlbumCardProps) {
   const navigate = useNavigate();
@@ -235,19 +251,24 @@ export const AlbumCard = React.memo(function AlbumCard({ artist, name, ... }: Al
 **Location:** `app/ui/src/components/album/AlbumGrid.tsx`, `ArtistGrid`, `TrackTable`
 
 **Problem:**
+
 ```tsx
 // All items rendered simultaneously
-{albums.map((a) => <AlbumCard key={a.name} {...a} />)}
+{
+  albums.map((a) => <AlbumCard key={a.name} {...a} />);
+}
 ```
 
 **Impact:**
+
 - DOM nodes: 4400 albums × ~500 nodes = 2.2M nodes
 - Memory: ~200-500MB for DOM
 - Scroll jank, GC pauses, frame drops
 
 **Fix:**
+
 ```tsx
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer } from "@tanstack/react-virtual";
 
 export function AlbumGrid({ artist, albums }: AlbumGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -264,8 +285,8 @@ export function AlbumGrid({ artist, albums }: AlbumGridProps) {
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
+          width: "100%",
+          position: "relative",
         }}
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {
@@ -274,10 +295,10 @@ export function AlbumGrid({ artist, albums }: AlbumGridProps) {
             <div
               key={virtualItem.key}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
-                width: '100%',
+                width: "100%",
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
@@ -300,6 +321,7 @@ export function AlbumGrid({ artist, albums }: AlbumGridProps) {
 **Location:** `app/ui/src/pages/Insights.tsx`
 
 **Problem:**
+
 ```tsx
 <DecadeBar data={decades} />  // 48K tracks
 <BitrateChart data={bitrates} />  // 48K tracks
@@ -307,11 +329,13 @@ export function AlbumGrid({ artist, albums }: AlbumGridProps) {
 ```
 
 **Impact:**
+
 - Rendering 48,000 data points per chart
 - Main thread blocked for 500-1000ms
 - Page load delay
 
 **Fix:**
+
 ```tsx
 // Data sampling utility
 function sampleData<T extends Record<string, any>>(
@@ -339,6 +363,7 @@ function sampleData<T extends Record<string, any>>(
 **Location:** `app/ui/src/components/album/AlbumCard.tsx`
 
 **Problem:**
+
 ```tsx
 <img
   src={coverUrl}
@@ -350,14 +375,16 @@ function sampleData<T extends Record<string, any>>(
 ```
 
 **Impact:**
+
 - Full-res images (500KB-2MB each) load first
 - Delayed layout shift (CLS)
 - Poor perceived performance
 
 **Fix:**
+
 ```tsx
 <img
-  src={`${coverUrl}?w=100&h=100`}  // Thumbnail first
+  src={`${coverUrl}?w=100&h=100`} // Thumbnail first
   srcSet={`${coverUrl}?w=100&h=100 100w, ${coverUrl}?w=400&h=400 400w`}
   sizes="(max-width: 200px) 100px, 400px"
   alt={name}
@@ -365,7 +392,7 @@ function sampleData<T extends Record<string, any>>(
   decoding="async"
   onLoad={(e) => {
     // Swap to full-res on load
-    if (e.currentTarget.srcset?.includes('100w')) {
+    if (e.currentTarget.srcset?.includes("100w")) {
       e.currentTarget.src = coverUrl;
     }
     setImgLoaded(true);
@@ -374,6 +401,7 @@ function sampleData<T extends Record<string, any>>(
 ```
 
 **Backend support (API modification):**
+
 ```python
 # Add thumbnail endpoint
 @app.get("/api/cover/{artist}/{album}")
@@ -398,17 +426,20 @@ async def get_cover_thumbnail(
 **Location:** `app/crate/db/cache.py:14-15`
 
 **Problem:**
+
 ```python
 _MEM_TTL = 60
 _MEM_MAX_SIZE = 2000  # Only 2000 items
 ```
 
 **Impact:**
+
 - With 48K tracks, constant cache eviction
 - Low cache hit rate (~10-15%)
 - Repeated database hits for same data
 
 **Fix:**
+
 ```python
 _MEM_TTL = 300          # 5 minutes
 _MEM_MAX_SIZE = 15000   # 15K items
@@ -423,17 +454,20 @@ _MEM_MAX_SIZE = 15000   # 15K items
 **Location:** `app/crate/api/browse.py`
 
 **Problem:**
+
 ```python
 # No caching for /browse/artists?page=1&per_page=60
 # Every scroll triggers new DB query
 ```
 
 **Impact:**
+
 - User scrolling back sees loading spinners
 - Repeated queries for same page data
 - Unnecessary database load
 
 **Fix:**
+
 ```python
 @app.get("/api/browse/artists")
 async def get_artists(
@@ -466,6 +500,7 @@ async def get_artists(
 **Location:** `app/ui/src/components/album/AlbumCard.tsx:58-77`
 
 **Problem:**
+
 ```tsx
 async function handlePlay(e: React.MouseEvent) {
   e.stopPropagation();
@@ -474,10 +509,12 @@ async function handlePlay(e: React.MouseEvent) {
 ```
 
 **Impact:**
+
 - Perceived lag on play button click
 - Poor UX for rapid interactions
 
 **Fix:**
+
 ```tsx
 const [prefetchData, setPrefetchData] = useState<AlbumPlaybackPayload | null>(null);
 
@@ -514,6 +551,7 @@ return (
 **Location:** `app/ui/nginx.conf`
 
 **Problem:**
+
 ```nginx
 server {
     listen 80;
@@ -521,12 +559,14 @@ server {
 ```
 
 **Impact:**
+
 - JavaScript bundles (500KB-1MB) transferred uncompressed
 - CSS assets (50-200KB) transferred uncompressed
 - Slower initial page loads
 - Higher bandwidth costs
 
 **Fix:**
+
 ```nginx
 server {
     listen 80;
@@ -570,11 +610,13 @@ server {
 ### 13. No CDN for Static Assets
 
 **Problem:**
+
 - Cover images served directly from API
 - No edge caching
 - Every user request hits origin server
 
 **Fix:**
+
 ```nginx
 # Add cache headers for cover images
 location /api/cover/ {
@@ -594,10 +636,12 @@ location /api/cover/ {
 **Location:** `app/ui/nginx.conf`
 
 **Problem:**
+
 - Browser must discover resources one by one
 - Multiple RTTs for critical CSS/JS
 
 **Fix:**
+
 ```nginx
 location / {
     http2_push /assets/main.js;
@@ -617,6 +661,7 @@ location / {
 **Location:** Database
 
 **Action:**
+
 ```sql
 -- Cover lookup optimization
 CREATE INDEX IF NOT EXISTS idx_lib_tracks_album_cover
@@ -651,6 +696,7 @@ CREATE INDEX IF NOT EXISTS idx_lib_tracks_format
 ### 2. Enable pg_trgm for Searches
 
 **Action:**
+
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -674,6 +720,7 @@ CREATE INDEX IF NOT EXISTS idx_tracks_title_trgm
 **Location:** `app/crate/db/cache.py`
 
 **Action:**
+
 ```python
 # Change from
 _MEM_TTL = 60
@@ -694,6 +741,7 @@ _MEM_MAX_SIZE = 15000
 **Location:** `app/ui/src/components/album/AlbumCard.tsx`
 
 **Action:**
+
 ```tsx
 import React from 'react';
 
@@ -715,6 +763,7 @@ export const AlbumCard = React.memo(function AlbumCard({ artist, name, ... }: Al
 **Location:** `app/crate/api/browse.py`
 
 **Action:**
+
 ```python
 # Add LIMIT to all aggregation queries
 cur.execute("""
@@ -746,6 +795,7 @@ cur.execute("""
 **Location:** `app/ui/nginx.conf`
 
 **Action:**
+
 ```nginx
 gzip on;
 gzip_comp_level 6;
@@ -759,22 +809,22 @@ gzip_types text/plain text/css text/javascript application/json application/java
 
 ## ROI Analysis
 
-| Priority | Issue | Impact | Effort | ROI | Time to Implement |
-|----------|-------|--------|--------|-----|-------------------|
-| 🔴 CRITICAL | Unpaginated queries | 🔴 High | ⭐ Easy | ⭐⭐⭐⭐⭐ | 1 hour |
-| 🔴 CRITICAL | N+1 queries | 🔴 High | ⭐⭐ Medium | ⭐⭐⭐⭐⭐ | 4-6 hours |
-| 🔴 CRITICAL | No pg_trgm | 🔴 High | ⭐ Easy | ⭐⭐⭐⭐⭐ | 30 min |
-| 🔴 CRITICAL | Connection pool | 🟠 Medium | ⭐ Easy | ⭐⭐⭐⭐ | 5 min |
-| 🟠 HIGH | React.memo | 🟠 Medium | ⭐ Easy | ⭐⭐⭐⭐ | 30 min |
-| 🟠 HIGH | Virtual scrolling | 🟠 Medium | ⭐⭐⭐ Medium | ⭐⭐⭐ | 1 day |
-| 🟠 HIGH | Nivo sampling | 🟠 Medium | ⭐ Easy | ⭐⭐⭐ | 1 hour |
-| 🟠 HIGH | Progressive images | 🟠 Medium | ⭐⭐ Medium | ⭐⭐⭐ | 4 hours |
-| 🟡 MEDIUM | L1 cache size | 🟡 Low | ⭐ Easy | ⭐⭐⭐ | 5 min |
-| 🟡 MEDIUM | Cache pagination | 🟡 Low | ⭐⭐ Medium | ⭐⭐⭐ | 2 hours |
-| 🟡 MEDIUM | Prefetch data | 🟡 Low | ⭐⭐ Medium | ⭐⭐ | 2 hours |
-| 🟢 LOW | Nginx gzip | 🟡 Low | ⭐ Easy | ⭐⭐⭐ | 30 min |
-| 🟢 LOW | CDN cache | 🟡 Low | ⭐⭐ Medium | ⭐⭐ | 2 hours |
-| 🟢 LOW | HTTP/2 push | 🟢 Very Low | ⭐ Easy | ⭐ | 30 min |
+| Priority    | Issue               | Impact      | Effort        | ROI        | Time to Implement |
+| ----------- | ------------------- | ----------- | ------------- | ---------- | ----------------- |
+| 🔴 CRITICAL | Unpaginated queries | 🔴 High     | ⭐ Easy       | ⭐⭐⭐⭐⭐ | 1 hour            |
+| 🔴 CRITICAL | N+1 queries         | 🔴 High     | ⭐⭐ Medium   | ⭐⭐⭐⭐⭐ | 4-6 hours         |
+| 🔴 CRITICAL | No pg_trgm          | 🔴 High     | ⭐ Easy       | ⭐⭐⭐⭐⭐ | 30 min            |
+| 🔴 CRITICAL | Connection pool     | 🟠 Medium   | ⭐ Easy       | ⭐⭐⭐⭐   | 5 min             |
+| 🟠 HIGH     | React.memo          | 🟠 Medium   | ⭐ Easy       | ⭐⭐⭐⭐   | 30 min            |
+| 🟠 HIGH     | Virtual scrolling   | 🟠 Medium   | ⭐⭐⭐ Medium | ⭐⭐⭐     | 1 day             |
+| 🟠 HIGH     | Nivo sampling       | 🟠 Medium   | ⭐ Easy       | ⭐⭐⭐     | 1 hour            |
+| 🟠 HIGH     | Progressive images  | 🟠 Medium   | ⭐⭐ Medium   | ⭐⭐⭐     | 4 hours           |
+| 🟡 MEDIUM   | L1 cache size       | 🟡 Low      | ⭐ Easy       | ⭐⭐⭐     | 5 min             |
+| 🟡 MEDIUM   | Cache pagination    | 🟡 Low      | ⭐⭐ Medium   | ⭐⭐⭐     | 2 hours           |
+| 🟡 MEDIUM   | Prefetch data       | 🟡 Low      | ⭐⭐ Medium   | ⭐⭐       | 2 hours           |
+| 🟢 LOW      | Nginx gzip          | 🟡 Low      | ⭐ Easy       | ⭐⭐⭐     | 30 min            |
+| 🟢 LOW      | CDN cache           | 🟡 Low      | ⭐⭐ Medium   | ⭐⭐       | 2 hours           |
+| 🟢 LOW      | HTTP/2 push         | 🟢 Very Low | ⭐ Easy       | ⭐         | 30 min            |
 
 ---
 
@@ -785,6 +835,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 **Goal:** Immediate 30-40% overall performance improvement
 
 **Tasks:**
+
 1. ✅ Add LIMIT to all aggregation queries (1 hour)
 2. ✅ Install pg_trgm + create GIN indexes (30 min)
 3. ✅ Increase L1 cache to 15K (5 min)
@@ -793,6 +844,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 6. ✅ Add missing composite indexes (1 hour)
 
 **Expected Results:**
+
 - 80% reduction in aggregation query time
 - 90% reduction in search query time
 - 40% increase in cache hit rate
@@ -808,6 +860,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 **Goal:** Eliminate jank and improve perceived performance
 
 **Tasks:**
+
 1. ✅ Implement virtual scrolling for AlbumGrid (4 hours)
 2. ✅ Implement virtual scrolling for ArtistGrid (4 hours)
 3. ✅ Implement virtual scrolling for TrackTable (4 hours)
@@ -816,6 +869,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 6. ✅ Add prefetch on hover for play button (2 hours)
 
 **Expected Results:**
+
 - 95% reduction in DOM nodes
 - 90% reduction in memory usage
 - 70% reduction in chart render time
@@ -831,6 +885,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 **Goal:** Eliminate N+1 queries and optimize database access
 
 **Tasks:**
+
 1. ✅ Refactor browse.py to eliminate N+1 queries (2 days)
 2. ✅ Implement cache for paginated lists (1 day)
 3. ✅ Tune connection pool parameters (2 hours)
@@ -839,6 +894,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 6. ✅ Add database connection pool monitoring (4 hours)
 
 **Expected Results:**
+
 - 95% reduction in query count
 - 70% reduction in API response time
 - Eliminated connection pool exhaustion
@@ -853,6 +909,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 **Goal:** Optimize delivery and caching
 
 **Tasks:**
+
 1. ✅ Configure CDN edge caching (Cloudflare) (4 hours)
 2. ✅ Implement HTTP/2 push for critical resources (2 hours)
 3. ✅ Optimize nginx configuration (4 hours)
@@ -860,6 +917,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 5. ✅ Add CDN cache invalidation strategy (2 hours)
 
 **Expected Results:**
+
 - 90% reduction in origin server load
 - 200-300ms reduction in initial page load
 - Better performance visibility
@@ -873,12 +931,14 @@ gzip_types text/plain text/css text/javascript application/json application/java
 ### Key Performance Indicators
 
 **Database:**
+
 - Query execution time (p50, p95, p99)
 - Connection pool utilization
 - Cache hit rate (L1, L2)
 - Query count per endpoint
 
 **Frontend:**
+
 - First Contentful Paint (FCP) < 1.5s
 - Largest Contentful Paint (LCP) < 2.5s
 - Cumulative Layout Shift (CLS) < 0.1
@@ -886,6 +946,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 - Time to Interactive (TTI) < 3.5s
 
 **API:**
+
 - Response time (p50, p95, p99)
 - Request rate
 - Error rate
@@ -894,17 +955,20 @@ gzip_types text/plain text/css text/javascript application/json application/java
 ### Recommended Tools
 
 **Backend:**
+
 - `psycopg2` connection pool monitoring
 - `pg_stat_statements` for query analysis
 - Redis INFO for cache stats
 
 **Frontend:**
+
 - Chrome DevTools Performance tab
 - Lighthouse CI
 - WebPageTest
 - Sentry for error tracking
 
 **Infrastructure:**
+
 - Prometheus + Grafana
 - Cloudflare Web Analytics
 - New Relic or Datadog (optional)
@@ -916,11 +980,13 @@ gzip_types text/plain text/css text/javascript application/json application/java
 ### Performance Tests
 
 1. **Load Testing:**
+
    - Apache Bench (ab) for API endpoints
    - k6 for realistic user scenarios
    - Locust for distributed load testing
 
 2. **Frontend Performance:**
+
    - Lighthouse CI in CI/CD pipeline
    - Bundle size monitoring
    - Memory profiling (Chrome DevTools)
@@ -933,6 +999,7 @@ gzip_types text/plain text/css text/javascript application/json application/java
 ### Regression Testing
 
 After each optimization:
+
 1. Run full test suite
 2. Benchmark critical endpoints
 3. Verify no regressions in functionality
@@ -950,12 +1017,14 @@ This performance analysis identifies critical bottlenecks that can be addressed 
 - **60% reduction in asset transfer size**
 
 **Next Steps:**
+
 1. Implement Phase 1 (Quick Wins) - immediate impact
 2. Monitor metrics for 1 week
 3. Proceed to Phase 2 (Frontend Optimization)
 4. Continue to Phase 3 and 4 as needed
 
 **Estimated Total Impact:**
+
 - Overall performance improvement: 60-80%
 - User experience: Significantly improved (sub-second page loads, smooth scrolling)
 - Infrastructure efficiency: Reduced database and network load
@@ -1074,7 +1143,7 @@ server {
 // 1. Memoize expensive computations
 const sortedItems = useMemo(
   () => items.sort((a, b) => a.name.localeCompare(b.name)),
-  [items]
+  [items],
 );
 
 // 2. Memoize callbacks
@@ -1088,7 +1157,7 @@ const ExpensiveComponent = React.memo(function ExpensiveComponent({ data }) {
 });
 
 // 4. Code-split heavy components
-const HeavyComponent = lazy(() => import('./HeavyComponent'));
+const HeavyComponent = lazy(() => import("./HeavyComponent"));
 
 function App() {
   return (

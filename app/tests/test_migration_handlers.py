@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from crate.worker_handlers.migration import _handle_fix_artist, build_artist_layout_fix_issue, preview_fix_artist
+from crate.worker_handlers.migration import (
+    _handle_fix_artist,
+    build_artist_layout_fix_issue,
+    preview_fix_artist,
+)
 
 
 def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_path):
@@ -37,7 +41,9 @@ def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_
     )
     monkeypatch.setattr(
         "crate.worker_handlers.migration.update_artist_folder_name",
-        lambda artist_name, folder_name: update_calls.append((artist_name, folder_name)),
+        lambda artist_name, folder_name: update_calls.append(
+            (artist_name, folder_name)
+        ),
     )
     monkeypatch.setattr(
         "crate.worker_handlers.migration.get_artist_album_paths",
@@ -52,10 +58,18 @@ def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_
         lambda library_root, artist, artist_name, album_name: target_album_dir,
     )
     monkeypatch.setattr("crate.worker_handlers.migration.LibrarySync", FakeSync)
-    monkeypatch.setattr("crate.worker_handlers.migration.emit_task_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.set_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.delete_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.is_cancelled", lambda task_id: False)
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.emit_task_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.set_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.delete_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.is_cancelled", lambda task_id: False
+    )
 
     result = _handle_fix_artist(
         "task-fix-artist-1",
@@ -74,7 +88,9 @@ def test_fix_artist_consolidates_legacy_artist_dir_and_resyncs(monkeypatch, tmp_
     assert update_calls == [("Terror", artist_uid), ("Terror", artist_uid)]
 
 
-def test_fix_artist_discovers_tag_matched_legacy_dir_when_folder_name_already_points_to_empty_target(monkeypatch, tmp_path):
+def test_fix_artist_discovers_tag_matched_legacy_dir_when_folder_name_already_points_to_empty_target(
+    monkeypatch, tmp_path
+):
     library_root = tmp_path / "library"
     artist_uid = "695179a0-3863-50c2-9302-61f5cf144daa"
     album_uid = "564b0e79-0978-40ad-b764-059bf15410ff"
@@ -117,17 +133,28 @@ def test_fix_artist_discovers_tag_matched_legacy_dir_when_folder_name_already_po
     )
     monkeypatch.setattr(
         "crate.worker_handlers.migration.infer_album_identity",
-        lambda album_dir, fallback_artist="": ("Birds In Row", "You, Me & the Violence"),
+        lambda album_dir, fallback_artist="": (
+            "Birds In Row",
+            "You, Me & the Violence",
+        ),
     )
     monkeypatch.setattr(
         "crate.worker_handlers.migration._resolve_fix_album_target",
         lambda library_root, artist, artist_name, album_name: target_album_dir,
     )
     monkeypatch.setattr("crate.worker_handlers.migration.LibrarySync", FakeSync)
-    monkeypatch.setattr("crate.worker_handlers.migration.emit_task_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.set_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.delete_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.migration.is_cancelled", lambda task_id: False)
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.emit_task_event", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.set_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.delete_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.migration.is_cancelled", lambda task_id: False
+    )
 
     result = _handle_fix_artist(
         "task-fix-artist-2",
@@ -177,7 +204,9 @@ def test_preview_fix_artist_reports_legacy_album_moves(monkeypatch, tmp_path):
         lambda library_root, artist, artist_name, album_name: target_album_dir,
     )
 
-    preview = preview_fix_artist(library_root, artist, {"library_path": str(library_root)})
+    preview = preview_fix_artist(
+        library_root, artist, {"library_path": str(library_root)}
+    )
 
     assert preview["status"] == "needs_fix"
     assert preview["applicable"] is True
@@ -218,12 +247,16 @@ def test_preview_fix_artist_does_not_scan_unrelated_library_dirs(monkeypatch, tm
 
     def fail_on_unrelated(album_dir, fallback_artist=""):
         if album_dir == unrelated_album_dir:
-            raise AssertionError("repair preview should not inspect unrelated library dirs")
+            raise AssertionError(
+                "repair preview should not inspect unrelated library dirs"
+            )
         return ("Quicksand", "Slip")
 
     monkeypatch.setattr(migration, "infer_album_identity", fail_on_unrelated)
 
-    preview = preview_fix_artist(library_root, artist, {"library_path": str(library_root)})
+    preview = preview_fix_artist(
+        library_root, artist, {"library_path": str(library_root)}
+    )
 
     assert preview["status"] == "already_canonical"
     assert preview["album_moves"] == []

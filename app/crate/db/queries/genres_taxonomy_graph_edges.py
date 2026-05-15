@@ -41,7 +41,9 @@ def load_genre_graph_edge_rows(session, canonical_slug: str) -> list[dict]:
                 """
             ),
             {"canonical_slug": canonical_slug},
-        ).mappings().all()
+        )
+        .mappings()
+        .all()
     ]
 
 

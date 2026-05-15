@@ -36,7 +36,9 @@ const PAD: Track[] = Array.from({ length: 10 }, (_, i) => ({
   artist: "Pad",
 }));
 
-function baseOptions(overrides: Partial<Parameters<typeof usePlaybackIntelligence>[0]> = {}) {
+function baseOptions(
+  overrides: Partial<Parameters<typeof usePlaybackIntelligence>[0]> = {},
+) {
   const actions = makeActions();
   const playSourceRadio: PlaySource = {
     type: "album",
@@ -86,7 +88,11 @@ describe("continueInfinitePlayback", () => {
 
   it("returns false when playSource is radio (not album/playlist)", () => {
     const { opts } = baseOptions({
-      playSource: { type: "radio", name: "R", radio: { seedType: "track", seedId: 1 } },
+      playSource: {
+        type: "radio",
+        name: "R",
+        radio: { seedType: "track", seedId: 1 },
+      },
     });
     const { result } = renderHook(() => usePlaybackIntelligence(opts));
     expect(result.current.continueInfinitePlayback()).toBe(false);
@@ -221,13 +227,19 @@ describe("radio refill effect", () => {
 
   it("does nothing when not playing", async () => {
     const { opts, actions } = baseOptions({
-      playSource: { type: "radio", name: "R", radio: { seedType: "track", seedId: 1 } },
+      playSource: {
+        type: "radio",
+        name: "R",
+        radio: { seedType: "track", seedId: 1 },
+      },
       isPlaying: false,
     });
 
     renderHook(() => usePlaybackIntelligence(opts));
 
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     expect(mockRadioCont).not.toHaveBeenCalled();
     expect(actions.appendTracks).not.toHaveBeenCalled();
@@ -241,7 +253,9 @@ describe("resetPlaybackIntelligence", () => {
 
     const { result } = renderHook(() => usePlaybackIntelligence(opts));
 
-    act(() => { result.current.continueInfinitePlayback(); });
+    act(() => {
+      result.current.continueInfinitePlayback();
+    });
     expect(() => result.current.resetPlaybackIntelligence()).not.toThrow();
   });
 });

@@ -12,9 +12,10 @@ def list_invalid_genre_taxonomy_nodes(*, session=None) -> list[dict]:
         with read_scope() as s:
             return list_invalid_genre_taxonomy_nodes(session=s)
 
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT
                 n.id,
                 n.entity_uid::text AS entity_uid,
@@ -30,8 +31,11 @@ def list_invalid_genre_taxonomy_nodes(*, session=None) -> list[dict]:
             GROUP BY n.id, n.entity_uid, n.slug, n.name
             ORDER BY n.slug ASC
             """
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     invalid_items: list[dict] = []
     for row in rows:
@@ -138,18 +142,28 @@ def list_genre_taxonomy_nodes_for_musicbrainz_sync(
 
 def get_genre_taxonomy_node_id(slug: str) -> int | None:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
-            {"slug": slug},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT id FROM genre_taxonomy_nodes WHERE slug = :slug"),
+                {"slug": slug},
+            )
+            .mappings()
+            .first()
+        )
     return row["id"] if row else None
 
 
 def get_remaining_without_external_description() -> int:
     with read_scope() as session:
-        row = session.execute(
-            text("SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes WHERE external_description IS NULL OR external_description = ''")
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(
+                    "SELECT COUNT(*)::INTEGER AS cnt FROM genre_taxonomy_nodes WHERE external_description IS NULL OR external_description = ''"
+                )
+            )
+            .mappings()
+            .first()
+        )
     return int(row["cnt"] or 0) if row else 0
 
 

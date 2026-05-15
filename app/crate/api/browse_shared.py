@@ -2,10 +2,15 @@ from pathlib import Path
 
 import mutagen
 
-from crate.api._deps import COVER_NAMES, exclude_dirs, extensions, library_path, safe_path
+from crate.api._deps import (
+    COVER_NAMES,
+    exclude_dirs,
+    extensions,
+    library_path,
+    safe_path,
+)
 from crate.audio import get_audio_files, read_tags
 from crate.db.repositories.library import get_library_album, get_library_track_count
-from crate.db.queries.browse import find_album_row
 
 import re as _re
 
@@ -18,7 +23,9 @@ def display_name(folder_name: str) -> str:
     return _YEAR_PREFIX_RE.sub("", folder_name)
 
 
-def build_genre_profile(items: list[dict] | list[str], limit: int | None = None) -> list[dict]:
+def build_genre_profile(
+    items: list[dict] | list[str], limit: int | None = None
+) -> list[dict]:
     prepared: list[dict] = []
 
     for item in items:
@@ -60,7 +67,9 @@ def build_genre_profile(items: list[dict] | list[str], limit: int | None = None)
     result: list[dict] = []
     for item in prepared:
         share = item["weight"] / total_weight if total_weight else 0.0
-        relative_percent = int(round((item["weight"] / max_weight) * 100)) if max_weight else 0
+        relative_percent = (
+            int(round((item["weight"] / max_weight) * 100)) if max_weight else 0
+        )
         result.append(
             {
                 "name": item["name"],
@@ -106,8 +115,12 @@ def fs_build_artists_list() -> list[dict]:
                     ext = file_path.suffix.lower()
                     fmt_counts[ext] = fmt_counts.get(ext, 0) + 1
                     total_size += file_path.stat().st_size
-        primary_format = max(fmt_counts, key=fmt_counts.get) if fmt_counts else None
-        has_photo = any((artist_dir / photo_name).exists() for photo_name in ARTIST_PHOTO_NAMES)
+        primary_format = (
+            max(fmt_counts, key=lambda key: fmt_counts[key]) if fmt_counts else None
+        )
+        has_photo = any(
+            (artist_dir / photo_name).exists() for photo_name in ARTIST_PHOTO_NAMES
+        )
         artists.append(
             {
                 "name": artist_dir.name,
@@ -165,8 +178,17 @@ def fs_artist_detail(name: str) -> dict | None:
             }
         )
 
-    primary_format = max(all_fmt_counts, key=all_fmt_counts.get) if all_fmt_counts else None
-    top_genres = [genre for genre, _count in sorted(genre_counts.items(), key=lambda item: item[1], reverse=True)[:5]]
+    primary_format = (
+        max(all_fmt_counts, key=lambda key: all_fmt_counts[key])
+        if all_fmt_counts
+        else None
+    )
+    top_genres = [
+        genre
+        for genre, _count in sorted(
+            genre_counts.items(), key=lambda item: item[1], reverse=True
+        )[:5]
+    ]
     genre_profile = build_genre_profile(top_genres, limit=5)
 
     return {
@@ -199,9 +221,10 @@ def fs_album_detail(artist: str, album: str) -> dict | None:
     album_tags = {}
     for track in tracks:
         tags = read_tags(track)
-        info = mutagen.File(track)
-        bitrate = getattr(info.info, "bitrate", 0)
-        length = getattr(info.info, "length", 0)
+        info = getattr(mutagen, "File")(track)
+        audio_info = getattr(info, "info", None)
+        bitrate = getattr(audio_info, "bitrate", 0)
+        length = getattr(audio_info, "length", 0)
         track_list.append(
             {
                 "filename": track.name,
@@ -227,7 +250,9 @@ def fs_album_detail(artist: str, album: str) -> dict | None:
 
     album_genres = []
     if album_tags.get("genre"):
-        album_genres = [genre.strip() for genre in album_tags["genre"].split(",") if genre.strip()]
+        album_genres = [
+            genre.strip() for genre in album_tags["genre"].split(",") if genre.strip()
+        ]
 
     return {
         "artist": artist,
@@ -286,8 +311,9 @@ def find_album_dir(lib: Path, artist: str, album: str) -> Path | None:
     tracks /Artist/YYYY/Album.
     """
     import re
+
     album_variants = [album]
-    normalized = re.sub(r'\.{2,}', '.', album)
+    normalized = re.sub(r"\.{2,}", ".", album)
     if normalized != album:
         album_variants.append(normalized)
 

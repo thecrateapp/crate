@@ -87,6 +87,10 @@ jobs:
             type=sha,prefix=,format=short
             type=raw,value=latest
 
+      # Worker image: PyTorch CPU + Essentia models are cached via Dockerfile
+      # layer ordering (models downloaded before mutable source COPY) plus
+      # BuildKit pip cache mounts. With GHA cache enabled, rebuilds that only
+      # touch application code should skip the ~400MB model download layer.
       - uses: docker/build-push-action@v7
         with:
           context: ./app

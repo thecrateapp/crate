@@ -7,7 +7,6 @@ Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2
 import os
 import logging
 import requests
-from datetime import datetime, timezone
 
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import get_cache, set_cache
@@ -18,14 +17,18 @@ API_BASE = "https://app.ticketmaster.com/discovery/v2"
 
 
 def _api_key() -> str:
-    return get_setting("ticketmaster_api_key", os.environ.get("TICKETMASTER_API_KEY", ""))
+    return get_setting(
+        "ticketmaster_api_key", os.environ.get("TICKETMASTER_API_KEY", "")
+    )
 
 
 def is_configured() -> bool:
     return bool(_api_key())
 
 
-def search_events(artist_name: str, country_code: str = "", size: int = 10) -> list[dict]:
+def search_events(
+    artist_name: str, country_code: str = "", size: int = 10
+) -> list[dict]:
     """Search upcoming music events for an artist.
 
     Args:
@@ -102,7 +105,8 @@ def search_events(artist_name: str, country_code: str = "", size: int = 10) -> l
             event = {
                 "id": e.get("id", ""),
                 "name": e.get("name", ""),
-                "date": start.get("localDate") or (start.get("dateTime", "")[:10] if start.get("dateTime") else ""),
+                "date": start.get("localDate")
+                or (start.get("dateTime", "")[:10] if start.get("dateTime") else ""),
                 "local_date": start.get("localDate", ""),
                 "local_time": start.get("localTime", ""),
                 "venue": venue_data.get("name", ""),
@@ -137,7 +141,9 @@ def get_next_show(artist_name: str, country_code: str = "") -> dict | None:
     return events[0] if events else None
 
 
-def get_upcoming_shows(artist_name: str, country_code: str = "", limit: int = 10) -> list[dict]:
+def get_upcoming_shows(
+    artist_name: str, country_code: str = "", limit: int = 10
+) -> list[dict]:
     """Get upcoming shows, limited to N."""
     return search_events(artist_name, country_code=country_code, size=limit)
 

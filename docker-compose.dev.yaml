@@ -25,7 +25,7 @@ services:
       - -c
       - log_lock_waits=on
       - -c
-      - log_line_prefix=%m [%p] %q%u@%d 
+      - log_line_prefix=%m [%p] %q%u@%d
     environment:
       - POSTGRES_USER=crate
       - POSTGRES_PASSWORD=crate
@@ -36,15 +36,29 @@ services:
       - "5433:5432"
     networks:
       - crate-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crate -d crate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
   redis:
     image: redis:7-alpine
     container_name: crate-dev-redis
-    command: redis-server --maxmemory 256mb --maxmemory-policy volatile-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD:-redis-dev}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev}
     ports:
       - "6380:6379"
     networks:
       - crate-dev
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
 
   slskd:
     image: slskd/slskd:latest
@@ -96,7 +110,7 @@ services:
       - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
       - NUMBA_CACHE_DIR=/tmp/numba_cache
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_SSE_REDIS_MAX_CONNECTIONS=${CRATE_SSE_REDIS_MAX_CONNECTIONS:-128}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
@@ -123,10 +137,14 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
-      - media-worker
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
+      media-worker:
+        condition: service_started
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "1.0"
@@ -167,7 +185,7 @@ services:
       - TORCH_NUM_THREADS=${CRATE_WORKER_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${CRATE_WORKER_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${CRATE_WORKER_FFMPEG_THREADS:-1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
@@ -183,13 +201,25 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
     mem_limit: 1536m
     mem_reservation: 512m
     cpus: "0.75"
-    command: ["worker", "--queues", "fast,default", "--processes", "${CRATE_WORKER_PROCESSES:-1}", "--no-daemons", "--no-projector"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "fast,default",
+        "--processes",
+        "${CRATE_WORKER_PROCESSES:-1}",
+        "--no-daemons",
+        "--no-projector",
+      ]
 
   projector:
     build:
@@ -209,7 +239,7 @@ services:
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=projector
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_PROJECTOR_INTERVAL_SECONDS=${CRATE_PROJECTOR_INTERVAL_SECONDS:-5}
       - CRATE_PROJECTOR_BATCH_LIMIT=${CRATE_PROJECTOR_BATCH_LIMIT:-200}
@@ -224,8 +254,10 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 512m
     mem_reservation: 128m
     cpus: "0.25"
@@ -266,7 +298,7 @@ services:
       - TORCH_NUM_THREADS=${MAINTENANCE_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${MAINTENANCE_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${MAINTENANCE_FFMPEG_THREADS:-1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
@@ -281,13 +313,27 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
-      - slskd
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      slskd:
+        condition: service_started
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "0.5"
-    command: ["worker", "--queues", "maintenance", "--processes", "${MAINTENANCE_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-daemons", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "maintenance",
+        "--processes",
+        "${MAINTENANCE_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   analysis-worker:
     build:
@@ -318,7 +364,7 @@ services:
       - TORCH_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${ANALYSIS_FFMPEG_THREADS:-1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
     volumes:
       - ./app/crate:/app/crate:ro
@@ -329,12 +375,24 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 2g
     mem_reservation: 768m
     cpus: "0.75"
-    command: ["worker", "--queues", "heavy", "--processes", "${ANALYSIS_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "heavy",
+        "--processes",
+        "${ANALYSIS_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   playback-worker:
     build:
@@ -365,7 +423,7 @@ services:
       - TORCH_NUM_THREADS=${PLAYBACK_NATIVE_THREADS:-1}
       - NUMBA_NUM_THREADS=${PLAYBACK_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${PLAYBACK_FFMPEG_THREADS:-1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_STREAM_TRANSCODE_MAX_CONCURRENT=${STREAM_TRANSCODE_MAX_CONCURRENT:-1}
     volumes:
@@ -377,12 +435,25 @@ services:
     networks:
       - crate-dev
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "1.0"
-    command: ["worker", "--queues", "playback", "--processes", "${PLAYBACK_WORKER_PROCESSES:-1}", "--no-service-loop", "--no-daemons", "--no-projector", "--no-telegram"]
+    command:
+      [
+        "worker",
+        "--queues",
+        "playback",
+        "--processes",
+        "${PLAYBACK_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
 
   media-worker:
     build:
@@ -393,7 +464,7 @@ services:
       - TZ=Europe/Madrid
       - DATA_DIR=/data
       - CRATE_MEDIA_WORKER_ADDR=0.0.0.0:8687
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
     volumes:
       - ./test-music:/music:ro
       - dev_data:/data
@@ -408,6 +479,15 @@ services:
   caddy:
     image: caddy:2-alpine
     container_name: crate-dev-caddy
+    environment:
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
+      no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis,host.docker.internal"
     ports:
       - "80:80"
       - "443:443"

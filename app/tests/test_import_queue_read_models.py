@@ -108,7 +108,10 @@ class TestImportQueueReadModels:
             source="tidal",
         )
         assert changed is True
-        assert all(item["source_path"] != source_path for item in list_import_queue_items(status="pending"))
+        assert all(
+            item["source_path"] != source_path
+            for item in list_import_queue_items(status="pending")
+        )
 
         refresh_import_queue_items(
             [
@@ -128,27 +131,37 @@ class TestImportQueueReadModels:
             scanned_sources=["tidal"],
         )
 
-        assert all(item["source_path"] != source_path for item in list_import_queue_items(status="pending"))
+        assert all(
+            item["source_path"] != source_path
+            for item in list_import_queue_items(status="pending")
+        )
 
         removed = remove_import_queue_item(source_path, source="tidal")
         assert removed is True
 
         with transaction_scope() as session:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT COUNT(*) AS cnt
                     FROM import_queue_items
                     WHERE source = 'tidal' AND path = :path
                     """
-                ),
-                {"path": source_path},
-            ).mappings().first()
+                    ),
+                    {"path": source_path},
+                )
+                .mappings()
+                .first()
+            )
         assert int(row["cnt"]) == 0
         assert count_import_queue_items(status="pending") >= 0
 
     def test_refresh_removes_stale_items_for_scanned_sources(self):
-        from crate.db.import_queue_read_models import list_import_queue_items, refresh_import_queue_items
+        from crate.db.import_queue_read_models import (
+            list_import_queue_items,
+            refresh_import_queue_items,
+        )
 
         self._ensure_tables()
 
@@ -173,8 +186,14 @@ class TestImportQueueReadModels:
             scanned_sources=["soulseek"],
         )
 
-        assert any(item["source_path"] == source_path for item in list_import_queue_items(status="pending"))
+        assert any(
+            item["source_path"] == source_path
+            for item in list_import_queue_items(status="pending")
+        )
 
         refresh_import_queue_items([], scanned_sources=["soulseek"])
 
-        assert all(item["source_path"] != source_path for item in list_import_queue_items(status="pending"))
+        assert all(
+            item["source_path"] != source_path
+            for item in list_import_queue_items(status="pending")
+        )

@@ -1,13 +1,19 @@
-import { vec3, vec4 } from 'gl-matrix';
-import { type VisualizerMode } from '@/lib/player-visualizer-prefs';
-import { setGL } from './globals';
-import Icosphere from './geometry/Icosphere';
-import Ring from './geometry/Ring';
-import Square from './geometry/Square';
-import OpenGLRenderer from './rendering/OpenGLRenderer';
-import Camera from './Camera';
-import ShaderProgram, { Shader } from './rendering/ShaderProgram';
-import { LINE_VERT, LINE_FRAG, BLUR_FRAG, BLEND_FRAG, QUAD_VERT } from './shaders';
+import { vec3, vec4 } from "gl-matrix";
+import { type VisualizerMode } from "@/lib/player-visualizer-prefs";
+import { setGL } from "./globals";
+import Icosphere from "./geometry/Icosphere";
+import Ring from "./geometry/Ring";
+import Square from "./geometry/Square";
+import OpenGLRenderer from "./rendering/OpenGLRenderer";
+import Camera from "./Camera";
+import ShaderProgram, { Shader } from "./rendering/ShaderProgram";
+import {
+  LINE_VERT,
+  LINE_FRAG,
+  BLUR_FRAG,
+  BLEND_FRAG,
+  QUAD_VERT,
+} from "./shaders";
 
 interface AudioMetrics {
   freqAvg: number;
@@ -24,7 +30,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function mixColor(a: [number, number, number], b: [number, number, number], t: number): [number, number, number] {
+function mixColor(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number,
+): [number, number, number] {
   const mix = clamp(t, 0, 1);
   return [
     a[0] + (b[0] - a[0]) * mix,
@@ -137,8 +147,12 @@ export class MusicVisualizer {
     getPlaybackState: () => { volume: number; isPlaying: boolean },
     mode: VisualizerMode = "spheres",
   ) {
-    const glCtx = canvas.getContext('webgl2', { alpha: true, antialias: false, preserveDrawingBuffer: false });
-    if (!glCtx) throw new Error('WebGL2 not supported');
+    const glCtx = canvas.getContext("webgl2", {
+      alpha: true,
+      antialias: false,
+      preserveDrawingBuffer: false,
+    });
+    if (!glCtx) throw new Error("WebGL2 not supported");
 
     this.canvas = canvas;
     this.glCtx = glCtx;
@@ -163,14 +177,25 @@ export class MusicVisualizer {
   private updateViewportScaleCompensation() {
     const rawReference = this.canvas.dataset.vizReferenceSize;
     const referenceSize = rawReference ? Number.parseFloat(rawReference) : NaN;
-    const currentSize = Math.max(1, Math.min(this.canvas.clientWidth || 0, this.canvas.clientHeight || 0));
+    const currentSize = Math.max(
+      1,
+      Math.min(this.canvas.clientWidth || 0, this.canvas.clientHeight || 0),
+    );
 
-    if (!Number.isFinite(referenceSize) || referenceSize <= 0 || currentSize <= 0) {
+    if (
+      !Number.isFinite(referenceSize) ||
+      referenceSize <= 0 ||
+      currentSize <= 0
+    ) {
       this.viewportScaleCompensation = 1.0;
       return;
     }
 
-    this.viewportScaleCompensation = clamp(referenceSize / currentSize, 0.7, 1.0);
+    this.viewportScaleCompensation = clamp(
+      referenceSize / currentSize,
+      0.7,
+      1.0,
+    );
   }
 
   setMode(mode: VisualizerMode) {
@@ -195,25 +220,81 @@ export class MusicVisualizer {
     const ease = 0.085;
     const colorEase = 0.065;
 
-    this.renderedSeparation = lerp(this.renderedSeparation, this.separation, ease);
+    this.renderedSeparation = lerp(
+      this.renderedSeparation,
+      this.separation,
+      ease,
+    );
     this.renderedGlow = lerp(this.renderedGlow, this.glow, ease);
     this.renderedScale = lerp(this.renderedScale, this.scale, ease);
-    this.renderedPersistence = lerp(this.renderedPersistence, this.persistence, ease);
+    this.renderedPersistence = lerp(
+      this.renderedPersistence,
+      this.persistence,
+      ease,
+    );
     this.renderedOctaves = lerp(this.renderedOctaves, this.octaves, ease);
-    this.renderedOrbitSpeed = lerp(this.renderedOrbitSpeed, this.orbitSpeed, ease);
-    this.renderedCameraDrift = lerp(this.renderedCameraDrift, this.cameraDrift, ease);
-    this.renderedCameraDepth = lerp(this.renderedCameraDepth, this.cameraDepth, ease);
+    this.renderedOrbitSpeed = lerp(
+      this.renderedOrbitSpeed,
+      this.orbitSpeed,
+      ease,
+    );
+    this.renderedCameraDrift = lerp(
+      this.renderedCameraDrift,
+      this.cameraDrift,
+      ease,
+    );
+    this.renderedCameraDepth = lerp(
+      this.renderedCameraDepth,
+      this.cameraDepth,
+      ease,
+    );
     this.renderedPulseGain = lerp(this.renderedPulseGain, this.pulseGain, ease);
-    this.renderedTurbulence = lerp(this.renderedTurbulence, this.turbulence, ease);
-    this.renderedOrbitPhase = lerp(this.renderedOrbitPhase, this.orbitPhase, ease);
-    this.renderedShellDensity = lerp(this.renderedShellDensity, this.shellDensity, ease);
-    this.renderedBeatResponse = lerp(this.renderedBeatResponse, this.beatResponse, ease);
+    this.renderedTurbulence = lerp(
+      this.renderedTurbulence,
+      this.turbulence,
+      ease,
+    );
+    this.renderedOrbitPhase = lerp(
+      this.renderedOrbitPhase,
+      this.orbitPhase,
+      ease,
+    );
+    this.renderedShellDensity = lerp(
+      this.renderedShellDensity,
+      this.shellDensity,
+      ease,
+    );
+    this.renderedBeatResponse = lerp(
+      this.renderedBeatResponse,
+      this.beatResponse,
+      ease,
+    );
     this.renderedBeatDecay = lerp(this.renderedBeatDecay, this.beatDecay, ease);
-    this.renderedSectionRate = lerp(this.renderedSectionRate, this.sectionRate, ease);
-    this.renderedSectionDepth = lerp(this.renderedSectionDepth, this.sectionDepth, ease);
-    this.renderedLowBandWeight = lerp(this.renderedLowBandWeight, this.lowBandWeight, ease);
-    this.renderedMidBandWeight = lerp(this.renderedMidBandWeight, this.midBandWeight, ease);
-    this.renderedHighBandWeight = lerp(this.renderedHighBandWeight, this.highBandWeight, ease);
+    this.renderedSectionRate = lerp(
+      this.renderedSectionRate,
+      this.sectionRate,
+      ease,
+    );
+    this.renderedSectionDepth = lerp(
+      this.renderedSectionDepth,
+      this.sectionDepth,
+      ease,
+    );
+    this.renderedLowBandWeight = lerp(
+      this.renderedLowBandWeight,
+      this.lowBandWeight,
+      ease,
+    );
+    this.renderedMidBandWeight = lerp(
+      this.renderedMidBandWeight,
+      this.midBandWeight,
+      ease,
+    );
+    this.renderedHighBandWeight = lerp(
+      this.renderedHighBandWeight,
+      this.highBandWeight,
+      ease,
+    );
 
     this.renderedColor1 = [
       lerp(this.renderedColor1[0], this.color1[0], colorEase),
@@ -246,7 +327,10 @@ export class MusicVisualizer {
     this.square = new Square(vec3.fromValues(0, 0, 0));
     this.square.create();
 
-    this.camera = new Camera(vec3.fromValues(0, 0, 5), vec3.fromValues(0, 0, 0));
+    this.camera = new Camera(
+      vec3.fromValues(0, 0, 5),
+      vec3.fromValues(0, 0, 0),
+    );
     this.camera.setAspectRatio(this.width / Math.max(this.height, 1));
     this.camera.updateProjectionMatrix();
 
@@ -290,7 +374,17 @@ export class MusicVisualizer {
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.CLAMP_TO_EDGE);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.NEAREST);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.NEAREST);
-    g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+    g.texImage2D(
+      g.TEXTURE_2D,
+      0,
+      g.RGBA,
+      w,
+      h,
+      0,
+      g.RGBA,
+      g.UNSIGNED_BYTE,
+      null,
+    );
 
     this.brightTex = g.createTexture()!;
     g.bindTexture(g.TEXTURE_2D, this.brightTex);
@@ -298,16 +392,43 @@ export class MusicVisualizer {
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.CLAMP_TO_EDGE);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.NEAREST);
     g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.NEAREST);
-    g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+    g.texImage2D(
+      g.TEXTURE_2D,
+      0,
+      g.RGBA,
+      w,
+      h,
+      0,
+      g.RGBA,
+      g.UNSIGNED_BYTE,
+      null,
+    );
 
     g.bindFramebuffer(g.FRAMEBUFFER, this.fbo);
-    g.framebufferTexture2D(g.DRAW_FRAMEBUFFER, g.COLOR_ATTACHMENT0, g.TEXTURE_2D, this.colorTex, 0);
-    g.framebufferTexture2D(g.DRAW_FRAMEBUFFER, g.COLOR_ATTACHMENT1, g.TEXTURE_2D, this.brightTex, 0);
+    g.framebufferTexture2D(
+      g.DRAW_FRAMEBUFFER,
+      g.COLOR_ATTACHMENT0,
+      g.TEXTURE_2D,
+      this.colorTex,
+      0,
+    );
+    g.framebufferTexture2D(
+      g.DRAW_FRAMEBUFFER,
+      g.COLOR_ATTACHMENT1,
+      g.TEXTURE_2D,
+      this.brightTex,
+      0,
+    );
 
     this.rboDepth = g.createRenderbuffer()!;
     g.bindRenderbuffer(g.RENDERBUFFER, this.rboDepth);
     g.renderbufferStorage(g.RENDERBUFFER, g.DEPTH_COMPONENT16, w, h);
-    g.framebufferRenderbuffer(g.FRAMEBUFFER, g.DEPTH_ATTACHMENT, g.RENDERBUFFER, this.rboDepth);
+    g.framebufferRenderbuffer(
+      g.FRAMEBUFFER,
+      g.DEPTH_ATTACHMENT,
+      g.RENDERBUFFER,
+      this.rboDepth,
+    );
     g.drawBuffers([g.COLOR_ATTACHMENT0, g.COLOR_ATTACHMENT1]);
     g.bindFramebuffer(g.FRAMEBUFFER, null);
 
@@ -321,8 +442,24 @@ export class MusicVisualizer {
       g.texParameteri(g.TEXTURE_2D, g.TEXTURE_WRAP_T, g.CLAMP_TO_EDGE);
       g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MIN_FILTER, g.NEAREST);
       g.texParameteri(g.TEXTURE_2D, g.TEXTURE_MAG_FILTER, g.NEAREST);
-      g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
-      g.framebufferTexture2D(g.DRAW_FRAMEBUFFER, g.COLOR_ATTACHMENT0, g.TEXTURE_2D, this.blurTexs[i]!, 0);
+      g.texImage2D(
+        g.TEXTURE_2D,
+        0,
+        g.RGBA,
+        w,
+        h,
+        0,
+        g.RGBA,
+        g.UNSIGNED_BYTE,
+        null,
+      );
+      g.framebufferTexture2D(
+        g.DRAW_FRAMEBUFFER,
+        g.COLOR_ATTACHMENT0,
+        g.TEXTURE_2D,
+        this.blurTexs[i]!,
+        0,
+      );
     }
     g.bindFramebuffer(g.FRAMEBUFFER, null);
   }
@@ -365,7 +502,11 @@ export class MusicVisualizer {
     rawMid /= Math.max(1, midEnd - lowEnd);
     rawHigh /= Math.max(1, bins - midEnd);
 
-    const rawEnvelope = clamp(rawLow * 0.62 + rawMid * 0.25 + rawHigh * 0.13, 0, 1);
+    const rawEnvelope = clamp(
+      rawLow * 0.62 + rawMid * 0.25 + rawHigh * 0.13,
+      0,
+      1,
+    );
     const playbackTarget = playback.isPlaying ? 1 : 0;
     this.playbackLevel = lerp(
       this.playbackLevel,
@@ -383,21 +524,38 @@ export class MusicVisualizer {
     );
 
     // Use sqrt instead of 1-exp to preserve peak shape while still compressing
-    const baseFreqAvg = clamp(Math.sqrt(rawFreqAvg * normalization * 0.85), 0, 1.15);
-    const low = clamp(Math.sqrt(rawLow * normalization * 1.0), 0, 1.25) * this.playbackLevel;
-    const mid = clamp(Math.sqrt(rawMid * normalization * 0.95), 0, 1.2) * this.playbackLevel;
-    const high = clamp(Math.sqrt(rawHigh * normalization * 0.9), 0, 1.15) * this.playbackLevel;
-    const envelope = clamp(Math.sqrt(rawEnvelope * normalization * 1.0), 0, 1.2) * this.playbackLevel;
-    const freqAvg = clamp(baseFreqAvg * (0.84 + envelope * 0.26), 0, 1.15) * this.playbackLevel;
+    const baseFreqAvg = clamp(
+      Math.sqrt(rawFreqAvg * normalization * 0.85),
+      0,
+      1.15,
+    );
+    const low =
+      clamp(Math.sqrt(rawLow * normalization * 1.0), 0, 1.25) *
+      this.playbackLevel;
+    const mid =
+      clamp(Math.sqrt(rawMid * normalization * 0.95), 0, 1.2) *
+      this.playbackLevel;
+    const high =
+      clamp(Math.sqrt(rawHigh * normalization * 0.9), 0, 1.15) *
+      this.playbackLevel;
+    const envelope =
+      clamp(Math.sqrt(rawEnvelope * normalization * 1.0), 0, 1.2) *
+      this.playbackLevel;
+    const freqAvg =
+      clamp(baseFreqAvg * (0.84 + envelope * 0.26), 0, 1.15) *
+      this.playbackLevel;
 
     this.envelopeAverage = this.envelopeAverage * 0.9 + envelope * 0.1;
     const transient = Math.max(0, envelope - this.envelopeAverage);
     const beatThreshold = 0.018 + (1.15 - this.renderedBeatResponse) * 0.008;
-    const minBeatFrames = Math.max(10, Math.round(20 - this.renderedBeatResponse * 5));
+    const minBeatFrames = Math.max(
+      10,
+      Math.round(20 - this.renderedBeatResponse * 5),
+    );
     const isBeat =
-      transient * this.renderedBeatResponse > beatThreshold
-      && envelope > this.envelopeAverage + 0.015
-      && this.time - this.lastBeatFrame > minBeatFrames;
+      transient * this.renderedBeatResponse > beatThreshold &&
+      envelope > this.envelopeAverage + 0.015 &&
+      this.time - this.lastBeatFrame > minBeatFrames;
 
     if (isBeat) {
       if (this.lastBeatFrame > 0) {
@@ -408,7 +566,8 @@ export class MusicVisualizer {
             this.beatIntervals.shift();
           }
           this.beatIntervalAverage =
-            this.beatIntervals.reduce((sum, value) => sum + value, 0) / this.beatIntervals.length;
+            this.beatIntervals.reduce((sum, value) => sum + value, 0) /
+            this.beatIntervals.length;
 
           const variance =
             this.beatIntervals.reduce(
@@ -416,18 +575,31 @@ export class MusicVisualizer {
               0,
             ) / this.beatIntervals.length;
           const deviation = Math.sqrt(variance);
-          this.grooveConfidence = clamp(1 - deviation / Math.max(this.beatIntervalAverage, 1), 0, 1);
+          this.grooveConfidence = clamp(
+            1 - deviation / Math.max(this.beatIntervalAverage, 1),
+            0,
+            1,
+          );
         }
       }
-      this.beatPulse = clamp(transient * 10 * this.renderedBeatResponse + envelope * 0.4, 0, 1.6);
+      this.beatPulse = clamp(
+        transient * 10 * this.renderedBeatResponse + envelope * 0.4,
+        0,
+        1.6,
+      );
       this.lastBeatFrame = this.time;
     } else {
       this.beatPulse *= this.renderedBeatDecay;
       if (this.beatIntervalAverage > 0 && this.grooveConfidence > 0.08) {
-        const phase = (this.time - this.lastBeatFrame) / this.beatIntervalAverage;
+        const phase =
+          (this.time - this.lastBeatFrame) / this.beatIntervalAverage;
         const wrapped = phase - Math.floor(phase);
         const beatWindow = Math.min(wrapped, 1 - wrapped);
-        const predicted = Math.exp(-beatWindow * 20) * this.grooveConfidence * this.renderedBeatResponse * 0.52;
+        const predicted =
+          Math.exp(-beatWindow * 20) *
+          this.grooveConfidence *
+          this.renderedBeatResponse *
+          0.52;
         this.groovePulse = Math.max(this.groovePulse * 0.93, predicted);
       } else {
         this.groovePulse *= this.playbackLevel > 0.1 ? 0.9 : 0.82;
@@ -443,9 +615,21 @@ export class MusicVisualizer {
 
   private updateCamera(metrics: AudioMetrics) {
     this.camera.position = vec3.fromValues(
-      Math.sin(this.time * 0.0025 * this.renderedOrbitSpeed + this.renderedOrbitPhase) * 0.08 * this.renderedCameraDrift,
-      Math.cos(this.time * 0.002 * this.renderedOrbitSpeed + this.renderedOrbitPhase * 0.6) * 0.06 * this.renderedCameraDrift,
-      5 + this.renderedCameraDepth - metrics.pulse * 0.08 * this.renderedPulseGain - this.arrivalAccentPulse * 0.12,
+      Math.sin(
+        this.time * 0.0025 * this.renderedOrbitSpeed + this.renderedOrbitPhase,
+      ) *
+        0.08 *
+        this.renderedCameraDrift,
+      Math.cos(
+        this.time * 0.002 * this.renderedOrbitSpeed +
+          this.renderedOrbitPhase * 0.6,
+      ) *
+        0.06 *
+        this.renderedCameraDrift,
+      5 +
+        this.renderedCameraDepth -
+        metrics.pulse * 0.08 * this.renderedPulseGain -
+        this.arrivalAccentPulse * 0.12,
     );
     this.camera.update();
   }
@@ -455,32 +639,83 @@ export class MusicVisualizer {
     this.line.setAudio(metrics.freqAvg, metrics.timeAvg);
 
     const beat = metrics.beat * this.renderedBeatResponse;
-    const sectionWave = 0.5 + 0.5 * Math.sin(this.time * 0.0014 * this.renderedSectionRate + this.renderedOrbitPhase * 0.35);
+    const sectionWave =
+      0.5 +
+      0.5 *
+        Math.sin(
+          this.time * 0.0014 * this.renderedSectionRate +
+            this.renderedOrbitPhase * 0.35,
+        );
     const sectionLift = (sectionWave - 0.5) * 2 * this.renderedSectionDepth;
     const arrival = this.arrivalAccentPulse;
-    const pulseLow = (metrics.low * this.renderedLowBandWeight + beat * 0.5) * this.renderedPulseGain;
-    const pulseMid = (metrics.mid * this.renderedMidBandWeight + beat * 0.22 + metrics.transient * 0.35) * this.renderedPulseGain;
-    const pulseHigh = (metrics.high * this.renderedHighBandWeight + metrics.transient * 0.28) * this.renderedPulseGain;
-    const turbulence = this.renderedTurbulence + sectionLift * 0.18 + arrival * 0.16;
-    const shellGap = this.renderedSeparation * clamp(1.22 - (this.renderedShellDensity - 1) * 0.7 + sectionLift * 0.18 + arrival * 0.12, 0.7, 1.4);
-    const coreDetail = 3 + this.renderedOctaves + beat * 0.3 + this.renderedShellDensity * 0.2 + sectionLift * 0.2 + arrival * 0.35;
-    const midDetail = 1 + this.renderedOctaves + this.renderedShellDensity * 0.15 + sectionLift * 0.15 + arrival * 0.18;
-    const outerDetail = 2 + this.renderedOctaves + metrics.transient * 0.4 + this.renderedShellDensity * 0.1 + sectionLift * 0.1 + arrival * 0.22;
+    const pulseLow =
+      (metrics.low * this.renderedLowBandWeight + beat * 0.5) *
+      this.renderedPulseGain;
+    const pulseMid =
+      (metrics.mid * this.renderedMidBandWeight +
+        beat * 0.22 +
+        metrics.transient * 0.35) *
+      this.renderedPulseGain;
+    const pulseHigh =
+      (metrics.high * this.renderedHighBandWeight + metrics.transient * 0.28) *
+      this.renderedPulseGain;
+    const turbulence =
+      this.renderedTurbulence + sectionLift * 0.18 + arrival * 0.16;
+    const shellGap =
+      this.renderedSeparation *
+      clamp(
+        1.22 -
+          (this.renderedShellDensity - 1) * 0.7 +
+          sectionLift * 0.18 +
+          arrival * 0.12,
+        0.7,
+        1.4,
+      );
+    const coreDetail =
+      3 +
+      this.renderedOctaves +
+      beat * 0.3 +
+      this.renderedShellDensity * 0.2 +
+      sectionLift * 0.2 +
+      arrival * 0.35;
+    const midDetail =
+      1 +
+      this.renderedOctaves +
+      this.renderedShellDensity * 0.15 +
+      sectionLift * 0.15 +
+      arrival * 0.18;
+    const outerDetail =
+      2 +
+      this.renderedOctaves +
+      metrics.transient * 0.4 +
+      this.renderedShellDensity * 0.1 +
+      sectionLift * 0.1 +
+      arrival * 0.22;
     const colorLift = clamp(arrival * 0.18 + beat * 0.05, 0, 0.24);
     const color1 = mixColor(this.renderedColor1, [1, 1, 1], colorLift);
     const color2 = mixColor(this.renderedColor2, [1, 1, 1], colorLift * 0.85);
     const color3 = mixColor(this.renderedColor3, [1, 1, 1], colorLift * 0.72);
 
     let scaleVal =
-      (1.16 + pulseLow * 0.3 + beat * 0.11 + this.renderedCameraDepth * 0.08 + sectionLift * 0.08 + arrival * 0.1)
-      * this.viewportScaleCompensation;
+      (1.16 +
+        pulseLow * 0.3 +
+        beat * 0.11 +
+        this.renderedCameraDepth * 0.08 +
+        sectionLift * 0.08 +
+        arrival * 0.1) *
+      this.viewportScaleCompensation;
     this.line.setNoise(
-      this.renderedScale * 2.0 * turbulence * (0.92 + this.renderedShellDensity * 0.08),
+      this.renderedScale *
+        2.0 *
+        turbulence *
+        (0.92 + this.renderedShellDensity * 0.08),
       this.renderedPersistence * (0.48 + sectionWave * 0.04),
       coreDetail,
       0.005 * turbulence + this.renderedOrbitPhase * 0.001,
     );
-    this.line.setGeometryColor(vec4.fromValues(color1[0], color1[1], color1[2], 1.0));
+    this.line.setGeometryColor(
+      vec4.fromValues(color1[0], color1[1], color1[2], 1.0),
+    );
     this.renderer.render(this.camera, this.line, [this.sphere3], scaleVal);
 
     scaleVal += shellGap + pulseMid * 0.1;
@@ -490,17 +725,22 @@ export class MusicVisualizer {
       midDetail,
       -0.01 * turbulence + this.renderedOrbitPhase * 0.0006,
     );
-    this.line.setGeometryColor(vec4.fromValues(color2[0], color2[1], color2[2], 1.0));
+    this.line.setGeometryColor(
+      vec4.fromValues(color2[0], color2[1], color2[2], 1.0),
+    );
     this.renderer.render(this.camera, this.line, [this.sphere2], scaleVal);
 
     scaleVal += shellGap + pulseHigh * 0.08;
     this.line.setNoise(
       this.renderedScale * (0.92 + turbulence * 0.08 + beat * 0.04),
-      this.renderedPersistence * (0.94 + metrics.transient * 0.12 + sectionLift * 0.05),
+      this.renderedPersistence *
+        (0.94 + metrics.transient * 0.12 + sectionLift * 0.05),
       outerDetail,
       0.01 * turbulence - this.renderedOrbitPhase * 0.0008,
     );
-    this.line.setGeometryColor(vec4.fromValues(color3[0], color3[1], color3[2], 1.0));
+    this.line.setGeometryColor(
+      vec4.fromValues(color3[0], color3[1], color3[2], 1.0),
+    );
     this.renderer.render(this.camera, this.line, [this.sphere1], scaleVal);
   }
 
@@ -523,11 +763,31 @@ export class MusicVisualizer {
     this.camera.updateProjectionMatrix();
 
     g.bindTexture(g.TEXTURE_2D, this.colorTex);
-    g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+    g.texImage2D(
+      g.TEXTURE_2D,
+      0,
+      g.RGBA,
+      w,
+      h,
+      0,
+      g.RGBA,
+      g.UNSIGNED_BYTE,
+      null,
+    );
     g.bindTexture(g.TEXTURE_2D, null);
 
     g.bindTexture(g.TEXTURE_2D, this.brightTex);
-    g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+    g.texImage2D(
+      g.TEXTURE_2D,
+      0,
+      g.RGBA,
+      w,
+      h,
+      0,
+      g.RGBA,
+      g.UNSIGNED_BYTE,
+      null,
+    );
     g.bindTexture(g.TEXTURE_2D, null);
 
     g.bindRenderbuffer(g.RENDERBUFFER, this.rboDepth);
@@ -536,7 +796,17 @@ export class MusicVisualizer {
 
     for (let i = 0; i < 2; i++) {
       g.bindTexture(g.TEXTURE_2D, this.blurTexs[i]!);
-      g.texImage2D(g.TEXTURE_2D, 0, g.RGBA, w, h, 0, g.RGBA, g.UNSIGNED_BYTE, null);
+      g.texImage2D(
+        g.TEXTURE_2D,
+        0,
+        g.RGBA,
+        w,
+        h,
+        0,
+        g.RGBA,
+        g.UNSIGNED_BYTE,
+        null,
+      );
       g.bindTexture(g.TEXTURE_2D, null);
     }
   }
@@ -592,7 +862,10 @@ export class MusicVisualizer {
       const idx = Number(horizontal);
       g.bindFramebuffer(g.FRAMEBUFFER, this.blurFBOs[idx]!);
       g.uniform1i(horizontalLoc, idx);
-      g.bindTexture(g.TEXTURE_2D, firstIteration ? this.brightTex : this.blurTexs[Number(!horizontal)]!);
+      g.bindTexture(
+        g.TEXTURE_2D,
+        firstIteration ? this.brightTex : this.blurTexs[Number(!horizontal)]!,
+      );
       this.renderer.render(this.camera, this.blur, [this.square]);
       horizontal = !horizontal;
       firstIteration = false;
@@ -628,7 +901,7 @@ export class MusicVisualizer {
     for (const fbo of this.blurFBOs) g.deleteFramebuffer(fbo);
     for (const tex of this.blurTexs) g.deleteTexture(tex);
 
-    const ext = g.getExtension('WEBGL_lose_context');
+    const ext = g.getExtension("WEBGL_lose_context");
     if (ext) ext.loseContext();
   }
 }

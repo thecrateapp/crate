@@ -16,7 +16,9 @@ const runtimeState = vi.hoisted(() => ({
 }));
 
 vi.mock("@/app-shell/AppProviders", () => ({
-  AppProviders: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  AppProviders: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 vi.mock("@/components/layout/Shell", () => ({

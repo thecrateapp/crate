@@ -20,13 +20,21 @@ export function Profile() {
   const [changingPw, setChangingPw] = useState(false);
 
   const connectedAccounts = user?.connected_accounts || [];
-  const linkedProviders = new Set(connectedAccounts.filter((item) => item.status !== "unlinked").map((item) => item.provider));
+  const linkedProviders = new Set(
+    connectedAccounts
+      .filter((item) => item.status !== "unlinked")
+      .map((item) => item.provider),
+  );
 
   async function handleSaveProfile(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      await api("/api/auth/profile", "PUT", { name, username: username.trim() || null, bio });
+      await api("/api/auth/profile", "PUT", {
+        name,
+        username: username.trim() || null,
+        bio,
+      });
       toast.success("Profile updated");
       await refetch();
     } catch (err) {
@@ -57,7 +65,9 @@ export function Profile() {
       setNewPw("");
       setConfirmPw("");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to change password");
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to change password",
+      );
     } finally {
       setChangingPw(false);
     }
@@ -74,7 +84,9 @@ export function Profile() {
   }
 
   function startProviderLink(provider: string) {
-    window.location.href = `/api/auth/${provider}?return_to=${encodeURIComponent(window.location.origin + "/profile")}`;
+    window.location.href = `/api/auth/${provider}?return_to=${encodeURIComponent(
+      window.location.origin + "/profile",
+    )}`;
   }
 
   if (!user) return null;
@@ -94,23 +106,36 @@ export function Profile() {
             </div>
           )}
           <div>
-            <div className="font-semibold text-lg">{user.name || user.email}</div>
+            <div className="font-semibold text-lg">
+              {user.name || user.email}
+            </div>
             <div className="text-sm text-muted-foreground">{user.email}</div>
-            <Badge variant="secondary" className="mt-1">{user.role}</Badge>
+            <Badge variant="secondary" className="mt-1">
+              {user.role}
+            </Badge>
           </div>
         </div>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Display Name</label>
+            <label className="text-sm text-muted-foreground mb-1 block">
+              Display Name
+            </label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Username</label>
-            <Input value={username} onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))} />
+            <label className="text-sm text-muted-foreground mb-1 block">
+              Username
+            </label>
+            <Input
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
+            />
           </div>
           <div>
-            <label className="text-sm text-muted-foreground mb-1 block">Bio</label>
+            <label className="text-sm text-muted-foreground mb-1 block">
+              Bio
+            </label>
             <Input value={bio} onChange={(e) => setBio(e.target.value)} />
           </div>
           <Button type="submit" size="sm" disabled={saving}>
@@ -164,20 +189,32 @@ export function Profile() {
           return (
             <div
               key={provider}
-              className={`flex items-center justify-between py-3 ${index === 0 ? "border-b border-border" : ""}`}
+              className={`flex items-center justify-between py-3 ${
+                index === 0 ? "border-b border-border" : ""
+              }`}
             >
               <div>
-                <div className="text-sm font-medium">{provider.charAt(0).toUpperCase() + provider.slice(1)}</div>
+                <div className="text-sm font-medium">
+                  {provider.charAt(0).toUpperCase() + provider.slice(1)}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {linked ? "Linked" : "Not linked"}
                 </div>
               </div>
               {linked ? (
-                <Button size="sm" variant="outline" onClick={() => handleUnlinkProvider(provider)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleUnlinkProvider(provider)}
+                >
                   <Unlink size={14} className="mr-1" /> Unlink
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => startProviderLink(provider)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startProviderLink(provider)}
+                >
                   <Link2 size={14} className="mr-1" /> Link
                 </Button>
               )}

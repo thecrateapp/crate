@@ -14,6 +14,10 @@ from crate.db.tx import transaction_scope
 from crate.db.ui_snapshot_store import mark_ui_snapshots_stale
 
 
+def _rowcount(result: Any) -> int:
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 def mark_import_queue_item_imported(
     source_path: str,
     *,
@@ -32,7 +36,9 @@ def remove_import_queue_item(source_path: str, *, source: str | None = None) -> 
     with transaction_scope() as session:
         if source:
             result = session.execute(
-                text("DELETE FROM import_queue_items WHERE source = :source AND path = :path"),
+                text(
+                    "DELETE FROM import_queue_items WHERE source = :source AND path = :path"
+                ),
                 {"source": source, "path": source_path},
             )
         else:
@@ -40,16 +46,22 @@ def remove_import_queue_item(source_path: str, *, source: str | None = None) -> 
                 text("DELETE FROM import_queue_items WHERE path = :path"),
                 {"path": source_path},
             )
-        removed = int(result.rowcount or 0)
+        removed = _rowcount(result)
         pending_count = int(
             session.execute(
-                text("SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = 'pending'")
+                text(
+                    "SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = 'pending'"
+                )
             ).scalar()
             or 0
         )
-        set_ops_runtime_state("imports_pending", {"count": pending_count}, session=session)
+        set_ops_runtime_state(
+            "imports_pending", {"count": pending_count}, session=session
+        )
         if removed:
-            mark_ui_snapshots_stale(scope="ops", subject_key="dashboard", session=session)
+            mark_ui_snapshots_stale(
+                scope="ops", subject_key="dashboard", session=session
+            )
             append_domain_event(
                 "library.import_queue.changed",
                 {"pending_count": pending_count, "removed": removed},
@@ -68,9 +80,10 @@ def _update_import_queue_item_status(
     source: str | None = None,
 ) -> bool:
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT source, path, payload_json
                 FROM import_queue_items
                 WHERE path = :path
@@ -78,13 +91,17 @@ def _update_import_queue_item_status(
                 ORDER BY updated_at DESC
                 LIMIT 1
                 """
-            ),
-            {"path": source_path, "source": source},
-        ).mappings().first()
+                ),
+                {"path": source_path, "source": source},
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             return False
 
-        payload = coerce_json(row.get("payload_json")) or {}
+        payload_raw = coerce_json(row.get("payload_json"))
+        payload = payload_raw if isinstance(payload_raw, dict) else {}
         if payload_patch:
             payload.update(payload_patch)
         payload["status"] = status
@@ -108,11 +125,15 @@ def _update_import_queue_item_status(
         )
         pending_count = int(
             session.execute(
-                text("SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = 'pending'")
+                text(
+                    "SELECT COUNT(*) AS cnt FROM import_queue_items WHERE status = 'pending'"
+                )
             ).scalar()
             or 0
         )
-        set_ops_runtime_state("imports_pending", {"count": pending_count}, session=session)
+        set_ops_runtime_state(
+            "imports_pending", {"count": pending_count}, session=session
+        )
         mark_ui_snapshots_stale(scope="ops", subject_key="dashboard", session=session)
         append_domain_event(
             "library.import_queue.changed",

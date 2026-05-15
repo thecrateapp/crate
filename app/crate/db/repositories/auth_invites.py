@@ -24,7 +24,9 @@ def create_auth_invite(
             token=secrets.token_urlsafe(24),
             email=email,
             created_by=created_by,
-            expires_at=(now + timedelta(hours=expires_in_hours)) if expires_in_hours > 0 else None,
+            expires_at=(now + timedelta(hours=expires_in_hours))
+            if expires_in_hours > 0
+            else None,
             max_uses=max_uses,
             created_at=now,
         )
@@ -47,11 +49,15 @@ def list_auth_invites(created_by: int | None = None) -> list[dict]:
         stmt = select(AuthInvite)
         if created_by is not None:
             stmt = stmt.where(AuthInvite.created_by == created_by)
-        rows = session.execute(stmt.order_by(AuthInvite.created_at.desc())).scalars().all()
+        rows = (
+            session.execute(stmt.order_by(AuthInvite.created_at.desc())).scalars().all()
+        )
         return [model_to_dict(row) for row in rows]
 
 
-def consume_auth_invite(token: str, *, session=None) -> dict | None:
+def consume_auth_invite(
+    token: str, *, email: str | None = None, session=None
+) -> dict | None:
     def _impl(s) -> dict | None:
         invite = s.get(AuthInvite, token)
         if invite is None:
@@ -59,8 +65,16 @@ def consume_auth_invite(token: str, *, session=None) -> dict | None:
         now = datetime.now(timezone.utc)
         if invite.expires_at is not None and invite.expires_at <= now:
             return None
-        if invite.max_uses is not None and int(invite.use_count or 0) >= invite.max_uses:
+        if (
+            invite.max_uses is not None
+            and int(invite.use_count or 0) >= invite.max_uses
+        ):
             return None
+        if invite.email:
+            expected = invite.email.strip().lower()
+            actual = (email or "").strip().lower()
+            if expected != actual:
+                return None
         invite.use_count = int(invite.use_count or 0) + 1
         if invite.accepted_at is None:
             invite.accepted_at = now

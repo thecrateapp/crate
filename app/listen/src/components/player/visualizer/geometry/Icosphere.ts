@@ -1,6 +1,6 @@
-import { vec3, vec4 } from 'gl-matrix';
-import Drawable from '../rendering/Drawable';
-import { gl } from '../globals';
+import { vec3, vec4 } from "gl-matrix";
+import Drawable from "../rendering/Drawable";
+import { gl } from "../globals";
 
 class Icosphere extends Drawable {
   buffer!: ArrayBuffer;
@@ -9,7 +9,12 @@ class Icosphere extends Drawable {
   normals!: Float32Array;
   center: vec4;
 
-  constructor(center: vec3, public radius: number, public subdivisions: number, public mode: GLenum) {
+  constructor(
+    center: vec3,
+    public radius: number,
+    public subdivisions: number,
+    public mode: GLenum,
+  ) {
     super();
     this.center = vec4.fromValues(center[0], center[1], center[2], 1);
   }
@@ -24,11 +29,11 @@ class Icosphere extends Drawable {
 
     const buffer0 = new ArrayBuffer(
       maxIndexCount * 3 * Uint32Array.BYTES_PER_ELEMENT +
-      maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT +
-      maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT
+        maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT +
+        maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT,
     );
     const buffer1 = new ArrayBuffer(
-      maxIndexCount * 3 * Uint32Array.BYTES_PER_ELEMENT
+      maxIndexCount * 3 * Uint32Array.BYTES_PER_ELEMENT,
     );
     const buffers: ArrayBuffer[] = [buffer0, buffer1];
     let b = 0;
@@ -36,17 +41,26 @@ class Icosphere extends Drawable {
     const indexByteOffset = 0;
     const vertexByteOffset = maxIndexCount * 3 * Uint32Array.BYTES_PER_ELEMENT;
     const normalByteOffset = vertexByteOffset;
-    const positionByteOffset = vertexByteOffset + maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT;
+    const positionByteOffset =
+      vertexByteOffset + maxVertexCount * 4 * Float32Array.BYTES_PER_ELEMENT;
 
     let triangles: Uint32Array[] = new Array(20);
     let nextTriangles: Uint32Array[] = [];
     for (let i = 0; i < 20; ++i) {
-      triangles[i] = new Uint32Array(buffers[b]!, indexByteOffset + i * 3 * Uint32Array.BYTES_PER_ELEMENT, 3);
+      triangles[i] = new Uint32Array(
+        buffers[b]!,
+        indexByteOffset + i * 3 * Uint32Array.BYTES_PER_ELEMENT,
+        3,
+      );
     }
 
     const vertices: Float32Array[] = new Array(12);
     for (let i = 0; i < 12; ++i) {
-      vertices[i] = new Float32Array(buffer0, vertexByteOffset + i * 4 * Float32Array.BYTES_PER_ELEMENT, 4);
+      vertices[i] = new Float32Array(
+        buffer0,
+        vertexByteOffset + i * 4 * Float32Array.BYTES_PER_ELEMENT,
+        4,
+      );
     }
 
     vertices[0]!.set([-X, N, Z, 0]);
@@ -90,11 +104,23 @@ class Icosphere extends Drawable {
 
       const edgeMap: Map<string, number> = new Map();
       function mid(v0: number, v1: number): number {
-        const key = [v0, v1].sort().join('_');
+        const key = [v0, v1].sort().join("_");
         if (!edgeMap.has(key)) {
-          const midpoint = new Float32Array(buffer0, vertexByteOffset + vertices.length * 4 * Float32Array.BYTES_PER_ELEMENT, 4);
-          vec4.add(midpoint as unknown as vec4, vertices[v0]! as unknown as vec4, vertices[v1]! as unknown as vec4);
-          vec4.normalize(midpoint as unknown as vec4, midpoint as unknown as vec4);
+          const midpoint = new Float32Array(
+            buffer0,
+            vertexByteOffset +
+              vertices.length * 4 * Float32Array.BYTES_PER_ELEMENT,
+            4,
+          );
+          vec4.add(
+            midpoint as unknown as vec4,
+            vertices[v0]! as unknown as vec4,
+            vertices[v1]! as unknown as vec4,
+          );
+          vec4.normalize(
+            midpoint as unknown as vec4,
+            midpoint as unknown as vec4,
+          );
           edgeMap.set(key, vertices.length);
           vertices.push(midpoint);
         }
@@ -111,19 +137,35 @@ class Icosphere extends Drawable {
         const v5 = mid(v2, v0);
 
         const buf = buffers[b]!;
-        nextTriangles[triangleIdx] = new Uint32Array(buf, indexByteOffset + (triangleIdx) * 3 * Uint32Array.BYTES_PER_ELEMENT, 3);
+        nextTriangles[triangleIdx] = new Uint32Array(
+          buf,
+          indexByteOffset + triangleIdx * 3 * Uint32Array.BYTES_PER_ELEMENT,
+          3,
+        );
         nextTriangles[triangleIdx]!.set([v0, v3, v5]);
         triangleIdx++;
 
-        nextTriangles[triangleIdx] = new Uint32Array(buf, indexByteOffset + (triangleIdx) * 3 * Uint32Array.BYTES_PER_ELEMENT, 3);
+        nextTriangles[triangleIdx] = new Uint32Array(
+          buf,
+          indexByteOffset + triangleIdx * 3 * Uint32Array.BYTES_PER_ELEMENT,
+          3,
+        );
         nextTriangles[triangleIdx]!.set([v3, v4, v5]);
         triangleIdx++;
 
-        nextTriangles[triangleIdx] = new Uint32Array(buf, indexByteOffset + (triangleIdx) * 3 * Uint32Array.BYTES_PER_ELEMENT, 3);
+        nextTriangles[triangleIdx] = new Uint32Array(
+          buf,
+          indexByteOffset + triangleIdx * 3 * Uint32Array.BYTES_PER_ELEMENT,
+          3,
+        );
         nextTriangles[triangleIdx]!.set([v3, v1, v4]);
         triangleIdx++;
 
-        nextTriangles[triangleIdx] = new Uint32Array(buf, indexByteOffset + (triangleIdx) * 3 * Uint32Array.BYTES_PER_ELEMENT, 3);
+        nextTriangles[triangleIdx] = new Uint32Array(
+          buf,
+          indexByteOffset + triangleIdx * 3 * Uint32Array.BYTES_PER_ELEMENT,
+          3,
+        );
         nextTriangles[triangleIdx]!.set([v5, v4, v2]);
         triangleIdx++;
       }
@@ -140,14 +182,35 @@ class Icosphere extends Drawable {
     }
 
     for (let i = 0; i < vertices.length; ++i) {
-      const pos = new Float32Array(buffer0, positionByteOffset + i * 4 * Float32Array.BYTES_PER_ELEMENT, 4) as unknown as vec4;
-      vec4.scaleAndAdd(pos, this.center, vertices[i]! as unknown as vec4, this.radius);
+      const pos = new Float32Array(
+        buffer0,
+        positionByteOffset + i * 4 * Float32Array.BYTES_PER_ELEMENT,
+        4,
+      ) as unknown as vec4;
+      vec4.scaleAndAdd(
+        pos,
+        this.center,
+        vertices[i]! as unknown as vec4,
+        this.radius,
+      );
     }
 
     this.buffer = buffer0;
-    this.indices = new Uint32Array(this.buffer, indexByteOffset, triangles.length * 3);
-    this.normals = new Float32Array(this.buffer, normalByteOffset, vertices.length * 4);
-    this.positions = new Float32Array(this.buffer, positionByteOffset, vertices.length * 4);
+    this.indices = new Uint32Array(
+      this.buffer,
+      indexByteOffset,
+      triangles.length * 3,
+    );
+    this.normals = new Float32Array(
+      this.buffer,
+      normalByteOffset,
+      vertices.length * 4,
+    );
+    this.positions = new Float32Array(
+      this.buffer,
+      positionByteOffset,
+      vertices.length * 4,
+    );
 
     this.generateIdx();
     this.generatePos();

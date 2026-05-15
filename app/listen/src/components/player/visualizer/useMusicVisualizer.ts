@@ -1,11 +1,11 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
-import { MusicVisualizer } from './MusicVisualizer';
-import { createAnalyserNode } from '@/hooks/use-audio-visualizer';
-import { getAnalyserNode } from '@/lib/gapless-player';
-import type { VisualizerMode } from '@/lib/player-visualizer-prefs';
+import { useEffect, useRef, type MutableRefObject } from "react";
+import { MusicVisualizer } from "./MusicVisualizer";
+import { createAnalyserNode } from "@/hooks/use-audio-visualizer";
+import { getAnalyserNode } from "@/lib/gapless-player";
+import type { VisualizerMode } from "@/lib/player-visualizer-prefs";
 
 function dbg(msg: string) {
-  const d = document.getElementById('viz-debug');
+  const d = document.getElementById("viz-debug");
   if (d) d.textContent = msg;
 }
 
@@ -27,7 +27,9 @@ export function useMusicVisualizer(
 
   useEffect(() => {
     if (!active || !canvasRef.current) {
-      dbg(`off: active=${active} canvas=${!!canvasRef.current} analyser=${!!getAnalyserNode()}`);
+      dbg(
+        `off: active=${active} canvas=${!!canvasRef.current} analyser=${!!getAnalyserNode()}`,
+      );
       return;
     }
 
@@ -64,7 +66,7 @@ export function useMusicVisualizer(
 
       const forceResize = (viz: MusicVisualizer) => {
         const origW = canvas.style.width;
-        canvas.style.width = (canvas.clientWidth - 1) + 'px';
+        canvas.style.width = canvas.clientWidth - 1 + "px";
         requestAnimationFrame(() => {
           canvas.style.width = origW;
           requestAnimationFrame(() => {
@@ -76,7 +78,12 @@ export function useMusicVisualizer(
       };
 
       try {
-        const viz = new MusicVisualizer(canvas, node, () => playbackStateRef.current, mode);
+        const viz = new MusicVisualizer(
+          canvas,
+          node,
+          () => playbackStateRef.current,
+          mode,
+        );
         vizRef.current = viz;
         viz.start();
         setTimeout(() => forceResize(viz), 100);

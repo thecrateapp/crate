@@ -2,7 +2,11 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from crate.api.auth import _require_auth, _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.genres import (
     EqPresetUpdateResponse,
     GenreDetailResponse,
@@ -23,7 +27,10 @@ from crate.db.genres import (
 )
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.tasks import create_task
-from crate.genre_taxonomy import invalidate_runtime_taxonomy_cache, resolve_genre_eq_preset
+from crate.genre_taxonomy import (
+    invalidate_runtime_taxonomy_cache,
+    resolve_genre_eq_preset,
+)
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
 
@@ -49,7 +56,11 @@ def _get_or_create_task(task_type: str, params: dict, max_limit: int = 500) -> d
     for status in ("running", "pending"):
         existing = list_tasks(status=status, task_type=task_type, limit=1)
         if existing:
-            return {"task_id": existing[0]["id"], "status": existing[0]["status"], "deduplicated": True}
+            return {
+                "task_id": existing[0]["id"],
+                "status": existing[0]["status"],
+                "deduplicated": True,
+            }
     task_id = create_task(task_type, params)
     return {"task_id": task_id, "status": "queued", "deduplicated": False}
 
@@ -157,10 +168,7 @@ def taxonomy_tree(request: Request):
     for slug, meta in catalog.items():
         preset = resolve_genre_eq_preset(slug)
         c = counts.get(slug, {"artist_count": 0, "album_count": 0})
-        children = sorted(
-            s for s, m in catalog.items()
-            if slug in m.get("parents", [])
-        )
+        children = sorted(s for s, m in catalog.items() if slug in m.get("parents", []))
         node = {
             "slug": slug,
             "name": meta["name"],
@@ -175,7 +183,9 @@ def taxonomy_tree(request: Request):
             "album_count": c["album_count"],
             "eq_gains": list(preset["gains"]) if preset else None,
             "eq_preset_source": preset["source"] if preset else None,
-            "eq_preset_inherited_from": preset.get("slug") if preset and preset["source"] == "inherited" else None,
+            "eq_preset_inherited_from": preset.get("slug")
+            if preset and preset["source"] == "inherited"
+            else None,
         }
         nodes.append(node)
         if meta.get("top_level", False):
@@ -230,15 +240,19 @@ def reindex_genres(request: Request):
     responses=_GENRE_ADMIN_RESPONSES,
     summary="Queue genre taxonomy inference",
 )
-def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody = InferTaxonomyBody()):
+def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody | None = None):
     _require_admin(request)
+    body = body or InferTaxonomyBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
-    return _get_or_create_task("infer_genre_taxonomy", {
-        "limit": body.limit,
-        "focus_slug": slug,
-        "include_external": body.include_external,
-        "aggressive": body.aggressive,
-    })
+    return _get_or_create_task(
+        "infer_genre_taxonomy",
+        {
+            "limit": body.limit,
+            "focus_slug": slug,
+            "include_external": body.include_external,
+            "aggressive": body.aggressive,
+        },
+    )
 
 
 @router.post(
@@ -247,14 +261,20 @@ def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody = InferTaxono
     responses=_GENRE_ADMIN_RESPONSES,
     summary="Queue genre description enrichment",
 )
-def enrich_genre_descriptions(request: Request, body: EnrichDescriptionsBody = EnrichDescriptionsBody()):
+def enrich_genre_descriptions(
+    request: Request, body: EnrichDescriptionsBody | None = None
+):
     _require_admin(request)
+    body = body or EnrichDescriptionsBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
-    return _get_or_create_task("enrich_genre_descriptions", {
-        "limit": body.limit,
-        "focus_slug": slug,
-        "force": body.force,
-    })
+    return _get_or_create_task(
+        "enrich_genre_descriptions",
+        {
+            "limit": body.limit,
+            "focus_slug": slug,
+            "force": body.force,
+        },
+    )
 
 
 @router.post(
@@ -263,14 +283,20 @@ def enrich_genre_descriptions(request: Request, body: EnrichDescriptionsBody = E
     responses=_GENRE_ADMIN_RESPONSES,
     summary="Queue MusicBrainz genre graph sync",
 )
-def sync_musicbrainz_genre_graph(request: Request, body: MusicBrainzSyncBody = MusicBrainzSyncBody()):
+def sync_musicbrainz_genre_graph(
+    request: Request, body: MusicBrainzSyncBody | None = None
+):
     _require_admin(request)
+    body = body or MusicBrainzSyncBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
-    return _get_or_create_task("sync_musicbrainz_genre_graph", {
-        "limit": body.limit,
-        "focus_slug": slug,
-        "force": body.force,
-    })
+    return _get_or_create_task(
+        "sync_musicbrainz_genre_graph",
+        {
+            "limit": body.limit,
+            "focus_slug": slug,
+            "force": body.force,
+        },
+    )
 
 
 @router.post(
@@ -344,7 +370,11 @@ def update_genre_eq_preset(request: Request, slug: str, body: EqPresetBody):
     responses=_GENRE_RESPONSES,
     summary="Generate an EQ preset for a genre using AI",
 )
-def generate_genre_eq(request: Request, slug: str, apply: bool = Query(False, description="Auto-apply the generated preset")):
+def generate_genre_eq(
+    request: Request,
+    slug: str,
+    apply: bool = Query(False, description="Auto-apply the generated preset"),
+):
     """Use the configured LLM to generate a 10-band EQ preset for a genre."""
     _require_admin(request)
 
@@ -363,6 +393,7 @@ def generate_genre_eq(request: Request, slug: str, apply: bool = Query(False, de
 
     try:
         from crate.llm.prompts.eq_preset import generate_eq_preset
+
         result = generate_eq_preset(
             genre_name=canonical_slug.replace("-", " ").title(),
             description=description,

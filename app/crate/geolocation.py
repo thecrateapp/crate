@@ -28,6 +28,7 @@ def detect_location_from_ip(ip: str) -> dict | None:
         return None
 
     from crate.db.cache_store import get_cache, set_cache
+
     cache_key = f"geo:ip:{ip}"
     cached = get_cache(cache_key, max_age_seconds=86400)
     if cached:
@@ -70,6 +71,7 @@ def geocode_city(query: str) -> dict | None:
         return None
 
     from crate.db.cache_store import get_cache, set_cache
+
     cache_key = f"geo:city:{normalized.lower()}"
     cached = get_cache(cache_key, max_age_seconds=30 * 86400)
     if cached:
@@ -85,7 +87,12 @@ def geocode_city(query: str) -> dict | None:
     try:
         resp = requests.get(
             "https://nominatim.openstreetmap.org/search",
-            params={"q": normalized, "format": "jsonv2", "limit": 1, "addressdetails": 1},
+            params={
+                "q": normalized,
+                "format": "jsonv2",
+                "limit": 1,
+                "addressdetails": 1,
+            },
             headers={"User-Agent": "crate/1.0 (https://github.com/crate)"},
             timeout=10,
         )
@@ -98,7 +105,10 @@ def geocode_city(query: str) -> dict | None:
         address = item.get("address", {})
         result = {
             "display_name": item.get("display_name", normalized),
-            "city": address.get("city") or address.get("town") or address.get("village") or normalized.split(",")[0].strip(),
+            "city": address.get("city")
+            or address.get("town")
+            or address.get("village")
+            or normalized.split(",")[0].strip(),
             "country": address.get("country", ""),
             "country_code": (address.get("country_code") or "").upper(),
             "latitude": float(item["lat"]),
@@ -120,6 +130,7 @@ def search_cities(query: str, limit: int = 5) -> list[dict]:
         return []
 
     from crate.db.cache_store import get_cache, set_cache
+
     cache_key = f"geo:search:{normalized.lower()}"
     cached = get_cache(cache_key, max_age_seconds=7 * 86400)
     if cached:
@@ -148,18 +159,25 @@ def search_cities(query: str, limit: int = 5) -> list[dict]:
         results = []
         for item in resp.json():
             address = item.get("address", {})
-            city = address.get("city") or address.get("town") or address.get("village") or item.get("name", "")
+            city = (
+                address.get("city")
+                or address.get("town")
+                or address.get("village")
+                or item.get("name", "")
+            )
             country = address.get("country", "")
             if not city:
                 continue
-            results.append({
-                "city": city,
-                "country": country,
-                "country_code": (address.get("country_code") or "").upper(),
-                "display_name": f"{city}, {country}" if country else city,
-                "latitude": float(item["lat"]),
-                "longitude": float(item["lon"]),
-            })
+            results.append(
+                {
+                    "city": city,
+                    "country": country,
+                    "country_code": (address.get("country_code") or "").upper(),
+                    "display_name": f"{city}, {country}" if country else city,
+                    "latitude": float(item["lat"]),
+                    "longitude": float(item["lon"]),
+                }
+            )
         set_cache(cache_key, results, ttl=7 * 86400)
         return results
     except Exception:

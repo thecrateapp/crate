@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cacheClear, cacheGet, cacheInvalidate, cacheSet, scopesForUrl } from "@/lib/cache";
+import {
+  cacheClear,
+  cacheGet,
+  cacheInvalidate,
+  cacheSet,
+  scopesForUrl,
+} from "@/lib/cache";
 
 describe("listen api cache", () => {
   beforeEach(() => {
@@ -14,12 +20,15 @@ describe("listen api cache", () => {
       "requestIdleCallback",
       vi.fn((callback: IdleRequestCallback, options?: IdleRequestOptions) => {
         const handle = nextHandle++;
-        const timer = setTimeout(() => {
-          callback({
-            didTimeout: false,
-            timeRemaining: () => 50,
-          } as IdleDeadline);
-        }, options?.timeout ?? 0);
+        const timer = setTimeout(
+          () => {
+            callback({
+              didTimeout: false,
+              timeRemaining: () => 50,
+            } as IdleDeadline);
+          },
+          options?.timeout ?? 0,
+        );
         timers.set(handle, timer);
         return handle;
       }),
@@ -57,7 +66,9 @@ describe("listen api cache", () => {
     await vi.runAllTimersAsync();
 
     expect(setItemSpy).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("crate-api-cache:/api/me/home/discovery")).toContain("Converge");
+    expect(
+      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
+    ).toContain("Converge");
   });
 
   it("coalesces repeated writes for the same URL and persists the latest payload", async () => {
@@ -69,7 +80,9 @@ describe("listen api cache", () => {
     await vi.runAllTimersAsync();
 
     expect(setItemSpy).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("crate-api-cache:/api/me/home/discovery")).toContain("New");
+    expect(
+      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
+    ).toContain("New");
   });
 
   it("cancels pending writes when the matching scope is invalidated", async () => {
@@ -82,7 +95,9 @@ describe("listen api cache", () => {
 
     expect(setItemSpy).not.toHaveBeenCalled();
     expect(cacheGet("/api/me/stats/overview?window=30d")).toBeNull();
-    expect(localStorage.getItem("crate-api-cache:/api/me/stats/overview?window=30d")).toBeNull();
+    expect(
+      localStorage.getItem("crate-api-cache:/api/me/stats/overview?window=30d"),
+    ).toBeNull();
   });
 
   it("keeps persistent entries for normal daily app opens", () => {
@@ -113,7 +128,9 @@ describe("listen api cache", () => {
     );
 
     expect(cacheGet("/api/me/home/discovery")).toBeNull();
-    expect(localStorage.getItem("crate-api-cache:/api/me/home/discovery")).toBeNull();
+    expect(
+      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
+    ).toBeNull();
   });
 
   it("maps jam room endpoints to the jam scope", () => {

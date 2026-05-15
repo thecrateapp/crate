@@ -20,8 +20,12 @@ def emit_task_event(task_id: str, event_type: str, data: dict | None = None):
                 "INSERT INTO task_events (task_id, event_type, data_json, created_at) "
                 "VALUES (:task_id, :event_type, :data_json, :created_at)"
             ),
-            {"task_id": task_id, "event_type": event_type,
-             "data_json": json.dumps(safe_data, default=str), "created_at": now},
+            {
+                "task_id": task_id,
+                "event_type": event_type,
+                "data_json": json.dumps(safe_data, default=str),
+                "created_at": now,
+            },
         )
 
     # Publish to Redis for SSE subscribers (non-blocking)
@@ -31,15 +35,23 @@ def emit_task_event(task_id: str, event_type: str, data: dict | None = None):
     if event_type in ("info", "warn", "warning", "error", "item"):
         try:
             from crate.db.worker_logs import insert_log
+
             message = safe_data.get("message") or safe_data.get("label") or event_type
-            level = safe_data.get("level", event_type if event_type in ("warn", "warning", "error") else "info")
+            level = safe_data.get(
+                "level",
+                event_type if event_type in ("warn", "warning", "error") else "info",
+            )
             insert_log(
                 level=level,
                 message=str(message),
                 task_id=task_id,
                 category=safe_data.get("category", "general"),
-                metadata={k: v for k, v in safe_data.items()
-                          if k not in ("level", "message", "category")} or None,
+                metadata={
+                    k: v
+                    for k, v in safe_data.items()
+                    if k not in ("level", "message", "category")
+                }
+                or None,
             )
         except Exception:
             pass
@@ -48,16 +60,20 @@ def emit_task_event(task_id: str, event_type: str, data: dict | None = None):
 def _publish_to_redis(task_id: str, event_type: str, data: dict, timestamp: str):
     """Publish event to Redis channels for SSE consumers."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if not r:
             return
-        payload = json.dumps({
-            "task_id": task_id,
-            "event_type": event_type,
-            "data": data,
-            "timestamp": timestamp,
-        }, default=str)
+        payload = json.dumps(
+            {
+                "task_id": task_id,
+                "event_type": event_type,
+                "data": data,
+                "timestamp": timestamp,
+            },
+            default=str,
+        )
         # Per-task channel (for task detail SSE)
         r.publish(f"crate:sse:task:{task_id}", payload)
         # Global channel (signal to refresh the global status snapshot)
@@ -69,13 +85,17 @@ def _publish_to_redis(task_id: str, event_type: str, data: dict, timestamp: str)
 def get_task_events(task_id: str, after_id: int = 0, limit: int = 100) -> list[dict]:
     """Get events for a task after a given ID."""
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT id, event_type, data_json, created_at FROM task_events "
-                "WHERE task_id = :task_id AND id > :after_id ORDER BY id LIMIT :lim"
-            ),
-            {"task_id": task_id, "after_id": after_id, "lim": limit},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT id, event_type, data_json, created_at FROM task_events "
+                    "WHERE task_id = :task_id AND id > :after_id ORDER BY id LIMIT :lim"
+                ),
+                {"task_id": task_id, "after_id": after_id, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     results = []
     for r in rows:
         d = serialize_row(r)
@@ -107,25 +127,33 @@ def cleanup_old_events(max_age_hours: int = 48):
 def cleanup_orphan_events():
     """Remove events whose task no longer exists."""
     with transaction_scope() as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             DELETE FROM task_events
             WHERE task_id NOT IN (SELECT id FROM tasks)
-        """))
+        """)
+        )
 
 
 def cleanup_old_tasks(max_age_days: int = 7):
     """Remove completed/failed/cancelled tasks older than N days."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
     with transaction_scope() as session:
-        session.execute(text("""
+        session.execute(
+            text("""
             DELETE FROM task_events WHERE task_id IN (
                 SELECT id FROM tasks
                 WHERE status IN ('completed', 'failed', 'cancelled')
                 AND created_at < :cutoff
             )
-        """), {"cutoff": cutoff})
-        session.execute(text("""
+        """),
+            {"cutoff": cutoff},
+        )
+        session.execute(
+            text("""
             DELETE FROM tasks
             WHERE status IN ('completed', 'failed', 'cancelled')
             AND created_at < :cutoff
-        """), {"cutoff": cutoff})
+        """),
+            {"cutoff": cutoff},
+        )

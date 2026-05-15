@@ -117,7 +117,9 @@ def upgrade() -> None:
         WHERE bliss_embedding IS NOT NULL
         """
     )
-    _run_concurrently("DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_hnsw")
+    _run_concurrently(
+        "DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_hnsw"
+    )
 
 
 def downgrade() -> None:
@@ -128,5 +130,7 @@ def downgrade() -> None:
         WHERE bliss_embedding IS NOT NULL
         """
     )
-    _run_concurrently("DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_cosine_hnsw")
+    _run_concurrently(
+        "DROP INDEX CONCURRENTLY IF EXISTS idx_library_tracks_bliss_embedding_cosine_hnsw"
+    )
     op.execute("DROP TABLE IF EXISTS artist_bliss_centroids")

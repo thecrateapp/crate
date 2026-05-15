@@ -3,7 +3,7 @@
 import asyncio
 import json
 from typing import Any
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -19,6 +19,7 @@ from tests.conftest import PG_AVAILABLE
 class TestPasswordHashing:
     def test_hash_and_verify(self):
         from crate.auth import hash_password, verify_password
+
         pw = "s3cret!Pass"
         hashed = hash_password(pw)
         assert hashed != pw
@@ -26,21 +27,28 @@ class TestPasswordHashing:
 
     def test_wrong_password_fails(self):
         from crate.auth import hash_password, verify_password
+
         hashed = hash_password("correct")
         assert not verify_password("wrong", hashed)
 
     def test_different_hashes_for_same_password(self):
         from crate.auth import hash_password
+
         h1 = hash_password("same")
         h2 = hash_password("same")
         assert h1 != h2  # bcrypt salt should differ
 
 
 class TestJWT:
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
     def test_create_and_verify(self, _mock_secret):
         from crate.auth import create_jwt, verify_jwt
-        token = create_jwt(42, "user@test.com", "admin", username="testuser", name="Test")
+
+        token = create_jwt(
+            42, "user@test.com", "admin", username="testuser", name="Test"
+        )
         payload = verify_jwt(token)
         assert payload is not None
         assert payload["user_id"] == 42
@@ -49,13 +57,24 @@ class TestJWT:
         assert payload["username"] == "testuser"
         assert payload["name"] == "Test"
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
     def test_create_jwt_supports_listen_expiry_override(self, _mock_secret):
         import jwt as pyjwt
 
-        from crate.auth import JWT_ALGORITHM, LISTEN_ACCESS_TOKEN_EXPIRY_HOURS, create_jwt
+        from crate.auth import (
+            JWT_ALGORITHM,
+            LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
+            create_jwt,
+        )
 
-        token = create_jwt(42, "user@test.com", "user", expires_in_hours=LISTEN_ACCESS_TOKEN_EXPIRY_HOURS)
+        token = create_jwt(
+            42,
+            "user@test.com",
+            "user",
+            expires_in_hours=LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
+        )
         payload = pyjwt.decode(
             token,
             "test-secret-key-1234-12345678901234",
@@ -63,13 +82,44 @@ class TestJWT:
             options={"verify_exp": False},
         )
 
-        assert payload["exp"] - payload["iat"] == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS * 3600
+        assert (
+            payload["exp"] - payload["iat"] == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS * 3600
+        )
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
+    def test_auth_login_payload_exposes_access_expiry(self, _mock_secret):
+        from crate.auth import create_jwt
+        from crate.api.auth import _auth_login_payload
+
+        token = create_jwt(42, "user@test.com", "user", expires_in_hours=1)
+
+        payload = _auth_login_payload(
+            {
+                "id": 42,
+                "email": "user@test.com",
+                "name": None,
+                "avatar": None,
+                "role": "user",
+            },
+            token,
+            {"id": "sess-123", "expires_at": None},
+        )
+
+        assert payload["access_expires_at"] is not None
+        expires_at = datetime.fromisoformat(payload["access_expires_at"])
+        assert expires_at > datetime.now(timezone.utc)
+
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
     def test_refresh_jwt_is_not_accepted_as_access_token(self, _mock_secret):
         from crate.auth import create_refresh_jwt, verify_jwt, verify_refresh_jwt
 
-        token = create_refresh_jwt(42, "sess-123", datetime.now(timezone.utc) + timedelta(days=30))
+        token = create_refresh_jwt(
+            42, "sess-123", datetime.now(timezone.utc) + timedelta(days=30)
+        )
 
         assert verify_jwt(token) is None
         payload = verify_refresh_jwt(token)
@@ -78,10 +128,13 @@ class TestJWT:
         assert payload["user_id"] == 42
         assert payload["sid"] == "sess-123"
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
     def test_expired_token_returns_none(self, _mock_secret):
         import jwt as pyjwt
         from crate.auth import verify_jwt, JWT_ALGORITHM
+
         payload = {
             "user_id": 1,
             "email": "x@x.com",
@@ -89,28 +142,40 @@ class TestJWT:
             "iat": datetime.now(timezone.utc) - timedelta(hours=48),
             "exp": datetime.now(timezone.utc) - timedelta(hours=24),
         }
-        token = pyjwt.encode(payload, "test-secret-key-1234-12345678901234", algorithm=JWT_ALGORITHM)
+        token = pyjwt.encode(
+            payload, "test-secret-key-1234-12345678901234", algorithm=JWT_ALGORITHM
+        )
         assert verify_jwt(token) is None
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
     def test_tampered_token_returns_none(self, _mock_secret):
         from crate.auth import create_jwt, verify_jwt
+
         token = create_jwt(1, "a@b.com", "user")
         header, payload, signature = token.split(".")
         tampered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
         tampered = ".".join([header, payload, tampered_signature])
         assert verify_jwt(tampered) is None
 
-    @patch("crate.auth._get_jwt_secret", return_value="key-A-1234567890123456789012345678")
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="key-A-1234567890123456789012345678"
+    )
     def test_wrong_secret_returns_none(self, _mock_secret):
         import jwt as pyjwt
         from crate.auth import verify_jwt, JWT_ALGORITHM
+
         payload = {
-            "user_id": 1, "email": "a@b.com", "role": "user",
+            "user_id": 1,
+            "email": "a@b.com",
+            "role": "user",
             "iat": datetime.now(timezone.utc),
             "exp": datetime.now(timezone.utc) + timedelta(hours=1),
         }
-        token = pyjwt.encode(payload, "key-B-1234567890123456789012345678", algorithm=JWT_ALGORITHM)
+        token = pyjwt.encode(
+            payload, "key-B-1234567890123456789012345678", algorithm=JWT_ALGORITHM
+        )
         assert verify_jwt(token) is None
 
 
@@ -118,14 +183,17 @@ class TestGetJwtSecret:
     @patch.dict("os.environ", {"JWT_SECRET": "env-secret-123456789012345678901234"})
     def test_env_var_takes_precedence(self):
         from crate.auth import _get_jwt_secret
+
         assert _get_jwt_secret() == "env-secret-123456789012345678901234"
 
     @patch.dict("os.environ", {}, clear=True)
     @patch("crate.auth.get_setting", return_value="stored-secret")
     def test_falls_back_to_db_setting(self, mock_get):
         import os
+
         os.environ.pop("JWT_SECRET", None)
         from crate.auth import _get_jwt_secret
+
         assert _get_jwt_secret() == "stored-secret"
 
     @patch.dict("os.environ", {}, clear=True)
@@ -133,8 +201,10 @@ class TestGetJwtSecret:
     @patch("crate.auth.get_setting", return_value=None)
     def test_generates_and_stores_if_missing(self, mock_get, mock_set):
         import os
+
         os.environ.pop("JWT_SECRET", None)
         from crate.auth import _get_jwt_secret
+
         secret = _get_jwt_secret()
         assert len(secret) == 64  # token_hex(32) = 64 hex chars
         mock_set.assert_called_once_with("jwt_secret", secret)
@@ -144,7 +214,9 @@ class TestOAuthRedirectHelpers:
     def test_append_query_param_preserves_existing_params(self):
         from crate.api.auth import _append_query_param
 
-        url = _append_query_param("https://listen.example/auth/callback?next=%2Fmix", "token", "abc123")
+        url = _append_query_param(
+            "https://listen.example/auth/callback?next=%2Fmix", "token", "abc123"
+        )
 
         assert url == "https://listen.example/auth/callback?next=%2Fmix&token=abc123"
 
@@ -152,17 +224,28 @@ class TestOAuthRedirectHelpers:
         from crate.api.auth import _post_auth_redirect_url
 
         assert (
-            _post_auth_redirect_url("https://listen.example/auth/callback?next=%2Fmix", "abc123")
+            _post_auth_redirect_url(
+                "https://listen.example/auth/callback?next=%2Fmix", "abc123"
+            )
             == "https://listen.example/auth/callback?next=%2Fmix&token=abc123"
         )
-        assert _post_auth_redirect_url("https://admin.example/users", "abc123") == "https://admin.example/users"
-        assert _post_auth_redirect_url("/auth/callback?next=%2Fmix", "abc123") == "/auth/callback?next=%2Fmix&token=abc123"
+        assert (
+            _post_auth_redirect_url("https://admin.example/users", "abc123")
+            == "https://admin.example/users"
+        )
+        assert (
+            _post_auth_redirect_url("/auth/callback?next=%2Fmix", "abc123")
+            == "/auth/callback?next=%2Fmix&token=abc123"
+        )
 
-    @patch.dict("os.environ", {
-        "APPLE_ASSOCIATED_APP_IDS": "",
-        "APPLE_TEAM_ID": "TEAM123456",
-        "APPLE_LISTEN_BUNDLE_ID": "org.lespedants.crate.listen",
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "APPLE_ASSOCIATED_APP_IDS": "",
+            "APPLE_TEAM_ID": "TEAM123456",
+            "APPLE_LISTEN_BUNDLE_ID": "org.lespedants.crate.listen",
+        },
+    )
     def test_apple_app_site_association_uses_listen_app_id(self):
         from crate.api.auth import apple_app_site_association
 
@@ -181,19 +264,64 @@ class TestOAuthRedirectHelpers:
             },
         }
 
-    @patch.dict("os.environ", {"APPLE_ASSOCIATED_APP_IDS": "TEAM.one, TEAM.two"}, clear=False)
+    @patch.dict(
+        "os.environ", {"APPLE_ASSOCIATED_APP_IDS": "TEAM.one, TEAM.two"}, clear=False
+    )
     def test_apple_app_site_association_supports_multiple_app_ids(self):
         from crate.api.auth import apple_app_site_association
 
         response = asyncio.run(apple_app_site_association())
         payload = json.loads(response.body)
 
-        assert [item["appID"] for item in payload["applinks"]["details"]] == ["TEAM.one", "TEAM.two"]
+        assert [item["appID"] for item in payload["applinks"]["details"]] == [
+            "TEAM.one",
+            "TEAM.two",
+        ]
+
+    @patch.dict(
+        "os.environ", {"JWT_SECRET": "test-secret-key-1234-12345678901234"}, clear=False
+    )
+    def test_oauth_state_stores_invite_server_side(self):
+        from crate.api.auth import _build_oauth_state, _parse_oauth_state
+
+        with (
+            patch(
+                "crate.api.auth.secrets.token_urlsafe",
+                side_effect=["verifier-token", "invite-key"],
+            ),
+            patch("crate.api.auth._store_oauth_invite_token") as mock_store,
+        ):
+            state = _build_oauth_state(
+                provider="google",
+                return_to="cratemusic://oauth/callback",
+                mode="login",
+                user_id=None,
+                invite_token="invite-token",
+                app_id="listen-native",
+            )
+
+        parsed = _parse_oauth_state(state)
+        assert parsed["invite_key"] == "invite-key"
+        assert "invite_token" not in parsed
+        mock_store.assert_called_once_with("invite-key", "invite-token")
+
+    def test_oauth_invite_storage_falls_back_to_memory(self):
+        from crate.api import auth
+
+        with auth._oauth_invite_lock:
+            auth._oauth_invite_memory.clear()
+
+        with patch("crate.api.auth._get_rate_limit_redis", return_value=None):
+            auth._store_oauth_invite_token("invite-key", "invite-token")
+            assert auth._retrieve_oauth_invite_token("invite-key") == "invite-token"
+            assert auth._retrieve_oauth_invite_token("invite-key") is None
 
 
 class TestOAuthStart:
     @staticmethod
-    def _request(headers: list[tuple[bytes, bytes]] | None = None, query_string: bytes = b"") -> Request:
+    def _request(
+        headers: list[tuple[bytes, bytes]] | None = None, query_string: bytes = b""
+    ) -> Request:
         return Request(
             {
                 "type": "http",
@@ -215,12 +343,30 @@ class TestOAuthStart:
         request = self._request()
         request.state.user = {"id": 7, "email": "admin@cratemusic.app", "role": "admin"}
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            result = asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="https://listen.lespedants.org/auth/callback")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            result = asyncio.run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
 
         assert result["provider"] == "google"
         assert captured_state["mode"] == "login"
@@ -234,12 +380,30 @@ class TestOAuthStart:
         request = self._request()
         request.state.user = {"id": 7, "email": "admin@cratemusic.app", "role": "admin"}
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            result = asyncio.run(oauth_link(request, "google", OAuthStartRequest(return_to="https://listen.lespedants.org/settings")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            result = asyncio.run(
+                oauth_link(
+                    request,
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/settings"
+                    ),
+                )
+            )
 
         assert result["provider"] == "google"
         assert captured_state["mode"] == "link"
@@ -255,7 +419,9 @@ class TestOAuthStart:
         request.state.user = None
 
         with pytest.raises(HTTPException) as exc_info:
-            asyncio.run(oauth_link(request, "google", OAuthStartRequest(return_to="/settings")))
+            asyncio.run(
+                oauth_link(request, "google", OAuthStartRequest(return_to="/settings"))
+            )
 
         assert exc_info.value.status_code == 401
 
@@ -264,11 +430,23 @@ class TestOAuthStart:
 
         request = self._request(headers=[(b"host", b"listen.lespedants.org")])
 
-        with patch.dict("os.environ", {"DOMAIN": "lespedants.org", "GOOGLE_CLIENT_ID": "id", "GOOGLE_CLIENT_SECRET": "secret"}), \
-             patch("crate.api.auth.get_setting", return_value=None):
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "DOMAIN": "lespedants.org",
+                    "GOOGLE_CLIENT_ID": "id",
+                    "GOOGLE_CLIENT_SECRET": "secret",
+                },
+            ),
+            patch("crate.api.auth.get_setting", return_value=None),
+        ):
             providers = _provider_status(request)
 
-        assert providers["google"]["login_url"] == "https://listen.lespedants.org/api/auth/google"
+        assert (
+            providers["google"]["login_url"]
+            == "https://listen.lespedants.org/api/auth/google"
+        )
 
     def test_oauth_start_infers_listen_web_from_return_to(self):
         from crate.api.auth import oauth_start
@@ -278,12 +456,30 @@ class TestOAuthStart:
         request = self._request()
         request.state.user = None
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="https://listen.lespedants.org/auth/callback")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            asyncio.run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(
+                        return_to="https://listen.lespedants.org/auth/callback"
+                    ),
+                )
+            )
 
         assert captured_state["app_id"] == "listen-web"
 
@@ -295,12 +491,28 @@ class TestOAuthStart:
         request = self._request()
         request.state.user = None
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="cratemusic://oauth/callback")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            asyncio.run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(return_to="cratemusic://oauth/callback"),
+                )
+            )
 
         assert captured_state["app_id"] == "listen-native"
 
@@ -338,7 +550,9 @@ class TestOAuthStart:
         from crate.api.auth import _post_auth_redirect_url
 
         assert (
-            _post_auth_redirect_url("http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123")
+            _post_auth_redirect_url(
+                "http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123"
+            )
             == "http://127.0.0.1:17654/oauth/callback?next=%2F&token=abc123"
         )
 
@@ -350,12 +564,28 @@ class TestOAuthStart:
         request = self._request(query_string=b"app_id=listen-tauri")
         request.state.user = None
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="cratemusic://oauth/callback")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            asyncio.run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(return_to="cratemusic://oauth/callback"),
+                )
+            )
 
         assert captured_state["app_id"] == "listen-tauri"
 
@@ -392,8 +622,13 @@ class TestAuthUserAvatarProxy:
             content=b"avatar-bytes",
         )
 
-        with patch("crate.api.auth.get_user_by_id", return_value={"avatar": "https://lh3.googleusercontent.com/a/avatar"}), \
-             patch("crate.api.auth.requests.get", return_value=upstream) as get:
+        with (
+            patch(
+                "crate.api.auth.get_user_by_id",
+                return_value={"avatar": "https://lh3.googleusercontent.com/a/avatar"},
+            ),
+            patch("crate.api.auth.requests.get", return_value=upstream) as get,
+        ):
             response = asyncio.run(auth_user_avatar(self._request(), 7))
 
         assert response.body == b"avatar-bytes"
@@ -406,7 +641,10 @@ class TestAuthUserAvatarProxy:
 
         from crate.api.auth import auth_user_avatar
 
-        with patch("crate.api.auth.get_user_by_id", return_value={"avatar": "https://example.test/avatar.jpg"}):
+        with patch(
+            "crate.api.auth.get_user_by_id",
+            return_value={"avatar": "https://example.test/avatar.jpg"},
+        ):
             with pytest.raises(HTTPException) as exc_info:
                 asyncio.run(auth_user_avatar(self._request(), 7))
 
@@ -441,26 +679,42 @@ class TestOAuthCallback:
             "google_id": "google-sub-123",
         }
 
-        with patch("crate.api.auth._parse_oauth_state", return_value={
-            "provider": "google",
-            "return_to": "cratemusic://oauth/callback",
-            "mode": "login",
-            "verifier": "verifier",
-            "app_id": "listen-android",
-        }), \
-             patch("crate.api.auth._google_userinfo", return_value={
-                 "id": "google-sub-123",
-                 "email": "legacy@test.com",
-                 "name": "Legacy User",
-             }), \
-             patch("crate.api.auth.get_user_by_external_identity", return_value=None), \
-             patch("crate.api.auth.get_user_by_google_id", return_value=legacy_user), \
-             patch("crate.api.auth.upsert_user_external_identity") as mock_upsert, \
-             patch("crate.api.auth.update_user_last_login") as mock_last_login, \
-             patch("crate.api.auth._create_login_session", return_value=("jwt-token", {"id": "sess-1"}, "refresh-token")):
-            response = asyncio.run(oauth_callback(self._request(), "google", code="code", state="state"))
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "verifier",
+                    "app_id": "listen-android",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-sub-123",
+                    "email": "legacy@test.com",
+                    "name": "Legacy User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=legacy_user),
+            patch("crate.api.auth.upsert_user_external_identity") as mock_upsert,
+            patch("crate.api.auth.update_user_last_login") as mock_last_login,
+            patch(
+                "crate.api.auth._create_login_session",
+                return_value=("jwt-token", {"id": "sess-1"}, "refresh-token"),
+            ),
+        ):
+            response = asyncio.run(
+                oauth_callback(self._request(), "google", code="code", state="state")
+            )
 
-        assert response.headers["location"] == "cratemusic://oauth/callback?token=jwt-token&refresh_token=refresh-token"
+        assert (
+            response.headers["location"]
+            == "cratemusic://oauth/callback?token=jwt-token&refresh_token=refresh-token"
+        )
         mock_upsert.assert_called_once()
         mock_last_login.assert_called_once_with(legacy_user["id"])
 
@@ -479,33 +733,213 @@ class TestOAuthCallback:
             "google_id": None,
         }
 
-        with patch("crate.api.auth._parse_oauth_state", return_value={
-            "provider": "google",
-            "return_to": "cratemusic://oauth/callback",
-            "mode": "login",
-            "verifier": "verifier",
-        }), \
-             patch("crate.api.auth._google_userinfo", return_value={
-                 "id": "google-sub-999",
-                 "email": "conflict@test.com",
-                 "name": "Conflict User",
-             }), \
-             patch("crate.api.auth.get_user_by_external_identity", return_value=None), \
-             patch("crate.api.auth.get_user_by_google_id", return_value=None), \
-             patch("crate.api.auth.get_user_by_email", return_value=existing_user), \
-             patch(
-                 "crate.api.auth.upsert_user_external_identity",
-                 side_effect=IntegrityError(
-                     "INSERT INTO user_external_identities ...",
-                     {},
-                     Exception("duplicate key value violates unique constraint idx_user_external_identities_provider_user_id"),
-                 ),
-             ):
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "verifier",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-sub-999",
+                    "email": "conflict@test.com",
+                    "name": "Conflict User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            patch("crate.api.auth.get_user_by_email", return_value=existing_user),
+            patch(
+                "crate.api.auth.upsert_user_external_identity",
+                side_effect=IntegrityError(
+                    "INSERT INTO user_external_identities ...",
+                    {},
+                    Exception(
+                        "duplicate key value violates unique constraint idx_user_external_identities_provider_user_id"
+                    ),
+                ),
+            ),
+        ):
             with pytest.raises(HTTPException) as exc_info:
-                asyncio.run(oauth_callback(self._request(), "google", code="code", state="state"))
+                asyncio.run(
+                    oauth_callback(
+                        self._request(), "google", code="code", state="state"
+                    )
+                )
 
         assert exc_info.value.status_code == 409
         assert "already linked" in exc_info.value.detail
+
+    def test_google_callback_blocks_new_user_when_registration_is_closed(self):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_callback
+
+        def setting(key: str, default: str | None = None):
+            return {
+                "auth_invite_only": "false",
+                "open_registration": "false",
+            }.get(key, default)
+
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "verifier",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-sub-new",
+                    "email": "new-google@test.com",
+                    "name": "New Google User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            patch("crate.api.auth.get_user_by_email", return_value=None),
+            patch("crate.api.auth.count_users", return_value=1),
+            patch("crate.api.auth.get_setting", side_effect=setting),
+            patch("crate.api.auth.create_user") as mock_create_user,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(
+                    oauth_callback(
+                        self._request(), "google", code="code", state="state"
+                    )
+                )
+
+        assert exc_info.value.status_code == 403
+        assert (
+            exc_info.value.detail
+            == "Invite token required or does not match this email"
+        )
+        mock_create_user.assert_not_called()
+
+    def test_google_callback_rejects_new_user_without_email(self):
+        from fastapi import HTTPException
+
+        from crate.api.auth import oauth_callback
+
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "verifier",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-sub-no-email",
+                    "name": "No Email User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            patch("crate.api.auth.create_user") as mock_create_user,
+            patch("crate.api.auth.consume_auth_invite") as mock_consume,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                asyncio.run(
+                    oauth_callback(
+                        self._request(), "google", code="code", state="state"
+                    )
+                )
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "OAuth provider did not return an email address"
+        mock_create_user.assert_not_called()
+        mock_consume.assert_not_called()
+
+    def test_google_callback_allows_new_user_with_invite_when_registration_is_closed(
+        self,
+    ):
+        from crate.api.auth import oauth_callback
+
+        created_user = {
+            "id": 43,
+            "email": "invited-google@test.com",
+            "role": "user",
+            "username": "invited",
+            "name": "Invited User",
+            "google_id": "google-sub-invited",
+        }
+
+        def setting(key: str, default: str | None = None):
+            return {
+                "auth_invite_only": "false",
+                "open_registration": "false",
+            }.get(key, default)
+
+        with (
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={
+                    "provider": "google",
+                    "return_to": "cratemusic://oauth/callback",
+                    "mode": "login",
+                    "verifier": "verifier",
+                    "invite_key": "invite-key",
+                    "app_id": "listen-android",
+                },
+            ),
+            patch(
+                "crate.api.auth._google_userinfo",
+                return_value={
+                    "id": "google-sub-invited",
+                    "email": "invited-google@test.com",
+                    "name": "Invited User",
+                },
+            ),
+            patch("crate.api.auth.get_user_by_external_identity", return_value=None),
+            patch("crate.api.auth.get_user_by_google_id", return_value=None),
+            patch("crate.api.auth.get_user_by_email", return_value=None),
+            patch("crate.api.auth.count_users", return_value=1),
+            patch("crate.api.auth.get_setting", side_effect=setting),
+            patch(
+                "crate.api.auth._retrieve_oauth_invite_token",
+                return_value="invite-token",
+            ) as mock_retrieve,
+            patch(
+                "crate.api.auth.consume_auth_invite", return_value=True
+            ) as mock_consume,
+            patch(
+                "crate.api.auth.create_user", return_value=created_user
+            ) as mock_create_user,
+            patch("crate.api.auth.upsert_user_external_identity") as mock_upsert,
+            patch("crate.api.auth.update_user_last_login"),
+            patch(
+                "crate.api.auth._create_login_session",
+                return_value=("jwt-token", {"id": "sess-1"}, "refresh-token"),
+            ),
+        ):
+            response = asyncio.run(
+                oauth_callback(self._request(), "google", code="code", state="state")
+            )
+
+        assert (
+            response.headers["location"]
+            == "cratemusic://oauth/callback?token=jwt-token&refresh_token=refresh-token"
+        )
+        mock_retrieve.assert_called_once_with("invite-key")
+        mock_consume.assert_called_once_with(
+            "invite-token", email="invited-google@test.com"
+        )
+        mock_create_user.assert_called_once()
+        mock_upsert.assert_called_once()
 
 
 class TestLoginSessionExpiry:
@@ -537,7 +971,9 @@ class TestLoginSessionExpiry:
         }
         captured: dict[str, Any] = {}
 
-        def fake_create_session(session_id: str, user_id: int, expires_at: str, **kwargs):
+        def fake_create_session(
+            session_id: str, user_id: int, expires_at: str, **kwargs
+        ):
             captured["session_id"] = session_id
             captured["user_id"] = user_id
             captured["expires_at"] = expires_at
@@ -545,15 +981,23 @@ class TestLoginSessionExpiry:
             return {"id": session_id, "expires_at": expires_at}
 
         before = datetime.now(timezone.utc)
-        with patch("crate.api.auth.create_session", side_effect=fake_create_session), \
-             patch("crate.api.auth.create_jwt", return_value="jwt-token") as mock_create_jwt, \
-             patch("crate.api.auth.create_refresh_jwt", return_value="refresh-token") as mock_create_refresh:
+        with (
+            patch("crate.api.auth.create_session", side_effect=fake_create_session),
+            patch(
+                "crate.api.auth.create_jwt", return_value="jwt-token"
+            ) as mock_create_jwt,
+            patch(
+                "crate.api.auth.create_refresh_jwt", return_value="refresh-token"
+            ) as mock_create_refresh,
+        ):
             token, session, refresh_token = _create_login_session(
                 user,
-                self._request(headers=[
-                    (b"x-crate-app", b"listen-web"),
-                    (b"x-device-fingerprint", b"device-123"),
-                ]),
+                self._request(
+                    headers=[
+                        (b"x-crate-app", b"listen-web"),
+                        (b"x-device-fingerprint", b"device-123"),
+                    ]
+                ),
             )
 
         expires_at = datetime.fromisoformat(captured["expires_at"])
@@ -563,7 +1007,10 @@ class TestLoginSessionExpiry:
         assert expires_at - before >= timedelta(days=30) - timedelta(seconds=2)
         assert captured["kwargs"]["app_id"] == "listen-web"
         assert captured["kwargs"]["device_fingerprint"] == "device-123"
-        assert mock_create_jwt.call_args.kwargs["expires_in_hours"] == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
+        assert (
+            mock_create_jwt.call_args.kwargs["expires_in_hours"]
+            == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
+        )
         assert mock_create_refresh.called
 
     def test_admin_sessions_keep_default_one_day_expiry(self):
@@ -579,21 +1026,31 @@ class TestLoginSessionExpiry:
         }
         captured: dict[str, Any] = {}
 
-        def fake_create_session(session_id: str, user_id: int, expires_at: str, **kwargs):
+        def fake_create_session(
+            session_id: str, user_id: int, expires_at: str, **kwargs
+        ):
             captured["expires_at"] = expires_at
             captured["kwargs"] = kwargs
             return {"id": session_id, "expires_at": expires_at}
 
         before = datetime.now(timezone.utc)
-        with patch("crate.api.auth.create_session", side_effect=fake_create_session), \
-             patch("crate.api.auth.create_jwt", return_value="jwt-token") as mock_create_jwt:
+        with (
+            patch("crate.api.auth.create_session", side_effect=fake_create_session),
+            patch(
+                "crate.api.auth.create_jwt", return_value="jwt-token"
+            ) as mock_create_jwt,
+        ):
             _token, _session, refresh_token = _create_login_session(
                 user,
                 self._request(headers=[(b"host", b"admin.lespedants.org")]),
             )
 
         expires_at = datetime.fromisoformat(captured["expires_at"])
-        assert timedelta(hours=JWT_EXPIRY_HOURS) - timedelta(seconds=2) <= expires_at - before <= timedelta(hours=JWT_EXPIRY_HOURS, seconds=2)
+        assert (
+            timedelta(hours=JWT_EXPIRY_HOURS) - timedelta(seconds=2)
+            <= expires_at - before
+            <= timedelta(hours=JWT_EXPIRY_HOURS, seconds=2)
+        )
         assert captured["kwargs"]["app_id"] is None
         assert refresh_token is None
         assert mock_create_jwt.call_args.kwargs["expires_in_hours"] == JWT_EXPIRY_HOURS
@@ -605,20 +1062,31 @@ class TestLoginSessionExpiry:
 class TestLoginEndpoint:
     def test_login_success(self, test_app):
         fake_user = {
-            "id": 1, "email": "test@test.com", "name": "Test",
-            "avatar": None, "role": "admin", "username": "admin",
+            "id": 1,
+            "email": "test@test.com",
+            "name": "Test",
+            "avatar": None,
+            "role": "admin",
+            "username": "admin",
             "password_hash": "$2b$12$realhashdoesntmatterhere",
         }
         fake_session = {
             "id": "sess-123",
             "expires_at": datetime.now(timezone.utc).isoformat(),
         }
-        with patch("crate.api.auth.get_user_by_email", return_value=fake_user), \
-             patch("crate.api.auth.get_setting", return_value=None), \
-             patch("crate.api.auth.verify_password", return_value=True), \
-             patch("crate.api.auth.update_user_last_login"), \
-             patch("crate.api.auth._create_login_session", return_value=("fake-jwt", fake_session, None)):
-            resp = test_app.post("/api/auth/login", json={"email": "test@test.com", "password": "pass"})
+        with (
+            patch("crate.api.auth.get_user_by_email", return_value=fake_user),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.verify_password", return_value=True),
+            patch("crate.api.auth.update_user_last_login"),
+            patch(
+                "crate.api.auth._create_login_session",
+                return_value=("fake-jwt", fake_session, None),
+            ),
+        ):
+            resp = test_app.post(
+                "/api/auth/login", json={"email": "test@test.com", "password": "pass"}
+            )
             assert resp.status_code == 200
             data = resp.json()
             assert data["email"] == "test@test.com"
@@ -630,19 +1098,31 @@ class TestLoginEndpoint:
 
     def test_login_wrong_password(self, test_app):
         fake_user = {
-            "id": 1, "email": "test@test.com", "name": "Test",
-            "avatar": None, "role": "admin", "password_hash": "somehash",
+            "id": 1,
+            "email": "test@test.com",
+            "name": "Test",
+            "avatar": None,
+            "role": "admin",
+            "password_hash": "somehash",
         }
-        with patch("crate.api.auth.get_user_by_email", return_value=fake_user), \
-             patch("crate.api.auth.get_setting", return_value=None), \
-             patch("crate.api.auth.verify_password", return_value=False):
-            resp = test_app.post("/api/auth/login", json={"email": "test@test.com", "password": "wrong"})
+        with (
+            patch("crate.api.auth.get_user_by_email", return_value=fake_user),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.verify_password", return_value=False),
+        ):
+            resp = test_app.post(
+                "/api/auth/login", json={"email": "test@test.com", "password": "wrong"}
+            )
             assert resp.status_code == 401
 
     def test_login_unknown_email(self, test_app):
-        with patch("crate.api.auth.get_user_by_email", return_value=None), \
-             patch("crate.api.auth.get_setting", return_value=None):
-            resp = test_app.post("/api/auth/login", json={"email": "nobody@x.com", "password": "x"})
+        with (
+            patch("crate.api.auth.get_user_by_email", return_value=None),
+            patch("crate.api.auth.get_setting", return_value=None),
+        ):
+            resp = test_app.post(
+                "/api/auth/login", json={"email": "nobody@x.com", "password": "x"}
+            )
             assert resp.status_code == 401
 
     def test_login_rate_limit_blocks_repeated_failures(self, test_app):
@@ -650,16 +1130,31 @@ class TestLoginEndpoint:
 
         auth_api._login_failure_memory.clear()
         try:
-            with patch.dict("os.environ", {
-                "CRATE_LOGIN_RATE_LIMIT_MAX_ATTEMPTS": "2",
-                "CRATE_LOGIN_RATE_LIMIT_WINDOW_SECONDS": "300",
-            }, clear=False), \
-                 patch("crate.api.auth._get_rate_limit_redis", return_value=None), \
-                 patch("crate.api.auth.get_user_by_email", return_value=None), \
-                 patch("crate.api.auth.get_setting", return_value=None):
-                first = test_app.post("/api/auth/login", json={"email": "limited@test.com", "password": "x"})
-                second = test_app.post("/api/auth/login", json={"email": "limited@test.com", "password": "x"})
-                third = test_app.post("/api/auth/login", json={"email": "limited@test.com", "password": "x"})
+            with (
+                patch.dict(
+                    "os.environ",
+                    {
+                        "CRATE_LOGIN_RATE_LIMIT_MAX_ATTEMPTS": "2",
+                        "CRATE_LOGIN_RATE_LIMIT_WINDOW_SECONDS": "300",
+                    },
+                    clear=False,
+                ),
+                patch("crate.api.auth._get_rate_limit_redis", return_value=None),
+                patch("crate.api.auth.get_user_by_email", return_value=None),
+                patch("crate.api.auth.get_setting", return_value=None),
+            ):
+                first = test_app.post(
+                    "/api/auth/login",
+                    json={"email": "limited@test.com", "password": "x"},
+                )
+                second = test_app.post(
+                    "/api/auth/login",
+                    json={"email": "limited@test.com", "password": "x"},
+                )
+                third = test_app.post(
+                    "/api/auth/login",
+                    json={"email": "limited@test.com", "password": "x"},
+                )
 
             assert first.status_code == 401
             assert second.status_code == 401
@@ -690,50 +1185,195 @@ class TestRefreshEndpoint:
             "name": "Listener",
         }
 
-        with patch("crate.api.auth.verify_refresh_jwt", return_value={"user_id": 7, "sid": "sess-123"}), \
-             patch("crate.api.auth.get_session", return_value=session), \
-             patch("crate.api.auth.get_user_by_id", return_value=user), \
-             patch("crate.api.auth.touch_session", return_value=session), \
-             patch("crate.api.auth.create_jwt", return_value="new-access") as mock_create_jwt, \
-             patch("crate.api.auth.create_refresh_jwt", return_value="new-refresh"):
+        with (
+            patch(
+                "crate.api.auth.verify_refresh_jwt",
+                return_value={"user_id": 7, "sid": "sess-123"},
+            ),
+            patch("crate.api.auth.get_session", return_value=session),
+            patch("crate.api.auth.get_user_by_id", return_value=user),
+            patch("crate.api.auth.touch_session", return_value=session),
+            patch(
+                "crate.api.auth.create_jwt", return_value="new-access"
+            ) as mock_create_jwt,
+            patch("crate.api.auth.create_refresh_jwt", return_value="new-refresh"),
+        ):
             resp = test_app.post(
                 "/api/auth/refresh",
                 json={"refresh_token": "old-refresh"},
-                headers={"x-crate-app": "listen-android", "x-device-fingerprint": "device-123"},
+                headers={
+                    "x-crate-app": "listen-android",
+                    "x-device-fingerprint": "device-123",
+                },
             )
 
         assert resp.status_code == 200
         assert resp.json()["token"] == "new-access"
         assert resp.json()["refresh_token"] == "new-refresh"
         assert resp.json()["session"]["id"] == "sess-123"
-        assert mock_create_jwt.call_args.kwargs["expires_in_hours"] == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
+        assert (
+            mock_create_jwt.call_args.kwargs["expires_in_hours"]
+            == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
+        )
 
 
 class TestRegisterEndpoint:
     def test_first_user_no_auth_needed(self, test_app):
         """First user registration should work without admin auth."""
-        fake_user = {"id": 1, "email": "new@test.com", "name": "New", "avatar": None, "role": "user", "username": None}
+        fake_user = {
+            "id": 1,
+            "email": "new@test.com",
+            "name": "New",
+            "avatar": None,
+            "role": "user",
+            "username": None,
+        }
         fake_session = {"id": "sess123", "user_id": 1}
 
-        with patch("crate.api.auth.count_users", return_value=0), \
-             patch("crate.api.auth.get_setting", return_value=None), \
-             patch("crate.api.auth.get_user_by_email", return_value=None), \
-             patch("crate.api.auth.hash_password", return_value="hashed"), \
-             patch("crate.api.auth.create_user", return_value=fake_user), \
-             patch("crate.api.auth.update_user_last_login"), \
-             patch("crate.api.auth.create_session", return_value=fake_session), \
-             patch("crate.api.auth.create_jwt", return_value="jwt-token"):
-            resp = test_app.post("/api/auth/register", json={"email": "new@test.com", "password": "secretpw1"})
+        with (
+            patch("crate.api.auth.count_users", return_value=0),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.get_user_by_email", return_value=None),
+            patch("crate.api.auth.hash_password", return_value="hashed"),
+            patch("crate.api.auth.create_user", return_value=fake_user),
+            patch("crate.api.auth.update_user_last_login"),
+            patch("crate.api.auth.create_session", return_value=fake_session),
+            patch("crate.api.auth.create_jwt", return_value="jwt-token"),
+        ):
+            resp = test_app.post(
+                "/api/auth/register",
+                json={"email": "new@test.com", "password": "secretpw1"},
+            )
             assert resp.status_code == 201
 
     def test_duplicate_email_returns_409(self, test_app):
         existing_user = {"id": 1, "email": "taken@test.com"}
 
-        with patch("crate.api.auth.count_users", return_value=0), \
-             patch("crate.api.auth.get_setting", return_value=None), \
-             patch("crate.api.auth.get_user_by_email", return_value=existing_user):
-            resp = test_app.post("/api/auth/register", json={"email": "taken@test.com", "password": "longpassword1"})
+        with (
+            patch("crate.api.auth.count_users", return_value=0),
+            patch("crate.api.auth.get_setting", return_value=None),
+            patch("crate.api.auth.get_user_by_email", return_value=existing_user),
+        ):
+            resp = test_app.post(
+                "/api/auth/register",
+                json={"email": "taken@test.com", "password": "longpassword1"},
+            )
             assert resp.status_code == 409
+
+    def test_invite_allows_registration_when_registration_is_closed(self, test_app):
+        fake_user = {
+            "id": 2,
+            "email": "invited@test.com",
+            "name": None,
+            "avatar": None,
+            "role": "user",
+            "username": None,
+        }
+        fake_session = {"id": "sess456", "user_id": 2}
+
+        def setting(key: str, default: str | None = None):
+            return {
+                "open_registration": "false",
+                "auth_invite_only": "false",
+            }.get(key, default)
+
+        with (
+            patch("crate.api.auth.count_users", return_value=1),
+            patch("crate.api.auth.get_setting", side_effect=setting),
+            patch("crate.api.auth._request_user_is_admin", return_value=False),
+            patch(
+                "crate.api.auth.consume_auth_invite", return_value=True
+            ) as mock_consume,
+            patch("crate.api.auth.get_user_by_email", return_value=None),
+            patch("crate.api.auth.hash_password", return_value="hashed"),
+            patch("crate.api.auth.create_user", return_value=fake_user),
+            patch("crate.api.auth.update_user_last_login"),
+            patch("crate.api.auth.create_session", return_value=fake_session),
+            patch("crate.api.auth.create_jwt", return_value="jwt-token"),
+        ):
+            resp = test_app.post(
+                "/api/auth/register",
+                json={
+                    "email": "invited@test.com",
+                    "password": "longpassword1",
+                    "invite_token": "invite-token",
+                },
+            )
+
+        assert resp.status_code == 201
+        mock_consume.assert_called_once_with("invite-token", email="invited@test.com")
+
+    def test_closed_registration_does_not_consume_invite_for_short_password(
+        self, test_app
+    ):
+        def setting(key: str, default: str | None = None):
+            return {
+                "open_registration": "false",
+                "auth_invite_only": "false",
+            }.get(key, default)
+
+        with (
+            patch("crate.api.auth.count_users", return_value=1),
+            patch("crate.api.auth.get_setting", side_effect=setting),
+            patch("crate.api.auth._request_user_is_admin", return_value=False),
+            patch("crate.api.auth.consume_auth_invite") as mock_consume,
+        ):
+            resp = test_app.post(
+                "/api/auth/register",
+                json={
+                    "email": "invited@test.com",
+                    "password": "short",
+                    "invite_token": "invite-token",
+                },
+            )
+
+        assert resp.status_code == 400
+        mock_consume.assert_not_called()
+
+    def test_closed_registration_does_not_consume_invite_for_duplicate_email(
+        self, test_app
+    ):
+        existing_user = {"id": 7, "email": "invited@test.com"}
+
+        def setting(key: str, default: str | None = None):
+            return {
+                "open_registration": "false",
+                "auth_invite_only": "false",
+            }.get(key, default)
+
+        with (
+            patch("crate.api.auth.count_users", return_value=1),
+            patch("crate.api.auth.get_setting", side_effect=setting),
+            patch("crate.api.auth._request_user_is_admin", return_value=False),
+            patch("crate.api.auth.get_user_by_email", return_value=existing_user),
+            patch("crate.api.auth.consume_auth_invite") as mock_consume,
+        ):
+            resp = test_app.post(
+                "/api/auth/register",
+                json={
+                    "email": "invited@test.com",
+                    "password": "longpassword1",
+                    "invite_token": "invite-token",
+                },
+            )
+
+        assert resp.status_code == 409
+        mock_consume.assert_not_called()
+
+
+class TestAdminCreateUser:
+    def test_admin_create_user_rejects_short_password(self, test_app):
+        resp = test_app.post(
+            "/api/auth/users",
+            json={
+                "email": "short-password@test.com",
+                "password": "short",
+                "role": "user",
+            },
+        )
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Password must be at least 8 characters"
 
 
 class TestAuthMiddleware:
@@ -742,6 +1382,7 @@ class TestAuthMiddleware:
     def test_require_auth_raises_401_when_no_user(self):
         from crate.api.auth import _require_auth
         from fastapi import HTTPException
+
         mock_request = MagicMock()
         mock_request.state.user = None
         with pytest.raises(HTTPException) as exc_info:
@@ -751,6 +1392,7 @@ class TestAuthMiddleware:
     def test_require_admin_raises_403_for_non_admin(self):
         from crate.api.auth import _require_admin
         from fastapi import HTTPException
+
         mock_request = MagicMock()
         mock_request.state.user = {"id": 1, "email": "a@b.com", "role": "user"}
         with pytest.raises(HTTPException) as exc_info:
@@ -759,13 +1401,18 @@ class TestAuthMiddleware:
 
     def test_require_admin_passes_for_admin(self):
         from crate.api.auth import _require_admin
+
         mock_request = MagicMock()
         mock_request.state.user = {"id": 1, "email": "a@b.com", "role": "admin"}
         user = _require_admin(mock_request)
         assert user["role"] == "admin"
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
-    def test_auth_middleware_does_not_touch_session_on_authenticated_reads(self, _mock_secret):
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
+    def test_auth_middleware_does_not_touch_session_on_authenticated_reads(
+        self, _mock_secret
+    ):
         from crate.api.auth import AuthMiddleware
         from crate.auth import create_jwt
 
@@ -778,13 +1425,25 @@ class TestAuthMiddleware:
         def ping(request: Request):
             return {"user": request.state.user["email"]}
 
-        with patch(
-            "crate.api.auth_cache.get_cached_session",
-            return_value={"id": "sess-123", "expires_at": datetime.now(timezone.utc) + timedelta(hours=1), "revoked_at": None},
-        ), patch(
-            "crate.api.auth_cache.get_cached_user",
-            return_value={"id": 1, "email": "admin@cratemusic.app", "role": "admin"},
-        ), patch("crate.api.auth.touch_session") as mock_touch:
+        with (
+            patch(
+                "crate.api.auth_cache.get_cached_session",
+                return_value={
+                    "id": "sess-123",
+                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+                    "revoked_at": None,
+                },
+            ),
+            patch(
+                "crate.api.auth_cache.get_cached_user",
+                return_value={
+                    "id": 1,
+                    "email": "admin@cratemusic.app",
+                    "role": "admin",
+                },
+            ),
+            patch("crate.api.auth.touch_session") as mock_touch,
+        ):
             with TestClient(app) as client:
                 client.cookies.set("crate_session", token)
                 response = client.get("/ping")
@@ -793,8 +1452,12 @@ class TestAuthMiddleware:
         assert response.json()["user"] == "admin@cratemusic.app"
         mock_touch.assert_not_called()
 
-    @patch("crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234")
-    def test_auth_middleware_accepts_listen_cookie_without_origin_hint(self, _mock_secret):
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
+    def test_auth_middleware_accepts_listen_cookie_without_origin_hint(
+        self, _mock_secret
+    ):
         from crate.api.auth import AuthMiddleware
         from crate.auth import create_jwt
 
@@ -807,12 +1470,23 @@ class TestAuthMiddleware:
         def asset(request: Request):
             return {"user": request.state.user["email"]}
 
-        with patch(
-            "crate.api.auth_cache.get_cached_session",
-            return_value={"id": "sess-123", "expires_at": datetime.now(timezone.utc) + timedelta(hours=1), "revoked_at": None},
-        ), patch(
-            "crate.api.auth_cache.get_cached_user",
-            return_value={"id": 1, "email": "admin@cratemusic.app", "role": "admin"},
+        with (
+            patch(
+                "crate.api.auth_cache.get_cached_session",
+                return_value={
+                    "id": "sess-123",
+                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+                    "revoked_at": None,
+                },
+            ),
+            patch(
+                "crate.api.auth_cache.get_cached_user",
+                return_value={
+                    "id": 1,
+                    "email": "admin@cratemusic.app",
+                    "role": "admin",
+                },
+            ),
         ):
             with TestClient(app) as client:
                 client.cookies.set("crate_session_listen", token)
@@ -829,7 +1503,10 @@ class TestAuthMiddleware:
                 "method": "GET",
                 "path": "/protected",
                 "query_string": b"",
-                "headers": [(key.lower().encode(), value.encode()) for key, value in headers.items()],
+                "headers": [
+                    (key.lower().encode(), value.encode())
+                    for key, value in headers.items()
+                ],
                 "client": ("172.18.0.10", 12345),
                 "scheme": "http",
                 "server": ("crate-api", 8585),
@@ -839,27 +1516,41 @@ class TestAuthMiddleware:
     def test_auth_middleware_ignores_remote_user_without_shared_secret(self):
         from crate.api.auth import AuthMiddleware
 
-        request = self._remote_user_request({
-            "Remote-User": "admin@cratemusic.app",
-            "Remote-Role": "admin",
-        })
+        request = self._remote_user_request(
+            {
+                "Remote-User": "admin@cratemusic.app",
+                "Remote-Role": "admin",
+            }
+        )
 
-        with patch.dict("os.environ", {"FORWARD_AUTH_SECRET": "", "CRATE_FORWARD_AUTH_SECRET": ""}, clear=False):
-            user = asyncio.run(AuthMiddleware(lambda *_args: None).resolve_user(request))
+        with patch.dict(
+            "os.environ",
+            {"FORWARD_AUTH_SECRET": "", "CRATE_FORWARD_AUTH_SECRET": ""},
+            clear=False,
+        ):
+            user = asyncio.run(
+                AuthMiddleware(lambda *_args: None).resolve_user(request)
+            )
 
         assert user is None
 
     def test_auth_middleware_accepts_remote_user_with_shared_secret(self):
         from crate.api.auth import AuthMiddleware
 
-        request = self._remote_user_request({
-            "Remote-User": "admin@cratemusic.app",
-            "Remote-Role": "admin",
-            "X-Forward-Auth-Secret": "shared-secret",
-        })
+        request = self._remote_user_request(
+            {
+                "Remote-User": "admin@cratemusic.app",
+                "Remote-Role": "admin",
+                "X-Forward-Auth-Secret": "shared-secret",
+            }
+        )
 
-        with patch.dict("os.environ", {"FORWARD_AUTH_SECRET": "shared-secret"}, clear=False):
-            user = asyncio.run(AuthMiddleware(lambda *_args: None).resolve_user(request))
+        with patch.dict(
+            "os.environ", {"FORWARD_AUTH_SECRET": "shared-secret"}, clear=False
+        ):
+            user = asyncio.run(
+                AuthMiddleware(lambda *_args: None).resolve_user(request)
+            )
 
         assert user == {
             "id": None,
@@ -943,7 +1634,10 @@ class TestAuthIntegration:
         from crate.db.tx import transaction_scope
 
         with transaction_scope() as session:
-            with patch("crate.db.auth.transaction_scope", side_effect=AssertionError("nested scope")):
+            with patch(
+                "crate.db.auth.transaction_scope",
+                side_effect=AssertionError("nested scope"),
+            ):
                 user = create_user("composed-user@test.com", session=session)
                 loaded = get_user_by_id(user["id"], session=session)
 
@@ -956,7 +1650,10 @@ class TestAuthIntegration:
 
         with transaction_scope() as session:
             user = create_user("update-user@test.com", session=session)
-            with patch("crate.db.auth.transaction_scope", side_effect=AssertionError("nested scope")):
+            with patch(
+                "crate.db.auth.transaction_scope",
+                side_effect=AssertionError("nested scope"),
+            ):
                 same_user = update_user(user["id"], session=session)
 
         assert same_user is not None
@@ -967,7 +1664,13 @@ class TestAuthIntegration:
         from crate.auth import create_jwt
 
         user = pg_db.create_user("stale-role@test.com", role="user")
-        token = create_jwt(user["id"], user["email"], "user", username=user["username"], name=user["name"])
+        token = create_jwt(
+            user["id"],
+            user["email"],
+            "user",
+            username=user["username"],
+            name=user["name"],
+        )
         pg_db.update_user(user["id"], role="admin")
 
         app = FastAPI()
@@ -976,6 +1679,7 @@ class TestAuthIntegration:
         @app.get("/admin-check")
         def admin_check(request: Request):
             from crate.api.auth import _require_admin
+
             user = _require_admin(request)
             return {"role": user["role"]}
 
@@ -987,7 +1691,10 @@ class TestAuthIntegration:
         assert resp.json()["role"] == "admin"
 
     def test_parse_device_details_returns_structured_mobile_client_metadata(self):
-        from crate.db.repositories.auth_shared import parse_device_details, parse_device_label
+        from crate.db.repositories.auth_shared import (
+            parse_device_details,
+            parse_device_label,
+        )
 
         user_agent = (
             "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
@@ -1023,10 +1730,34 @@ class TestAuthIntegration:
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
         )
 
-        pg_db.create_session("iphone-a", user["id"], (now + timedelta(days=7)).isoformat(), user_agent=iphone_ua, last_seen_ip="10.0.0.5")
-        pg_db.create_session("iphone-b", user["id"], (now + timedelta(days=7)).isoformat(), user_agent=iphone_ua, last_seen_ip="10.0.0.5")
-        pg_db.create_session("desktop-a", user["id"], (now + timedelta(days=7)).isoformat(), user_agent=mac_ua, last_seen_ip="10.0.0.8")
-        pg_db.create_session("history-a", user["id"], (now + timedelta(days=7)).isoformat(), user_agent=iphone_ua, last_seen_ip="10.0.0.5")
+        pg_db.create_session(
+            "iphone-a",
+            user["id"],
+            (now + timedelta(days=7)).isoformat(),
+            user_agent=iphone_ua,
+            last_seen_ip="10.0.0.5",
+        )
+        pg_db.create_session(
+            "iphone-b",
+            user["id"],
+            (now + timedelta(days=7)).isoformat(),
+            user_agent=iphone_ua,
+            last_seen_ip="10.0.0.5",
+        )
+        pg_db.create_session(
+            "desktop-a",
+            user["id"],
+            (now + timedelta(days=7)).isoformat(),
+            user_agent=mac_ua,
+            last_seen_ip="10.0.0.8",
+        )
+        pg_db.create_session(
+            "history-a",
+            user["id"],
+            (now + timedelta(days=7)).isoformat(),
+            user_agent=iphone_ua,
+            last_seen_ip="10.0.0.5",
+        )
 
         with transaction_scope() as session:
             session.execute(
@@ -1111,7 +1842,9 @@ class TestAuthIntegration:
                 },
             )
 
-        def fake_get_cache(key: str, max_age_seconds: int | None = None) -> dict[str, Any] | None:
+        def fake_get_cache(
+            key: str, max_age_seconds: int | None = None
+        ) -> dict[str, Any] | None:
             if key == f"now_playing:{user['id']}":
                 return {
                     "title": "Mind's A Lie",
@@ -1122,9 +1855,15 @@ class TestAuthIntegration:
                 }
             return None
 
-        with patch("crate.db.repositories.auth_sessions.get_cache", side_effect=fake_get_cache), patch(
-            "crate.db.cache_store.get_cache",
-            side_effect=fake_get_cache,
+        with (
+            patch(
+                "crate.db.repositories.auth_sessions.get_cache",
+                side_effect=fake_get_cache,
+            ),
+            patch(
+                "crate.db.cache_store.get_cache",
+                side_effect=fake_get_cache,
+            ),
         ):
             presence = get_users_presence([user["id"]])[user["id"]]
             sessions = list_sessions(user["id"], include_revoked=True)
@@ -1137,11 +1876,15 @@ class TestAuthIntegration:
         assert session_map["listen-hidden"]["activity_state"] == "active"
         assert session_map["admin-active"]["activity_state"] == "active"
 
-    def test_admin_can_set_password_for_sso_only_user_and_revoke_sessions(self, real_auth_client, pg_db):
+    def test_admin_can_set_password_for_sso_only_user_and_revoke_sessions(
+        self, real_auth_client, pg_db
+    ):
         from crate.auth import verify_password
 
         now = datetime.now(timezone.utc)
-        user = pg_db.create_user("sso-only@test.com", password_hash=None, google_id="google-123")
+        user = pg_db.create_user(
+            "sso-only@test.com", password_hash=None, google_id="google-123"
+        )
         pg_db.create_session("target-sess-a", user["id"], now + timedelta(days=7))
         pg_db.create_session("target-sess-b", user["id"], now + timedelta(days=7))
 

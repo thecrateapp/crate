@@ -16,12 +16,14 @@ function deferred<T>() {
 
 describe("createPreloadableLazy", () => {
   it("shares a single loader promise between preload and render", async () => {
-    const request = deferred<{ TestComponent: ComponentType<Record<string, never>> }>();
+    const request = deferred<{
+      TestComponent: ComponentType<Record<string, never>>;
+    }>();
     const loader = vi.fn(() => request.promise);
-    const { Component, preload } = createPreloadableLazy<Record<string, never>, { TestComponent: ComponentType<Record<string, never>> }>(
-      loader,
-      (module) => module.TestComponent,
-    );
+    const { Component, preload } = createPreloadableLazy<
+      Record<string, never>,
+      { TestComponent: ComponentType<Record<string, never>> }
+    >(loader, (module) => module.TestComponent);
 
     const preloadPromise = preload();
 
@@ -49,10 +51,10 @@ describe("createPreloadableLazy", () => {
     const loader = vi.fn(async () => ({
       TestComponent: () => <div>Player surface</div>,
     }));
-    const { Component } = createPreloadableLazy<Record<string, never>, { TestComponent: ComponentType<Record<string, never>> }>(
-      loader,
-      (module) => module.TestComponent,
-    );
+    const { Component } = createPreloadableLazy<
+      Record<string, never>,
+      { TestComponent: ComponentType<Record<string, never>> }
+    >(loader, (module) => module.TestComponent);
 
     render(
       <Suspense fallback={<div>Loading…</div>}>
@@ -67,15 +69,16 @@ describe("createPreloadableLazy", () => {
   });
 
   it("allows retry after a failed preload", async () => {
-    const loader = vi.fn()
+    const loader = vi
+      .fn()
       .mockRejectedValueOnce(new Error("chunk failed"))
       .mockResolvedValueOnce({
         TestComponent: () => <div>Recovered surface</div>,
       });
-    const { Component, preload } = createPreloadableLazy<Record<string, never>, { TestComponent: ComponentType<Record<string, never>> }>(
-      loader,
-      (module) => module.TestComponent,
-    );
+    const { Component, preload } = createPreloadableLazy<
+      Record<string, never>,
+      { TestComponent: ComponentType<Record<string, never>> }
+    >(loader, (module) => module.TestComponent);
 
     await expect(preload()).rejects.toThrow("chunk failed");
 

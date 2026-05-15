@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 import shutil
+from typing import Any, Mapping
 
 import mutagen
 from fastapi import APIRouter, Query, Request
@@ -10,8 +11,19 @@ from starlette.background import BackgroundTask
 from crate.api._deps import COVER_NAMES, extensions, library_path
 from crate.api.auth import _require_auth
 from crate.api.image_variants import build_image_response
-from crate.api.browse_shared import build_genre_profile, display_name, find_album_dir, find_album_row, fs_album_detail, has_library_data
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.browse_shared import (
+    build_genre_profile,
+    display_name,
+    find_album_dir,
+    fs_album_detail,
+    has_library_data,
+)
+from crate.db.queries.browse import find_album_row
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.browse import AlbumDetailResponse, RelatedAlbumResponse
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
@@ -24,7 +36,11 @@ from crate.db.repositories.library import (
     get_library_artist_by_slug,
     get_library_tracks,
 )
-from crate.db.queries.browse import get_album_genre_ids, get_related_albums, get_album_genre_profile
+from crate.db.queries.browse import (
+    get_album_genre_ids,
+    get_related_albums,
+    get_album_genre_profile,
+)
 from crate.db.queries.lyrics import get_album_track_lyrics_status
 from crate.db.repositories.tasks import create_task
 from crate.slugs import build_public_album_slug
@@ -73,6 +89,39 @@ _ZIP_RESPONSES = merge_responses(
 )
 
 
+def _tag_text(value) -> str:
+    return str(value) if value is not None else ""
+
+
+def _track_tags(track: Mapping[str, Any]) -> dict:
+    return {
+        "title": _tag_text(track.get("title")),
+        "artist": _tag_text(track.get("artist")),
+        "album": _tag_text(track.get("album")),
+        "albumartist": _tag_text(track.get("albumartist")),
+        "tracknumber": _tag_text(track.get("track_number")),
+        "discnumber": _tag_text(track.get("disc_number")),
+        "date": _tag_text(track.get("year"))[:4],
+        "genre": _tag_text(track.get("genre")),
+        "musicbrainz_albumid": track.get("musicbrainz_albumid"),
+        "musicbrainz_trackid": track.get("musicbrainz_trackid"),
+    }
+
+
+def _album_slug_matches(
+    album: Mapping[str, Any], requested_slug: str, artist_slug: str
+) -> bool:
+    requested = build_public_album_slug(requested_slug)
+    artist = build_public_album_slug(artist_slug)
+    album_name_slug = build_public_album_slug(album.get("name"))
+    stored_slug = build_public_album_slug(album.get("slug"))
+    candidates = {album_name_slug, stored_slug}
+    for slug in (album_name_slug, stored_slug):
+        if artist and slug.startswith(f"{artist}-"):
+            candidates.add(slug[len(artist) + 1 :])
+    return requested in candidates
+
+
 @router.get(
     "/api/albums/{album_id}/related",
     response_model=list[RelatedAlbumResponse],
@@ -92,7 +141,9 @@ def api_related_albums_by_id(request: Request, album_id: int, limit: int = 15):
     responses=_BROWSE_RESPONSES,
     summary="List albums related to a given album by entity UID",
 )
-def api_related_albums_by_entity_uid(request: Request, album_entity_uid: str, limit: int = 15):
+def api_related_albums_by_entity_uid(
+    request: Request, album_entity_uid: str, limit: int = 15
+):
     album = get_library_album_by_entity_uid(album_entity_uid)
     if not album:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -110,7 +161,11 @@ def api_related_albums(request: Request, artist: str, album: str, limit: int = 1
         return []
 
     album_id = current["id"]
-    year = current["year"][:4] if current.get("year") and len(current.get("year", "")) >= 4 else None
+    year = (
+        current["year"][:4]
+        if current.get("year") and len(current.get("year", "")) >= 4
+        else None
+    )
     seen.add(album_id)
 
     genre_ids = get_album_genre_ids(album_id)
@@ -168,6 +223,9 @@ def api_album(request: Request, artist: str, album: str):
     album_tags = {}
     for track in tracks_data:
         entity_uid = track.get("entity_uid")
+        size = int(track.get("size") or 0)
+        bitrate = int(track.get("bitrate") or 0)
+        duration = float(track.get("duration") or 0)
         track_list.append(
             {
                 "id": track["id"],
@@ -175,8 +233,8 @@ def api_album(request: Request, artist: str, album: str):
                 "storage_id": track.get("storage_id"),
                 "filename": track["filename"],
                 "format": track.get("format", ""),
-                "size_mb": round(track["size"] / (1024**2), 1) if track.get("size") else 0,
-                "bitrate": track.get("bitrate") // 1000 if track.get("bitrate") else None,
+                "size_mb": round(size / (1024**2), 1) if size else 0,
+                "bitrate": bitrate // 1000 if bitrate else None,
                 "sample_rate": track.get("sample_rate"),
                 "bit_depth": track.get("bit_depth"),
                 "bpm": track.get("bpm"),
@@ -186,7 +244,7 @@ def api_album(request: Request, artist: str, album: str):
                 "danceability": track.get("danceability"),
                 "valence": track.get("valence"),
                 "bliss_vector": track.get("bliss_vector"),
-                "length_sec": round(track["duration"]) if track.get("duration") else 0,
+                "length_sec": round(duration) if duration else 0,
                 "popularity": track.get("popularity"),
                 "popularity_score": track.get("popularity_score"),
                 "popularity_confidence": track.get("popularity_confidence"),
@@ -203,26 +261,17 @@ def api_album(request: Request, artist: str, album: str):
                         "updated_at": None,
                     },
                 ),
-                "tags": {
-                    "title": track.get("title", ""),
-                    "artist": track.get("artist", ""),
-                    "album": track.get("album", ""),
-                    "albumartist": track.get("albumartist", ""),
-                    "tracknumber": str(track.get("track_number", "")),
-                    "discnumber": str(track.get("disc_number", "")),
-                    "date": track.get("year", ""),
-                    "genre": track.get("genre", ""),
-                    "musicbrainz_albumid": track.get("musicbrainz_albumid", ""),
-                    "musicbrainz_trackid": track.get("musicbrainz_trackid", ""),
-                },
-                "path": str(Path(track["path"]).relative_to(lib)) if track.get("path") else "",
+                "tags": _track_tags(track),
+                "path": str(Path(track["path"]).relative_to(lib))
+                if track.get("path")
+                else "",
             }
         )
         if not album_tags and track.get("album"):
             album_tags = {
                 "artist": track.get("albumartist") or track.get("artist", ""),
                 "album": track.get("album", ""),
-                "year": track.get("year", "")[:4] if track.get("year") else "",
+                "year": str(track.get("year") or "")[:4],
                 "genre": track.get("genre", ""),
                 "musicbrainz_albumid": track.get("musicbrainz_albumid"),
             }
@@ -246,7 +295,9 @@ def api_album(request: Request, artist: str, album: str):
         "id": album_data["id"],
         "entity_uid": album_data.get("entity_uid"),
         "slug": album_data.get("slug"),
-        "artist_id": artist_row["id"] if (artist_row := get_library_artist(artist)) else None,
+        "artist_id": artist_row["id"]
+        if (artist_row := get_library_artist(artist))
+        else None,
         "artist_entity_uid": artist_row.get("entity_uid") if artist_row else None,
         "artist_slug": artist_row["slug"] if artist_row else None,
         "artist": artist,
@@ -286,8 +337,7 @@ def api_album_by_artist_slug(request: Request, artist_slug: str, album_slug: str
         (
             current
             for current in get_library_albums(artist["name"])
-            if build_public_album_slug(current.get("name")) == album_slug
-            or current.get("slug") == album_slug
+            if _album_slug_matches(current, album_slug, artist_slug)
         ),
         None,
     )
@@ -332,11 +382,11 @@ def _placeholder_cover(seed: str) -> Response:
         f'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
         f'<stop offset="0%" stop-color="hsl({h},45%,28%)"/>'
         f'<stop offset="100%" stop-color="hsl({(h + 30) % 360},35%,15%)"/>'
-        f'</linearGradient></defs>'
+        f"</linearGradient></defs>"
         f'<rect width="200" height="200" fill="url(#g)"/>'
         f'<text x="100" y="118" font-family="sans-serif" font-size="86" '
         f'font-weight="700" fill="rgba(255,255,255,0.42)" text-anchor="middle">{initial}</text>'
-        f'</svg>'
+        f"</svg>"
     )
     return Response(
         content=svg,
@@ -353,7 +403,7 @@ def _extract_embedded_cover(audio_file: Path) -> tuple[bytes, str] | None:
     tuple-vs-string iteration difference between ``VComment`` and ``ID3``.
     """
     try:
-        audio = mutagen.File(audio_file)
+        audio = getattr(mutagen, "File")(audio_file)
     except Exception:
         return None
     if audio is None:
@@ -404,7 +454,9 @@ def api_cover(
     if not album_dir:
         return _placeholder_cover(album or artist)
 
-    _IMG_CACHE = {"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"}
+    _IMG_CACHE = {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+    }
 
     for cover_name in COVER_NAMES:
         cover = album_dir / cover_name
@@ -424,7 +476,9 @@ def api_cover(
         extracted = _extract_embedded_cover(track)
         if extracted:
             data, mime = extracted
-            return build_image_response(data, mime, size=size, output_format=image_format, headers=_IMG_CACHE)
+            return build_image_response(
+                data, mime, size=size, output_format=image_format, headers=_IMG_CACHE
+            )
 
     return _placeholder_cover(album or artist)
 
@@ -441,12 +495,15 @@ def api_enrich_album(request: Request, album_id: int):
     album = get_library_album_by_id(album_id)
     if not album:
         return JSONResponse({"error": "Not found"}, status_code=404)
-    task_id = create_task("process_new_content", {
-        "artist": album["artist"],
-        "album": album["name"],
-        "force": True,
-        "triggered_by": "ui",
-    })
+    task_id = create_task(
+        "process_new_content",
+        {
+            "artist": album["artist"],
+            "album": album["name"],
+            "force": True,
+            "triggered_by": "ui",
+        },
+    )
     return {"task_id": task_id}
 
 
@@ -475,13 +532,16 @@ def api_fetch_cover(request: Request, album_id: int):
     album = get_library_album_by_id(album_id)
     if not album:
         return JSONResponse({"error": "Album not found"}, status_code=404)
-    task_id = create_task("fetch_album_cover", {
-        "album_id": album_id,
-        "artist": album["artist"],
-        "album": album["name"],
-        "path": album.get("path", ""),
-        "mbid": album.get("musicbrainz_albumid", ""),
-    })
+    task_id = create_task(
+        "fetch_album_cover",
+        {
+            "album_id": album_id,
+            "artist": album["artist"],
+            "album": album["name"],
+            "path": album.get("path", ""),
+            "mbid": album.get("musicbrainz_albumid", ""),
+        },
+    )
     return {"task_id": task_id}
 
 
@@ -513,7 +573,13 @@ def api_cover_by_id(
         return _placeholder_cover("?")
     artist = get_library_artist(album["artist"])
     album_dir = resolve_album_dir(library_path(), album, artist=artist)
-    return api_cover(album["artist"], album["name"], album_dir=album_dir, size=size, image_format=image_format)
+    return api_cover(
+        album["artist"],
+        album["name"],
+        album_dir=album_dir,
+        size=size,
+        image_format=image_format,
+    )
 
 
 @router.get(
@@ -531,7 +597,13 @@ def api_cover_by_entity_uid(
         return _placeholder_cover("?")
     artist = get_library_artist(album["artist"])
     album_dir = resolve_album_dir(library_path(), album, artist=artist)
-    return api_cover(album["artist"], album["name"], album_dir=album_dir, size=size, image_format=image_format)
+    return api_cover(
+        album["artist"],
+        album["name"],
+        album_dir=album_dir,
+        size=size,
+        image_format=image_format,
+    )
 
 
 def api_download_album(request: Request, artist: str, album: str):
@@ -569,21 +641,38 @@ def api_download_album(request: Request, artist: str, album: str):
             )
             from crate.db.queries.portable_metadata import get_portable_album_payload
             from crate.media_worker import build_album_download_package
-            from crate.portable_metadata import export_album_rich_metadata, find_album_artwork_file
+            from crate.portable_metadata import (
+                export_album_rich_metadata,
+                find_album_artwork_file,
+            )
 
             payload = get_portable_album_payload(int(album_row["id"]))
             if payload:
                 album_payload = payload.get("album") or {}
                 artwork_path = find_album_artwork_file(album_payload.get("path") or "")
                 cache_key = album_download_cache_key(payload, artwork_path=artwork_path)
-                cache_filename = safe_download_filename(f"{artist} - {album}.zip", "album.zip")
-                cached = get_cached_download("album", cache_key, cache_filename, ttl_seconds=album_cache_ttl_seconds())
+                cache_filename = safe_download_filename(
+                    f"{artist} - {album}.zip", "album.zip"
+                )
+                cached = get_cached_download(
+                    "album",
+                    cache_key,
+                    cache_filename,
+                    ttl_seconds=album_cache_ttl_seconds(),
+                )
                 if cached is None:
                     with download_cache_lock("album", cache_key):
-                        cached = get_cached_download("album", cache_key, cache_filename, ttl_seconds=album_cache_ttl_seconds())
+                        cached = get_cached_download(
+                            "album",
+                            cache_key,
+                            cache_filename,
+                            ttl_seconds=album_cache_ttl_seconds(),
+                        )
                         if cached is None:
                             if download_cache_enabled():
-                                worker_output_path = cached_download_artifact_path("album", cache_key, cache_filename)
+                                worker_output_path = cached_download_artifact_path(
+                                    "album", cache_key, cache_filename
+                                )
                                 worker_result = build_album_download_package(
                                     payload,
                                     output_path=worker_output_path,
@@ -595,7 +684,9 @@ def api_download_album(request: Request, artist: str, album: str):
                                     cache_key=cache_key,
                                     cache_metadata={
                                         "album_id": album_row["id"],
-                                        "album_entity_uid": album_payload.get("entity_uid"),
+                                        "album_entity_uid": album_payload.get(
+                                            "entity_uid"
+                                        ),
                                         "engine": "crate-media-worker",
                                         "tracks": len(payload.get("tracks") or []),
                                     },
@@ -608,7 +699,10 @@ def api_download_album(request: Request, artist: str, album: str):
                                         ttl_seconds=album_cache_ttl_seconds(),
                                     )
                                 elif worker_result:
-                                    log.debug("crate-media-worker package failed: %s", worker_result)
+                                    log.debug(
+                                        "crate-media-worker package failed: %s",
+                                        worker_result,
+                                    )
                             if cached is None:
                                 export_result = export_album_rich_metadata(
                                     payload,
@@ -617,9 +711,18 @@ def api_download_album(request: Request, artist: str, album: str):
                                     write_rich_tags=True,
                                 )
                                 export_dir = Path(str(export_result["export_path"]))
-                                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zip_file:
-                                    for file_path in sorted(path for path in export_dir.rglob("*") if path.is_file()):
-                                        zip_file.write(str(file_path), str(file_path.relative_to(export_dir)))
+                                with zipfile.ZipFile(
+                                    zip_path, "w", zipfile.ZIP_STORED
+                                ) as zip_file:
+                                    for file_path in sorted(
+                                        path
+                                        for path in export_dir.rglob("*")
+                                        if path.is_file()
+                                    ):
+                                        zip_file.write(
+                                            str(file_path),
+                                            str(file_path.relative_to(export_dir)),
+                                        )
                                 cached = store_cached_download(
                                     "album",
                                     cache_key,
@@ -627,9 +730,13 @@ def api_download_album(request: Request, artist: str, album: str):
                                     zip_path,
                                     metadata={
                                         "album_id": album_row["id"],
-                                        "album_entity_uid": album_payload.get("entity_uid"),
+                                        "album_entity_uid": album_payload.get(
+                                            "entity_uid"
+                                        ),
                                         "tracks": export_result.get("tracks"),
-                                        "artwork_files": export_result.get("artwork_files"),
+                                        "artwork_files": export_result.get(
+                                            "artwork_files"
+                                        ),
                                     },
                                 )
                 if cached is not None:
@@ -640,17 +747,22 @@ def api_download_album(request: Request, artist: str, album: str):
     if cached_zip is not None:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         safe_name = f"{artist} - {album}.zip".replace("/", "-")
-        return FileResponse(path=str(cached_zip), filename=safe_name, media_type="application/zip")
+        return FileResponse(
+            path=str(cached_zip), filename=safe_name, media_type="application/zip"
+        )
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zip_file:
         if export_dir and export_dir.is_dir():
-            for file_path in sorted(path for path in export_dir.rglob("*") if path.is_file()):
+            for file_path in sorted(
+                path for path in export_dir.rglob("*") if path.is_file()
+            ):
                 zip_file.write(str(file_path), str(file_path.relative_to(export_dir)))
         else:
             for file_path in sorted(album_dir.iterdir()):
                 if file_path.is_file() and (
                     file_path.suffix.lower() in exts
-                    or file_path.name.lower() in ("cover.jpg", "cover.png", "folder.jpg", "front.jpg")
+                    or file_path.name.lower()
+                    in ("cover.jpg", "cover.png", "folder.jpg", "front.jpg")
                 ):
                     zip_file.write(str(file_path), file_path.name)
 

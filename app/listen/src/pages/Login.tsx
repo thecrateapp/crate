@@ -61,8 +61,18 @@ export function Login() {
     setSubmitting(true);
 
     try {
-      const res = await api<{ token?: string; refresh_token?: string | null }>("/api/auth/login", "POST", { email, password });
-      if (res?.token) setAuthTokens(res.token, res.refresh_token ?? undefined);
+      const res = await api<{
+        token?: string;
+        access_expires_at?: string | null;
+        refresh_token?: string | null;
+      }>("/api/auth/login", "POST", { email, password });
+      if (res?.token) {
+        setAuthTokens(
+          res.token,
+          res.refresh_token ?? undefined,
+          res.access_expires_at ?? undefined,
+        );
+      }
       await refetch();
       navigate(returnTo, { replace: true });
     } catch (err) {
@@ -83,10 +93,7 @@ export function Login() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-app-surface px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-5"
-      >
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-4">
           <img src="/icons/logo.svg" alt="Crate" className="h-16 w-16 mb-2" />
           <h1 className="text-2xl font-bold text-white">Crate</h1>
@@ -95,13 +102,12 @@ export function Login() {
 
         {authConfig.invite_only ? (
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-            New accounts are invite-only right now. If you are joining a private beta, open your invite link to register.
+            New accounts are invite-only right now. If you are joining a private
+            beta, open your invite link to register.
           </div>
         ) : null}
 
-        {error && (
-          <p className="text-sm text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
         <div>
           <label htmlFor="email" className="block text-sm text-white/60 mb-1">
@@ -118,7 +124,10 @@ export function Login() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm text-white/60 mb-1">
+          <label
+            htmlFor="password"
+            className="block text-sm text-white/60 mb-1"
+          >
             Password
           </label>
           <input
@@ -145,13 +154,20 @@ export function Login() {
           <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/45">
             <span className="text-white/65">Desktop OAuth:</span>{" "}
             {tauriAuthDiagnostic.status}
-            {tauriAuthDiagnostic.detail ? ` · ${tauriAuthDiagnostic.detail}` : ""}
+            {tauriAuthDiagnostic.detail
+              ? ` · ${tauriAuthDiagnostic.detail}`
+              : ""}
           </div>
         ) : null}
 
         <p className="text-center text-sm text-white/40">
           No account?{" "}
-          <Link to={`/register?return_to=${encodeURIComponent(returnTo)}`} className="text-primary hover:underline">Create one</Link>
+          <Link
+            to={`/register?return_to=${encodeURIComponent(returnTo)}`}
+            className="text-primary hover:underline"
+          >
+            Create one
+          </Link>
         </p>
       </form>
     </div>

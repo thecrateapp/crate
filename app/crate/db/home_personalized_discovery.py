@@ -144,7 +144,9 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
 
 
 def build_home_discovery_payload(user_id: int) -> dict:
-    context = get_cached_home_context(user_id, top_artist_limit=28, top_album_limit=12, top_genre_limit=8)
+    context = get_cached_home_context(
+        user_id, top_artist_limit=28, top_album_limit=12, top_genre_limit=8
+    )
     top_albums = context["top_albums"]
     followed_names_lower = context["followed_names_lower"]
     followed = context["followed"]
@@ -153,7 +155,9 @@ def build_home_discovery_payload(user_id: int) -> dict:
     mix_seed_genres = context["mix_seed_genres"]
     interest_artists_lower = context["interest_artists_lower"]
 
-    hero = _get_home_hero(user_id, followed_names_lower, top_artist_names_lower[:8], top_genres_lower[:4])
+    hero = _get_home_hero(
+        user_id, followed_names_lower, top_artist_names_lower[:8], top_genres_lower[:4]
+    )
     recent_releases = recent_releases_from_context(context)
 
     precomputed_mixes: dict[str, tuple[str, str, list[dict]]] = {}
@@ -199,7 +203,9 @@ def build_home_discovery_payload(user_id: int) -> dict:
         "recent_global_artists": _build_recent_global_artists(7),
         "listening_history": get_listening_history_cards(user_id, limit=8),
         "replay": get_replay_mix(user_id, window="30d", limit=18),
-        "upcoming": _build_home_upcoming(user_id, lookup_limit=120, item_limit=12, followed=followed),
+        "upcoming": _build_home_upcoming(
+            user_id, lookup_limit=120, item_limit=12, followed=followed
+        ),
     }
 
 

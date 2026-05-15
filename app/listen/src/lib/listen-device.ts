@@ -65,7 +65,9 @@ function generateDeviceFingerprint(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return `listen:${crypto.randomUUID()}`;
   }
-  return `listen:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `listen:${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
 }
 
 export function getListenDeviceFingerprint(): string {

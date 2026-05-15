@@ -22,24 +22,40 @@ def update_track_artist(track_path: str, artist_name: str) -> None:
 def update_album_path_and_name(old_path: str, new_path: str, album_name: str) -> None:
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_albums SET name = :name, path = :new_path WHERE path = :old_path"),
+            text(
+                "UPDATE library_albums SET name = :name, path = :new_path WHERE path = :old_path"
+            ),
             {"name": album_name, "new_path": new_path, "old_path": old_path},
         )
         session.execute(
-            text("UPDATE library_tracks SET path = REPLACE(path, :old_prefix, :new_prefix) WHERE path LIKE :pattern"),
-            {"old_prefix": old_path + "/", "new_prefix": new_path + "/", "pattern": old_path + "/%"},
+            text(
+                "UPDATE library_tracks SET path = REPLACE(path, :old_prefix, :new_prefix) WHERE path LIKE :pattern"
+            ),
+            {
+                "old_prefix": old_path + "/",
+                "new_prefix": new_path + "/",
+                "pattern": old_path + "/%",
+            },
         )
 
 
 def merge_album_folder(old_path: str, new_path: str, album_name: str) -> None:
     with transaction_scope() as session:
         session.execute(
-            text("UPDATE library_albums SET name = :name, path = :new_path WHERE path = :old_path"),
+            text(
+                "UPDATE library_albums SET name = :name, path = :new_path WHERE path = :old_path"
+            ),
             {"name": album_name, "new_path": new_path, "old_path": old_path},
         )
         session.execute(
-            text("UPDATE library_tracks SET path = REPLACE(path, :old_prefix, :new_prefix) WHERE path LIKE :pattern"),
-            {"old_prefix": old_path + "/", "new_prefix": new_path + "/", "pattern": old_path + "/%"},
+            text(
+                "UPDATE library_tracks SET path = REPLACE(path, :old_prefix, :new_prefix) WHERE path LIKE :pattern"
+            ),
+            {
+                "old_prefix": old_path + "/",
+                "new_prefix": new_path + "/",
+                "pattern": old_path + "/%",
+            },
         )
         session.execute(
             text(
@@ -54,9 +70,10 @@ def get_tracks_by_paths(paths: list[str]) -> list[dict]:
     if not paths:
         return []
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     id,
                     entity_uid::text AS entity_uid,
@@ -78,9 +95,12 @@ def get_tracks_by_paths(paths: list[str]) -> list[dict]:
                 FROM library_tracks
                 WHERE path = ANY(:paths)
                 """
-            ),
-            {"paths": paths},
-        ).mappings().all()
+                ),
+                {"paths": paths},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(r) for r in rows]
 
 

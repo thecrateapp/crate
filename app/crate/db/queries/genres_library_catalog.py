@@ -8,9 +8,10 @@ from crate.db.tx import read_scope
 
 def get_all_genres() -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     g.id,
                     g.entity_uid::text AS entity_uid,
@@ -47,16 +48,20 @@ def get_all_genres() -> list[dict]:
                 HAVING COUNT(DISTINCT ag.artist_name) > 0 OR COUNT(DISTINCT alg.album_id) > 0
                 ORDER BY COUNT(DISTINCT ag.artist_name) DESC
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return annotate_genre_mapping([dict(r) for r in rows])
 
 
 def get_unmapped_genres(limit: int = 24) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     g.id,
                     g.entity_uid::text AS entity_uid,
@@ -79,9 +84,12 @@ def get_unmapped_genres(limit: int = 24) -> list[dict]:
                 ORDER BY COUNT(DISTINCT ag.artist_name) DESC, COUNT(DISTINCT alg.album_id) DESC, g.name ASC
                 LIMIT :lim
                 """
-            ),
-            {"lim": limit},
-        ).mappings().all()
+                ),
+                {"lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     items = [dict(row) for row in rows]
     for item in items:
         item["mapped"] = False
@@ -102,17 +110,24 @@ def get_unmapped_genres(limit: int = 24) -> list[dict]:
 
 def get_total_genre_count() -> int:
     with read_scope() as session:
-        row = session.execute(text("SELECT COUNT(*) as cnt FROM genres")).mappings().first()
+        row = (
+            session.execute(text("SELECT COUNT(*) as cnt FROM genres"))
+            .mappings()
+            .first()
+        )
     return int(row["cnt"]) if row else 0
 
 
-def list_unmapped_genres_for_inference(limit: int, focus_slug: str | None = None) -> list[dict]:
+def list_unmapped_genres_for_inference(
+    limit: int, focus_slug: str | None = None
+) -> list[dict]:
     with read_scope() as session:
         items: list[dict] = []
         if focus_slug:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         g.id,
                         g.entity_uid::text AS entity_uid,
@@ -126,17 +141,21 @@ def list_unmapped_genres_for_inference(limit: int, focus_slug: str | None = None
                     WHERE g.slug = :focus_slug
                     GROUP BY g.id, g.entity_uid, g.name, g.slug
                     """
-                ),
-                {"focus_slug": focus_slug},
-            ).mappings().first()
+                    ),
+                    {"focus_slug": focus_slug},
+                )
+                .mappings()
+                .first()
+            )
             if row:
                 items.append(dict(row))
 
         remaining_limit = max(limit - len(items), 0)
         if remaining_limit > 0:
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         g.id,
                         g.entity_uid::text AS entity_uid,
@@ -160,18 +179,22 @@ def list_unmapped_genres_for_inference(limit: int, focus_slug: str | None = None
                     ORDER BY COUNT(DISTINCT ag.artist_name) DESC, COUNT(DISTINCT alg.album_id) DESC, g.name ASC
                     LIMIT :remaining_limit
                     """
-                ),
-                {"focus_slug": focus_slug, "remaining_limit": remaining_limit},
-            ).mappings().all()
+                    ),
+                    {"focus_slug": focus_slug, "remaining_limit": remaining_limit},
+                )
+                .mappings()
+                .all()
+            )
             items.extend(dict(row) for row in rows)
     return items
 
 
 def get_unmapped_genre_count() -> int:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT COUNT(*)::INTEGER AS cnt
                 FROM genres g
                 LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
@@ -182,8 +205,11 @@ def get_unmapped_genre_count() -> int:
                       WHERE LOWER(TRIM(gta_name.alias_name)) = LOWER(TRIM(g.name))
                   )
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
     return int(row["cnt"] or 0) if row else 0
 
 

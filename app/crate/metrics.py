@@ -17,18 +17,29 @@ import time
 from datetime import datetime, timezone
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
+from typing import TypedDict
 
 log = logging.getLogger(__name__)
 
 _REDIS_PREFIX = "crate:metrics"
+_METRIC_KEYS_SET = "crate:metric_keys"
 _DEFAULT_BUCKET_TTL_SECONDS = 24 * 3600
 _MIN_BUCKET_TTL_SECONDS = 3600
 _MAX_BUCKET_TTL_SECONDS = 7 * 86400
 _ASYNC_QUEUE_MAX = 10_000
 _ROUTE_LATENCY_METRIC = "api.route.latency"
-_async_metric_queue: Queue[tuple[str, float, dict | None]] = Queue(maxsize=_ASYNC_QUEUE_MAX)
+_async_metric_queue: Queue[tuple[str, float, dict | None]] = Queue(
+    maxsize=_ASYNC_QUEUE_MAX
+)
 _async_worker_lock = Lock()
 _async_worker_started = False
+
+
+class _MetricAggregate(TypedDict):
+    count: int
+    sum: float
+    min: float | None
+    max: float | None
 
 
 def _minute_bucket(ts: float | None = None) -> int:
@@ -92,11 +103,13 @@ def _route_id(target: str, method: str, path: str) -> str:
 
 # ── Recording ────────────────────────────────────────────────────
 
+
 def _record_sync(name: str, value: float, tags: dict | None = None):
     """Record a metric sample synchronously to Redis."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r is None:
             return
 
@@ -105,6 +118,8 @@ def _record_sync(name: str, value: float, tags: dict | None = None):
         ttl_seconds = _bucket_ttl_seconds()
 
         pipe = r.pipeline(transaction=False)
+        pipe.sadd(_METRIC_KEYS_SET, name)
+        pipe.expire(_METRIC_KEYS_SET, _MAX_BUCKET_TTL_SECONDS)
         pipe.hincrby(key, "count", 1)
         pipe.hincrbyfloat(key, "sum", value)
 
@@ -122,14 +137,21 @@ def _record_sync(name: str, value: float, tags: dict | None = None):
                 redis.call('hset', key, 'max', val)
             end
             """,
-            1, key, str(value),
+            1,
+            key,
+            str(value),
         )
         pipe.expire(key, ttl_seconds)
 
         # Store tags as JSON if present (once per key)
         if tags:
             tags_key = f"{key}:tags"
-            pipe.set(tags_key, json.dumps(tags, separators=(",", ":")), ex=ttl_seconds, nx=True)
+            pipe.set(
+                tags_key,
+                json.dumps(tags, separators=(",", ":")),
+                ex=ttl_seconds,
+                nx=True,
+            )
 
         pipe.execute()
     except Exception:
@@ -149,8 +171,9 @@ def _record_route_latency_sync(value: float, tags: dict | None = None):
         return
 
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r is None:
             return
 
@@ -160,9 +183,15 @@ def _record_route_latency_sync(value: float, tags: dict | None = None):
         bucket_key = _route_bucket_key(bucket_ts)
         key = _route_metric_key(route_id, bucket_ts)
         samples_key = f"{key}:samples"
-        status_family = f"status_{status[:1]}xx" if status and status[0].isdigit() else "status_other"
+        status_family = (
+            f"status_{status[:1]}xx"
+            if status and status[0].isdigit()
+            else "status_other"
+        )
 
         pipe = r.pipeline(transaction=False)
+        pipe.sadd(_METRIC_KEYS_SET, _ROUTE_LATENCY_METRIC)
+        pipe.expire(_METRIC_KEYS_SET, _MAX_BUCKET_TTL_SECONDS)
         pipe.sadd(bucket_key, route_id)
         pipe.expire(bucket_key, ttl_seconds)
         pipe.hset(
@@ -190,7 +219,9 @@ def _record_route_latency_sync(value: float, tags: dict | None = None):
                 redis.call('hset', key, 'max', val)
             end
             """,
-            1, key, str(value),
+            1,
+            key,
+            str(value),
         )
         pipe.rpush(samples_key, round(float(value), 3))
         pipe.ltrim(samples_key, -_route_sample_limit(), -1)
@@ -223,7 +254,9 @@ def _ensure_async_worker():
     with _async_worker_lock:
         if _async_worker_started:
             return
-        worker = Thread(target=_async_record_loop, name="crate-metrics-buffer", daemon=True)
+        worker = Thread(
+            target=_async_record_loop, name="crate-metrics-buffer", daemon=True
+        )
         worker.start()
         _async_worker_started = True
 
@@ -280,11 +313,13 @@ def record_route_latency_later(
 
 # ── Querying ─────────────────────────────────────────────────────
 
+
 def query_recent(name: str, minutes: int = 60) -> list[dict]:
     """Read minute-granularity buckets from Redis for the last N minutes."""
     try:
-        from crate.db.cache_runtime import _get_redis
-        r = _get_redis()
+        from crate.db.cache_runtime import get_redis
+
+        r = get_redis()
         if r is None:
             return []
 
@@ -303,21 +338,27 @@ def query_recent(name: str, minutes: int = 60) -> list[dict]:
             bucket_ts = buckets[len(buckets) - 1 - i]
             count = int(data.get(b"count", data.get("count", 0)))
             total = float(data.get(b"sum", data.get("sum", 0)))
-            results.append({
-                "timestamp": datetime.fromtimestamp(bucket_ts, tz=timezone.utc).isoformat(),
-                "count": count,
-                "avg": round(total / count, 2) if count > 0 else 0,
-                "min": round(float(data.get(b"min", data.get("min", 0))), 2),
-                "max": round(float(data.get(b"max", data.get("max", 0))), 2),
-                "sum": round(total, 2),
-            })
+            results.append(
+                {
+                    "timestamp": datetime.fromtimestamp(
+                        bucket_ts, tz=timezone.utc
+                    ).isoformat(),
+                    "count": count,
+                    "avg": round(total / count, 2) if count > 0 else 0,
+                    "min": round(float(data.get(b"min", data.get("min", 0))), 2),
+                    "max": round(float(data.get(b"max", data.get("max", 0))), 2),
+                    "sum": round(total, 2),
+                }
+            )
         return results
     except Exception:
         log.debug("Failed to query recent metrics", exc_info=True)
         return []
 
 
-def query_recent_rolled(name: str, minutes: int = 1440, bucket_minutes: int = 60) -> list[dict]:
+def query_recent_rolled(
+    name: str, minutes: int = 1440, bucket_minutes: int = 60
+) -> list[dict]:
     """Read recent Redis buckets and roll them up in-process.
 
     This keeps near-realtime dashboard queries on Redis instead of
@@ -345,7 +386,9 @@ def query_recent_rolled(name: str, minutes: int = 1440, bucket_minutes: int = 60
         current = rolled.setdefault(
             rolled_ts,
             {
-                "timestamp": datetime.fromtimestamp(rolled_ts, tz=timezone.utc).isoformat(),
+                "timestamp": datetime.fromtimestamp(
+                    rolled_ts, tz=timezone.utc
+                ).isoformat(),
                 "count": 0,
                 "sum": 0.0,
                 "min": None,
@@ -360,8 +403,12 @@ def query_recent_rolled(name: str, minutes: int = 1440, bucket_minutes: int = 60
         if count > 0:
             min_value = float(bucket.get("min", 0) or 0)
             max_value = float(bucket.get("max", 0) or 0)
-            current["min"] = min_value if current["min"] is None else min(current["min"], min_value)
-            current["max"] = max_value if current["max"] is None else max(current["max"], max_value)
+            current["min"] = (
+                min_value if current["min"] is None else min(current["min"], min_value)
+            )
+            current["max"] = (
+                max_value if current["max"] is None else max(current["max"], max_value)
+            )
 
     results = []
     for _, bucket in sorted(rolled.items()):
@@ -402,14 +449,16 @@ def query_summary(name: str, minutes: int = 5) -> dict:
 
 def query_summaries(specs: dict[str, tuple[str, int]]) -> dict[str, dict]:
     """Aggregate multiple metric summaries with one Redis pipeline."""
-    defaults = {key: {"count": 0, "avg": 0, "min": 0, "max": 0, "sum": 0} for key in specs}
+    defaults = {
+        key: {"count": 0, "avg": 0, "min": 0, "max": 0, "sum": 0} for key in specs
+    }
     if not specs:
         return {}
 
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        r = _get_redis()
+        r = get_redis()
         if r is None:
             return defaults
 
@@ -424,9 +473,8 @@ def query_summaries(specs: dict[str, tuple[str, int]]) -> dict[str, dict]:
                 lookup_keys.append(summary_key)
 
         raw_results = pipe.execute()
-        aggregates: dict[str, dict[str, float | int | None]] = {
-            key: {"count": 0, "sum": 0.0, "min": None, "max": None}
-            for key in specs
+        aggregates: dict[str, _MetricAggregate] = {
+            key: {"count": 0, "sum": 0.0, "min": None, "max": None} for key in specs
         }
 
         for summary_key, data in zip(lookup_keys, raw_results):
@@ -442,13 +490,23 @@ def query_summaries(specs: dict[str, tuple[str, int]]) -> dict[str, dict]:
                 max_value = float(data.get(b"max", data.get("max", 0)))
                 current_min = aggregates[summary_key]["min"]
                 current_max = aggregates[summary_key]["max"]
-                aggregates[summary_key]["min"] = min_value if current_min is None else min(float(current_min), min_value)
-                aggregates[summary_key]["max"] = max_value if current_max is None else max(float(current_max), max_value)
+                aggregates[summary_key]["min"] = (
+                    min_value
+                    if current_min is None
+                    else min(float(current_min), min_value)
+                )
+                aggregates[summary_key]["max"] = (
+                    max_value
+                    if current_max is None
+                    else max(float(current_max), max_value)
+                )
 
         return {
             key: {
                 "count": int(aggregate["count"]),
-                "avg": round(float(aggregate["sum"]) / int(aggregate["count"]), 2) if int(aggregate["count"]) > 0 else 0,
+                "avg": round(float(aggregate["sum"]) / int(aggregate["count"]), 2)
+                if int(aggregate["count"]) > 0
+                else 0,
                 "min": round(float(aggregate["min"] or 0), 2),
                 "max": round(float(aggregate["max"] or 0), 2),
                 "sum": round(float(aggregate["sum"]), 2),
@@ -460,14 +518,16 @@ def query_summaries(specs: dict[str, tuple[str, int]]) -> dict[str, dict]:
         return defaults
 
 
-def query_route_latency(minutes: int = 15, limit: int = 20, target: str | None = None) -> list[dict]:
+def query_route_latency(
+    minutes: int = 15, limit: int = 20, target: str | None = None
+) -> list[dict]:
     """Aggregate recent per-route latency with p95/p99 from sampled Redis data."""
     minutes = max(1, min(240, int(minutes)))
     limit = max(1, min(100, int(limit)))
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        r = _get_redis()
+        r = get_redis()
         if r is None:
             return []
 
@@ -480,7 +540,9 @@ def query_route_latency(minutes: int = 15, limit: int = 20, target: str | None =
             pipe.smembers(_route_bucket_key(bucket_ts))
         for route_set in pipe.execute():
             for raw_id in route_set or []:
-                route_ids.add(raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id))
+                route_ids.add(
+                    raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id)
+                )
 
         if not route_ids:
             return []
@@ -532,15 +594,35 @@ def query_route_latency(minutes: int = 15, limit: int = 20, target: str | None =
             if count > 0:
                 min_value = float(row.get("min") or 0)
                 max_value = float(row.get("max") or 0)
-                current["min"] = min_value if current["min"] is None else min(float(current["min"]), min_value)
-                current["max"] = max_value if current["max"] is None else max(float(current["max"]), max_value)
+                current["min"] = (
+                    min_value
+                    if current["min"] is None
+                    else min(float(current["min"]), min_value)
+                )
+                current["max"] = (
+                    max_value
+                    if current["max"] is None
+                    else max(float(current["max"]), max_value)
+                )
 
-            for family in ("status_2xx", "status_3xx", "status_4xx", "status_5xx", "status_other"):
+            for family in (
+                "status_2xx",
+                "status_3xx",
+                "status_4xx",
+                "status_5xx",
+                "status_other",
+            ):
                 current[family] += int(row.get(family) or 0)
 
             for raw_sample in samples_raw or []:
                 try:
-                    current["samples"].append(float(raw_sample.decode() if isinstance(raw_sample, bytes) else raw_sample))
+                    current["samples"].append(
+                        float(
+                            raw_sample.decode()
+                            if isinstance(raw_sample, bytes)
+                            else raw_sample
+                        )
+                    )
                 except (TypeError, ValueError):
                     continue
 
@@ -563,7 +645,10 @@ def query_route_latency(minutes: int = 15, limit: int = 20, target: str | None =
                 }
             )
 
-        results.sort(key=lambda row: (float(row.get("p95") or 0), int(row.get("count") or 0)), reverse=True)
+        results.sort(
+            key=lambda row: (float(row.get("p95") or 0), int(row.get("count") or 0)),
+            reverse=True,
+        )
         return results[:limit]
     except Exception:
         log.debug("Failed to query route latency metrics", exc_info=True)
@@ -572,79 +657,99 @@ def query_route_latency(minutes: int = 15, limit: int = 20, target: str | None =
 
 # ── Flush to PostgreSQL ──────────────────────────────────────────
 
+
 def flush_to_postgres(period: str = "hour"):
     """Roll up Redis minute-buckets into PostgreSQL hourly/daily rows.
 
     Called by the worker service loop every 5 minutes.
     """
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
         from crate.db.repositories.management import upsert_metric_rollup
 
-        r = _get_redis()
+        r = get_redis()
         if r is None:
             return
 
-        # Find all metric keys in Redis
-        cursor = 0
-        pattern = f"{_REDIS_PREFIX}:*"
+        # Find all metric keys in Redis via tracked set + targeted scans
         processed = 0
 
-        while True:
-            cursor, keys = r.scan(cursor, match=pattern, count=200)
-            for key_bytes in keys:
-                key = key_bytes.decode() if isinstance(key_bytes, bytes) else key_bytes
-                # Skip tag keys
-                if key.endswith(":tags"):
-                    continue
+        metric_names = r.smembers(_METRIC_KEYS_SET)
+        names = [
+            n.decode() if isinstance(n, bytes) else str(n) for n in (metric_names or [])
+        ]
 
-                parts = key.split(":")
-                if len(parts) < 4:
-                    continue
+        # Also scan for route metrics which do not use the standard bucket naming
+        route_patterns = [f"{_REDIS_PREFIX}:route:*", f"{_REDIS_PREFIX}:routes:*"]
+        all_patterns = [f"{_REDIS_PREFIX}:{name}:*" for name in names] + route_patterns
 
-                name = parts[2]
-                try:
-                    bucket_ts = int(parts[3])
-                except (ValueError, IndexError):
-                    continue
+        for pattern in all_patterns:
+            cursor = 0
+            while True:
+                cursor, keys = r.scan(cursor, match=pattern, count=200)
+                for key_bytes in keys:
+                    key = (
+                        key_bytes.decode()
+                        if isinstance(key_bytes, bytes)
+                        else key_bytes
+                    )
+                    # Skip tag keys
+                    if key.endswith(":tags"):
+                        continue
 
-                # Only flush buckets older than 10 minutes
-                if bucket_ts > _minute_bucket() - 600:
-                    continue
+                    parts = key.split(":")
+                    if len(parts) < 4:
+                        continue
 
-                data = r.hgetall(key)
-                if not data:
-                    continue
+                    name = parts[2]
+                    try:
+                        bucket_ts = int(parts[3])
+                    except (ValueError, IndexError):
+                        continue
 
-                count = int(data.get(b"count", data.get("count", 0)))
-                total = float(data.get(b"sum", data.get("sum", 0)))
-                min_val = float(data.get(b"min", data.get("min", 0)))
-                max_val = float(data.get(b"max", data.get("max", 0)))
-                avg_val = total / count if count > 0 else 0
+                    # Only flush buckets older than 10 minutes
+                    if bucket_ts > _minute_bucket() - 600:
+                        continue
 
-                # Read tags
-                tags_raw = r.get(f"{key}:tags")
-                tags_json = tags_raw.decode() if isinstance(tags_raw, bytes) else (tags_raw or "{}")
+                    data = r.hgetall(key)
+                    if not data:
+                        continue
 
-                # Compute hour bucket
-                hour_ts = bucket_ts - (bucket_ts % 3600)
-                bucket_start = datetime.fromtimestamp(hour_ts, tz=timezone.utc).isoformat()
+                    count = int(data.get(b"count", data.get("count", 0)))
+                    total = float(data.get(b"sum", data.get("sum", 0)))
+                    min_val = float(data.get(b"min", data.get("min", 0)))
+                    max_val = float(data.get(b"max", data.get("max", 0)))
+                    avg_val = total / count if count > 0 else 0
 
-                upsert_metric_rollup(
-                    name=name,
-                    tags_json=tags_json,
-                    period=period,
-                    bucket_start=bucket_start,
-                    count=count,
-                    sum_value=total,
-                    min_value=min_val,
-                    max_value=max_val,
-                    avg_value=avg_val,
-                )
-                processed += 1
+                    # Read tags
+                    tags_raw = r.get(f"{key}:tags")
+                    tags_json = (
+                        tags_raw.decode()
+                        if isinstance(tags_raw, bytes)
+                        else (tags_raw or "{}")
+                    )
 
-            if cursor == 0:
-                break
+                    # Compute hour bucket
+                    hour_ts = bucket_ts - (bucket_ts % 3600)
+                    bucket_start = datetime.fromtimestamp(
+                        hour_ts, tz=timezone.utc
+                    ).isoformat()
+
+                    upsert_metric_rollup(
+                        name=name,
+                        tags_json=tags_json,
+                        period=period,
+                        bucket_start=bucket_start,
+                        count=count,
+                        sum_value=total,
+                        min_value=min_val,
+                        max_value=max_val,
+                        avg_value=avg_val,
+                    )
+                    processed += 1
+
+                if cursor == 0:
+                    break
 
         if processed > 0:
             log.debug("Flushed %d metric buckets to PostgreSQL", processed)
@@ -653,15 +758,25 @@ def flush_to_postgres(period: str = "hour"):
         log.warning("Metrics flush to PostgreSQL failed", exc_info=True)
 
 
-def query_historical(name: str, period: str = "hour", start: str | None = None, end: str | None = None, limit: int = 168) -> list[dict]:
+def query_historical(
+    name: str,
+    period: str = "hour",
+    start: str | None = None,
+    end: str | None = None,
+    limit: int = 168,
+) -> list[dict]:
     """Read rollup data from PostgreSQL."""
     try:
         from crate.db.queries.management import query_metric_rollups
 
-        rows = query_metric_rollups(name=name, period=period, start=start, end=end, limit=limit)
+        rows = query_metric_rollups(
+            name=name, period=period, start=start, end=end, limit=limit
+        )
         return [
             {
-                "timestamp": row["bucket_start"].isoformat() if hasattr(row["bucket_start"], "isoformat") else str(row["bucket_start"]),
+                "timestamp": row["bucket_start"].isoformat()
+                if hasattr(row["bucket_start"], "isoformat")
+                else str(row["bucket_start"]),
                 "count": row["count"],
                 "avg": round(float(row["avg_value"] or 0), 2),
                 "min": round(float(row["min_value"] or 0), 2),

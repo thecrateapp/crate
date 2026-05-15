@@ -57,9 +57,10 @@ def get_cached_lyrics(
         return None
 
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT provider, synced_lyrics, plain_lyrics, found, updated_at
                 FROM track_lyrics
                 WHERE provider = :provider
@@ -67,9 +68,16 @@ def get_cached_lyrics(
                   AND title_key = :title_key
                 LIMIT 1
                 """
-            ),
-            {"provider": provider, "artist_key": artist_key, "title_key": title_key},
-        ).mappings().first()
+                ),
+                {
+                    "provider": provider,
+                    "artist_key": artist_key,
+                    "title_key": title_key,
+                },
+            )
+            .mappings()
+            .first()
+        )
 
     if not row:
         return None
@@ -107,9 +115,10 @@ def store_lyrics(
     has_lyrics = bool(synced_lyrics or plain_lyrics)
     found_value = has_lyrics if found is None else bool(found)
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO track_lyrics (
                     provider,
                     artist_key,
@@ -150,21 +159,24 @@ def store_lyrics(
                     updated_at = EXCLUDED.updated_at
                 RETURNING provider, synced_lyrics, plain_lyrics, found, updated_at
                 """
-            ),
-            {
-                "provider": provider,
-                "artist_key": artist_key,
-                "title_key": title_key,
-                "artist": artist_clean,
-                "title": title_clean,
-                "track_id": track_id,
-                "track_entity_uid": track_entity_uid,
-                "synced_lyrics": synced_lyrics,
-                "plain_lyrics": plain_lyrics,
-                "found": found_value,
-                "source_json": json.dumps(source_json or {}, default=str),
-            },
-        ).mappings().one()
+                ),
+                {
+                    "provider": provider,
+                    "artist_key": artist_key,
+                    "title_key": title_key,
+                    "artist": artist_clean,
+                    "title": title_clean,
+                    "track_id": track_id,
+                    "track_entity_uid": track_entity_uid,
+                    "synced_lyrics": synced_lyrics,
+                    "plain_lyrics": plain_lyrics,
+                    "found": found_value,
+                    "source_json": json.dumps(source_json or {}, default=str),
+                },
+            )
+            .mappings()
+            .one()
+        )
 
     return _payload_from_row(row)
 

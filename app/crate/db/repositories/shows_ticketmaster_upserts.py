@@ -14,9 +14,10 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
 
     with transaction_scope() as session:
         if normalized_external_id:
-            row = session.execute(
-                text(
-                    """
+            row = (
+                session.execute(
+                    text(
+                        """
                     INSERT INTO shows (external_id, artist_name, date, local_time, venue, address_line1, city, region,
                         postal_code, country, country_code, latitude, longitude, url, image_url, lineup,
                         price_range, status, source, created_at, updated_at)
@@ -45,36 +46,42 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                         updated_at = EXCLUDED.updated_at
                     RETURNING id
                     """
-                ),
-                {
-                    "external_id": normalized_external_id,
-                    "artist_name": artist_name,
-                    "date": date,
-                    "local_time": kwargs.get("local_time"),
-                    "venue": venue,
-                    "address_line1": kwargs.get("address_line1"),
-                    "city": kwargs.get("city"),
-                    "region": kwargs.get("region"),
-                    "postal_code": kwargs.get("postal_code"),
-                    "country": kwargs.get("country"),
-                    "country_code": kwargs.get("country_code"),
-                    "latitude": kwargs.get("latitude"),
-                    "longitude": kwargs.get("longitude"),
-                    "url": kwargs.get("url"),
-                    "image_url": kwargs.get("image_url"),
-                    "lineup": kwargs.get("lineup"),
-                    "price_range": kwargs.get("price_range"),
-                    "status": kwargs.get("status", "onsale"),
-                    "source": kwargs.get("source", "ticketmaster"),
-                    "created_at": now,
-                    "updated_at": now,
-                },
-            ).mappings().first()
+                    ),
+                    {
+                        "external_id": normalized_external_id,
+                        "artist_name": artist_name,
+                        "date": date,
+                        "local_time": kwargs.get("local_time"),
+                        "venue": venue,
+                        "address_line1": kwargs.get("address_line1"),
+                        "city": kwargs.get("city"),
+                        "region": kwargs.get("region"),
+                        "postal_code": kwargs.get("postal_code"),
+                        "country": kwargs.get("country"),
+                        "country_code": kwargs.get("country_code"),
+                        "latitude": kwargs.get("latitude"),
+                        "longitude": kwargs.get("longitude"),
+                        "url": kwargs.get("url"),
+                        "image_url": kwargs.get("image_url"),
+                        "lineup": kwargs.get("lineup"),
+                        "price_range": kwargs.get("price_range"),
+                        "status": kwargs.get("status", "onsale"),
+                        "source": kwargs.get("source", "ticketmaster"),
+                        "created_at": now,
+                        "updated_at": now,
+                    },
+                )
+                .mappings()
+                .first()
+            )
+            if row is None:
+                raise RuntimeError("Show insert did not return an id")
             return row["id"]
 
-        existing = session.execute(
-            text(
-                """
+        existing = (
+            session.execute(
+                text(
+                    """
                 SELECT id
                 FROM shows
                 WHERE external_id IS NULL
@@ -83,9 +90,12 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                   AND COALESCE(venue, '') = COALESCE(:venue, '')
                 LIMIT 1
                 """
-            ),
-            {"artist_name": artist_name, "date": date, "venue": venue},
-        ).mappings().first()
+                ),
+                {"artist_name": artist_name, "date": date, "venue": venue},
+            )
+            .mappings()
+            .first()
+        )
         if existing:
             session.execute(
                 text(
@@ -132,9 +142,10 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
             )
             return existing["id"]
 
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO shows (external_id, artist_name, date, local_time, venue, address_line1, city, region,
                     postal_code, country, country_code, latitude, longitude, url, image_url, lineup,
                     price_range, status, source, created_at, updated_at)
@@ -143,31 +154,36 @@ def upsert_show(external_id: str, artist_name: str, date: str, **kwargs) -> int 
                     :price_range, :status, :source, :created_at, :updated_at)
                 RETURNING id
                 """
-            ),
-            {
-                "external_id": None,
-                "artist_name": artist_name,
-                "date": date,
-                "local_time": kwargs.get("local_time"),
-                "venue": venue,
-                "address_line1": kwargs.get("address_line1"),
-                "city": kwargs.get("city"),
-                "region": kwargs.get("region"),
-                "postal_code": kwargs.get("postal_code"),
-                "country": kwargs.get("country"),
-                "country_code": kwargs.get("country_code"),
-                "latitude": kwargs.get("latitude"),
-                "longitude": kwargs.get("longitude"),
-                "url": kwargs.get("url"),
-                "image_url": kwargs.get("image_url"),
-                "lineup": kwargs.get("lineup"),
-                "price_range": kwargs.get("price_range"),
-                "status": kwargs.get("status", "onsale"),
-                "source": kwargs.get("source", "ticketmaster"),
-                "created_at": now,
-                "updated_at": now,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "external_id": None,
+                    "artist_name": artist_name,
+                    "date": date,
+                    "local_time": kwargs.get("local_time"),
+                    "venue": venue,
+                    "address_line1": kwargs.get("address_line1"),
+                    "city": kwargs.get("city"),
+                    "region": kwargs.get("region"),
+                    "postal_code": kwargs.get("postal_code"),
+                    "country": kwargs.get("country"),
+                    "country_code": kwargs.get("country_code"),
+                    "latitude": kwargs.get("latitude"),
+                    "longitude": kwargs.get("longitude"),
+                    "url": kwargs.get("url"),
+                    "image_url": kwargs.get("image_url"),
+                    "lineup": kwargs.get("lineup"),
+                    "price_range": kwargs.get("price_range"),
+                    "status": kwargs.get("status", "onsale"),
+                    "source": kwargs.get("source", "ticketmaster"),
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise RuntimeError("Show upsert did not return an id")
         return row["id"]
 
 

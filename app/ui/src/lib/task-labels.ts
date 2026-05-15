@@ -37,5 +37,8 @@ const TASK_LABELS: Record<string, string> = {
 };
 
 export function taskLabel(taskType: string): string {
-  return TASK_LABELS[taskType] ?? taskType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    TASK_LABELS[taskType] ??
+    taskType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }

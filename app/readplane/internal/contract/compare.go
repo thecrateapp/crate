@@ -24,6 +24,7 @@ var timeKeys = map[string]struct{}{
 
 type normalizedNumber string
 
+// NormalizeJSON decodes JSON and normalizes numbers and known time fields.
 func NormalizeJSON(raw []byte) (any, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
@@ -34,6 +35,7 @@ func NormalizeJSON(raw []byte) (any, error) {
 	return normalizeValue("", value), nil
 }
 
+// EqualJSON compares two JSON payloads after normalization and returns a diff on mismatch.
 func EqualJSON(left []byte, right []byte) (bool, string, error) {
 	leftValue, err := NormalizeJSON(left)
 	if err != nil {

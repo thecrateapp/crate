@@ -38,5 +38,11 @@
     "../shared/web/**/*.ts",
     "../shared/ui/**/*.ts",
     "../shared/ui/**/*.tsx"
+  ],
+  "exclude": [
+    "../listen/src/**/*.test.ts",
+    "../listen/src/**/*.test.tsx",
+    "../shared/ui/**/*.test.ts",
+    "../shared/ui/**/*.test.tsx"
   ]
 }

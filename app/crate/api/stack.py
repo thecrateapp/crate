@@ -11,7 +11,11 @@ from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.utility import (
     AdminStackSnapshotResponse,
@@ -20,7 +24,11 @@ from crate.api.schemas.utility import (
     StackContainerLogsResponse,
     StackStatusResponse,
 )
-from crate.db.admin_stack_surface import STACK_SNAPSHOT_SCOPE, get_cached_stack_surface, publish_stack_surface_signal
+from crate.db.admin_stack_surface import (
+    STACK_SNAPSHOT_SCOPE,
+    get_cached_stack_surface,
+    publish_stack_surface_signal,
+)
 from crate.db.snapshot_events import snapshot_channel
 from crate.docker_ctl import (
     get_container,
@@ -51,7 +59,9 @@ async def _stack_stream() -> AsyncIterator[str]:
         pubsub = await open_pubsub(channel)
         heartbeat_counter = 0
         while True:
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            message = await pubsub.get_message(
+                ignore_subscribe_messages=True, timeout=1.0
+            )
             if message and message.get("type") == "message":
                 yield f"data: {json_dumps(get_cached_stack_surface())}\n\n"
                 heartbeat_counter = 0
@@ -103,7 +113,12 @@ async def admin_stack_stream(request: Request):
 def stack_status(request: Request, fresh: bool = False):
     _require_admin(request)
     snapshot = get_cached_stack_surface(fresh=fresh)
-    return snapshot.get("stack") or {"available": False, "total": 0, "running": 0, "containers": []}
+    return snapshot.get("stack") or {
+        "available": False,
+        "total": 0,
+        "running": 0,
+        "containers": [],
+    }
 
 
 @router.get(
@@ -142,11 +157,18 @@ def stack_restart_container(request: Request, name: str):
     _require_admin(request)
     # Safety: only allow restarting crate containers
     allowed_prefixes = [
-        "librarian-", "tidarr", "tidalrr",
-        "slskd", "soulsync", "traefik", "nginx",
+        "librarian-",
+        "tidarr",
+        "tidalrr",
+        "slskd",
+        "soulsync",
+        "traefik",
+        "nginx",
     ]
     if not any(name.startswith(p) for p in allowed_prefixes):
-        raise HTTPException(status_code=403, detail=f"Cannot restart '{name}': not a managed container")
+        raise HTTPException(
+            status_code=403, detail=f"Cannot restart '{name}': not a managed container"
+        )
 
     ok = restart_container(name)
     if ok:
@@ -156,8 +178,13 @@ def stack_restart_container(request: Request, name: str):
 
 
 ALLOWED_PREFIXES = [
-    "librarian-", "tidarr", "tidalrr",
-    "slskd", "soulsync", "traefik", "nginx",
+    "librarian-",
+    "tidarr",
+    "tidalrr",
+    "slskd",
+    "soulsync",
+    "traefik",
+    "nginx",
 ]
 
 
@@ -174,7 +201,9 @@ def _is_allowed(name: str) -> bool:
 def stack_stop_container(request: Request, name: str):
     _require_admin(request)
     if not _is_allowed(name):
-        raise HTTPException(status_code=403, detail=f"Cannot stop '{name}': not a managed container")
+        raise HTTPException(
+            status_code=403, detail=f"Cannot stop '{name}': not a managed container"
+        )
     ok = stop_container(name)
     if ok:
         publish_stack_surface_signal()
@@ -191,7 +220,9 @@ def stack_stop_container(request: Request, name: str):
 def stack_start_container(request: Request, name: str):
     _require_admin(request)
     if not _is_allowed(name):
-        raise HTTPException(status_code=403, detail=f"Cannot start '{name}': not a managed container")
+        raise HTTPException(
+            status_code=403, detail=f"Cannot start '{name}': not a managed container"
+        )
     ok = start_container(name)
     if ok:
         publish_stack_surface_signal()

@@ -2,16 +2,13 @@ import { useMemo, type ReactNode } from "react";
 
 import { ResponsiveBar } from "@nivo/bar";
 import { ResponsiveScatterPlot } from "@nivo/scatterplot";
-import {
-  BarChart3,
-  Disc3,
-  Globe,
-  Sparkles,
-  Trophy,
-  Zap,
-} from "lucide-react";
+import { BarChart3, Disc3, Globe, Sparkles, Trophy, Zap } from "lucide-react";
 
-import { OpsPageHero, OpsPanel, OpsStatTile } from "@/components/admin/ops-surfaces";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+} from "@/components/admin/ops-surfaces";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
 import {
@@ -27,7 +24,12 @@ import { cn, formatNumber } from "@/lib/utils";
 interface InsightsData {
   countries: Record<string, number>;
   bpm_distribution: { bpm: string; count: number }[];
-  energy_danceability: { x: number; y: number; artist: string; title: string }[];
+  energy_danceability: {
+    x: number;
+    y: number;
+    artist: string;
+    title: string;
+  }[];
   top_genres: { genre: string; artists: number; albums: number }[];
   popularity: {
     artist: string;
@@ -45,7 +47,12 @@ interface InsightsData {
     popularity_score?: number | null;
     year: string | null;
   }[];
-  acoustic_instrumental: { x: number; y: number; artist: string; title: string }[];
+  acoustic_instrumental: {
+    x: number;
+    y: number;
+    artist: string;
+    title: string;
+  }[];
   feature_coverage: { feature: string; value: number; total: number }[];
   artist_depth: {
     artist: string;
@@ -124,17 +131,26 @@ function ChartTooltip({
       ) : null}
       <div className={cn("space-y-0.5", eyebrow ? "mt-2" : "")}>
         <div className="font-medium leading-tight text-white">{title}</div>
-        {subtitle ? <div className="text-[11px] text-white/45">{subtitle}</div> : null}
+        {subtitle ? (
+          <div className="text-[11px] text-white/45">{subtitle}</div>
+        ) : null}
       </div>
       <div className="mt-3 space-y-1.5">
         {metrics.map((metric) => (
-          <div key={`${metric.label}-${metric.value}`} className="flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0">
+          <div
+            key={`${metric.label}-${metric.value}`}
+            className="flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0"
+          >
             <span className="text-white/45">{metric.label}</span>
             <span className="font-medium text-white">{metric.value}</span>
           </div>
         ))}
       </div>
-      {footer ? <div className="mt-3 border-t border-white/6 pt-2 text-[10px] text-white/35">{footer}</div> : null}
+      {footer ? (
+        <div className="mt-3 border-t border-white/6 pt-2 text-[10px] text-white/35">
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -146,12 +162,21 @@ function HeroSignalPanel({
 }) {
   return (
     <div className="min-w-[320px] rounded-sm border border-white/10 bg-black/20 p-4 shadow-[0_18px_44px_rgba(0,0,0,0.2)] backdrop-blur-xl">
-      <div className="text-[11px] uppercase tracking-[0.16em] text-cyan-200/70">Signal Brief</div>
+      <div className="text-[11px] uppercase tracking-[0.16em] text-cyan-200/70">
+        Signal Brief
+      </div>
       <div className="mt-3 space-y-3">
         {items.map((item) => (
-          <div key={item.label} className="border-b border-white/8 pb-3 last:border-b-0 last:pb-0">
-            <div className="text-[11px] uppercase tracking-[0.14em] text-white/35">{item.label}</div>
-            <div className="mt-1 text-lg font-semibold tracking-tight text-white">{item.value}</div>
+          <div
+            key={item.label}
+            className="border-b border-white/8 pb-3 last:border-b-0 last:pb-0"
+          >
+            <div className="text-[11px] uppercase tracking-[0.14em] text-white/35">
+              {item.label}
+            </div>
+            <div className="mt-1 text-lg font-semibold tracking-tight text-white">
+              {item.value}
+            </div>
             <div className="mt-1 text-xs text-white/45">{item.caption}</div>
           </div>
         ))}
@@ -180,9 +205,15 @@ function InsightStoryCard({
           : "border-white/8 bg-black/20",
       )}
     >
-      <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-white">{value}</div>
-      <div className="mt-2 text-sm leading-relaxed text-white/55">{caption}</div>
+      <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-white">
+        {value}
+      </div>
+      <div className="mt-2 text-sm leading-relaxed text-white/55">
+        {caption}
+      </div>
     </div>
   );
 }
@@ -199,7 +230,12 @@ function InsightChartCard({
   className?: string;
 }) {
   return (
-    <Card className={cn("relative gap-0 overflow-hidden border-white/10 bg-[rgba(12,12,20,0.96)] shadow-[0_18px_44px_rgba(0,0,0,0.22)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-16 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent)]", className)}>
+    <Card
+      className={cn(
+        "relative gap-0 overflow-hidden border-white/10 bg-[rgba(12,12,20,0.96)] shadow-[0_18px_44px_rgba(0,0,0,0.22)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-16 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent)]",
+        className,
+      )}
+    >
       <CardHeader className="border-b border-white/6 pb-4">
         <CardTitle className="text-base text-white">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
@@ -210,7 +246,8 @@ function InsightChartCard({
 }
 
 export function Insights() {
-  const { data, loading, error, refetch } = useApi<InsightsData>("/api/insights");
+  const { data, loading, error, refetch } =
+    useApi<InsightsData>("/api/insights");
 
   const decadeData = useMemo(() => {
     if (!data?.albums_by_decade) return [];
@@ -305,25 +342,32 @@ export function Insights() {
 
   const countriesRepresented = Object.keys(data?.countries ?? {}).length;
   const decadesRepresented = Object.keys(data?.albums_by_decade ?? {}).length;
-  const surfacedStandouts = (data?.popularity.length ?? 0) + (data?.top_albums.length ?? 0);
+  const surfacedStandouts =
+    (data?.popularity.length ?? 0) + (data?.top_albums.length ?? 0);
   const leadGenre = data?.top_genres[0];
   const leadArtist = data?.popularity[0];
   const leadAlbum = data?.top_albums[0];
-  const leadFeature = [...featureCoverageData].sort((a, b) => b.coverage - a.coverage)[0];
+  const leadFeature = [...featureCoverageData].sort(
+    (a, b) => b.coverage - a.coverage,
+  )[0];
   const leadDecade = [...decadeData].sort((a, b) => b.albums - a.albums)[0];
   const heroBriefItems = [
     {
       label: "Dominant genre",
       value: leadGenre?.genre ?? "No data yet",
       caption: leadGenre
-        ? `${formatNumber(leadGenre.artists)} artists and ${formatNumber(leadGenre.albums)} albums sit under this tag.`
+        ? `${formatNumber(leadGenre.artists)} artists and ${formatNumber(
+            leadGenre.albums,
+          )} albums sit under this tag.`
         : "Genre distribution will sharpen as enrichment fills in taxonomy data.",
     },
     {
       label: "Catalog center",
       value: leadDecade?.decade ?? "No decade data",
       caption: leadDecade
-        ? `${formatNumber(leadDecade.albums)} albums make this the densest release era in the library.`
+        ? `${formatNumber(
+            leadDecade.albums,
+          )} albums make this the densest release era in the library.`
         : "Release-year density appears once enough album dates are present.",
     },
     {
@@ -345,9 +389,15 @@ export function Insights() {
           title="Insights"
           description="Macro patterns across the library, with a cleaner split between collection shape, standouts and audio signature."
         >
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Collection shape</span>
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Standouts</span>
-          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Audio signature</span>
+          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+            Collection shape
+          </span>
+          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+            Standouts
+          </span>
+          <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+            Audio signature
+          </span>
         </OpsPageHero>
         <GridSkeleton count={6} columns="grid-cols-1 xl:grid-cols-2" />
       </div>
@@ -374,9 +424,15 @@ export function Insights() {
         description="A macro read on how the library is shaped, where its weight sits, and how much of the collection is analytically mapped."
         actions={<HeroSignalPanel items={heroBriefItems} />}
       >
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Collection shape</span>
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Standouts</span>
-        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">Audio signature</span>
+        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+          Collection shape
+        </span>
+        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+          Standouts
+        </span>
+        <span className="rounded-sm border border-white/10 bg-black/20 px-3 py-1 text-xs text-white/55">
+          Audio signature
+        </span>
       </OpsPageHero>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -405,7 +461,11 @@ export function Insights() {
           icon={Trophy}
           label="Standouts Surfaced"
           value={formatNumber(surfacedStandouts)}
-          caption={`${formatNumber(data.popularity.length)} artists and ${formatNumber(data.top_albums.length)} albums with strong signal`}
+          caption={`${formatNumber(
+            data.popularity.length,
+          )} artists and ${formatNumber(
+            data.top_albums.length,
+          )} albums with strong signal`}
           tone="default"
         />
       </div>
@@ -416,7 +476,9 @@ export function Insights() {
           value={leadGenre?.genre ?? "No genre signal yet"}
           caption={
             leadGenre
-              ? `${formatNumber(leadGenre.artists)} artists and ${formatNumber(leadGenre.albums)} albums currently shape the strongest taxonomy cluster.`
+              ? `${formatNumber(leadGenre.artists)} artists and ${formatNumber(
+                  leadGenre.albums,
+                )} albums currently shape the strongest taxonomy cluster.`
               : "As genre enrichment lands, this slot will summarize the library's strongest cultural cluster."
           }
           accent="primary"
@@ -426,16 +488,24 @@ export function Insights() {
           value={leadDecade?.decade ?? "No decade signal yet"}
           caption={
             leadDecade
-              ? `${formatNumber(leadDecade.albums)} albums make this the decade where the catalog feels heaviest.`
+              ? `${formatNumber(
+                  leadDecade.albums,
+                )} albums make this the decade where the catalog feels heaviest.`
               : "This will surface the decade where release density really accumulates."
           }
         />
         <InsightStoryCard
           label="Best-Mapped Feature"
-          value={leadFeature ? `${leadFeature.feature} ${leadFeature.coverage}%` : "No feature signal yet"}
+          value={
+            leadFeature
+              ? `${leadFeature.feature} ${leadFeature.coverage}%`
+              : "No feature signal yet"
+          }
           caption={
             leadFeature
-              ? `${formatNumber(leadFeature.value)} of ${formatNumber(leadFeature.total)} tracks already carry this analytical signal.`
+              ? `${formatNumber(leadFeature.value)} of ${formatNumber(
+                  leadFeature.total,
+                )} tracks already carry this analytical signal.`
               : "Feature coverage becomes more informative as analysis jobs fill in the catalog."
           }
         />
@@ -449,7 +519,9 @@ export function Insights() {
         <div className="grid gap-4 xl:grid-cols-3">
           <InsightChartCard
             title="Genre Footprint"
-            description={`Top ${formatNumber(genreData.length)} genres by artist and album depth.`}
+            description={`Top ${formatNumber(
+              genreData.length,
+            )} genres by artist and album depth.`}
           >
             <div className="h-[320px]">
               {genreData.length > 0 ? (
@@ -483,11 +555,17 @@ export function Insights() {
                   tooltip={({ id, value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Genre footprint"
-                      title={String((datum as { fullGenre?: string }).fullGenre ?? "")}
+                      title={String(
+                        (datum as { fullGenre?: string }).fullGenre ?? "",
+                      )}
                       metrics={[
-                        { label: String(id), value: formatNumber(Number(value)) },
                         {
-                          label: String(id) === "artists" ? "Albums" : "Artists",
+                          label: String(id),
+                          value: formatNumber(Number(value)),
+                        },
+                        {
+                          label:
+                            String(id) === "artists" ? "Albums" : "Artists",
                           value: formatNumber(
                             Number(
                               String(id) === "artists"
@@ -530,8 +608,15 @@ export function Insights() {
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Artist origins"
-                      title={String((datum as { fullCountry?: string }).fullCountry ?? "")}
-                      metrics={[{ label: "Artists", value: formatNumber(Number(value)) }]}
+                      title={String(
+                        (datum as { fullCountry?: string }).fullCountry ?? "",
+                      )}
+                      metrics={[
+                        {
+                          label: "Artists",
+                          value: formatNumber(Number(value)),
+                        },
+                      ]}
                       footer="Country coverage depends on artist enrichment, so this chart grows as metadata improves."
                     />
                   )}
@@ -564,8 +649,12 @@ export function Insights() {
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Catalog density"
-                      title={String((datum as { decade?: string }).decade ?? "")}
-                      metrics={[{ label: "Albums", value: formatNumber(Number(value)) }]}
+                      title={String(
+                        (datum as { decade?: string }).decade ?? "",
+                      )}
+                      metrics={[
+                        { label: "Albums", value: formatNumber(Number(value)) },
+                      ]}
                       footer="This shows the decade where your release density really concentrates."
                     />
                   )}
@@ -608,11 +697,26 @@ export function Insights() {
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Artist standout"
-                      title={String((datum as { fullArtist?: string }).fullArtist ?? "")}
+                      title={String(
+                        (datum as { fullArtist?: string }).fullArtist ?? "",
+                      )}
                       metrics={[
-                        { label: "Popularity score", value: formatNumber(Number(value)) },
-                        { label: "Listeners", value: formatNumber(Number((datum as { listeners: number }).listeners)) },
-                        { label: "Albums in library", value: formatNumber(Number((datum as { albums: number }).albums)) },
+                        {
+                          label: "Popularity score",
+                          value: formatNumber(Number(value)),
+                        },
+                        {
+                          label: "Listeners",
+                          value: formatNumber(
+                            Number((datum as { listeners: number }).listeners),
+                          ),
+                        },
+                        {
+                          label: "Albums in library",
+                          value: formatNumber(
+                            Number((datum as { albums: number }).albums),
+                          ),
+                        },
                       ]}
                       footer="Artist momentum now comes from the consolidated popularity model, not the older Spotify-heavy heuristic."
                     />
@@ -648,12 +752,29 @@ export function Insights() {
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Album standout"
-                      title={String((datum as { fullAlbum?: string }).fullAlbum ?? "")}
-                      subtitle={String((datum as { fullArtist?: string }).fullArtist ?? "")}
+                      title={String(
+                        (datum as { fullAlbum?: string }).fullAlbum ?? "",
+                      )}
+                      subtitle={String(
+                        (datum as { fullArtist?: string }).fullArtist ?? "",
+                      )}
                       metrics={[
-                        { label: "Popularity score", value: formatNumber(Number(value)) },
-                        { label: "Listeners", value: formatNumber(Number((datum as { listeners: number }).listeners)) },
-                        { label: "Year", value: (datum as { year?: string | null }).year || "Unknown" },
+                        {
+                          label: "Popularity score",
+                          value: formatNumber(Number(value)),
+                        },
+                        {
+                          label: "Listeners",
+                          value: formatNumber(
+                            Number((datum as { listeners: number }).listeners),
+                          ),
+                        },
+                        {
+                          label: "Year",
+                          value:
+                            (datum as { year?: string | null }).year ||
+                            "Unknown",
+                        },
                       ]}
                       footer="Albums surface here by consolidated score first, with listeners as supporting signal."
                     />
@@ -709,10 +830,22 @@ export function Insights() {
                         eyebrow="Depth vs popularity"
                         title={point.artist}
                         metrics={[
-                          { label: "Popularity score", value: formatNumber(Number(point.x)) },
-                          { label: "Albums", value: formatNumber(point.albums) },
-                          { label: "Tracks", value: formatNumber(point.tracks) },
-                          { label: "Listeners", value: formatNumber(point.listeners) },
+                          {
+                            label: "Popularity score",
+                            value: formatNumber(Number(point.x)),
+                          },
+                          {
+                            label: "Albums",
+                            value: formatNumber(point.albums),
+                          },
+                          {
+                            label: "Tracks",
+                            value: formatNumber(point.tracks),
+                          },
+                          {
+                            label: "Listeners",
+                            value: formatNumber(point.listeners),
+                          },
                         ]}
                         footer="The upper-right corner is where both library depth and external signal concentrate."
                       />
@@ -758,12 +891,21 @@ export function Insights() {
                   tooltip={({ value, data: datum }) => (
                     <ChartTooltip
                       eyebrow="Analysis coverage"
-                      title={String((datum as { feature?: string }).feature ?? "")}
+                      title={String(
+                        (datum as { feature?: string }).feature ?? "",
+                      )}
                       metrics={[
-                        { label: "Coverage", value: `${formatNumber(Number(value))}%` },
+                        {
+                          label: "Coverage",
+                          value: `${formatNumber(Number(value))}%`,
+                        },
                         {
                           label: "Tracks with signal",
-                          value: `${formatNumber(Number((datum as { value: number }).value))} / ${formatNumber(Number((datum as { total: number }).total))}`,
+                          value: `${formatNumber(
+                            Number((datum as { value: number }).value),
+                          )} / ${formatNumber(
+                            Number((datum as { total: number }).total),
+                          )}`,
                         },
                       ]}
                       footer="This turns analysis completeness into per-feature visibility instead of a single blended number."
@@ -799,7 +941,9 @@ export function Insights() {
                     <ChartTooltip
                       eyebrow="Tempo bucket"
                       title={String((datum as { bpm?: string }).bpm ?? "")}
-                      metrics={[{ label: "Tracks", value: formatNumber(Number(value)) }]}
+                      metrics={[
+                        { label: "Tracks", value: formatNumber(Number(value)) },
+                      ]}
                       footer="BPM buckets give a fast read on whether the analyzed library clusters in slower, mid-tempo or high-energy bands."
                     />
                   )}
@@ -841,15 +985,28 @@ export function Insights() {
                   theme={NIVO_THEME}
                   motionConfig="gentle"
                   tooltip={({ node }) => {
-                    const point = node.data as { title?: string; artist?: string };
+                    const point = node.data as {
+                      title?: string;
+                      artist?: string;
+                    };
                     return (
                       <ChartTooltip
                         eyebrow="Audio profile"
                         title={String(point.title ?? "Track")}
                         subtitle={String(point.artist ?? "Unknown artist")}
                         metrics={[
-                          { label: "Energy", value: formatNumber(Number((node.data as { x?: number }).x ?? 0)) },
-                          { label: "Danceability", value: formatNumber(Number((node.data as { y?: number }).y ?? 0)) },
+                          {
+                            label: "Energy",
+                            value: formatNumber(
+                              Number((node.data as { x?: number }).x ?? 0),
+                            ),
+                          },
+                          {
+                            label: "Danceability",
+                            value: formatNumber(
+                              Number((node.data as { y?: number }).y ?? 0),
+                            ),
+                          },
                         ]}
                         footer="This overlay uses the same structure as the rest of Insights, so audio scatters no longer fall back to a legacy tooltip."
                       />
@@ -893,15 +1050,28 @@ export function Insights() {
                   theme={NIVO_THEME}
                   motionConfig="gentle"
                   tooltip={({ node }) => {
-                    const point = node.data as { title?: string; artist?: string };
+                    const point = node.data as {
+                      title?: string;
+                      artist?: string;
+                    };
                     return (
                       <ChartTooltip
                         eyebrow="Audio profile"
                         title={String(point.title ?? "Track")}
                         subtitle={String(point.artist ?? "Unknown artist")}
                         metrics={[
-                          { label: "Acousticness", value: formatNumber(Number((node.data as { x?: number }).x ?? 0)) },
-                          { label: "Instrumentalness", value: formatNumber(Number((node.data as { y?: number }).y ?? 0)) },
+                          {
+                            label: "Acousticness",
+                            value: formatNumber(
+                              Number((node.data as { x?: number }).x ?? 0),
+                            ),
+                          },
+                          {
+                            label: "Instrumentalness",
+                            value: formatNumber(
+                              Number((node.data as { y?: number }).y ?? 0),
+                            ),
+                          },
                         ]}
                         footer="This makes it much easier to distinguish organic, vocal and instrumental outliers without losing context."
                       />

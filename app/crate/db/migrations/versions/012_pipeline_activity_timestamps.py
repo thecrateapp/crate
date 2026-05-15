@@ -16,8 +16,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS analysis_completed_at TIMESTAMPTZ")
-    op.execute("ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS bliss_computed_at TIMESTAMPTZ")
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS analysis_completed_at TIMESTAMPTZ"
+    )
+    op.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS bliss_computed_at TIMESTAMPTZ"
+    )
     # Intentionally avoid a full-table backfill here. On production-size
     # libraries this can exceed statement_timeout during startup and block
     # both API and worker boot. Runtime code already falls back to

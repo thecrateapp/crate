@@ -31,20 +31,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-api.txt requirements-worker.txt .
-RUN pip install --no-cache-dir --prefer-binary -r requirements-worker.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefer-binary -r requirements-worker.txt
 
 # PyTorch CPU-only + PANNs for audio classification (x86_64 only)
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
-        pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
-        pip install --no-cache-dir panns_inference; \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    if [ "$(uname -m)" = "x86_64" ]; then \
+        pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+        pip install panns_inference; \
     fi
 
-COPY alembic.ini .
-COPY crate ./crate
-COPY scripts ./scripts
-COPY bin ./bin
-
-# Download Essentia ML models + PANNs CNN14 checkpoint (x86_64 only)
+# Download Essentia ML models + PANNs CNN14 checkpoint (x86_64 only).
+# Placed BEFORE the mutable source code COPY so Docker layer caching
+# preserves this expensive step across code-only changes.
+COPY scripts/download_models.sh ./scripts/
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
         apt-get update && apt-get install -y --no-install-recommends curl && \
         bash scripts/download_models.sh /app/models && \
@@ -52,6 +52,11 @@ RUN if [ "$(uname -m)" = "x86_64" ]; then \
         apt-get purge -y --auto-remove curl && \
         rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*; \
     fi
+
+COPY alembic.ini .
+COPY crate ./crate
+COPY scripts ./scripts
+COPY bin ./bin
 
 # Install crate-cli binary for production Linux workers (x86_64 only)
 RUN if [ "$(uname -m)" = "x86_64" ]; then \

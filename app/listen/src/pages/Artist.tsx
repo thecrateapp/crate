@@ -2,9 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
-import {
-  ArtistBioModal,
-} from "@/components/artist/ArtistBioModal";
+import { ArtistBioModal } from "@/components/artist/ArtistBioModal";
 import { ArtistHeroSection } from "@/components/artist/ArtistHeroSection";
 import { ArtistSetlistModal } from "@/components/artist/ArtistSetlistSection";
 import {
@@ -32,7 +30,11 @@ import { useApi } from "@/hooks/use-api";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
-import { artistBackgroundApiUrl, artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistBackgroundApiUrl,
+  artistPagePath,
+  artistPhotoApiUrl,
+} from "@/lib/library-routes";
 
 export function Artist() {
   const { artistSlug: routeArtistSlug } = useParams<{ artistSlug?: string }>();
@@ -44,15 +46,23 @@ export function Artist() {
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const { playAll } = usePlayerActions();
 
-  const { data: pageData, loading, error } = useApi<ArtistPageData>(
-    routeArtistSlug ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/page` : null,
+  const {
+    data: pageData,
+    loading,
+    error,
+  } = useApi<ArtistPageData>(
+    routeArtistSlug
+      ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/page`
+      : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
   );
   const { data: canonicalTopTracks } = useApi<ArtistTopTrack[]>(
     routeArtistSlug
-      ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/top-tracks?count=50`
+      ? `/api/artist-slugs/${encodeURIComponent(
+          routeArtistSlug,
+        )}/top-tracks?count=50`
       : null,
     "GET",
     undefined,
@@ -77,7 +87,9 @@ export function Artist() {
     try {
       const following = isFollowing(data.id);
       await toggleArtistFollow(data.id);
-      toast.success(following ? `Unfollowed ${data.name}` : `Following ${data.name}`);
+      toast.success(
+        following ? `Unfollowed ${data.name}` : `Following ${data.name}`,
+      );
     } catch {
       toast.error("Failed to update follow status");
     }
@@ -91,7 +103,11 @@ export function Artist() {
     })}`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: data.name, text: data.name, url: shareUrl });
+        await navigator.share({
+          title: data.name,
+          text: data.name,
+          url: shareUrl,
+        });
       } else {
         await navigator.clipboard.writeText(shareUrl);
         toast.success("Artist link copied");
@@ -106,12 +122,19 @@ export function Artist() {
   const enrichment: ArtistPageEnrichment | undefined = pageData?.enrichment;
 
   const coverFallback = data?.albums?.[0]
-    ? buildArtistAlbumCover(data.name, data.albums[0]!.name, data.albums[0]!.id, data.albums[0]!.slug)
+    ? buildArtistAlbumCover(
+        data.name,
+        data.albums[0]!.name,
+        data.albums[0]!.id,
+        data.albums[0]!.slug,
+      )
     : undefined;
 
   const playerTracks = useMemo<Track[]>(() => {
     if (!topTracks.length) return [];
-    return topTracks.map((track) => buildArtistPlayerTrack(track, data?.name || "", coverFallback));
+    return topTracks.map((track) =>
+      buildArtistPlayerTrack(track, data?.name || "", coverFallback),
+    );
   }, [coverFallback, data?.name, topTracks]);
 
   async function handleArtistRadio() {
@@ -142,7 +165,10 @@ export function Artist() {
     }
 
     const queue = shuffle ? shuffleArray(playerTracks) : playerTracks;
-    playAll(queue, shuffle ? 0 : startIndex, { type: "queue", name: `${data?.name || "Artist"} Top Tracks` });
+    playAll(queue, shuffle ? 0 : startIndex, {
+      type: "queue",
+      name: `${data?.name || "Artist"} Top Tracks`,
+    });
   }
 
   const similarArtists = info?.similar ?? [];
@@ -158,12 +184,18 @@ export function Artist() {
   async function handlePlayArtistSetlist() {
     try {
       if (!data?.id) return;
-      const queue = await fetchPlayableSetlist({ artistId: data.id, artistName: data.name });
+      const queue = await fetchPlayableSetlist({
+        artistId: data.id,
+        artistName: data.name,
+      });
       if (!queue.length) {
         toast.info("No probable setlist tracks matched your library");
         return;
       }
-      playAll(queue, 0, { type: "playlist", name: `${data.name} Probable Setlist` });
+      playAll(queue, 0, {
+        type: "playlist",
+        name: `${data.name} Probable Setlist`,
+      });
       toast.success(`Playing probable setlist: ${queue.length} tracks`);
     } catch {
       toast.error("Failed to load probable setlist");
@@ -187,7 +219,12 @@ export function Artist() {
   }
 
   const imageVersion = data.updated_at ?? undefined;
-  const photoUrl = buildArtistPhotoUrl(data.name, data.id, data.slug, imageVersion);
+  const photoUrl = buildArtistPhotoUrl(
+    data.name,
+    data.id,
+    data.slug,
+    imageVersion,
+  );
   const canonicalPhotoUrl = artistPhotoApiUrl(
     { artistId: data.id, artistSlug: data.slug, artistName: data.name },
     { size: 512, version: imageVersion },
@@ -196,7 +233,7 @@ export function Artist() {
     { artistId: data.id, artistSlug: data.slug, artistName: data.name },
     { size: 1280, version: imageVersion },
   );
-  const tags = data.genres.length > 0 ? data.genres : (info?.tags ?? []);
+  const tags = data.genres.length > 0 ? data.genres : info?.tags ?? [];
 
   return (
     <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
@@ -232,9 +269,7 @@ export function Artist() {
           onToggleExpand={setExpandedShowId}
           onPlayProbableSetlist={() => void handlePlayArtistSetlist()}
         />
-        <RelatedArtistsSection
-          artists={similarArtists}
-        />
+        <RelatedArtistsSection artists={similarArtists} />
       </div>
 
       <ArtistBioModal

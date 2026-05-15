@@ -1,10 +1,11 @@
 """Integration with crate-cli Rust binary for bliss song distance/similarity."""
 
-import json
 import logging
 import random
 import re
-from crate.crate_cli import find_binary, is_available, run_bliss
+
+from crate.crate_cli import is_available as _crate_cli_is_available
+from crate.crate_cli import run_bliss
 from crate.db.queries.bliss import (
     build_user_radio_profile,
     get_album_tracks_for_radio,
@@ -28,18 +29,30 @@ log = logging.getLogger(__name__)
 
 # Camelot wheel mapping: (key, scale) -> camelot position
 CAMELOT = {
-    ("C", "major"): "8B",  ("A", "minor"): "8A",
-    ("G", "major"): "9B",  ("E", "minor"): "9A",
-    ("D", "major"): "10B", ("B", "minor"): "10A",
-    ("A", "major"): "11B", ("F#", "minor"): "11A",
-    ("E", "major"): "12B", ("C#", "minor"): "12A",
-    ("B", "major"): "1B",  ("G#", "minor"): "1A",
-    ("F#", "major"): "2B", ("D#", "minor"): "2A",
-    ("C#", "major"): "3B", ("A#", "minor"): "3A",
-    ("G#", "major"): "4B", ("F", "minor"): "4A",
-    ("D#", "major"): "5B", ("C", "minor"): "5A",
-    ("A#", "major"): "6B", ("G", "minor"): "6A",
-    ("F", "major"): "7B",  ("D", "minor"): "7A",
+    ("C", "major"): "8B",
+    ("A", "minor"): "8A",
+    ("G", "major"): "9B",
+    ("E", "minor"): "9A",
+    ("D", "major"): "10B",
+    ("B", "minor"): "10A",
+    ("A", "major"): "11B",
+    ("F#", "minor"): "11A",
+    ("E", "major"): "12B",
+    ("C#", "minor"): "12A",
+    ("B", "major"): "1B",
+    ("G#", "minor"): "1A",
+    ("F#", "major"): "2B",
+    ("D#", "minor"): "2A",
+    ("C#", "major"): "3B",
+    ("A#", "minor"): "3A",
+    ("G#", "major"): "4B",
+    ("F", "minor"): "4A",
+    ("D#", "major"): "5B",
+    ("C", "minor"): "5A",
+    ("A#", "major"): "6B",
+    ("G", "minor"): "6A",
+    ("F", "major"): "7B",
+    ("D", "minor"): "7A",
 }
 
 _LOW_SIGNAL_TITLE_RE = re.compile(
@@ -60,6 +73,10 @@ _ALT_VERSION_RE = re.compile(
 _TITLE_STRIP_RE = re.compile(r"\s*[\(\[].*?[\)\]]\s*")
 
 
+def is_available() -> bool:
+    return _crate_cli_is_available()
+
+
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     mag_a = sum(x * x for x in a) ** 0.5
@@ -67,8 +84,9 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return max(0.0, dot / (mag_a * mag_b)) if mag_a and mag_b else 0.0
 
 
-def _key_compatibility(key_a: str | None, scale_a: str | None,
-                       key_b: str | None, scale_b: str | None) -> float:
+def _key_compatibility(
+    key_a: str | None, scale_a: str | None, key_b: str | None, scale_b: str | None
+) -> float:
     """Return 1.0 for same key, 0.8 for adjacent on Camelot wheel, 0.3 otherwise."""
     if not key_a or not scale_a or not key_b or not scale_b:
         return 0.5  # neutral when data missing
@@ -115,7 +133,12 @@ def _normalize_similarity_score(score: float | int | str | None) -> float:
 
 
 def _candidate_artist_name(track: dict) -> str:
-    artist = track.get("album_artist") or track.get("_artist_lookup_name") or track.get("artist") or ""
+    artist = (
+        track.get("album_artist")
+        or track.get("_artist_lookup_name")
+        or track.get("artist")
+        or ""
+    )
     return artist.strip() if isinstance(artist, str) else ""
 
 
@@ -130,6 +153,8 @@ def _normalized_title_key(track: dict) -> str:
 
 def _year_bucket(track: dict) -> int | None:
     raw_year = track.get("year")
+    if not isinstance(raw_year, int | str | float):
+        return None
     try:
         year = int(raw_year)
     except (TypeError, ValueError):
@@ -175,20 +200,28 @@ def _year_proximity(seed: dict, candidate: dict) -> float:
     return max(0.0, 1.0 - diff / 25.0)
 
 
-def _score_candidate(candidate: dict, seeds: list[dict],
-                     artist_genres: set[str], similar_artist_names: set[str]) -> float:
+def _score_candidate(
+    candidate: dict,
+    seeds: list[dict],
+    artist_genres: set[str],
+    similar_artist_names: set[str],
+) -> float:
     """Score a candidate track against a list of seed tracks, return best score."""
     best = 0.0
     cand_genres = set(candidate.get("_genres") or [])
     cand_artist = _candidate_artist_name(candidate)
-    similar_artist_lookup = {name.lower() for name in similar_artist_names if isinstance(name, str)}
+    similar_artist_lookup = {
+        name.lower() for name in similar_artist_names if isinstance(name, str)
+    }
 
     for seed in seeds:
         score = 0.0
 
         # Bliss cosine similarity (weight 0.3)
         if candidate.get("bliss_vector") and seed.get("bliss_vector"):
-            score += 0.3 * _cosine_similarity(candidate["bliss_vector"], seed["bliss_vector"])
+            score += 0.3 * _cosine_similarity(
+                candidate["bliss_vector"], seed["bliss_vector"]
+            )
 
         # BPM proximity (weight 0.15)
         if candidate.get("bpm") and seed.get("bpm"):
@@ -197,8 +230,10 @@ def _score_candidate(candidate: dict, seeds: list[dict],
 
         # Key compatibility via Camelot (weight 0.1)
         score += 0.1 * _key_compatibility(
-            seed.get("audio_key"), seed.get("audio_scale"),
-            candidate.get("audio_key"), candidate.get("audio_scale"),
+            seed.get("audio_key"),
+            seed.get("audio_scale"),
+            candidate.get("audio_key"),
+            candidate.get("audio_scale"),
         )
 
         # Energy proximity (weight 0.1)
@@ -263,11 +298,17 @@ def _get_artist_genre_map(artist_names: set[str]) -> dict[str, set[str]]:
     return _db_get_artist_genre_map(artist_names=artist_names)
 
 
-def _select_seed_tracks(tracks: list[dict], *, max_count: int, require_bliss: bool = True) -> list[dict]:
+def _select_seed_tracks(
+    tracks: list[dict], *, max_count: int, require_bliss: bool = True
+) -> list[dict]:
     if max_count <= 0 or not tracks:
         return []
 
-    pool = [track for track in tracks if track.get("bliss_vector")] if require_bliss else list(tracks)
+    pool = (
+        [track for track in tracks if track.get("bliss_vector")]
+        if require_bliss
+        else list(tracks)
+    )
     if not pool and require_bliss:
         pool = list(tracks)
     if not pool:
@@ -287,7 +328,11 @@ def _select_seed_tracks(tracks: list[dict], *, max_count: int, require_bliss: bo
         track_path = track.get("path") or track.get("track_path")
         if not track_path:
             continue
-        if era_bucket is None or era_bucket in seen_eras or (album_key and album_key in seen_albums):
+        if (
+            era_bucket is None
+            or era_bucket in seen_eras
+            or (album_key and album_key in seen_albums)
+        ):
             continue
         selected.append(track)
         seen_paths.add(track_path)
@@ -406,9 +451,13 @@ def _diversify_tracks(
     return result
 
 
-def _apply_diversity(scored: list[tuple[float, dict]], max_consecutive: int = 2) -> list[dict]:
+def _apply_diversity(
+    scored: list[tuple[float, dict]], max_consecutive: int = 2
+) -> list[dict]:
     """Sort by score and avoid artist/album clumps near the top of the queue."""
-    ranked = [track for _, track in sorted(scored, key=lambda item: item[0], reverse=True)]
+    ranked = [
+        track for _, track in sorted(scored, key=lambda item: item[0], reverse=True)
+    ]
     return _diversify_tracks(
         ranked,
         max_consecutive_artist=max_consecutive,
@@ -484,18 +533,24 @@ def _build_user_radio_profile(
     if not user_id or not tracks:
         return {}
 
-    track_ids = [track["track_id"] for track in tracks if track.get("track_id") is not None]
-    artist_names = sorted({
-        _candidate_artist_name(track)
-        for track in tracks
-        if _candidate_artist_name(track)
-    })
+    track_ids = [
+        track["track_id"] for track in tracks if track.get("track_id") is not None
+    ]
+    artist_names = sorted(
+        {
+            _candidate_artist_name(track)
+            for track in tracks
+            if _candidate_artist_name(track)
+        }
+    )
     artist_name_keys = [name.lower() for name in artist_names]
-    album_pairs = sorted({
-        (_candidate_artist_name(track), (track.get("album") or "").strip())
-        for track in tracks
-        if _candidate_artist_name(track) and (track.get("album") or "").strip()
-    })
+    album_pairs = sorted(
+        {
+            (_candidate_artist_name(track), str(track.get("album") or "").strip())
+            for track in tracks
+            if _candidate_artist_name(track) and (track.get("album") or "").strip()
+        }
+    )
 
     return build_user_radio_profile(
         user_id,
@@ -506,7 +561,9 @@ def _build_user_radio_profile(
     )
 
 
-def _apply_user_profile_score(track: dict, score: float, user_profile: dict | None) -> float:
+def _apply_user_profile_score(
+    track: dict, score: float, user_profile: dict | None
+) -> float:
     if not user_profile:
         return score
 
@@ -555,8 +612,14 @@ def _merge_ranked_tracks(*track_lists: list[dict], limit: int) -> list[dict]:
     for list_index, tracks in enumerate(track_lists):
         total = max(1, len(tracks))
         for rank, track in enumerate(tracks):
-            key = track.get("track_path") or track.get("path") or (
-                f"id:{track.get('track_id')}" if track.get("track_id") is not None else None
+            key = (
+                track.get("track_path")
+                or track.get("path")
+                or (
+                    f"id:{track.get('track_id')}"
+                    if track.get("track_id") is not None
+                    else None
+                )
             )
             if not key:
                 continue
@@ -612,7 +675,9 @@ def _recommend_without_bliss(
         return []
 
     seed_paths = [path for path in exclude_paths if path]
-    seed_artists = {_candidate_artist_name(seed) for seed in seeds if _candidate_artist_name(seed)}
+    seed_artists = {
+        _candidate_artist_name(seed) for seed in seeds if _candidate_artist_name(seed)
+    }
     if not seed_artists:
         return []
 
@@ -635,12 +700,14 @@ def _recommend_without_bliss(
             if score > combined_score_map.get(key, 0.0):
                 combined_score_map[key] = score
 
-    similar_artist_names = sorted({
-        name.lower()
-        for names in similar_artist_map.values()
-        for name in names
-        if isinstance(name, str) and name
-    })
+    similar_artist_names = sorted(
+        {
+            name.lower()
+            for names in similar_artist_map.values()
+            for name in names
+            if isinstance(name, str) and name
+        }
+    )
 
     candidates = get_recommend_without_bliss_candidates(
         seed_paths=seed_paths,
@@ -648,7 +715,9 @@ def _recommend_without_bliss(
         artist_pick_limit=10 if similar_artist_names else 5,
         row_limit=max(limit * 8, 240),
     )
-    candidate_artists = {_candidate_artist_name(row) for row in candidates if _candidate_artist_name(row)}
+    candidate_artists = {
+        _candidate_artist_name(row) for row in candidates if _candidate_artist_name(row)
+    }
     candidate_genre_map = _get_artist_genre_map(candidate_artists)
 
     if not candidates:
@@ -657,16 +726,16 @@ def _recommend_without_bliss(
     prepared_seeds = []
     for seed in seeds:
         seed_artist = _candidate_artist_name(seed)
-        prepared_seeds.append({**seed, "_genres": list(seed_genre_map.get(seed_artist, set()))})
+        prepared_seeds.append(
+            {**seed, "_genres": list(seed_genre_map.get(seed_artist, set()))}
+        )
 
     user_profile = _build_user_radio_profile(user_id, prepared_seeds + candidates)
     seed_artist_keys = {artist.lower() for artist in seed_artists}
     scored: list[tuple[float, dict]] = []
 
     similar_artist_names_flat = {
-        name
-        for names in similar_artist_map.values()
-        for name in names
+        name for names in similar_artist_map.values() for name in names
     }
 
     for candidate in candidates:
@@ -677,7 +746,9 @@ def _recommend_without_bliss(
 
         candidate["_genres"] = list(candidate_genre_map.get(candidate_artist, set()))
         if candidate_artist_key in combined_score_map:
-            candidate["_artist_similarity_score"] = combined_score_map[candidate_artist_key]
+            candidate["_artist_similarity_score"] = combined_score_map[
+                candidate_artist_key
+            ]
         score = _score_candidate(
             candidate,
             prepared_seeds,
@@ -711,7 +782,9 @@ def _get_artist_radio_recommendations(
     if not seeds:
         return []
 
-    seed_paths = [seed["path"] for seed in seeds if seed.get("path") and seed.get("bliss_vector")]
+    seed_paths = [
+        seed["path"] for seed in seeds if seed.get("path") and seed.get("bliss_vector")
+    ]
     if not seed_paths:
         seed_paths = [seed["path"] for seed in seeds if seed.get("path")]
     if not seed_paths:
@@ -723,7 +796,9 @@ def _get_artist_radio_recommendations(
         user_id=user_id,
     )
 
-    in_library_similar = [row for row in similar_rows if row.get("in_library") and row.get("similar_name")]
+    in_library_similar = [
+        row for row in similar_rows if row.get("in_library") and row.get("similar_name")
+    ]
     if not in_library_similar:
         return _diversify_tracks(bliss_recommendations)[:limit]
 
@@ -733,25 +808,37 @@ def _get_artist_radio_recommendations(
         if seed.get("path")
     }
     similar_score_map = _get_similar_artist_score_map(in_library_similar)
-    similar_artist_keys = [row["similar_name"].lower() for row in in_library_similar if row.get("similar_name")]
+    similar_artist_keys = [
+        row["similar_name"].lower()
+        for row in in_library_similar
+        if row.get("similar_name")
+    ]
 
     candidate_rows = get_similar_artist_tracks_for_radio(
         similar_artist_keys=similar_artist_keys,
         limit=max(limit * 3, 60),
     )
-    candidate_artists = {_candidate_artist_name(row) for row in candidate_rows if _candidate_artist_name(row)}
+    candidate_artists = {
+        _candidate_artist_name(row)
+        for row in candidate_rows
+        if _candidate_artist_name(row)
+    }
     artist_genre_map = _get_artist_genre_map(candidate_artists)
 
     if not candidate_rows:
         return _diversify_tracks(bliss_recommendations)[:limit]
 
-    user_profile = _build_user_radio_profile(user_id, bliss_recommendations + candidate_rows)
+    user_profile = _build_user_radio_profile(
+        user_id, bliss_recommendations + candidate_rows
+    )
 
     similar_artist_tracks: list[dict] = []
     for candidate in candidate_rows:
         lookup_artist = _candidate_artist_name(candidate)
         candidate["_genres"] = list(artist_genre_map.get(lookup_artist, set()))
-        candidate["_artist_similarity_score"] = similar_score_map.get(lookup_artist.lower(), 0.0)
+        candidate["_artist_similarity_score"] = similar_score_map.get(
+            lookup_artist.lower(), 0.0
+        )
         score = _score_candidate(
             candidate,
             list(seed_lookup.values()),
@@ -769,7 +856,12 @@ def _get_artist_radio_recommendations(
 
     merged = _merge_ranked_tracks(
         bliss_recommendations,
-        _apply_diversity([(float(track.get("score") or 0.0), track) for track in similar_artist_tracks]),
+        _apply_diversity(
+            [
+                (float(track.get("score") or 0.0), track)
+                for track in similar_artist_tracks
+            ]
+        ),
         limit=max(limit * 3, 60),
     )
     return _diversify_tracks(merged)[:limit]
@@ -793,12 +885,18 @@ def generate_artist_radio(
         return []
 
     artist_genres = _get_artist_genre_ids(artist_name)
-    similar_rows = _get_similar_artist_rows(artist_id=artist_id, artist_name=artist_name)
+    similar_rows = _get_similar_artist_rows(
+        artist_id=artist_id, artist_name=artist_name
+    )
 
     seed_count = min(6, max(3, limit // 10 or 1))
-    seeds = _select_seed_tracks(all_artist_tracks, max_count=seed_count, require_bliss=True)
+    seeds = _select_seed_tracks(
+        all_artist_tracks, max_count=seed_count, require_bliss=True
+    )
     if not seeds:
-        seeds = _select_seed_tracks(all_artist_tracks, max_count=seed_count, require_bliss=False)
+        seeds = _select_seed_tracks(
+            all_artist_tracks, max_count=seed_count, require_bliss=False
+        )
     if not seeds:
         return []
 
@@ -814,11 +912,14 @@ def generate_artist_radio(
         user_id=user_id,
     )
 
-    source_tracks = [_radio_track_payload(track) for track in _select_seed_tracks(
-        all_artist_tracks,
-        max_count=max(limit, 24),
-        require_bliss=False,
-    )]
+    source_tracks = [
+        _radio_track_payload(track)
+        for track in _select_seed_tracks(
+            all_artist_tracks,
+            max_count=max(limit, 24),
+            require_bliss=False,
+        )
+    ]
 
     # NOTE: recommended_tracks already have user-profile adjustments applied
     # inside _get_artist_radio_recommendations → _score_candidate pipeline.
@@ -832,7 +933,9 @@ def generate_artist_radio(
     )
 
 
-def get_similar_from_db(track_path: str, limit: int = 20, *, user_id: int | None = None) -> list[dict]:
+def get_similar_from_db(
+    track_path: str, limit: int = 20, *, user_id: int | None = None
+) -> list[dict]:
     """Find similar tracks using pre-computed vectors stored in DB (multi-signal scoring)."""
     source = get_track_with_artist(track_path=track_path)
     if not source:
@@ -861,7 +964,9 @@ def get_similar_from_db(track_path: str, limit: int = 20, *, user_id: int | None
         return []
 
     # Fetch genres for unique candidate artists
-    candidate_artists = {_candidate_artist_name(c) for c in candidates if _candidate_artist_name(c)}
+    candidate_artists = {
+        _candidate_artist_name(c) for c in candidates if _candidate_artist_name(c)
+    }
     artist_genre_map = _get_artist_genre_map(candidate_artists)
 
     # Get similar artist names for source artist
@@ -893,10 +998,12 @@ def get_similar_from_db(track_path: str, limit: int = 20, *, user_id: int | None
 
     result = []
     for score, t in scored[:limit]:
-        result.append({
-            **_radio_track_payload(t),
-            "score": round(score, 4),
-        })
+        result.append(
+            {
+                **_radio_track_payload(t),
+                "score": round(score, 4),
+            }
+        )
     return result
 
 
@@ -920,7 +1027,9 @@ def generate_track_radio(
     )
 
     seed_payload = _radio_track_payload(seed)
-    similar_tracks = get_similar_from_db(track_path, limit=max(limit * 3, 60), user_id=user_id)
+    similar_tracks = get_similar_from_db(
+        track_path, limit=max(limit * 3, 60), user_id=user_id
+    )
     seen_paths = {seed_payload["track_path"]}
     unique_similar: list[dict] = []
     for track in similar_tracks:
@@ -944,9 +1053,8 @@ def generate_track_radio(
     max_items = max(limit, 1)
 
     while len(playlist) < max_items:
-        should_insert_artist = (
-            artist_index < len(picked_same_artist)
-            and (similar_index >= len(unique_similar) or len(playlist) % 4 == 0)
+        should_insert_artist = artist_index < len(picked_same_artist) and (
+            similar_index >= len(unique_similar) or len(playlist) % 4 == 0
         )
         if should_insert_artist:
             candidate = _radio_track_payload(picked_same_artist[artist_index])
@@ -996,8 +1104,14 @@ def _aggregate_similar_candidates(
         per_seed_limit=per_seed_limit,
     )
 
-    seed_artists = {_candidate_artist_name(seed) for seed in seeds if _candidate_artist_name(seed)}
-    candidate_artists = {_candidate_artist_name(row) for row in candidate_rows if _candidate_artist_name(row)}
+    seed_artists = {
+        _candidate_artist_name(seed) for seed in seeds if _candidate_artist_name(seed)
+    }
+    candidate_artists = {
+        _candidate_artist_name(row)
+        for row in candidate_rows
+        if _candidate_artist_name(row)
+    }
     seed_genre_map = _get_artist_genre_map(seed_artists)
     candidate_genre_map = _get_artist_genre_map(candidate_artists)
     similar_artist_map = {
@@ -1011,7 +1125,10 @@ def _aggregate_similar_candidates(
     user_profile = _build_user_radio_profile(user_id, seeds + candidate_rows)
 
     seed_map = {
-        seed["path"]: {**seed, "_genres": list(seed_genre_map.get(_candidate_artist_name(seed), set()))}
+        seed["path"]: {
+            **seed,
+            "_genres": list(seed_genre_map.get(_candidate_artist_name(seed), set())),
+        }
         for seed in seeds
     }
 
@@ -1026,7 +1143,9 @@ def _aggregate_similar_candidates(
             for key, value in candidate_row.items()
             if key not in {"seed_path", "seed_rank"}
         }
-        candidate["_genres"] = list(candidate_genre_map.get(_candidate_artist_name(candidate), set()))
+        candidate["_genres"] = list(
+            candidate_genre_map.get(_candidate_artist_name(candidate), set())
+        )
 
         score = _score_candidate(
             candidate,
@@ -1049,7 +1168,9 @@ def _aggregate_similar_candidates(
             },
         )
         rank = int(candidate_row.get("seed_rank") or per_seed_limit)
-        entry["_aggregate_score"] += score + max(0.0, (per_seed_limit - rank) / (per_seed_limit * 100))
+        entry["_aggregate_score"] += score + max(
+            0.0, (per_seed_limit - rank) / (per_seed_limit * 100)
+        )
         entry["_hits"] += 1
 
     ranked = sorted(
@@ -1076,9 +1197,8 @@ def _interleave_radio_queue(
     recommended_index = 0
 
     while len(playlist) < limit:
-        should_insert_source = (
-            source_index < len(picked_source)
-            and (recommended_index >= len(recommended_tracks) or len(playlist) % 4 == 0)
+        should_insert_source = source_index < len(picked_source) and (
+            recommended_index >= len(recommended_tracks) or len(playlist) % 4 == 0
         )
         if should_insert_source:
             candidate = picked_source[source_index]
@@ -1114,9 +1234,13 @@ def generate_album_radio(
         return []
 
     source_tracks = [_radio_track_payload(track) for track in album_tracks]
-    seed_tracks = _select_seed_tracks(album_tracks, max_count=min(4, len(album_tracks)), require_bliss=True)
+    seed_tracks = _select_seed_tracks(
+        album_tracks, max_count=min(4, len(album_tracks)), require_bliss=True
+    )
     if not seed_tracks:
-        seed_tracks = _select_seed_tracks(album_tracks, max_count=min(4, len(album_tracks)), require_bliss=False)
+        seed_tracks = _select_seed_tracks(
+            album_tracks, max_count=min(4, len(album_tracks)), require_bliss=False
+        )
     seed_paths = [track["path"] for track in seed_tracks if track.get("path")]
     recommended_tracks = _aggregate_similar_candidates(
         seed_paths,
@@ -1144,13 +1268,19 @@ def generate_playlist_radio(
 ) -> list[dict]:
     playlist_tracks = get_playlist_tracks_for_radio(playlist_id=playlist_id)
 
-    source_tracks = [_radio_track_payload(track) for track in playlist_tracks if track.get("path")]
+    source_tracks = [
+        _radio_track_payload(track) for track in playlist_tracks if track.get("path")
+    ]
     if not source_tracks:
         return []
 
-    seed_tracks = _select_seed_tracks(playlist_tracks, max_count=min(5, len(playlist_tracks)), require_bliss=True)
+    seed_tracks = _select_seed_tracks(
+        playlist_tracks, max_count=min(5, len(playlist_tracks)), require_bliss=True
+    )
     if not seed_tracks:
-        seed_tracks = _select_seed_tracks(playlist_tracks, max_count=min(5, len(playlist_tracks)), require_bliss=False)
+        seed_tracks = _select_seed_tracks(
+            playlist_tracks, max_count=min(5, len(playlist_tracks)), require_bliss=False
+        )
     seed_paths = [track["path"] for track in seed_tracks if track.get("path")]
     recommended_tracks = _aggregate_similar_candidates(
         seed_paths,
@@ -1180,17 +1310,23 @@ def generate_virtual_playlist_radio(
             current["path"] = current["track_path"]
         source_rows.append(current)
 
-    source_tracks = [_radio_track_payload(track) for track in source_rows if track.get("path")]
+    source_tracks = [
+        _radio_track_payload(track) for track in source_rows if track.get("path")
+    ]
     if not source_tracks:
         return []
 
-    seed_tracks = _select_seed_tracks(source_rows, max_count=min(5, len(source_rows)), require_bliss=True)
+    seed_tracks = _select_seed_tracks(
+        source_rows, max_count=min(5, len(source_rows)), require_bliss=True
+    )
     if not seed_tracks:
-        seed_tracks = _select_seed_tracks(source_rows, max_count=min(5, len(source_rows)), require_bliss=False)
+        seed_tracks = _select_seed_tracks(
+            source_rows, max_count=min(5, len(source_rows)), require_bliss=False
+        )
     seed_paths = [
-        track.get("path") or track.get("track_path")
+        str(path)
         for track in seed_tracks
-        if track.get("path") or track.get("track_path")
+        if (path := track.get("path") or track.get("track_path"))
     ]
     recommended_tracks = _aggregate_similar_candidates(
         seed_paths,

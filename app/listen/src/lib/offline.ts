@@ -1,9 +1,19 @@
 import { Capacitor } from "@capacitor/core";
 import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
 
-import { api, apiFetch, apiUrl, getApiAuthHeaders, getApiBase } from "@/lib/api";
+import {
+  api,
+  apiFetch,
+  apiUrl,
+  getApiAuthHeaders,
+  getApiBase,
+} from "@/lib/api";
 import { getStoredAuthUserId } from "@/lib/auth-user-storage";
-import { isAndroidNative, isIosBrowser, isNative } from "@/lib/capacitor-runtime";
+import {
+  isAndroidNative,
+  isIosBrowser,
+  isNative,
+} from "@/lib/capacitor-runtime";
 import {
   trackOfflineManifestApiPath,
   trackStreamApiPath,
@@ -11,7 +21,13 @@ import {
 import type { PlaybackResolution } from "@/lib/track-playback";
 
 export type OfflineItemKind = "track" | "album" | "playlist";
-export type OfflineItemState = "idle" | "queued" | "downloading" | "syncing" | "ready" | "error";
+export type OfflineItemState =
+  | "idle"
+  | "queued"
+  | "downloading"
+  | "syncing"
+  | "ready"
+  | "error";
 
 export interface OfflineManifestTrack {
   entity_uid?: string | null;
@@ -103,9 +119,15 @@ const IOS_BROWSER_OFFLINE_SOFT_LIMIT_BYTES = 450 * 1024 * 1024;
 const ANDROID_OFFLINE_DELIVERY_POLICY = "balanced";
 const EMPTY_SNAPSHOT: OfflineSnapshot = { items: {} };
 const nativeSnapshotCache = new Map<string, OfflineSnapshot>();
-const nativeAssetIndexCache = new Map<string, Record<string, OfflineNativeAssetRecord>>();
+const nativeAssetIndexCache = new Map<
+  string,
+  Record<string, OfflineNativeAssetRecord>
+>();
 const nativeSnapshotLoaders = new Map<string, Promise<OfflineSnapshot>>();
-const nativeAssetIndexLoaders = new Map<string, Promise<Record<string, OfflineNativeAssetRecord>>>();
+const nativeAssetIndexLoaders = new Map<
+  string,
+  Promise<Record<string, OfflineNativeAssetRecord>>
+>();
 
 function encodeKey(input: string): string {
   try {
@@ -118,12 +140,22 @@ function encodeKey(input: string): string {
   }
 }
 
-export function deriveOfflineProfileKey(userId: number, serverOrigin?: string): string {
-  const origin = (serverOrigin || getApiBase() || window.location.origin || "listen").replace(/\/+$/, "");
+export function deriveOfflineProfileKey(
+  userId: number,
+  serverOrigin?: string,
+): string {
+  const origin = (
+    serverOrigin ||
+    getApiBase() ||
+    window.location.origin ||
+    "listen"
+  ).replace(/\/+$/, "");
   return encodeKey(`${origin}|${userId}`);
 }
 
-export function deriveOfflineProfileKeyFromStoredUser(serverOrigin?: string): string | null {
+export function deriveOfflineProfileKeyFromStoredUser(
+  serverOrigin?: string,
+): string | null {
   if (typeof window === "undefined") return null;
   const rawUserId = getStoredAuthUserId(serverOrigin);
   const userId = rawUserId ? Number(rawUserId) : NaN;
@@ -135,14 +167,21 @@ export function isOfflineSupported(): boolean {
   if (typeof window === "undefined") return false;
   if (!("localStorage" in window)) return false;
   if (isNative) return true;
-  return typeof navigator !== "undefined" && "caches" in window && "serviceWorker" in navigator;
+  return (
+    typeof navigator !== "undefined" &&
+    "caches" in window &&
+    "serviceWorker" in navigator
+  );
 }
 
 export function getOfflineCacheName(profileKey: string): string {
   return `${OFFLINE_CACHE_PREFIX}${profileKey}`;
 }
 
-export function getOfflineItemKey(kind: OfflineItemKind, entityId: string | number): string {
+export function getOfflineItemKey(
+  kind: OfflineItemKind,
+  entityId: string | number,
+): string {
   return `${kind}:${entityId}`;
 }
 
@@ -182,7 +221,9 @@ function legacyTrackStreamApiPath(storageId: string): string {
 }
 
 function legacyTrackOfflineManifestApiPath(storageId: string): string {
-  return `/api/offline/tracks/by-storage/${encodeURIComponent(storageId)}/manifest`;
+  return `/api/offline/tracks/by-storage/${encodeURIComponent(
+    storageId,
+  )}/manifest`;
 }
 
 type OfflineTrackIdentityInput =
@@ -192,29 +233,47 @@ type OfflineTrackIdentityInput =
   | { entity_uid?: string | null; storage_id?: string | null }
   | { entityUid?: string | null; storageId?: string | null };
 
-type OfflineTrackIdentityObject = Exclude<OfflineTrackIdentityInput, string | null | undefined>;
-type OfflineTrackSnakeIdentity = { entity_uid?: string | null; storage_id?: string | null };
-type OfflineTrackCamelIdentity = { entityUid?: string | null; storageId?: string | null };
+type OfflineTrackIdentityObject = Exclude<
+  OfflineTrackIdentityInput,
+  string | null | undefined
+>;
+type OfflineTrackSnakeIdentity = {
+  entity_uid?: string | null;
+  storage_id?: string | null;
+};
+type OfflineTrackCamelIdentity = {
+  entityUid?: string | null;
+  storageId?: string | null;
+};
 
-function hasSnakeCaseOfflineIdentity(track: OfflineTrackIdentityObject): track is OfflineTrackSnakeIdentity {
+function hasSnakeCaseOfflineIdentity(
+  track: OfflineTrackIdentityObject,
+): track is OfflineTrackSnakeIdentity {
   return "entity_uid" in track || "storage_id" in track;
 }
 
-function readOfflineTrackEntityUid(track: OfflineTrackIdentityObject): string | null {
+function readOfflineTrackEntityUid(
+  track: OfflineTrackIdentityObject,
+): string | null {
   if (hasSnakeCaseOfflineIdentity(track)) {
     return normalizeIdentityValue(track.entity_uid);
   }
   return normalizeIdentityValue((track as OfflineTrackCamelIdentity).entityUid);
 }
 
-function readOfflineTrackStorageId(track: OfflineTrackIdentityObject): string | null {
+function readOfflineTrackStorageId(
+  track: OfflineTrackIdentityObject,
+): string | null {
   if (hasSnakeCaseOfflineIdentity(track)) {
     return normalizeIdentityValue(track.storage_id);
   }
   return normalizeIdentityValue((track as OfflineTrackCamelIdentity).storageId);
 }
 
-export function getOfflineTrackAssetKey(track: OfflineTrackIdentityInput, storageId?: string | null): string | null {
+export function getOfflineTrackAssetKey(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string | null {
   if (typeof track === "string") {
     return normalizeIdentityValue(storageId) || normalizeIdentityValue(track);
   }
@@ -228,7 +287,10 @@ export function getOfflineTrackAssetKey(track: OfflineTrackIdentityInput, storag
   );
 }
 
-function getOfflineTrackAssetAliases(track: OfflineTrackIdentityInput, storageId?: string | null): string[] {
+function getOfflineTrackAssetAliases(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string[] {
   const aliases = new Set<string>();
   const primary = getOfflineTrackAssetKey(track, storageId);
   if (primary) aliases.add(primary);
@@ -248,11 +310,15 @@ function getOfflineTrackAssetAliases(track: OfflineTrackIdentityInput, storageId
   return Array.from(aliases);
 }
 
-function getOfflineTrackCacheUrls(track: OfflineTrackIdentityInput, storageId?: string | null): string[] {
+function getOfflineTrackCacheUrls(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string[] {
   const urls = new Set<string>();
-  const entityUid = track && typeof track === "object"
-    ? readOfflineTrackEntityUid(track)
-    : null;
+  const entityUid =
+    track && typeof track === "object"
+      ? readOfflineTrackEntityUid(track)
+      : null;
   const resolvedStorageId =
     normalizeIdentityValue(storageId) ||
     (track && typeof track === "object"
@@ -275,11 +341,15 @@ function getOfflineTrackCacheUrls(track: OfflineTrackIdentityInput, storageId?: 
   return Array.from(urls);
 }
 
-export function getOfflineTrackManifestPaths(track: OfflineTrackIdentityInput, storageId?: string | null): string[] {
+export function getOfflineTrackManifestPaths(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string[] {
   const urls = new Set<string>();
-  const entityUid = track && typeof track === "object"
-    ? readOfflineTrackEntityUid(track)
-    : null;
+  const entityUid =
+    track && typeof track === "object"
+      ? readOfflineTrackEntityUid(track)
+      : null;
   const resolvedStorageId =
     normalizeIdentityValue(storageId) ||
     (track && typeof track === "object"
@@ -313,16 +383,24 @@ function parseOfflineSnapshot(raw: string | null): OfflineSnapshot {
   if (!raw) return EMPTY_SNAPSHOT;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || typeof parsed.items !== "object") {
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      typeof parsed.items !== "object"
+    ) {
       return EMPTY_SNAPSHOT;
     }
-    return normalizeOfflineSnapshot({ items: parsed.items as Record<string, OfflineItemRecord> });
+    return normalizeOfflineSnapshot({
+      items: parsed.items as Record<string, OfflineItemRecord>,
+    });
   } catch {
     return EMPTY_SNAPSHOT;
   }
 }
 
-function normalizeOfflineItemRecord(item: OfflineItemRecord): OfflineItemRecord {
+function normalizeOfflineItemRecord(
+  item: OfflineItemRecord,
+): OfflineItemRecord {
   const normalizedTracks = Array.isArray(item.tracks) ? item.tracks : [];
   const aliasToAssetKey = new Map<string, string>();
   for (const track of normalizedTracks) {
@@ -336,33 +414,40 @@ function normalizeOfflineItemRecord(item: OfflineItemRecord): OfflineItemRecord 
 
   const normalizedReadyAssetKeys = Array.from(
     new Set(
-      ((item.readyAssetKeys || item.readyStorageIds) || [])
-        .map((value) => aliasToAssetKey.get(value) || normalizeIdentityValue(value))
+      (item.readyAssetKeys || item.readyStorageIds || [])
+        .map(
+          (value) =>
+            aliasToAssetKey.get(value) || normalizeIdentityValue(value),
+        )
         .filter((value): value is string => Boolean(value)),
     ),
   );
 
-  const canonicalEntityId = item.kind === "track"
-    ? (
-      getOfflineTrackAssetKey(normalizedTracks[0] ?? null) ||
-      normalizeIdentityValue(item.entityId) ||
-      String(item.entityId)
-    )
-    : String(item.entityId);
+  const canonicalEntityId =
+    item.kind === "track"
+      ? getOfflineTrackAssetKey(normalizedTracks[0] ?? null) ||
+        normalizeIdentityValue(item.entityId) ||
+        String(item.entityId)
+      : String(item.entityId);
 
   return {
     ...item,
     key: getOfflineItemKey(item.kind, canonicalEntityId),
     entityId: canonicalEntityId,
-    readyAssetKeys: normalizedReadyAssetKeys.length || item.readyAssetKeys || item.readyStorageIds
-      ? normalizedReadyAssetKeys
-      : undefined,
+    readyAssetKeys:
+      normalizedReadyAssetKeys.length ||
+      item.readyAssetKeys ||
+      item.readyStorageIds
+        ? normalizedReadyAssetKeys
+        : undefined,
     readyStorageIds: undefined,
     tracks: normalizedTracks,
   };
 }
 
-export function normalizeOfflineSnapshot(snapshot: OfflineSnapshot): OfflineSnapshot {
+export function normalizeOfflineSnapshot(
+  snapshot: OfflineSnapshot,
+): OfflineSnapshot {
   const items: Record<string, OfflineItemRecord> = {};
   for (const record of Object.values(snapshot.items || {})) {
     const normalized = normalizeOfflineItemRecord(record);
@@ -371,11 +456,15 @@ export function normalizeOfflineSnapshot(snapshot: OfflineSnapshot): OfflineSnap
   return { items };
 }
 
-function parseOfflineNativeAssetIndex(raw: string | null): Record<string, OfflineNativeAssetRecord> {
+function parseOfflineNativeAssetIndex(
+  raw: string | null,
+): Record<string, OfflineNativeAssetRecord> {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed as Record<string, OfflineNativeAssetRecord> : {};
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, OfflineNativeAssetRecord>)
+      : {};
   } catch {
     return {};
   }
@@ -384,16 +473,22 @@ function parseOfflineNativeAssetIndex(raw: string | null): Record<string, Offlin
 function getLegacyOfflineSnapshot(profileKey: string): OfflineSnapshot {
   if (typeof window === "undefined") return EMPTY_SNAPSHOT;
   try {
-    return parseOfflineSnapshot(localStorage.getItem(`${OFFLINE_META_PREFIX}${profileKey}`));
+    return parseOfflineSnapshot(
+      localStorage.getItem(`${OFFLINE_META_PREFIX}${profileKey}`),
+    );
   } catch {
     return EMPTY_SNAPSHOT;
   }
 }
 
-function getLegacyOfflineNativeAssetIndex(profileKey: string): Record<string, OfflineNativeAssetRecord> {
+function getLegacyOfflineNativeAssetIndex(
+  profileKey: string,
+): Record<string, OfflineNativeAssetRecord> {
   if (typeof window === "undefined") return {};
   try {
-    return parseOfflineNativeAssetIndex(localStorage.getItem(getOfflineNativeAssetStorageKey(profileKey)));
+    return parseOfflineNativeAssetIndex(
+      localStorage.getItem(getOfflineNativeAssetStorageKey(profileKey)),
+    );
   } catch {
     return {};
   }
@@ -440,7 +535,10 @@ async function readNativeJsonFile(path: string): Promise<string | null> {
   }
 }
 
-async function writeNativeJsonFile(path: string, payload: unknown): Promise<void> {
+async function writeNativeJsonFile(
+  path: string,
+  payload: unknown,
+): Promise<void> {
   await ensureOfflineNativeMetaDir();
   await Filesystem.writeFile({
     path,
@@ -451,7 +549,9 @@ async function writeNativeJsonFile(path: string, payload: unknown): Promise<void
   });
 }
 
-async function ensureOfflineSnapshotLoaded(profileKey: string): Promise<OfflineSnapshot> {
+async function ensureOfflineSnapshotLoaded(
+  profileKey: string,
+): Promise<OfflineSnapshot> {
   const cached = nativeSnapshotCache.get(profileKey);
   if (cached) return cached;
   const inFlight = nativeSnapshotLoaders.get(profileKey);
@@ -507,13 +607,17 @@ async function ensureOfflineNativeAssetIndexLoaded(
   return loader;
 }
 
-function loadOfflineNativeAssetIndex(profileKey: string): Record<string, OfflineNativeAssetRecord> {
+function loadOfflineNativeAssetIndex(
+  profileKey: string,
+): Record<string, OfflineNativeAssetRecord> {
   if (isNative) {
     return nativeAssetIndexCache.get(profileKey) ?? {};
   }
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(getOfflineNativeAssetStorageKey(profileKey));
+    const raw = localStorage.getItem(
+      getOfflineNativeAssetStorageKey(profileKey),
+    );
     return parseOfflineNativeAssetIndex(raw);
   } catch {
     return {};
@@ -526,18 +630,26 @@ function saveOfflineNativeAssetIndex(
 ): void {
   if (isNative) {
     nativeAssetIndexCache.set(profileKey, assets);
-    void writeNativeJsonFile(getOfflineNativeAssetIndexPath(profileKey), assets);
+    void writeNativeJsonFile(
+      getOfflineNativeAssetIndexPath(profileKey),
+      assets,
+    );
     return;
   }
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(getOfflineNativeAssetStorageKey(profileKey), JSON.stringify(assets));
+    localStorage.setItem(
+      getOfflineNativeAssetStorageKey(profileKey),
+      JSON.stringify(assets),
+    );
   } catch {
     // ignore persistence failures
   }
 }
 
-export function loadOfflineSnapshot(profileKey: string | null): OfflineSnapshot {
+export function loadOfflineSnapshot(
+  profileKey: string | null,
+): OfflineSnapshot {
   if (!profileKey || typeof window === "undefined") return EMPTY_SNAPSHOT;
   if (isNative) {
     return nativeSnapshotCache.get(profileKey) ?? EMPTY_SNAPSHOT;
@@ -550,22 +662,33 @@ export function loadOfflineSnapshot(profileKey: string | null): OfflineSnapshot 
   }
 }
 
-export function saveOfflineSnapshot(profileKey: string | null, snapshot: OfflineSnapshot): void {
+export function saveOfflineSnapshot(
+  profileKey: string | null,
+  snapshot: OfflineSnapshot,
+): void {
   if (!profileKey || typeof window === "undefined") return;
   const normalized = normalizeOfflineSnapshot(snapshot);
   if (isNative) {
     nativeSnapshotCache.set(profileKey, normalized);
-    void writeNativeJsonFile(getOfflineNativeSnapshotPath(profileKey), normalized);
+    void writeNativeJsonFile(
+      getOfflineNativeSnapshotPath(profileKey),
+      normalized,
+    );
     return;
   }
   try {
-    localStorage.setItem(`${OFFLINE_META_PREFIX}${profileKey}`, JSON.stringify(normalized));
+    localStorage.setItem(
+      `${OFFLINE_META_PREFIX}${profileKey}`,
+      JSON.stringify(normalized),
+    );
   } catch {
     // ignore persistence failures; cache may still hold usable media
   }
 }
 
-export async function hydrateOfflineProfileState(profileKey: string | null): Promise<OfflineSnapshot> {
+export async function hydrateOfflineProfileState(
+  profileKey: string | null,
+): Promise<OfflineSnapshot> {
   if (!profileKey) return EMPTY_SNAPSHOT;
   if (!isNative) return loadOfflineSnapshot(profileKey);
   const [snapshot] = await Promise.all([
@@ -575,10 +698,14 @@ export async function hydrateOfflineProfileState(profileKey: string | null): Pro
   return snapshot;
 }
 
-export function canonicalStreamPath(track: OfflineTrackIdentityInput, storageId?: string | null): string {
-  const entityUid = track && typeof track === "object"
-    ? readOfflineTrackEntityUid(track)
-    : null;
+export function canonicalStreamPath(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string {
+  const entityUid =
+    track && typeof track === "object"
+      ? readOfflineTrackEntityUid(track)
+      : null;
   const resolvedStorageId =
     normalizeIdentityValue(storageId) ||
     (track && typeof track === "object"
@@ -591,11 +718,18 @@ export function canonicalStreamPath(track: OfflineTrackIdentityInput, storageId?
   throw new Error("Offline stream path requires entity_uid or storage_id");
 }
 
-export function canonicalStreamUrl(track: OfflineTrackIdentityInput, storageId?: string | null): string {
+export function canonicalStreamUrl(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string {
   return apiUrl(canonicalStreamPath(track, storageId));
 }
 
-export async function hasCachedTrackAsset(profileKey: string, track: OfflineTrackIdentityInput, storageId?: string | null): Promise<boolean> {
+export async function hasCachedTrackAsset(
+  profileKey: string,
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): Promise<boolean> {
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return false;
   if (isNative) {
@@ -623,14 +757,24 @@ export async function hasCachedTrackAsset(profileKey: string, track: OfflineTrac
 }
 
 function normalizeAudioExtension(value?: string | null): string | null {
-  const candidate = (value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const candidate = (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
   if (!candidate) return null;
   if (candidate === "aac") return "m4a";
   return candidate;
 }
 
-function inferOfflineFileExtension(track: OfflineManifestTrack, formatOverride?: string | null): string {
-  return normalizeAudioExtension(formatOverride) || normalizeAudioExtension(track.format) || "bin";
+function inferOfflineFileExtension(
+  track: OfflineManifestTrack,
+  formatOverride?: string | null,
+): string {
+  return (
+    normalizeAudioExtension(formatOverride) ||
+    normalizeAudioExtension(track.format) ||
+    "bin"
+  );
 }
 
 function safeOfflineFileStem(assetKey: string): string {
@@ -664,7 +808,10 @@ async function assertNativeTrackIntegrity(
   return { uri: stat.uri, size: actualSize };
 }
 
-async function assertWebTrackIntegrity(response: Response, track: OfflineManifestTrack): Promise<void> {
+async function assertWebTrackIntegrity(
+  response: Response,
+  track: OfflineManifestTrack,
+): Promise<void> {
   const headerSize = Number(response.headers.get("content-length") || 0);
   const expectedSize = expectedTrackBytes(track);
   if (expectedSize > 0 && headerSize > 0 && headerSize !== expectedSize) {
@@ -689,7 +836,10 @@ async function estimateMissingOfflineBytes(
 
 async function estimateNativeOfflineBytes(profileKey: string): Promise<number> {
   const assets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-  return Object.values(assets).reduce((total, asset) => total + Math.max(0, Number(asset.byteLength || 0)), 0);
+  return Object.values(assets).reduce(
+    (total, asset) => total + Math.max(0, Number(asset.byteLength || 0)),
+    0,
+  );
 }
 
 export async function ensureOfflineStorageBudget(
@@ -700,7 +850,10 @@ export async function ensureOfflineStorageBudget(
   if (pendingBytes <= 0) return;
   if (isNative) {
     const currentBytes = await estimateNativeOfflineBytes(profileKey);
-    if (currentBytes + pendingBytes + OFFLINE_STORAGE_HEADROOM_BYTES > NATIVE_OFFLINE_SOFT_LIMIT_BYTES) {
+    if (
+      currentBytes + pendingBytes + OFFLINE_STORAGE_HEADROOM_BYTES >
+      NATIVE_OFFLINE_SOFT_LIMIT_BYTES
+    ) {
       throw new Error("Offline copies are above the native storage budget");
     }
     return;
@@ -709,7 +862,11 @@ export async function ensureOfflineStorageBudget(
   const estimate = await navigator.storage.estimate();
   const quota = Number(estimate.quota || 0);
   const usage = Number(estimate.usage || 0);
-  if (isIosBrowser && usage + pendingBytes + OFFLINE_STORAGE_HEADROOM_BYTES > IOS_BROWSER_OFFLINE_SOFT_LIMIT_BYTES) {
+  if (
+    isIosBrowser &&
+    usage + pendingBytes + OFFLINE_STORAGE_HEADROOM_BYTES >
+      IOS_BROWSER_OFFLINE_SOFT_LIMIT_BYTES
+  ) {
     throw new Error("Offline copies are above the iOS browser storage budget");
   }
   if (!quota || quota <= 0) return;
@@ -726,30 +883,48 @@ interface NativeOfflineDownloadTarget {
   effectivePolicy: string;
 }
 
-function nativePlaybackPathForTrack(track: OfflineManifestTrack): string | null {
+function nativePlaybackPathForTrack(
+  track: OfflineManifestTrack,
+): string | null {
   if (track.entity_uid) {
-    return `/api/tracks/by-entity/${encodeURIComponent(track.entity_uid)}/playback?delivery=${ANDROID_OFFLINE_DELIVERY_POLICY}`;
+    return `/api/tracks/by-entity/${encodeURIComponent(
+      track.entity_uid,
+    )}/playback?delivery=${ANDROID_OFFLINE_DELIVERY_POLICY}`;
   }
   if (track.track_id) {
-    return `/api/tracks/${encodeURIComponent(String(track.track_id))}/playback?delivery=${ANDROID_OFFLINE_DELIVERY_POLICY}`;
+    return `/api/tracks/${encodeURIComponent(
+      String(track.track_id),
+    )}/playback?delivery=${ANDROID_OFFLINE_DELIVERY_POLICY}`;
   }
   return null;
 }
 
-function sourceNeedsMobileVariant(track: OfflineManifestTrack, resolution?: PlaybackResolution | null): boolean {
-  const sourceFormat = normalizeAudioExtension(resolution?.source?.format || track.format);
-  const sourceBitrate = Number(resolution?.source?.bitrate || track.bitrate || 0);
-  const sourceSampleRate = Number(resolution?.source?.sample_rate || track.sample_rate || 0);
+function sourceNeedsMobileVariant(
+  track: OfflineManifestTrack,
+  resolution?: PlaybackResolution | null,
+): boolean {
+  const sourceFormat = normalizeAudioExtension(
+    resolution?.source?.format || track.format,
+  );
+  const sourceBitrate = Number(
+    resolution?.source?.bitrate || track.bitrate || 0,
+  );
+  const sourceSampleRate = Number(
+    resolution?.source?.sample_rate || track.sample_rate || 0,
+  );
   if (resolution?.source?.lossless) return true;
   if (!sourceFormat) return false;
-  if (["flac", "wav", "alac", "aiff", "aif"].includes(sourceFormat)) return true;
+  if (["flac", "wav", "alac", "aiff", "aif"].includes(sourceFormat))
+    return true;
   if (["m4a", "mp3", "opus", "ogg"].includes(sourceFormat)) {
     return sourceBitrate > 256 || sourceSampleRate > 48_000;
   }
   return false;
 }
 
-async function resolveNativeOfflineDownloadTarget(track: OfflineManifestTrack): Promise<NativeOfflineDownloadTarget> {
+async function resolveNativeOfflineDownloadTarget(
+  track: OfflineManifestTrack,
+): Promise<NativeOfflineDownloadTarget> {
   const fallback = {
     streamUrl: track.stream_url,
     extension: inferOfflineFileExtension(track),
@@ -779,7 +954,8 @@ async function resolveNativeOfflineDownloadTarget(track: OfflineManifestTrack): 
     return fallback;
   }
 
-  const deliveryFormat = resolution.delivery?.format || resolution.delivery?.codec;
+  const deliveryFormat =
+    resolution.delivery?.format || resolution.delivery?.codec;
   return {
     streamUrl: resolution.stream_url || track.stream_url,
     extension: inferOfflineFileExtension(track, deliveryFormat),
@@ -788,19 +964,27 @@ async function resolveNativeOfflineDownloadTarget(track: OfflineManifestTrack): 
   };
 }
 
-export async function cacheTrackAsset(profileKey: string, track: OfflineManifestTrack): Promise<void> {
+export async function cacheTrackAsset(
+  profileKey: string,
+  track: OfflineManifestTrack,
+): Promise<void> {
   const assetKey = getOfflineTrackAssetKey(track);
   if (!assetKey) {
     throw new Error("Offline copy requires entity_uid or storage_id");
   }
   if (isNative) {
-    const existingAssets = await ensureOfflineNativeAssetIndexLoaded(profileKey);
-    const existing = getOfflineTrackAssetAliases(track).map((alias) => existingAssets[alias]).find(Boolean);
+    const existingAssets =
+      await ensureOfflineNativeAssetIndexLoaded(profileKey);
+    const existing = getOfflineTrackAssetAliases(track)
+      .map((alias) => existingAssets[alias])
+      .find(Boolean);
     if (existing) return;
 
     const downloadTarget = await resolveNativeOfflineDownloadTarget(track);
     const dirPath = `offline-media/${profileKey}`;
-    const filePath = `${dirPath}/${safeOfflineFileStem(assetKey)}.${downloadTarget.extension}`;
+    const filePath = `${dirPath}/${safeOfflineFileStem(assetKey)}.${
+      downloadTarget.extension
+    }`;
 
     await Filesystem.mkdir({
       path: dirPath,
@@ -818,7 +1002,10 @@ export async function cacheTrackAsset(profileKey: string, track: OfflineManifest
       headers: getApiAuthHeaders(),
     });
 
-    const { uri, size } = await assertNativeTrackIntegrity(filePath, downloadTarget.expectedBytes);
+    const { uri, size } = await assertNativeTrackIntegrity(
+      filePath,
+      downloadTarget.expectedBytes,
+    );
 
     const nextAssets = loadOfflineNativeAssetIndex(profileKey);
     nextAssets[assetKey] = {
@@ -847,11 +1034,17 @@ export async function cacheTrackAsset(profileKey: string, track: OfflineManifest
   await cache.put(cacheKey, response.clone());
 }
 
-export async function deleteCachedTrackAsset(profileKey: string, track: OfflineTrackIdentityInput, storageId?: string | null): Promise<void> {
+export async function deleteCachedTrackAsset(
+  profileKey: string,
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): Promise<void> {
   const aliases = getOfflineTrackAssetAliases(track, storageId);
   if (!aliases.length) return;
   if (isNative) {
-    const assets = { ...(await ensureOfflineNativeAssetIndexLoaded(profileKey)) };
+    const assets = {
+      ...(await ensureOfflineNativeAssetIndexLoaded(profileKey)),
+    };
     const entry = aliases.map((alias) => assets[alias]).find(Boolean);
     if (entry?.path) {
       await Filesystem.deleteFile({
@@ -892,7 +1085,9 @@ export async function clearOfflineAssets(profileKey: string): Promise<void> {
   await caches.delete(getOfflineCacheName(profileKey));
 }
 
-export function buildAssetUsage(snapshot: OfflineSnapshot): Map<string, number> {
+export function buildAssetUsage(
+  snapshot: OfflineSnapshot,
+): Map<string, number> {
   const usage = new Map<string, number>();
   for (const item of Object.values(snapshot.items)) {
     for (const track of item.tracks) {
@@ -904,7 +1099,9 @@ export function buildAssetUsage(snapshot: OfflineSnapshot): Map<string, number> 
   return usage;
 }
 
-export function summarizeOfflineSnapshot(snapshot: OfflineSnapshot): OfflineSummary {
+export function summarizeOfflineSnapshot(
+  snapshot: OfflineSnapshot,
+): OfflineSummary {
   const items = Object.values(snapshot.items);
   return items.reduce<OfflineSummary>(
     (summary, item) => {
@@ -964,17 +1161,25 @@ export function getOfflineActionLabel(state: OfflineItemState): string {
   }
 }
 
-export function getOfflineNativePlaybackUrl(track: OfflineTrackIdentityInput, storageId?: string | null): string | null {
+export function getOfflineNativePlaybackUrl(
+  track: OfflineTrackIdentityInput,
+  storageId?: string | null,
+): string | null {
   if (!isNative) return null;
   const profileKey = getActiveOfflineProfileKey();
   if (!profileKey) return null;
   const assets = loadOfflineNativeAssetIndex(profileKey);
-  const entry = getOfflineTrackAssetAliases(track, storageId).map((alias) => assets[alias]).find(Boolean);
+  const entry = getOfflineTrackAssetAliases(track, storageId)
+    .map((alias) => assets[alias])
+    .find(Boolean);
   return entry?.playbackUrl || null;
 }
 
-export async function syncOfflineProfileToServiceWorker(profileKey: string | null): Promise<void> {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+export async function syncOfflineProfileToServiceWorker(
+  profileKey: string | null,
+): Promise<void> {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator))
+    return;
 
   const payload = { type: "crate:set-offline-profile", profileKey };
   try {
@@ -986,7 +1191,9 @@ export async function syncOfflineProfileToServiceWorker(profileKey: string | nul
   }
 }
 
-export async function primeOfflineRuntimeProfile(serverOrigin?: string): Promise<void> {
+export async function primeOfflineRuntimeProfile(
+  serverOrigin?: string,
+): Promise<void> {
   const profileKey = deriveOfflineProfileKeyFromStoredUser(serverOrigin);
   setActiveOfflineProfileKey(profileKey);
   await syncOfflineProfileToServiceWorker(profileKey);

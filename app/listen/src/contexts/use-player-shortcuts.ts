@@ -43,7 +43,13 @@ export function usePlayerShortcuts({
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey
+      )
+        return;
       if (isTypingTarget(event.target)) return;
       if (!hasCurrentTrack) return;
 
@@ -87,5 +93,18 @@ export function usePlayerShortcuts({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentTime, duration, hasCurrentTrack, isPlaying, lastNonZeroVolume, next, pause, prev, resume, seek, setVolume, volume]);
+  }, [
+    currentTime,
+    duration,
+    hasCurrentTrack,
+    isPlaying,
+    lastNonZeroVolume,
+    next,
+    pause,
+    prev,
+    resume,
+    seek,
+    setVolume,
+    volume,
+  ]);
 }

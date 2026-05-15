@@ -7,7 +7,11 @@ describe("QualityBadge", () => {
   it("shows the tier icon for source quality badges", () => {
     const { container } = render(
       <QualityBadge
-        badge={{ label: "FLAC 16/44.1", detail: "16-bit / 44.1 kHz", tier: "lossless" }}
+        badge={{
+          label: "FLAC 16/44.1",
+          detail: "16-bit / 44.1 kHz",
+          tier: "lossless",
+        }}
         origin="source"
       />,
     );

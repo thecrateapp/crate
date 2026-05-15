@@ -38,7 +38,9 @@ export function AuthCallback() {
       return;
     }
 
-    const { handled, next } = persistOAuthCallbackPayload(window.location.search);
+    const { handled, next } = persistOAuthCallbackPayload(
+      window.location.search,
+    );
     if (!handled) {
       navigate("/login", { replace: true });
       return;
@@ -66,7 +68,11 @@ export function AuthCallback() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-app-surface px-6 text-white">
         <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-white/[0.04] p-8 text-center shadow-[0_24px_80px_-48px_rgba(0,0,0,0.9)]">
-          <img src="/icons/logo.svg" alt="Crate" className="mx-auto mb-4 h-14 w-14" />
+          <img
+            src="/icons/logo.svg"
+            alt="Crate"
+            className="mx-auto mb-4 h-14 w-14"
+          />
           <h1 className="text-2xl font-bold">Return to Crate</h1>
           <p className="mt-3 text-sm leading-6 text-slate-400">
             If the desktop app did not open automatically, use the button below.

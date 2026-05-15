@@ -7,7 +7,11 @@ from sqlalchemy import text
 
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.repositories.tasks import create_task_dedup
-from crate.db.repositories.user_library_shared import emit_user_domain_event, resolve_track_reference, utc_now_iso
+from crate.db.repositories.user_library_shared import (
+    emit_user_domain_event,
+    resolve_track_reference,
+    utc_now_iso,
+)
 from crate.db.tx import register_after_commit, transaction_scope
 
 _STATS_REFRESH_DEBOUNCE_SECONDS = 300
@@ -90,8 +94,12 @@ def record_play(
             track_path=track_path,
         )
         resolved_track_id = resolved_track["track_id"] if resolved_track else None
-        resolved_track_entity_uid = (resolved_track or {}).get("track_entity_uid") or track_entity_uid
-        resolved_track_path = track_path or (resolved_track or {}).get("track_path") or ""
+        resolved_track_entity_uid = (resolved_track or {}).get(
+            "track_entity_uid"
+        ) or track_entity_uid
+        resolved_track_path = (
+            track_path or (resolved_track or {}).get("track_path") or ""
+        )
         session.execute(
             text(
                 """
@@ -153,18 +161,22 @@ def record_play_event(
     created_at = utc_now_iso()
     with transaction_scope() as session:
         if client_event_id:
-            existing = session.execute(
-                text(
-                    """
+            existing = (
+                session.execute(
+                    text(
+                        """
                     SELECT id
                     FROM user_play_events
                     WHERE user_id = :user_id
                       AND client_event_id = :client_event_id
                     LIMIT 1
                     """
-                ),
-                {"user_id": user_id, "client_event_id": client_event_id},
-            ).mappings().first()
+                    ),
+                    {"user_id": user_id, "client_event_id": client_event_id},
+                )
+                .mappings()
+                .first()
+            )
             if existing:
                 return int(existing["id"])
 
@@ -175,11 +187,14 @@ def record_play_event(
             track_path=track_path,
         )
         resolved_track_id = resolved_track["track_id"] if resolved_track else None
-        resolved_track_entity_uid = (resolved_track or {}).get("track_entity_uid") or track_entity_uid
+        resolved_track_entity_uid = (resolved_track or {}).get(
+            "track_entity_uid"
+        ) or track_entity_uid
         resolved_track_path = track_path or (resolved_track or {}).get("track_path")
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 INSERT INTO user_play_events (
                     user_id,
                     client_event_id,
@@ -216,34 +231,39 @@ def record_play_event(
                 )
                 RETURNING id
                 """
-            ),
-            {
-                "user_id": user_id,
-                "client_event_id": client_event_id,
-                "track_id": resolved_track_id,
-                "track_entity_uid": resolved_track_entity_uid,
-                "track_path": resolved_track_path,
-                "title": title,
-                "artist": artist,
-                "album": album,
-                "started_at": started_at,
-                "ended_at": ended_at,
-                "played_seconds": played_seconds,
-                "track_duration_seconds": track_duration_seconds,
-                "completion_ratio": completion_ratio,
-                "was_skipped": was_skipped,
-                "was_completed": was_completed,
-                "play_source_type": play_source_type,
-                "play_source_id": play_source_id,
-                "play_source_name": play_source_name,
-                "context_artist": context_artist,
-                "context_album": context_album,
-                "context_playlist_id": context_playlist_id,
-                "device_type": device_type,
-                "app_platform": app_platform,
-                "created_at": created_at,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "user_id": user_id,
+                    "client_event_id": client_event_id,
+                    "track_id": resolved_track_id,
+                    "track_entity_uid": resolved_track_entity_uid,
+                    "track_path": resolved_track_path,
+                    "title": title,
+                    "artist": artist,
+                    "album": album,
+                    "started_at": started_at,
+                    "ended_at": ended_at,
+                    "played_seconds": played_seconds,
+                    "track_duration_seconds": track_duration_seconds,
+                    "completion_ratio": completion_ratio,
+                    "was_skipped": was_skipped,
+                    "was_completed": was_completed,
+                    "play_source_type": play_source_type,
+                    "play_source_id": play_source_id,
+                    "play_source_name": play_source_name,
+                    "context_artist": context_artist,
+                    "context_album": context_album,
+                    "context_playlist_id": context_playlist_id,
+                    "device_type": device_type,
+                    "app_platform": app_platform,
+                    "created_at": created_at,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise RuntimeError("Play event insert did not return an id")
         event_id = row["id"]
 
         emit_user_domain_event(

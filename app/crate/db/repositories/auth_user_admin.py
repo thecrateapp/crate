@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from crate.db.queries.auth_presence import get_users_presence as query_get_users_presence
-from crate.db.queries.auth_user_lists import list_users as query_list_users, list_users_map_rows as query_list_users_map_rows
+from crate.db.queries.auth_presence import (
+    get_users_presence as query_get_users_presence,
+)
+from crate.db.queries.auth_user_lists import (
+    list_users as query_list_users,
+    list_users_map_rows as query_list_users_map_rows,
+)
 from crate.db.repositories.auth_shared import model_to_dict
 from crate.db.repositories.auth_user_accounts import get_user_by_id
 from crate.db.orm.user import User

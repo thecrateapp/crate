@@ -47,7 +47,9 @@ def _genre_cache_key(genres: dict[str, float]) -> tuple[tuple[str, float], ...]:
 
 
 @lru_cache(maxsize=4096)
-def _expand_genre_weight_items(items: tuple[tuple[str, float], ...]) -> tuple[tuple[str, float], ...]:
+def _expand_genre_weight_items(
+    items: tuple[tuple[str, float], ...],
+) -> tuple[tuple[str, float], ...]:
     expanded: dict[str, float] = {}
     for raw_genre, weight in items:
         if weight <= 0:
@@ -55,12 +57,18 @@ def _expand_genre_weight_items(items: tuple[tuple[str, float], ...]) -> tuple[tu
         canonical_slug = resolve_genre_slug(raw_genre) or slugify_genre(raw_genre)
         if not canonical_slug:
             continue
-        ancestors = get_genre_ancestor_slugs(canonical_slug, include_self=True) or [canonical_slug]
+        ancestors = get_genre_ancestor_slugs(canonical_slug, include_self=True) or [
+            canonical_slug
+        ]
         for index, slug in enumerate(ancestors):
             weighted = weight if index == 0 else weight * 0.65
             expanded[slug] = max(expanded.get(slug, 0.0), weighted)
-        for related_term in get_related_genre_terms(canonical_slug, limit=12, max_depth=1):
-            related_slug = resolve_genre_slug(related_term) or slugify_genre(related_term)
+        for related_term in get_related_genre_terms(
+            canonical_slug, limit=12, max_depth=1
+        ):
+            related_slug = resolve_genre_slug(related_term) or slugify_genre(
+                related_term
+            )
             if related_slug and related_slug not in expanded:
                 expanded[related_slug] = weight * 0.35
     return tuple(sorted(expanded.items()))
@@ -71,15 +79,21 @@ def _expand_genre_weights(genres: dict[str, float]) -> dict[str, float]:
 
 
 @lru_cache(maxsize=4096)
-def _expand_genre_weight_items_for_radio(items: tuple[tuple[str, float], ...]) -> tuple[tuple[str, float], ...]:
+def _expand_genre_weight_items_for_radio(
+    items: tuple[tuple[str, float], ...],
+) -> tuple[tuple[str, float], ...]:
     expanded: dict[str, float] = {}
     for raw_genre, weight in items:
         if weight <= 0:
             continue
-        canonical_slug = resolve_static_genre_slug(raw_genre) or slugify_genre(raw_genre)
+        canonical_slug = resolve_static_genre_slug(raw_genre) or slugify_genre(
+            raw_genre
+        )
         if not canonical_slug:
             continue
-        ancestors = get_static_genre_ancestor_slugs(canonical_slug, include_self=True) or [canonical_slug]
+        ancestors = get_static_genre_ancestor_slugs(
+            canonical_slug, include_self=True
+        ) or [canonical_slug]
         for index, slug in enumerate(ancestors):
             weighted = weight if index == 0 else weight * 0.65
             expanded[slug] = max(expanded.get(slug, 0.0), weighted)
@@ -90,15 +104,22 @@ def _expand_genre_weights_for_radio(genres: dict[str, float]) -> dict[str, float
     return dict(_expand_genre_weight_items_for_radio(_genre_cache_key(genres)))
 
 
-def _genre_jaccard(candidate_genres: dict[str, float], target_genres: dict[str, float]) -> float:
+def _genre_jaccard(
+    candidate_genres: dict[str, float], target_genres: dict[str, float]
+) -> float:
     if not candidate_genres or not target_genres:
         return 0.0
     shared_keys = set(candidate_genres.keys()) & set(target_genres.keys())
     if not shared_keys:
         return 0.0
     all_keys = set(candidate_genres.keys()) | set(target_genres.keys())
-    intersection = sum(min(candidate_genres[key], target_genres[key]) for key in shared_keys)
-    union = sum(max(candidate_genres.get(key, 0.0), target_genres.get(key, 0.0)) for key in all_keys)
+    intersection = sum(
+        min(candidate_genres[key], target_genres[key]) for key in shared_keys
+    )
+    union = sum(
+        max(candidate_genres.get(key, 0.0), target_genres.get(key, 0.0))
+        for key in all_keys
+    )
     return intersection / union if union > 0 else 0.0
 
 
@@ -119,16 +140,28 @@ def make_radio_genre_overlap_scorer(
     def expanded_for(artist_name: str) -> dict[str, float]:
         key = artist_name.lower()
         if key not in expanded_cache:
-            expanded_cache[key] = _expand_genre_weights_for_radio(genre_map.get(key, {}))
+            expanded_cache[key] = _expand_genre_weights_for_radio(
+                genre_map.get(key, {})
+            )
         return expanded_cache[key]
 
     target_genre_sets = [expanded_for(artist) for artist in target_artists]
 
-    def score(candidate_artist: str, _target_artists: list[str], _genre_map: dict[str, dict[str, float]]) -> float:
+    def score(
+        candidate_artist: str,
+        _target_artists: list[str],
+        _genre_map: dict[str, dict[str, float]],
+    ) -> float:
         candidate_genres = expanded_for(candidate_artist)
         if not candidate_genres or not target_genre_sets:
             return 0.0
-        return max((_genre_jaccard(candidate_genres, target_genres) for target_genres in target_genre_sets), default=0.0)
+        return max(
+            (
+                _genre_jaccard(candidate_genres, target_genres)
+                for target_genres in target_genre_sets
+            ),
+            default=0.0,
+        )
 
     return score
 
@@ -160,7 +193,12 @@ def _artist_affinity(
             candidate_sims = sim_graph.get(candidate_lower, {})
             shared = set(context_sims.keys()) & set(candidate_sims.keys())
             if shared:
-                second_degree = max(min(context_sims[item], candidate_sims[item]) for item in shared) * 0.5
+                second_degree = (
+                    max(
+                        min(context_sims[item], candidate_sims[item]) for item in shared
+                    )
+                    * 0.5
+                )
                 if second_degree > best:
                     best = second_degree
 
@@ -173,7 +211,9 @@ def _genre_overlap(
     genre_map: dict[str, dict[str, float]],
 ) -> float:
     """Weighted Jaccard-like genre overlap between candidate and target artists."""
-    candidate_genres = _expand_genre_weights(genre_map.get(candidate_artist.lower(), {}))
+    candidate_genres = _expand_genre_weights(
+        genre_map.get(candidate_artist.lower(), {})
+    )
     if not candidate_genres or not target_artists:
         return 0.0
 

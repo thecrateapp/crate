@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
@@ -19,10 +26,18 @@ import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@crate/ui/shadcn/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
@@ -167,16 +182,38 @@ const SORT_OPTIONS = [
 
 const DROPDOWN_FIELDS: Record<
   string,
-  { optionsKey: keyof FilterOptions; searchPlaceholder: string; placeholder: string }
+  {
+    optionsKey: keyof FilterOptions;
+    searchPlaceholder: string;
+    placeholder: string;
+  }
 > = {
-  artist: { optionsKey: "artists", searchPlaceholder: "Search artists...", placeholder: "Select artist" },
-  genre: { optionsKey: "genres", searchPlaceholder: "Search genres...", placeholder: "Select genre" },
-  format: { optionsKey: "formats", searchPlaceholder: "Search formats...", placeholder: "Select format" },
-  audio_key: { optionsKey: "keys", searchPlaceholder: "Search keys...", placeholder: "Select key" },
+  artist: {
+    optionsKey: "artists",
+    searchPlaceholder: "Search artists...",
+    placeholder: "Select artist",
+  },
+  genre: {
+    optionsKey: "genres",
+    searchPlaceholder: "Search genres...",
+    placeholder: "Select genre",
+  },
+  format: {
+    optionsKey: "formats",
+    searchPlaceholder: "Search formats...",
+    placeholder: "Select format",
+  },
+  audio_key: {
+    optionsKey: "keys",
+    searchPlaceholder: "Search keys...",
+    placeholder: "Select key",
+  },
 };
 
 function getFieldType(field: string): "text" | "number" {
-  return RULE_FIELDS.find((item) => item.value === field)?.type === "text" ? "text" : "number";
+  return RULE_FIELDS.find((item) => item.value === field)?.type === "text"
+    ? "text"
+    : "number";
 }
 
 function getOpsForField(field: string) {
@@ -235,7 +272,11 @@ function TogglePill({
 
 function StatusChip({ status }: { status: string }) {
   if (status === "running") {
-    return <CrateChip active className="text-[11px]">Generating</CrateChip>;
+    return (
+      <CrateChip active className="text-[11px]">
+        Generating
+      </CrateChip>
+    );
   }
   if (status === "queued") {
     return (
@@ -257,7 +298,9 @@ function StatusChip({ status }: { status: string }) {
 function MetricTile({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-md border border-white/10 bg-black/15 p-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </div>
       <div className="mt-1 text-base font-semibold">{value}</div>
     </div>
   );
@@ -274,7 +317,9 @@ function DistributionBlock({
 
   return (
     <div className="space-y-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </div>
       <div className="flex flex-wrap gap-1.5">
         {items.map(([name, count]) => (
           <CrateChip key={name} className="text-[11px]">
@@ -295,9 +340,15 @@ export function PlaylistEditor() {
     data: surface,
     loading,
     refetch,
-  } = useApi<PlaylistEditorSurface>(id ? `/api/admin/system-playlists/${id}/editor-snapshot` : null);
-  const { data: filterOptions } = useApi<FilterOptions>("/api/playlists/filter-options");
-  const [liveSurface, setLiveSurface] = useState<PlaylistEditorSurface | null>(null);
+  } = useApi<PlaylistEditorSurface>(
+    id ? `/api/admin/system-playlists/${id}/editor-snapshot` : null,
+  );
+  const { data: filterOptions } = useApi<FilterOptions>(
+    "/api/playlists/filter-options",
+  );
+  const [liveSurface, setLiveSurface] = useState<PlaylistEditorSurface | null>(
+    null,
+  );
 
   const playlist = liveSurface?.playlist ?? surface?.playlist ?? null;
   const history = liveSurface?.history ?? surface?.history ?? [];
@@ -308,7 +359,9 @@ export function PlaylistEditor() {
 
   useEffect(() => {
     if (!id) return;
-    const source = new EventSource(apiSseUrl(`/api/admin/system-playlists/${id}/stream`));
+    const source = new EventSource(
+      apiSseUrl(`/api/admin/system-playlists/${id}/stream`),
+    );
     source.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as PlaylistEditorSurface;
@@ -367,8 +420,10 @@ export function PlaylistEditor() {
   const isSmart = basePlaylist?.is_smart ?? false;
   const persistedSmartRules = basePlaylist?.smart_rules;
   const currentSmartRules = { match, rules, limit, sort };
-  const smartRulesChanged = isSmart
-    && JSON.stringify(currentSmartRules) !== JSON.stringify(persistedSmartRules ?? null);
+  const smartRulesChanged =
+    isSmart &&
+    JSON.stringify(currentSmartRules) !==
+      JSON.stringify(persistedSmartRules ?? null);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -434,9 +489,13 @@ export function PlaylistEditor() {
     setPreviewing(true);
     setPreview(null);
     try {
-      const result = await api<PreviewResult>(`/api/admin/system-playlists/${id}/preview`, "POST", {
-        smart_rules: currentSmartRules,
-      });
+      const result = await api<PreviewResult>(
+        `/api/admin/system-playlists/${id}/preview`,
+        "POST",
+        {
+          smart_rules: currentSmartRules,
+        },
+      );
       setPreview(result);
     } catch {
       toast.error("Preview failed");
@@ -447,7 +506,10 @@ export function PlaylistEditor() {
 
   const handleDuplicate = useCallback(async () => {
     try {
-      const result = await api<{ id: number }>(`/api/admin/system-playlists/${id}/duplicate`, "POST");
+      const result = await api<{ id: number }>(
+        `/api/admin/system-playlists/${id}/duplicate`,
+        "POST",
+      );
       toast.success("Playlist duplicated");
       navigate(`/playlists/${result.id}`);
     } catch {
@@ -466,7 +528,9 @@ export function PlaylistEditor() {
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
-        await api(`/api/admin/system-playlists/${id}`, "PUT", { cover_data_url: encoded });
+        await api(`/api/admin/system-playlists/${id}`, "PUT", {
+          cover_data_url: encoded,
+        });
         toast.success("Cover upload started");
         void refetch();
       } catch {
@@ -483,7 +547,9 @@ export function PlaylistEditor() {
 
   const handleRemoveCover = useCallback(async () => {
     try {
-      await api(`/api/admin/system-playlists/${id}`, "PUT", { cover_data_url: null });
+      await api(`/api/admin/system-playlists/${id}`, "PUT", {
+        cover_data_url: null,
+      });
       toast.success("Cover removed");
       void refetch();
     } catch {
@@ -492,16 +558,23 @@ export function PlaylistEditor() {
   }, [id, refetch]);
 
   function addRule() {
-    setRules((current) => [...current, { field: "genre", op: "contains", value: "" }]);
+    setRules((current) => [
+      ...current,
+      { field: "genre", op: "contains", value: "" },
+    ]);
   }
 
   function removeRule(index: number) {
-    setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index));
+    setRules((current) =>
+      current.filter((_, ruleIndex) => ruleIndex !== index),
+    );
   }
 
   function updateRule(index: number, patch: Partial<SmartRule>) {
     setRules((current) =>
-      current.map((rule, ruleIndex) => (ruleIndex === index ? { ...rule, ...patch } : rule)),
+      current.map((rule, ruleIndex) =>
+        ruleIndex === index ? { ...rule, ...patch } : rule,
+      ),
     );
   }
 
@@ -519,7 +592,11 @@ export function PlaylistEditor() {
   }
 
   if (!playlist) {
-    return <div className="py-12 text-center text-muted-foreground">Playlist not found</div>;
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        Playlist not found
+      </div>
+    );
   }
 
   return (
@@ -528,7 +605,12 @@ export function PlaylistEditor() {
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex flex-col gap-5 md:flex-row md:items-start">
             <div className="space-y-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate("/playlists")} className="w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/playlists")}
+                className="w-fit"
+              >
                 <ArrowLeft size={14} className="mr-1" /> Back to playlists
               </Button>
 
@@ -546,8 +628,12 @@ export function PlaylistEditor() {
                 <CrateChip active={isSmart} className="text-[11px]">
                   {isSmart ? "smart" : "static"}
                 </CrateChip>
-                <CrateChip className="text-[11px]">{isCurated ? "curated" : "internal"}</CrateChip>
-                <CrateChip className="text-[11px]">{isActive ? "active" : "inactive"}</CrateChip>
+                <CrateChip className="text-[11px]">
+                  {isCurated ? "curated" : "internal"}
+                </CrateChip>
+                <CrateChip className="text-[11px]">
+                  {isActive ? "active" : "inactive"}
+                </CrateChip>
                 {isSmart ? (
                   <CrateChip active={autoRefresh} className="text-[11px]">
                     auto-refresh
@@ -557,22 +643,38 @@ export function PlaylistEditor() {
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight">{name || playlist.name}</h1>
+                <h1 className="text-3xl font-semibold tracking-tight">
+                  {name || playlist.name}
+                </h1>
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {description || "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
+                  {description ||
+                    "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
-                <CrateChip className="text-[11px]">{playlist.track_count} tracks</CrateChip>
-                <CrateChip className="text-[11px]">{formatMinutes(playlist.total_duration)}</CrateChip>
                 <CrateChip className="text-[11px]">
-                  {playlist.follower_count} follower{playlist.follower_count === 1 ? "" : "s"}
+                  {playlist.track_count} tracks
                 </CrateChip>
-                {category ? <CrateChip className="text-[11px]">{category}</CrateChip> : null}
-                {featuredRank != null ? <CrateChip className="text-[11px]">Rank {featuredRank}</CrateChip> : null}
+                <CrateChip className="text-[11px]">
+                  {formatMinutes(playlist.total_duration)}
+                </CrateChip>
+                <CrateChip className="text-[11px]">
+                  {playlist.follower_count} follower
+                  {playlist.follower_count === 1 ? "" : "s"}
+                </CrateChip>
+                {category ? (
+                  <CrateChip className="text-[11px]">{category}</CrateChip>
+                ) : null}
+                {featuredRank != null ? (
+                  <CrateChip className="text-[11px]">
+                    Rank {featuredRank}
+                  </CrateChip>
+                ) : null}
                 {playlist.last_generated_at ? (
-                  <CrateChip className="text-[11px]">Generated {timeAgo(playlist.last_generated_at)}</CrateChip>
+                  <CrateChip className="text-[11px]">
+                    Generated {timeAgo(playlist.last_generated_at)}
+                  </CrateChip>
                 ) : null}
               </div>
 
@@ -589,7 +691,12 @@ export function PlaylistEditor() {
               <Copy size={14} className="mr-1" /> Duplicate
             </Button>
             {isSmart ? (
-              <Button variant="outline" size="sm" onClick={handlePreview} disabled={previewing}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+                disabled={previewing}
+              >
                 {previewing ? (
                   <Loader2 size={14} className="mr-1 animate-spin" />
                 ) : (
@@ -599,7 +706,12 @@ export function PlaylistEditor() {
               </Button>
             ) : null}
             {isSmart ? (
-              <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generating}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGenerate}
+                disabled={generating}
+              >
                 {generating ? (
                   <Loader2 size={14} className="mr-1 animate-spin" />
                 ) : (
@@ -609,7 +721,11 @@ export function PlaylistEditor() {
               </Button>
             ) : null}
             <Button size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Save size={14} className="mr-1" />}
+              {saving ? (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              ) : (
+                <Save size={14} className="mr-1" />
+              )}
               Save changes
             </Button>
           </div>
@@ -622,13 +738,17 @@ export function PlaylistEditor() {
             <CardHeader className="space-y-1">
               <CardTitle className="text-base">Editorial</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Core metadata and visibility settings for how this playlist behaves across the product.
+                Core metadata and visibility settings for how this playlist
+                behaves across the product.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_160px]">
                 <Field label="Name">
-                  <Input value={name} onChange={(event) => setName(event.target.value)} />
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
                 </Field>
                 <Field label="Category">
                   <AdminSelect
@@ -644,7 +764,9 @@ export function PlaylistEditor() {
                     type="number"
                     value={featuredRank ?? ""}
                     onChange={(event) =>
-                      setFeaturedRank(event.target.value ? Number(event.target.value) : null)
+                      setFeaturedRank(
+                        event.target.value ? Number(event.target.value) : null,
+                      )
                     }
                     placeholder="Optional"
                   />
@@ -661,7 +783,11 @@ export function PlaylistEditor() {
               </Field>
 
               <div className="flex flex-wrap gap-2 border-t border-white/10 pt-4">
-                <TogglePill label="Active" active={isActive} onClick={() => setIsActive((value) => !value)} />
+                <TogglePill
+                  label="Active"
+                  active={isActive}
+                  onClick={() => setIsActive((value) => !value)}
+                />
                 <TogglePill
                   label="Curated in listen"
                   active={isCurated}
@@ -684,7 +810,8 @@ export function PlaylistEditor() {
                 <ImagePlus size={16} /> Cover
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Upload a manual cover when the playlist needs a strong editorial identity. Remove it to fall back to the collage.
+                Upload a manual cover when the playlist needs a strong editorial
+                identity. Remove it to fall back to the collage.
               </p>
             </CardHeader>
             <CardContent>
@@ -700,12 +827,16 @@ export function PlaylistEditor() {
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-wrap gap-2">
                     <CrateChip className="text-[11px]">
-                      {playlist.cover_data_url ? "Manual cover active" : "Using auto-collage"}
+                      {playlist.cover_data_url
+                        ? "Manual cover active"
+                        : "Using auto-collage"}
                     </CrateChip>
                   </div>
 
                   <p className="text-sm text-muted-foreground">
-                    Covers help playlists feel editorially finished. Use a manual asset when this collection has a strong identity or featured placement.
+                    Covers help playlists feel editorially finished. Use a
+                    manual asset when this collection has a strong identity or
+                    featured placement.
                   </p>
 
                   <div className="flex flex-wrap gap-2">
@@ -727,10 +858,16 @@ export function PlaylistEditor() {
                       ) : (
                         <Upload size={14} className="mr-1" />
                       )}
-                      {playlist.cover_data_url ? "Replace cover" : "Upload cover"}
+                      {playlist.cover_data_url
+                        ? "Replace cover"
+                        : "Upload cover"}
                     </Button>
                     {playlist.cover_data_url ? (
-                      <Button variant="outline" size="sm" onClick={handleRemoveCover}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveCover}
+                      >
                         <Trash2 size={14} className="mr-1" /> Remove cover
                       </Button>
                     ) : null}
@@ -747,7 +884,8 @@ export function PlaylistEditor() {
                   <Sparkles size={16} /> Smart rules
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Keep the builder dense, but readable: editorial intent first, then execution details and preview.
+                  Keep the builder dense, but readable: editorial intent first,
+                  then execution details and preview.
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -772,7 +910,9 @@ export function PlaylistEditor() {
                       min={1}
                       max={500}
                       value={limit}
-                      onChange={(event) => setLimit(Number(event.target.value) || 50)}
+                      onChange={(event) =>
+                        setLimit(Number(event.target.value) || 50)
+                      }
                     />
                   </Field>
 
@@ -791,15 +931,23 @@ export function PlaylistEditor() {
                 <div className="space-y-3">
                   {rules.map((rule, index) => {
                     const dropdownConfig = DROPDOWN_FIELDS[rule.field];
-                    const dropdownOptions = dropdownConfig && filterOptions
-                      ? filterOptions[dropdownConfig.optionsKey].map((value) => ({ value, label: value }))
-                      : [];
+                    const dropdownOptions =
+                      dropdownConfig && filterOptions
+                        ? filterOptions[dropdownConfig.optionsKey].map(
+                            (value) => ({ value, label: value }),
+                          )
+                        : [];
                     const ops = getOpsForField(rule.field);
 
                     return (
-                      <div key={`${rule.field}-${index}`} className="rounded-md border border-white/10 bg-black/10 p-3">
+                      <div
+                        key={`${rule.field}-${index}`}
+                        className="rounded-md border border-white/10 bg-black/10 p-3"
+                      >
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <CrateChip className="text-[11px]">Rule {index + 1}</CrateChip>
+                          <CrateChip className="text-[11px]">
+                            Rule {index + 1}
+                          </CrateChip>
                           <ActionIconButton
                             variant="row"
                             tone="danger"
@@ -814,8 +962,13 @@ export function PlaylistEditor() {
                           <Field label="Field">
                             <AdminSelect
                               value={rule.field}
-                              onChange={(value) => updateRuleField(index, value)}
-                              options={RULE_FIELDS.map((field) => ({ value: field.value, label: field.label }))}
+                              onChange={(value) =>
+                                updateRuleField(index, value)
+                              }
+                              options={RULE_FIELDS.map((field) => ({
+                                value: field.value,
+                                label: field.label,
+                              }))}
                               allowClear={false}
                               placeholder="Field"
                               triggerClassName="w-full max-w-none"
@@ -825,7 +978,9 @@ export function PlaylistEditor() {
                           <Field label="Operator">
                             <AdminSelect
                               value={rule.op}
-                              onChange={(value) => updateRule(index, { op: value, value: "" })}
+                              onChange={(value) =>
+                                updateRule(index, { op: value, value: "" })
+                              }
                               options={ops}
                               allowClear={false}
                               placeholder="Operator"
@@ -838,25 +993,37 @@ export function PlaylistEditor() {
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <Input
                                   type="number"
-                                  value={Array.isArray(rule.value) ? String(rule.value[0] ?? "") : ""}
+                                  value={
+                                    Array.isArray(rule.value)
+                                      ? String(rule.value[0] ?? "")
+                                      : ""
+                                  }
                                   placeholder="Minimum"
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
                                         Number(event.target.value),
-                                        Array.isArray(rule.value) ? Number(rule.value[1] ?? 0) : 0,
+                                        Array.isArray(rule.value)
+                                          ? Number(rule.value[1] ?? 0)
+                                          : 0,
                                       ],
                                     })
                                   }
                                 />
                                 <Input
                                   type="number"
-                                  value={Array.isArray(rule.value) ? String(rule.value[1] ?? "") : ""}
+                                  value={
+                                    Array.isArray(rule.value)
+                                      ? String(rule.value[1] ?? "")
+                                      : ""
+                                  }
                                   placeholder="Maximum"
                                   onChange={(event) =>
                                     updateRule(index, {
                                       value: [
-                                        Array.isArray(rule.value) ? Number(rule.value[0] ?? 0) : 0,
+                                        Array.isArray(rule.value)
+                                          ? Number(rule.value[0] ?? 0)
+                                          : 0,
                                         Number(event.target.value),
                                       ],
                                     })
@@ -866,11 +1033,15 @@ export function PlaylistEditor() {
                             ) : dropdownConfig ? (
                               <AdminSelect
                                 value={String(rule.value ?? "")}
-                                onChange={(value) => updateRule(index, { value })}
+                                onChange={(value) =>
+                                  updateRule(index, { value })
+                                }
                                 options={dropdownOptions}
                                 placeholder={dropdownConfig.placeholder}
                                 searchable
-                                searchPlaceholder={dropdownConfig.searchPlaceholder}
+                                searchPlaceholder={
+                                  dropdownConfig.searchPlaceholder
+                                }
                                 allowClear={false}
                                 triggerClassName="w-full max-w-none"
                               />
@@ -880,9 +1051,10 @@ export function PlaylistEditor() {
                                 placeholder="Value"
                                 onChange={(event) =>
                                   updateRule(index, {
-                                    value: getFieldType(rule.field) === "number"
-                                      ? Number(event.target.value)
-                                      : event.target.value,
+                                    value:
+                                      getFieldType(rule.field) === "number"
+                                        ? Number(event.target.value)
+                                        : event.target.value,
                                   })
                                 }
                               />
@@ -896,7 +1068,8 @@ export function PlaylistEditor() {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
                   <p className="text-sm text-muted-foreground">
-                    Use preview to sanity-check the shape of the result before saving or generating again.
+                    Use preview to sanity-check the shape of the result before
+                    saving or generating again.
                   </p>
                   <Button variant="outline" size="sm" onClick={addRule}>
                     <Plus size={14} className="mr-1" /> Add rule
@@ -913,7 +1086,9 @@ export function PlaylistEditor() {
                         {formatMinutes(preview.duration_total_sec)}
                       </CrateChip>
                       {preview.avg_year ? (
-                        <CrateChip className="text-[11px]">Avg year {preview.avg_year}</CrateChip>
+                        <CrateChip className="text-[11px]">
+                          Avg year {preview.avg_year}
+                        </CrateChip>
                       ) : null}
                       {preview.year_range ? (
                         <CrateChip className="text-[11px]">
@@ -924,26 +1099,42 @@ export function PlaylistEditor() {
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 pt-4">
                       <p className="max-w-2xl text-sm text-muted-foreground">
-                        Preview is only a simulation. It does not replace the playlist tracks until you generate the playlist with these rules.
+                        Preview is only a simulation. It does not replace the
+                        playlist tracks until you generate the playlist with
+                        these rules.
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {smartRulesChanged ? (
-                          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSave}
+                            disabled={saving}
+                          >
                             {saving ? (
-                              <Loader2 size={14} className="mr-1 animate-spin" />
+                              <Loader2
+                                size={14}
+                                className="mr-1 animate-spin"
+                              />
                             ) : (
                               <Save size={14} className="mr-1" />
                             )}
                             Save rules
                           </Button>
                         ) : null}
-                        <Button size="sm" onClick={handleGenerate} disabled={generating}>
+                        <Button
+                          size="sm"
+                          onClick={handleGenerate}
+                          disabled={generating}
+                        >
                           {generating ? (
                             <Loader2 size={14} className="mr-1 animate-spin" />
                           ) : (
                             <RefreshCw size={14} className="mr-1" />
                           )}
-                          {smartRulesChanged ? "Apply preview to playlist" : "Generate playlist"}
+                          {smartRulesChanged
+                            ? "Apply preview to playlist"
+                            : "Generate playlist"}
                         </Button>
                       </div>
                     </div>
@@ -951,11 +1142,16 @@ export function PlaylistEditor() {
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                       <DistributionBlock
                         label="Top genres"
-                        items={Object.entries(preview.genre_distribution).slice(0, 10)}
+                        items={Object.entries(preview.genre_distribution).slice(
+                          0,
+                          10,
+                        )}
                       />
                       <DistributionBlock
                         label="Top artists"
-                        items={Object.entries(preview.artist_distribution).slice(0, 8)}
+                        items={Object.entries(
+                          preview.artist_distribution,
+                        ).slice(0, 8)}
                       />
                     </div>
 
@@ -967,24 +1163,34 @@ export function PlaylistEditor() {
                         <div className="space-y-1.5">
                           {preview.tracks.slice(0, 8).map((track, index) => (
                             <div
-                              key={`${track.artist ?? "artist"}-${track.title ?? "track"}-${index}`}
+                              key={`${track.artist ?? "artist"}-${
+                                track.title ?? "track"
+                              }-${index}`}
                               className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-white/[0.03]"
                             >
-                              <span className="w-6 text-right text-xs text-muted-foreground">{index + 1}</span>
+                              <span className="w-6 text-right text-xs text-muted-foreground">
+                                {index + 1}
+                              </span>
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-sm font-medium">
                                   {track.title || "Untitled"}
                                 </div>
                                 <div className="truncate text-xs text-muted-foreground">
-                                  {[track.artist, track.album].filter(Boolean).join(" — ")}
+                                  {[track.artist, track.album]
+                                    .filter(Boolean)
+                                    .join(" — ")}
                                 </div>
                               </div>
                               <div className="flex shrink-0 gap-1.5">
                                 {track.format ? (
-                                  <CrateChip className="text-[10px]">{track.format}</CrateChip>
+                                  <CrateChip className="text-[10px]">
+                                    {track.format}
+                                  </CrateChip>
                                 ) : null}
                                 {track.year ? (
-                                  <CrateChip className="text-[10px]">{track.year}</CrateChip>
+                                  <CrateChip className="text-[10px]">
+                                    {track.year}
+                                  </CrateChip>
                                 ) : null}
                                 {track.duration != null ? (
                                   <CrateChip className="text-[10px]">
@@ -1020,9 +1226,13 @@ export function PlaylistEditor() {
                       key={track.id ?? index}
                       className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/[0.03]"
                     >
-                      <span className="w-6 text-right text-xs text-muted-foreground">{index + 1}</span>
+                      <span className="w-6 text-right text-xs text-muted-foreground">
+                        {index + 1}
+                      </span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{track.title}</div>
+                        <div className="truncate text-sm font-medium">
+                          {track.title}
+                        </div>
                         <div className="truncate text-xs text-muted-foreground">
                           {track.artist} — {track.album}
                         </div>
@@ -1055,11 +1265,18 @@ export function PlaylistEditor() {
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               <MetricTile label="Tracks" value={playlist.track_count} />
-              <MetricTile label="Duration" value={formatMinutes(playlist.total_duration || 0)} />
+              <MetricTile
+                label="Duration"
+                value={formatMinutes(playlist.total_duration || 0)}
+              />
               <MetricTile label="Followers" value={playlist.follower_count} />
               <MetricTile
                 label="Last generated"
-                value={playlist.last_generated_at ? timeAgo(playlist.last_generated_at) : "Never"}
+                value={
+                  playlist.last_generated_at
+                    ? timeAgo(playlist.last_generated_at)
+                    : "Never"
+                }
               />
             </CardContent>
           </Card>
@@ -1080,7 +1297,9 @@ export function PlaylistEditor() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <StatusChip status={entry.status} />
-                        <span className="text-sm">{timeAgo(entry.started_at)}</span>
+                        <span className="text-sm">
+                          {timeAgo(entry.started_at)}
+                        </span>
                       </div>
                       {entry.track_count != null ? (
                         <span className="text-xs tabular-nums text-muted-foreground">
@@ -1090,10 +1309,14 @@ export function PlaylistEditor() {
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {entry.triggered_by}
-                      {entry.duration_sec != null ? ` · ${Math.round(entry.duration_sec)}s` : ""}
+                      {entry.duration_sec != null
+                        ? ` · ${Math.round(entry.duration_sec)}s`
+                        : ""}
                     </div>
                     {entry.error ? (
-                      <div className="mt-2 text-xs text-red-200">{entry.error}</div>
+                      <div className="mt-2 text-xs text-red-200">
+                        {entry.error}
+                      </div>
                     ) : null}
                   </div>
                 ))}

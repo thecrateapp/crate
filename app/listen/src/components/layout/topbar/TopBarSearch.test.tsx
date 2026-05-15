@@ -12,12 +12,15 @@ import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 function mockHoverPointer(matches: boolean) {
-  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-    matches,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })));
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
 }
 
 describe("TopBarSearch", () => {
@@ -41,7 +44,9 @@ describe("TopBarSearch", () => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("true");
     });
 
-    const input = screen.getByPlaceholderText("Search artists, albums, tracks...");
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
     await waitFor(() => {
       expect(document.activeElement).toBe(input);
     });
@@ -95,7 +100,9 @@ describe("TopBarSearch", () => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("true");
     });
 
-    const input = screen.getByPlaceholderText("Search artists, albums, tracks...");
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
     await waitFor(() => {
       expect(document.activeElement).toBe(input);
     });
@@ -122,7 +129,9 @@ describe("TopBarSearch", () => {
 
     renderWithListenProviders(<TopBarSearch />);
 
-    const input = screen.getByPlaceholderText("Search artists, albums, tracks...");
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "high" } });
 

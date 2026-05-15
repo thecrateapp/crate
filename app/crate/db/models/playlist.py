@@ -1,12 +1,12 @@
 """Typed models for playlist-related data."""
 
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
 class PlaylistRow(BaseModel):
     """Full playlist record from the playlists table."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -26,6 +26,7 @@ class PlaylistRow(BaseModel):
 
 class PlaylistTrackRow(BaseModel):
     """A track within a playlist, including its position."""
+
     model_config = ConfigDict(from_attributes=True)
 
     playlist_id: int
@@ -40,6 +41,7 @@ class PlaylistTrackRow(BaseModel):
 
 class PlaylistSummary(BaseModel):
     """Lightweight playlist info for list views."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

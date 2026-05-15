@@ -24,13 +24,22 @@ export function measureVisualizerCanvasRect(
   const centerX = anchorRect.left - containerRect.left + anchorRect.width / 2;
   const centerY = anchorRect.top - containerRect.top + anchorRect.height / 2;
 
-  const horizontalRadius = Math.min(centerX - edgePadding, containerRect.width - centerX - edgePadding);
-  const verticalRadius = Math.min(centerY - edgePadding, containerRect.height - centerY - edgePadding);
-  const maxSize = Math.floor(Math.max(0, Math.min(horizontalRadius, verticalRadius) * 2));
+  const horizontalRadius = Math.min(
+    centerX - edgePadding,
+    containerRect.width - centerX - edgePadding,
+  );
+  const verticalRadius = Math.min(
+    centerY - edgePadding,
+    containerRect.height - centerY - edgePadding,
+  );
+  const maxSize = Math.floor(
+    Math.max(0, Math.min(horizontalRadius, verticalRadius) * 2),
+  );
 
   if (maxSize <= 0) return null;
 
-  const referenceSize = Math.max(anchorRect.width, anchorRect.height) * baseScale;
+  const referenceSize =
+    Math.max(anchorRect.width, anchorRect.height) * baseScale;
   const bufferedSize = referenceSize * bufferScale;
   const size = Math.max(referenceSize, Math.min(maxSize, bufferedSize));
 

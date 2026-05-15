@@ -1,6 +1,8 @@
 import os
 import re
 import logging
+from urllib.parse import quote
+
 import requests
 
 import musicbrainzngs
@@ -12,7 +14,6 @@ LASTFM_BASE = "http://ws.audioscrobbler.com/2.0/"
 FANART_BASE = "https://webservice.fanart.tv/v3/music/"
 LASTFM_PLACEHOLDER_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
 log = logging.getLogger(__name__)
-
 
 
 def _lastfm_key() -> str | None:
@@ -34,12 +35,16 @@ def get_artist_info(artist_name: str) -> dict | None:
         return None
 
     try:
-        resp = requests.get(LASTFM_BASE, params={
-            "method": "artist.getinfo",
-            "artist": artist_name,
-            "api_key": api_key,
-            "format": "json",
-        }, timeout=10)
+        resp = requests.get(
+            LASTFM_BASE,
+            params={
+                "method": "artist.getinfo",
+                "artist": artist_name,
+                "api_key": api_key,
+                "format": "json",
+            },
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json()
     except Exception:
@@ -52,9 +57,13 @@ def get_artist_info(artist_name: str) -> dict | None:
 
     bio = artist.get("bio", {}) or {}
     bio_content = bio.get("content") or bio.get("summary", "")
-    bio_content = re.sub(r'<a href="https://www.last.fm/.*?>Read more on Last\.fm</a>\.?', '', bio_content).strip()
-    bio_content = re.sub(r'Read more on Last\.fm\.?$', '', bio_content).strip()
-    bio_content = re.sub(r'<[^>]+>', '', bio_content).strip()
+    bio_content = re.sub(
+        r'<a href="https://www.last.fm/.*?>Read more on Last\.fm</a>\.?',
+        "",
+        bio_content,
+    ).strip()
+    bio_content = re.sub(r"Read more on Last\.fm\.?$", "", bio_content).strip()
+    bio_content = re.sub(r"<[^>]+>", "", bio_content).strip()
 
     images = artist.get("image", [])
     image_url = None
@@ -116,25 +125,31 @@ def get_top_tracks(artist_name: str, limit: int = 20) -> list[dict] | None:
         return None
 
     try:
-        resp = requests.get(LASTFM_BASE, params={
-            "method": "artist.gettoptracks",
-            "artist": artist_name,
-            "api_key": api_key,
-            "format": "json",
-            "limit": limit,
-        }, timeout=10)
+        resp = requests.get(
+            LASTFM_BASE,
+            params={
+                "method": "artist.gettoptracks",
+                "artist": artist_name,
+                "api_key": api_key,
+                "format": "json",
+                "limit": limit,
+            },
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json()
 
         raw_tracks = data.get("toptracks", {}).get("track", [])
         tracks = []
         for t in raw_tracks:
-            tracks.append({
-                "title": t.get("name", ""),
-                "playcount": int(t.get("playcount", 0)),
-                "listeners": int(t.get("listeners", 0)),
-                "url": t.get("url", ""),
-            })
+            tracks.append(
+                {
+                    "title": t.get("name", ""),
+                    "playcount": int(t.get("playcount", 0)),
+                    "listeners": int(t.get("listeners", 0)),
+                    "url": t.get("url", ""),
+                }
+            )
 
         set_cache(_top_tracks_cache_key(artist_name, limit), {"tracks": tracks})
         return tracks
@@ -149,23 +164,28 @@ def _get_similar_artists(artist_name: str, limit: int = 30) -> list[dict]:
     if not key:
         return []
     try:
-        resp = requests.get(LASTFM_BASE, params={
-            "method": "artist.getsimilar",
-            "artist": artist_name,
-            "api_key": key,
-            "format": "json",
-            "limit": limit,
-        }, timeout=10)
+        resp = requests.get(
+            LASTFM_BASE,
+            params={
+                "method": "artist.getsimilar",
+                "artist": artist_name,
+                "api_key": key,
+                "format": "json",
+                "limit": limit,
+            },
+            timeout=10,
+        )
         if resp.status_code != 200:
             return []
         data = resp.json()
         artists = data.get("similarartists", {}).get("artist", [])
-        return [{"name": a["name"], "match": float(a.get("match", 0))} for a in artists[:limit]]
+        return [
+            {"name": a["name"], "match": float(a.get("match", 0))}
+            for a in artists[:limit]
+        ]
     except Exception:
         log.debug("Last.fm getsimilar failed for %s", artist_name)
         return []
-
-
 
 
 def download_artist_image(image_url: str) -> bytes | None:
@@ -223,7 +243,9 @@ def get_fanart_artist_image(artist_name: str) -> str | None:
         return None
 
     try:
-        resp = requests.get(f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10)
+        resp = requests.get(
+            f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10
+        )
         if resp.status_code == 404:
             set_cache(cache_key, {"url": None}, ttl=604800)
             return None
@@ -263,7 +285,9 @@ def get_fanart_background(artist_name: str) -> str | None:
         return None
 
     try:
-        resp = requests.get(f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10)
+        resp = requests.get(
+            f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10
+        )
         if resp.status_code == 404:
             set_cache(cache_key, {"url": None}, ttl=604800)
             return None
@@ -298,7 +322,9 @@ def get_fanart_all_images(artist_name: str) -> dict | None:
         return None
 
     try:
-        resp = requests.get(f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10)
+        resp = requests.get(
+            f"{FANART_BASE}{mbid}", params={"api_key": api_key}, timeout=10
+        )
         if resp.status_code == 404:
             return None
         resp.raise_for_status()
@@ -308,10 +334,14 @@ def get_fanart_all_images(artist_name: str) -> dict | None:
         return None
 
     result = {
-        "backgrounds": [img["url"] for img in data.get("artistbackground", []) if img.get("url")],
+        "backgrounds": [
+            img["url"] for img in data.get("artistbackground", []) if img.get("url")
+        ],
         "thumbs": [img["url"] for img in data.get("artistthumb", []) if img.get("url")],
         "logos": [img["url"] for img in data.get("hdmusiclogo", []) if img.get("url")],
-        "banners": [img["url"] for img in data.get("musicbanner", []) if img.get("url")],
+        "banners": [
+            img["url"] for img in data.get("musicbanner", []) if img.get("url")
+        ],
     }
 
     set_cache(cache_key, result, ttl=604800)
@@ -326,8 +356,11 @@ def _deezer_artist_image(artist_name: str) -> str | None:
         return cached.get("url")
 
     try:
-        resp = requests.get("https://api.deezer.com/search/artist",
-                            params={"q": artist_name}, timeout=10)
+        resp = requests.get(
+            "https://api.deezer.com/search/artist",
+            params={"q": artist_name},
+            timeout=10,
+        )
         resp.raise_for_status()
         data = resp.json()
         for a in data.get("data", []):
@@ -363,6 +396,7 @@ def get_best_artist_image(artist_name: str) -> bytes | None:
     # Try Spotify
     try:
         from crate.spotify import search_artist as spotify_search
+
         sp = spotify_search(artist_name)
         if sp and sp.get("images"):
             img_url = sp["images"][0].get("url") if sp["images"] else None
@@ -395,18 +429,22 @@ def get_lastfm_best_background(artist_name: str) -> bytes | None:
         return None
 
     try:
-        safe_name = requests.utils.quote(artist_name, safe="")
+        safe_name = quote(artist_name, safe="")
         page_url = f"https://www.last.fm/music/{safe_name}/+images"
-        resp = requests.get(page_url, timeout=10, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; Grooveyard/1.0)",
-        })
+        resp = requests.get(
+            page_url,
+            timeout=10,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; Grooveyard/1.0)",
+            },
+        )
         if resp.status_code != 200:
             set_cache(cache_key, {"url": None}, ttl=604800)
             return None
 
         # Extract image hashes from 300x300 thumbnails
         hashes = re.findall(
-            r'lastfm\.freetls\.fastly\.net/i/u/300x300/([a-f0-9]+)\.jpg',
+            r"lastfm\.freetls\.fastly\.net/i/u/300x300/([a-f0-9]+)\.jpg",
             resp.text,
         )
         hashes = list(dict.fromkeys(hashes))  # dedupe, preserve order
@@ -432,6 +470,7 @@ def get_lastfm_best_background(artist_name: str) -> bytes | None:
 
                 from io import BytesIO
                 from PIL import Image
+
                 img = Image.open(BytesIO(img_resp.content))
                 w, h = img.size
                 if w < 400 or h < 300:

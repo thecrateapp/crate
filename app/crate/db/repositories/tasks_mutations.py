@@ -2,10 +2,20 @@ from __future__ import annotations
 
 from crate.db.repositories.tasks_creation import create_task as _create_task
 from crate.db.repositories.tasks_creation import create_task_dedup as _create_task_dedup
-from crate.db.repositories.tasks_creation import find_active_task_by_type_params as _find_active_task_by_type_params
-from crate.db.repositories.tasks_scan_results import save_scan_result as _save_scan_result
-from crate.db.repositories.tasks_shared import dispatch_task, dumps, register_tasks_surface_signal
-from crate.db.repositories.tasks_updates import fail_or_retry_task as _fail_or_retry_task
+from crate.db.repositories.tasks_creation import (
+    find_active_task_by_type_params as _find_active_task_by_type_params,
+)
+from crate.db.repositories.tasks_scan_results import (
+    save_scan_result as _save_scan_result,
+)
+from crate.db.repositories.tasks_shared import (
+    dispatch_task,
+    dumps,
+    register_tasks_surface_signal,
+)
+from crate.db.repositories.tasks_updates import (
+    fail_or_retry_task as _fail_or_retry_task,
+)
 from crate.db.repositories.tasks_updates import heartbeat_task as _heartbeat_task
 from crate.db.repositories.tasks_updates import start_task as _start_task
 from crate.db.repositories.tasks_updates import update_task as _update_task
@@ -35,7 +45,12 @@ def create_task(
     )
 
 
-def create_task_dedup(task_type: str, params: dict | None = None, dedup_key: str = "", dispatch: bool = True) -> str | None:
+def create_task_dedup(
+    task_type: str,
+    params: dict | None = None,
+    dedup_key: str = "",
+    dispatch: bool = True,
+) -> str | None:
     return _create_task_dedup(
         task_type,
         params,
@@ -47,8 +62,12 @@ def create_task_dedup(task_type: str, params: dict | None = None, dedup_key: str
     )
 
 
-def find_active_task_by_type_params(task_type: str, params: dict | None = None, *, dedup_key: str = "") -> str | None:
-    return _find_active_task_by_type_params(task_type, params, dedup_key=dedup_key, dumps_fn=dumps)
+def find_active_task_by_type_params(
+    task_type: str, params: dict | None = None, *, dedup_key: str = ""
+) -> str | None:
+    return _find_active_task_by_type_params(
+        task_type, params, dedup_key=dedup_key, dumps_fn=dumps
+    )
 
 
 def update_task(
@@ -72,7 +91,9 @@ def update_task(
     )
 
 
-def start_task(task_id: str, *, worker_id: str | None = None, session=None) -> dict | None:
+def start_task(
+    task_id: str, *, worker_id: str | None = None, session=None
+) -> dict | None:
     return _start_task(task_id, worker_id=worker_id, session=session)
 
 

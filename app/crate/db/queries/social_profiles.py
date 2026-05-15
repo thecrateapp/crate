@@ -8,9 +8,10 @@ from crate.db.tx import read_scope
 
 def get_followers(user_id: int, *, limit: int = 100) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     u.id,
                     u.username,
@@ -23,17 +24,21 @@ def get_followers(user_id: int, *, limit: int = 100) -> list[dict]:
                 ORDER BY ur.created_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_following(user_id: int, *, limit: int = 100) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     u.id,
                     u.username,
@@ -46,9 +51,12 @@ def get_following(user_id: int, *, limit: int = 100) -> list[dict]:
                 ORDER BY ur.created_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"user_id": user_id, "lim": limit},
-        ).mappings().all()
+                ),
+                {"user_id": user_id, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
@@ -57,9 +65,10 @@ def search_users(query: str, *, limit: int = 20) -> list[dict]:
         return []
     pattern = f"%{query.strip()}%"
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT
                     id,
                     username,
@@ -75,35 +84,47 @@ def search_users(query: str, *, limit: int = 20) -> list[dict]:
                     created_at DESC
                 LIMIT :lim
                 """
-            ),
-            {"pattern": pattern, "lim": limit},
-        ).mappings().all()
+                ),
+                {"pattern": pattern, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
 def get_public_user_profile(user_id: int) -> dict | None:
     with read_scope() as session:
-        row = session.execute(
-            text(user_profile_sql("u.id = :user_id")),
-            {"user_id": user_id},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(user_profile_sql("u.id = :user_id")),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def get_public_user_profile_by_username(username: str) -> dict | None:
     with read_scope() as session:
-        row = session.execute(
-            text(user_profile_sql("u.username = :username")),
-            {"username": username},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text(user_profile_sql("u.username = :username")),
+                {"username": username},
+            )
+            .mappings()
+            .first()
+        )
     return dict(row) if row else None
 
 
 def get_public_playlists_for_user(user_id: int) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT DISTINCT
                     p.id,
                     p.name,
@@ -122,9 +143,12 @@ def get_public_playlists_for_user(user_id: int) -> list[dict]:
                   AND p.visibility = 'public'
                 ORDER BY p.updated_at DESC
                 """
-            ),
-            {"user_id": user_id},
-        ).mappings().all()
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 

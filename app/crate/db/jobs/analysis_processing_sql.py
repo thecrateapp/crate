@@ -73,7 +73,9 @@ def _processing_seed_sql(*, pipeline: str) -> tuple[str, str, str]:
     raise ValueError(f"Invalid pipeline: {pipeline!r}")
 
 
-def complete_processing_state(session, *, track_id: int, pipeline: str, completed_at: str) -> None:
+def complete_processing_state(
+    session, *, track_id: int, pipeline: str, completed_at: str
+) -> None:
     session.execute(
         text(
             """
@@ -91,7 +93,9 @@ def complete_processing_state(session, *, track_id: int, pipeline: str, complete
     )
 
 
-def complete_processing_states(session, *, track_ids: list[int], pipeline: str, completed_at: str) -> None:
+def complete_processing_states(
+    session, *, track_ids: list[int], pipeline: str, completed_at: str
+) -> None:
     cleaned = [int(track_id) for track_id in track_ids if track_id]
     if not cleaned:
         return

@@ -1,12 +1,12 @@
 """Typed models for show/concert data."""
 
-
 import datetime as _dt
 from pydantic import BaseModel, ConfigDict
 
 
 class ShowRow(BaseModel):
     """An upcoming show/concert."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -34,6 +34,7 @@ class ShowRow(BaseModel):
 
 class ShowSummary(BaseModel):
     """Lightweight show for list views."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

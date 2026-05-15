@@ -44,7 +44,12 @@ def _parse_bytes(raw: str | None, default: int) -> int:
         return default
     text = raw.strip().lower()
     multiplier = 1
-    for suffix, value in (("tb", 1024**4), ("gb", 1024**3), ("mb", 1024**2), ("kb", 1024)):
+    for suffix, value in (
+        ("tb", 1024**4),
+        ("gb", 1024**3),
+        ("mb", 1024**2),
+        ("kb", 1024),
+    ):
         if text.endswith(suffix):
             multiplier = value
             text = text[: -len(suffix)].strip()
@@ -72,15 +77,21 @@ def download_cache_root() -> Path:
 
 
 def album_cache_ttl_seconds() -> int:
-    return _parse_int("CRATE_DOWNLOAD_CACHE_ALBUM_TTL_SECONDS", _DEFAULT_ALBUM_TTL_SECONDS)
+    return _parse_int(
+        "CRATE_DOWNLOAD_CACHE_ALBUM_TTL_SECONDS", _DEFAULT_ALBUM_TTL_SECONDS
+    )
 
 
 def track_cache_ttl_seconds() -> int:
-    return _parse_int("CRATE_DOWNLOAD_CACHE_TRACK_TTL_SECONDS", _DEFAULT_TRACK_TTL_SECONDS)
+    return _parse_int(
+        "CRATE_DOWNLOAD_CACHE_TRACK_TTL_SECONDS", _DEFAULT_TRACK_TTL_SECONDS
+    )
 
 
 def download_cache_max_bytes() -> int:
-    return _parse_bytes(os.environ.get("CRATE_DOWNLOAD_CACHE_MAX_BYTES"), _DEFAULT_MAX_BYTES)
+    return _parse_bytes(
+        os.environ.get("CRATE_DOWNLOAD_CACHE_MAX_BYTES"), _DEFAULT_MAX_BYTES
+    )
 
 
 def safe_download_filename(value: str, fallback: str) -> str:
@@ -97,7 +108,13 @@ def _json_default(value: Any) -> Any:
 
 
 def _stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=_json_default,
+    )
 
 
 def _sha(value: Any) -> str:
@@ -124,15 +141,21 @@ def _lyrics_signature(track: dict[str, Any]) -> dict[str, Any]:
         "provider": lyrics.get("provider"),
         "found": bool(lyrics.get("found")),
         "updated_at": lyrics.get("updated_at"),
-        "plain_hash": hashlib.sha256(str(plain or "").encode("utf-8")).hexdigest() if plain else None,
-        "synced_hash": hashlib.sha256(str(synced or "").encode("utf-8")).hexdigest() if synced else None,
+        "plain_hash": hashlib.sha256(str(plain or "").encode("utf-8")).hexdigest()
+        if plain
+        else None,
+        "synced_hash": hashlib.sha256(str(synced or "").encode("utf-8")).hexdigest()
+        if synced
+        else None,
     }
 
 
 def _track_payload_signature(track: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": track.get("id"),
-        "entity_uid": str(track.get("entity_uid")) if track.get("entity_uid") is not None else None,
+        "entity_uid": str(track.get("entity_uid"))
+        if track.get("entity_uid") is not None
+        else None,
         "path": track.get("path"),
         "relative_path": track.get("relative_path"),
         "filename": track.get("filename"),
@@ -145,31 +168,49 @@ def _track_payload_signature(track: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def album_download_cache_key(album_payload: dict[str, Any], *, artwork_path: str | Path | None = None) -> str:
+def album_download_cache_key(
+    album_payload: dict[str, Any], *, artwork_path: str | Path | None = None
+) -> str:
     album = album_payload.get("album") or {}
     artist = album_payload.get("artist") or {}
     material = {
         "version": DOWNLOAD_CACHE_VERSION,
         "kind": "album",
-        "artist_uid": str(artist.get("entity_uid")) if artist.get("entity_uid") is not None else None,
+        "artist_uid": str(artist.get("entity_uid"))
+        if artist.get("entity_uid") is not None
+        else None,
         "album_id": album.get("id"),
-        "album_uid": str(album.get("entity_uid")) if album.get("entity_uid") is not None else None,
+        "album_uid": str(album.get("entity_uid"))
+        if album.get("entity_uid") is not None
+        else None,
         "album_path": album.get("path"),
         "artwork": _file_signature(artwork_path),
-        "tracks": [_track_payload_signature(track) for track in album_payload.get("tracks") or []],
+        "tracks": [
+            _track_payload_signature(track)
+            for track in album_payload.get("tracks") or []
+        ],
     }
     return _sha(material)
 
 
-def track_download_cache_key(payload: dict[str, Any], *, source_path: str | Path, artwork_path: str | Path | None = None) -> str:
+def track_download_cache_key(
+    payload: dict[str, Any],
+    *,
+    source_path: str | Path,
+    artwork_path: str | Path | None = None,
+) -> str:
     track = payload.get("track") or {}
     album = payload.get("album") or {}
     artist = payload.get("artist") or {}
     material = {
         "version": DOWNLOAD_CACHE_VERSION,
         "kind": "track",
-        "artist_uid": str(artist.get("entity_uid")) if artist.get("entity_uid") is not None else None,
-        "album_uid": str(album.get("entity_uid")) if album.get("entity_uid") is not None else None,
+        "artist_uid": str(artist.get("entity_uid"))
+        if artist.get("entity_uid") is not None
+        else None,
+        "album_uid": str(album.get("entity_uid"))
+        if album.get("entity_uid") is not None
+        else None,
         "track": _track_payload_signature({**track, "path": str(source_path)}),
         "artwork": _file_signature(artwork_path),
     }
@@ -202,16 +243,29 @@ def _write_manifest(kind: str, key: str, payload: dict[str, Any]) -> None:
     path = _manifest_path(kind, key)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=_json_default) + "\n", encoding="utf-8")
+    tmp_path.write_text(
+        json.dumps(
+            payload, ensure_ascii=False, indent=2, sort_keys=True, default=_json_default
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     tmp_path.replace(path)
 
 
-def get_cached_download(kind: str, key: str, filename: str, *, ttl_seconds: int) -> CachedDownload | None:
+def get_cached_download(
+    kind: str, key: str, filename: str, *, ttl_seconds: int
+) -> CachedDownload | None:
     if not download_cache_enabled() or ttl_seconds <= 0:
         return None
     path = _artifact_path(kind, key, filename)
     manifest = _read_manifest(kind, key)
-    if not manifest or manifest.get("key") != key or manifest.get("filename") != path.name or not path.is_file():
+    if (
+        not manifest
+        or manifest.get("key") != key
+        or manifest.get("filename") != path.name
+        or not path.is_file()
+    ):
         return None
 
     now = time.time()
@@ -285,12 +339,21 @@ def register_cached_download(
             },
         )
         prune_download_cache()
-        return CachedDownload(key=key, path=path, filename=path.name, bytes=stat.st_size)
+        return CachedDownload(
+            key=key, path=path, filename=path.name, bytes=stat.st_size
+        )
     except Exception:
         return None
 
 
-def store_cached_download(kind: str, key: str, filename: str, source_path: str | Path, *, metadata: dict[str, Any] | None = None) -> CachedDownload | None:
+def store_cached_download(
+    kind: str,
+    key: str,
+    filename: str,
+    source_path: str | Path,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> CachedDownload | None:
     if not download_cache_enabled():
         return None
     source = Path(str(source_path))
@@ -322,7 +385,9 @@ def store_cached_download(kind: str, key: str, filename: str, source_path: str |
             },
         )
         prune_download_cache()
-        return CachedDownload(key=key, path=path, filename=path.name, bytes=stat.st_size)
+        return CachedDownload(
+            key=key, path=path, filename=path.name, bytes=stat.st_size
+        )
     except Exception:
         with contextlib.suppress(Exception):
             tmp_path.unlink(missing_ok=True)
@@ -334,7 +399,9 @@ def remove_cached_download(kind: str, key: str) -> None:
 
 
 @contextlib.contextmanager
-def download_cache_lock(kind: str, key: str, *, timeout_seconds: int = _DEFAULT_LOCK_TIMEOUT_SECONDS) -> Iterator[None]:
+def download_cache_lock(
+    kind: str, key: str, *, timeout_seconds: int = _DEFAULT_LOCK_TIMEOUT_SECONDS
+) -> Iterator[None]:
     if not download_cache_enabled():
         yield
         return
@@ -396,7 +463,9 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
     survivors: list[tuple[Path, Path, dict[str, Any], int]] = []
     for artifact_path, manifest_path, manifest in _iter_artifacts():
         kind = str(manifest.get("kind") or "")
-        ttl = album_cache_ttl_seconds() if kind == "album" else track_cache_ttl_seconds()
+        ttl = (
+            album_cache_ttl_seconds() if kind == "album" else track_cache_ttl_seconds()
+        )
         created_at = float(manifest.get("created_at") or 0)
         try:
             size = artifact_path.stat().st_size
@@ -412,9 +481,18 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
 
     total = sum(size for _, _, _, size in survivors)
     if total <= limit:
-        return {"removed": removed, "bytes_removed": bytes_removed, "bytes": total, "limit": limit}
+        return {
+            "removed": removed,
+            "bytes_removed": bytes_removed,
+            "bytes": total,
+            "limit": limit,
+        }
 
-    survivors.sort(key=lambda item: float(item[2].get("last_accessed_at") or item[2].get("created_at") or 0))
+    survivors.sort(
+        key=lambda item: float(
+            item[2].get("last_accessed_at") or item[2].get("created_at") or 0
+        )
+    )
     for artifact_path, manifest_path, _manifest, size in survivors:
         if total <= limit:
             break
@@ -423,7 +501,12 @@ def prune_download_cache(*, max_bytes: int | None = None) -> dict[str, Any]:
         removed += 1
         shutil.rmtree(manifest_path.parent, ignore_errors=True)
 
-    return {"removed": removed, "bytes_removed": bytes_removed, "bytes": total, "limit": limit}
+    return {
+        "removed": removed,
+        "bytes_removed": bytes_removed,
+        "bytes": total,
+        "limit": limit,
+    }
 
 
 __all__ = [

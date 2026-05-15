@@ -13,6 +13,7 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 )
 
+// Connect builds a read-only PostgreSQL connection pool from the given config.
 func Connect(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
@@ -31,6 +32,7 @@ func Connect(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, poolCfg)
 }
 
+// WithTimeout returns a derived context with the given query timeout.
 func WithTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout <= 0 {
 		timeout = 800 * time.Millisecond
@@ -38,15 +40,18 @@ func WithTimeout(parent context.Context, timeout time.Duration) (context.Context
 	return context.WithTimeout(parent, timeout)
 }
 
+// IsUndefinedTable reports whether the error is a missing-relation PostgreSQL error.
 func IsUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
 	return err != nil && AsPgError(err, &pgErr) && pgErr.Code == "42P01"
 }
 
+// AsPgError unwraps the error chain into a *pgconn.PgError.
 func AsPgError(err error, target **pgconn.PgError) bool {
 	return errors.As(err, target)
 }
 
+// RequiredTablesReady verifies that the minimal schema required by readplane exists.
 func RequiredTablesReady(ctx context.Context, pool *pgxpool.Pool) error {
 	const query = `
 		SELECT

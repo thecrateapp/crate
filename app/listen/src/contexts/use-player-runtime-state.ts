@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import type { CrossfadeTransition } from "@/contexts/player-context";
@@ -39,20 +35,27 @@ export function usePlayerRuntimeState() {
   const [duration, setDurationState] = useState(0);
   const [volume, setVolumeState] = useState(getStoredVolume);
   const [analyserVersion, setAnalyserVersion] = useState(0);
-  const [crossfadeTransition, setCrossfadeTransition] = useState<CrossfadeTransition | null>(null);
+  const [crossfadeTransition, setCrossfadeTransition] =
+    useState<CrossfadeTransition | null>(null);
   const [shuffle, setShuffleState] = useState(() => stored.current.shuffle);
   const [playSource, setPlaySource] = useState<PlaySource | null>(null);
   const [repeat, setRepeatState] = useState<RepeatMode>("off");
-  const [smartCrossfadeEnabled, setSmartCrossfadeEnabled] = useState(getSmartCrossfadePreference);
-  const [recentlyPlayed, setRecentlyPlayed] = useState<Track[]>(getStoredRecentlyPlayed);
-  const [infinitePlaybackEnabled, setInfinitePlaybackEnabled] = useState(getInfinitePlaybackPreference);
-  const [smartPlaylistSuggestionsEnabled, setSmartPlaylistSuggestionsEnabled] = useState(
-    getSmartPlaylistSuggestionsPreference,
+  const [smartCrossfadeEnabled, setSmartCrossfadeEnabled] = useState(
+    getSmartCrossfadePreference,
   );
-  const [smartPlaylistSuggestionsCadence, setSmartPlaylistSuggestionsCadence] = useState(
-    getSmartPlaylistSuggestionsCadencePreference,
+  const [recentlyPlayed, setRecentlyPlayed] = useState<Track[]>(
+    getStoredRecentlyPlayed,
   );
-  const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] = useState(getPlaybackDeliveryPolicyPreference);
+  const [infinitePlaybackEnabled, setInfinitePlaybackEnabled] = useState(
+    getInfinitePlaybackPreference,
+  );
+  const [smartPlaylistSuggestionsEnabled, setSmartPlaylistSuggestionsEnabled] =
+    useState(getSmartPlaylistSuggestionsPreference);
+  const [smartPlaylistSuggestionsCadence, setSmartPlaylistSuggestionsCadence] =
+    useState(getSmartPlaylistSuggestionsCadencePreference);
+  const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] = useState(
+    getPlaybackDeliveryPolicyPreference,
+  );
 
   const currentTrack = queue[currentIndex];
 
@@ -64,7 +67,9 @@ export function usePlayerRuntimeState() {
   const shuffleRef = useRef(shuffle);
   const playSourceRef = useRef(playSource);
   const smartCrossfadeEnabledRef = useRef(smartCrossfadeEnabled);
-  const effectiveCrossfadeMsRef = useRef(getCrossfadeDurationPreference() * 1000);
+  const effectiveCrossfadeMsRef = useRef(
+    getCrossfadeDurationPreference() * 1000,
+  );
   const isPlayingRef = useRef(isPlaying);
   const isBufferingRef = useRef(isBuffering);
   const currentTimeRef = useRef(currentTime);
@@ -92,11 +97,14 @@ export function usePlayerRuntimeState() {
       onAllFinished: () => callbacksRef.current.onAllFinished?.(),
       onError: (path, err) => callbacksRef.current.onError?.(path, err),
       onBuffering: (path) => callbacksRef.current.onBuffering?.(path),
-      onAnalyserReady: (analyser) => callbacksRef.current.onAnalyserReady?.(analyser),
+      onAnalyserReady: (analyser) =>
+        callbacksRef.current.onAnalyserReady?.(analyser),
     });
   }
 
-  const unshuffledQueueRef = useRef<Track[] | null>(stored.current.unshuffledQueue);
+  const unshuffledQueueRef = useRef<Track[] | null>(
+    stored.current.unshuffledQueue,
+  );
   const engineTrackMapRef = useRef<Map<string, Track[]>>(new Map());
 
   const resetEngineTrackMap = useCallback(() => {
@@ -142,7 +150,9 @@ export function usePlayerRuntimeState() {
     const bucket = engineTrackMapRef.current.get(url);
     if (!bucket) return;
     const trackKey = getTrackCacheKey(track);
-    const index = bucket.findIndex((candidate) => getTrackCacheKey(candidate) === trackKey);
+    const index = bucket.findIndex(
+      (candidate) => getTrackCacheKey(candidate) === trackKey,
+    );
     if (index < 0) return;
     bucket.splice(index, 1);
     if (bucket.length === 0) {

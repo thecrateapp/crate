@@ -17,8 +17,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'")
-    op.execute("ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN NOT NULL DEFAULT FALSE")
+    op.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'private'"
+    )
+    op.execute(
+        "ALTER TABLE jam_rooms ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN NOT NULL DEFAULT FALSE"
+    )
     op.execute(
         "CREATE INDEX IF NOT EXISTS idx_jam_rooms_visibility_status "
         "ON jam_rooms(status, visibility, created_at DESC)"

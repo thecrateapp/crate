@@ -70,15 +70,25 @@ def upgrade() -> None:
 def downgrade() -> None:
     for statement in reversed(DROP_DUPLICATE_INDEXES):
         if "idx_albums_artist_name" in statement:
-            _run_concurrently("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_albums_artist_name ON library_albums (artist, name)")
+            _run_concurrently(
+                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_albums_artist_name ON library_albums (artist, name)"
+            )
         elif "idx_tracks_album_id" in statement:
-            _run_concurrently("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracks_album_id ON library_tracks (album_id)")
+            _run_concurrently(
+                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracks_album_id ON library_tracks (album_id)"
+            )
         elif "idx_users_email" in statement:
-            _run_concurrently("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email ON users (email)")
+            _run_concurrently(
+                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email ON users (email)"
+            )
         elif "idx_users_google_id" in statement:
-            _run_concurrently("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_google_id ON users (google_id)")
+            _run_concurrently(
+                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_google_id ON users (google_id)"
+            )
         elif "idx_playlist_members_composite" in statement:
-            _run_concurrently("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_playlist_members_composite ON playlist_members (playlist_id, user_id)")
+            _run_concurrently(
+                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_playlist_members_composite ON playlist_members (playlist_id, user_id)"
+            )
 
     for statement in reversed(CREATE_INDEXES):
         index_name = statement.split("IF NOT EXISTS ", 1)[1].split(" ON ", 1)[0]

@@ -1,11 +1,13 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
 import {
-  ExternalLink,
-  MapPin,
-  Ticket,
-  X,
-} from "lucide-react";
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link } from "react-router";
+import { ExternalLink, MapPin, Ticket, X } from "lucide-react";
 
 import {
   artistBackgroundApiUrl,
@@ -137,11 +139,16 @@ export function getGenreColor(genres?: string[]): string {
 
 function getArtistLink(artist: ShowArtistRef | null | undefined) {
   if (!artist || artist.id == null) return undefined;
-  return artistPagePath({ artistId: artist.id, artistSlug: artist.slug, artistName: artist.name });
+  return artistPagePath({
+    artistId: artist.id,
+    artistSlug: artist.slug,
+    artistName: artist.name,
+  });
 }
 
 function formatDateParts(date: string, time: string) {
-  if (!date) return { dateLabel: "", monthLabel: "", dayLabel: "", weekdayLabel: "" };
+  if (!date)
+    return { dateLabel: "", monthLabel: "", dayLabel: "", weekdayLabel: "" };
   const value = new Date(`${date}T12:00:00`);
   return {
     dateLabel: value.toLocaleDateString("en-US", {
@@ -150,30 +157,49 @@ function formatDateParts(date: string, time: string) {
       day: "numeric",
       year: "numeric",
     }),
-    monthLabel: value.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+    monthLabel: value
+      .toLocaleDateString("en-US", { month: "short" })
+      .toUpperCase(),
     dayLabel: String(value.getDate()),
-    weekdayLabel: value.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase(),
+    weekdayLabel: value
+      .toLocaleDateString("en-US", { weekday: "short" })
+      .toUpperCase(),
     timeLabel: time ? time.slice(0, 5) : "",
   };
 }
 
-function normalizeLineupArtists(show: ShowCardInput, primaryArtist: ShowArtistRef | null) {
+function normalizeLineupArtists(
+  show: ShowCardInput,
+  primaryArtist: ShowArtistRef | null,
+) {
   const raw = show as Partial<ShowEvent & AdminShowCardItem>;
   const rawLineupArtists = Array.isArray(raw.lineup_artists)
     ? raw.lineup_artists.filter(
         (artist): artist is ShowArtistRef =>
-          Boolean(artist) && typeof artist.name === "string" && artist.name.length > 0,
+          Boolean(artist) &&
+          typeof artist.name === "string" &&
+          artist.name.length > 0,
       )
     : [];
   const rawLineup = Array.isArray(raw.lineup)
-    ? raw.lineup.filter((artist): artist is string => typeof artist === "string" && artist.length > 0)
+    ? raw.lineup.filter(
+        (artist): artist is string =>
+          typeof artist === "string" && artist.length > 0,
+      )
     : [];
 
-  const lineup: ShowArtistRef[] = rawLineupArtists.length > 0
-    ? rawLineupArtists
-    : rawLineup.map((name) => ({ name }));
+  const lineup: ShowArtistRef[] =
+    rawLineupArtists.length > 0
+      ? rawLineupArtists
+      : rawLineup.map((name) => ({ name }));
 
-  if (primaryArtist && !lineup.some((artist) => artist.name === primaryArtist.name && artist.id === primaryArtist.id)) {
+  if (
+    primaryArtist &&
+    !lineup.some(
+      (artist) =>
+        artist.name === primaryArtist.name && artist.id === primaryArtist.id,
+    )
+  ) {
     return [primaryArtist, ...lineup];
   }
   return lineup.length > 0 ? lineup : primaryArtist ? [primaryArtist] : [];
@@ -235,7 +261,8 @@ function normalizeShow(show: ShowCardInput): NormalizedShow {
           ? raw.local_time
           : "",
     venue: typeof raw.venue === "string" ? raw.venue : "",
-    addressLine1: typeof raw.address_line1 === "string" ? raw.address_line1 : "",
+    addressLine1:
+      typeof raw.address_line1 === "string" ? raw.address_line1 : "",
     city: typeof raw.city === "string" ? raw.city : "",
     region: typeof raw.region === "string" ? raw.region : "",
     postalCode: typeof raw.postal_code === "string" ? raw.postal_code : "",
@@ -250,12 +277,17 @@ function normalizeShow(show: ShowCardInput): NormalizedShow {
           : "",
     primaryArtist,
     lineupArtists,
-    genres:
-      Array.isArray(raw.genres)
-        ? raw.genres.filter((genre): genre is string => typeof genre === "string" && genre.length > 0)
-        : Array.isArray(raw.artist_genres)
-          ? raw.artist_genres.filter((genre): genre is string => typeof genre === "string" && genre.length > 0)
-          : [],
+    genres: Array.isArray(raw.genres)
+      ? raw.genres.filter(
+          (genre): genre is string =>
+            typeof genre === "string" && genre.length > 0,
+        )
+      : Array.isArray(raw.artist_genres)
+        ? raw.artist_genres.filter(
+            (genre): genre is string =>
+              typeof genre === "string" && genre.length > 0,
+          )
+        : [],
     coverUrl,
     artistPhotoUrl,
     backgroundUrl,
@@ -278,8 +310,12 @@ function CompactCard({ show }: { show: ShowEvent }) {
           />
         ) : null}
       </div>
-      <span className="truncate font-medium">{normalized.primaryArtist?.name ?? normalized.title}</span>
-      <span className="hidden truncate text-muted-foreground sm:inline">{normalized.venue}</span>
+      <span className="truncate font-medium">
+        {normalized.primaryArtist?.name ?? normalized.title}
+      </span>
+      <span className="hidden truncate text-muted-foreground sm:inline">
+        {normalized.venue}
+      </span>
     </div>
   );
 }
@@ -296,7 +332,10 @@ function CollapsedShowCard({
   show: NormalizedShow;
   onToggle?: () => void;
 }) {
-  const { monthLabel, dayLabel, weekdayLabel } = formatDateParts(show.date, show.time);
+  const { monthLabel, dayLabel, weekdayLabel } = formatDateParts(
+    show.date,
+    show.time,
+  );
   const support = show.lineupArtists.slice(1);
 
   return (
@@ -335,16 +374,26 @@ function CollapsedShowCard({
         </div>
         {support.length > 0 ? (
           <div className="mt-0.5 truncate text-[10px] text-white/40">
-            w/ {support.slice(0, 3).map((artist) => artist.name).join(", ")}
+            w/{" "}
+            {support
+              .slice(0, 3)
+              .map((artist) => artist.name)
+              .join(", ")}
             {support.length > 3 ? ` +${support.length - 3}` : ""}
           </div>
         ) : null}
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">{monthLabel}</span>
-        <span className="text-[20px] font-black leading-tight text-primary">{dayLabel}</span>
-        <span className="text-[8px] font-medium leading-none text-white/40">{weekdayLabel}</span>
+        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+          {monthLabel}
+        </span>
+        <span className="text-[20px] font-black leading-tight text-primary">
+          {dayLabel}
+        </span>
+        <span className="text-[8px] font-medium leading-none text-white/40">
+          {weekdayLabel}
+        </span>
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-center gap-1 pr-2">
@@ -394,7 +443,9 @@ function ActionButton({
     >
       {icon}
       {label}
-      {href.startsWith("http") ? <span className="h-[5px] w-[5px] rounded-full bg-green-400" /> : null}
+      {href.startsWith("http") ? (
+        <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
+      ) : null}
     </a>
   );
 }
@@ -408,12 +459,19 @@ function ExpandedShowCardBody({
   closeable?: boolean;
   onClose?: () => void;
 }) {
-  const { dateLabel, timeLabel } = formatDateParts(show.date, show.time) as ReturnType<typeof formatDateParts> & {
+  const { dateLabel, timeLabel } = formatDateParts(
+    show.date,
+    show.time,
+  ) as ReturnType<typeof formatDateParts> & {
     timeLabel?: string;
   };
   const support = show.lineupArtists.slice(1);
-  const locationLabel = [show.city, show.region, show.country].filter(Boolean).join(", ");
-  const addressLabel = [show.addressLine1, show.postalCode].filter(Boolean).join(" · ");
+  const locationLabel = [show.city, show.region, show.country]
+    .filter(Boolean)
+    .join(", ");
+  const addressLabel = [show.addressLine1, show.postalCode]
+    .filter(Boolean)
+    .join(" · ");
   const artistHref = getArtistLink(show.primaryArtist);
 
   return (
@@ -445,8 +503,12 @@ function ExpandedShowCardBody({
         ) : null}
 
         <div className="absolute right-3 top-2.5 z-10 text-right">
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">{dateLabel}</div>
-          {timeLabel ? <div className="text-[10px] text-white/40">{timeLabel}</div> : null}
+          <div className="text-[10px] font-bold tracking-wide text-primary/70">
+            {dateLabel}
+          </div>
+          {timeLabel ? (
+            <div className="text-[10px] text-white/40">{timeLabel}</div>
+          ) : null}
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 z-10">
@@ -476,7 +538,11 @@ function ExpandedShowCardBody({
               )}
               {support.length > 0 ? (
                 <div className="truncate text-[10px] text-white/40">
-                  w/ {support.slice(0, 4).map((artist) => artist.name).join(" · ")}
+                  w/{" "}
+                  {support
+                    .slice(0, 4)
+                    .map((artist) => artist.name)
+                    .join(" · ")}
                   {support.length > 4 ? ` +${support.length - 4}` : ""}
                 </div>
               ) : null}
@@ -490,8 +556,12 @@ function ExpandedShowCardBody({
           <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
           <div className="min-w-0">
             <span className="font-medium text-white/70">{show.venue}</span>
-            {addressLabel ? <span className="text-white/40"> · {addressLabel}</span> : null}
-            {locationLabel ? <div className="text-white/40">{locationLabel}</div> : null}
+            {addressLabel ? (
+              <span className="text-white/40"> · {addressLabel}</span>
+            ) : null}
+            {locationLabel ? (
+              <div className="text-white/40">{locationLabel}</div>
+            ) : null}
           </div>
         </div>
 
@@ -509,8 +579,17 @@ function ExpandedShowCardBody({
         ) : null}
 
         <div className="mt-3 flex gap-2">
-          <ActionButton href={artistHref} label="Open Artist" icon={<MapPin size={13} />} />
-          <ActionButton href={show.url} label="Get Tickets" icon={<Ticket size={13} />} tone="primary" />
+          <ActionButton
+            href={artistHref}
+            label="Open Artist"
+            icon={<MapPin size={13} />}
+          />
+          <ActionButton
+            href={show.url}
+            label="Get Tickets"
+            icon={<Ticket size={13} />}
+            tone="primary"
+          />
         </div>
       </div>
     </div>
@@ -531,7 +610,8 @@ export function ShowCard({
   className?: string;
 }) {
   const normalized = useMemo(() => normalizeShow(show), [show]);
-  const isInteractive = typeof expanded === "boolean" && typeof onToggle === "function";
+  const isInteractive =
+    typeof expanded === "boolean" && typeof onToggle === "function";
   const contentRef = useRef<HTMLDivElement>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number>(0);
 
@@ -561,7 +641,9 @@ export function ShowCard({
   }
 
   const cardHeight = expanded
-    ? (measuredHeight > 0 ? measuredHeight : "auto")
+    ? measuredHeight > 0
+      ? measuredHeight
+      : "auto"
     : COLLAPSED_HEIGHT;
 
   return (
@@ -577,11 +659,17 @@ export function ShowCard({
       onClick={!expanded ? onToggle : undefined}
     >
       <div ref={contentRef}>
-        {!expanded ? <div className="absolute inset-0 bg-raised-surface" /> : null}
+        {!expanded ? (
+          <div className="absolute inset-0 bg-raised-surface" />
+        ) : null}
         {!expanded ? (
           <CollapsedShowCard show={normalized} onToggle={onToggle} />
         ) : (
-          <ExpandedShowCardBody show={normalized} closeable onClose={onToggle} />
+          <ExpandedShowCardBody
+            show={normalized}
+            closeable
+            onClose={onToggle}
+          />
         )}
       </div>
     </div>

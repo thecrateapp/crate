@@ -17,7 +17,9 @@ _UPSERT_SIMILARITY_SQL = text(
 )
 
 
-def upsert_similarity(artist_name: str, similar_name: str, score: float, source: str = "lastfm") -> None:
+def upsert_similarity(
+    artist_name: str, similar_name: str, score: float, source: str = "lastfm"
+) -> None:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
         session.execute(
@@ -71,7 +73,7 @@ def mark_library_status() -> int:
                 """
             )
         )
-        return result.rowcount
+        return int(getattr(result, "rowcount", 0) or 0)
 
 
 __all__ = [

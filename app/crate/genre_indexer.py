@@ -65,8 +65,7 @@ def _normalize_weighted_genres(
         return []
 
     return [
-        (genre, round(score / selected_total, 4), source)
-        for genre, score in selected
+        (genre, round(score / selected_total, 4), source) for genre, score in selected
     ]
 
 
@@ -101,7 +100,9 @@ def derive_album_genres(
             direct_scores[genre] += track_weight
 
     if direct_scores:
-        return _normalize_weighted_genres(direct_scores, source="tags", max_items=max_items)
+        return _normalize_weighted_genres(
+            direct_scores, source="tags", max_items=max_items
+        )
 
     fallback_scores: dict[str, float] = defaultdict(float)
     for item in artist_profile or []:
@@ -192,14 +193,22 @@ def index_all_genres(progress_callback=None) -> dict:
             continue
         genres = []
         for r in rows:
-            weight = float(r["score"] or 0.0) / max_score  # Normalize: strongest signal = 1.0
+            weight = (
+                float(r["score"] or 0.0) / max_score
+            )  # Normalize: strongest signal = 1.0
             genres.append((r["name"], round(weight, 2), "derived"))
 
         set_artist_genres(artist_name, genres)
         artist_count += 1
 
         if progress_callback and i % 50 == 0:
-            progress_callback({"phase": "deriving_artist_genres", "done": i, "total": len(missing_artists)})
+            progress_callback(
+                {
+                    "phase": "deriving_artist_genres",
+                    "done": i,
+                    "total": len(missing_artists),
+                }
+            )
 
     # Count total genres
     genre_count = get_total_genre_count()

@@ -45,7 +45,9 @@ def test_select_diverse_tracks_prefers_studio_version_over_live_variant():
         },
     ]
 
-    selected = _select_diverse_tracks_with_backfill(rows, limit=2, max_per_artist=2, max_per_album=2)
+    selected = _select_diverse_tracks_with_backfill(
+        rows, limit=2, max_per_artist=2, max_per_album=2
+    )
 
     assert [row["title"] for row in selected] == ["Concubine", "Fault and Fracture"]
 
@@ -68,9 +70,14 @@ def test_select_diverse_tracks_keeps_live_fallback_when_no_studio_exists():
         },
     ]
 
-    selected = _select_diverse_tracks_with_backfill(rows, limit=2, max_per_artist=2, max_per_album=2)
+    selected = _select_diverse_tracks_with_backfill(
+        rows, limit=2, max_per_artist=2, max_per_album=2
+    )
 
-    assert [row["title"] for row in selected] == ["Concubine (Live at CBGB)", "Fault and Fracture"]
+    assert [row["title"] for row in selected] == [
+        "Concubine (Live at CBGB)",
+        "Fault and Fracture",
+    ]
 
 
 def test_select_diverse_tracks_does_not_collapse_plain_studio_title_duplicates_without_version_signal():
@@ -98,15 +105,27 @@ def test_select_diverse_tracks_does_not_collapse_plain_studio_title_duplicates_w
         },
     ]
 
-    selected = _select_diverse_tracks_with_backfill(rows, limit=3, max_per_artist=3, max_per_album=2)
+    selected = _select_diverse_tracks_with_backfill(
+        rows, limit=3, max_per_artist=3, max_per_album=2
+    )
 
     assert [row["title"] for row in selected] == ["Intro", "Intro", "Outro"]
 
 
 def test_match_setlist_track_prefers_studio_version_when_available():
     tracks = [
-        {"id": 10, "title": "Concubine (Live at CBGB)", "album": "Live", "path": "/live.flac"},
-        {"id": 11, "title": "Concubine (Remix)", "album": "Remix", "path": "/remix.flac"},
+        {
+            "id": 10,
+            "title": "Concubine (Live at CBGB)",
+            "album": "Live",
+            "path": "/live.flac",
+        },
+        {
+            "id": 11,
+            "title": "Concubine (Remix)",
+            "album": "Remix",
+            "path": "/remix.flac",
+        },
         {"id": 12, "title": "Concubine", "album": "Jane Doe", "path": "/studio.flac"},
     ]
 
@@ -118,8 +137,18 @@ def test_match_setlist_track_prefers_studio_version_when_available():
 
 def test_match_setlist_track_falls_back_to_live_version_when_needed():
     tracks = [
-        {"id": 10, "title": "Concubine (Live at CBGB)", "album": "Live", "path": "/live.flac"},
-        {"id": 11, "title": "Concubine (Remix)", "album": "Remix", "path": "/remix.flac"},
+        {
+            "id": 10,
+            "title": "Concubine (Live at CBGB)",
+            "album": "Live",
+            "path": "/live.flac",
+        },
+        {
+            "id": 11,
+            "title": "Concubine (Remix)",
+            "album": "Remix",
+            "path": "/remix.flac",
+        },
     ]
 
     match = _match_setlist_track("Concubine", tracks, set())
@@ -165,9 +194,20 @@ def test_get_home_mix_detail_payload_dedupes_track_variants():
         },
     ]
 
-    with patch("crate.db.home_personalized_collections.get_cached_home_context", return_value={"interest_artists_lower": [], "top_genres_lower": []}), \
-         patch("crate.db.home_personalized_collections.recent_releases_from_context", return_value=[]), \
-         patch("crate.db.home_personalized_collections._build_mix_rows", return_value=("Punk Rock Mix", "desc", rows)):
+    with (
+        patch(
+            "crate.db.home_personalized_collections.get_cached_home_context",
+            return_value={"interest_artists_lower": [], "top_genres_lower": []},
+        ),
+        patch(
+            "crate.db.home_personalized_collections.recent_releases_from_context",
+            return_value=[],
+        ),
+        patch(
+            "crate.db.home_personalized_collections._build_mix_rows",
+            return_value=("Punk Rock Mix", "desc", rows),
+        ),
+    ):
         payload = get_home_mix(1, "genre-punk-rock", limit=40)
 
     assert payload is not None

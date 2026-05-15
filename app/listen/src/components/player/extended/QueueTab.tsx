@@ -2,11 +2,20 @@ import { useMemo } from "react";
 import { Save, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { ItemActionMenu, ItemActionMenuButton, type ItemActionMenuEntry, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  type ItemActionMenuEntry,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { getPlaySourceLabel } from "@/components/player/player-source";
-import { usePlayerActions, usePlayerState, type Track } from "@/contexts/PlayerContext";
+import {
+  usePlayerActions,
+  usePlayerState,
+  type Track,
+} from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 
 function QueueTabRow({
@@ -32,7 +41,10 @@ function QueueTabRow({
     if (!onRemove) return baseActions;
     return [
       ...baseActions,
-      { type: "divider", key: `queue-tab-remove-divider-${track.id}-${indexLabel}` },
+      {
+        type: "divider",
+        key: `queue-tab-remove-divider-${track.id}-${indexLabel}`,
+      },
       {
         key: `queue-tab-remove-${track.id}-${indexLabel}`,
         label: "Remove from queue",
@@ -56,21 +68,39 @@ function QueueTabRow({
         }
       }}
       onContextMenu={actionMenu.handleContextMenu}
-      className={`group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${faded ? "opacity-50" : ""}`}
+      className={`group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+        faded ? "opacity-50" : ""
+      }`}
     >
-      <span className={`w-4 shrink-0 text-right text-[10px] tabular-nums ${faded ? "text-white/15" : "text-white/20"}`}>
+      <span
+        className={`w-4 shrink-0 text-right text-[10px] tabular-nums ${
+          faded ? "text-white/15" : "text-white/20"
+        }`}
+      >
         {indexLabel}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className={`min-w-0 flex-1 truncate text-[12px] ${faded ? "text-white/50" : "text-white/80"}`}>{track.title}</p>
+          <p
+            className={`min-w-0 flex-1 truncate text-[12px] ${
+              faded ? "text-white/50" : "text-white/80"
+            }`}
+          >
+            {track.title}
+          </p>
           {track.isSuggested ? (
             <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
               Suggested
             </span>
           ) : null}
         </div>
-        <p className={`truncate text-[10px] ${faded ? "text-white/40" : "text-muted-foreground"}`}>{track.artist}</p>
+        <p
+          className={`truncate text-[10px] ${
+            faded ? "text-white/40" : "text-muted-foreground"
+          }`}
+        >
+          {track.artist}
+        </p>
       </div>
       <ItemActionMenuButton
         buttonRef={actionMenu.triggerRef}
@@ -91,7 +121,14 @@ function QueueTabRow({
 
 export function QueueTab() {
   const { isPlaying } = usePlayerState();
-  const { queue, currentIndex, playSource, currentTrack, jumpTo, removeFromQueue } = usePlayerActions();
+  const {
+    queue,
+    currentIndex,
+    playSource,
+    currentTrack,
+    jumpTo,
+    removeFromQueue,
+  } = usePlayerActions();
 
   const history = queue.slice(0, currentIndex).reverse();
   const upcoming = queue.slice(currentIndex + 1);
@@ -163,19 +200,37 @@ export function QueueTab() {
               {currentIndex + 1}
             </span>
             {currentTrack.albumCover ? (
-              <img src={currentTrack.albumCover} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded object-cover" />
+              <img
+                src={currentTrack.albumCover}
+                alt=""
+                loading="lazy"
+                className="h-8 w-8 shrink-0 rounded object-cover"
+              />
             ) : (
               <div className="h-8 w-8 shrink-0 rounded bg-white/10" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-medium text-primary">{currentTrack.title}</p>
-              <p className="truncate text-[10px] text-muted-foreground">{currentTrack.artist}</p>
+              <p className="truncate text-[12px] font-medium text-primary">
+                {currentTrack.title}
+              </p>
+              <p className="truncate text-[10px] text-muted-foreground">
+                {currentTrack.artist}
+              </p>
             </div>
             {isPlaying && (
               <div className="flex h-4 shrink-0 items-end gap-0.5">
-                <div className="equalizer-bar w-[3px] rounded-sm bg-primary" style={{ animationDelay: "0ms" }} />
-                <div className="equalizer-bar w-[3px] rounded-sm bg-primary" style={{ animationDelay: "200ms" }} />
-                <div className="equalizer-bar w-[3px] rounded-sm bg-primary" style={{ animationDelay: "400ms" }} />
+                <div
+                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <div
+                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  style={{ animationDelay: "200ms" }}
+                />
+                <div
+                  className="equalizer-bar w-[3px] rounded-sm bg-primary"
+                  style={{ animationDelay: "400ms" }}
+                />
               </div>
             )}
           </div>
@@ -203,7 +258,9 @@ export function QueueTab() {
       )}
 
       {upcoming.length === 0 && !currentTrack ? (
-        <div className="py-12 text-center text-sm text-white/20">Queue is empty</div>
+        <div className="py-12 text-center text-sm text-white/20">
+          Queue is empty
+        </div>
       ) : null}
     </div>
   );

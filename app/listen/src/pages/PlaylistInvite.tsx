@@ -12,7 +12,11 @@ export function PlaylistInvite() {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    api<{ playlist_id: number }>(`/api/playlists/invites/${token}/accept`, "POST", {})
+    api<{ playlist_id: number }>(
+      `/api/playlists/invites/${token}/accept`,
+      "POST",
+      {},
+    )
       .then((response) => {
         if (cancelled) return;
         toast.success("You joined the collaborative playlist");
@@ -33,7 +37,9 @@ export function PlaylistInvite() {
       <Loader2 size={22} className="animate-spin text-primary" />
       <div>
         <p className="text-lg font-medium text-foreground">Joining playlist…</p>
-        <p className="text-sm text-muted-foreground">We are validating the invite and adding you as a collaborator.</p>
+        <p className="text-sm text-muted-foreground">
+          We are validating the invite and adding you as a collaborator.
+        </p>
       </div>
     </div>
   );

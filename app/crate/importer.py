@@ -3,9 +3,8 @@
 import logging
 import re
 import shutil
-import time
 from pathlib import Path
-from threading import Thread, Lock
+from threading import Lock
 
 from crate.audio import get_audio_files, read_tags
 
@@ -14,8 +13,16 @@ log = logging.getLogger(__name__)
 # Download sources to monitor
 DEFAULT_SOURCES = [
     {"name": "tidal", "path": "/music/.imports/tidal", "pattern": "{artist}/{album}"},
-    {"name": "soulseek", "path": "/music/.imports/soulseek", "pattern": "{artist}/{album}"},
-    {"name": "tidalrr", "path": "/music/.imports/tidalrr", "pattern": "{artist}/{album}"},
+    {
+        "name": "soulseek",
+        "path": "/music/.imports/soulseek",
+        "pattern": "{artist}/{album}",
+    },
+    {
+        "name": "tidalrr",
+        "path": "/music/.imports/tidalrr",
+        "pattern": "{artist}/{album}",
+    },
 ]
 
 
@@ -53,18 +60,22 @@ class ImportQueue:
                     dest = self.library_path / _sanitize(artist) / _sanitize(album)
                     exists = dest.exists()
 
-                    pending.append({
-                        "source": source["name"],
-                        "source_path": str(album_dir),
-                        "artist": artist,
-                        "album": album,
-                        "track_count": len(tracks),
-                        "formats": list({t.suffix.lower() for t in tracks}),
-                        "total_size_mb": round(sum(t.stat().st_size for t in tracks) / (1024**2)),
-                        "dest_path": str(dest),
-                        "dest_exists": exists,
-                        "status": "pending",
-                    })
+                    pending.append(
+                        {
+                            "source": source["name"],
+                            "source_path": str(album_dir),
+                            "artist": artist,
+                            "album": album,
+                            "track_count": len(tracks),
+                            "formats": list({t.suffix.lower() for t in tracks}),
+                            "total_size_mb": round(
+                                sum(t.stat().st_size for t in tracks) / (1024**2)
+                            ),
+                            "dest_path": str(dest),
+                            "dest_exists": exists,
+                            "status": "pending",
+                        }
+                    )
 
         with self._lock:
             self._queue = pending
@@ -77,11 +88,18 @@ class ImportQueue:
 
         refresh_import_queue_items(
             pending,
-            scanned_sources=[str(source.get("name") or "filesystem") for source in self.sources],
+            scanned_sources=[
+                str(source.get("name") or "filesystem") for source in self.sources
+            ],
         )
         return pending
 
-    def import_item(self, source_path: str, dest_artist: str = None, dest_album: str = None) -> dict:
+    def import_item(
+        self,
+        source_path: str,
+        dest_artist: str | None = None,
+        dest_album: str | None = None,
+    ) -> dict:
         """Import a single album from source to library."""
         src = Path(source_path)
         if not src.exists() or not src.is_dir():
@@ -92,8 +110,13 @@ class ImportQueue:
             return {"error": "No audio files found"}
 
         tags = read_tags(tracks[0])
-        artist = dest_artist or tags.get("albumartist") or tags.get("artist") or "Unknown Artist"
-        album = dest_album or tags.get("album") or src.name
+        artist = str(
+            dest_artist
+            or tags.get("albumartist")
+            or tags.get("artist")
+            or "Unknown Artist"
+        )
+        album = str(dest_album or tags.get("album") or src.name)
 
         dest = self.library_path / _sanitize(artist) / _sanitize(album)
 
@@ -124,7 +147,7 @@ class ImportQueue:
                 "tracks": len(tracks),
             }
 
-    def import_all(self, items: list[dict] = None) -> list[dict]:
+    def import_all(self, items: list[dict] | None = None) -> list[dict]:
         """Import multiple items."""
         if items is None:
             items = self.scan_pending()
@@ -133,8 +156,8 @@ class ImportQueue:
         for item in items:
             result = self.import_item(
                 item["source_path"],
-                item.get("artist"),
-                item.get("album"),
+                str(item.get("artist") or ""),
+                str(item.get("album") or ""),
             )
             result["source"] = item.get("source", "")
             result["source_path"] = item["source_path"]

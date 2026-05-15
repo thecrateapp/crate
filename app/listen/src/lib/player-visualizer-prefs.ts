@@ -36,8 +36,14 @@ export function getPlayerSurfaceModePreference(): PlayerSurfaceMode {
 export function setPlayerSurfaceModePreference(value: PlayerSurfaceMode) {
   try {
     localStorage.setItem(PLAYER_SURFACE_MODE_KEY, value);
-    localStorage.setItem(VISUALIZER_ENABLED_KEY, String(value === "visualizer"));
-    dispatchVisualizerPrefsChange({ playerSurfaceMode: value, visualizerEnabled: value === "visualizer" });
+    localStorage.setItem(
+      VISUALIZER_ENABLED_KEY,
+      String(value === "visualizer"),
+    );
+    dispatchVisualizerPrefsChange({
+      playerSurfaceMode: value,
+      visualizerEnabled: value === "visualizer",
+    });
   } catch {
     // ignore storage failures
   }
@@ -101,18 +107,35 @@ export function getVisualizerSettingsPreference(): VisualizerSettingsPreference 
     if (!raw) return DEFAULT_VISUALIZER_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<VisualizerSettingsPreference>;
     return {
-      separation: typeof parsed.separation === "number" ? parsed.separation : DEFAULT_VISUALIZER_SETTINGS.separation,
-      glow: typeof parsed.glow === "number" ? parsed.glow : DEFAULT_VISUALIZER_SETTINGS.glow,
-      scale: typeof parsed.scale === "number" ? parsed.scale : DEFAULT_VISUALIZER_SETTINGS.scale,
-      persistence: typeof parsed.persistence === "number" ? parsed.persistence : DEFAULT_VISUALIZER_SETTINGS.persistence,
-      octaves: typeof parsed.octaves === "number" ? parsed.octaves : DEFAULT_VISUALIZER_SETTINGS.octaves,
+      separation:
+        typeof parsed.separation === "number"
+          ? parsed.separation
+          : DEFAULT_VISUALIZER_SETTINGS.separation,
+      glow:
+        typeof parsed.glow === "number"
+          ? parsed.glow
+          : DEFAULT_VISUALIZER_SETTINGS.glow,
+      scale:
+        typeof parsed.scale === "number"
+          ? parsed.scale
+          : DEFAULT_VISUALIZER_SETTINGS.scale,
+      persistence:
+        typeof parsed.persistence === "number"
+          ? parsed.persistence
+          : DEFAULT_VISUALIZER_SETTINGS.persistence,
+      octaves:
+        typeof parsed.octaves === "number"
+          ? parsed.octaves
+          : DEFAULT_VISUALIZER_SETTINGS.octaves,
     };
   } catch {
     return DEFAULT_VISUALIZER_SETTINGS;
   }
 }
 
-export function setVisualizerSettingsPreference(value: VisualizerSettingsPreference) {
+export function setVisualizerSettingsPreference(
+  value: VisualizerSettingsPreference,
+) {
   try {
     localStorage.setItem(VISUALIZER_SETTINGS_KEY, JSON.stringify(value));
     dispatchVisualizerPrefsChange({ visualizerSettings: value });

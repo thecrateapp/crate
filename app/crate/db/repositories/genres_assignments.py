@@ -1,5 +1,3 @@
-import re
-
 from sqlalchemy import text
 
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
@@ -20,15 +18,20 @@ def get_or_create_genre(name: str, *, session=None) -> int:
     if session is None:
         with transaction_scope() as s:
             return get_or_create_genre(name, session=s)
-    row = session.execute(
-        text("SELECT id FROM genres WHERE slug = :slug"),
-        {"slug": slug},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text("SELECT id FROM genres WHERE slug = :slug"),
+            {"slug": slug},
+        )
+        .mappings()
+        .first()
+    )
     if row:
         return row["id"]
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             INSERT INTO genres (entity_uid, name, slug)
             VALUES (:entity_uid, :name, :slug)
             ON CONFLICT(slug) DO UPDATE
@@ -36,16 +39,39 @@ def get_or_create_genre(name: str, *, session=None) -> int:
                 name = EXCLUDED.name
             RETURNING id
             """
-        ),
-        {"entity_uid": str(genre_entity_uid(name=name, slug=slug)), "name": name, "slug": slug},
-    ).mappings().first()
+            ),
+            {
+                "entity_uid": str(genre_entity_uid(name=name, slug=slug)),
+                "name": name,
+                "slug": slug,
+            },
+        )
+        .mappings()
+        .first()
+    )
     if row:
-        upsert_entity_identity_key(session, entity_type="genre", entity_uid=str(genre_entity_uid(name=name, slug=slug)), key_type="slug", key_value=slug, is_primary=True)
-        upsert_entity_identity_key(session, entity_type="genre", entity_uid=str(genre_entity_uid(name=name, slug=slug)), key_type="name", key_value=name, is_primary=True)
+        upsert_entity_identity_key(
+            session,
+            entity_type="genre",
+            entity_uid=str(genre_entity_uid(name=name, slug=slug)),
+            key_type="slug",
+            key_value=slug,
+            is_primary=True,
+        )
+        upsert_entity_identity_key(
+            session,
+            entity_type="genre",
+            entity_uid=str(genre_entity_uid(name=name, slug=slug)),
+            key_type="name",
+            key_value=name,
+            is_primary=True,
+        )
     return row["id"]
 
 
-def set_artist_genres(artist_name: str, genres: list[tuple[str, float, str]], *, session=None):
+def set_artist_genres(
+    artist_name: str, genres: list[tuple[str, float, str]], *, session=None
+):
     if session is None:
         with transaction_scope() as s:
             return set_artist_genres(artist_name, genres, session=s)
@@ -62,11 +88,18 @@ def set_artist_genres(artist_name: str, genres: list[tuple[str, float, str]], *,
                 "INSERT INTO artist_genres (artist_name, genre_id, weight, source) VALUES (:artist_name, :genre_id, :weight, :source) "
                 "ON CONFLICT DO NOTHING"
             ),
-            {"artist_name": artist_name, "genre_id": genre_id, "weight": weight, "source": source},
+            {
+                "artist_name": artist_name,
+                "genre_id": genre_id,
+                "weight": weight,
+                "source": source,
+            },
         )
 
 
-def set_album_genres(album_id: int, genres: list[tuple[str, float, str]], *, session=None):
+def set_album_genres(
+    album_id: int, genres: list[tuple[str, float, str]], *, session=None
+):
     if session is None:
         with transaction_scope() as s:
             return set_album_genres(album_id, genres, session=s)
@@ -83,7 +116,12 @@ def set_album_genres(album_id: int, genres: list[tuple[str, float, str]], *, ses
                 "INSERT INTO album_genres (album_id, genre_id, weight, source) VALUES (:album_id, :genre_id, :weight, :source) "
                 "ON CONFLICT DO NOTHING"
             ),
-            {"album_id": album_id, "genre_id": genre_id, "weight": weight, "source": source},
+            {
+                "album_id": album_id,
+                "genre_id": genre_id,
+                "weight": weight,
+                "source": source,
+            },
         )
 
 

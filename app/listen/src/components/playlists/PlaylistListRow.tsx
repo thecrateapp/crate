@@ -1,14 +1,29 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Heart, Loader2, Play, Shuffle, Sparkles, type LucideIcon } from "lucide-react";
+import {
+  Heart,
+  Loader2,
+  Play,
+  Shuffle,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { ItemActionMenu, ItemActionMenuButton, type ItemActionMenuEntry, useItemActionMenu } from "@/components/actions/ItemActionMenu";
+import {
+  ItemActionMenu,
+  ItemActionMenuButton,
+  type ItemActionMenuEntry,
+  useItemActionMenu,
+} from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { api } from "@/lib/api";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
@@ -70,7 +85,6 @@ interface PlaylistListRowProps {
   }>;
 }
 
-
 function toPlayerTracks(tracks: PlaylistTrackResponse[]): Track[] {
   return tracks.map((track) =>
     toPlayableTrack(
@@ -117,7 +131,9 @@ export function PlaylistListRow({
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { getPlaylistState, getPlaylistRecord } = useOffline();
-  const [playingMode, setPlayingMode] = useState<"play" | "shuffle" | null>(null);
+  const [playingMode, setPlayingMode] = useState<"play" | "shuffle" | null>(
+    null,
+  );
   const [togglingFollow, setTogglingFollow] = useState(false);
   const offlineState = getPlaylistState(playlistId);
   const offlineRecord = getPlaylistRecord(playlistId);
@@ -127,30 +143,39 @@ export function PlaylistListRow({
         ? `${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState)
       : isOfflineBusy(offlineState) && offlineRecord?.trackCount
-        ? `${Math.min(offlineRecord.readyTrackCount || 0, offlineRecord.trackCount)}/${offlineRecord.trackCount} offline`
+        ? `${Math.min(
+            offlineRecord.readyTrackCount || 0,
+            offlineRecord.trackCount,
+          )}/${offlineRecord.trackCount} offline`
         : getOfflineStateLabel(offlineState);
 
-  const loadAndPlay = useCallback(async (mode: "play" | "shuffle") => {
-    setPlayingMode(mode);
-    try {
-      const response = await api<PlaylistDetailResponse>(detailEndpoint);
-      const tracks = toPlayerTracks(response.tracks || []);
-      if (tracks.length === 0) {
-        toast.message("This playlist has no playable tracks yet");
-        return;
+  const loadAndPlay = useCallback(
+    async (mode: "play" | "shuffle") => {
+      setPlayingMode(mode);
+      try {
+        const response = await api<PlaylistDetailResponse>(detailEndpoint);
+        const tracks = toPlayerTracks(response.tracks || []);
+        if (tracks.length === 0) {
+          toast.message("This playlist has no playable tracks yet");
+          return;
+        }
+        const queue = mode === "shuffle" ? shuffleArray(tracks) : tracks;
+        playAll(queue, 0, {
+          type: "playlist",
+          name,
+          radio:
+            playlistId != null
+              ? { seedType: "playlist", seedId: playlistId }
+              : undefined,
+        });
+      } catch {
+        toast.error("Failed to load playlist");
+      } finally {
+        setPlayingMode(null);
       }
-      const queue = mode === "shuffle" ? shuffleArray(tracks) : tracks;
-      playAll(queue, 0, {
-        type: "playlist",
-        name,
-        radio: playlistId != null ? { seedType: "playlist", seedId: playlistId } : undefined,
-      });
-    } catch {
-      toast.error("Failed to load playlist");
-    } finally {
-      setPlayingMode(null);
-    }
-  }, [detailEndpoint, name, playAll, playlistId]);
+    },
+    [detailEndpoint, name, playAll, playlistId],
+  );
 
   const baseActions = usePlaylistActionEntries({
     playlistId,
@@ -179,7 +204,9 @@ export function PlaylistListRow({
   }, [baseActions, extraActions]);
   const actionMenu = useItemActionMenu(menuActions);
 
-  async function handleToggleFollow(event: React.MouseEvent<HTMLButtonElement>) {
+  async function handleToggleFollow(
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) {
     event.stopPropagation();
     if (!followState) return;
     setTogglingFollow(true);
@@ -190,11 +217,13 @@ export function PlaylistListRow({
     }
   }
 
-  const badgeLabel =
-    crateManaged
-      ? null
-      :
-    badge === "smart" ? "Smart" : badge === "curated" ? "Curated" : null;
+  const badgeLabel = crateManaged
+    ? null
+    : badge === "smart"
+      ? "Smart"
+      : badge === "curated"
+        ? "Curated"
+        : null;
 
   return (
     <div
@@ -229,7 +258,9 @@ export function PlaylistListRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{name}</span>
+          <span className="truncate text-sm font-medium text-foreground">
+            {name}
+          </span>
           {badgeLabel ? (
             <span className="inline-flex items-center rounded-md border border-primary/30 px-1.5 py-0 text-[10px] font-medium text-primary">
               <Sparkles size={10} className="mr-0.5" />
@@ -258,7 +289,11 @@ export function PlaylistListRow({
             </span>
           ) : null}
         </div>
-        {description ? <div className="mt-1 truncate text-[11px] text-white/40">{description}</div> : null}
+        {description ? (
+          <div className="mt-1 truncate text-[11px] text-white/40">
+            {description}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
@@ -269,7 +304,11 @@ export function PlaylistListRow({
           }}
           title="Play"
         >
-          {playingMode === "play" ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} fill="currentColor" className="ml-0.5" />}
+          {playingMode === "play" ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Play size={15} fill="currentColor" className="ml-0.5" />
+          )}
         </ActionIconButton>
         <ActionIconButton
           onClick={(event) => {
@@ -278,7 +317,11 @@ export function PlaylistListRow({
           }}
           title="Shuffle"
         >
-          {playingMode === "shuffle" ? <Loader2 size={15} className="animate-spin" /> : <Shuffle size={15} />}
+          {playingMode === "shuffle" ? (
+            <Loader2 size={15} className="animate-spin" />
+          ) : (
+            <Shuffle size={15} />
+          )}
         </ActionIconButton>
         {followState ? (
           <ActionIconButton
@@ -286,7 +329,14 @@ export function PlaylistListRow({
             active={followState.isFollowed}
             title={followState.isFollowed ? "Following" : "Follow"}
           >
-            {togglingFollow ? <Loader2 size={15} className="animate-spin" /> : <Heart size={15} className={followState.isFollowed ? "fill-current" : ""} />}
+            {togglingFollow ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Heart
+                size={15}
+                className={followState.isFollowed ? "fill-current" : ""}
+              />
+            )}
           </ActionIconButton>
         ) : null}
         {extraActions?.map((action) => {
@@ -302,7 +352,11 @@ export function PlaylistListRow({
               tone={action.tone}
               title={action.title}
             >
-              {action.loading ? <Loader2 size={15} className="animate-spin" /> : <Icon size={15} />}
+              {action.loading ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Icon size={15} />
+              )}
             </ActionIconButton>
           );
         })}

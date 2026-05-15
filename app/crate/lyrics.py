@@ -143,7 +143,9 @@ def sync_lyrics_for_tracks(
                     "album_id": track.get("album_id"),
                     "title": title,
                     "track_id": track.get("id"),
-                    "track_entity_uid": str(track["entity_uid"]) if track.get("entity_uid") else None,
+                    "track_entity_uid": str(track["entity_uid"])
+                    if track.get("entity_uid")
+                    else None,
                     "path": track.get("path"),
                 }
             )
@@ -162,7 +164,9 @@ def sync_lyrics_for_tracks(
                         "album_id": track.get("album_id"),
                         "title": title,
                         "track_id": track.get("id"),
-                        "track_entity_uid": str(track["entity_uid"]) if track.get("entity_uid") else None,
+                        "track_entity_uid": str(track["entity_uid"])
+                        if track.get("entity_uid")
+                        else None,
                         "path": track.get("path"),
                         "status": "none",
                         "found": False,
@@ -174,7 +178,13 @@ def sync_lyrics_for_tracks(
             continue
 
         try:
-            cached = None if force else get_cached_lyrics(artist, title, max_age_seconds=LYRICS_TTL_SECONDS)
+            cached = (
+                None
+                if force
+                else get_cached_lyrics(
+                    artist, title, max_age_seconds=LYRICS_TTL_SECONDS
+                )
+            )
             if cached is not None:
                 payload = _response_payload(cached)
                 status_payload = _lyrics_status_payload(cached)
@@ -184,7 +194,9 @@ def sync_lyrics_for_tracks(
                     artist,
                     title,
                     track_id=track.get("id"),
-                    track_entity_uid=str(track["entity_uid"]) if track.get("entity_uid") else None,
+                    track_entity_uid=str(track["entity_uid"])
+                    if track.get("entity_uid")
+                    else None,
                 )
                 payload = _response_payload(stored)
                 status_payload = _lyrics_status_payload(stored)
@@ -205,7 +217,9 @@ def sync_lyrics_for_tracks(
                         "album_id": track.get("album_id"),
                         "title": title,
                         "track_id": track.get("id"),
-                        "track_entity_uid": str(track["entity_uid"]) if track.get("entity_uid") else None,
+                        "track_entity_uid": str(track["entity_uid"])
+                        if track.get("entity_uid")
+                        else None,
                         "path": track.get("path"),
                         "source": source,
                         **status_payload,
@@ -226,7 +240,9 @@ def sync_lyrics_for_tracks(
                         "album_id": track.get("album_id"),
                         "title": title,
                         "track_id": track.get("id"),
-                        "track_entity_uid": str(track["entity_uid"]) if track.get("entity_uid") else None,
+                        "track_entity_uid": str(track["entity_uid"])
+                        if track.get("entity_uid")
+                        else None,
                         "path": track.get("path"),
                         "status": "none",
                         "found": False,
@@ -240,7 +256,9 @@ def sync_lyrics_for_tracks(
             time.sleep(delay_seconds)
 
     if progress_callback:
-        progress_callback({"event": "complete", "done": len(tracks), "total": len(tracks)})
+        progress_callback(
+            {"event": "complete", "done": len(tracks), "total": len(tracks)}
+        )
 
     return {
         "tracks": len(tracks),

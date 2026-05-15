@@ -47,7 +47,11 @@ def _identity_tags(
         "crate_audio_fingerprint": audio_fingerprint,
         "crate_audio_fingerprint_source": audio_fingerprint_source,
     }
-    return {key: text for key, value in raw.items() if (text := _tag_value(value)) is not None}
+    return {
+        key: text
+        for key, value in raw.items()
+        if (text := _tag_value(value)) is not None
+    }
 
 
 def _find_artwork_files(album_dir: Path) -> list[str]:
@@ -85,11 +89,20 @@ def write_album_sidecar(album_payload: dict[str, Any]) -> Path:
     sidecar_path = sidecar_dir / "album.json"
     payload = _sidecar_payload(album_payload, album_dir)
 
-    fd, tmp_name = tempfile.mkstemp(prefix="album.", suffix=".json.tmp", dir=sidecar_dir)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix="album.", suffix=".json.tmp", dir=sidecar_dir
+    )
     tmp_path = Path(tmp_name)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True, default=_json_default)
+            json.dump(
+                payload,
+                handle,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+                default=_json_default,
+            )
             handle.write("\n")
         tmp_path.replace(sidecar_path)
     except Exception:
@@ -106,6 +119,7 @@ def _write_mp4_tags(path: Path, tags: dict[str, str]) -> None:
 
     try:
         from mutagen.mp4 import AtomDataType
+
         dataformat = AtomDataType.UTF8
     except Exception:
         dataformat = 1
@@ -115,31 +129,38 @@ def _write_mp4_tags(path: Path, tags: dict[str, str]) -> None:
         if key == "lyrics":
             audio["\xa9lyr"] = [value]
             continue
-        audio[f"----:com.crate:{key}"] = [MP4FreeForm(value.encode("utf-8"), dataformat=dataformat)]
+        audio[f"----:com.crate:{key}"] = [
+            MP4FreeForm(value.encode("utf-8"), dataformat=dataformat)
+        ]
     audio.save()
 
 
 def _write_mp3_tags(path: Path, tags: dict[str, str]) -> None:
-    from mutagen.id3 import TXXX, USLT
+    import mutagen.id3 as id3
     from mutagen.mp3 import MP3
 
+    TXXX = getattr(id3, "TXXX")
+    USLT = getattr(id3, "USLT")
     audio = MP3(str(path))
     if audio.tags is None:
         audio.add_tags()
+    tags_obj = audio.tags
+    if tags_obj is None:
+        raise ValueError("could not initialize MP3 tags")
     for key, value in tags.items():
         if key == "lyrics":
-            audio.tags.delall("USLT")
-            audio.tags.add(USLT(encoding=3, lang="eng", desc="", text=value))
+            tags_obj.delall("USLT")
+            tags_obj.add(USLT(encoding=3, lang="eng", desc="", text=value))
             continue
-        audio.tags.delall(f"TXXX:{key}")
-        audio.tags.add(TXXX(encoding=3, desc=key, text=[value]))
+        tags_obj.delall(f"TXXX:{key}")
+        tags_obj.add(TXXX(encoding=3, desc=key, text=[value]))
     audio.save()
 
 
 def _write_mapping_tags(path: Path, tags: dict[str, str]) -> None:
     import mutagen
 
-    audio = mutagen.File(str(path))
+    audio = getattr(mutagen, "File")(str(path))
     if audio is None:
         raise ValueError("unsupported audio file")
     for key, value in tags.items():
@@ -166,7 +187,9 @@ def _image_mime(path: Path) -> str:
     return "image/jpeg"
 
 
-def find_album_artwork_file(album_dir: str | Path, names: list[str] | None = None) -> Path | None:
+def find_album_artwork_file(
+    album_dir: str | Path, names: list[str] | None = None
+) -> Path | None:
     root = Path(str(album_dir))
     if not root.is_dir():
         return None
@@ -204,14 +227,18 @@ def _embed_mp4_artwork(path: Path, artwork_path: Path) -> None:
 
 
 def _embed_mp3_artwork(path: Path, artwork_path: Path) -> None:
-    from mutagen.id3 import APIC
+    import mutagen.id3 as id3
     from mutagen.mp3 import MP3
 
+    APIC = getattr(id3, "APIC")
     audio = MP3(str(path))
     if audio.tags is None:
         audio.add_tags()
-    audio.tags.delall("APIC")
-    audio.tags.add(
+    tags_obj = audio.tags
+    if tags_obj is None:
+        raise ValueError("could not initialize MP3 tags")
+    tags_obj.delall("APIC")
+    tags_obj.add(
         APIC(
             encoding=3,
             mime=_image_mime(artwork_path),
@@ -277,7 +304,11 @@ def write_track_identity_tags(
         audio_fingerprint_source=audio_fingerprint_source,
     )
     if not tags:
-        return {"written": False, "path": str(path), "error": "no identity tags to write"}
+        return {
+            "written": False,
+            "path": str(path),
+            "error": "no identity tags to write",
+        }
 
     try:
         _write_tags_for_path(path, tags)
@@ -308,14 +339,24 @@ def _rich_tags(
         "lyrics": lyrics.get("plain"),
         "unsyncedlyrics": lyrics.get("plain"),
         "syncedlyrics": lyrics.get("synced"),
-        "crate_analysis_json": json.dumps(analysis, ensure_ascii=False, sort_keys=True, default=_json_default)
+        "crate_analysis_json": json.dumps(
+            analysis, ensure_ascii=False, sort_keys=True, default=_json_default
+        )
         if analysis
         else None,
-        "crate_bliss_vector": ",".join(str(value) for value in (bliss.get("vector") or []))
+        "crate_bliss_vector": ",".join(
+            str(value) for value in (bliss.get("vector") or [])
+        )
         if bliss.get("vector")
         else None,
     }
-    tags.update({key: text for key, value in extras.items() if (text := _tag_value(value)) is not None})
+    tags.update(
+        {
+            key: text
+            for key, value in extras.items()
+            if (text := _tag_value(value)) is not None
+        }
+    )
     return tags
 
 
@@ -331,7 +372,9 @@ def write_track_rich_tags(
     if not path.exists():
         return {"written": False, "path": str(path), "error": "file not found"}
 
-    tags = _rich_tags(artist_uid=artist_uid, album_uid=album_uid, track_payload=track_payload)
+    tags = _rich_tags(
+        artist_uid=artist_uid, album_uid=album_uid, track_payload=track_payload
+    )
     if not tags:
         return {"written": False, "path": str(path), "error": "no tags to write"}
 
@@ -346,7 +389,12 @@ def write_track_rich_tags(
                 artwork_error = str(exc)[:500]
     except Exception as exc:
         return {"written": False, "path": str(path), "error": str(exc)[:500]}
-    result = {"written": True, "path": str(path), "tags": sorted(tags), "artwork_embedded": artwork_embedded}
+    result = {
+        "written": True,
+        "path": str(path),
+        "tags": sorted(tags),
+        "artwork_embedded": artwork_embedded,
+    }
     if artwork_error:
         result["artwork_error"] = artwork_error
     return result
@@ -394,7 +442,9 @@ def write_album_portable_metadata(
     return result
 
 
-def iter_album_sidecars(root_path: str | Path, *, limit: int | None = None) -> list[Path]:
+def iter_album_sidecars(
+    root_path: str | Path, *, limit: int | None = None
+) -> list[Path]:
     root = Path(str(root_path))
     if not root.exists():
         return []
@@ -442,7 +492,9 @@ def _safe_segment(value: Any, fallback: str) -> str:
     return text or fallback
 
 
-def _copy_artwork_files(source_album_dir: Path, export_album_dir: Path, names: list[str]) -> int:
+def _copy_artwork_files(
+    source_album_dir: Path, export_album_dir: Path, names: list[str]
+) -> int:
     copied = 0
     for name in names:
         source = source_album_dir / name
@@ -464,9 +516,17 @@ def export_album_rich_metadata(
 ) -> dict[str, Any]:
     source_album = album_payload.get("album") or {}
     artist_payload = album_payload.get("artist") or {}
-    artist_name = artist_payload.get("name") or source_album.get("artist") or "Unknown Artist"
-    album_name = source_album.get("name") or source_album.get("tag_album") or "Unknown Album"
-    export_album_dir = Path(str(export_root)) / _safe_segment(artist_name, "Unknown Artist") / _safe_segment(album_name, "Unknown Album")
+    artist_name = (
+        artist_payload.get("name") or source_album.get("artist") or "Unknown Artist"
+    )
+    album_name = (
+        source_album.get("name") or source_album.get("tag_album") or "Unknown Album"
+    )
+    export_album_dir = (
+        Path(str(export_root))
+        / _safe_segment(artist_name, "Unknown Artist")
+        / _safe_segment(album_name, "Unknown Album")
+    )
     export_album_dir.mkdir(parents=True, exist_ok=True)
 
     export_payload = deepcopy(album_payload)
@@ -474,8 +534,12 @@ def export_album_rich_metadata(
     source_album_dir = Path(str(source_album.get("path") or ""))
     artwork_path = None
     if source_album_dir.is_dir():
-        artwork_names = list(source_album.get("artwork_files") or _find_artwork_files(source_album_dir))
-        artwork_copied = _copy_artwork_files(source_album_dir, export_album_dir, artwork_names)
+        artwork_names = list(
+            source_album.get("artwork_files") or _find_artwork_files(source_album_dir)
+        )
+        artwork_copied = _copy_artwork_files(
+            source_album_dir, export_album_dir, artwork_names
+        )
         artwork_path = find_album_artwork_file(source_album_dir, artwork_names)
     else:
         artwork_copied = 0
@@ -488,7 +552,12 @@ def export_album_rich_metadata(
     for track_payload in export_payload.get("tracks") or []:
         track = dict(track_payload)
         source_path = Path(str(track.get("path") or ""))
-        relative_path = str(track.get("relative_path") or source_path.name or track.get("filename") or "").strip()
+        relative_path = str(
+            track.get("relative_path")
+            or source_path.name
+            or track.get("filename")
+            or ""
+        ).strip()
         if include_audio:
             if not source_path.is_file():
                 tag_errors.append({"path": str(source_path), "error": "file not found"})

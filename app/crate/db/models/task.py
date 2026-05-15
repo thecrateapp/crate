@@ -4,7 +4,6 @@ Covers the ``tasks`` table and the ``scan_results`` table.
 Models match the dict shapes returned by ``_row_to_task()`` in ``db/tasks.py``.
 """
 
-
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +16,7 @@ class TaskRow(BaseModel):
     Note: ``params`` and ``result`` are the deserialized JSON versions of the
     ``params_json`` / ``result_json`` DB columns (done by ``_row_to_task``).
     """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -41,6 +41,7 @@ class TaskRow(BaseModel):
 
 class TaskSummary(BaseModel):
     """Lighter task projection for list views."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -57,6 +58,7 @@ class TaskSummary(BaseModel):
 
 class ScanResultRow(BaseModel):
     """Scan result record as returned by ``get_latest_scan()``."""
+
     model_config = ConfigDict(from_attributes=True)
 
     task_id: str

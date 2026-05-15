@@ -25,12 +25,16 @@ const TRACK_A: Track = { id: "a", title: "A", artist: "Artist" };
 const TRACK_B: Track = { id: "b", title: "B", artist: "Artist" };
 
 function createOptions() {
-  const callbacksRef = { current: {} as GaplessPlayerCallbacks } as MutableRefObject<GaplessPlayerCallbacks>;
+  const callbacksRef = {
+    current: {} as GaplessPlayerCallbacks,
+  } as MutableRefObject<GaplessPlayerCallbacks>;
   return {
     callbacksRef,
     crossfadeTimerRef: { current: null } as MutableRefObject<number | null>,
     currentIndexRef: { current: 0 } as MutableRefObject<number>,
-    currentTrackRef: { current: TRACK_A } as MutableRefObject<Track | undefined>,
+    currentTrackRef: { current: TRACK_A } as MutableRefObject<
+      Track | undefined
+    >,
     playSourceRef: { current: null } as MutableRefObject<PlaySource | null>,
     durationRef: { current: 0 } as MutableRefObject<number>,
     effectiveCrossfadeMsRef: { current: 0 } as MutableRefObject<number>,
@@ -38,7 +42,9 @@ function createOptions() {
     bufferingIntentRef: { current: false } as MutableRefObject<boolean>,
     pendingRestoreTimeRef: { current: 0 } as MutableRefObject<number>,
     resumeAfterReloadRef: { current: false } as MutableRefObject<boolean>,
-    engineTrackMapRef: { current: new Map() } as MutableRefObject<Map<string, Track[]>>,
+    engineTrackMapRef: { current: new Map() } as MutableRefObject<
+      Map<string, Track[]>
+    >,
     queueRef: { current: [TRACK_A, TRACK_B] } as MutableRefObject<Track[]>,
     commitCurrentTime: vi.fn(),
     commitDuration: vi.fn(),

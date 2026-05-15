@@ -3,6 +3,12 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
+def test_bliss_reexports_crate_cli_availability_check():
+    from crate.bliss import is_available
+
+    assert callable(is_available)
+
+
 def test_get_similar_from_db_uses_fallback_without_bliss_vector():
     from crate.bliss import get_similar_from_db
 
@@ -29,9 +35,13 @@ def test_get_similar_from_db_uses_fallback_without_bliss_vector():
         }
     ]
 
-    with patch("crate.bliss.get_track_with_artist", return_value=source), \
-         patch("crate.bliss._get_artist_genre_ids", return_value={"metalcore"}), \
-         patch("crate.bliss._recommend_without_bliss", return_value=fallback) as recommend:
+    with (
+        patch("crate.bliss.get_track_with_artist", return_value=source),
+        patch("crate.bliss._get_artist_genre_ids", return_value={"metalcore"}),
+        patch(
+            "crate.bliss._recommend_without_bliss", return_value=fallback
+        ) as recommend,
+    ):
         result = get_similar_from_db(source["path"], limit=12, user_id=5)
 
     assert result == fallback
@@ -86,24 +96,29 @@ def test_get_similar_from_db_scores_and_sorts_candidates():
             candidates[1]["path"]: 0.93,
         }[candidate["path"]]
 
-    with patch("crate.bliss.get_track_with_artist", return_value=source), \
-         patch("crate.bliss._get_artist_genre_ids", return_value={"metalcore"}), \
-         patch("crate.bliss.get_bliss_candidates", return_value=candidates), \
-         patch(
-             "crate.bliss._get_artist_genre_map",
-             return_value={"Cave In": {"post-hardcore"}, "Botch": {"metalcore"}},
-         ), \
-         patch("crate.bliss._get_similar_artist_names", return_value={"Botch"}), \
-         patch("crate.bliss._build_user_radio_profile", return_value={}), \
-         patch("crate.bliss._score_candidate", side_effect=_score), \
-         patch(
-             "crate.bliss._apply_user_profile_score",
-             side_effect=lambda candidate, score, user_profile: score,
-         ):
+    with (
+        patch("crate.bliss.get_track_with_artist", return_value=source),
+        patch("crate.bliss._get_artist_genre_ids", return_value={"metalcore"}),
+        patch("crate.bliss.get_bliss_candidates", return_value=candidates),
+        patch(
+            "crate.bliss._get_artist_genre_map",
+            return_value={"Cave In": {"post-hardcore"}, "Botch": {"metalcore"}},
+        ),
+        patch("crate.bliss._get_similar_artist_names", return_value={"Botch"}),
+        patch("crate.bliss._build_user_radio_profile", return_value={}),
+        patch("crate.bliss._score_candidate", side_effect=_score),
+        patch(
+            "crate.bliss._apply_user_profile_score",
+            side_effect=lambda candidate, score, user_profile: score,
+        ),
+    ):
         result = get_similar_from_db(source["path"], limit=2, user_id=9)
 
     assert [track["track_id"] for track in result] == [3, 2]
-    assert result[0]["track_path"] == "Botch/We Are the Romans/02 - To Our Friends in the Great White North.flac"
+    assert (
+        result[0]["track_path"]
+        == "Botch/We Are the Romans/02 - To Our Friends in the Great White North.flac"
+    )
     assert result[0]["score"] == 0.93
     assert result[1]["score"] == 0.41
 
@@ -162,16 +177,19 @@ def test_generate_track_radio_keeps_seed_first_and_deduplicates_paths():
         },
     ]
 
-    with patch("crate.bliss.get_track_with_artist", return_value=seed), \
-         patch("crate.bliss.get_same_artist_tracks", return_value=same_artist_tracks), \
-         patch("crate.bliss.get_similar_from_db", return_value=similar_tracks):
+    with (
+        patch("crate.bliss.get_track_with_artist", return_value=seed),
+        patch("crate.bliss.get_same_artist_tracks", return_value=same_artist_tracks),
+        patch("crate.bliss.get_similar_from_db", return_value=similar_tracks),
+    ):
         result = generate_track_radio(seed["path"], limit=4, mix_ratio=0.25, user_id=3)
 
     assert result[0]["track_path"] == "Converge/Jane Doe/01 - Concubine.flac"
     assert len({track["track_path"] for track in result}) == len(result)
-    assert "Botch/We Are the Romans/02 - To Our Friends in the Great White North.flac" in {
-        track["track_path"] for track in result
-    }
+    assert (
+        "Botch/We Are the Romans/02 - To Our Friends in the Great White North.flac"
+        in {track["track_path"] for track in result}
+    )
     assert "Converge/Jane Doe/02 - Fault and Fracture.flac" in {
         track["track_path"] for track in result
     }

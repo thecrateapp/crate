@@ -16,9 +16,10 @@ def append_jam_room_event(
 ) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     with transaction_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 WITH inserted AS (
                     INSERT INTO jam_room_events (room_id, user_id, event_type, payload_json, created_at)
                     VALUES (:room_id, :user_id, :event_type, :payload_json, :created_at)
@@ -32,24 +33,32 @@ def append_jam_room_event(
                 FROM inserted
                 LEFT JOIN users u ON u.id = inserted.user_id
                 """
-            ),
-            {
-                "room_id": room_id,
-                "user_id": user_id,
-                "event_type": event_type,
-                "payload_json": json.dumps(payload or {}),
-                "created_at": now,
-            },
-        ).mappings().first()
+                ),
+                {
+                    "room_id": room_id,
+                    "user_id": user_id,
+                    "event_type": event_type,
+                    "payload_json": json.dumps(payload or {}),
+                    "created_at": now,
+                },
+            )
+            .mappings()
+            .first()
+        )
+    if row is None:
+        raise RuntimeError("Jam room event insert did not return a row")
     return dict(row)
 
 
-def list_jam_room_events(room_id: str, *, after_id: int | None = None, limit: int = 100) -> list[dict]:
+def list_jam_room_events(
+    room_id: str, *, after_id: int | None = None, limit: int = 100
+) -> list[dict]:
     with transaction_scope() as session:
         if after_id is None:
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         jre.*,
                         u.username,
@@ -61,13 +70,17 @@ def list_jam_room_events(room_id: str, *, after_id: int | None = None, limit: in
                     ORDER BY jre.id ASC
                     LIMIT :lim
                     """
-                ),
-                {"room_id": room_id, "lim": limit},
-            ).mappings().all()
+                    ),
+                    {"room_id": room_id, "lim": limit},
+                )
+                .mappings()
+                .all()
+            )
         else:
-            rows = session.execute(
-                text(
-                    """
+            rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT
                         jre.*,
                         u.username,
@@ -79,9 +92,12 @@ def list_jam_room_events(room_id: str, *, after_id: int | None = None, limit: in
                     ORDER BY jre.id ASC
                     LIMIT :lim
                     """
-                ),
-                {"room_id": room_id, "after_id": after_id, "lim": limit},
-            ).mappings().all()
+                    ),
+                    {"room_id": room_id, "after_id": after_id, "lim": limit},
+                )
+                .mappings()
+                .all()
+            )
     return [dict(row) for row in rows]
 
 

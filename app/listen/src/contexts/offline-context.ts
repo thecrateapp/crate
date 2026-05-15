@@ -34,9 +34,15 @@ export interface OfflineContextValue {
   isTrackOffline: (entityUid?: string | null) => boolean;
   isAlbumOffline: (albumId?: number | null) => boolean;
   isPlaylistOffline: (playlistId?: number | null) => boolean;
-  toggleTrackOffline: (input: OfflineTrackInput) => Promise<"enabled" | "removed">;
-  toggleAlbumOffline: (input: OfflineAlbumInput) => Promise<"enabled" | "removed">;
-  togglePlaylistOffline: (input: OfflinePlaylistInput) => Promise<"enabled" | "removed">;
+  toggleTrackOffline: (
+    input: OfflineTrackInput,
+  ) => Promise<"enabled" | "removed">;
+  toggleAlbumOffline: (
+    input: OfflineAlbumInput,
+  ) => Promise<"enabled" | "removed">;
+  togglePlaylistOffline: (
+    input: OfflinePlaylistInput,
+  ) => Promise<"enabled" | "removed">;
   syncAll: () => Promise<void>;
   clearActiveProfile: () => Promise<void>;
 }

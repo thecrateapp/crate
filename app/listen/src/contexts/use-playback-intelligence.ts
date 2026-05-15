@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
-import { areTracksFromSameAlbum, getTrackCacheKey } from "@/contexts/player-utils";
+import {
+  areTracksFromSameAlbum,
+  getTrackCacheKey,
+} from "@/contexts/player-utils";
 import { fetchInfiniteContinuation, fetchRadioContinuation } from "@/lib/radio";
 
 const RADIO_REFILL_THRESHOLD = 3;
@@ -10,7 +13,9 @@ const SMART_PLAYLIST_SUGGESTION_BATCH_SIZE = 12;
 
 function getPlaySourceSignature(source: PlaySource | null): string | null {
   if (!source) return null;
-  const legacySeedStorageId = (source.radio as { seedStorageId?: string | null } | undefined)?.seedStorageId ?? "";
+  const legacySeedStorageId =
+    (source.radio as { seedStorageId?: string | null } | undefined)
+      ?.seedStorageId ?? "";
   return [
     source.type,
     source.name,
@@ -23,7 +28,11 @@ function getPlaySourceSignature(source: PlaySource | null): string | null {
   ].join("::");
 }
 
-function collectUniqueTracks(candidates: Track[], queue: Track[], recent: Track[]): Track[] {
+function collectUniqueTracks(
+  candidates: Track[],
+  queue: Track[],
+  recent: Track[],
+): Track[] {
   const existingKeys = new Set(
     [...queue, ...recent].map((track) => getTrackCacheKey(track)),
   );
@@ -152,11 +161,17 @@ export function usePlaybackIntelligence({
     const controller = new AbortController();
     radioRefillAbortRef.current = controller;
 
-    fetchRadioContinuation(playSource, RADIO_REFILL_BATCH_SIZE, { signal: controller.signal })
+    fetchRadioContinuation(playSource, RADIO_REFILL_BATCH_SIZE, {
+      signal: controller.signal,
+    })
       .then((tracks) => {
         if (controller.signal.aborted) return;
         if (radioRefillSignatureRef.current !== signature) return;
-        if (getPlaySourceSignature(playSourceRef.current) !== getPlaySourceSignature(playSource)) return;
+        if (
+          getPlaySourceSignature(playSourceRef.current) !==
+          getPlaySourceSignature(playSource)
+        )
+          return;
         actionsRef.current.appendTracks(tracks);
       })
       .catch((error) => {
@@ -202,19 +217,26 @@ export function usePlaybackIntelligence({
     if (continuationInFlightRef.current) return;
 
     const sessionSignature = getPlaySourceSignature(playSource);
-    const signature = [sessionSignature, currentTrack?.id ?? "", queue.length].join("::");
+    const signature = [
+      sessionSignature,
+      currentTrack?.id ?? "",
+      queue.length,
+    ].join("::");
     if (continuationSignatureRef.current === signature) return;
     continuationSignatureRef.current = signature;
     continuationInFlightRef.current = true;
     const controller = new AbortController();
     continuationPrefetchAbortRef.current = controller;
 
-    fetchInfiniteContinuation(playSource!, RADIO_REFILL_BATCH_SIZE, { signal: controller.signal })
+    fetchInfiniteContinuation(playSource!, RADIO_REFILL_BATCH_SIZE, {
+      signal: controller.signal,
+    })
       .then((tracks) => {
         if (controller.signal.aborted) return;
         if (!tracks.length) return;
         if (continuationSignatureRef.current !== signature) return;
-        if (getPlaySourceSignature(playSourceRef.current) !== sessionSignature) return;
+        if (getPlaySourceSignature(playSourceRef.current) !== sessionSignature)
+          return;
         actionsRef.current.appendTracks(tracks);
       })
       .catch((error) => {
@@ -237,7 +259,14 @@ export function usePlaybackIntelligence({
       }
       continuationInFlightRef.current = false;
     };
-  }, [currentIndex, infinitePlaybackEnabled, playSource, queue, queue.length, shuffle]);
+  }, [
+    currentIndex,
+    infinitePlaybackEnabled,
+    playSource,
+    queue,
+    queue.length,
+    shuffle,
+  ]);
 
   // ── Smart playlist suggestions: inject one tasteful recommendation
   // every N original tracks played in a playlist session.
@@ -300,13 +329,21 @@ export function usePlaybackIntelligence({
     playlistSuggestionAbortRef.current = controller;
     const expectedSeedId = playSource?.radio?.seedId ?? null;
 
-    fetchInfiniteContinuation(playSource!, SMART_PLAYLIST_SUGGESTION_BATCH_SIZE, { signal: controller.signal })
+    fetchInfiniteContinuation(
+      playSource!,
+      SMART_PLAYLIST_SUGGESTION_BATCH_SIZE,
+      { signal: controller.signal },
+    )
       .then((tracks) => {
         if (controller.signal.aborted) return;
         if (!tracks.length) return;
         if (playlistSuggestionSignatureRef.current !== signature) return;
         const latestSource = playSourceRef.current;
-        if (latestSource?.type !== "playlist" || latestSource?.radio?.seedId !== expectedSeedId) return;
+        if (
+          latestSource?.type !== "playlist" ||
+          latestSource?.radio?.seedId !== expectedSeedId
+        )
+          return;
 
         actionsRef.current.insertSuggestionAfterCurrent(tracks);
       })
@@ -359,7 +396,12 @@ export function usePlaybackIntelligence({
     }
 
     const sessionSignature = getPlaySourceSignature(playSource);
-    const requestSignature = [sessionSignature, currentIndexRef.current, queueRef.current.length, "manual"].join("::");
+    const requestSignature = [
+      sessionSignature,
+      currentIndexRef.current,
+      queueRef.current.length,
+      "manual",
+    ].join("::");
 
     actionsRef.current.setBuffering(true);
     continuationSignatureRef.current = requestSignature;
@@ -368,14 +410,18 @@ export function usePlaybackIntelligence({
     const controller = new AbortController();
     continuationManualAbortRef.current = controller;
 
-    fetchInfiniteContinuation(playSource, RADIO_REFILL_BATCH_SIZE, { signal: controller.signal })
+    fetchInfiniteContinuation(playSource, RADIO_REFILL_BATCH_SIZE, {
+      signal: controller.signal,
+    })
       .then((tracks) => {
         if (controller.signal.aborted) return;
         if (continuationSignatureRef.current !== requestSignature) {
           actionsRef.current.setBuffering(false);
           return;
         }
-        if (getPlaySourceSignature(playSourceRef.current) !== sessionSignature) {
+        if (
+          getPlaySourceSignature(playSourceRef.current) !== sessionSignature
+        ) {
           actionsRef.current.setBuffering(false);
           return;
         }
@@ -384,7 +430,11 @@ export function usePlaybackIntelligence({
           return;
         }
 
-        const uniqueTracks = collectUniqueTracks(tracks, queueRef.current, recentlyPlayedRef.current);
+        const uniqueTracks = collectUniqueTracks(
+          tracks,
+          queueRef.current,
+          recentlyPlayedRef.current,
+        );
         if (uniqueTracks.length === 0) {
           actionsRef.current.setBuffering(false);
           return;

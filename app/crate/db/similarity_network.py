@@ -33,23 +33,29 @@ def _lookup_artist_refs(nodes: dict[str, dict]) -> dict[str, dict]:
         return {}
 
     with transaction_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT id, slug, name
                 FROM library_artists
                 WHERE LOWER(name) = ANY(:names)
                 """
-            ),
-            {"names": all_node_names},
-        ).mappings().all()
+                ),
+                {"names": all_node_names},
+            )
+            .mappings()
+            .all()
+        )
     return {
         row["name"].lower(): {"artist_id": row["id"], "artist_slug": row["slug"]}
         for row in rows
     }
 
 
-def get_artist_network(artist_name: str, depth: int = 2, limit_per_level: int = 15) -> dict:
+def get_artist_network(
+    artist_name: str, depth: int = 2, limit_per_level: int = 15
+) -> dict:
     """Return {nodes, links} for ForceGraph2D.
 
     depth=1: center + direct similar
@@ -60,21 +66,30 @@ def get_artist_network(artist_name: str, depth: int = 2, limit_per_level: int = 
     seen_links: set[tuple[str, str]] = set()
 
     center_key = _key(artist_name)
-    nodes[center_key] = {"id": artist_name, "group": 0, "in_library": True, "score": 1.0}
+    nodes[center_key] = {
+        "id": artist_name,
+        "group": 0,
+        "in_library": True,
+        "score": 1.0,
+    }
 
     with transaction_scope() as session:
-        level1 = session.execute(
-            text(
-                """
+        level1 = (
+            session.execute(
+                text(
+                    """
                 SELECT similar_name, score, in_library
                 FROM artist_similarities
                 WHERE artist_name = :artist_name
                 ORDER BY score DESC
                 LIMIT :lim
                 """
-            ),
-            {"artist_name": artist_name, "lim": limit_per_level},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name, "lim": limit_per_level},
+            )
+            .mappings()
+            .all()
+        )
 
     level1_names: list[str] = []
     for row in level1:
@@ -98,18 +113,22 @@ def get_artist_network(artist_name: str, depth: int = 2, limit_per_level: int = 
 
     if depth >= 2 and level1_names:
         with transaction_scope() as session:
-            level2_rows = session.execute(
-                text(
-                    """
+            level2_rows = (
+                session.execute(
+                    text(
+                        """
                     SELECT artist_name, similar_name, score, in_library
                     FROM artist_similarities
                     WHERE artist_name = ANY(:names)
                        OR similar_name = ANY(:names)
                     ORDER BY score DESC
                     """
-                ),
-                {"names": level1_names},
-            ).mappings().all()
+                    ),
+                    {"names": level1_names},
+                )
+                .mappings()
+                .all()
+            )
 
         per_parent: dict[str, int] = {}
         for row in level2_rows:

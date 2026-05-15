@@ -1,14 +1,23 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.utility import (
     OrganizeApplyRequest,
     OrganizeApplyResponse,
     OrganizePresetsResponse,
     OrganizePreviewResponse,
 )
-from crate.organizer import preview_organize, organize_album, suggest_folder_name, PRESETS
+from crate.organizer import (
+    preview_organize,
+    organize_album,
+    suggest_folder_name,
+    PRESETS,
+)
 from crate.api._deps import library_path, extensions, safe_path
 from crate.db.repositories.library import get_library_album_by_id
 
@@ -34,7 +43,9 @@ def api_organize_presets(request: Request):
     return PRESETS
 
 
-def api_organize_preview(request: Request, artist: str, album: str, pattern: str | None = None):
+def api_organize_preview(
+    request: Request, artist: str, album: str, pattern: str | None = None
+):
     _require_admin(request)
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
@@ -43,7 +54,9 @@ def api_organize_preview(request: Request, artist: str, album: str, pattern: str
 
     exts = extensions()
     preview = preview_organize(album_dir, exts, pattern)
-    folder_suggestion = suggest_folder_name(album_dir, exts, include_year="year" in (pattern or ""))
+    folder_suggestion = suggest_folder_name(
+        album_dir, exts, include_year="year" in (pattern or "")
+    )
 
     return {
         "tracks": preview,
@@ -53,7 +66,9 @@ def api_organize_preview(request: Request, artist: str, album: str, pattern: str
     }
 
 
-def api_organize_apply(request: Request, artist: str, album: str, data: OrganizeApplyRequest | None = None):
+def api_organize_apply(
+    request: Request, artist: str, album: str, data: OrganizeApplyRequest | None = None
+):
     _require_admin(request)
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
@@ -74,7 +89,9 @@ def api_organize_apply(request: Request, artist: str, album: str, data: Organize
     responses=_ORGANIZER_RESPONSES,
     summary="Preview file-organization changes for an album",
 )
-def api_organize_preview_by_id(request: Request, album_id: int, pattern: str | None = None):
+def api_organize_preview_by_id(
+    request: Request, album_id: int, pattern: str | None = None
+):
     album = get_library_album_by_id(album_id)
     if not album:
         raise HTTPException(status_code=404, detail="Not found")
@@ -87,7 +104,9 @@ def api_organize_preview_by_id(request: Request, album_id: int, pattern: str | N
     responses=_ORGANIZER_RESPONSES,
     summary="Apply file-organization changes to an album",
 )
-def api_organize_apply_by_id(request: Request, album_id: int, data: OrganizeApplyRequest | None = None):
+def api_organize_apply_by_id(
+    request: Request, album_id: int, data: OrganizeApplyRequest | None = None
+):
     album = get_library_album_by_id(album_id)
     if not album:
         raise HTTPException(status_code=404, detail="Not found")

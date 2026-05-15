@@ -3,7 +3,7 @@
 import os
 import logging
 import requests
-from typing import Optional
+
 
 from crate.db.cache_settings import get_setting
 
@@ -14,8 +14,12 @@ USER_AGENT = "Crate/1.0 +https://github.com/crate"
 
 
 def _headers() -> dict:
-    key = get_setting("discogs_consumer_key", os.environ.get("DISCOGS_CONSUMER_KEY", ""))
-    secret = get_setting("discogs_consumer_secret", os.environ.get("DISCOGS_CONSUMER_SECRET", ""))
+    key = get_setting(
+        "discogs_consumer_key", os.environ.get("DISCOGS_CONSUMER_KEY", "")
+    )
+    secret = get_setting(
+        "discogs_consumer_secret", os.environ.get("DISCOGS_CONSUMER_SECRET", "")
+    )
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if key and secret:
         headers["Authorization"] = f"Discogs key={key}, secret={secret}"
@@ -23,11 +27,13 @@ def _headers() -> dict:
 
 
 def is_configured() -> bool:
-    key = get_setting("discogs_consumer_key", os.environ.get("DISCOGS_CONSUMER_KEY", ""))
+    key = get_setting(
+        "discogs_consumer_key", os.environ.get("DISCOGS_CONSUMER_KEY", "")
+    )
     return bool(key)
 
 
-def search_artist(name: str) -> Optional[dict]:
+def search_artist(name: str) -> dict | None:
     """Search for an artist on Discogs. Returns best match or None."""
     try:
         resp = requests.get(
@@ -48,7 +54,7 @@ def search_artist(name: str) -> Optional[dict]:
         return None
 
 
-def get_artist(artist_id: int) -> Optional[dict]:
+def get_artist(artist_id: int) -> dict | None:
     """Get full artist details from Discogs."""
     try:
         resp = requests.get(
@@ -64,12 +70,19 @@ def get_artist(artist_id: int) -> Optional[dict]:
         return None
 
 
-def get_artist_releases(artist_id: int, page: int = 1, per_page: int = 100) -> list[dict]:
+def get_artist_releases(
+    artist_id: int, page: int = 1, per_page: int = 100
+) -> list[dict]:
     """Get artist releases (discography) from Discogs."""
     try:
         resp = requests.get(
             f"{DISCOGS_API}/artists/{artist_id}/releases",
-            params={"page": page, "per_page": per_page, "sort": "year", "sort_order": "desc"},
+            params={
+                "page": page,
+                "per_page": per_page,
+                "sort": "year",
+                "sort_order": "desc",
+            },
             headers=_headers(),
             timeout=10,
         )
@@ -96,7 +109,9 @@ def enrich_artist(name: str) -> dict:
         return {}
 
     result["discogs_id"] = artist_id
-    result["discogs_url"] = match.get("resource_url", "").replace("api.discogs.com", "discogs.com")
+    result["discogs_url"] = match.get("resource_url", "").replace(
+        "api.discogs.com", "discogs.com"
+    )
 
     # Get full artist details
     details = get_artist(artist_id)
@@ -129,19 +144,21 @@ def enrich_artist(name: str) -> dict:
         albums = []
         for r in releases:
             if r.get("type") == "master" or r.get("role", "").lower() == "main":
-                albums.append({
-                    "title": r.get("title", ""),
-                    "year": r.get("year"),
-                    "type": r.get("type", ""),
-                    "format": r.get("format", ""),
-                    "discogs_id": r.get("id"),
-                })
+                albums.append(
+                    {
+                        "title": r.get("title", ""),
+                        "year": r.get("year"),
+                        "type": r.get("type", ""),
+                        "format": r.get("format", ""),
+                        "discogs_id": r.get("id"),
+                    }
+                )
         result["discogs_releases"] = albums[:200]
 
     return result
 
 
-def get_release(release_id: int) -> Optional[dict]:
+def get_release(release_id: int) -> dict | None:
     """Get full release details (tracklist, formats, labels)."""
     try:
         resp = requests.get(
@@ -162,7 +179,12 @@ def get_user_collection(username: str, page: int = 1, per_page: int = 100) -> di
     try:
         resp = requests.get(
             f"{DISCOGS_API}/users/{username}/collection/folders/0/releases",
-            params={"page": page, "per_page": per_page, "sort": "added", "sort_order": "desc"},
+            params={
+                "page": page,
+                "per_page": per_page,
+                "sort": "added",
+                "sort_order": "desc",
+            },
             headers=_headers(),
             timeout=15,
         )

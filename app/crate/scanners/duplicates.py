@@ -1,6 +1,5 @@
 import logging
 import re
-from pathlib import Path
 
 from thefuzz import fuzz
 
@@ -19,15 +18,15 @@ STRIP_PATTERNS = [
     r"\s*\(Expanded[^)]*\)",
     r"\s*\[Deluxe[^\]]*\]",
     r"\s*\[Remaster[^\]]*\]",
-    r"\s*\[\d{4}\]",             # [2014] suffix
-    r"\s*\(\d{4}\)",             # (2021) suffix
-    r"^\d{4}\s*-\s*",           # Year prefix: "2012 - Album"
-    r"^\[\d{4}\]\s*",           # Year prefix: "[2024] Album"
-    r"^\d{2}\s*-\s*",           # Track prefix: "08 - Album"
-    r"\s*-\s*WEB\s*-.*$",       # Scene tags
+    r"\s*\[\d{4}\]",  # [2014] suffix
+    r"\s*\(\d{4}\)",  # (2021) suffix
+    r"^\d{4}\s*-\s*",  # Year prefix: "2012 - Album"
+    r"^\[\d{4}\]\s*",  # Year prefix: "[2024] Album"
+    r"^\d{2}\s*-\s*",  # Track prefix: "08 - Album"
+    r"\s*-\s*WEB\s*-.*$",  # Scene tags
     r"\s*\(YEAR\d+\)\s*\[FLAC\]$",  # (YEAR0001) [FLAC]
-    r"\s*@\s*\d+\s*$",          # Bitrate suffix
-    r"^.*?\s*-\s*\d{4}\s*-\s*", # "Artist - 2022 - Album"
+    r"\s*@\s*\d+\s*$",  # Bitrate suffix
+    r"^.*?\s*-\s*\d{4}\s*-\s*",  # "Artist - 2022 - Album"
 ]
 
 # Patterns that indicate a numbered series (NOT duplicates)
@@ -55,7 +54,7 @@ def extract_series_key(name: str) -> str | None:
         r"(.+?)\s*[,.]?\s*"
         r"(?:vol(?:ume|\.)?|pt\.?|part|ep|chapter|book)\s*\.?\s*"
         r"(?:#?\s*(\d+|[ivxlc]+))\s*(?:\(.*\))?$",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     m = series_re.match(normalized)
     if m:
@@ -126,7 +125,7 @@ class DuplicateScanner(BaseScanner):
             norm_a = normalize_album_name(a.name)
             group = [a]
 
-            for b in albums[i + 1:]:
+            for b in albums[i + 1 :]:
                 if b.path in checked:
                     continue
 
@@ -186,7 +185,8 @@ class DuplicateScanner(BaseScanner):
             if result is True:
                 log.debug(
                     "MB confirmed different releases: %s vs %s",
-                    group[0].name, album.name
+                    group[0].name,
+                    album.name,
                 )
                 continue  # Not a duplicate, different release group
             # Same release group or unknown -> keep as potential duplicate
@@ -226,10 +226,14 @@ class DuplicateScanner(BaseScanner):
         best = ranked[0]
         rest = ranked[1:]
 
-        confidence = 95 if all(
-            normalize_album_name(a.name) == normalize_album_name(best.name)
-            for a in rest
-        ) else 80
+        confidence = (
+            95
+            if all(
+                normalize_album_name(a.name) == normalize_album_name(best.name)
+                for a in rest
+            )
+            else 80
+        )
 
         return Issue(
             type=IssueType.DUPLICATE_ALBUM,
@@ -237,7 +241,9 @@ class DuplicateScanner(BaseScanner):
             confidence=confidence,
             description=(
                 f"[{best.artist}] {len(group)} copies: "
-                + ", ".join(f'"{a.name}" ({a.track_count}t, {a.primary_format})' for a in group)
+                + ", ".join(
+                    f'"{a.name}" ({a.track_count}t, {a.primary_format})' for a in group
+                )
             ),
             paths=[a.path for a in group],
             suggestion=f'Keep "{best.name}" ({best.track_count} tracks, {best.primary_format}), remove {len(rest)} others',
@@ -245,8 +251,13 @@ class DuplicateScanner(BaseScanner):
                 "keep": str(best.path),
                 "remove": [str(a.path) for a in rest],
                 "albums": [
-                    {"path": str(a.path), "tracks": a.track_count, "format": a.primary_format, "size": a.total_size}
+                    {
+                        "path": str(a.path),
+                        "tracks": a.track_count,
+                        "format": a.primary_format,
+                        "size": a.total_size,
+                    }
                     for a in group
                 ],
-            }
+            },
         )

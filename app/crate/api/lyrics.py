@@ -1,7 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.auth import _require_auth
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.utility import LyricsResponse
 from crate.lyrics import get_or_fetch_lyrics
 

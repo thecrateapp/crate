@@ -123,7 +123,9 @@ class TestCreateTaskDedup:
         second = pg_db.create_task_dedup("health_check")
         assert second is None
 
-    def test_explicit_dedup_key_suppresses_duplicates_even_when_params_differ(self, pg_db):
+    def test_explicit_dedup_key_suppresses_duplicates_even_when_params_differ(
+        self, pg_db
+    ):
         first = pg_db.create_task_dedup(
             "tidal_download",
             {"url": "https://tidal.com/album/123", "download_id": 1},

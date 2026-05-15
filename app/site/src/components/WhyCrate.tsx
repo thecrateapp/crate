@@ -5,10 +5,11 @@ const STORY_BLOCKS: ReactNode[][] = [
   [
     "For a long time, I wanted my music library to feel like mine again. Not as a folder I occasionally searched through, but as something I could live with every day.",
     <>
-      After trying several excellent self-hosted tools, I discovered projects like{" "}
-      <strong className="font-semibold text-white/82">Navidrome</strong> — outstanding
-      software that is lightweight, elegant, and thoughtfully designed. It reminded me
-      that self-hosted music could be pleasant, not just possible.
+      After trying several excellent self-hosted tools, I discovered projects
+      like <strong className="font-semibold text-white/82">Navidrome</strong> —
+      outstanding software that is lightweight, elegant, and thoughtfully
+      designed. It reminded me that self-hosted music could be pleasant, not
+      just possible.
     </>,
     "It also showed me what I personally missed: more context, more discovery, and better tools for taking care of a collection that had taken years to build.",
   ],
@@ -17,8 +18,8 @@ const STORY_BLOCKS: ReactNode[][] = [
     <>
       Eventually, the obvious question arose:{" "}
       <strong className="font-semibold text-white/86">
-        If this way of building actually works, could I use it to make the music tool
-        I kept wishing existed?
+        If this way of building actually works, could I use it to make the music
+        tool I kept wishing existed?
       </strong>
     </>,
     "That’s how Crate was born.",
@@ -33,7 +34,8 @@ const STORY_BLOCKS: ReactNode[][] = [
       <strong className="font-semibold text-white/86">
         I’m looking for developers, self-hosters, and music people
       </strong>{" "}
-      who are willing to try it, question it, and help shape it. Strong opinions are useful here.
+      who are willing to try it, question it, and help shape it. Strong opinions
+      are useful here.
     </>,
     "If you care about self-hosted music, own-your-data tools, Go, React, TypeScript, Docker, or just the idea of taking back control of a music collection, you can help.",
     "Try it, break it, criticize it, suggest something better, or build a piece of it.",
@@ -61,14 +63,17 @@ export function WhyCrate() {
             Why I started building this.
           </h2>
           <p className="mt-5 max-w-md text-base leading-7 text-white/58">
-            Crate started with my own library, and with a growing discomfort around
-            renting music from platforms that do not care much about artists or listeners.
+            Crate started with my own library, and with a growing discomfort
+            around renting music from platforms that do not care much about
+            artists or listeners.
           </p>
 
           <div className="mt-8 border-l border-cyan-300/35 pl-5">
             <p className="text-[15px] font-medium leading-7 text-white/82">
               It is not finished, and it is not trying to be everything.
-              <span className="block text-cyan-200">It is a way to take one small piece back.</span>
+              <span className="block text-cyan-200">
+                It is a way to take one small piece back.
+              </span>
             </p>
           </div>
         </div>
@@ -96,8 +101,8 @@ export function WhyCrate() {
                 If this matters to you, come poke at it.
               </p>
               <p className="mt-3 text-[15px] leading-7 text-white/58">
-                Try the current version, open issues, propose changes, or just tell me
-                where the assumptions do not match your library.
+                Try the current version, open issues, propose changes, or just
+                tell me where the assumptions do not match your library.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <a

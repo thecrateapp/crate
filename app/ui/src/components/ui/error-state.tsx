@@ -1,12 +1,15 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { Button } from "./button";
+import { Button } from "@crate/ui/shadcn/button";
 
 interface ErrorStateProps {
   message?: string;
   onRetry?: () => void;
 }
 
-export function ErrorState({ message = "Something went wrong", onRetry }: ErrorStateProps) {
+export function ErrorState({
+  message = "Something went wrong",
+  onRetry,
+}: ErrorStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <AlertTriangle size={32} className="text-destructive mb-3" />

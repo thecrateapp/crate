@@ -15,16 +15,16 @@ export interface TrackReferencePayload {
   duration?: number;
 }
 
-type TrackReferenceInput = PlayableTrackIdentityInput & Partial<Pick<
-  PlayableTrackInput,
-  "title" | "artist" | "album" | "duration"
->>;
+type TrackReferenceInput = PlayableTrackIdentityInput &
+  Partial<Pick<PlayableTrackInput, "title" | "artist" | "album" | "duration">>;
 
 export function hasTrackReference(input: PlayableTrackIdentityInput): boolean {
   return hasPlayableTrackReference(input);
 }
 
-export function toTrackReferencePayload(input: TrackReferenceInput): TrackReferencePayload {
+export function toTrackReferencePayload(
+  input: TrackReferenceInput,
+): TrackReferencePayload {
   return {
     track_id: getPlayableTrackLibraryId(input),
     entity_uid: input.entityUid ?? input.entity_uid ?? undefined,

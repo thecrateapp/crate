@@ -76,7 +76,8 @@ export function Login() {
 
         {authConfig.invite_only ? (
           <div className="rounded-md border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-            New accounts are invite-only right now. If you already have access, sign in below or use your social provider.
+            New accounts are invite-only right now. If you already have access,
+            sign in below or use your social provider.
           </div>
         ) : null}
 
@@ -101,7 +102,10 @@ export function Login() {
         </div>
 
         <div>
-          <label htmlFor="password" className="mb-1 block text-sm text-white/60">
+          <label
+            htmlFor="password"
+            className="mb-1 block text-sm text-white/60"
+          >
             Password
           </label>
           <input

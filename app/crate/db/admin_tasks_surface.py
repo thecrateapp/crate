@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from crate.db.cache_runtime import _get_redis
+from crate.db.cache_runtime import get_redis
 from crate.db.ops_runtime_views import DEFAULT_MAX_WORKERS, get_worker_live_state
 from crate.db.ui_snapshot_store import get_or_build_ui_snapshot
 from crate.db.queries.tasks import get_task_activity_snapshot, list_tasks
@@ -58,7 +58,9 @@ def build_tasks_surface_payload(limit: int = 100) -> dict[str, Any]:
             "systems": worker_live["systems"],
         }
     else:
-        activity = get_task_activity_snapshot(running_limit=25, pending_limit=25, recent_limit=10)
+        activity = get_task_activity_snapshot(
+            running_limit=25, pending_limit=25, recent_limit=10
+        )
         running = activity["running_tasks"]
         pending = activity["pending_tasks"]
         recent = activity["recent_tasks"]
@@ -88,7 +90,9 @@ def build_tasks_surface_payload(limit: int = 100) -> dict[str, Any]:
     return {"live": live, "history": history}
 
 
-def get_cached_tasks_surface(*, limit: int = 100, fresh: bool = False) -> dict[str, Any]:
+def get_cached_tasks_surface(
+    *, limit: int = 100, fresh: bool = False
+) -> dict[str, Any]:
     safe_limit = min(max(int(limit or 100), 1), 200)
     return get_or_build_ui_snapshot(
         scope=TASKS_SNAPSHOT_SCOPE,
@@ -103,7 +107,7 @@ def get_cached_tasks_surface(*, limit: int = 100, fresh: bool = False) -> dict[s
 
 def publish_tasks_surface_signal() -> None:
     try:
-        redis = _get_redis()
+        redis = get_redis()
         if not redis:
             return
         payload = json.dumps(

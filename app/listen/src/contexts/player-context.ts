@@ -50,8 +50,14 @@ export interface PlayerActionsValue {
   reorderQueue: (fromIndex: number, toIndex: number) => void;
 }
 
-export type PlayerContextValue = PlayerStateValue & PlayerProgressValue & PlayerActionsValue;
+export type PlayerContextValue = PlayerStateValue &
+  PlayerProgressValue &
+  PlayerActionsValue;
 
 export const PlayerStateContext = createContext<PlayerStateValue | null>(null);
-export const PlayerProgressContext = createContext<PlayerProgressValue | null>(null);
-export const PlayerActionsContext = createContext<PlayerActionsValue | null>(null);
+export const PlayerProgressContext = createContext<PlayerProgressValue | null>(
+  null,
+);
+export const PlayerActionsContext = createContext<PlayerActionsValue | null>(
+  null,
+);

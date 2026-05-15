@@ -135,7 +135,11 @@ export function CommandPalette() {
                   { label: "Insights", path: "/insights", icon: BarChart3 },
                   { label: "Health", path: "/health", icon: HeartPulse },
                   { label: "Acquisition", path: "/download", icon: Download },
-                  { label: "System Playlists", path: "/playlists", icon: ListMusic },
+                  {
+                    label: "System Playlists",
+                    path: "/playlists",
+                    icon: ListMusic,
+                  },
                   { label: "Discovery", path: "/discover", icon: Compass },
                   { label: "Settings", path: "/settings", icon: Settings },
                 ].map((item) => (
@@ -231,7 +235,8 @@ export function CommandPalette() {
                 <Command.Item
                   onSelect={() =>
                     action(
-                      () => api("/api/tasks/backfill-track-fingerprints", "POST"),
+                      () =>
+                        api("/api/tasks/backfill-track-fingerprints", "POST"),
                       "Backfill audio fingerprints",
                     )
                   }
@@ -243,7 +248,8 @@ export function CommandPalette() {
                 <Command.Item
                   onSelect={() =>
                     action(
-                      () => api("/api/manage/sync-lyrics", "POST", { limit: 1000 }),
+                      () =>
+                        api("/api/manage/sync-lyrics", "POST", { limit: 1000 }),
                       "Sync Lyrics",
                     )
                   }
@@ -255,7 +261,11 @@ export function CommandPalette() {
                 <Command.Item
                   onSelect={() =>
                     action(
-                      () => api("/api/manage/portable-metadata", "POST", { write_audio_tags: true, write_sidecars: true }),
+                      () =>
+                        api("/api/manage/portable-metadata", "POST", {
+                          write_audio_tags: true,
+                          write_sidecars: true,
+                        }),
                       "Portable Metadata",
                     )
                   }
@@ -267,7 +277,8 @@ export function CommandPalette() {
                 <Command.Item
                   onSelect={() =>
                     action(
-                      () => api("/api/manage/portable-metadata/rehydrate", "POST"),
+                      () =>
+                        api("/api/manage/portable-metadata/rehydrate", "POST"),
                       "Portable Metadata Rehydrate",
                     )
                   }
@@ -279,7 +290,12 @@ export function CommandPalette() {
                 <Command.Item
                   onSelect={() =>
                     action(
-                      () => api("/api/manage/portable-metadata/export-rich", "POST", { include_audio: false, write_rich_tags: false }),
+                      () =>
+                        api(
+                          "/api/manage/portable-metadata/export-rich",
+                          "POST",
+                          { include_audio: false, write_rich_tags: false },
+                        ),
                       "Rich Metadata Export",
                     )
                   }
@@ -347,7 +363,15 @@ export function CommandPalette() {
                 {searchResults.artists.slice(0, 5).map((a) => (
                   <Command.Item
                     key={a.name}
-                    onSelect={() => go(artistPagePath({ artistId: a.id, artistSlug: a.slug, artistName: a.name }))}
+                    onSelect={() =>
+                      go(
+                        artistPagePath({
+                          artistId: a.id,
+                          artistSlug: a.slug,
+                          artistName: a.name,
+                        }),
+                      )
+                    }
                     className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
                   >
                     <User size={14} className="text-muted-foreground" />
@@ -365,7 +389,16 @@ export function CommandPalette() {
                 {searchResults.albums.slice(0, 5).map((a) => (
                   <Command.Item
                     key={`${a.artist}-${a.name}`}
-                    onSelect={() => go(albumPagePath({ albumId: a.id, albumSlug: a.slug, artistName: a.artist, albumName: a.name }))}
+                    onSelect={() =>
+                      go(
+                        albumPagePath({
+                          albumId: a.id,
+                          albumSlug: a.slug,
+                          artistName: a.artist,
+                          albumName: a.name,
+                        }),
+                      )
+                    }
                     className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
                   >
                     <Disc3 size={14} className="text-muted-foreground" />

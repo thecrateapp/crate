@@ -13,7 +13,10 @@ import { ArtistAboutSection } from "@/components/artist/ArtistAboutSection";
 import { ArtistLoadingState } from "@/components/artist/ArtistLoadingState";
 import { ArtistOverviewSection } from "@/components/artist/ArtistOverviewSection";
 import { ArtistSetlistSection } from "@/components/artist/ArtistSetlistSection";
-import { ArtistShowsSection, type ArtistShowEvent } from "@/components/artist/ArtistShowsSection";
+import {
+  ArtistShowsSection,
+  type ArtistShowEvent,
+} from "@/components/artist/ArtistShowsSection";
 import { ArtistSimilarSection } from "@/components/artist/ArtistSimilarSection";
 import { ArtistStatsSection } from "@/components/artist/ArtistStatsSection";
 import { ArtistTopTracksSection } from "@/components/artist/ArtistTopTracksSection";
@@ -27,7 +30,14 @@ import {
 } from "@/components/artist/artistPageData";
 import type { ArtistData, TabKey } from "@/components/artist/artistPageTypes";
 import { api } from "@/lib/api";
-import { artistActionApiPath, artistApiPath, artistManagementApiPath, artistPagePath, tidalDownloadMissingArtistApiPath, tidalMissingArtistApiPath } from "@/lib/library-routes";
+import {
+  artistActionApiPath,
+  artistApiPath,
+  artistManagementApiPath,
+  artistPagePath,
+  tidalDownloadMissingArtistApiPath,
+  tidalMissingArtistApiPath,
+} from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,7 +52,10 @@ type ArtistMetadataAction = "lyrics" | "portable" | "export" | null;
 // ── Main Component ──
 
 export function Artist() {
-  const { artistId: artistIdParam, artistSlug } = useParams<{ artistId?: string; artistSlug?: string }>();
+  const { artistId: artistIdParam, artistSlug } = useParams<{
+    artistId?: string;
+    artistSlug?: string;
+  }>();
   const navigate = useNavigate();
   const artistId = artistIdParam ? Number(artistIdParam) : undefined;
   const { data, loading } = useApi<ArtistData>(
@@ -64,36 +77,59 @@ export function Artist() {
   const [showMissing, setShowMissing] = useState(true);
   const [upcomingShows, setUpcomingShows] = useState<ArtistShowEvent[]>([]);
   const [showsLoaded, setShowsLoaded] = useState(false);
-  const [missingAlbums, setMissingAlbums] = useState<{ title: string; first_release_date: string; type: string }[]>([]);
+  const [missingAlbums, setMissingAlbums] = useState<
+    { title: string; first_release_date: string; type: string }[]
+  >([]);
   const [missingLoaded, setMissingLoaded] = useState(false);
-  const [tidalMissing, setTidalMissing] = useState<{ url: string; title: string; year: string; tracks: number; cover: string | null; quality: string }[]>([]);
+  const [tidalMissing, setTidalMissing] = useState<
+    {
+      url: string;
+      title: string;
+      year: string;
+      tracks: number;
+      cover: string | null;
+      quality: string;
+    }[]
+  >([]);
   const [tidalMissingLoaded, setTidalMissingLoaded] = useState(false);
   const [downloadingDiscog, setDownloadingDiscog] = useState(false);
-  const [allTrackTitles, setAllTrackTitles] = useState<{
-    title: string;
-    album: string;
-    path: string;
-    album_id?: number;
-    album_slug?: string;
-  }[]>([]);
+  const [allTrackTitles, setAllTrackTitles] = useState<
+    {
+      title: string;
+      album: string;
+      path: string;
+      album_id?: number;
+      album_slug?: string;
+    }[]
+  >([]);
   const [bioExpanded, setBioExpanded] = useState(false);
-  const { enrichment: fetchedEnrichment, loading: enrichmentLoading } = useArtistEnrichment(data?.id, data?.entity_uid);
+  const { enrichment: fetchedEnrichment, loading: enrichmentLoading } =
+    useArtistEnrichment(data?.id, data?.entity_uid);
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRepairDialog, setShowRepairDialog] = useState(false);
-  const [metadataAction, setMetadataAction] = useState<ArtistMetadataAction>(null);
-  const [issueCountOverride, setIssueCountOverride] = useState<number | null>(null);
+  const [metadataAction, setMetadataAction] =
+    useState<ArtistMetadataAction>(null);
+  const [issueCountOverride, setIssueCountOverride] = useState<number | null>(
+    null,
+  );
   const { isAdmin } = useAuth();
   const rawIssueCount = data?.issue_count ?? 0;
   const shouldLoadRepairPlanSummary = isAdmin && rawIssueCount > 0;
   const repairPlanEndpoint = shouldLoadRepairPlanSummary
-    ? artistManagementApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "repair-plan") || null
+    ? artistManagementApiPath(
+        { artistId: data?.id, artistEntityUid: data?.entity_uid },
+        "repair-plan",
+      ) || null
     : null;
-  const { data: repairPlanSummary } = useApi<ArtistRepairPlanSummary>(repairPlanEndpoint);
+  const { data: repairPlanSummary } =
+    useApi<ArtistRepairPlanSummary>(repairPlanEndpoint);
 
   useEffect(() => {
     if (artistId == null || !data?.slug) return;
-    navigate(artistPagePath({ artistSlug: data.slug, artistName: data.name }), { replace: true });
+    navigate(artistPagePath({ artistSlug: data.slug, artistName: data.name }), {
+      replace: true,
+    });
   }, [artistId, data?.slug, data?.name, navigate]);
 
   // Sync enrichment from hook (can be overridden by manual enrich)
@@ -103,51 +139,97 @@ export function Artist() {
 
   // Fetch upcoming shows
   useEffect(() => {
-    const endpoint = artistActionApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "shows");
+    const endpoint = artistActionApiPath(
+      { artistId: data?.id, artistEntityUid: data?.entity_uid },
+      "shows",
+    );
     if (!endpoint || showsLoaded) return;
     api<{ events: ArtistShowEvent[]; configured: boolean }>(endpoint)
-      .then((d) => { setUpcomingShows(d.events || []); setShowsLoaded(true); })
+      .then((d) => {
+        setUpcomingShows(d.events || []);
+        setShowsLoaded(true);
+      })
       .catch(() => setShowsLoaded(true));
   }, [data?.entity_uid, data?.id, showsLoaded]);
 
   // Fetch all track titles for setlist matching (lazy)
   useEffect(() => {
-    const endpoint = artistActionApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "track-titles");
-    if (!endpoint || activeTab !== "setlist" || allTrackTitles.length > 0) return;
-    api<{ title: string; album: string; path: string; album_id?: number; album_slug?: string }[]>(endpoint)
-      .then((d) => { if (Array.isArray(d)) setAllTrackTitles(d); })
+    const endpoint = artistActionApiPath(
+      { artistId: data?.id, artistEntityUid: data?.entity_uid },
+      "track-titles",
+    );
+    if (!endpoint || activeTab !== "setlist" || allTrackTitles.length > 0)
+      return;
+    api<
+      {
+        title: string;
+        album: string;
+        path: string;
+        album_id?: number;
+        album_slug?: string;
+      }[]
+    >(endpoint)
+      .then((d) => {
+        if (Array.isArray(d)) setAllTrackTitles(d);
+      })
       .catch(() => {});
   }, [data?.entity_uid, data?.id, activeTab, allTrackTitles.length]);
 
   // Fetch missing albums (lazy, on discography tab)
   useEffect(() => {
-    const endpoint = artistActionApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "missing");
+    const endpoint = artistActionApiPath(
+      { artistId: data?.id, artistEntityUid: data?.entity_uid },
+      "missing",
+    );
     if (!endpoint || activeTab !== "discography" || missingLoaded) return;
     let cancelled = false;
-    api<{ missing: { title: string; first_release_date: string; type: string }[] }>(endpoint)
-      .then((d) => { if (!cancelled) { setMissingAlbums(d.missing ?? []); setMissingLoaded(true); } })
-      .catch(() => { if (!cancelled) setMissingLoaded(true); });
-    return () => { cancelled = true; };
+    api<{
+      missing: { title: string; first_release_date: string; type: string }[];
+    }>(endpoint)
+      .then((d) => {
+        if (!cancelled) {
+          setMissingAlbums(d.missing ?? []);
+          setMissingLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMissingLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [data?.entity_uid, data?.id, activeTab, missingLoaded]);
 
   // Fetch Tidal missing albums (lazy, on discography tab)
   useEffect(() => {
-    const endpoint = tidalMissingArtistApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid });
+    const endpoint = tidalMissingArtistApiPath({
+      artistId: data?.id,
+      artistEntityUid: data?.entity_uid,
+    });
     if (!endpoint || activeTab !== "discography" || tidalMissingLoaded) return;
     api<{ albums: typeof tidalMissing; authenticated: boolean }>(endpoint)
-      .then((d) => { if (d.albums) setTidalMissing(d.albums); setTidalMissingLoaded(true); })
+      .then((d) => {
+        if (d.albums) setTidalMissing(d.albums);
+        setTidalMissingLoaded(true);
+      })
       .catch(() => setTidalMissingLoaded(true));
   }, [data?.entity_uid, data?.id, activeTab, tidalMissingLoaded]);
 
   if (loading) return <ArtistLoadingState />;
 
-  if (!data) return <div className="text-center py-12 text-muted-foreground">Not found</div>;
+  if (!data)
+    return (
+      <div className="text-center py-12 text-muted-foreground">Not found</div>
+    );
 
   const artistName = data.name;
-  const totalTracks = data.total_tracks ?? data.albums.reduce((s, a) => s + a.tracks, 0);
-  const totalSize = data.total_size_mb ?? data.albums.reduce((s, a) => s + a.size_mb, 0);
+  const totalTracks =
+    data.total_tracks ?? data.albums.reduce((s, a) => s + a.tracks, 0);
+  const totalSize =
+    data.total_size_mb ?? data.albums.reduce((s, a) => s + a.size_mb, 0);
   const letter = artistName.charAt(0).toUpperCase();
-  const issueCount = issueCountOverride ?? repairPlanSummary?.total ?? rawIssueCount;
+  const issueCount =
+    issueCountOverride ?? repairPlanSummary?.total ?? rawIssueCount;
   const showRepairAction = issueCount > 0;
 
   const sortedAlbums = [...data.albums].sort((a, b) => {
@@ -175,10 +257,18 @@ export function Artist() {
   async function enrichArtist() {
     setEnriching(true);
     try {
-      const endpoint = artistActionApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "enrich");
+      const endpoint = artistActionApiPath(
+        { artistId: data?.id, artistEntityUid: data?.entity_uid },
+        "enrich",
+      );
       if (!endpoint) throw new Error("artist reference missing");
-      const res = await api<{ status: string; task_id: string }>(endpoint, "POST");
-      toast.success("Enrichment started", { description: "This may take a moment..." });
+      const res = await api<{ status: string; task_id: string }>(
+        endpoint,
+        "POST",
+      );
+      toast.success("Enrichment started", {
+        description: "This may take a moment...",
+      });
       const task = await waitForTask(res.task_id, 120000);
       setEnriching(false);
       if (task.status === "completed") {
@@ -195,10 +285,15 @@ export function Artist() {
 
   async function analyzeArtist() {
     try {
-      const endpoint = artistManagementApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "reanalyze");
+      const endpoint = artistManagementApiPath(
+        { artistId: data?.id, artistEntityUid: data?.entity_uid },
+        "reanalyze",
+      );
       if (!endpoint) throw new Error("artist reference missing");
       await api(endpoint, "POST");
-      toast.success("Analysis queued", { description: "Background daemons will process the tracks." });
+      toast.success("Analysis queued", {
+        description: "Background daemons will process the tracks.",
+      });
     } catch {
       toast.error("Failed to queue analysis");
     }
@@ -211,10 +306,17 @@ export function Artist() {
   async function downloadMissingDiscography() {
     setDownloadingDiscog(true);
     try {
-      const endpoint = tidalDownloadMissingArtistApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid });
+      const endpoint = tidalDownloadMissingArtistApiPath({
+        artistId: data?.id,
+        artistEntityUid: data?.entity_uid,
+      });
       if (!endpoint) throw new Error("artist reference missing");
       const res = await api<{ queued: number }>(endpoint, "POST", {
-        albums: tidalMissing.map((album) => ({ url: album.url, title: album.title, cover_url: album.cover })),
+        albums: tidalMissing.map((album) => ({
+          url: album.url,
+          title: album.title,
+          cover_url: album.cover,
+        })),
       });
       toast.success(`Queued ${res.queued} albums for download`);
       setTidalMissing([]);
@@ -225,11 +327,16 @@ export function Artist() {
     }
   }
 
-  async function queueArtistMetadataAction(action: Exclude<ArtistMetadataAction, null>) {
+  async function queueArtistMetadataAction(
+    action: Exclude<ArtistMetadataAction, null>,
+  ) {
     setMetadataAction(action);
     try {
       if (action === "lyrics") {
-        await api("/api/manage/sync-lyrics", "POST", { artist: artistName, limit: 1000 });
+        await api("/api/manage/sync-lyrics", "POST", {
+          artist: artistName,
+          limit: 1000,
+        });
         toast.success("Lyrics sync queued");
       } else if (action === "portable") {
         await api("/api/manage/portable-metadata", "POST", {
@@ -255,13 +362,13 @@ export function Artist() {
 
   return (
     <div className="-mt-16 md:-mt-[6.5rem]">
-        <ArtistHeroSection
-          artistName={artistName}
-          artistId={data.id}
-          artistEntityUid={data.entity_uid}
-          artistSlug={data.slug}
-          imageVersion={data.updated_at}
-          letter={letter}
+      <ArtistHeroSection
+        artistName={artistName}
+        artistId={data.id}
+        artistEntityUid={data.entity_uid}
+        artistSlug={data.slug}
+        imageVersion={data.updated_at}
+        letter={letter}
         albumCount={data.albums.length}
         totalTracks={totalTracks}
         totalSizeMb={totalSize}
@@ -314,11 +421,14 @@ export function Artist() {
         onDelete={() => setShowDeleteConfirm(true)}
       />
 
-      <ArtistTabsNav tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+      <ArtistTabsNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* ═══ CONTENT ═══ */}
       <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 pt-6 md:px-8">
-
         {/* ── Overview Tab ── */}
         {activeTab === "overview" && (
           <ArtistOverviewSection
@@ -391,12 +501,21 @@ export function Artist() {
 
         {/* ── Similar Artists Tab ── */}
         {activeTab === "similar" && (
-          <ArtistSimilarSection artistName={artistName} artistId={data.id} artistEntityUid={data.entity_uid} artists={mergedSimilar} />
+          <ArtistSimilarSection
+            artistName={artistName}
+            artistId={data.id}
+            artistEntityUid={data.entity_uid}
+            artists={mergedSimilar}
+          />
         )}
 
         {/* ── Stats Tab ── */}
         {activeTab === "stats" && (
-          <ArtistStatsSection artistName={artistName} artistId={data.id} artistEntityUid={data.entity_uid} />
+          <ArtistStatsSection
+            artistName={artistName}
+            artistId={data.id}
+            artistEntityUid={data.entity_uid}
+          />
         )}
 
         {/* ── About Tab ── */}
@@ -421,16 +540,22 @@ export function Artist() {
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title={`Delete ${data?.name ?? "artist"}?`}
-        description={`This will permanently delete ${data?.name ?? "this artist"} and all their albums/tracks from the database AND the filesystem. This action cannot be undone.`}
+        description={`This will permanently delete ${
+          data?.name ?? "this artist"
+        } and all their albums/tracks from the database AND the filesystem. This action cannot be undone.`}
         confirmLabel="Delete Artist"
         variant="destructive"
         onConfirm={async () => {
           try {
-            const endpoint = artistManagementApiPath({ artistId: data?.id, artistEntityUid: data?.entity_uid }, "delete");
+            const endpoint = artistManagementApiPath(
+              { artistId: data?.id, artistEntityUid: data?.entity_uid },
+              "delete",
+            );
             if (!endpoint) throw new Error("artist reference missing");
             await api<{ task_id: string }>(endpoint, "POST", { mode: "full" });
             toast.success(`Deletion queued for ${data!.name}`, {
-              description: "The worker will delete the artist in the background.",
+              description:
+                "The worker will delete the artist in the background.",
             });
             window.location.href = "/browse";
           } catch (error) {

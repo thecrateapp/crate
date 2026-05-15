@@ -5,7 +5,7 @@ description: Guide for implementing smooth animations using React's View Transit
 
 # React View Transitions
 
-Animate between UI states using the browser's native `document.startViewTransition`. Declare *what* with `<ViewTransition>`, trigger *when* with `startTransition` / `useDeferredValue` / `Suspense`, control *how* with CSS classes.
+Animate between UI states using the browser's native `document.startViewTransition`. Declare _what_ with `<ViewTransition>`, trigger _when_ with `startTransition` / `useDeferredValue` / `Suspense`, control _how_ with CSS classes.
 
 ## When to Apply
 
@@ -25,13 +25,13 @@ Animate between UI states using the browser's native `document.startViewTransiti
 
 ## Animation Priority
 
-| Priority | Pattern | What it communicates |
-|----------|---------|---------------------|
-| 1 | Shared element (`name`) | "Same thing - going deeper" |
-| 2 | Suspense reveal | "Data loaded" |
-| 3 | List identity (per-item `key`) | "Same items, new arrangement" |
-| 4 | State change (`enter`/`exit`) | "Something appeared/disappeared" |
-| 5 | Route change (layout-level) | "Going to a new place" |
+| Priority | Pattern                        | What it communicates             |
+| -------- | ------------------------------ | -------------------------------- |
+| 1        | Shared element (`name`)        | "Same thing - going deeper"      |
+| 2        | Suspense reveal                | "Data loaded"                    |
+| 3        | List identity (per-item `key`) | "Same items, new arrangement"    |
+| 4        | State change (`enter`/`exit`)  | "Something appeared/disappeared" |
+| 5        | Route change (layout-level)    | "Going to a new place"           |
 
 ## Reference Files
 

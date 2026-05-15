@@ -35,16 +35,24 @@ def test_home_upcoming_trims_preview_items_but_keeps_full_summary(monkeypatch):
         "crate.db.home_builder_upcoming_feed.get_followed_artists",
         lambda user_id: [{"artist_name": "Converge"}],
     )
-    monkeypatch.setattr("crate.db.queries.user.get_upcoming_releases", lambda *args, **kwargs: releases)
-    monkeypatch.setattr("crate.db.queries.user.get_upcoming_shows", lambda *args, **kwargs: shows)
-    monkeypatch.setattr("crate.db.queries.shows.get_attending_show_ids", lambda user_id, ids: {100, 102})
+    monkeypatch.setattr(
+        "crate.db.queries.user.get_upcoming_releases", lambda *args, **kwargs: releases
+    )
+    monkeypatch.setattr(
+        "crate.db.queries.user.get_upcoming_shows", lambda *args, **kwargs: shows
+    )
+    monkeypatch.setattr(
+        "crate.db.queries.shows.get_attending_show_ids", lambda user_id, ids: {100, 102}
+    )
     monkeypatch.setattr(
         "crate.db.repositories.auth.get_user_by_id",
         lambda user_id: {"latitude": None, "longitude": None, "show_radius_km": 60},
     )
     monkeypatch.setattr(
         "crate.db.home_builder_upcoming_feed._build_upcoming_insights_home",
-        lambda user_id, shows, attending_show_ids: [{"type": "show_prep", "show_id": 100}],
+        lambda user_id, shows, attending_show_ids: [
+            {"type": "show_prep", "show_id": 100}
+        ],
     )
 
     payload = _build_home_upcoming(1, lookup_limit=120, item_limit=5)

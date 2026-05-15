@@ -42,11 +42,20 @@ function UserAvatar({
 }) {
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
-    return <img src={avatarUrl} alt={name} onError={handleAvatarError} className={`${className} rounded-full object-cover`} />;
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        onError={handleAvatarError}
+        className={`${className} rounded-full object-cover`}
+      />
+    );
   }
   const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
-    <div className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center font-semibold`}>
+    <div
+      className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center font-semibold`}
+    >
       {initial}
     </div>
   );
@@ -68,9 +77,14 @@ export function People() {
     }
     const controller = new AbortController();
     setSearching(true);
-    api<UserSearchResult[]>(`/api/users/search?q=${encodeURIComponent(trimmed)}&limit=12`, "GET", undefined, {
-      signal: controller.signal,
-    })
+    api<UserSearchResult[]>(
+      `/api/users/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      "GET",
+      undefined,
+      {
+        signal: controller.signal,
+      },
+    )
       .then((items) => setResults(items || []))
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -89,8 +103,12 @@ export function People() {
     if (!user?.username) return "/settings";
     return `/users/${user.username}`;
   }, [user?.username]);
-  const ownFollowersHref = user?.username ? `/users/${user.username}/followers` : "/people";
-  const ownFollowingHref = user?.username ? `/users/${user.username}/following` : "/people";
+  const ownFollowersHref = user?.username
+    ? `/users/${user.username}/followers`
+    : "/people";
+  const ownFollowingHref = user?.username
+    ? `/users/${user.username}/following`
+    : "/people";
 
   return (
     <div className="space-y-6">
@@ -99,7 +117,8 @@ export function People() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">People</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Find other listeners, compare taste, and jump into shared sessions.
+              Find other listeners, compare taste, and jump into shared
+              sessions.
             </p>
           </div>
           <Link
@@ -116,25 +135,47 @@ export function People() {
             to={ownProfileHref}
             className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4 hover:bg-cyan-400/10 transition-colors"
           >
-            <div className="text-xs uppercase tracking-wide text-cyan-300/70">Your profile</div>
+            <div className="text-xs uppercase tracking-wide text-cyan-300/70">
+              Your profile
+            </div>
             <div className="mt-2 text-lg font-semibold text-foreground">
               {data?.profile.display_name || user?.name || user?.email || "You"}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
-              {data?.profile.username ? `@${data.profile.username}` : "Set a username from settings/admin"}
+              {data?.profile.username
+                ? `@${data.profile.username}`
+                : "Set a username from settings/admin"}
             </div>
           </Link>
-          <Link to={ownFollowersHref} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Followers</div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">{data?.followers_count ?? "—"}</div>
+          <Link
+            to={ownFollowersHref}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+          >
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Followers
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-foreground">
+              {data?.followers_count ?? "—"}
+            </div>
           </Link>
-          <Link to={ownFollowingHref} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Following</div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">{data?.following_count ?? "—"}</div>
+          <Link
+            to={ownFollowingHref}
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
+          >
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Following
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-foreground">
+              {data?.following_count ?? "—"}
+            </div>
           </Link>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Friends</div>
-            <div className="mt-2 text-2xl font-semibold text-foreground">{data?.friends_count ?? "—"}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              Friends
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-foreground">
+              {data?.friends_count ?? "—"}
+            </div>
           </div>
         </div>
       </div>
@@ -178,13 +219,23 @@ export function People() {
                 to={item.username ? `/users/${item.username}` : "/people"}
                 className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
               >
-                <UserAvatar name={label} avatar={item.avatar} userId={item.id} />
+                <UserAvatar
+                  name={label}
+                  avatar={item.avatar}
+                  userId={item.id}
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-foreground">{label}</div>
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {label}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {item.username ? `@${item.username}` : "No username yet"}
                   </div>
-                  {item.bio ? <div className="mt-1 truncate text-xs text-muted-foreground">{item.bio}</div> : null}
+                  {item.bio ? (
+                    <div className="mt-1 truncate text-xs text-muted-foreground">
+                      {item.bio}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/65">
                   <UserRoundPlus size={13} />

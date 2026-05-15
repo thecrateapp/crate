@@ -1,11 +1,20 @@
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _require_admin
-from crate.api._deps import album_names_from_entity_uid, album_names_from_id, library_path, safe_path
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api._deps import (
+    album_names_from_entity_uid,
+    album_names_from_id,
+    library_path,
+    safe_path,
+)
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.utility import AlbumTagsUpdate, TrackTagsUpdate
-from crate.db.repositories.library import get_library_album_by_id, get_track_path_by_id
+from crate.db.repositories.library import get_track_path_by_id
 from crate.db.repositories.tasks import create_task
 
 router = APIRouter(tags=["metadata"])
@@ -19,7 +28,9 @@ _TAG_RESPONSES = merge_responses(
 )
 
 
-def _update_album_tags(request: Request, artist: str, album: str, data: AlbumTagsUpdate):
+def _update_album_tags(
+    request: Request, artist: str, album: str, data: AlbumTagsUpdate
+):
     _require_admin(request)
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
@@ -32,12 +43,15 @@ def _update_album_tags(request: Request, artist: str, album: str, data: AlbumTag
         if val is not None:
             album_fields[field] = val
 
-    task_id = create_task("update_album_tags", {
-        "artist_folder": artist,
-        "album_folder": album,
-        "album_fields": album_fields,
-        "track_tags": data.tracks,
-    })
+    task_id = create_task(
+        "update_album_tags",
+        {
+            "artist_folder": artist,
+            "album_folder": album,
+            "album_fields": album_fields,
+            "track_tags": data.tracks,
+        },
+    )
     return {"task_id": task_id}
 
 
@@ -60,7 +74,9 @@ def api_update_tags_by_id(request: Request, album_id: int, data: AlbumTagsUpdate
     responses=_TAG_RESPONSES,
     summary="Queue an album-tag update by entity UID",
 )
-def api_update_tags_by_entity_uid(request: Request, album_entity_uid: str, data: AlbumTagsUpdate):
+def api_update_tags_by_entity_uid(
+    request: Request, album_entity_uid: str, data: AlbumTagsUpdate
+):
     names = album_names_from_entity_uid(album_entity_uid)
     if not names:
         raise HTTPException(status_code=404, detail="Not found")
@@ -74,10 +90,13 @@ def _update_track_tags(request: Request, filepath: str, data: TrackTagsUpdate):
     if not track_path or not track_path.is_file():
         raise HTTPException(status_code=404, detail="Not found")
 
-    task_id = create_task("update_track_tags", {
-        "filepath": filepath,
-        "tags": data.model_dump(),
-    })
+    task_id = create_task(
+        "update_track_tags",
+        {
+            "filepath": filepath,
+            "tags": data.model_dump(),
+        },
+    )
     return {"task_id": task_id}
 
 
@@ -95,7 +114,7 @@ def api_update_track_tags_by_id(request: Request, track_id: int, data: TrackTags
     lib = library_path()
     lib_str = str(lib)
     if filepath.startswith(lib_str):
-        filepath = filepath[len(lib_str):].lstrip("/")
+        filepath = filepath[len(lib_str) :].lstrip("/")
     elif filepath.startswith("/music/"):
-        filepath = filepath[len("/music/"):].lstrip("/")
+        filepath = filepath[len("/music/") :].lstrip("/")
     return _update_track_tags(request, filepath, data)

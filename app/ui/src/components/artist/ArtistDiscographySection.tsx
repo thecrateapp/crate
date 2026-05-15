@@ -112,8 +112,13 @@ export function ArtistDiscographySection({
             | { kind: "tidal"; album: TidalMissingAlbum }
             | { kind: "missing"; album: MissingAlbum };
 
-          const items: GridItem[] = sortedAlbums.map((album) => ({ kind: "local", album }));
-          const tidalTitles = new Set(tidalMissing.map((album) => album.title.toLowerCase()));
+          const items: GridItem[] = sortedAlbums.map((album) => ({
+            kind: "local",
+            album,
+          }));
+          const tidalTitles = new Set(
+            tidalMissing.map((album) => album.title.toLowerCase()),
+          );
 
           for (const album of tidalMissing) {
             items.push({ kind: "tidal", album });
@@ -130,9 +135,17 @@ export function ArtistDiscographySection({
           if (sort === "year") {
             items.sort((a, b) => {
               const yearA =
-                a.kind === "local" ? a.album.year || "" : a.kind === "tidal" ? a.album.year || "" : a.album.first_release_date || "";
+                a.kind === "local"
+                  ? a.album.year || ""
+                  : a.kind === "tidal"
+                    ? a.album.year || ""
+                    : a.album.first_release_date || "";
               const yearB =
-                b.kind === "local" ? b.album.year || "" : b.kind === "tidal" ? b.album.year || "" : b.album.first_release_date || "";
+                b.kind === "local"
+                  ? b.album.year || ""
+                  : b.kind === "tidal"
+                    ? b.album.year || ""
+                    : b.album.first_release_date || "";
               return yearB.localeCompare(yearA);
             });
           }

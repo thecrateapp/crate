@@ -32,7 +32,9 @@ export function Nav() {
       <div className="mx-auto flex max-w-[1400px] h-16 items-center gap-6 px-5 sm:px-8">
         <a href="/" className="flex items-center gap-2.5">
           <img src="/icons/logo.svg" alt="" className="h-8 w-8" />
-          <span className="text-[15px] font-semibold tracking-tight text-white">Crate</span>
+          <span className="text-[15px] font-semibold tracking-tight text-white">
+            Crate
+          </span>
         </a>
 
         {/* Desktop nav */}

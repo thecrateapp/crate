@@ -32,7 +32,9 @@ def annotate_genre_mapping(items: list[dict]) -> list[dict]:
             item["top_level_slug"] = top_level_slug
             item["top_level_name"] = get_genre_display_name(top_level_slug)
             item["top_level_description"] = get_genre_description(top_level_slug)
-            item["description"] = item.get("canonical_description") or get_genre_description(canonical_slug)
+            item["description"] = item.get(
+                "canonical_description"
+            ) or get_genre_description(canonical_slug)
         else:
             item["top_level_slug"] = None
             item["top_level_name"] = None
@@ -50,14 +52,19 @@ def annotate_eq_preset(item: dict) -> None:
     canonical_gains = item.pop("canonical_eq_gains", None)
     canonical_slug = item.get("canonical_slug")
 
-    item["eq_gains"] = [float(v) for v in canonical_gains] if canonical_gains is not None else None
-    item["eq_preset_resolved"] = resolve_genre_eq_preset(canonical_slug) if canonical_slug else None
+    item["eq_gains"] = (
+        [float(v) for v in canonical_gains] if canonical_gains is not None else None
+    )
+    item["eq_preset_resolved"] = (
+        resolve_genre_eq_preset(canonical_slug) if canonical_slug else None
+    )
 
 
 def get_genre_summary_by_slug(session, slug: str) -> dict | None:
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT
                 g.id,
                 g.entity_uid::text AS entity_uid,
@@ -97,9 +104,12 @@ def get_genre_summary_by_slug(session, slug: str) -> dict | None:
                 tn.eq_gains,
                 tn.eq_reasoning
             """
-        ),
-        {"slug": slug},
-    ).mappings().first()
+            ),
+            {"slug": slug},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return None
     annotated = annotate_genre_mapping([dict(row)])[0]
@@ -110,9 +120,10 @@ def get_genre_summary_by_slug(session, slug: str) -> dict | None:
 def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
     if not slugs:
         return {}
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT
                 n.slug,
                 n.name,
@@ -129,14 +140,18 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
             WHERE n.slug = ANY(:slugs)
             GROUP BY n.id, n.slug, n.name, n.description, n.external_description, n.is_top_level
             """
-        ),
-        {"slugs": slugs},
-    ).mappings().all()
+            ),
+            {"slugs": slugs},
+        )
+        .mappings()
+        .all()
+    )
     stats = {row["slug"]: dict(row) for row in rows}
 
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             WITH alias_counts AS (
                 SELECT
                     n.slug AS taxonomy_slug,
@@ -160,9 +175,12 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
             WHERE genre_slug IS NOT NULL
             ORDER BY taxonomy_slug, artist_count DESC, album_count DESC, genre_slug ASC
             """
-        ),
-        {"slugs": slugs},
-    ).mappings().all()
+            ),
+            {"slugs": slugs},
+        )
+        .mappings()
+        .all()
+    )
     for row in rows:
         bucket = stats.get(row["taxonomy_slug"])
         if not bucket:

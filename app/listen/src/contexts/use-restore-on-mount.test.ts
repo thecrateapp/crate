@@ -40,14 +40,17 @@ function setStored(
   wasPlaying = false,
   extras: { shuffle?: boolean; unshuffledQueue?: Track[] | null } = {},
 ) {
-  localStorage.setItem("listen-player-state", JSON.stringify({
-    queue,
-    currentIndex,
-    currentTime,
-    wasPlaying,
-    shuffle: extras.shuffle ?? false,
-    unshuffledQueue: extras.unshuffledQueue ?? null,
-  }));
+  localStorage.setItem(
+    "listen-player-state",
+    JSON.stringify({
+      queue,
+      currentIndex,
+      currentTime,
+      wasPlaying,
+      shuffle: extras.shuffle ?? false,
+      unshuffledQueue: extras.unshuffledQueue ?? null,
+    }),
+  );
 }
 
 interface TestOptions {
@@ -58,11 +61,17 @@ interface TestOptions {
 
 function createOptions(opts: TestOptions = {}) {
   return {
-    isPlayingRef: { current: opts.isPlaying ?? false } as MutableRefObject<boolean>,
+    isPlayingRef: {
+      current: opts.isPlaying ?? false,
+    } as MutableRefObject<boolean>,
     queueRef: { current: opts.queue ?? [] } as MutableRefObject<Track[]>,
-    repeatRef: { current: opts.repeat ?? "off" as RepeatMode } as MutableRefObject<RepeatMode>,
+    repeatRef: {
+      current: opts.repeat ?? ("off" as RepeatMode),
+    } as MutableRefObject<RepeatMode>,
     bufferingIntentRef: { current: false } as MutableRefObject<boolean>,
-    buildEngineUrls: vi.fn((tracks: Track[]) => tracks.map((t) => `/stream/${t.id}`)),
+    buildEngineUrls: vi.fn((tracks: Track[]) =>
+      tracks.map((t) => `/stream/${t.id}`),
+    ),
     pullFromEngine: vi.fn(),
     pushToEngine: vi.fn(),
     commitIsBuffering: vi.fn(),
@@ -75,7 +84,8 @@ beforeEach(() => {
   localStorage.clear();
   vi.useFakeTimers();
   Object.values(gaplessPlayer).forEach((fn) => {
-    if (typeof fn === "function" && "mockClear" in fn) (fn as { mockClear: () => void }).mockClear();
+    if (typeof fn === "function" && "mockClear" in fn)
+      (fn as { mockClear: () => void }).mockClear();
   });
   nativePlayerMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
 });
@@ -157,7 +167,9 @@ describe("useRestoreOnMount", () => {
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
 
-    act(() => { result.current.tryRestoreAutoplay(); });
+    act(() => {
+      result.current.tryRestoreAutoplay();
+    });
     expect(mockFadeInAndPlay).not.toHaveBeenCalled();
   });
 
@@ -167,11 +179,15 @@ describe("useRestoreOnMount", () => {
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
 
-    act(() => { result.current.tryRestoreAutoplay(); });
+    act(() => {
+      result.current.tryRestoreAutoplay();
+    });
     expect(mockFadeInAndPlay).toHaveBeenCalledTimes(1);
 
     // Second call should not re-trigger.
-    act(() => { result.current.tryRestoreAutoplay(); });
+    act(() => {
+      result.current.tryRestoreAutoplay();
+    });
     expect(mockFadeInAndPlay).toHaveBeenCalledTimes(1);
   });
 
@@ -181,7 +197,9 @@ describe("useRestoreOnMount", () => {
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
 
-    act(() => { result.current.tryRestoreAutoplay(); });
+    act(() => {
+      result.current.tryRestoreAutoplay();
+    });
     expect(opts.commitIsBuffering).toHaveBeenCalledWith(true);
 
     // Advance past the 2.5s safety timeout with isPlayingRef still false.
@@ -198,10 +216,14 @@ describe("useRestoreOnMount", () => {
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
 
-    act(() => { result.current.tryRestoreAutoplay(); });
+    act(() => {
+      result.current.tryRestoreAutoplay();
+    });
     const beforeCalls = opts.commitIsBuffering.mock.calls.length;
 
-    act(() => { result.current.cancelRestoreAutoplay(); });
+    act(() => {
+      result.current.cancelRestoreAutoplay();
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(3000);
     });
@@ -245,9 +267,15 @@ describe("useRestoreOnMount", () => {
 
   it("is tolerant to legacy stored sessions missing shuffle fields", () => {
     // Simulate a session persisted by an older version of the app.
-    localStorage.setItem("listen-player-state", JSON.stringify({
-      queue: [TRACK_A], currentIndex: 0, currentTime: 0, wasPlaying: false,
-    }));
+    localStorage.setItem(
+      "listen-player-state",
+      JSON.stringify({
+        queue: [TRACK_A],
+        currentIndex: 0,
+        currentTime: 0,
+        wasPlaying: false,
+      }),
+    );
     const opts = createOptions();
 
     const { result } = renderHook(() => useRestoreOnMount(opts));

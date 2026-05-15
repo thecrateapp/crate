@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any, TypedDict
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,13 +25,143 @@ def coerce_uuid_or_none(value: str | uuid.UUID | None) -> uuid.UUID | None:
     return None
 
 
-def artist_to_dict(artist) -> dict | None:
+class LibraryArtistRow(TypedDict):
+    id: int
+    storage_id: str | None
+    entity_uid: str | None
+    name: str
+    slug: str | None
+    folder_name: str | None
+    album_count: int
+    track_count: int
+    total_size: int
+    formats: list[str]
+    primary_format: str | None
+    has_photo: int
+    dir_mtime: float | None
+    updated_at: Any | None
+    bio: str | None
+    tags_json: Any | None
+    similar_json: Any | None
+    spotify_id: str | None
+    spotify_popularity: int | None
+    spotify_followers: int | None
+    mbid: str | None
+    country: str | None
+    area: str | None
+    formed: str | None
+    ended: str | None
+    artist_type: str | None
+    members_json: Any | None
+    urls_json: Any | None
+    listeners: int | None
+    enriched_at: Any | None
+    discogs_id: str | None
+    lastfm_playcount: int | None
+    popularity: int | None
+    popularity_score: float | None
+    popularity_confidence: float | None
+    discogs_profile: str | None
+    discogs_members_json: Any | None
+    latest_release_date: str | None
+    content_hash: str | None
+
+
+class LibraryAlbumRow(TypedDict):
+    id: int
+    storage_id: str | None
+    entity_uid: str | None
+    artist: str
+    name: str
+    slug: str | None
+    path: str
+    track_count: int
+    total_size: int
+    total_duration: float
+    formats: list[str]
+    year: str | None
+    genre: str | None
+    has_cover: int
+    musicbrainz_albumid: str | None
+    musicbrainz_releasegroupid: str | None
+    tag_album: str | None
+    dir_mtime: float | None
+    updated_at: Any | None
+    discogs_master_id: str | None
+    lastfm_listeners: int | None
+    lastfm_playcount: int | None
+    popularity: int | None
+    popularity_score: float | None
+    popularity_confidence: float | None
+    quarantined_at: Any | None
+    quarantine_task_id: str | None
+
+
+class LibraryTrackRow(TypedDict):
+    id: int
+    storage_id: str | None
+    entity_uid: str | None
+    album_id: int | None
+    artist: str
+    album: str
+    slug: str | None
+    filename: str
+    title: str | None
+    track_number: int | None
+    disc_number: int
+    format: str | None
+    bitrate: int | None
+    sample_rate: int | None
+    bit_depth: int | None
+    duration: float | None
+    size: int | None
+    year: str | None
+    genre: str | None
+    albumartist: str | None
+    musicbrainz_albumid: str | None
+    musicbrainz_trackid: str | None
+    audio_fingerprint: str | None
+    audio_fingerprint_source: str | None
+    audio_fingerprint_computed_at: Any | None
+    path: str
+    updated_at: Any | None
+    bpm: float | None
+    audio_key: str | None
+    audio_scale: str | None
+    energy: float | None
+    mood_json: Any | None
+    danceability: float | None
+    valence: float | None
+    acousticness: float | None
+    instrumentalness: float | None
+    loudness: float | None
+    dynamic_range: float | None
+    spectral_complexity: float | None
+    analysis_state: str | None
+    bliss_state: str | None
+    analysis_completed_at: Any | None
+    bliss_computed_at: Any | None
+    bliss_vector: list[float] | None
+    lastfm_listeners: int | None
+    lastfm_playcount: int | None
+    lastfm_top_rank: int | None
+    spotify_track_popularity: int | None
+    spotify_top_rank: int | None
+    popularity: int | None
+    popularity_score: float | None
+    popularity_confidence: float | None
+    rating: int
+
+
+def artist_to_dict(artist) -> LibraryArtistRow | None:
     if artist is None:
         return None
     entity_uid = str(artist.entity_uid) if getattr(artist, "entity_uid", None) else None
     return {
         "id": artist.id,
-        "storage_id": None if entity_uid else (str(artist.storage_id) if artist.storage_id else None),
+        "storage_id": None
+        if entity_uid
+        else (str(artist.storage_id) if artist.storage_id else None),
         "entity_uid": entity_uid,
         "name": artist.name,
         "slug": artist.slug,
@@ -71,13 +202,15 @@ def artist_to_dict(artist) -> dict | None:
     }
 
 
-def album_to_dict(album) -> dict | None:
+def album_to_dict(album) -> LibraryAlbumRow | None:
     if album is None:
         return None
     entity_uid = str(album.entity_uid) if getattr(album, "entity_uid", None) else None
     return {
         "id": album.id,
-        "storage_id": None if entity_uid else (str(album.storage_id) if album.storage_id else None),
+        "storage_id": None
+        if entity_uid
+        else (str(album.storage_id) if album.storage_id else None),
         "entity_uid": entity_uid,
         "artist": album.artist,
         "name": album.name,
@@ -106,7 +239,7 @@ def album_to_dict(album) -> dict | None:
     }
 
 
-def track_to_dict(track) -> dict | None:
+def track_to_dict(track) -> LibraryTrackRow | None:
     if track is None:
         return None
     entity_uid = str(track.entity_uid) if getattr(track, "entity_uid", None) else None
@@ -154,7 +287,9 @@ def track_to_dict(track) -> dict | None:
         "bliss_state": track.bliss_state,
         "analysis_completed_at": track.analysis_completed_at,
         "bliss_computed_at": track.bliss_computed_at,
-        "bliss_vector": list(track.bliss_vector or []) if track.bliss_vector is not None else None,
+        "bliss_vector": list(track.bliss_vector or [])
+        if track.bliss_vector is not None
+        else None,
         "lastfm_listeners": track.lastfm_listeners,
         "lastfm_playcount": track.lastfm_playcount,
         "lastfm_top_rank": track.lastfm_top_rank,
@@ -171,7 +306,9 @@ def allocate_unique_slug(session: Session, model, base_slug: str) -> str:
     candidate = base_slug or "item"
     suffix = 2
     while True:
-        exists = session.execute(select(model.id).where(model.slug == candidate).limit(1)).scalar_one_or_none()
+        exists = session.execute(
+            select(model.id).where(model.slug == candidate).limit(1)
+        ).scalar_one_or_none()
         if exists is None:
             return candidate
         candidate = f"{base_slug}-{suffix}"
@@ -184,5 +321,8 @@ __all__ = [
     "artist_to_dict",
     "coerce_uuid",
     "coerce_uuid_or_none",
+    "LibraryAlbumRow",
+    "LibraryArtistRow",
+    "LibraryTrackRow",
     "track_to_dict",
 ]

@@ -69,14 +69,17 @@ RETURNING artist_id
 
 
 def refresh_artist_bliss_centroids_for_track_ids(session, track_ids: list[int]) -> int:
-    track_ids = [int(track_id) for track_id in dict.fromkeys(track_ids or []) if track_id]
+    track_ids = [
+        int(track_id) for track_id in dict.fromkeys(track_ids or []) if track_id
+    ]
     if not track_ids:
         return 0
 
-    rows = session.execute(
-        text(
-            _CENTROID_SQL.format(
-                artist_filter="""
+    rows = (
+        session.execute(
+            text(
+                _CENTROID_SQL.format(
+                    artist_filter="""
                   AND ar.id IN (
                       SELECT DISTINCT ar2.id
                       FROM library_tracks t2
@@ -85,10 +88,13 @@ def refresh_artist_bliss_centroids_for_track_ids(session, track_ids: list[int]) 
                       WHERE t2.id = ANY(:track_ids)
                   )
                 """
-            )
-        ),
-        {"track_ids": track_ids},
-    ).mappings().all()
+                )
+            ),
+            {"track_ids": track_ids},
+        )
+        .mappings()
+        .all()
+    )
     return len(rows)
 
 
@@ -97,9 +103,13 @@ def refresh_all_artist_bliss_centroids(*, session=None) -> int:
         with transaction_scope() as owned_session:
             return refresh_all_artist_bliss_centroids(session=owned_session)
 
-    rows = session.execute(
-        text(_CENTROID_SQL.format(artist_filter="")),
-    ).mappings().all()
+    rows = (
+        session.execute(
+            text(_CENTROID_SQL.format(artist_filter="")),
+        )
+        .mappings()
+        .all()
+    )
     return len(rows)
 
 

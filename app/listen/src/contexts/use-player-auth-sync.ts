@@ -29,7 +29,10 @@ export function usePlayerAuthSync({
       void flushPlayEventQueue();
     };
     window.addEventListener("online", onOnline);
-    window.addEventListener("crate:network-restored", onOnline as EventListener);
+    window.addEventListener(
+      "crate:network-restored",
+      onOnline as EventListener,
+    );
 
     const interval = window.setInterval(() => {
       void flushPlayEventQueue();
@@ -37,7 +40,10 @@ export function usePlayerAuthSync({
 
     return () => {
       window.removeEventListener("online", onOnline);
-      window.removeEventListener("crate:network-restored", onOnline as EventListener);
+      window.removeEventListener(
+        "crate:network-restored",
+        onOnline as EventListener,
+      );
       window.clearInterval(interval);
     };
   }, [authUser]);
@@ -51,15 +57,23 @@ export function usePlayerAuthSync({
     const activeTrack = isPlaying ? currentTrack : undefined;
     const activeTrackKey = activeTrack ? getTrackCacheKey(activeTrack) : null;
 
-    if (nowPlayingTrackKeyRef.current && nowPlayingTrackKeyRef.current !== activeTrackKey) {
-      void api("/api/me/now-playing", "POST", { playing: false }).catch(() => {});
+    if (
+      nowPlayingTrackKeyRef.current &&
+      nowPlayingTrackKeyRef.current !== activeTrackKey
+    ) {
+      void api("/api/me/now-playing", "POST", { playing: false }).catch(
+        () => {},
+      );
       nowPlayingTrackKeyRef.current = null;
       nowPlayingStartedAtRef.current = null;
     }
 
     if (!activeTrack) return;
 
-    if (nowPlayingTrackKeyRef.current !== activeTrackKey || !nowPlayingStartedAtRef.current) {
+    if (
+      nowPlayingTrackKeyRef.current !== activeTrackKey ||
+      !nowPlayingStartedAtRef.current
+    ) {
       nowPlayingStartedAtRef.current = new Date().toISOString();
     }
 

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.queries.user_library_shared import has_legacy_stream_id_column, relative_track_path
+from crate.db.queries.user_library_shared import (
+    has_legacy_stream_id_column,
+    relative_track_path,
+)
 from crate.db.tx import read_scope
 
 
-def get_play_history_rows(user_id: int, *, limit: int, has_legacy_stream_id_column: bool) -> list[dict]:
+def get_play_history_rows(
+    user_id: int, *, limit: int, has_legacy_stream_id_column: bool
+) -> list[dict]:
     query_sql = """
         SELECT
             COALESCE(lt.id, upe.track_id) AS track_id,
@@ -63,11 +68,17 @@ def get_play_history_rows(user_id: int, *, limit: int, has_legacy_stream_id_colu
     """
 
     with read_scope() as session:
-        rows = session.execute(text(query_sql), {"user_id": user_id, "lim": limit}).mappings().all()
+        rows = (
+            session.execute(text(query_sql), {"user_id": user_id, "lim": limit})
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]
 
 
-def resolve_play_history_album_fallback(normalized_pairs: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+def resolve_play_history_album_fallback(
+    normalized_pairs: list[tuple[str, str]],
+) -> dict[tuple[str, str], dict]:
     if not normalized_pairs:
         return {}
 
@@ -81,9 +92,10 @@ def resolve_play_history_album_fallback(normalized_pairs: list[tuple[str, str]])
         values_sql.append(f"(:{artist_key}, :{title_key})")
 
     with read_scope() as session:
-        fallback_rows = session.execute(
-            text(
-                f"""
+        fallback_rows = (
+            session.execute(
+                text(
+                    f"""
                 WITH input_pairs(artist, title) AS (
                     VALUES {", ".join(values_sql)}
                 )
@@ -124,9 +136,12 @@ def resolve_play_history_album_fallback(normalized_pairs: list[tuple[str, str]])
                     CASE WHEN alb.id IS NULL THEN 1 ELSE 0 END,
                     lt.id DESC
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
 
     return {
         ((row["artist"] or "").lower(), (row["title"] or "").lower()): dict(row)
@@ -175,7 +190,9 @@ def get_play_history(user_id: int, limit: int = 50) -> list[dict]:
         item["album_slug"] = hit.get("album_slug")
         item["album"] = item.get("album") or hit.get("album")
         item["artist_id"] = item.get("artist_id") or hit.get("artist_id")
-        item["artist_entity_uid"] = item.get("artist_entity_uid") or hit.get("artist_entity_uid")
+        item["artist_entity_uid"] = item.get("artist_entity_uid") or hit.get(
+            "artist_entity_uid"
+        )
         item["artist_slug"] = item.get("artist_slug") or hit.get("artist_slug")
 
     return rows

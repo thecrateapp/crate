@@ -10,19 +10,27 @@ interface OfflineBadgeProps {
   className?: string;
 }
 
-export function OfflineBadge({ state, compact = false, subtle = false, className }: OfflineBadgeProps) {
+export function OfflineBadge({
+  state,
+  compact = false,
+  subtle = false,
+  className,
+}: OfflineBadgeProps) {
   if (state === "idle") return null;
   const label = getOfflineStateLabel(state);
 
   if (subtle) {
     const iconSize = compact ? 12 : 14;
-    const icon = state === "ready"
-      ? <CheckCircle2 size={iconSize} />
-      : state === "error"
-        ? <AlertCircle size={iconSize} />
-        : state === "queued"
-          ? <Download size={iconSize} />
-          : <Loader2 size={iconSize} className="animate-spin" />;
+    const icon =
+      state === "ready" ? (
+        <CheckCircle2 size={iconSize} />
+      ) : state === "error" ? (
+        <AlertCircle size={iconSize} />
+      ) : state === "queued" ? (
+        <Download size={iconSize} />
+      ) : (
+        <Loader2 size={iconSize} className="animate-spin" />
+      );
     return (
       <span
         className={cn(
@@ -36,7 +44,9 @@ export function OfflineBadge({ state, compact = false, subtle = false, className
         )}
       >
         {icon}
-        {!compact ? <span className="text-[11px] font-medium tracking-wide">{label}</span> : null}
+        {!compact ? (
+          <span className="text-[11px] font-medium tracking-wide">{label}</span>
+        ) : null}
       </span>
     );
   }
@@ -76,7 +86,11 @@ export function OfflineBadge({ state, compact = false, subtle = false, className
         className,
       )}
     >
-      {state === "queued" ? <Download size={compact ? 11 : 12} /> : <Loader2 size={compact ? 11 : 12} className="animate-spin" />}
+      {state === "queued" ? (
+        <Download size={compact ? 11 : 12} />
+      ) : (
+        <Loader2 size={compact ? 11 : 12} className="animate-spin" />
+      )}
       {!compact ? label : null}
     </span>
   );

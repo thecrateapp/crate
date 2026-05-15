@@ -2,7 +2,12 @@ import { registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 
 import { isNative } from "@/lib/capacitor-runtime";
 
-export type NativeMediaControl = "play" | "pause" | "next" | "previous" | "seekTo";
+export type NativeMediaControl =
+  | "play"
+  | "pause"
+  | "next"
+  | "previous"
+  | "seekTo";
 
 export type NativeMediaSessionPayload = {
   title: string;
@@ -29,9 +34,12 @@ type CrateMediaSessionPlugin = {
   ): Promise<PluginListenerHandle>;
 };
 
-const nativeMediaSession = registerPlugin<CrateMediaSessionPlugin>("CrateMediaSession");
+const nativeMediaSession =
+  registerPlugin<CrateMediaSessionPlugin>("CrateMediaSession");
 
-export async function syncNativeMediaSession(payload: NativeMediaSessionPayload): Promise<void> {
+export async function syncNativeMediaSession(
+  payload: NativeMediaSessionPayload,
+): Promise<void> {
   if (!isNative) return;
   try {
     await nativeMediaSession.update(payload);
@@ -40,7 +48,9 @@ export async function syncNativeMediaSession(payload: NativeMediaSessionPayload)
   }
 }
 
-export async function stopNativeMediaSession(options?: { suppressControl?: boolean }): Promise<void> {
+export async function stopNativeMediaSession(options?: {
+  suppressControl?: boolean;
+}): Promise<void> {
   if (!isNative) return;
   try {
     await nativeMediaSession.stop(options);

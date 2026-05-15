@@ -44,4 +44,6 @@ def test_db_facade_reexports_all_public_top_level_functions():
             if not hasattr(db, name):
                 missing.append(f"{path.stem}.{name}")
 
-    assert missing == [], "crate.db is missing public re-exports:\n" + "\n".join(missing)
+    assert missing == [], "crate.db is missing public re-exports:\n" + "\n".join(
+        missing
+    )

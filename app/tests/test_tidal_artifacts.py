@@ -21,10 +21,12 @@ def test_tidal_download_uses_collision_safe_output_template(tmp_path, monkeypatc
             album_dir = processing_dir / "KNEECAP" / "H.O.O.D 2025"
             album_dir.mkdir(parents=True)
             (album_dir / "01-01 - H.O.O.D (2025 Mix).m4a").write_bytes(b"fake-aac")
-            self.stdout = iter([
-                "Total downloads: 1\n",
-                "Downloaded H.O.O.D  123 /tmp/out\n",
-            ])
+            self.stdout = iter(
+                [
+                    "Total downloads: 1\n",
+                    "Downloaded H.O.O.D  123 /tmp/out\n",
+                ]
+            )
             self.returncode = 0
 
         def wait(self, timeout=None):
@@ -99,23 +101,31 @@ def test_get_album_tracks_preserves_tidal_version_metadata(monkeypatch):
     ]
 
 
-def test_refresh_token_falls_back_to_raw_client_when_tiddl_cli_model_fails(tmp_path, monkeypatch):
+def test_refresh_token_falls_back_to_raw_client_when_tiddl_cli_model_fails(
+    tmp_path, monkeypatch
+):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()
     auth_file = auth_dir / "auth.json"
-    auth_file.write_text(json.dumps({
-        "token": "expired-token",
-        "refresh_token": "refresh-token",
-        "expires_at": 1,
-        "user_id": "old-user",
-        "country_code": "US",
-    }))
+    auth_file.write_text(
+        json.dumps(
+            {
+                "token": "expired-token",
+                "refresh_token": "refresh-token",
+                "expires_at": 1,
+                "user_id": "old-user",
+                "country_code": "US",
+            }
+        )
+    )
 
     monkeypatch.setattr(tidal, "TIDDL_CONFIG_DIR", str(auth_dir))
     monkeypatch.setattr(
         tidal.subprocess,
         "run",
-        lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="ValidationError: user.facebookUid"),
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=1, stdout="", stderr="ValidationError: user.facebookUid"
+        ),
     )
     monkeypatch.setattr(
         tidal,
@@ -143,11 +153,15 @@ def test_download_syncs_tiddl_country_before_cli(tmp_path, monkeypatch):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()
     auth_file = auth_dir / "auth.json"
-    auth_file.write_text(json.dumps({
-        "token": "token",
-        "refresh_token": "refresh",
-        "country_code": "ES",
-    }))
+    auth_file.write_text(
+        json.dumps(
+            {
+                "token": "token",
+                "refresh_token": "refresh",
+                "country_code": "ES",
+            }
+        )
+    )
 
     class FakeProc:
         def __init__(self, _cmd, **_kwargs):
@@ -174,14 +188,20 @@ def test_download_syncs_tiddl_country_before_cli(tmp_path, monkeypatch):
 def test_refresh_token_keeps_tiddl_cli_success_path(tmp_path, monkeypatch):
     auth_dir = tmp_path / ".tiddl"
     auth_dir.mkdir()
-    (auth_dir / "auth.json").write_text(json.dumps({"token": "token", "refresh_token": "refresh"}))
+    (auth_dir / "auth.json").write_text(
+        json.dumps({"token": "token", "refresh_token": "refresh"})
+    )
 
     monkeypatch.setattr(tidal, "TIDDL_CONFIG_DIR", str(auth_dir))
-    monkeypatch.setattr(tidal.subprocess, "run", lambda *_args, **_kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(
+        tidal.subprocess, "run", lambda *_args, **_kwargs: SimpleNamespace(returncode=0)
+    )
     monkeypatch.setattr(
         tidal,
         "_raw_tidal_refresh",
-        lambda _refresh: (_ for _ in ()).throw(AssertionError("fallback should not run")),
+        lambda _refresh: (_ for _ in ()).throw(
+            AssertionError("fallback should not run")
+        ),
     )
 
     assert tidal.refresh_token() is True
@@ -237,7 +257,9 @@ def test_repair_tidal_artifacts_marks_temp_aac_unrecoverable(tmp_path, monkeypat
     assert summary["lossy_files"] == ["Terror/Still Suffer/tmpcafebabe"]
 
 
-def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tree(tmp_path, monkeypatch):
+def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tree(
+    tmp_path, monkeypatch
+):
     initial_dir = tmp_path / "initial" / "Terror" / "Still Suffer"
     initial_dir.mkdir(parents=True)
     _write_mp4_header(initial_dir / "Promised Only Lies.flac")
@@ -250,9 +272,15 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
 
     download_calls: list[str] = []
 
-    def _fake_download(_url: str, quality: str = "max", task_id: str = "", progress_callback=None):
+    def _fake_download(
+        _url: str, quality: str = "max", task_id: str = "", progress_callback=None
+    ):
         download_calls.append(quality)
-        path = initial_dir.parent.parent if quality == "max" else fallback_dir.parent.parent
+        path = (
+            initial_dir.parent.parent
+            if quality == "max"
+            else fallback_dir.parent.parent
+        )
         return {
             "success": True,
             "path": str(path),
@@ -274,23 +302,59 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
     monkeypatch.setattr("crate.tidal.download", _fake_download)
     monkeypatch.setattr("crate.tidal.ensure_auth", lambda: True)
     monkeypatch.setattr("crate.tidal.get_album_track_count", lambda _album_id: 10)
-    monkeypatch.setattr("crate.tidal.get_album_tracks", lambda _album_id: [{"id": str(i)} for i in range(10)])
+    monkeypatch.setattr(
+        "crate.tidal.get_album_tracks",
+        lambda _album_id: [{"id": str(i)} for i in range(10)],
+    )
     monkeypatch.setattr(
         "crate.tidal.move_to_library_detailed",
-        lambda _path, _lib: [{"artist": "Terror", "album": "Still Suffer", "path": str(tmp_path / "library" / "Terror" / "Still Suffer"), "moved": 10}],
+        lambda _path, _lib: [
+            {
+                "artist": "Terror",
+                "album": "Still Suffer",
+                "path": str(tmp_path / "library" / "Terror" / "Still Suffer"),
+                "moved": 10,
+            }
+        ],
     )
     monkeypatch.setattr("crate.library_sync.LibrarySync", _DummySync)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.emit_task_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.emit_item_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.set_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.delete_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.append_domain_event", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition.update_tidal_download", lambda *args, **kwargs: None)
-    monkeypatch.setattr("crate.worker_handlers.acquisition._resolve_tidal_preferred_artist_name", lambda *args, **kwargs: "Terror")
-    monkeypatch.setattr("crate.worker_handlers.acquisition._align_tidal_staged_artist_dirs", lambda *args, **kwargs: ["Terror"])
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_item_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.set_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.delete_cache", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.append_domain_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.update_tidal_download",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._resolve_tidal_preferred_artist_name",
+        lambda *args, **kwargs: "Terror",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._align_tidal_staged_artist_dirs",
+        lambda *args, **kwargs: ["Terror"],
+    )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
-    (tmp_path / "library" / "Terror" / "Still Suffer").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "library" / "Terror" / "Still Suffer").mkdir(
+        parents=True, exist_ok=True
+    )
 
     result = _tidal_download_inner(
         "task-1",

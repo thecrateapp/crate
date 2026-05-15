@@ -21,11 +21,7 @@ function severityBadge(severity: string) {
     medium: "bg-yellow-500 text-black",
     low: "bg-secondary text-muted-foreground",
   };
-  return (
-    <Badge className={map[severity] || map.low}>
-      {severity}
-    </Badge>
-  );
+  return <Badge className={map[severity] || map.low}>{severity}</Badge>;
 }
 
 export function IssueList({ issues }: IssueListProps) {

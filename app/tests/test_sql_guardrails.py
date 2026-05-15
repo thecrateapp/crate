@@ -19,4 +19,3 @@ def test_playlist_runtime_queries_do_not_resolve_tracks_by_path_suffix_like():
             offenders.append(str(path.relative_to(PROJECT_ROOT)))
 
     assert offenders == []
-

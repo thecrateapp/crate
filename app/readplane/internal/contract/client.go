@@ -13,15 +13,18 @@ import (
 	"time"
 )
 
+// Client is an HTTP client for interacting with the Crate API contract.
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
 }
 
+// LoginResponse is the JSON shape returned by the Crate login endpoint.
 type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+// NewClient creates a Client targeting the given base URL with the specified timeout.
 func NewClient(baseURL string, timeout time.Duration) Client {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if timeout <= 0 {
@@ -33,6 +36,7 @@ func NewClient(baseURL string, timeout time.Duration) Client {
 	}
 }
 
+// Login authenticates with email and password and returns a bearer token.
 func (c Client) Login(ctx context.Context, email string, password string) (string, error) {
 	body, err := json.Marshal(map[string]string{"email": email, "password": password})
 	if err != nil {
@@ -65,6 +69,7 @@ func (c Client) Login(ctx context.Context, email string, password string) (strin
 	return parsed.Token, nil
 }
 
+// Get performs an authenticated GET request and returns the response body and headers.
 func (c Client) Get(ctx context.Context, path string, token string) ([]byte, http.Header, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url(path), nil)
 	if err != nil {
@@ -88,6 +93,7 @@ func (c Client) Get(ctx context.Context, path string, token string) ([]byte, htt
 	return raw, resp.Header, nil
 }
 
+// FirstSSEData opens an SSE stream and returns the first data event payload.
 func (c Client) FirstSSEData(ctx context.Context, path string, token string) ([]byte, error) {
 	parsed, err := url.Parse(c.url(path))
 	if err != nil {

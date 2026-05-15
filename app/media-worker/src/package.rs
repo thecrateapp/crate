@@ -1,3 +1,6 @@
+//! Album and track artifact packaging: ZIP generation with rich tags, progress
+//! reporting, and cancellation support.
+
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -342,56 +345,57 @@ fn build_zip(
             + usize::from(job.sidecar_json.is_some());
         let mut entry_index = 0usize;
         for entry in &job.tracks {
-            add_source_entry(
-                "track",
+            add_source_entry(&mut SourceEntryConfig {
+                default_kind: "track",
                 entry,
-                &mut names,
-                &mut zip,
+                names: &mut names,
+                zip: &mut zip,
                 result,
-                staging_root.as_deref(),
-                job.primary_artwork_path.as_deref(),
-                job.sidecar_json.as_ref(),
+                staging_root: staging_root.as_deref(),
+                primary_artwork_path: job.primary_artwork_path.as_deref(),
+                package_payload: job.sidecar_json.as_ref(),
                 progress,
                 total_entries,
-                &mut entry_index,
-            )?;
+                entry_index: &mut entry_index,
+            })?;
         }
         for entry in &job.artwork_files {
-            add_source_entry(
-                "artwork",
+            add_source_entry(&mut SourceEntryConfig {
+                default_kind: "artwork",
                 entry,
-                &mut names,
-                &mut zip,
+                names: &mut names,
+                zip: &mut zip,
                 result,
-                None,
-                None,
-                None,
+                staging_root: None,
+                primary_artwork_path: None,
+                package_payload: None,
                 progress,
                 total_entries,
-                &mut entry_index,
-            )?;
+                entry_index: &mut entry_index,
+            })?;
         }
         for entry in &job.extra_files {
-            add_source_entry(
-                entry.kind.as_deref().unwrap_or("extra"),
+            add_source_entry(&mut SourceEntryConfig {
+                default_kind: entry.kind.as_deref().unwrap_or("extra"),
                 entry,
-                &mut names,
-                &mut zip,
+                names: &mut names,
+                zip: &mut zip,
                 result,
-                None,
-                None,
-                None,
+                staging_root: None,
+                primary_artwork_path: None,
+                package_payload: None,
                 progress,
                 total_entries,
-                &mut entry_index,
-            )?;
+                entry_index: &mut entry_index,
+            })?;
         }
 
         if let Some(sidecar) = &job.sidecar_json {
             progress.check_cancelled()?;
             let bytes = serde_json::to_vec_pretty(sidecar)
                 .map_err(|err| format!("serialize sidecar metadata: {err}"))?;
-            let name = unique_name(".crate/album.json", &mut names);
+            let name = unique_name(".crate/album.json", &mut names)
+                .unwrap_or_else(|_| ".crate/album.json".to_string());
             entry_index += 1;
             progress.emit(
                 "entry_started",
@@ -429,66 +433,72 @@ fn build_zip(
     build_result
 }
 
-fn add_source_entry(
-    default_kind: &str,
-    entry: &PackageEntry,
-    names: &mut HashSet<String>,
-    zip: &mut StoredZipWriter<File>,
-    result: &mut PackageResult,
-    staging_root: Option<&Path>,
-    primary_artwork_path: Option<&str>,
-    package_payload: Option<&Value>,
-    progress: &ProgressSink,
+struct SourceEntryConfig<'a> {
+    default_kind: &'a str,
+    entry: &'a PackageEntry,
+    names: &'a mut HashSet<String>,
+    zip: &'a mut StoredZipWriter<File>,
+    result: &'a mut PackageResult,
+    staging_root: Option<&'a Path>,
+    primary_artwork_path: Option<&'a str>,
+    package_payload: Option<&'a Value>,
+    progress: &'a ProgressSink,
     total_entries: usize,
-    entry_index: &mut usize,
-) -> Result<(), String> {
-    let source = PathBuf::from(&entry.source_path);
-    let fallback = entry
+    entry_index: &'a mut usize,
+}
+
+fn add_source_entry(config: &mut SourceEntryConfig<'_>) -> Result<(), String> {
+    let source = PathBuf::from(&config.entry.source_path);
+    let fallback = config
+        .entry
         .filename
         .as_deref()
         .or_else(|| source.file_name().and_then(|value| value.to_str()))
         .unwrap_or("track");
-    let requested_name = entry
+    let requested_name = config
+        .entry
         .relative_path
         .as_deref()
-        .or(entry.filename.as_deref())
+        .or(config.entry.filename.as_deref())
         .unwrap_or(fallback);
-    let name = unique_name(&safe_entry_name(requested_name, fallback), names);
-    let kind = entry.kind.as_deref().unwrap_or(default_kind).to_string();
-    *entry_index += 1;
-    progress.check_cancelled()?;
-    progress.emit(
+    let name = unique_name(&safe_entry_name(requested_name, fallback), config.names)
+        .unwrap_or_else(|_| fallback.to_string());
+    let kind = config.entry.kind.as_deref().unwrap_or(config.default_kind).to_string();
+    *config.entry_index += 1;
+    config.progress.check_cancelled()?;
+    config.progress.emit(
         "entry_started",
-        json!({"kind": kind.clone(), "name": name.clone(), "index": *entry_index, "total": total_entries}),
+        json!({"kind": kind.clone(), "name": name.clone(), "index": *config.entry_index, "total": config.total_entries}),
     );
 
     if !source.is_file() {
-        result.errors.push(format!(
+        config.result.errors.push(format!(
             "missing source for {kind} {name}: {}",
             source.display()
         ));
-        progress.emit(
+        config.progress.emit(
             "entry_failed",
-            json!({"kind": kind.clone(), "name": name.clone(), "index": *entry_index, "total": total_entries, "error": "missing source"}),
+            json!({"kind": kind.clone(), "name": name.clone(), "index": *config.entry_index, "total": config.total_entries, "error": "missing source"}),
         );
         return Ok(());
     }
 
     let staged_path;
-    let should_cancel = || progress.is_cancelled();
+    let should_cancel = || config.progress.is_cancelled();
     let source_for_zip = if kind == "track" {
-        if let Some(root) = staging_root {
-            let metadata = entry
+        if let Some(root) = config.staging_root {
+            let metadata = config
+                .entry
                 .metadata
                 .as_ref()
                 .ok_or_else(|| format!("rich package track {name} is missing metadata"))?;
             staged_path = Some(stage_track_copy(&source, root, &name, &should_cancel)?);
-            progress.check_cancelled()?;
-            let artwork = entry.artwork_path.as_deref().or(primary_artwork_path);
+            config.progress.check_cancelled()?;
+            let artwork = config.entry.artwork_path.as_deref().or(config.primary_artwork_path);
             write_rich_tags(
                 staged_path.as_ref().expect("staged track exists"),
                 metadata,
-                package_payload,
+                config.package_payload,
                 artwork.map(Path::new),
             )
             .map_err(|err| format!("write rich tags for {name}: {err}"))?;
@@ -500,19 +510,20 @@ fn add_source_entry(
         &source
     };
 
-    let written = zip
+    let written = config
+        .zip
         .add_file_checked(&name, source_for_zip, Some(&should_cancel))
         .map_err(|err| format!("write {kind} {name}: {err}"))?;
-    result.entries.push(PackagedEntry {
+    config.result.entries.push(PackagedEntry {
         kind,
         name,
         source_path: Some(source.display().to_string()),
         bytes: written,
     });
-    if let Some(entry) = result.entries.last() {
-        progress.emit(
+    if let Some(entry) = config.result.entries.last() {
+        config.progress.emit(
             "entry_finished",
-            json!({"kind": entry.kind.clone(), "name": entry.name.clone(), "index": *entry_index, "total": total_entries, "bytes": written}),
+            json!({"kind": entry.kind.clone(), "name": entry.name.clone(), "index": *config.entry_index, "total": config.total_entries, "bytes": written}),
         );
     }
     Ok(())
@@ -669,10 +680,10 @@ fn temporary_audio_output_path(path: &Path) -> PathBuf {
     path.with_file_name(tmp_name)
 }
 
-fn unique_name(raw: &str, names: &mut HashSet<String>) -> String {
+fn unique_name(raw: &str, names: &mut HashSet<String>) -> Result<String, String> {
     let mut candidate = raw.to_string();
     if names.insert(candidate.clone()) {
-        return candidate;
+        return Ok(candidate);
     }
 
     let path = Path::new(raw);
@@ -682,7 +693,7 @@ fn unique_name(raw: &str, names: &mut HashSet<String>) -> String {
         .and_then(|value| value.to_str())
         .unwrap_or(raw);
     let extension = path.extension().and_then(|value| value.to_str());
-    for index in 2.. {
+    for index in 2..1_000_000 {
         let leaf = match extension {
             Some(extension) if !extension.is_empty() => format!("{stem} ({index}).{extension}"),
             _ => format!("{stem} ({index})"),
@@ -693,10 +704,10 @@ fn unique_name(raw: &str, names: &mut HashSet<String>) -> String {
             format!("{parent}/{leaf}")
         };
         if names.insert(candidate.clone()) {
-            return candidate;
+            return Ok(candidate);
         }
     }
-    unreachable!()
+    Err(format!("unable to generate unique name for {raw}"))
 }
 
 fn safe_entry_name(raw: &str, fallback: &str) -> String {
@@ -756,7 +767,8 @@ mod tests {
     use crate::cache::DownloadCachePolicy;
 
     use super::{
-        build_album_package, build_track_artifact, PackageEntry, PackageJob, TrackArtifactJob,
+        build_album_package, build_track_artifact, unique_name, PackageEntry, PackageJob,
+        TrackArtifactJob,
     };
 
     #[test]
@@ -950,6 +962,23 @@ mod tests {
         let events = fs::read_to_string(progress_path).unwrap();
         assert!(events.contains("\"event\":\"started\""));
         assert!(events.contains("\"event\":\"cancelled\""));
+    }
+
+    #[test]
+    fn unique_name_avoids_collisions() {
+        let mut names = std::collections::HashSet::new();
+        names.insert("file.txt".to_string());
+        assert_eq!(unique_name("file.txt", &mut names).unwrap(), "file (2).txt");
+        names.insert("file (2).txt".to_string());
+        assert_eq!(unique_name("file.txt", &mut names).unwrap(), "file (3).txt");
+    }
+
+    #[test]
+    fn unique_name_errors_after_exhaustion() {
+        let mut names: std::collections::HashSet<String> =
+            (2..1_000_000).map(|i| format!("file ({i}).txt")).collect();
+        names.insert("file.txt".to_string());
+        assert!(unique_name("file.txt", &mut names).is_err());
     }
 
     fn test_dir(name: &str) -> PathBuf {

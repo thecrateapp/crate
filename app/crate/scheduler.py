@@ -1,7 +1,6 @@
 """Task scheduler — configurable recurring tasks."""
 
 import logging
-import time
 from datetime import datetime, timezone
 
 from crate.db.cache_settings import get_setting, set_setting
@@ -12,18 +11,19 @@ log = logging.getLogger(__name__)
 
 # Default schedule: {task_type: interval_seconds}
 DEFAULT_SCHEDULES = {
-    "enrich_artists": 86400,       # 24h — full enrichment of all artists
-    "library_pipeline": 86400,     # 24h — gated maintenance path (watcher handles real-time)
-    "compute_analytics": 14400,    # 4h — recompute analytics from DB
-    "check_new_releases": 43200,   # 12h — check MusicBrainz for new releases
+    "enrich_artists": 86400,  # 24h — full enrichment of all artists
+    "library_pipeline": 86400,  # 24h — gated maintenance path (watcher handles real-time)
+    "compute_analytics": 14400,  # 4h — recompute analytics from DB
+    "check_new_releases": 43200,  # 12h — check MusicBrainz for new releases
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
-    "sync_shows": 86400,           # 24h — sync shows from Ticketmaster
+    "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
 }
 
 
 def get_schedules() -> dict[str, int]:
     """Get configured schedules from settings, falling back to defaults."""
     import json
+
     raw = get_setting("schedules")
     if raw:
         try:
@@ -41,6 +41,7 @@ def get_schedules() -> dict[str, int]:
 def set_schedules(schedules: dict[str, int]):
     """Save schedule configuration."""
     import json
+
     set_setting("schedules", json.dumps(schedules))
 
 
@@ -59,6 +60,7 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
 
     if last_run:
         from crate.utils import to_datetime
+
         last_time = to_datetime(last_run)
         if last_time is not None:
             elapsed = (datetime.now(timezone.utc) - last_time).total_seconds()
@@ -101,7 +103,11 @@ def check_and_create_scheduled_tasks():
                     )
                     continue
             except Exception:
-                log.debug("Resource governor check failed for scheduled %s", task_type, exc_info=True)
+                log.debug(
+                    "Resource governor check failed for scheduled %s",
+                    task_type,
+                    exc_info=True,
+                )
             log.info("Scheduling task: %s (interval=%ds)", task_type, interval)
             task_id = create_task_dedup(task_type, dedup_key=f"schedule:{task_type}")
             if task_id:

@@ -18,6 +18,7 @@ _OUTPUT_FORMAT_TO_MEDIA = {
     "webp": "image/webp",
 }
 
+
 def resize_image_bytes(
     content: bytes,
     media_type: str,
@@ -44,12 +45,16 @@ def resize_image_bytes(
         return content, media_type
 
     output = BytesIO()
-    save_format = _RASTER_MEDIA_TO_FORMAT.get(target_media_type or media_type, image_format)
+    save_format = _RASTER_MEDIA_TO_FORMAT.get(
+        target_media_type or media_type, image_format
+    )
 
     if save_format == "JPEG":
         if image.mode not in ("RGB", "L"):
             image = image.convert("RGB")
-        image.save(output, format=save_format, quality=85, optimize=True, progressive=True)
+        image.save(
+            output, format=save_format, quality=85, optimize=True, progressive=True
+        )
     elif save_format == "PNG":
         image.save(output, format=save_format, optimize=True)
     else:

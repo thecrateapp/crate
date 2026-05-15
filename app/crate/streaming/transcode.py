@@ -5,7 +5,11 @@ import subprocess
 from pathlib import Path
 
 from crate.streaming.paths import resolve_data_file
-from crate.db.repositories.streaming import get_variant_by_cache_key, mark_variant_failed, mark_variant_ready
+from crate.db.repositories.streaming import (
+    get_variant_by_cache_key,
+    mark_variant_failed,
+    mark_variant_ready,
+)
 
 
 class StreamVariantError(RuntimeError):
@@ -38,7 +42,9 @@ def transcode_variant(cache_key: str, *, timeout_seconds: int = 900) -> dict:
         raise StreamVariantError(error)
 
     if output_path.is_file() and output_path.stat().st_size > 0:
-        ready = mark_variant_ready(cache_key, row["relative_path"], output_path.stat().st_size)
+        ready = mark_variant_ready(
+            cache_key, row["relative_path"], output_path.stat().st_size
+        )
         return ready or row
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,7 +82,9 @@ def transcode_variant(cache_key: str, *, timeout_seconds: int = 900) -> dict:
     ]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout_seconds
+        )
         if result.returncode != 0:
             error = (result.stderr or result.stdout or "ffmpeg failed").strip()[-2000:]
             mark_variant_failed(cache_key, error)
@@ -86,7 +94,9 @@ def transcode_variant(cache_key: str, *, timeout_seconds: int = 900) -> dict:
             mark_variant_failed(cache_key, error)
             raise StreamVariantError(error)
         tmp_path.replace(output_path)
-        ready = mark_variant_ready(cache_key, row["relative_path"], output_path.stat().st_size)
+        ready = mark_variant_ready(
+            cache_key, row["relative_path"], output_path.stat().st_size
+        )
         return ready or row
     except Exception as exc:
         if tmp_path.exists():

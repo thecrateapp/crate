@@ -9,11 +9,7 @@ interface FilterablePlaylistTrack {
 }
 
 function normalizeFilterQuery(value: string): string[] {
-  return value
-    .toLowerCase()
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  return value.toLowerCase().trim().split(/\s+/).filter(Boolean);
 }
 
 export function filterPlaylistTracks<T extends FilterablePlaylistTrack>(
@@ -24,7 +20,9 @@ export function filterPlaylistTracks<T extends FilterablePlaylistTrack>(
   if (!terms.length) return tracks;
 
   return tracks.filter((track) => {
-    const haystack = `${track.title || ""} ${track.artist || ""} ${track.album || ""}`.toLowerCase();
+    const haystack = `${track.title || ""} ${track.artist || ""} ${
+      track.album || ""
+    }`.toLowerCase();
     return terms.every((term) => haystack.includes(term));
   });
 }
@@ -43,7 +41,9 @@ export function PlaylistTrackFilterBar({
   className?: string;
 }) {
   const filtering = query.trim().length > 0;
-  const countLabel = filtering ? `${filteredCount} of ${totalCount}` : `${totalCount}`;
+  const countLabel = filtering
+    ? `${filteredCount} of ${totalCount}`
+    : `${totalCount}`;
 
   return (
     <div className={cn("flex w-full", className)}>

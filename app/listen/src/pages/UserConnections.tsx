@@ -25,11 +25,20 @@ function UserAvatar({
 }) {
   const { avatarUrl, handleAvatarError } = useUserAvatarUrl(avatar, userId);
   if (avatarUrl) {
-    return <img src={avatarUrl} alt={name} onError={handleAvatarError} className={`${className} rounded-full object-cover`} />;
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        onError={handleAvatarError}
+        className={`${className} rounded-full object-cover`}
+      />
+    );
   }
   const initial = name.trim().charAt(0).toUpperCase() || "U";
   return (
-    <div className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center font-semibold`}>
+    <div
+      className={`${className} rounded-full bg-cyan-400/15 text-cyan-300 flex items-center justify-center font-semibold`}
+    >
       {initial}
     </div>
   );
@@ -38,9 +47,13 @@ function UserAvatar({
 export function UserConnections() {
   const { username } = useParams<{ username: string }>();
   const location = useLocation();
-  const mode = location.pathname.endsWith("/following") ? "following" : "followers";
+  const mode = location.pathname.endsWith("/following")
+    ? "following"
+    : "followers";
   const { data, loading } = useApi<UserListItem[]>(
-    username ? `/api/users/${encodeURIComponent(username)}/${mode}?limit=200` : null,
+    username
+      ? `/api/users/${encodeURIComponent(username)}/${mode}?limit=200`
+      : null,
   );
 
   return (
@@ -56,7 +69,9 @@ export function UserConnections() {
         <div className="mt-4 flex items-center gap-3">
           <Users size={18} className="text-cyan-300" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground capitalize">{mode}</h1>
+            <h1 className="text-3xl font-bold text-foreground capitalize">
+              {mode}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Public connections for @{username}.
             </p>
@@ -72,16 +87,23 @@ export function UserConnections() {
         ) : data && data.length > 0 ? (
           <div className="space-y-3">
             {data.map((item) => {
-              const label = item.display_name || item.username || "Unknown user";
+              const label =
+                item.display_name || item.username || "Unknown user";
               return (
                 <Link
                   key={`${mode}-${item.id}`}
                   to={item.username ? `/users/${item.username}` : "/people"}
                   className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
                 >
-                  <UserAvatar name={label} avatar={item.avatar} userId={item.id} />
+                  <UserAvatar
+                    name={label}
+                    avatar={item.avatar}
+                    userId={item.id}
+                  />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">{label}</div>
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {label}
+                    </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {item.username ? `@${item.username}` : "No username yet"}
                     </div>

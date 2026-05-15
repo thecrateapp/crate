@@ -34,7 +34,9 @@ _ARTIST_CORE_SELECT = """
 """
 
 
-def get_artist_core_track_rows(*, artist_id: int, artist_name: str, limit: int) -> list[dict]:
+def get_artist_core_track_rows(
+    *, artist_id: int, artist_name: str, limit: int
+) -> list[dict]:
     return _fetch_rows(
         f"""
         SELECT
@@ -54,7 +56,9 @@ def get_artist_core_track_rows(*, artist_id: int, artist_name: str, limit: int) 
     )
 
 
-def get_artists_core_track_rows(*, artist_ids: list[int], per_artist_limit: int) -> list[dict]:
+def get_artists_core_track_rows(
+    *, artist_ids: list[int], per_artist_limit: int
+) -> list[dict]:
     cleaned_ids = [int(artist_id) for artist_id in artist_ids if artist_id is not None]
     if not cleaned_ids:
         return []

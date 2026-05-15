@@ -7,7 +7,11 @@ from typing import Any
 
 from sqlalchemy import text
 
-from crate.db.repositories.library_upserts import upsert_album, upsert_artist, upsert_track
+from crate.db.repositories.library_upserts import (
+    upsert_album,
+    upsert_artist,
+    upsert_track,
+)
 from crate.db.repositories.lyrics import store_lyrics
 from crate.db.tx import read_scope, transaction_scope
 
@@ -130,9 +134,10 @@ def mark_album_rich_export(
 
 def get_portable_metadata_status() -> dict[str, int]:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 WITH totals AS (
                     SELECT
                         (SELECT COUNT(*) FROM library_tracks) AS total_tracks,
@@ -213,8 +218,11 @@ def get_portable_metadata_status() -> dict[str, int]:
                     COALESCE(portable.rich_export_tracks, 0) AS rich_export_tracks
                 FROM totals, lyrics, portable
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
 
     return {key: int(value or 0) for key, value in dict(row or {}).items()}
 
@@ -238,22 +246,27 @@ def _track_filename(track: dict[str, Any]) -> str:
 def _restore_track_features(session, track_id: int, track: dict[str, Any]) -> None:
     now = datetime.now(timezone.utc)
     analysis = track.get("analysis") or {}
-    if any(analysis.get(key) is not None for key in (
-        "bpm",
-        "audio_key",
-        "audio_scale",
-        "energy",
-        "mood",
-        "danceability",
-        "valence",
-        "acousticness",
-        "instrumentalness",
-        "loudness",
-        "dynamic_range",
-        "spectral_complexity",
-    )):
+    if any(
+        analysis.get(key) is not None
+        for key in (
+            "bpm",
+            "audio_key",
+            "audio_scale",
+            "energy",
+            "mood",
+            "danceability",
+            "valence",
+            "acousticness",
+            "instrumentalness",
+            "loudness",
+            "dynamic_range",
+            "spectral_complexity",
+        )
+    ):
         mood = analysis.get("mood")
-        mood_json = json.dumps(mood) if mood is not None and not isinstance(mood, str) else mood
+        mood_json = (
+            json.dumps(mood) if mood is not None and not isinstance(mood, str) else mood
+        )
         session.execute(
             text(
                 """
@@ -420,11 +433,15 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 "name": artist.get("name") or album.get("artist"),
                 "storage_id": artist.get("storage_id"),
                 "entity_uid": artist.get("entity_uid"),
-                "folder_name": artist.get("folder_name") or Path(str(album["path"])).parent.name,
+                "folder_name": artist.get("folder_name")
+                or Path(str(album["path"])).parent.name,
                 "album_count": artist.get("album_count") or 1,
                 "track_count": artist.get("track_count") or len(tracks),
-                "total_size": artist.get("total_size") or sum(int(track.get("size") or 0) for track in tracks),
-                "formats": _formats(artist.get("formats_json") or artist.get("formats")),
+                "total_size": artist.get("total_size")
+                or sum(int(track.get("size") or 0) for track in tracks),
+                "formats": _formats(
+                    artist.get("formats_json") or artist.get("formats")
+                ),
                 "primary_format": artist.get("primary_format"),
                 "has_photo": artist.get("has_photo") or 0,
                 "mbid": artist.get("mbid"),
@@ -435,13 +452,17 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
         album_id = upsert_album(
             {
                 "artist": artist_name,
-                "name": album.get("name") or album.get("tag_album") or Path(str(album["path"])).name,
+                "name": album.get("name")
+                or album.get("tag_album")
+                or Path(str(album["path"])).name,
                 "storage_id": album.get("storage_id"),
                 "entity_uid": album.get("entity_uid"),
                 "path": album["path"],
                 "track_count": album.get("track_count") or len(tracks),
-                "total_size": album.get("total_size") or sum(int(track.get("size") or 0) for track in tracks),
-                "total_duration": album.get("total_duration") or sum(float(track.get("duration") or 0) for track in tracks),
+                "total_size": album.get("total_size")
+                or sum(int(track.get("size") or 0) for track in tracks),
+                "total_duration": album.get("total_duration")
+                or sum(float(track.get("duration") or 0) for track in tracks),
                 "formats": _formats(album.get("formats_json") or album.get("formats")),
                 "year": album.get("year"),
                 "genre": album.get("genre"),
@@ -458,7 +479,9 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 {
                     "album_id": album_id,
                     "artist": track.get("artist") or artist_name,
-                    "album": track.get("album") or album.get("name") or album.get("tag_album"),
+                    "album": track.get("album")
+                    or album.get("name")
+                    or album.get("tag_album"),
                     "storage_id": track.get("storage_id"),
                     "entity_uid": track.get("entity_uid"),
                     "filename": _track_filename(track),
@@ -474,7 +497,8 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                     "year": track.get("year"),
                     "genre": track.get("genre"),
                     "albumartist": track.get("albumartist"),
-                    "musicbrainz_albumid": track.get("musicbrainz_albumid") or album.get("musicbrainz_albumid"),
+                    "musicbrainz_albumid": track.get("musicbrainz_albumid")
+                    or album.get("musicbrainz_albumid"),
                     "musicbrainz_trackid": track.get("musicbrainz_trackid"),
                     "audio_fingerprint": track.get("audio_fingerprint"),
                     "audio_fingerprint_source": track.get("audio_fingerprint_source"),
@@ -482,14 +506,22 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 },
                 session=session,
             )
-            track_row = session.execute(
-                text("SELECT id, entity_uid FROM library_tracks WHERE path = :path LIMIT 1"),
-                {"path": track["path"]},
-            ).mappings().first()
+            track_row = (
+                session.execute(
+                    text(
+                        "SELECT id, entity_uid FROM library_tracks WHERE path = :path LIMIT 1"
+                    ),
+                    {"path": track["path"]},
+                )
+                .mappings()
+                .first()
+            )
             if not track_row:
                 continue
             _restore_track_features(session, int(track_row["id"]), track)
-            if (track.get("analysis") or {}).get("updated_at") or (track.get("bliss") or {}).get("computed_at"):
+            if (track.get("analysis") or {}).get("updated_at") or (
+                track.get("bliss") or {}
+            ).get("computed_at"):
                 restored_features += 1
 
             lyrics = track.get("lyrics") or {}
@@ -497,9 +529,12 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 lyrics_to_store.append(
                     {
                         "artist": track.get("artist") or artist_name,
-                        "title": track.get("title") or Path(_track_filename(track)).stem,
+                        "title": track.get("title")
+                        or Path(_track_filename(track)).stem,
                         "track_id": int(track_row["id"]),
-                        "track_entity_uid": str(track_row["entity_uid"]) if track_row["entity_uid"] else None,
+                        "track_entity_uid": str(track_row["entity_uid"])
+                        if track_row["entity_uid"]
+                        else None,
                         "synced_lyrics": lyrics.get("synced"),
                         "plain_lyrics": lyrics.get("plain"),
                         "found": bool(lyrics.get("found")),

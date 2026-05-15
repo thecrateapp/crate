@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from crate.db.repositories.user_library_aggregate_shared import window_cutoff
-from crate.db.repositories.user_library_daily_aggregates import recompute_user_daily_listening
+from crate.db.repositories.user_library_daily_aggregates import (
+    recompute_user_daily_listening,
+)
 from crate.db.repositories.user_library_entity_aggregates import (
     recompute_user_album_stats,
     recompute_user_artist_stats,

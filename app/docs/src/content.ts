@@ -137,36 +137,47 @@ function referenceDocs(): DocEntry[] {
     .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
 }
 
-export const docs: DocEntry[] = [
-  ...technicalDocs(),
-  ...referenceDocs(),
-];
+export const docs: DocEntry[] = [...technicalDocs(), ...referenceDocs()];
 
 export const docsBySection: Record<DocSection, DocEntry[]> = {
   technical: docs.filter((doc) => doc.section === "technical"),
   reference: docs.filter((doc) => doc.section === "reference"),
 };
 
-export const sectionMeta: Record<DocSection, { label: string; description: string }> = {
+export const sectionMeta: Record<
+  DocSection,
+  { label: string; description: string }
+> = {
   technical: {
     label: "Technical",
-    description: "Long-lived architecture and subsystem documentation for Crate as it exists today.",
+    description:
+      "Long-lived architecture and subsystem documentation for Crate as it exists today.",
   },
   reference: {
     label: "Reference",
-    description: "Entry-point docs and focused references that still matter day to day.",
+    description:
+      "Entry-point docs and focused references that still matter day to day.",
   },
 };
 
-export function getDoc(section: string | undefined, slug: string | undefined): DocEntry | undefined {
+export function getDoc(
+  section: string | undefined,
+  slug: string | undefined,
+): DocEntry | undefined {
   return docs.find((doc) => doc.section === section && doc.slug === slug);
 }
 
-export function getAdjacentDocs(doc: DocEntry): { previous?: DocEntry; next?: DocEntry } {
+export function getAdjacentDocs(doc: DocEntry): {
+  previous?: DocEntry;
+  next?: DocEntry;
+} {
   const inSection = docsBySection[doc.section];
   const index = inSection.findIndex((entry) => entry.id === doc.id);
   return {
     previous: index > 0 ? inSection[index - 1] : undefined,
-    next: index >= 0 && index < inSection.length - 1 ? inSection[index + 1] : undefined,
+    next:
+      index >= 0 && index < inSection.length - 1
+        ? inSection[index + 1]
+        : undefined,
   };
 }

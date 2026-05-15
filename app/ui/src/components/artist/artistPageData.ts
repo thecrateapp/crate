@@ -1,8 +1,15 @@
 import type { EnrichmentData } from "@/hooks/use-artist-data";
 
-import type { ArtistExternalLink, ArtistSimilarArtist, TabKey } from "./artistPageTypes";
+import type {
+  ArtistExternalLink,
+  ArtistSimilarArtist,
+  TabKey,
+} from "./artistPageTypes";
 
-export function buildArtistTags(genres: string[] | undefined, enrichment: EnrichmentData | null): string[] {
+export function buildArtistTags(
+  genres: string[] | undefined,
+  enrichment: EnrichmentData | null,
+): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   const raw = [
@@ -26,7 +33,9 @@ export function buildArtistTags(genres: string[] | undefined, enrichment: Enrich
   return result;
 }
 
-export function buildMergedSimilarArtists(enrichment: EnrichmentData | null): ArtistSimilarArtist[] {
+export function buildMergedSimilarArtists(
+  enrichment: EnrichmentData | null,
+): ArtistSimilarArtist[] {
   const seen = new Set<string>();
   const result: ArtistSimilarArtist[] = [];
 
@@ -56,38 +65,68 @@ export function buildMergedSimilarArtists(enrichment: EnrichmentData | null): Ar
   return result;
 }
 
-export function buildExternalLinks(enrichment: EnrichmentData | null): ArtistExternalLink[] {
+export function buildExternalLinks(
+  enrichment: EnrichmentData | null,
+): ArtistExternalLink[] {
   const links: ArtistExternalLink[] = [];
   const spotify = enrichment?.spotify;
   const lastfm = enrichment?.lastfm;
   const musicbrainz = enrichment?.musicbrainz;
 
-  if (spotify?.url) links.push({ label: "Spotify", url: spotify.url, color: "text-green-400" });
-  if (lastfm?.url) links.push({ label: "Last.fm", url: lastfm.url, color: "text-red-400" });
-  if (musicbrainz?.urls?.wikipedia) links.push({ label: "Wikipedia", url: musicbrainz.urls.wikipedia, color: "text-white/60" });
-  if (musicbrainz?.urls?.official) links.push({ label: "Official", url: musicbrainz.urls.official, color: "text-blue-400" });
-  if (musicbrainz?.urls?.instagram) links.push({ label: "Instagram", url: musicbrainz.urls.instagram, color: "text-pink-400" });
+  if (spotify?.url)
+    links.push({ label: "Spotify", url: spotify.url, color: "text-green-400" });
+  if (lastfm?.url)
+    links.push({ label: "Last.fm", url: lastfm.url, color: "text-red-400" });
+  if (musicbrainz?.urls?.wikipedia)
+    links.push({
+      label: "Wikipedia",
+      url: musicbrainz.urls.wikipedia,
+      color: "text-white/60",
+    });
+  if (musicbrainz?.urls?.official)
+    links.push({
+      label: "Official",
+      url: musicbrainz.urls.official,
+      color: "text-blue-400",
+    });
+  if (musicbrainz?.urls?.instagram)
+    links.push({
+      label: "Instagram",
+      url: musicbrainz.urls.instagram,
+      color: "text-pink-400",
+    });
   if (musicbrainz?.urls?.spotify && !spotify?.url) {
-    links.push({ label: "Spotify", url: musicbrainz.urls.spotify, color: "text-green-400" });
+    links.push({
+      label: "Spotify",
+      url: musicbrainz.urls.spotify,
+      color: "text-green-400",
+    });
   }
 
   return links;
 }
 
-export function buildArtistTabs(showCount: number): { key: TabKey; label: string }[] {
+export function buildArtistTabs(
+  showCount: number,
+): { key: TabKey; label: string }[] {
   return [
     { key: "overview", label: "Overview" },
     { key: "top-tracks", label: "Top Tracks" },
     { key: "discography", label: "Discography" },
     { key: "setlist", label: "Probable Setlist" },
-    ...(showCount > 0 ? [{ key: "shows" as TabKey, label: `Shows (${showCount})` }] : []),
+    ...(showCount > 0
+      ? [{ key: "shows" as TabKey, label: `Shows (${showCount})` }]
+      : []),
     { key: "similar", label: "Similar Artists" },
     { key: "stats", label: "Stats" },
     { key: "about", label: "About" },
   ];
 }
 
-export function computePopularityScore(spotifyPopularity?: number, lastfmListeners?: number): number {
+export function computePopularityScore(
+  spotifyPopularity?: number,
+  lastfmListeners?: number,
+): number {
   if (spotifyPopularity && spotifyPopularity > 0) return spotifyPopularity;
   if (!lastfmListeners || lastfmListeners <= 5000) return 0;
 
@@ -95,6 +134,13 @@ export function computePopularityScore(spotifyPopularity?: number, lastfmListene
   const maxListeners = Math.log(50000000);
   return Math.min(
     100,
-    Math.max(1, Math.round(((Math.log(lastfmListeners) - minListeners) / (maxListeners - minListeners)) * 100)),
+    Math.max(
+      1,
+      Math.round(
+        ((Math.log(lastfmListeners) - minListeners) /
+          (maxListeners - minListeners)) *
+          100,
+      ),
+    ),
   );
 }

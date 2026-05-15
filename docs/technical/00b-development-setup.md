@@ -19,11 +19,11 @@ npm install    # Installs all workspace dependencies (shared/ui, admin, listen)
 
 Crate uses npm workspaces. The root `package.json` orchestrates three packages:
 
-| Package | Path | What |
-|---------|------|------|
-| `@crate/ui` | `app/shared/ui` | Shared design system — tokens, primitives, shadcn, domain components |
-| `ui` | `app/ui` | Admin web app |
-| `crate-listen` | `app/listen` | Listening app |
+| Package        | Path            | What                                                                 |
+| -------------- | --------------- | -------------------------------------------------------------------- |
+| `@crate/ui`    | `app/shared/ui` | Shared design system — tokens, primitives, shadcn, domain components |
+| `ui`           | `app/ui`        | Admin web app                                                        |
+| `crate-listen` | `app/listen`    | Listening app                                                        |
 
 ## 2. Start the dev stack
 
@@ -38,13 +38,13 @@ This does everything:
 3. Installs npm dependencies
 4. Launches four Vite dev servers with hot reload
 
-| Service | URL | Port |
-|---------|-----|------|
-| Admin UI | `https://admin.dev.lespedants.org` | 5173 |
-| Listen app | `https://listen.dev.lespedants.org` | 5174 |
-| Docs | `https://docs.dev.cratemusic.app` | 5175 |
-| Marketing site | `https://www.dev.cratemusic.app` | 5176 |
-| API | `https://api.dev.lespedants.org` | 8585 |
+| Service        | URL                                 | Port |
+| -------------- | ----------------------------------- | ---- |
+| Admin UI       | `https://admin.dev.lespedants.org`  | 5173 |
+| Listen app     | `https://listen.dev.lespedants.org` | 5174 |
+| Docs           | `https://docs.dev.cratemusic.app`   | 5175 |
+| Marketing site | `https://www.dev.cratemusic.app`    | 5176 |
+| API            | `https://api.dev.lespedants.org`    | 8585 |
 
 Local HTTPS is handled by Caddy with auto-generated certificates. Run `make trust-local-ca` once to trust the local CA in your browser.
 
@@ -165,12 +165,12 @@ npx cap open android    # Open in Android Studio
 
 ## 6. Useful Make targets
 
-| Command | What |
-|---------|------|
-| `make dev` | Start everything |
-| `make dev-down` | Stop everything |
-| `make dev-rebuild` | Force rebuild + restart |
-| `make dev-logs` | Tail backend logs |
-| `make dev-logs s=worker` | Tail specific service |
-| `make ps` | Status of all services |
-| `make deploy` | Deploy to production server |
+| Command                  | What                        |
+| ------------------------ | --------------------------- |
+| `make dev`               | Start everything            |
+| `make dev-down`          | Stop everything             |
+| `make dev-rebuild`       | Force rebuild + restart     |
+| `make dev-logs`          | Tail backend logs           |
+| `make dev-logs s=worker` | Tail specific service       |
+| `make ps`                | Status of all services      |
+| `make deploy`            | Deploy to production server |

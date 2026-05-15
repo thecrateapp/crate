@@ -1,6 +1,16 @@
 export type EngineRepeatMode = "off" | "one" | "all";
-export type EnginePlaybackState = "idle" | "buffering" | "ready" | "playing" | "paused" | "ended";
-export type EngineTransitionType = "gapless" | "crossfade" | "manual-skip" | "seek";
+export type EnginePlaybackState =
+  | "idle"
+  | "buffering"
+  | "ready"
+  | "playing"
+  | "paused"
+  | "ended";
+export type EngineTransitionType =
+  | "gapless"
+  | "crossfade"
+  | "manual-skip"
+  | "seek";
 
 export interface EngineTrack {
   id: string;
@@ -93,7 +103,9 @@ export interface EngineEventMap {
 }
 
 export type EngineEventName = keyof EngineEventMap;
-export type EngineEventListener<K extends EngineEventName> = (event: EngineEventMap[K]) => void;
+export type EngineEventListener<K extends EngineEventName> = (
+  event: EngineEventMap[K],
+) => void;
 
 export interface PlaybackEngine {
   loadQueue(snapshot: EngineQueueSnapshot): Promise<EngineState | void>;
@@ -112,10 +124,19 @@ export interface PlaybackEngine {
   setCrossfadeMs(ms: number): Promise<EngineState | void>;
   setVolume(volume: number): Promise<EngineState | void>;
   setPlaybackRate(rate: number): Promise<EngineState | void>;
-  setEq(enabled: boolean, gains: number[], rampMs?: number): Promise<EngineState | void>;
+  setEq(
+    enabled: boolean,
+    gains: number[],
+    rampMs?: number,
+  ): Promise<EngineState | void>;
   getState(): Promise<EngineState | null>;
-  drainEvents(): Promise<Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>>;
-  on<K extends EngineEventName>(event: K, listener: EngineEventListener<K>): Promise<() => void>;
+  drainEvents(): Promise<
+    Array<{ event: EngineEventName; payload: EngineEventMap[EngineEventName] }>
+  >;
+  on<K extends EngineEventName>(
+    event: K,
+    listener: EngineEventListener<K>,
+  ): Promise<() => void>;
   destroy(): Promise<void>;
 }
 

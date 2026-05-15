@@ -11,7 +11,12 @@ interface RadioFeedbackProps {
   size?: "sm" | "md";
 }
 
-export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: RadioFeedbackProps) {
+export function RadioFeedback({
+  sessionId,
+  trackId,
+  onDislike,
+  size = "md",
+}: RadioFeedbackProps) {
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
 
@@ -22,9 +27,7 @@ export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: Ra
 
   if (!trackId) return null;
 
-  const buttonClass = size === "sm"
-    ? "h-11 w-11"
-    : "h-8 w-8";
+  const buttonClass = size === "sm" ? "h-11 w-11" : "h-8 w-8";
   const iconSize = size === "sm" ? 16 : 14;
 
   const handleLike = async () => {
@@ -68,7 +71,10 @@ export function RadioFeedback({ sessionId, trackId, onDislike, size = "md" }: Ra
         title="Less like this"
         aria-label="Less like this"
       >
-        <ThumbsDown size={iconSize} className={disliked ? "fill-current" : ""} />
+        <ThumbsDown
+          size={iconSize}
+          className={disliked ? "fill-current" : ""}
+        />
       </button>
     </div>
   );

@@ -19,9 +19,13 @@ from crate.db.jobs.repair import (
     update_artist_has_photo,
     update_track_artist,
 )
-from crate.db.repositories.library import delete_album, delete_artist, delete_track, get_library_artist
+from crate.db.repositories.library import (
+    delete_album,
+    delete_artist,
+    delete_track,
+    get_library_artist,
+)
 from crate.repair_catalog import REPAIR_CATALOG, REPAIR_CATALOG_BY_CHECK
-from crate.utils import PHOTO_NAMES
 from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 
 log = logging.getLogger(__name__)
@@ -36,7 +40,9 @@ class LibraryRepair:
 
     def __init__(self, config: dict):
         self.library_path = Path(config["library_path"])
-        self.extensions = set(config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"]))
+        self.extensions = set(
+            config.get("audio_extensions", [".flac", ".mp3", ".m4a", ".ogg", ".opus"])
+        )
 
     def _normalized_issues(
         self,
@@ -64,12 +70,18 @@ class LibraryRepair:
             if auto_only:
                 if not issue.get("auto_fixable", False):
                     continue
-            if global_only and catalog_entry is not None and not catalog_entry.globally_runnable:
+            if (
+                global_only
+                and catalog_entry is not None
+                and not catalog_entry.globally_runnable
+            ):
                 continue
             normalized.append((check, issue, catalog_entry))
         return normalized
 
-    def preview(self, report: dict, *, auto_only: bool = False, global_only: bool = False) -> dict:
+    def preview(
+        self, report: dict, *, auto_only: bool = False, global_only: bool = False
+    ) -> dict:
         items: list[dict] = []
         fixers = {
             check: getattr(self, method_name)
@@ -90,10 +102,16 @@ class LibraryRepair:
                 "support": support,
                 "risk": getattr(catalog_entry, "risk", None),
                 "scope": getattr(catalog_entry, "scope", None),
-                "requires_confirmation": bool(getattr(catalog_entry, "requires_confirmation", False)),
+                "requires_confirmation": bool(
+                    getattr(catalog_entry, "requires_confirmation", False)
+                ),
                 "supports_batch": bool(getattr(catalog_entry, "supports_batch", True)),
-                "supports_artist_scope": bool(getattr(catalog_entry, "supports_artist_scope", True)),
-                "supports_global_scope": bool(getattr(catalog_entry, "supports_global_scope", True)),
+                "supports_artist_scope": bool(
+                    getattr(catalog_entry, "supports_artist_scope", True)
+                ),
+                "supports_global_scope": bool(
+                    getattr(catalog_entry, "supports_global_scope", True)
+                ),
                 "auto_fixable": bool(issue.get("auto_fixable")),
                 "executable": False,
                 "action": None,
@@ -113,7 +131,9 @@ class LibraryRepair:
 
             fixer = fixers.get(check)
             if not fixer:
-                item["message"] = f"{check.replace('_', ' ').title()} still requires manual repair"
+                item["message"] = (
+                    f"{check.replace('_', ' ').title()} still requires manual repair"
+                )
                 items.append(item)
                 continue
 
@@ -128,16 +148,20 @@ class LibraryRepair:
 
             if result:
                 event_payload = self._build_event_payload(check, result)
-                item.update({
-                    "executable": bool(issue.get("auto_fixable")),
-                    "action": result.get("action"),
-                    "target": result.get("target"),
-                    "message": event_payload.get("message"),
-                    "fs_write": bool(result.get("fs_write")),
-                    "details": result.get("details"),
-                })
+                item.update(
+                    {
+                        "executable": bool(issue.get("auto_fixable")),
+                        "action": result.get("action"),
+                        "target": result.get("target"),
+                        "message": event_payload.get("message"),
+                        "fs_write": bool(result.get("fs_write")),
+                        "details": result.get("details"),
+                    }
+                )
             else:
-                item["message"] = f"No automatic action available for {check.replace('_', ' ')}"
+                item["message"] = (
+                    f"No automatic action available for {check.replace('_', ' ')}"
+                )
             item["item_key"] = self._issue_item_key(check, issue, item.get("target"))
             item["plan_item_id"] = self._issue_plan_item_id(
                 check,
@@ -177,11 +201,15 @@ class LibraryRepair:
         description = str(issue.get("description") or "").strip()
         return description or check
 
-    def _issue_item_key(self, check: str, issue: dict, target: str | None = None) -> str:
+    def _issue_item_key(
+        self, check: str, issue: dict, target: str | None = None
+    ) -> str:
         issue_id = issue.get("id")
         if isinstance(issue_id, int):
             return f"issue:{issue_id}"
-        resolved_target = str(target or self._issue_target(check, issue) or "item").strip()
+        resolved_target = str(
+            target or self._issue_target(check, issue) or "item"
+        ).strip()
         return f"{check}:{resolved_target}"
 
     def _issue_plan_item_id(
@@ -199,7 +227,9 @@ class LibraryRepair:
             "target": str(target or self._issue_target(check, issue)),
             "action": str(action or check),
         }
-        digest = hashlib.sha1(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        digest = hashlib.sha1(
+            json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
         return f"repair-plan:{digest[:16]}"
 
     def _compute_plan_version(self, items: list[dict]) -> str:
@@ -219,7 +249,9 @@ class LibraryRepair:
             }
             for item in items
         ]
-        digest = hashlib.sha256(json.dumps(normalized, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(
+            json.dumps(normalized, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
         return f"repair-preview:{digest[:24]}"
 
     def _build_item_result(
@@ -238,14 +270,18 @@ class LibraryRepair:
         return {
             "issue_id": issue.get("id") if isinstance(issue.get("id"), int) else None,
             "item_key": self._issue_item_key(check, issue, target),
-            "plan_item_id": self._issue_plan_item_id(check, issue, target=target, action=str(action)),
+            "plan_item_id": self._issue_plan_item_id(
+                check, issue, target=target, action=str(action)
+            ),
             "check_type": check,
             "outcome": outcome,
             "level": level,
             "support": getattr(catalog_entry, "support", None),
             "risk": getattr(catalog_entry, "risk", None),
             "scope": getattr(catalog_entry, "scope", None),
-            "requires_confirmation": bool(getattr(catalog_entry, "requires_confirmation", False)),
+            "requires_confirmation": bool(
+                getattr(catalog_entry, "requires_confirmation", False)
+            ),
             "action": action,
             "target": target,
             "applied": bool((result or {}).get("applied")),
@@ -316,7 +352,9 @@ class LibraryRepair:
         total_groups = len(by_check)
         for i, (check, group) in enumerate(by_check.items()):
             if progress_callback:
-                progress_callback({"phase": "repair", "fix": check, "done": i, "total": total_groups})
+                progress_callback(
+                    {"phase": "repair", "fix": check, "done": i, "total": total_groups}
+                )
 
             fixer = fixers.get(check)
             if not fixer:
@@ -337,13 +375,17 @@ class LibraryRepair:
 
             for issue in group:
                 if event_callback:
-                    event_callback(self._build_item_event_payload(self._build_item_result(
-                        check,
-                        issue,
-                        outcome="started",
-                        message=f"Starting {check.replace('_', ' ')} for {self._issue_target(check, issue)}",
-                        level="info",
-                    )))
+                    event_callback(
+                        self._build_item_event_payload(
+                            self._build_item_result(
+                                check,
+                                issue,
+                                outcome="started",
+                                message=f"Starting {check.replace('_', ' ')} for {self._issue_target(check, issue)}",
+                                level="info",
+                            )
+                        )
+                    )
                 try:
                     result = fixer(issue, dry_run=dry_run, task_id=task_id)
                     if result:
@@ -396,7 +438,12 @@ class LibraryRepair:
                         outcome="failed",
                         message=f"Repair failed for {check.replace('_', ' ')}: {target}",
                         level="error",
-                        result={"target": target, "details": {"error": "exception"}, "applied": False, "fs_write": False},
+                        result={
+                            "target": target,
+                            "details": {"error": "exception"},
+                            "applied": False,
+                            "fs_write": False,
+                        },
                     )
                     item_results.append(item_result)
                     summary["failed"] += 1
@@ -422,7 +469,9 @@ class LibraryRepair:
         elif result.get("applied"):
             message = f"Applied {action} on {target}"
         else:
-            reason = details.get("reason") or details.get("error") or result.get("reason")
+            reason = (
+                details.get("reason") or details.get("error") or result.get("reason")
+            )
             message = f"Skipped {action} on {target}"
             if reason:
                 message += f": {reason}"
@@ -433,7 +482,9 @@ class LibraryRepair:
             "message": message,
         }
 
-    def _fix_artist_layout(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_artist_layout(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist_name = str(details.get("artist") or "").strip()
         if not artist_name:
@@ -450,10 +501,14 @@ class LibraryRepair:
                 "message": f"Could not resolve artist record for {artist_name}",
             }
 
-        preview = preview_fix_artist(self.library_path, artist, {
-            "library_path": str(self.library_path),
-            "audio_extensions": sorted(self.extensions),
-        })
+        preview = preview_fix_artist(
+            self.library_path,
+            artist,
+            {
+                "library_path": str(self.library_path),
+                "audio_extensions": sorted(self.extensions),
+            },
+        )
         if str(preview.get("status") or "") != "needs_fix":
             return {
                 "action": "fix_artist_layout",
@@ -466,7 +521,10 @@ class LibraryRepair:
                     "candidate_dirs": list(preview.get("candidate_dirs") or []),
                     "reason": preview.get("message"),
                 },
-                "message": str(preview.get("message") or f"No artist layout fix needed for {artist_name}"),
+                "message": str(
+                    preview.get("message")
+                    or f"No artist layout fix needed for {artist_name}"
+                ),
             }
 
         if dry_run:
@@ -485,16 +543,26 @@ class LibraryRepair:
                     "skipped_foreign": int(preview.get("skipped_foreign") or 0),
                     "preview_errors": list(preview.get("preview_errors") or []),
                 },
-                "message": str(preview.get("message") or f"Would fix artist layout for {artist_name}"),
+                "message": str(
+                    preview.get("message")
+                    or f"Would fix artist layout for {artist_name}"
+                ),
             }
 
         if task_id is None:
-            raise RuntimeError("fix_artist_layout requires a task_id when applying changes")
+            raise RuntimeError(
+                "fix_artist_layout requires a task_id when applying changes"
+            )
 
-        result = _fix_artist(self.library_path, artist, task_id, {
-            "library_path": str(self.library_path),
-            "audio_extensions": sorted(self.extensions),
-        })
+        result = _fix_artist(
+            self.library_path,
+            artist,
+            task_id,
+            {
+                "library_path": str(self.library_path),
+                "audio_extensions": sorted(self.extensions),
+            },
+        )
         status = str(result.get("status") or "")
         applied = status == "fixed"
         details_payload = {
@@ -517,7 +585,11 @@ class LibraryRepair:
             f"{details_payload['albums_fixed']} albums, "
             f"{details_payload['album_files_moved']} files moved"
             if applied
-            else str(result.get("reason") or result.get("message") or f"Skipped artist layout fix for {artist_name}")
+            else str(
+                result.get("reason")
+                or result.get("message")
+                or f"Skipped artist layout fix for {artist_name}"
+            )
         )
         return {
             "action": "fix_artist_layout",
@@ -528,7 +600,9 @@ class LibraryRepair:
             "message": message,
         }
 
-    def _fix_duplicate_folders(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_duplicate_folders(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         folders = details.get("folders", [])
         if len(folders) < 2:
@@ -564,11 +638,18 @@ class LibraryRepair:
             except OSError:
                 log.warning("Could not remove dir (not empty?): %s", other_dir)
 
-        log_audit("merge_duplicate_folders", "artist", sorted_folders[0],
-                  details={"merged_from": sorted_folders[1:]}, task_id=task_id)
+        log_audit(
+            "merge_duplicate_folders",
+            "artist",
+            sorted_folders[0],
+            details={"merged_from": sorted_folders[1:]},
+            task_id=task_id,
+        )
         return result
 
-    def _fix_fk_orphans(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_fk_orphans(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         album_artist = details.get("artist", "")
         album_name = details.get("album", "")
@@ -585,24 +666,39 @@ class LibraryRepair:
         }
 
         if dry_run:
-            result["details"] = {"would_reassign_to": row["name"] if row else None, "would_delete": not row}
+            result["details"] = {
+                "would_reassign_to": row["name"] if row else None,
+                "would_delete": not row,
+            }
             return result
 
         if row:
             canonical = row["name"]
             reassign_album_artist(album_path, canonical)
             result["details"] = {"reassigned_to": canonical}
-            log_audit("fix_orphan_album", "album", album_name,
-                      details={"reassigned_to": canonical}, task_id=task_id)
+            log_audit(
+                "fix_orphan_album",
+                "album",
+                album_name,
+                details={"reassigned_to": canonical},
+                task_id=task_id,
+            )
         else:
             delete_album(album_path)
             result["details"] = {"deleted": True}
-            log_audit("delete_orphan_album", "album", album_name,
-                      details={"artist": album_artist, "path": album_path}, task_id=task_id)
+            log_audit(
+                "delete_orphan_album",
+                "album",
+                album_name,
+                details={"artist": album_artist, "path": album_path},
+                task_id=task_id,
+            )
 
         return result
 
-    def _fix_fk_orphan_tracks(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_fk_orphan_tracks(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         track_path = details.get("track_path", "")
 
@@ -619,7 +715,9 @@ class LibraryRepair:
 
         return result
 
-    def _fix_stale_entries(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_stale_entries(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist_name = details.get("artist", "")
 
@@ -636,7 +734,9 @@ class LibraryRepair:
 
         return result
 
-    def _fix_stale_albums(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_stale_albums(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         path = details.get("path", "")
         album_name = details.get("album", "")
@@ -650,12 +750,19 @@ class LibraryRepair:
 
         if not dry_run:
             delete_album(path)
-            log_audit("delete_stale_album", "album", album_name,
-                      details={"path": path}, task_id=task_id)
+            log_audit(
+                "delete_stale_album",
+                "album",
+                album_name,
+                details={"path": path},
+                task_id=task_id,
+            )
 
         return result
 
-    def _fix_stale_tracks(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_stale_tracks(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         track_path = details.get("track_path", "")
 
@@ -672,7 +779,9 @@ class LibraryRepair:
 
         return result
 
-    def _fix_zombie_artists(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_zombie_artists(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist_name = details.get("artist", "")
 
@@ -689,7 +798,9 @@ class LibraryRepair:
 
         return result
 
-    def _fix_has_photo_desync(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_has_photo_desync(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist_name = details.get("artist", "")
         # has_photo is an INTEGER column; JSONB deserializes `true`/`false` to
@@ -706,14 +817,24 @@ class LibraryRepair:
 
         if not dry_run:
             update_artist_has_photo(artist_name, fs_has_photo)
-            log_audit("fix_has_photo", "artist", artist_name,
-                      details={"new_value": fs_has_photo}, task_id=task_id)
+            log_audit(
+                "fix_has_photo",
+                "artist",
+                artist_name,
+                details={"new_value": fs_has_photo},
+                task_id=task_id,
+            )
             result["message"] = f"Synced artist photo flag for {artist_name}"
 
         return result
 
-    def _fix_duplicate_albums(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
-        from crate.duplicate_album import apply_duplicate_resolution, classify_duplicate_album
+    def _fix_duplicate_albums(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
+        from crate.duplicate_album import (
+            apply_duplicate_resolution,
+            classify_duplicate_album,
+        )
 
         details = issue.get("details", {})
         artist = details.get("artist", "")
@@ -781,7 +902,10 @@ class LibraryRepair:
                 details=result["details"],
                 task_id=task_id,
             )
-        elif verdict.action == "merge_into_canonical" and verdict.canonical_dir is not None:
+        elif (
+            verdict.action == "merge_into_canonical"
+            and verdict.canonical_dir is not None
+        ):
             merge_album_folder(str(loose_dir), str(verdict.canonical_dir), album_name)
             log_audit(
                 "merge_duplicate_album_folder",
@@ -792,7 +916,9 @@ class LibraryRepair:
             )
 
         result["details"]["enrich_artist"] = artist
-        result["message"] = f"Applied {verdict.action.replace('_', ' ')} for duplicate album {artist}/{album_name}"
+        result["message"] = (
+            f"Applied {verdict.action.replace('_', ' ')} for duplicate album {artist}/{album_name}"
+        )
         return result
 
     @staticmethod
@@ -809,8 +935,12 @@ class LibraryRepair:
     @staticmethod
     def _duplicate_track_keep_key(track: dict) -> tuple[int, int, int, int, int, str]:
         path = Path(str(track.get("path") or ""))
-        tag_artist, tag_album, tag_title, tag_tracknumber = LibraryRepair._duplicate_track_tag_identity(track)
-        readable_tag_score = sum(1 for value in (tag_artist, tag_album, tag_title, tag_tracknumber) if value)
+        tag_artist, tag_album, tag_title, tag_tracknumber = (
+            LibraryRepair._duplicate_track_tag_identity(track)
+        )
+        readable_tag_score = sum(
+            1 for value in (tag_artist, tag_album, tag_title, tag_tracknumber) if value
+        )
         return (
             1 if path.is_file() else 0,
             readable_tag_score,
@@ -820,7 +950,9 @@ class LibraryRepair:
             str(track.get("path") or ""),
         )
 
-    def _safe_duplicate_track_resolution(self, issue: dict) -> tuple[dict, list[dict]] | None:
+    def _safe_duplicate_track_resolution(
+        self, issue: dict
+    ) -> tuple[dict, list[dict]] | None:
         details = issue.get("details", {})
         artist = str(details.get("artist") or "").strip()
         album = str(details.get("album") or "").strip()
@@ -833,7 +965,11 @@ class LibraryRepair:
         if len(tracks) < 2:
             return None
 
-        album_ids = {track.get("album_id") for track in tracks if track.get("album_id") is not None}
+        album_ids = {
+            track.get("album_id")
+            for track in tracks
+            if track.get("album_id") is not None
+        }
         if len(album_ids) != 1:
             return None
 
@@ -841,19 +977,35 @@ class LibraryRepair:
         if len(parents) != 1:
             return None
 
-        durations = [float(track["duration"]) for track in tracks if track.get("duration") is not None]
+        durations = [
+            float(track["duration"])
+            for track in tracks
+            if track.get("duration") is not None
+        ]
         if durations and max(durations) - min(durations) > 1.0:
             return None
 
-        track_numbers = {int(track["track_number"]) for track in tracks if track.get("track_number") is not None}
+        track_numbers = {
+            int(track["track_number"])
+            for track in tracks
+            if track.get("track_number") is not None
+        }
         if len(track_numbers) > 1:
             return None
 
-        disc_numbers = {int(track["disc_number"]) for track in tracks if track.get("disc_number") is not None}
+        disc_numbers = {
+            int(track["disc_number"])
+            for track in tracks
+            if track.get("disc_number") is not None
+        }
         if len(disc_numbers) > 1:
             return None
 
-        fingerprints = {str(track["audio_fingerprint"]) for track in tracks if track.get("audio_fingerprint")}
+        fingerprints = {
+            str(track["audio_fingerprint"])
+            for track in tracks
+            if track.get("audio_fingerprint")
+        }
         if len(fingerprints) > 1:
             return None
 
@@ -863,7 +1015,9 @@ class LibraryRepair:
         tag_identities = [self._duplicate_track_tag_identity(track) for track in tracks]
         mismatched_tags = [
             track.get("path")
-            for track, (tag_artist, tag_album, tag_title, _tag_tracknumber) in zip(tracks, tag_identities, strict=False)
+            for track, (tag_artist, tag_album, tag_title, _tag_tracknumber) in zip(
+                tracks, tag_identities, strict=False
+            )
             if any(
                 (
                     tag_artist and tag_artist != expected_artist,
@@ -881,7 +1035,9 @@ class LibraryRepair:
             return None
         return keep, remove
 
-    def _fix_duplicate_tracks(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_duplicate_tracks(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist = str(details.get("artist") or "").strip()
         album = str(details.get("album") or "").strip()
@@ -893,7 +1049,9 @@ class LibraryRepair:
 
         keep, remove = resolution
         keep_path = str(keep.get("path") or "")
-        remove_paths = [str(track.get("path") or "") for track in remove if track.get("path")]
+        remove_paths = [
+            str(track.get("path") or "") for track in remove if track.get("path")
+        ]
         if not remove_paths:
             return None
         result = {
@@ -914,7 +1072,9 @@ class LibraryRepair:
         }
 
         if dry_run:
-            result["message"] = f"Would delete {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+            result["message"] = (
+                f"Would delete {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+            )
             return result
 
         removed_paths: list[str] = []
@@ -930,7 +1090,9 @@ class LibraryRepair:
                     removed_paths.append(path_str)
                 except OSError as exc:
                     result["details"]["error"] = f"Failed to delete {path_str}: {exc}"
-                    result["message"] = f"Failed to delete duplicate track file for {artist}/{album}/{title}"
+                    result["message"] = (
+                        f"Failed to delete duplicate track file for {artist}/{album}/{title}"
+                    )
                     return result
             else:
                 missing_paths.append(path_str)
@@ -941,7 +1103,9 @@ class LibraryRepair:
         result["details"]["removed_paths"] = removed_paths
         if missing_paths:
             result["details"]["missing_paths"] = missing_paths
-        result["message"] = f"Deleted {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+        result["message"] = (
+            f"Deleted {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+        )
         log_audit(
             "delete_duplicate_tracks",
             "track",
@@ -951,7 +1115,9 @@ class LibraryRepair:
         )
         return result
 
-    def _fix_canonical_mismatch(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_canonical_mismatch(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         artist_name = details.get("artist", "")
         tag_name = details.get("tag_name", "")
@@ -969,12 +1135,19 @@ class LibraryRepair:
 
         if not dry_run:
             rename_artist(artist_name, tag_name, details.get("folder", ""))
-            log_audit("fix_canonical_mismatch", "artist", artist_name,
-                      details={"tag_name": tag_name}, task_id=task_id)
+            log_audit(
+                "fix_canonical_mismatch",
+                "artist",
+                artist_name,
+                details={"tag_name": tag_name},
+                task_id=task_id,
+            )
 
         return result
 
-    def _fix_unindexed_files(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_unindexed_files(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         details = issue.get("details", {})
         dir_path = details.get("dir", "")
 
@@ -987,14 +1160,19 @@ class LibraryRepair:
         }
 
         if dry_run:
-            result["applied"] = True  # dry_run: always "applied" in the sense of "would apply"
+            result["applied"] = (
+                True  # dry_run: always "applied" in the sense of "would apply"
+            )
             return result
 
         import re
+
         unindexed_dir = Path(dir_path)
         if not unindexed_dir.exists():
             result["details"]["missing"] = True
-            result["applied"] = True  # dir is gone, nothing to index — treat as resolved
+            result["applied"] = (
+                True  # dir is gone, nothing to index — treat as resolved
+            )
             return result
 
         try:
@@ -1022,8 +1200,13 @@ class LibraryRepair:
                 result["details"]["merged_into"] = str(correct_dir)
                 result["applied"] = True
                 result["fs_write"] = True
-                log_audit("remove_duplicate_folder", "album", f"{folder_artist_name}/{folder_name}",
-                          details=result["details"], task_id=task_id)
+                log_audit(
+                    "remove_duplicate_folder",
+                    "album",
+                    f"{folder_artist_name}/{folder_name}",
+                    details=result["details"],
+                    task_id=task_id,
+                )
                 return result
 
         # Check for a duplicate album folder pattern: a loose `/Artist/Album`
@@ -1032,7 +1215,10 @@ class LibraryRepair:
         # would hit UNIQUE(artist, name) and silently fail).
         if folder_artist_name:
             try:
-                from crate.duplicate_album import classify_duplicate_album, apply_duplicate_resolution
+                from crate.duplicate_album import (
+                    classify_duplicate_album,
+                    apply_duplicate_resolution,
+                )
 
                 verdict = classify_duplicate_album(unindexed_dir, self.library_path)
                 if verdict.action in ("delete_loose", "merge_into_canonical"):
@@ -1067,7 +1253,11 @@ class LibraryRepair:
                     result["details"]["reason"] = verdict.reason
                     return result
             except Exception:
-                log.debug("duplicate_album classifier failed for %s", unindexed_dir, exc_info=True)
+                log.debug(
+                    "duplicate_album classifier failed for %s",
+                    unindexed_dir,
+                    exc_info=True,
+                )
 
         # Not a residue — sync files into DB, then enrich
         if not folder_artist_name:
@@ -1081,11 +1271,16 @@ class LibraryRepair:
             if row:
                 canonical_artist = row["name"]
         except Exception:
-            log.debug("Could not resolve canonical artist for %s", folder_artist_name, exc_info=True)
+            log.debug(
+                "Could not resolve canonical artist for %s",
+                folder_artist_name,
+                exc_info=True,
+            )
 
         try:
             from crate.library_sync import LibrarySync
             from crate.config import load_config
+
             syncer = LibrarySync(load_config())
             artist_dir = self.library_path / folder_artist_name
             if not artist_dir.is_dir():
@@ -1123,8 +1318,13 @@ class LibraryRepair:
         # re-enqueueing per-album and flooding dedup.
         if result.get("applied"):
             result["details"]["enrich_artist"] = canonical_artist
-        log_audit("reindex_unindexed", "directory", dir_path,
-                  details={"count": details.get("count", 0), "artist": canonical_artist}, task_id=task_id)
+        log_audit(
+            "reindex_unindexed",
+            "directory",
+            dir_path,
+            details={"count": details.get("count", 0), "artist": canonical_artist},
+            task_id=task_id,
+        )
         return result
 
     def _count_artist_tracks(self, artist_name: str) -> int:
@@ -1133,7 +1333,9 @@ class LibraryRepair:
         except Exception:
             return 0
 
-    def _fix_tag_mismatch(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_tag_mismatch(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         """Update DB track artist to match the albumartist tag (tag is source of truth)."""
         details = issue.get("details", {})
         track_path = details.get("track_path", "")
@@ -1145,20 +1347,32 @@ class LibraryRepair:
         result = {
             "action": "fix_tag_mismatch",
             "target": track_path,
-            "details": {"old_artist": details.get("db_artist"), "new_artist": tag_artist},
+            "details": {
+                "old_artist": details.get("db_artist"),
+                "new_artist": tag_artist,
+            },
             "applied": not dry_run,
             "fs_write": False,
         }
 
         if not dry_run:
             update_track_artist(track_path, tag_artist)
-            log_audit("fix_tag_mismatch", "track", track_path,
-                      details={"old_artist": details.get("db_artist"), "new_artist": tag_artist},
-                      task_id=task_id)
+            log_audit(
+                "fix_tag_mismatch",
+                "track",
+                track_path,
+                details={
+                    "old_artist": details.get("db_artist"),
+                    "new_artist": tag_artist,
+                },
+                task_id=task_id,
+            )
 
         return result
 
-    def _fix_folder_naming(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
+    def _fix_folder_naming(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
         """Move album folder to expected structure: Artist/Year/AlbumName."""
         details = issue.get("details", {})
         artist = details.get("artist", "")
@@ -1193,7 +1407,15 @@ class LibraryRepair:
 
             if expected_dir.exists() and expected_dir != current_dir:
                 # Smart merge: copy missing files, upgrade lossy→lossless
-                QUALITY_RANK = {".flac": 3, ".wav": 3, ".alac": 3, ".ogg": 2, ".opus": 2, ".m4a": 2, ".mp3": 1}
+                QUALITY_RANK = {
+                    ".flac": 3,
+                    ".wav": 3,
+                    ".alac": 3,
+                    ".ogg": 2,
+                    ".opus": 2,
+                    ".m4a": 2,
+                    ".mp3": 1,
+                }
                 src_files = {f.name: f for f in current_dir.iterdir() if f.is_file()}
                 dst_files = {f.name: f for f in expected_dir.iterdir() if f.is_file()}
                 # Build stem→file maps for quality comparison
@@ -1213,25 +1435,41 @@ class LibraryRepair:
                         stem = src_file.stem.lower()
                         dst_match = dst_by_stem.get(stem)
                         src_rank = QUALITY_RANK.get(src_file.suffix.lower(), 0)
-                        if dst_match and src_rank > QUALITY_RANK.get(dst_match.suffix.lower(), 0):
+                        if dst_match and src_rank > QUALITY_RANK.get(
+                            dst_match.suffix.lower(), 0
+                        ):
                             # Source is higher quality — replace
                             dst_match.unlink()
-                            shutil.move(str(src_file), str(expected_dir / src_file.name))
+                            shutil.move(
+                                str(src_file), str(expected_dir / src_file.name)
+                            )
                             upgraded.append(f"{dst_match.name} → {src_file.name}")
                         elif not dst_match:
                             shutil.move(str(src_file), str(expected_dir / name))
                             copied.append(name)
                 shutil.rmtree(str(current_dir))
-                log.info("Merged %s → %s (%d copied, %d upgraded, folder removed)",
-                         current_dir, expected_dir, len(copied), len(upgraded))
+                log.info(
+                    "Merged %s → %s (%d copied, %d upgraded, folder removed)",
+                    current_dir,
+                    expected_dir,
+                    len(copied),
+                    len(upgraded),
+                )
                 old_path_str = str(current_dir)
                 new_path_str = str(expected_dir)
-                merge_album_folder(details.get("path", old_path_str), new_path_str, clean_name)
+                merge_album_folder(
+                    details.get("path", old_path_str), new_path_str, clean_name
+                )
                 result["details"]["merged"] = True
                 result["details"]["files_copied"] = len(copied)
                 result["details"]["files_upgraded"] = upgraded
-                log_audit("merge_duplicate_album_folder", "album", f"{artist}/{year}/{clean_name}",
-                          details=result["details"], task_id=task_id)
+                log_audit(
+                    "merge_duplicate_album_folder",
+                    "album",
+                    f"{artist}/{year}/{clean_name}",
+                    details=result["details"],
+                    task_id=task_id,
+                )
                 return result
 
             try:
@@ -1242,18 +1480,37 @@ class LibraryRepair:
                 # Update DB
                 old_path_str = str(current_dir)
                 new_path_str = str(expected_dir)
-                update_album_path_and_name(details.get("path", old_path_str), new_path_str, clean_name)
-                log_audit("reorganize_album_folder", "album", f"{artist}/{year}/{clean_name}",
-                          details=result["details"], task_id=task_id)
+                update_album_path_and_name(
+                    details.get("path", old_path_str), new_path_str, clean_name
+                )
+                log_audit(
+                    "reorganize_album_folder",
+                    "album",
+                    f"{artist}/{year}/{clean_name}",
+                    details=result["details"],
+                    task_id=task_id,
+                )
             except Exception as e:
-                log.error("Failed to reorganize folder %s -> %s: %s", current_dir, expected_dir, e)
+                log.error(
+                    "Failed to reorganize folder %s -> %s: %s",
+                    current_dir,
+                    expected_dir,
+                    e,
+                )
                 result["applied"] = False
                 result["details"]["error"] = str(e)
 
         return result
 
-    def _fix_missing_cover(self, issue: dict, dry_run: bool, task_id: str | None = None) -> dict | None:
-        from crate.artwork import fetch_cover_from_caa, fetch_cover_from_tidal, extract_embedded_cover, save_cover
+    def _fix_missing_cover(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
+        from crate.artwork import (
+            fetch_cover_from_caa,
+            fetch_cover_from_tidal,
+            extract_embedded_cover,
+            save_cover,
+        )
         from crate.audio import get_audio_files
 
         details = issue.get("details", {})
@@ -1301,8 +1558,13 @@ class LibraryRepair:
         if image_data:
             save_cover(album_dir, image_data)
             result["details"] = {"source": source}
-            log_audit("fetch_missing_cover", "album", f"{artist}/{album}",
-                      details={"source": source, "path": album_path}, task_id=task_id)
+            log_audit(
+                "fetch_missing_cover",
+                "album",
+                f"{artist}/{album}",
+                details={"source": source, "path": album_path},
+                task_id=task_id,
+            )
         else:
             result["applied"] = False
             result["details"] = {"error": "no cover source found"}

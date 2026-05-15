@@ -1,4 +1,13 @@
-import { Activity, SlidersHorizontal, Sparkles, Sun, Tag, Volume2, X, Zap } from "lucide-react";
+import {
+  Activity,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  Tag,
+  Volume2,
+  X,
+  Zap,
+} from "lucide-react";
 
 import type { EqFeatures } from "@/hooks/use-eq-features";
 import { useEqualizer } from "@/hooks/use-equalizer";
@@ -51,7 +60,11 @@ function FeatureChip({
   zone: "neutral" | "active";
 }) {
   return (
-    <CrateChip active={zone === "active"} icon={Icon} className="font-mono tabular-nums">
+    <CrateChip
+      active={zone === "active"}
+      icon={Icon}
+      className="font-mono tabular-nums"
+    >
       <span title={label}>{value}</span>
     </CrateChip>
   );
@@ -85,7 +98,15 @@ function AdaptiveFeatureChips({
     const b = features.brightness;
     const active = b < 0.4 || b > 0.55;
     const label =
-      b < 0.25 ? "dark" : b < 0.4 ? "warm" : b > 0.7 ? "sharp" : b > 0.55 ? "bright" : "neutral";
+      b < 0.25
+        ? "dark"
+        : b < 0.4
+          ? "warm"
+          : b > 0.7
+            ? "sharp"
+            : b > 0.55
+              ? "bright"
+              : "neutral";
     chips.push(
       <FeatureChip
         key="brightness"
@@ -104,7 +125,9 @@ function AdaptiveFeatureChips({
       <FeatureChip
         key="loudness"
         icon={Volume2}
-        label={l > -10 ? "Hot master" : l < -20 ? "Very quiet" : "Standard level"}
+        label={
+          l > -10 ? "Hot master" : l < -20 ? "Very quiet" : "Standard level"
+        }
         value={`${l.toFixed(1)} LUFS`}
         zone={active ? "active" : "neutral"}
       />,
@@ -133,7 +156,9 @@ function AdaptiveFeatureChips({
       <FeatureChip
         key="energy"
         icon={Zap}
-        label={e > 0.7 ? "High energy" : e < 0.3 ? "Low energy" : "Moderate energy"}
+        label={
+          e > 0.7 ? "High energy" : e < 0.3 ? "Low energy" : "Moderate energy"
+        }
         value={`${Math.round(e * 100)}%`}
         zone={active ? "active" : "neutral"}
       />,
@@ -150,7 +175,9 @@ function AdaptiveFeatureChips({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-[9px] uppercase tracking-wider text-white/40">Track</span>
+      <span className="text-[9px] uppercase tracking-wider text-white/40">
+        Track
+      </span>
       {chips}
     </div>
   );
@@ -193,7 +220,9 @@ function GenreResolutionChip({
     return (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-white/60">
         <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-white/80">{primaryName}</span>
+        <span className="font-medium capitalize text-white/80">
+          {primaryName}
+        </span>
         <span className="opacity-50">— unmapped tag, holding flat.</span>
       </div>
     );
@@ -203,8 +232,12 @@ function GenreResolutionChip({
     return (
       <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-white/60">
         <Tag size={10} className="opacity-70" />
-        <span className="font-medium capitalize text-white/80">{primaryName}</span>
-        <span className="opacity-50">— no preset in taxonomy, holding flat.</span>
+        <span className="font-medium capitalize text-white/80">
+          {primaryName}
+        </span>
+        <span className="opacity-50">
+          — no preset in taxonomy, holding flat.
+        </span>
       </div>
     );
   }
@@ -214,9 +247,13 @@ function GenreResolutionChip({
     <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1.5 text-[10px] text-cyan-200">
       <Tag size={10} />
       <span className="font-medium capitalize">{primaryName}</span>
-      <span className="opacity-70">{isInherited ? "→ inherited" : "→ preset"}</span>
+      <span className="opacity-70">
+        {isInherited ? "→ inherited" : "→ preset"}
+      </span>
       {isInherited && preset.inheritedFrom ? (
-        <span className="font-medium capitalize opacity-80">from {preset.inheritedFrom.name}</span>
+        <span className="font-medium capitalize opacity-80">
+          from {preset.inheritedFrom.name}
+        </span>
       ) : null}
     </div>
   );
@@ -360,17 +397,17 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
           the per-band gains so the current curve doesn't feel like a
           black box. Only visible while adaptive mode is on. */}
       {adaptive ? (
-        <AdaptiveFeatureChips features={adaptiveFeatures} status={adaptiveStatus} />
+        <AdaptiveFeatureChips
+          features={adaptiveFeatures}
+          status={adaptiveStatus}
+        />
       ) : null}
 
       {/* Genre resolution readout — shows which genre was detected and
           which preset (if any) got applied. Visible while Genre mode
           is on so the user can see the mapping at a glance. */}
       {genreAdaptive ? (
-        <GenreResolutionChip
-          genre={trackGenre}
-          status={genreAdaptiveStatus}
-        />
+        <GenreResolutionChip genre={trackGenre} status={genreAdaptiveStatus} />
       ) : null}
 
       {/* Band sliders */}

@@ -7,24 +7,31 @@ from crate.db.tx import read_scope
 
 def get_artist_list_genres(artist_name: str) -> list[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT g.name FROM artist_genres ag JOIN genres g ON ag.genre_id = g.id "
-                "WHERE ag.artist_name = :artist_name ORDER BY ag.weight DESC LIMIT 5"
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT g.name FROM artist_genres ag JOIN genres g ON ag.genre_id = g.id "
+                    "WHERE ag.artist_name = :artist_name ORDER BY ag.weight DESC LIMIT 5"
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [row["name"] for row in rows]
 
 
-def get_artist_list_genres_map(artist_names: list[str], limit: int = 5) -> dict[str, list[str]]:
+def get_artist_list_genres_map(
+    artist_names: list[str], limit: int = 5
+) -> dict[str, list[str]]:
     if not artist_names:
         return {}
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 WITH ranked AS (
                     SELECT
                         ag.artist_name,
@@ -42,9 +49,12 @@ def get_artist_list_genres_map(artist_names: list[str], limit: int = 5) -> dict[
                 WHERE genre_rank <= :limit
                 ORDER BY artist_name ASC, genre_rank ASC
                 """
-            ),
-            {"artist_names": artist_names, "limit": limit},
-        ).mappings().all()
+                ),
+                {"artist_names": artist_names, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
 
     genre_map = {artist_name: [] for artist_name in artist_names}
     for row in rows:
@@ -54,9 +64,10 @@ def get_artist_list_genres_map(artist_names: list[str], limit: int = 5) -> dict[
 
 def get_artist_genres_by_name(artist_name: str, limit: int = 5) -> list[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT g.name
                 FROM artist_genres ag
                 JOIN genres g ON g.id = ag.genre_id
@@ -64,29 +75,37 @@ def get_artist_genres_by_name(artist_name: str, limit: int = 5) -> list[str]:
                 ORDER BY ag.weight DESC
                 LIMIT :limit
                 """
-            ),
-            {"artist_name": artist_name, "limit": limit},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [row["name"] for row in rows]
 
 
 def get_artist_top_genres(artist_name: str) -> list[str]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                "SELECT g.name FROM artist_genres ag JOIN genres g ON ag.genre_id = g.id "
-                "WHERE ag.artist_name = :artist_name ORDER BY ag.weight DESC"
-            ),
-            {"artist_name": artist_name},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(
+                    "SELECT g.name FROM artist_genres ag JOIN genres g ON ag.genre_id = g.id "
+                    "WHERE ag.artist_name = :artist_name ORDER BY ag.weight DESC"
+                ),
+                {"artist_name": artist_name},
+            )
+            .mappings()
+            .all()
+        )
         return [row["name"] for row in rows]
 
 
 def get_artist_genre_profile(artist_name: str, limit: int = 8) -> list[dict]:
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT g.name, g.slug, ag.weight, ag.source
                 FROM artist_genres ag
                 JOIN genres g ON g.id = ag.genre_id
@@ -94,13 +113,18 @@ def get_artist_genre_profile(artist_name: str, limit: int = 8) -> list[dict]:
                 ORDER BY ag.weight DESC NULLS LAST, g.name ASC
                 LIMIT :limit
                 """
-            ),
-            {"artist_name": artist_name, "limit": limit},
-        ).mappings().all()
+                ),
+                {"artist_name": artist_name, "limit": limit},
+            )
+            .mappings()
+            .all()
+        )
         return [dict(row) for row in rows]
 
 
-def get_all_artist_genre_map(artist_names: list[str] | None = None, limit: int | None = None) -> dict[str, list[str]]:
+def get_all_artist_genre_map(
+    artist_names: list[str] | None = None, limit: int | None = None
+) -> dict[str, list[str]]:
     if artist_names is not None and not artist_names:
         return {}
 

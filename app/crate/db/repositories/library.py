@@ -31,7 +31,10 @@ from crate.db.repositories.library_reads import (
     get_track_path_by_id,
     get_track_rating,
 )
-from crate.db.repositories.library_track_reads import get_library_track_by_storage_id, get_library_tracks_by_storage_ids
+from crate.db.repositories.library_track_reads import (
+    get_library_track_by_storage_id,
+    get_library_tracks_by_storage_ids,
+)
 from crate.db.repositories.library_writes import (
     delete_album,
     delete_artist,

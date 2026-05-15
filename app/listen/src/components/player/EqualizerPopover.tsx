@@ -23,7 +23,10 @@ export function EqualizerPopover({ open, onClose }: EqualizerPopoverProps) {
       if (event.key === "Escape") onClose();
     };
     const onPointerDown = (event: PointerEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     };

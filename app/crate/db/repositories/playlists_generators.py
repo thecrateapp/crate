@@ -21,14 +21,15 @@ def generate_by_genre(genre: str, limit: int = 50) -> list[int]:
         CASE WHEN t.genre ILIKE :genre THEN 1.0 ELSE 0.0 END
     )"""
     with read_scope() as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT
                     t.id,
                     MAX("""
-                + genre_relevance
-                + """) AS genre_relevance,
+                    + genre_relevance
+                    + """) AS genre_relevance,
                     MAX(COALESCE(t.popularity_score, -1)) AS popularity_score
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
@@ -51,17 +52,21 @@ def generate_by_genre(genre: str, limit: int = 50) -> list[int]:
                          RANDOM()
                 LIMIT :lim
                 """
-            ),
-            params,
-        ).mappings().all()
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
     return [row["id"] for row in rows]
 
 
 def generate_by_decade(decade: int, limit: int = 50) -> list[int]:
     with read_scope() as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
@@ -69,26 +74,33 @@ def generate_by_decade(decade: int, limit: int = 50) -> list[int]:
                 ORDER BY RANDOM()
                 LIMIT :lim
                 """
-            ),
-            {"year_start": str(decade), "year_end": str(decade + 9), "lim": limit},
-        ).mappings().all()
+                ),
+                {"year_start": str(decade), "year_end": str(decade + 9), "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [row["id"] for row in rows]
 
 
 def generate_by_artist(artist_name: str, limit: int = 50) -> list[int]:
     with read_scope() as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id
                 FROM library_tracks t
                 WHERE t.artist = :artist
                 ORDER BY t.album_id, t.track_number
                 LIMIT :lim
                 """
-            ),
-            {"artist": artist_name, "lim": limit},
-        ).mappings().all()
+                ),
+                {"artist": artist_name, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [row["id"] for row in rows]
 
 
@@ -96,27 +108,35 @@ def generate_similar_artists(similar_names: list[str], limit: int = 50) -> list[
     if not similar_names:
         return []
     with read_scope() as s:
-        rows = s.execute(
-            text(
-                """
+        rows = (
+            s.execute(
+                text(
+                    """
                 SELECT t.id
                 FROM library_tracks t
                 WHERE t.artist = ANY(:names)
                 ORDER BY RANDOM()
                 LIMIT :lim
                 """
-            ),
-            {"names": similar_names, "lim": limit},
-        ).mappings().all()
+                ),
+                {"names": similar_names, "lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [row["id"] for row in rows]
 
 
 def generate_random(limit: int = 50) -> list[int]:
     with read_scope() as s:
-        rows = s.execute(
-            text("SELECT id FROM library_tracks ORDER BY RANDOM() LIMIT :lim"),
-            {"lim": limit},
-        ).mappings().all()
+        rows = (
+            s.execute(
+                text("SELECT id FROM library_tracks ORDER BY RANDOM() LIMIT :lim"),
+                {"lim": limit},
+            )
+            .mappings()
+            .all()
+        )
     return [row["id"] for row in rows]
 
 

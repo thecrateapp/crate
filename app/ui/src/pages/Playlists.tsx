@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -16,7 +22,10 @@ import {
 import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { PlaylistArtwork, type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
@@ -121,12 +130,32 @@ const SORT_OPTIONS = [
 
 const DROPDOWN_FIELDS: Record<
   string,
-  { optionsKey: keyof FilterOptions; searchPlaceholder: string; placeholder: string }
+  {
+    optionsKey: keyof FilterOptions;
+    searchPlaceholder: string;
+    placeholder: string;
+  }
 > = {
-  artist: { optionsKey: "artists", searchPlaceholder: "Search artists...", placeholder: "Select artist" },
-  genre: { optionsKey: "genres", searchPlaceholder: "Search genres...", placeholder: "Select genre" },
-  format: { optionsKey: "formats", searchPlaceholder: "Search formats...", placeholder: "Select format" },
-  audio_key: { optionsKey: "keys", searchPlaceholder: "Search keys...", placeholder: "Select key" },
+  artist: {
+    optionsKey: "artists",
+    searchPlaceholder: "Search artists...",
+    placeholder: "Select artist",
+  },
+  genre: {
+    optionsKey: "genres",
+    searchPlaceholder: "Search genres...",
+    placeholder: "Select genre",
+  },
+  format: {
+    optionsKey: "formats",
+    searchPlaceholder: "Search formats...",
+    placeholder: "Select format",
+  },
+  audio_key: {
+    optionsKey: "keys",
+    searchPlaceholder: "Search keys...",
+    placeholder: "Select key",
+  },
 };
 
 function fmtDuration(totalSeconds: number): string {
@@ -137,7 +166,9 @@ function fmtDuration(totalSeconds: number): string {
 }
 
 function getFieldType(field: string): "text" | "number" {
-  return SMART_FIELDS.find((item) => item.value === field)?.type === "text" ? "text" : "number";
+  return SMART_FIELDS.find((item) => item.value === field)?.type === "text"
+    ? "text"
+    : "number";
 }
 
 function getOpsForField(field: string) {
@@ -146,7 +177,11 @@ function getOpsForField(field: string) {
 
 function getGenerationChip(status?: string) {
   if (status === "running") {
-    return <CrateChip active className="text-[11px]">Generating</CrateChip>;
+    return (
+      <CrateChip active className="text-[11px]">
+        Generating
+      </CrateChip>
+    );
   }
   if (status === "queued") {
     return (
@@ -231,7 +266,9 @@ export function Playlists() {
     () => ({
       all: playlists.length,
       curated: playlists.filter((playlist) => playlist.is_curated).length,
-      smart: playlists.filter((playlist) => playlist.generation_mode === "smart").length,
+      smart: playlists.filter(
+        (playlist) => playlist.generation_mode === "smart",
+      ).length,
       inactive: playlists.filter((playlist) => !playlist.is_active).length,
     }),
     [playlists],
@@ -253,10 +290,11 @@ export function Playlists() {
     const normalizedQuery = query.trim().toLowerCase();
 
     return playlists.filter((playlist) => {
-      const matchesMode = filter === "all"
-        || (filter === "curated" && playlist.is_curated)
-        || (filter === "smart" && playlist.generation_mode === "smart")
-        || (filter === "inactive" && !playlist.is_active);
+      const matchesMode =
+        filter === "all" ||
+        (filter === "curated" && playlist.is_curated) ||
+        (filter === "smart" && playlist.generation_mode === "smart") ||
+        (filter === "inactive" && !playlist.is_active);
 
       if (!matchesMode) return false;
 
@@ -299,10 +337,14 @@ export function Playlists() {
   async function toggleActive(playlist: SystemPlaylist) {
     try {
       await api(
-        `/api/admin/system-playlists/${playlist.id}/${playlist.is_active ? "deactivate" : "activate"}`,
+        `/api/admin/system-playlists/${playlist.id}/${
+          playlist.is_active ? "deactivate" : "activate"
+        }`,
         "POST",
       );
-      toast.success(playlist.is_active ? "Playlist deactivated" : "Playlist activated");
+      toast.success(
+        playlist.is_active ? "Playlist deactivated" : "Playlist activated",
+      );
       void fetchPlaylists();
     } catch {
       toast.error("Failed to update status");
@@ -325,9 +367,12 @@ export function Playlists() {
                 <Layers3 size={22} />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight">System Playlists</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  System Playlists
+                </h1>
                 <p className="text-sm text-muted-foreground">
-                  Editorial playlists for `listen`, with smart generation and admin-only controls.
+                  Editorial playlists for `listen`, with smart generation and
+                  admin-only controls.
                 </p>
               </div>
             </div>
@@ -337,14 +382,22 @@ export function Playlists() {
             <Button
               size="sm"
               variant={composerMode === "static" ? "default" : "outline"}
-              onClick={() => setComposerMode((current) => (current === "static" ? null : "static"))}
+              onClick={() =>
+                setComposerMode((current) =>
+                  current === "static" ? null : "static",
+                )
+              }
             >
               <Plus size={14} className="mr-1" /> New static
             </Button>
             <Button
               size="sm"
               variant={composerMode === "smart" ? "default" : "outline"}
-              onClick={() => setComposerMode((current) => (current === "smart" ? null : "smart"))}
+              onClick={() =>
+                setComposerMode((current) =>
+                  current === "smart" ? null : "smart",
+                )
+              }
             >
               <Sparkles size={14} className="mr-1" /> New smart
             </Button>
@@ -406,11 +459,17 @@ export function Playlists() {
       </section>
 
       {composerMode === "static" ? (
-        <CreateStaticPlaylistPanel onCreated={handleCreated} onCancel={() => setComposerMode(null)} />
+        <CreateStaticPlaylistPanel
+          onCreated={handleCreated}
+          onCancel={() => setComposerMode(null)}
+        />
       ) : null}
 
       {composerMode === "smart" ? (
-        <CreateSmartPlaylistPanel onCreated={handleCreated} onCancel={() => setComposerMode(null)} />
+        <CreateSmartPlaylistPanel
+          onCreated={handleCreated}
+          onCancel={() => setComposerMode(null)}
+        />
       ) : null}
 
       {loading ? (
@@ -422,15 +481,21 @@ export function Playlists() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-white/35">
             <ListMusic size={20} />
           </div>
-          <h2 className="mt-4 text-lg font-medium">No playlists for this view yet</h2>
+          <h2 className="mt-4 text-lg font-medium">
+            No playlists for this view yet
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Try a different search or filter, or start a new playlist from the composer above.
+            Try a different search or filter, or start a new playlist from the
+            composer above.
           </p>
         </Card>
       ) : (
         <div className="space-y-3">
           {filteredPlaylists.map((playlist) => (
-            <Card key={playlist.id} className="overflow-hidden border-white/10 bg-card">
+            <Card
+              key={playlist.id}
+              className="overflow-hidden border-white/10 bg-card"
+            >
               <div
                 className="flex cursor-pointer flex-col gap-4 px-4 py-4 transition-colors hover:bg-white/[0.03] lg:flex-row lg:items-stretch"
                 onClick={() => navigate(`/playlists/${playlist.id}`)}
@@ -444,19 +509,29 @@ export function Playlists() {
 
                 <div className="min-w-0 flex-1 space-y-2 lg:flex lg:flex-col lg:justify-center">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-sm font-semibold md:text-base">{playlist.name}</h2>
+                    <h2 className="truncate text-sm font-semibold md:text-base">
+                      {playlist.name}
+                    </h2>
                     <CrateChip>system</CrateChip>
                     <CrateChip active={playlist.generation_mode === "smart"}>
                       {playlist.generation_mode}
                     </CrateChip>
-                    {playlist.is_curated ? <CrateChip>curated</CrateChip> : null}
-                    {!playlist.is_active ? <CrateChip>inactive</CrateChip> : null}
-                    {playlist.category ? <CrateChip>{playlist.category}</CrateChip> : null}
+                    {playlist.is_curated ? (
+                      <CrateChip>curated</CrateChip>
+                    ) : null}
+                    {!playlist.is_active ? (
+                      <CrateChip>inactive</CrateChip>
+                    ) : null}
+                    {playlist.category ? (
+                      <CrateChip>{playlist.category}</CrateChip>
+                    ) : null}
                     {getGenerationChip(playlist.generation_status)}
                   </div>
 
                   {playlist.description ? (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">{playlist.description}</p>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {playlist.description}
+                    </p>
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       {playlist.generation_mode === "smart"
@@ -466,13 +541,20 @@ export function Playlists() {
                   )}
 
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <CrateChip className="text-[11px]">{playlist.track_count} tracks</CrateChip>
-                    <CrateChip className="text-[11px]">{fmtDuration(playlist.total_duration)}</CrateChip>
                     <CrateChip className="text-[11px]">
-                      {playlist.follower_count} follower{playlist.follower_count === 1 ? "" : "s"}
+                      {playlist.track_count} tracks
+                    </CrateChip>
+                    <CrateChip className="text-[11px]">
+                      {fmtDuration(playlist.total_duration)}
+                    </CrateChip>
+                    <CrateChip className="text-[11px]">
+                      {playlist.follower_count} follower
+                      {playlist.follower_count === 1 ? "" : "s"}
                     </CrateChip>
                     {playlist.featured_rank != null ? (
-                      <CrateChip className="text-[11px]">Rank {playlist.featured_rank}</CrateChip>
+                      <CrateChip className="text-[11px]">
+                        Rank {playlist.featured_rank}
+                      </CrateChip>
                     ) : null}
                     {playlist.last_generated_at ? (
                       <CrateChip className="text-[11px]">
@@ -482,8 +564,15 @@ export function Playlists() {
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2" onClick={(event) => event.stopPropagation()}>
-                  <Button size="sm" variant="outline" onClick={() => navigate(`/playlists/${playlist.id}`)}>
+                <div
+                  className="flex shrink-0 items-center gap-2"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/playlists/${playlist.id}`)}
+                  >
                     Open editor <ArrowRight size={14} className="ml-1" />
                   </Button>
                   <ActionIconButton
@@ -493,7 +582,11 @@ export function Playlists() {
                       void toggleActive(playlist);
                     }}
                   >
-                    {playlist.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {playlist.is_active ? (
+                      <EyeOff size={14} />
+                    ) : (
+                      <Eye size={14} />
+                    )}
                   </ActionIconButton>
                   <ActionIconButton
                     variant="row"
@@ -542,15 +635,19 @@ function CreateStaticPlaylistPanel({
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const playlist = await api<SystemPlaylist>("/api/admin/system-playlists", "POST", {
-        name: name.trim(),
-        description: description.trim(),
-        category,
-        featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
-        generation_mode: "static",
-        is_curated: isCurated,
-        is_active: isActive,
-      });
+      const playlist = await api<SystemPlaylist>(
+        "/api/admin/system-playlists",
+        "POST",
+        {
+          name: name.trim(),
+          description: description.trim(),
+          category,
+          featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
+          generation_mode: "static",
+          is_curated: isCurated,
+          is_active: isActive,
+        },
+      );
       toast.success("Static playlist created");
       onCreated(playlist);
     } catch {
@@ -572,13 +669,22 @@ function CreateStaticPlaylistPanel({
               <div>
                 <h2 className="text-lg font-semibold">New static playlist</h2>
                 <p className="text-sm text-muted-foreground">
-                  Create the editorial shell, then continue in the dedicated editor.
+                  Create the editorial shell, then continue in the dedicated
+                  editor.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <TogglePill label="Curated in listen" active={isCurated} onClick={() => setIsCurated((v) => !v)} />
-              <TogglePill label="Active" active={isActive} onClick={() => setIsActive((v) => !v)} />
+              <TogglePill
+                label="Curated in listen"
+                active={isCurated}
+                onClick={() => setIsCurated((v) => !v)}
+              />
+              <TogglePill
+                label="Active"
+                active={isActive}
+                onClick={() => setIsActive((v) => !v)}
+              />
             </div>
           </div>
 
@@ -589,7 +695,11 @@ function CreateStaticPlaylistPanel({
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
           <Field label="Name">
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Playlist name" />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Playlist name"
+            />
           </Field>
           <Field label="Category">
             <AdminSelect
@@ -621,14 +731,19 @@ function CreateStaticPlaylistPanel({
 
         <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">
-            Static playlists open in the editor right after creation so cover and editorial metadata stay in the same workflow.
+            Static playlists open in the editor right after creation so cover
+            and editorial metadata stay in the same workflow.
           </p>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onCancel}>
               Cancel
             </Button>
             <Button onClick={submit} disabled={saving || !name.trim()}>
-              {saving ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Plus size={14} className="mr-1" />}
+              {saving ? (
+                <Loader2 size={14} className="mr-1 animate-spin" />
+              ) : (
+                <Plus size={14} className="mr-1" />
+              )}
               Create & open
             </Button>
           </div>
@@ -659,14 +774,22 @@ function CreateSmartPlaylistPanel({
   const [match, setMatch] = useState<"all" | "any">("all");
   const [sort, setSort] = useState("random");
   const [saving, setSaving] = useState(false);
-  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(
+    null,
+  );
 
   useEffect(() => {
-    api<FilterOptions>("/api/playlists/filter-options").then(setFilterOptions).catch(() => {});
+    api<FilterOptions>("/api/playlists/filter-options")
+      .then(setFilterOptions)
+      .catch(() => {});
   }, []);
 
   function updateRule(index: number, patch: Partial<DraftSmartRule>) {
-    setRules((current) => current.map((rule, ruleIndex) => (ruleIndex === index ? { ...rule, ...patch } : rule)));
+    setRules((current) =>
+      current.map((rule, ruleIndex) =>
+        ruleIndex === index ? { ...rule, ...patch } : rule,
+      ),
+    );
   }
 
   function addRule() {
@@ -677,12 +800,20 @@ function CreateSmartPlaylistPanel({
   }
 
   function removeRule(index: number) {
-    setRules((current) => current.filter((_, ruleIndex) => ruleIndex !== index));
+    setRules((current) =>
+      current.filter((_, ruleIndex) => ruleIndex !== index),
+    );
   }
 
   function updateRuleField(index: number, field: string) {
     const nextOp = getOpsForField(field)[0]?.value ?? "eq";
-    updateRule(index, { field, op: nextOp, value: "", rangeMin: "", rangeMax: "" });
+    updateRule(index, {
+      field,
+      op: nextOp,
+      value: "",
+      rangeMin: "",
+      rangeMax: "",
+    });
   }
 
   function ruleHasValue(rule: DraftSmartRule) {
@@ -694,19 +825,21 @@ function CreateSmartPlaylistPanel({
 
   async function submit() {
     if (!name.trim()) return;
-    const payloadRules = rules
-      .filter(ruleHasValue)
-      .map((rule) => {
-        if (rule.op === "between") {
-          const min = rule.rangeMin.trim() ? Number(rule.rangeMin) : 0;
-          const max = rule.rangeMax.trim() ? Number(rule.rangeMax) : 9999;
-          return { field: rule.field, op: "between", value: [min, max] as [number, number] };
-        }
-        if (getFieldType(rule.field) === "number") {
-          return { field: rule.field, op: rule.op, value: Number(rule.value) };
-        }
-        return { field: rule.field, op: rule.op, value: rule.value.trim() };
-      });
+    const payloadRules = rules.filter(ruleHasValue).map((rule) => {
+      if (rule.op === "between") {
+        const min = rule.rangeMin.trim() ? Number(rule.rangeMin) : 0;
+        const max = rule.rangeMax.trim() ? Number(rule.rangeMax) : 9999;
+        return {
+          field: rule.field,
+          op: "between",
+          value: [min, max] as [number, number],
+        };
+      }
+      if (getFieldType(rule.field) === "number") {
+        return { field: rule.field, op: rule.op, value: Number(rule.value) };
+      }
+      return { field: rule.field, op: rule.op, value: rule.value.trim() };
+    });
 
     if (payloadRules.length === 0) {
       toast.error("Add at least one smart rule");
@@ -715,22 +848,26 @@ function CreateSmartPlaylistPanel({
 
     setSaving(true);
     try {
-      const playlist = await api<SystemPlaylist>("/api/admin/system-playlists", "POST", {
-        name: name.trim(),
-        description: description.trim(),
-        category,
-        featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
-        generation_mode: "smart",
-        is_curated: isCurated,
-        is_active: isActive,
-        auto_refresh_enabled: autoRefreshEnabled,
-        smart_rules: {
-          match,
-          rules: payloadRules,
-          limit: Number(limit) || 50,
-          sort,
+      const playlist = await api<SystemPlaylist>(
+        "/api/admin/system-playlists",
+        "POST",
+        {
+          name: name.trim(),
+          description: description.trim(),
+          category,
+          featured_rank: featuredRank.trim() ? Number(featuredRank) : null,
+          generation_mode: "smart",
+          is_curated: isCurated,
+          is_active: isActive,
+          auto_refresh_enabled: autoRefreshEnabled,
+          smart_rules: {
+            match,
+            rules: payloadRules,
+            limit: Number(limit) || 50,
+            sort,
+          },
         },
-      });
+      );
       toast.success("Smart playlist created and queued");
       onCreated(playlist);
     } catch {
@@ -752,13 +889,22 @@ function CreateSmartPlaylistPanel({
               <div>
                 <h2 className="text-lg font-semibold">New smart playlist</h2>
                 <p className="text-sm text-muted-foreground">
-                  Define the editorial shell, add rules, and jump straight into the editor once generation is queued.
+                  Define the editorial shell, add rules, and jump straight into
+                  the editor once generation is queued.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <TogglePill label="Curated in listen" active={isCurated} onClick={() => setIsCurated((v) => !v)} />
-              <TogglePill label="Active" active={isActive} onClick={() => setIsActive((v) => !v)} />
+              <TogglePill
+                label="Curated in listen"
+                active={isCurated}
+                onClick={() => setIsCurated((v) => !v)}
+              />
+              <TogglePill
+                label="Active"
+                active={isActive}
+                onClick={() => setIsActive((v) => !v)}
+              />
               <TogglePill
                 label="Auto-refresh daily"
                 active={autoRefreshEnabled}
@@ -774,7 +920,11 @@ function CreateSmartPlaylistPanel({
 
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
           <Field label="Name">
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Playlist name" />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Playlist name"
+            />
           </Field>
           <Field label="Category">
             <AdminSelect
@@ -809,7 +959,8 @@ function CreateSmartPlaylistPanel({
             <div>
               <h3 className="text-sm font-semibold">Rule composer</h3>
               <p className="text-sm text-muted-foreground">
-                Build the first pass here, then refine in the editor after creation if needed.
+                Build the first pass here, then refine in the editor after
+                creation if needed.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -852,9 +1003,13 @@ function CreateSmartPlaylistPanel({
             {rules.map((rule, index) => {
               const ops = getOpsForField(rule.field);
               const dropdownConfig = DROPDOWN_FIELDS[rule.field];
-              const dropdownOptions = dropdownConfig && filterOptions
-                ? filterOptions[dropdownConfig.optionsKey].map((value) => ({ value, label: value }))
-                : [];
+              const dropdownOptions =
+                dropdownConfig && filterOptions
+                  ? filterOptions[dropdownConfig.optionsKey].map((value) => ({
+                      value,
+                      label: value,
+                    }))
+                  : [];
 
               return (
                 <div
@@ -862,7 +1017,9 @@ function CreateSmartPlaylistPanel({
                   className="rounded-md border border-white/10 bg-card/60 p-3"
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <CrateChip className="text-[11px]">Rule {index + 1}</CrateChip>
+                    <CrateChip className="text-[11px]">
+                      Rule {index + 1}
+                    </CrateChip>
                     <ActionIconButton
                       variant="row"
                       tone="danger"
@@ -879,7 +1036,10 @@ function CreateSmartPlaylistPanel({
                       <AdminSelect
                         value={rule.field}
                         onChange={(value) => updateRuleField(index, value)}
-                        options={SMART_FIELDS.map((field) => ({ value: field.value, label: field.label }))}
+                        options={SMART_FIELDS.map((field) => ({
+                          value: field.value,
+                          label: field.label,
+                        }))}
                         placeholder="Field"
                         allowClear={false}
                         triggerClassName="w-full max-w-none"
@@ -889,7 +1049,14 @@ function CreateSmartPlaylistPanel({
                     <Field label="Operator">
                       <AdminSelect
                         value={rule.op}
-                        onChange={(value) => updateRule(index, { op: value, value: "", rangeMin: "", rangeMax: "" })}
+                        onChange={(value) =>
+                          updateRule(index, {
+                            op: value,
+                            value: "",
+                            rangeMin: "",
+                            rangeMax: "",
+                          })
+                        }
                         options={ops}
                         placeholder="Operator"
                         allowClear={false}
@@ -903,13 +1070,21 @@ function CreateSmartPlaylistPanel({
                           <Input
                             type="number"
                             value={rule.rangeMin}
-                            onChange={(event) => updateRule(index, { rangeMin: event.target.value })}
+                            onChange={(event) =>
+                              updateRule(index, {
+                                rangeMin: event.target.value,
+                              })
+                            }
                             placeholder="Minimum"
                           />
                           <Input
                             type="number"
                             value={rule.rangeMax}
-                            onChange={(event) => updateRule(index, { rangeMax: event.target.value })}
+                            onChange={(event) =>
+                              updateRule(index, {
+                                rangeMax: event.target.value,
+                              })
+                            }
                             placeholder="Maximum"
                           />
                         </div>
@@ -927,7 +1102,9 @@ function CreateSmartPlaylistPanel({
                       ) : (
                         <Input
                           value={rule.value}
-                          onChange={(event) => updateRule(index, { value: event.target.value })}
+                          onChange={(event) =>
+                            updateRule(index, { value: event.target.value })
+                          }
                           placeholder="Value"
                         />
                       )}
@@ -940,7 +1117,8 @@ function CreateSmartPlaylistPanel({
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
             <p className="text-sm text-muted-foreground">
-              Prefer one condition per rule. If you need multiple buckets, create more rules and switch match mode to `Any`.
+              Prefer one condition per rule. If you need multiple buckets,
+              create more rules and switch match mode to `Any`.
             </p>
             <Button variant="outline" size="sm" onClick={addRule}>
               <Plus size={14} className="mr-1" /> Add rule
@@ -950,7 +1128,8 @@ function CreateSmartPlaylistPanel({
 
         <div className="flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm text-muted-foreground">
-            Smart playlists queue their first generation immediately, then you continue in the editor for cover, status and later refinements.
+            Smart playlists queue their first generation immediately, then you
+            continue in the editor for cover, status and later refinements.
           </p>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onCancel}>

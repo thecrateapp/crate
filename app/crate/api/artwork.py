@@ -13,7 +13,11 @@ from crate.api._deps import (
     safe_path,
 )
 from crate.api.auth import _require_auth, _require_admin
-from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response, merge_responses
+from crate.api.openapi_responses import (
+    AUTH_ERROR_RESPONSES,
+    error_response,
+    merge_responses,
+)
 from crate.api.schemas.artwork import (
     ArtworkApplyRequest,
     ArtworkExtractRequest,
@@ -53,18 +57,21 @@ def api_artwork_missing(request: Request):
     """List albums missing cover art with details."""
     _require_auth(request)
     import re
+
     year_re = re.compile(r"^\d{4}\s*[-–]\s*")
     rows = get_albums_missing_covers()
     albums = []
     for r in rows:
-        albums.append({
-            "name": r["name"],
-            "display_name": year_re.sub("", r["name"]),
-            "artist": r["artist"],
-            "year": r.get("year", ""),
-            "mbid": r.get("musicbrainz_albumid"),
-            "path": r.get("path", ""),
-        })
+        albums.append(
+            {
+                "name": r["name"],
+                "display_name": year_re.sub("", r["name"]),
+                "artist": r["artist"],
+                "year": r.get("year", ""),
+                "mbid": r.get("musicbrainz_albumid"),
+                "path": r.get("path", ""),
+            }
+        )
     return {"missing_count": len(albums), "albums": albums}
 
 
@@ -183,15 +190,23 @@ def api_artwork_fetch_all(request: Request):
     return {"status": "queued", "task_id": task_id}
 
 
-async def api_upload_cover(request: Request, artist: str, album: str, file: UploadFile = File(...)):
+async def api_upload_cover(
+    request: Request, artist: str, album: str, file: UploadFile = File(...)
+):
     """Upload a cover image for an album. Saved to staging, worker copies to album dir."""
     _require_admin(request)
     import base64
+
     data = await file.read()
-    task_id = create_task("upload_image", {
-        "type": "cover", "artist": artist, "album": album,
-        "data_b64": base64.b64encode(data).decode(),
-    })
+    task_id = create_task(
+        "upload_image",
+        {
+            "type": "cover",
+            "artist": artist,
+            "album": album,
+            "data_b64": base64.b64encode(data).decode(),
+        },
+    )
     return {"status": "queued", "task_id": task_id}
 
 
@@ -201,7 +216,9 @@ async def api_upload_cover(request: Request, artist: str, album: str, file: Uplo
     responses=_ARTWORK_RESPONSES,
     summary="Upload album artwork",
 )
-async def api_upload_cover_by_id(request: Request, album_id: int, file: UploadFile = File(...)):
+async def api_upload_cover_by_id(
+    request: Request, album_id: int, file: UploadFile = File(...)
+):
     album_names = album_names_from_id(album_id)
     if not album_names:
         return JSONResponse({"error": "Album not found"}, status_code=404)
@@ -215,7 +232,9 @@ async def api_upload_cover_by_id(request: Request, album_id: int, file: UploadFi
     responses=_ARTWORK_RESPONSES,
     summary="Upload album artwork by entity UID",
 )
-async def api_upload_cover_by_entity_uid(request: Request, album_entity_uid: str, file: UploadFile = File(...)):
+async def api_upload_cover_by_entity_uid(
+    request: Request, album_entity_uid: str, file: UploadFile = File(...)
+):
     album_names = album_names_from_entity_uid(album_entity_uid)
     if not album_names:
         return JSONResponse({"error": "Album not found"}, status_code=404)
@@ -223,15 +242,22 @@ async def api_upload_cover_by_entity_uid(request: Request, album_entity_uid: str
     return await api_upload_cover(request, artist, album, file)
 
 
-async def api_upload_artist_photo(request: Request, name: str, file: UploadFile = File(...)):
+async def api_upload_artist_photo(
+    request: Request, name: str, file: UploadFile = File(...)
+):
     """Upload artist photo. Worker saves to artist dir."""
     _require_admin(request)
     import base64
+
     data = await file.read()
-    task_id = create_task("upload_image", {
-        "type": "artist_photo", "artist": name,
-        "data_b64": base64.b64encode(data).decode(),
-    })
+    task_id = create_task(
+        "upload_image",
+        {
+            "type": "artist_photo",
+            "artist": name,
+            "data_b64": base64.b64encode(data).decode(),
+        },
+    )
     return {"status": "queued", "task_id": task_id}
 
 
@@ -241,7 +267,9 @@ async def api_upload_artist_photo(request: Request, name: str, file: UploadFile 
     responses=_ARTWORK_RESPONSES,
     summary="Upload an artist photo",
 )
-async def api_upload_artist_photo_by_id(request: Request, artist_id: int, file: UploadFile = File(...)):
+async def api_upload_artist_photo_by_id(
+    request: Request, artist_id: int, file: UploadFile = File(...)
+):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
@@ -254,22 +282,31 @@ async def api_upload_artist_photo_by_id(request: Request, artist_id: int, file: 
     responses=_ARTWORK_RESPONSES,
     summary="Upload an artist photo by entity UID",
 )
-async def api_upload_artist_photo_by_entity_uid(request: Request, artist_entity_uid: str, file: UploadFile = File(...)):
+async def api_upload_artist_photo_by_entity_uid(
+    request: Request, artist_entity_uid: str, file: UploadFile = File(...)
+):
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
     return await api_upload_artist_photo(request, artist_name, file)
 
 
-async def api_upload_background(request: Request, name: str, file: UploadFile = File(...)):
+async def api_upload_background(
+    request: Request, name: str, file: UploadFile = File(...)
+):
     """Upload artist background. Worker saves to artist dir."""
     _require_admin(request)
     import base64
+
     data = await file.read()
-    task_id = create_task("upload_image", {
-        "type": "background", "artist": name,
-        "data_b64": base64.b64encode(data).decode(),
-    })
+    task_id = create_task(
+        "upload_image",
+        {
+            "type": "background",
+            "artist": name,
+            "data_b64": base64.b64encode(data).decode(),
+        },
+    )
     return {"status": "queued", "task_id": task_id}
 
 
@@ -279,7 +316,9 @@ async def api_upload_background(request: Request, name: str, file: UploadFile = 
     responses=_ARTWORK_RESPONSES,
     summary="Upload an artist background image",
 )
-async def api_upload_background_by_id(request: Request, artist_id: int, file: UploadFile = File(...)):
+async def api_upload_background_by_id(
+    request: Request, artist_id: int, file: UploadFile = File(...)
+):
     artist_name = artist_name_from_id(artist_id)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)
@@ -292,7 +331,9 @@ async def api_upload_background_by_id(request: Request, artist_id: int, file: Up
     responses=_ARTWORK_RESPONSES,
     summary="Upload an artist background image by entity UID",
 )
-async def api_upload_background_by_entity_uid(request: Request, artist_entity_uid: str, file: UploadFile = File(...)):
+async def api_upload_background_by_entity_uid(
+    request: Request, artist_entity_uid: str, file: UploadFile = File(...)
+):
     artist_name = artist_name_from_entity_uid(artist_entity_uid)
     if not artist_name:
         return JSONResponse({"error": "Artist not found"}, status_code=404)

@@ -1,6 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router";
-import { Clock, Disc, Library, Loader2, Music, Search, User, X } from "lucide-react";
+import {
+  Clock,
+  Disc,
+  Library,
+  Loader2,
+  Music,
+  Search,
+  User,
+  X,
+} from "lucide-react";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { api } from "@/lib/api";
@@ -62,9 +71,14 @@ function loadRecents(): string[] {
 }
 
 function saveRecent(query: string) {
-  const recents = loadRecents().filter((recent) => recent.toLowerCase() !== query.toLowerCase());
+  const recents = loadRecents().filter(
+    (recent) => recent.toLowerCase() !== query.toLowerCase(),
+  );
   recents.unshift(query);
-  localStorage.setItem(RECENTS_KEY, JSON.stringify(recents.slice(0, MAX_RECENTS)));
+  localStorage.setItem(
+    RECENTS_KEY,
+    JSON.stringify(recents.slice(0, MAX_RECENTS)),
+  );
 }
 
 function SearchResultThumb({ item }: { item: ResultItem }) {
@@ -73,7 +87,9 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${item.type === "artist" ? "rounded-md" : "rounded"}`}
+        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${
+          item.type === "artist" ? "rounded-md" : "rounded"
+        }`}
         onError={(event) => {
           (event.target as HTMLImageElement).style.display = "none";
         }}
@@ -81,12 +97,27 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
     );
   }
   if (item.type === "artist") {
-    return <User size={14} className="h-8 w-8 shrink-0 rounded-md bg-white/5 p-2 text-white/30" />;
+    return (
+      <User
+        size={14}
+        className="h-8 w-8 shrink-0 rounded-md bg-white/5 p-2 text-white/30"
+      />
+    );
   }
   if (item.type === "album") {
-    return <Disc size={14} className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30" />;
+    return (
+      <Disc
+        size={14}
+        className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+      />
+    );
   }
-  return <Music size={14} className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30" />;
+  return (
+    <Music
+      size={14}
+      className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+    />
+  );
 }
 
 export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
@@ -101,31 +132,36 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   const localCacheRef = useRef<Map<string, LocalResults>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const doLocalSearch = useCallback(async (value: string) => {
-    onQueryChange?.(value);
-    if (value.length < 2) {
-      setLocalResults(null);
-      setLoading(false);
-      return;
-    }
+  const doLocalSearch = useCallback(
+    async (value: string) => {
+      onQueryChange?.(value);
+      if (value.length < 2) {
+        setLocalResults(null);
+        setLoading(false);
+        return;
+      }
 
-    const cached = localCacheRef.current.get(value.toLowerCase());
-    if (cached) {
-      setLocalResults(cached);
+      const cached = localCacheRef.current.get(value.toLowerCase());
+      if (cached) {
+        setLocalResults(cached);
+        setOpen(true);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const result = await api<LocalResults>(
+        `/api/search?q=${encodeURIComponent(value)}`,
+      ).catch(() => null);
+      if (result) {
+        localCacheRef.current.set(value.toLowerCase(), result);
+      }
+      setLocalResults(result);
       setOpen(true);
       setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const result = await api<LocalResults>(`/api/search?q=${encodeURIComponent(value)}`).catch(() => null);
-    if (result) {
-      localCacheRef.current.set(value.toLowerCase(), result);
-    }
-    setLocalResults(result);
-    setOpen(true);
-    setLoading(false);
-  }, [onQueryChange]);
+    },
+    [onQueryChange],
+  );
 
   useEffect(() => {
     clearTimeout(localTimeoutRef.current);
@@ -149,7 +185,10 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     }
@@ -178,7 +217,11 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
         type: "artist",
         label: artist.name,
         sublabel: "Artist",
-        path: artistPagePath({ artistId: artist.id, artistSlug: artist.slug, artistName: artist.name }),
+        path: artistPagePath({
+          artistId: artist.id,
+          artistSlug: artist.slug,
+          artistName: artist.name,
+        }),
         imageUrl: artistPhotoApiUrl({
           artistId: artist.id,
           artistEntityUid: artist.entity_uid,
@@ -192,7 +235,12 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
         type: "album",
         label: album.name,
         sublabel: album.artist,
-        path: albumPagePath({ albumId: album.id, albumSlug: album.slug, artistName: album.artist, albumName: album.name }),
+        path: albumPagePath({
+          albumId: album.id,
+          albumSlug: album.slug,
+          artistName: album.artist,
+          albumName: album.name,
+        }),
         imageUrl: albumCoverApiUrl({
           albumId: album.id,
           albumEntityUid: album.entity_uid,
@@ -208,7 +256,12 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
         type: "track",
         label: track.title,
         sublabel: `${track.artist} — ${track.album}`,
-        path: albumPagePath({ albumId: track.album_id, albumSlug: track.album_slug, artistName: track.artist, albumName: track.album }),
+        path: albumPagePath({
+          albumId: track.album_id,
+          albumSlug: track.album_slug,
+          artistName: track.artist,
+          albumName: track.album,
+        }),
         imageUrl: albumCoverApiUrl({
           albumId: track.album_id,
           albumEntityUid: track.album_entity_uid,
@@ -223,7 +276,8 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
 
   const showRecents = open && query.length === 0 && recents.length > 0;
   const showResults = open && query.length > 0 && (items.length > 0 || loading);
-  const showNoResults = open && query.length >= 2 && !loading && localResults && items.length === 0;
+  const showNoResults =
+    open && query.length >= 2 && !loading && localResults && items.length === 0;
   const navigableCount = showRecents ? recents.length : items.length;
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -273,11 +327,22 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   }
 
   return (
-    <div ref={wrapperRef} className="relative flex-1 md:flex-none md:w-[420px] lg:w-[500px]">
+    <div
+      ref={wrapperRef}
+      className="relative flex-1 md:flex-none md:w-[420px] lg:w-[500px]"
+    >
       <div className="relative md:origin-right md:transition-transform md:duration-300 md:ease-out md:focus-within:scale-x-[1.06]">
         <div className="relative flex items-center">
-          <Search size={17} className="pointer-events-none absolute left-4 text-white/40" />
-          {loading ? <Loader2 size={15} className="absolute right-4 animate-spin text-white/40" /> : null}
+          <Search
+            size={17}
+            className="pointer-events-none absolute left-4 text-white/40"
+          />
+          {loading ? (
+            <Loader2
+              size={15}
+              className="absolute right-4 animate-spin text-white/40"
+            />
+          ) : null}
           {!loading && query ? (
             <button
               type="button"
@@ -323,10 +388,16 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
               >
                 <SearchResultThumb item={item} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] text-white/80">{item.label}</p>
-                  <p className="truncate text-[11px] text-white/40">{item.sublabel}</p>
+                  <p className="truncate text-[13px] text-white/80">
+                    {item.label}
+                  </p>
+                  <p className="truncate text-[11px] text-white/40">
+                    {item.sublabel}
+                  </p>
                 </div>
-                <span className="shrink-0 text-[10px] capitalize text-white/20">{item.type}</span>
+                <span className="shrink-0 text-[10px] capitalize text-white/20">
+                  {item.type}
+                </span>
               </button>
             ))}
           </AppPopover>
@@ -347,7 +418,9 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
                 }`}
               >
                 <Clock size={12} className="shrink-0 text-white/20" />
-                <span className="truncate text-[13px] text-white/60">{recent}</span>
+                <span className="truncate text-[13px] text-white/60">
+                  {recent}
+                </span>
               </button>
             ))}
           </AppPopover>

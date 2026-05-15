@@ -17,7 +17,9 @@ function dominantKey(tracks: AudioAnalysisTrack[]): string | null {
   const counts: Record<string, number> = {};
   for (const t of tracks) {
     if (t.key) {
-      const label = `${t.key}${t.scale ? ` ${t.scale === "major" ? "maj" : "min"}` : ""}`;
+      const label = `${t.key}${
+        t.scale ? ` ${t.scale === "major" ? "maj" : "min"}` : ""
+      }`;
       counts[label] = (counts[label] || 0) + 1;
     }
   }
@@ -28,7 +30,15 @@ function dominantKey(tracks: AudioAnalysisTrack[]): string | null {
 const NIVO_THEME = {
   axis: { ticks: { text: { fill: "#6b7280", fontSize: 11 } } },
   grid: { line: { stroke: "var(--color-border)" } },
-  tooltip: { container: { background: "var(--color-card)", color: "var(--color-foreground)", borderRadius: "8px", fontSize: 12, border: "1px solid var(--color-border)" } },
+  tooltip: {
+    container: {
+      background: "var(--color-card)",
+      color: "var(--color-foreground)",
+      borderRadius: "8px",
+      fontSize: 12,
+      border: "1px solid var(--color-border)",
+    },
+  },
   labels: { text: { fill: "#9ca3af", fontSize: 10 } },
 };
 
@@ -48,10 +58,12 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
     Instrumental: avg(tracks.map((t) => t.instrumentalness)),
   };
 
-  const radarDataFormatted = Object.entries(features).map(([feature, value]) => ({
-    feature,
-    value: Math.round(value * 100),
-  }));
+  const radarDataFormatted = Object.entries(features).map(
+    ([feature, value]) => ({
+      feature,
+      value: Math.round(value * 100),
+    }),
+  );
 
   const barData = Object.entries(features)
     .filter(([, v]) => v > 0)
@@ -74,12 +86,13 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
       }
     }
   }
-  const topMoods = moodCount > 0
-    ? Object.entries(moodSums)
-        .map(([m, v]) => [m, v / moodCount] as [string, number])
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-    : [];
+  const topMoods =
+    moodCount > 0
+      ? Object.entries(moodSums)
+          .map(([m, v]) => [m, v / moodCount] as [string, number])
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+      : [];
 
   return (
     <div className="mb-8 rounded-md border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
@@ -88,16 +101,40 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
           <Music size={14} className="text-primary" />
           Audio Profile
         </h4>
-        <span className="text-xs text-muted-foreground">{withData.length} tracks analyzed</span>
+        <span className="text-xs text-muted-foreground">
+          {withData.length} tracks analyzed
+        </span>
       </div>
 
       <div className="p-5">
         <div className="flex flex-col md:flex-row gap-6 items-start">
           <div className="grid grid-cols-2 gap-3 md:w-[220px] shrink-0">
-            <StatBox icon={<Gauge size={16} />} label="Avg BPM" value={avgBpm > 0 ? String(Math.round(avgBpm)) : "\u2014"} color="text-primary" />
-            <StatBox icon={<Key size={16} />} label="Key" value={key || "\u2014"} color="text-primary" />
-            <StatBox icon={<Volume2 size={16} />} label="Loudness" value={avgLoudness ? `${avgLoudness.toFixed(1)} dB` : "\u2014"} color="text-primary" />
-            <StatBox icon={<Music size={16} />} label="Energy" value={avgEnergy > 0 ? `${Math.round(avgEnergy * 100)}%` : "\u2014"} color="text-primary" />
+            <StatBox
+              icon={<Gauge size={16} />}
+              label="Avg BPM"
+              value={avgBpm > 0 ? String(Math.round(avgBpm)) : "\u2014"}
+              color="text-primary"
+            />
+            <StatBox
+              icon={<Key size={16} />}
+              label="Key"
+              value={key || "\u2014"}
+              color="text-primary"
+            />
+            <StatBox
+              icon={<Volume2 size={16} />}
+              label="Loudness"
+              value={avgLoudness ? `${avgLoudness.toFixed(1)} dB` : "\u2014"}
+              color="text-primary"
+            />
+            <StatBox
+              icon={<Music size={16} />}
+              label="Energy"
+              value={
+                avgEnergy > 0 ? `${Math.round(avgEnergy * 100)}%` : "\u2014"
+              }
+              color="text-primary"
+            />
           </div>
 
           {hasRadarData && (
@@ -150,14 +187,18 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
             <div className="md:hidden space-y-2">
               {barData.map((d) => (
                 <div key={d.name} className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground w-[70px] shrink-0">{d.name}</span>
+                  <span className="text-[11px] text-muted-foreground w-[70px] shrink-0">
+                    {d.name}
+                  </span>
                   <div className="h-2 flex-1 bg-secondary rounded-md overflow-hidden">
                     <div
                       className="h-full rounded-md transition-all duration-500 bg-primary"
                       style={{ width: `${d.value}%` }}
                     />
                   </div>
-                  <span className="text-[10px] text-muted-foreground font-mono w-[30px] text-right">{d.value}%</span>
+                  <span className="text-[10px] text-muted-foreground font-mono w-[30px] text-right">
+                    {d.value}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -169,8 +210,15 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">Mood:</span>
               {topMoods.map(([mood, score]) => (
-                <Badge key={mood} variant="secondary" className="text-[11px] px-2 py-0.5">
-                  {mood} <span className="text-muted-foreground ml-1">{Math.round(score * 100)}%</span>
+                <Badge
+                  key={mood}
+                  variant="secondary"
+                  className="text-[11px] px-2 py-0.5"
+                >
+                  {mood}{" "}
+                  <span className="text-muted-foreground ml-1">
+                    {Math.round(score * 100)}%
+                  </span>
                 </Badge>
               ))}
             </div>
@@ -181,12 +229,24 @@ export function AudioProfileCard({ analysisData }: AudioProfileCardProps) {
   );
 }
 
-function StatBox({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+function StatBox({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: string;
+}) {
   return (
     <div className="bg-secondary/50 rounded-md p-3">
       <div className={`flex items-center gap-1.5 mb-1 ${color}`}>
         {icon}
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
       </div>
       <div className="text-lg font-bold text-foreground font-mono">{value}</div>
     </div>

@@ -51,17 +51,21 @@ def relative_track_path(track_path: str) -> str:
 @lru_cache(maxsize=1)
 def has_legacy_stream_id_column() -> bool:
     with read_scope() as session:
-        row = session.execute(
-            text(
-                """
+        row = (
+            session.execute(
+                text(
+                    """
                 SELECT 1
                 FROM information_schema.columns
                 WHERE table_name = 'library_tracks'
                   AND column_name = 'navidrome_id'
                 LIMIT 1
                 """
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
     return row is not None
 
 

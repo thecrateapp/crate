@@ -15,17 +15,31 @@ interface TidalAlbumCardProps {
   url: string;
 }
 
-export function TidalAlbumCard({ artist: _artist, artistId, artistEntityUid, title, year, tracks, cover, url }: TidalAlbumCardProps) {
-  const [status, setStatus] = useState<"idle" | "downloading" | "queued">("idle");
+export function TidalAlbumCard({
+  artistId,
+  artistEntityUid,
+  title,
+  year,
+  tracks,
+  cover,
+  url,
+}: TidalAlbumCardProps) {
+  const [status, setStatus] = useState<"idle" | "downloading" | "queued">(
+    "idle",
+  );
 
   async function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
     if (status !== "idle") return;
     setStatus("downloading");
     try {
-      await api(tidalDownloadMissingArtistApiPath({ artistId, artistEntityUid }), "POST", {
-        albums: [{ url, title, cover_url: cover }],
-      });
+      await api(
+        tidalDownloadMissingArtistApiPath({ artistId, artistEntityUid }),
+        "POST",
+        {
+          albums: [{ url, title, cover_url: cover }],
+        },
+      );
       setStatus("queued");
       toast.success(`Queued: ${title}`);
     } catch {
@@ -46,7 +60,9 @@ export function TidalAlbumCard({ artist: _artist, artistId, artistEntityUid, tit
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-card">
-            <span className="text-3xl font-bold text-white/10">{title.charAt(0).toUpperCase()}</span>
+            <span className="text-3xl font-bold text-white/10">
+              {title.charAt(0).toUpperCase()}
+            </span>
           </div>
         )}
         {/* Download overlay */}
@@ -71,7 +87,9 @@ export function TidalAlbumCard({ artist: _artist, artistId, artistEntityUid, tit
           </div>
         )}
       </div>
-      <div className="font-semibold text-sm text-left truncate text-muted-foreground">{title}</div>
+      <div className="font-semibold text-sm text-left truncate text-muted-foreground">
+        {title}
+      </div>
       <div className="text-xs text-muted-foreground/60 text-left flex items-center gap-1 mt-0.5">
         <span>{year || "?"}</span>
         <span>&middot;</span>

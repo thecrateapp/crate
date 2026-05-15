@@ -46,9 +46,14 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
     savedAlbumsRequestRef.current = controller;
     setLoading(true);
     try {
-      const albums = await api<SavedAlbum[]>("/api/me/albums", "GET", undefined, {
-        signal: controller.signal,
-      });
+      const albums = await api<SavedAlbum[]>(
+        "/api/me/albums",
+        "GET",
+        undefined,
+        {
+          signal: controller.signal,
+        },
+      );
       setSavedAlbums(Array.isArray(albums) ? albums : []);
     } catch (error) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
@@ -78,19 +83,28 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
     });
   }, [refetch]);
 
-  const savedIds = useMemo(() => new Set(savedAlbums.map((album) => album.id)), [savedAlbums]);
+  const savedIds = useMemo(
+    () => new Set(savedAlbums.map((album) => album.id)),
+    [savedAlbums],
+  );
 
-  const isSaved = useCallback((albumId?: number | null) => {
-    if (albumId == null) return false;
-    return savedIds.has(albumId);
-  }, [savedIds]);
+  const isSaved = useCallback(
+    (albumId?: number | null) => {
+      if (albumId == null) return false;
+      return savedIds.has(albumId);
+    },
+    [savedIds],
+  );
 
-  const saveAlbum = useCallback(async (albumId?: number | null) => {
-    if (albumId == null) return false;
-    await api("/api/me/albums", "POST", { album_id: albumId });
-    await refetch();
-    return true;
-  }, [refetch]);
+  const saveAlbum = useCallback(
+    async (albumId?: number | null) => {
+      if (albumId == null) return false;
+      await api("/api/me/albums", "POST", { album_id: albumId });
+      await refetch();
+      return true;
+    },
+    [refetch],
+  );
 
   const unsaveAlbum = useCallback(async (albumId?: number | null) => {
     if (albumId == null) return false;
@@ -99,23 +113,37 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
     return true;
   }, []);
 
-  const toggleAlbumSaved = useCallback(async (albumId?: number | null) => {
-    if (albumId == null) return false;
-    if (savedIds.has(albumId)) {
-      return unsaveAlbum(albumId);
-    }
-    return saveAlbum(albumId);
-  }, [saveAlbum, savedIds, unsaveAlbum]);
+  const toggleAlbumSaved = useCallback(
+    async (albumId?: number | null) => {
+      if (albumId == null) return false;
+      if (savedIds.has(albumId)) {
+        return unsaveAlbum(albumId);
+      }
+      return saveAlbum(albumId);
+    },
+    [saveAlbum, savedIds, unsaveAlbum],
+  );
 
-  const value = useMemo<SavedAlbumsContextValue>(() => ({
-    savedAlbums,
-    loading,
-    isSaved,
-    saveAlbum,
-    unsaveAlbum,
-    toggleAlbumSaved,
-    refetch,
-  }), [savedAlbums, loading, isSaved, saveAlbum, unsaveAlbum, toggleAlbumSaved, refetch]);
+  const value = useMemo<SavedAlbumsContextValue>(
+    () => ({
+      savedAlbums,
+      loading,
+      isSaved,
+      saveAlbum,
+      unsaveAlbum,
+      toggleAlbumSaved,
+      refetch,
+    }),
+    [
+      savedAlbums,
+      loading,
+      isSaved,
+      saveAlbum,
+      unsaveAlbum,
+      toggleAlbumSaved,
+      refetch,
+    ],
+  );
 
   return (
     <SavedAlbumsContext.Provider value={value}>
@@ -126,6 +154,7 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
 
 export function useSavedAlbums() {
   const ctx = useContext(SavedAlbumsContext);
-  if (!ctx) throw new Error("useSavedAlbums must be used within SavedAlbumsProvider");
+  if (!ctx)
+    throw new Error("useSavedAlbums must be used within SavedAlbumsProvider");
   return ctx;
 }

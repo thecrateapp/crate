@@ -32,9 +32,17 @@ function playlistGradient(name: string): string {
   return `linear-gradient(145deg, hsl(${hue1}, 42%, 30%), hsl(${hue2}, 55%, 18%))`;
 }
 
-function CrateMark({ logoSrc, className = "" }: { logoSrc: string; className?: string }) {
+function CrateMark({
+  logoSrc,
+  className = "",
+}: {
+  logoSrc: string;
+  className?: string;
+}) {
   return (
-    <div className={`absolute right-2.5 top-2.5 flex items-center justify-center ${className}`}>
+    <div
+      className={`absolute right-2.5 top-2.5 flex items-center justify-center ${className}`}
+    >
       <img
         src={logoSrc}
         alt=""
@@ -64,12 +72,18 @@ export function PlaylistArtwork({
     if (collageSources.length >= 4) break;
   }
 
-  const crateMark = showCrateMark ? <CrateMark logoSrc={logoSrc} className={crateMarkClassName} /> : null;
+  const crateMark = showCrateMark ? (
+    <CrateMark logoSrc={logoSrc} className={crateMarkClassName} />
+  ) : null;
 
   if (coverDataUrl) {
     return (
       <div className={`relative overflow-hidden bg-white/5 ${className}`}>
-        <img src={coverDataUrl} alt={name} className="w-full h-full object-cover" />
+        <img
+          src={coverDataUrl}
+          alt={name}
+          className="w-full h-full object-cover"
+        />
         {crateMark}
       </div>
     );
@@ -79,7 +93,11 @@ export function PlaylistArtwork({
     if (collageSources.length === 1) {
       return (
         <div className={`relative overflow-hidden bg-white/5 ${className}`}>
-          <img src={collageSources[0]} alt={name} className="w-full h-full object-cover" />
+          <img
+            src={collageSources[0]}
+            alt={name}
+            className="w-full h-full object-cover"
+          />
           {crateMark}
         </div>
       );
@@ -98,7 +116,9 @@ export function PlaylistArtwork({
               key={`${source}-${index}`}
               src={source}
               alt=""
-              className={`w-full h-full object-cover ${collageSources.length === 3 && index === 2 ? "col-span-2" : ""}`}
+              className={`w-full h-full object-cover ${
+                collageSources.length === 3 && index === 2 ? "col-span-2" : ""
+              }`}
             />
           ))}
         </div>

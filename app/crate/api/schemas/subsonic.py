@@ -158,7 +158,9 @@ class SubsonicLicenseResponse(SubsonicEnvelopeBase):
 
 
 class SubsonicMusicFoldersBody(SubsonicResponseBase):
-    music_folders: SubsonicMusicFolders | None = Field(default=None, alias="musicFolders")
+    music_folders: SubsonicMusicFolders | None = Field(
+        default=None, alias="musicFolders"
+    )
 
 
 class SubsonicMusicFoldersResponse(SubsonicEnvelopeBase):
@@ -218,7 +220,9 @@ class SubsonicAlbumList2Response(SubsonicEnvelopeBase):
 
 
 class SubsonicSearchResult3Body(SubsonicResponseBase):
-    search_result3: SubsonicSearchResult3 | None = Field(default=None, alias="searchResult3")
+    search_result3: SubsonicSearchResult3 | None = Field(
+        default=None, alias="searchResult3"
+    )
 
 
 class SubsonicSearchResult3Response(SubsonicEnvelopeBase):
