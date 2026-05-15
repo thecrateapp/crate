@@ -308,7 +308,7 @@ def test_tidal_download_inner_falls_back_to_normal_for_unrecoverable_lossless_tr
     )
     monkeypatch.setattr(
         "crate.tidal.move_to_library_detailed",
-        lambda _path, _lib: [
+        lambda _path, _lib, **_kwargs: [
             {
                 "artist": "Terror",
                 "album": "Still Suffer",
