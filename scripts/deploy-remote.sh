@@ -93,6 +93,36 @@ set_env_value() {
   mv "$tmp" .env
 }
 
+assert_compose_redis_auth() {
+  if dc config | grep -q "REDIS_URL: redis://crate-redis:6379/0"; then
+    log "Compose would start services with unauthenticated Redis URLs"
+    return 1
+  fi
+}
+
+assert_music_mount_ready() {
+  local media_dir
+  local music_dir
+
+  if [[ "${CRATE_DEPLOY_ALLOW_EMPTY_MUSIC:-0}" == "1" ]]; then
+    return 0
+  fi
+
+  media_dir="$(env_value MEDIA_DIR)"
+  media_dir="${media_dir:-./media}"
+  music_dir="${media_dir%/}/music"
+
+  if [[ ! -d "$music_dir" ]]; then
+    log "Music directory is missing: ${music_dir}"
+    return 1
+  fi
+
+  if ! find -L "$music_dir" -type f \( -iname "*.flac" -o -iname "*.mp3" -o -iname "*.m4a" -o -iname "*.ogg" -o -iname "*.opus" \) -print -quit | grep -q .; then
+    log "Music directory has no playable audio files: ${music_dir}"
+    return 1
+  fi
+}
+
 wait_for_container_running() {
   local container="$1"
   local deadline=$((SECONDS + 120))
@@ -169,6 +199,8 @@ cmd_preflight() {
 
   mkdir -p "$BACKUP_ROOT"
   dc config -q
+  assert_compose_redis_auth
+  assert_music_mount_ready
 }
 
 cmd_backup() {
@@ -210,6 +242,8 @@ cmd_config() {
   set_env_value CRATE_IMAGE_OWNER "$DEPLOY_IMAGE_OWNER"
   set_env_value CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
   dc config -q
+  assert_compose_redis_auth
+  assert_music_mount_ready
 }
 
 cmd_pull() {

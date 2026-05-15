@@ -165,6 +165,58 @@ def test_flush_to_postgres_uses_smembers_then_targeted_scan(monkeypatch):
     assert call_log[0]["name"] == "api.requests"
 
 
+def test_flush_to_postgres_skips_non_hash_metric_keys(monkeypatch):
+    from crate import metrics
+
+    class FakeRedis:
+        def __init__(self):
+            self.hgetall_calls: list[str] = []
+
+        def smembers(self, key: str):
+            return {b"api.requests"}
+
+        def scan(self, cursor: int, match: str | None = None, count: int | None = None):
+            if cursor != 0:
+                return 0, []
+            if match == "crate:metrics:api.requests:*":
+                return 0, [b"crate:metrics:api.requests:0"]
+            if match == "crate:metrics:routes:*":
+                return 0, [b"crate:metrics:routes:0"]
+            return 0, []
+
+        def type(self, key: str):
+            if key == "crate:metrics:routes:0":
+                return b"set"
+            return b"hash"
+
+        def hgetall(self, key: str):
+            self.hgetall_calls.append(key)
+            if key == "crate:metrics:routes:0":
+                raise AssertionError("non-hash route index should be skipped")
+            return {"count": b"1", "sum": b"10", "min": b"5", "max": b"15"}
+
+        def get(self, key: str):
+            return None
+
+    fake_redis = FakeRedis()
+    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
+    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
+
+    call_log = []
+
+    def fake_upsert(**kwargs):
+        call_log.append(kwargs)
+
+    monkeypatch.setattr(
+        "crate.db.repositories.management.upsert_metric_rollup", fake_upsert
+    )
+
+    metrics.flush_to_postgres(period="hour")
+
+    assert fake_redis.hgetall_calls == ["crate:metrics:api.requests:0"]
+    assert len(call_log) == 1
+
+
 def test_metrics_redis_bucket_ttl_is_configurable(monkeypatch):
     from crate import metrics
 
