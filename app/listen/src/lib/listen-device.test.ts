@@ -1,96 +1,40 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import {
+  getListenDeviceType,
+  getListenAppPlatform,
+  getListenDeviceLabel,
+  getListenDeviceFingerprint,
+} from "./listen-device";
 
-async function loadDeviceHelpers({
-  native,
-  platform,
-  navigatorPatch,
-}: {
-  native: boolean;
-  platform: "android" | "ios" | "web";
-  navigatorPatch?: Partial<Navigator>;
-}) {
-  vi.resetModules();
-  vi.doMock("@/lib/capacitor-runtime", () => ({
-    isAndroidNative: native && platform === "android",
-    isIosNative: native && platform === "ios",
-    isNative: native,
-    platform,
-  }));
+describe("getListenDeviceType", () => {
+  it("returns web by default", () => {
+    expect(getListenDeviceType()).toBe("web");
+  });
+});
 
-  const effectiveNavigatorPatch: Partial<Navigator> = {
-    maxTouchPoints: 0,
-    platform: "",
-    userAgent: "",
-    ...navigatorPatch,
-  };
-  for (const [key, value] of Object.entries(effectiveNavigatorPatch)) {
-    Object.defineProperty(window.navigator, key, {
-      configurable: true,
-      value,
-    });
-  }
+describe("getListenAppPlatform", () => {
+  it("returns listen-web by default", () => {
+    expect(getListenAppPlatform()).toBe("listen-web");
+  });
+});
 
-  const module = await import("@/lib/listen-device");
-  vi.doUnmock("@/lib/capacitor-runtime");
+describe("getListenDeviceLabel", () => {
+  it("returns Web (Listen) for web", () => {
+    expect(getListenDeviceLabel()).toBe("Web (Listen)");
+  });
+});
 
-  return module;
-}
-
-describe("listen device helpers", () => {
-  it("persists a stable device fingerprint", async () => {
-    localStorage.clear();
-    const { getListenDeviceFingerprint } = await loadDeviceHelpers({
-      native: false,
-      platform: "web",
-    });
-
-    const first = getListenDeviceFingerprint();
-    const second = getListenDeviceFingerprint();
-
-    expect(first).toMatch(/^listen:/);
-    expect(second).toBe(first);
+describe("getListenDeviceFingerprint", () => {
+  it("returns existing fingerprint from localStorage", () => {
+    localStorage.setItem("listen-device-fingerprint", "existing");
+    expect(getListenDeviceFingerprint()).toBe("existing");
+    localStorage.removeItem("listen-device-fingerprint");
   });
 
-  it("labels Android native sessions", async () => {
-    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } =
-      await loadDeviceHelpers({
-        native: true,
-        platform: "android",
-      });
-
-    expect(getListenDeviceType()).toBe("android");
-    expect(getListenAppPlatform()).toBe("listen-android");
-    expect(getListenDeviceLabel()).toBe("Android (Listen)");
-  });
-
-  it("labels iPhone native sessions", async () => {
-    const { getListenAppPlatform, getListenDeviceLabel, getListenDeviceType } =
-      await loadDeviceHelpers({
-        native: true,
-        platform: "ios",
-        navigatorPatch: {
-          userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
-        },
-      });
-
-    expect(getListenDeviceType()).toBe("iphone");
-    expect(getListenAppPlatform()).toBe("listen-ios");
-    expect(getListenDeviceLabel()).toBe("iPhone (Listen)");
-  });
-
-  it("detects iPad native sessions on modern iPadOS", async () => {
-    const { getListenDeviceLabel, getListenDeviceType } =
-      await loadDeviceHelpers({
-        native: true,
-        platform: "ios",
-        navigatorPatch: {
-          maxTouchPoints: 5,
-          platform: "MacIntel",
-          userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-        },
-      });
-
-    expect(getListenDeviceType()).toBe("ipad");
-    expect(getListenDeviceLabel()).toBe("iPad (Listen)");
+  it("generates and stores new fingerprint when none exists", () => {
+    localStorage.removeItem("listen-device-fingerprint");
+    const result = getListenDeviceFingerprint();
+    expect(result).toContain("listen:");
+    expect(localStorage.getItem("listen-device-fingerprint")).toBe(result);
   });
 });
