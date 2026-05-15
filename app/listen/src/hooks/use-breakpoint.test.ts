@@ -1,42 +1,54 @@
-import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { useIsDesktop } from "./use-breakpoint";
 
-import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+function mockMatchMedia(matches: boolean) {
+  const listeners = new Set<(e: MediaQueryListEvent) => void>();
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: (
+        event: string,
+        handler: (e: MediaQueryListEvent) => void,
+      ) => {
+        listeners.add(handler);
+      },
+      removeEventListener: (
+        event: string,
+        handler: (e: MediaQueryListEvent) => void,
+      ) => {
+        listeners.delete(handler);
+      },
+      dispatchEvent: vi.fn(),
+    })),
+  });
+  return listeners;
+}
 
 describe("useIsDesktop", () => {
-  let originalMatchMedia: typeof window.matchMedia;
-
-  beforeEach(() => {
-    originalMatchMedia = window.matchMedia;
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: query === "(min-width: 768px)" ? false : false,
-        media: query,
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    });
+  it("returns true when matchMedia matches desktop width", () => {
+    mockMatchMedia(true);
+    const { result } = renderHook(() => useIsDesktop());
+    expect(result.current).toBe(true);
   });
 
-  afterEach(() => {
-    delete document.documentElement.dataset.listenRuntime;
-    Object.defineProperty(window, "matchMedia", {
-      writable: true,
-      value: originalMatchMedia,
-    });
-  });
-
-  it("returns the matchMedia result in browser", () => {
+  it("returns false when matchMedia does not match", () => {
+    mockMatchMedia(false);
     const { result } = renderHook(() => useIsDesktop());
     expect(result.current).toBe(false);
   });
 
-  it("forces desktop for the Tauri runtime", () => {
-    document.documentElement.dataset.listenRuntime = "tauri";
+  it("updates when media query changes", () => {
+    const listeners = mockMatchMedia(false);
     const { result } = renderHook(() => useIsDesktop());
+    expect(result.current).toBe(false);
+
+    act(() => {
+      listeners.forEach((fn) => fn({ matches: true } as MediaQueryListEvent));
+    });
     expect(result.current).toBe(true);
   });
 });

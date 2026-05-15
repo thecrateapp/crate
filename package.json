@@ -8,6 +8,7 @@
     "app/listen-desktop"
   ],
   "devDependencies": {
-    "@testing-library/user-event": "^14.6.1"
+    "@testing-library/user-event": "^14.6.1",
+    "@vitest/coverage-v8": "^4.1.6"
   }
 }
