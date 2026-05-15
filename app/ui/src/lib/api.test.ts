@@ -49,3 +49,39 @@ describe("createApiClient", () => {
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("api onUnauthorized", () => {
+  it("redirects to login with current path on 401", async () => {
+    const originalHref = window.location.href;
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { pathname: "/dashboard", search: "", hash: "", href: "" },
+    });
+
+    const client = createApiClient({
+      onUnauthorized: () => {
+        if (window.location.pathname !== "/login") {
+          const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+          window.location.href = `/login?redirect=${encodeURIComponent(
+            redirect,
+          )}`;
+        }
+      },
+    });
+
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      text: async () => "Unauthorized",
+      headers: new Headers(),
+    });
+
+    await expect(client("/api/test")).rejects.toThrow(ApiError);
+    expect(window.location.href).toBe("/login?redirect=%2Fdashboard");
+
+    Object.defineProperty(window, "location", {
+      writable: true,
+      value: { href: originalHref },
+    });
+  });
+});
