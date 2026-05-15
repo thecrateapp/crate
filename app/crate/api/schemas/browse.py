@@ -186,6 +186,16 @@ class ArtistShowEventResponse(BaseModel):
     def coerce_id_to_str(cls, v: Any) -> str:
         return str(v)
 
+    @field_validator("show_id", mode="before")
+    @classmethod
+    def coerce_show_id_to_int(cls, v: Any) -> int | None:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
     @field_validator("date", mode="before")
     @classmethod
     def coerce_date_to_str(cls, v: Any) -> str | None:
