@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,docs,site,reference or all)"
+        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,docs,site or all)"
         default: "all"
 
 env:
