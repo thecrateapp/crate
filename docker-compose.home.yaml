@@ -383,7 +383,7 @@ services:
       ]
 
   crate-analysis-worker:
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}
     container_name: crate-analysis-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
@@ -420,7 +420,7 @@ services:
       ]
 
   crate-playback-worker:
-    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
+    image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}
     container_name: crate-playback-worker
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}

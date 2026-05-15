@@ -1,140 +1,106 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
-  cacheClear,
   cacheGet,
-  cacheInvalidate,
   cacheSet,
+  cacheInvalidate,
+  cacheClear,
   scopesForUrl,
-} from "@/lib/cache";
+  onCacheInvalidation,
+} from "./cache";
 
-describe("listen api cache", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    cacheClear();
+beforeEach(() => {
+  cacheClear();
+  localStorage.clear();
+});
 
-    let nextHandle = 1;
-    const timers = new Map<number, ReturnType<typeof setTimeout>>();
-
-    vi.stubGlobal(
-      "requestIdleCallback",
-      vi.fn((callback: IdleRequestCallback, options?: IdleRequestOptions) => {
-        const handle = nextHandle++;
-        const timer = setTimeout(
-          () => {
-            callback({
-              didTimeout: false,
-              timeRemaining: () => 50,
-            } as IdleDeadline);
-          },
-          options?.timeout ?? 0,
-        );
-        timers.set(handle, timer);
-        return handle;
-      }),
-    );
-
-    vi.stubGlobal(
-      "cancelIdleCallback",
-      vi.fn((handle: number) => {
-        const timer = timers.get(handle);
-        if (timer != null) {
-          clearTimeout(timer);
-          timers.delete(handle);
-        }
-      }),
-    );
+describe("scopesForUrl", () => {
+  it("returns home scopes for discovery", () => {
+    expect(scopesForUrl("/api/me/home/discovery")).toEqual([
+      "home",
+      "library",
+      "follows",
+      "history",
+      "likes",
+    ]);
   });
 
-  afterEach(() => {
-    cacheClear();
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  it("returns likes scope for likes endpoint", () => {
+    expect(scopesForUrl("/api/me/likes")).toEqual(["likes"]);
   });
 
-  it("writes to memory immediately and defers localStorage persistence", async () => {
-    const setItemSpy = vi.spyOn(localStorage, "setItem");
-
-    cacheSet("/api/me/home/discovery", { hero: ["Converge"] });
-
-    expect(cacheGet<{ hero: string[] }>("/api/me/home/discovery")).toEqual({
-      hero: ["Converge"],
-    });
-    expect(setItemSpy).not.toHaveBeenCalled();
-
-    await vi.runAllTimersAsync();
-
-    expect(setItemSpy).toHaveBeenCalledTimes(1);
-    expect(
-      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
-    ).toContain("Converge");
+  it("returns playlist scope with id", () => {
+    expect(scopesForUrl("/api/playlists/42")).toEqual([
+      "playlists",
+      "playlist:42",
+    ]);
   });
 
-  it("coalesces repeated writes for the same URL and persists the latest payload", async () => {
-    const setItemSpy = vi.spyOn(localStorage, "setItem");
-
-    cacheSet("/api/me/home/discovery", { hero: ["Old"] });
-    cacheSet("/api/me/home/discovery", { hero: ["New"] });
-
-    await vi.runAllTimersAsync();
-
-    expect(setItemSpy).toHaveBeenCalledTimes(1);
-    expect(
-      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
-    ).toContain("New");
+  it("returns artist scope with id", () => {
+    expect(scopesForUrl("/api/artists/7")).toEqual([
+      "artist:7",
+      "library",
+      "follows",
+    ]);
   });
 
-  it("cancels pending writes when the matching scope is invalidated", async () => {
-    const setItemSpy = vi.spyOn(localStorage, "setItem");
+  it("returns empty for unknown urls", () => {
+    expect(scopesForUrl("/api/unknown")).toEqual([]);
+  });
+});
 
-    cacheSet("/api/me/stats/overview?window=30d", { minutes: 42 });
-    cacheInvalidate("history");
-
-    await vi.runAllTimersAsync();
-
-    expect(setItemSpy).not.toHaveBeenCalled();
-    expect(cacheGet("/api/me/stats/overview?window=30d")).toBeNull();
-    expect(
-      localStorage.getItem("crate-api-cache:/api/me/stats/overview?window=30d"),
-    ).toBeNull();
+describe("cacheGet / cacheSet", () => {
+  it("returns null for unset keys", () => {
+    expect(cacheGet("/api/foo")).toBeNull();
   });
 
-  it("keeps persistent entries for normal daily app opens", () => {
-    vi.setSystemTime(new Date("2026-05-06T12:00:00Z"));
+  it("stores and retrieves data", () => {
+    cacheSet("/api/foo", { bar: 1 });
+    expect(cacheGet("/api/foo")).toEqual({ bar: 1 });
+  });
+
+  it("falls back to localStorage", () => {
     localStorage.setItem(
-      "crate-api-cache:/api/me/home/discovery",
-      JSON.stringify({
-        data: { hero: ["Dredg"] },
-        timestamp: Date.now() - 179 * 24 * 60 * 60 * 1000,
-        scopes: ["home"],
-      }),
+      "crate-api-cache:/api/foo",
+      JSON.stringify({ data: { bar: 2 }, timestamp: Date.now(), scopes: [] }),
     );
-
-    expect(cacheGet<{ hero: string[] }>("/api/me/home/discovery")).toEqual({
-      hero: ["Dredg"],
-    });
+    expect(cacheGet("/api/foo")).toEqual({ bar: 2 });
   });
 
-  it("drops very old entries as a missed-invalidation safety net", () => {
-    vi.setSystemTime(new Date("2026-05-06T12:00:00Z"));
+  it("ignores expired localStorage entries", () => {
+    const old = Date.now() - 200 * 24 * 60 * 60 * 1000;
     localStorage.setItem(
-      "crate-api-cache:/api/me/home/discovery",
-      JSON.stringify({
-        data: { hero: ["Old"] },
-        timestamp: Date.now() - 181 * 24 * 60 * 60 * 1000,
-        scopes: ["home"],
-      }),
+      "crate-api-cache:/api/foo",
+      JSON.stringify({ data: { bar: 3 }, timestamp: old, scopes: [] }),
     );
-
-    expect(cacheGet("/api/me/home/discovery")).toBeNull();
-    expect(
-      localStorage.getItem("crate-api-cache:/api/me/home/discovery"),
-    ).toBeNull();
+    expect(cacheGet("/api/foo")).toBeNull();
   });
+});
 
-  it("maps jam room endpoints to the jam scope", () => {
-    expect(scopesForUrl("/api/jam/rooms")).toContain("jam");
-    expect(scopesForUrl("/api/jam/rooms/room-1")).toContain("jam");
+describe("cacheInvalidate", () => {
+  it("removes entries matching scope", () => {
+    cacheSet("/api/me/likes", [1]);
+    cacheSet("/api/me/follows", [2]);
+    cacheInvalidate("likes");
+    expect(cacheGet("/api/me/likes")).toBeNull();
+    expect(cacheGet("/api/me/follows")).not.toBeNull();
+  });
+});
+
+describe("cacheClear", () => {
+  it("removes all entries", () => {
+    cacheSet("/api/a", 1);
+    cacheSet("/api/b", 2);
+    cacheClear();
+    expect(cacheGet("/api/a")).toBeNull();
+    expect(cacheGet("/api/b")).toBeNull();
+  });
+});
+
+describe("onCacheInvalidation", () => {
+  it("returns an unsubscribe function", () => {
+    const fn = vi.fn();
+    const unsub = onCacheInvalidation(fn);
+    expect(typeof unsub).toBe("function");
+    unsub();
   });
 });

@@ -61,6 +61,6 @@ describe("useIsDesktop", () => {
     });
     const { result } = renderHook(() => useIsDesktop());
     expect(result.current).toBe(true);
-    delete (window as Record<string, unknown>).__TAURI_INTERNALS__;
+    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
   });
 });

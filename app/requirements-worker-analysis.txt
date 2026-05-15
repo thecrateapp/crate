@@ -1,0 +1,2 @@
+librosa>=0.10
+essentia-tensorflow>=2.1b5; platform_machine == "x86_64"

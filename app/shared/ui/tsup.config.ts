@@ -22,7 +22,10 @@ function walk(dir: string, extensions: string[], out: Record<string, string>) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
       walk(full, extensions, out);
-    } else if (extensions.some((ext) => entry.endsWith(ext))) {
+    } else if (
+      !entry.includes(".test.") &&
+      extensions.some((ext) => entry.endsWith(ext))
+    ) {
       const key = relative(".", full).replace(/\.(tsx?|ts)$/, "");
       out[key] = full;
     }

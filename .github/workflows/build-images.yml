@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       images:
-        description: "Images to build (comma-separated: backend,api,worker,media-worker,readplane,ui,listen,docs,site,reference or all)"
+        description: "Images to build (comma-separated: backend,api,worker,analysis-worker,playback-worker,media-worker,readplane,ui,listen,docs,site,reference or all)"
         default: "all"
 
 env:
@@ -87,15 +87,98 @@ jobs:
             type=sha,prefix=,format=short
             type=raw,value=latest
 
-      # Worker image: PyTorch CPU + Essentia models are cached via Dockerfile
-      # layer ordering (models downloaded before mutable source COPY) plus
-      # BuildKit pip cache mounts. With GHA cache enabled, rebuilds that only
-      # touch application code should skip the ~400MB model download layer.
+      # Core worker image: no Torch, Essentia, librosa, or model checkpoints.
+      # The heavy audio analysis stack is isolated in crate-analysis-worker.
       - uses: docker/build-push-action@v7
         with:
           context: ./app
           file: ./app/Dockerfile
-          target: worker
+          target: worker-core
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-analysis-worker:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'worker') || contains(github.event.inputs.images, 'analysis-worker') || github.event.inputs.images == 'all'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build crate-cli Linux binary
+        run: |
+          mkdir -p app/bin /tmp/crate-cli-build
+          docker build --platform linux/amd64 --output type=local,dest=/tmp/crate-cli-build tools/crate-cli
+          cp /tmp/crate-cli-build/crate-cli app/bin/crate-cli-linux-amd64
+          chmod +x app/bin/crate-cli-linux-amd64
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-analysis-worker
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          target: worker-analysis
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+
+  build-playback-worker:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.images, 'backend') || contains(github.event.inputs.images, 'worker') || contains(github.event.inputs.images, 'playback-worker') || github.event.inputs.images == 'all'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/crate-playback-worker
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          target: worker-playback
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

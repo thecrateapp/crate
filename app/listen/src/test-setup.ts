@@ -1,3 +1,5 @@
+import "@testing-library/jest-dom/vitest";
+
 /**
  * Vitest setup: polyfill localStorage. jsdom's implementation is
  * incomplete in some environments — replace with an in-memory map for

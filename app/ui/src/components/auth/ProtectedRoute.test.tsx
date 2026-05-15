@@ -35,7 +35,7 @@ describe("ProtectedRoute", () => {
 
   it("shows admin required message when not admin", () => {
     mockAuth({
-      user: { id: 1, email: "user@example.com" },
+      user: { id: 1, email: "user@example.com", name: "User", role: "user" },
       loading: false,
       isAdmin: false,
     });
@@ -60,7 +60,7 @@ describe("ProtectedRoute", () => {
 
   it("renders children when authenticated as admin", () => {
     mockAuth({
-      user: { id: 1, email: "admin@example.com" },
+      user: { id: 1, email: "admin@example.com", name: "Admin", role: "admin" },
       loading: false,
       isAdmin: true,
     });

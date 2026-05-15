@@ -46,7 +46,6 @@ for mod_name in (
     "thefuzz",
     "thefuzz.fuzz",
     "rich",
-    "beets",
     "librosa",
     "soundfile",
     "jwt",

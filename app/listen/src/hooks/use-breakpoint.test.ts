@@ -11,13 +11,13 @@ function mockMatchMedia(matches: boolean) {
       media: query,
       onchange: null,
       addEventListener: (
-        event: string,
+        _event: string,
         handler: (e: MediaQueryListEvent) => void,
       ) => {
         listeners.add(handler);
       },
       removeEventListener: (
-        event: string,
+        _event: string,
         handler: (e: MediaQueryListEvent) => void,
       ) => {
         listeners.delete(handler);

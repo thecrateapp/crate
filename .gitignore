@@ -11,6 +11,8 @@ test-music/
 # Node
 node_modules/
 dist/
+coverage/
+**/coverage/
 
 # Python
 __pycache__/

@@ -45,6 +45,7 @@ interface RadioSession {
   seedId?: string | number | null;
   seedEntityUid?: string | null;
   seedPath?: string | null;
+  seedStorageId?: string | null;
   shapedSessionId?: string | null;
 }
 

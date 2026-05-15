@@ -153,7 +153,7 @@ services:
   worker:
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-dev-worker
     environment:
       - TZ=Europe/Madrid
@@ -224,7 +224,7 @@ services:
   projector:
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-dev-projector
     environment:
       - TZ=Europe/Madrid
@@ -266,7 +266,7 @@ services:
   maintenance-worker:
     build:
       context: ./app
-      target: worker
+      target: worker-core
     container_name: crate-dev-maintenance-worker
     environment:
       - TZ=Europe/Madrid
@@ -338,7 +338,7 @@ services:
   analysis-worker:
     build:
       context: ./app
-      target: worker
+      target: worker-analysis
     container_name: crate-dev-analysis-worker
     environment:
       - TZ=Europe/Madrid
@@ -397,7 +397,7 @@ services:
   playback-worker:
     build:
       context: ./app
-      target: worker
+      target: worker-playback
     container_name: crate-dev-playback-worker
     environment:
       - TZ=Europe/Madrid
