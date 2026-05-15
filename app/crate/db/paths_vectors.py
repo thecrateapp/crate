@@ -26,7 +26,9 @@ def _lerp(a: list[float], b: list[float], t: float) -> list[float]:
     return [a[d] + (b[d] - a[d]) * t for d in range(len(a))]
 
 
-def resolve_bliss_centroid(endpoint_type: str, value: str, *, session=None) -> list[float] | None:
+def resolve_bliss_centroid(
+    endpoint_type: str, value: str, *, session=None
+) -> list[float] | None:
     """Resolve an endpoint (track/album/artist/genre) to a bliss centroid vector."""
     log.info("resolve_bliss_centroid: type=%s value=%s", endpoint_type, value)
     if endpoint_type == "artist":

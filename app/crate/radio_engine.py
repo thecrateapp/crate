@@ -11,6 +11,7 @@ import logging
 import time
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from crate.db.paths import (
     _centroid,
@@ -81,11 +82,14 @@ _graph_cache: (
 ) = None
 
 
-def _redis():
+def _redis() -> Any:
     """Get the Redis connection used for radio sessions."""
-    from crate.db.cache_runtime import _get_redis
+    from crate.db.cache_runtime import get_redis
 
-    return _get_redis()
+    redis_client = get_redis()
+    if redis_client is None:
+        raise RuntimeError("Redis is required for radio sessions")
+    return redis_client
 
 
 # ── Session management ─────────────────────────────────────────────

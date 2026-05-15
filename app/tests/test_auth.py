@@ -319,7 +319,9 @@ class TestOAuthRedirectHelpers:
 
 class TestOAuthStart:
     @staticmethod
-    def _request(headers: list[tuple[bytes, bytes]] | None = None, query_string: bytes = b"") -> Request:
+    def _request(
+        headers: list[tuple[bytes, bytes]] | None = None, query_string: bytes = b""
+    ) -> Request:
         return Request(
             {
                 "type": "http",
@@ -548,7 +550,9 @@ class TestOAuthStart:
         from crate.api.auth import _post_auth_redirect_url
 
         assert (
-            _post_auth_redirect_url("http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123")
+            _post_auth_redirect_url(
+                "http://127.0.0.1:17654/oauth/callback?next=%2F", "abc123"
+            )
             == "http://127.0.0.1:17654/oauth/callback?next=%2F&token=abc123"
         )
 
@@ -560,12 +564,28 @@ class TestOAuthStart:
         request = self._request(query_string=b"app_id=listen-tauri")
         request.state.user = None
 
-        with patch("crate.api.auth._provider_available", return_value=True), \
-             patch("crate.api.auth._build_oauth_state", side_effect=lambda **kwargs: captured_state.update(kwargs) or "state-token"), \
-             patch("crate.api.auth._parse_oauth_state", return_value={"verifier": "verifier"}), \
-             patch("crate.api.auth._pkce_challenge", return_value="challenge"), \
-             patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}):
-            asyncio.run(oauth_start(request, "google", OAuthStartRequest(return_to="cratemusic://oauth/callback")))
+        with (
+            patch("crate.api.auth._provider_available", return_value=True),
+            patch(
+                "crate.api.auth._build_oauth_state",
+                side_effect=lambda **kwargs: (
+                    captured_state.update(kwargs) or "state-token"
+                ),
+            ),
+            patch(
+                "crate.api.auth._parse_oauth_state",
+                return_value={"verifier": "verifier"},
+            ),
+            patch("crate.api.auth._pkce_challenge", return_value="challenge"),
+            patch.dict("os.environ", {"GOOGLE_CLIENT_ID": "google-client"}),
+        ):
+            asyncio.run(
+                oauth_start(
+                    request,
+                    "google",
+                    OAuthStartRequest(return_to="cratemusic://oauth/callback"),
+                )
+            )
 
         assert captured_state["app_id"] == "listen-tauri"
 

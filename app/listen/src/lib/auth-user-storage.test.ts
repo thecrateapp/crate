@@ -5,8 +5,8 @@ async function loadStorage(options: { native: boolean; apiBase?: string }) {
   vi.doMock("@/lib/api", () => ({
     getApiBase: () => options.apiBase ?? "",
   }));
-  vi.doMock("@/lib/capacitor-runtime", () => ({
-    isNative: options.native,
+  vi.doMock("@/lib/platform", () => ({
+    usesConfigurableServer: options.native,
   }));
   return import("./auth-user-storage");
 }
@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.clear();
   vi.doUnmock("@/lib/api");
-  vi.doUnmock("@/lib/capacitor-runtime");
+  vi.doUnmock("@/lib/platform");
   vi.resetModules();
 });
 

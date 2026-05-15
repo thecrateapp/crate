@@ -199,8 +199,71 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 .PHONY: dev-test
-dev-test: ## Run tests inside the dev container
-	@$(DC_DEV) exec worker pytest tests/ -v
+dev-test: dev-test-backend dev-test-readplane dev-test-rust dev-test-frontend ## Run backend, frontend, Go, and Rust checks
+	@echo "$(GREEN)All dev checks passed$(NC)"
+
+.PHONY: dev-test-preflight
+dev-test-preflight: ## Ensure the dev backend is running before containerized tests
+	@missing=0; \
+	for svc in postgres redis worker; do \
+		if ! $(DC_DEV) ps --services --filter status=running | grep -qx "$$svc"; then \
+			echo "$(RED)Missing dev service: $$svc$(NC)"; \
+			missing=1; \
+		fi; \
+	done; \
+	if [ "$$missing" -ne 0 ]; then \
+		echo "$(YELLOW)Run 'make dev-back' or 'make dev' before make dev-test.$(NC)"; \
+		exit 1; \
+	fi
+
+.PHONY: dev-test-backend
+dev-test-backend: dev-test-preflight ## Run Python backend static checks and pytest
+	@echo "$(YELLOW)Backend: pyright$(NC)"
+	@uv run pyright
+	@echo "$(YELLOW)Backend: ruff check$(NC)"
+	@uv run ruff check app/crate app/tests
+	@echo "$(YELLOW)Backend: ruff format --check$(NC)"
+	@uv run ruff format --check app/crate app/tests
+	@echo "$(YELLOW)Backend: pytest in an isolated dev runner$(NC)"
+	@$(DC_DEV) run --rm --no-deps worker python -m pytest tests/ -q --durations=20
+
+.PHONY: dev-test-readplane
+dev-test-readplane: ## Run Go readplane tests and vet
+	@$(MAKE) readplane-test
+	@$(MAKE) readplane-vet
+
+.PHONY: dev-test-rust
+dev-test-rust: ## Run Rust tests for native services/tools
+	@echo "$(YELLOW)Rust: media-worker$(NC)"
+	@cargo test --manifest-path app/media-worker/Cargo.toml
+	@echo "$(YELLOW)Rust: crate-cli$(NC)"
+	@if [ "$$(uname -s)" = "Linux" ] && [ "$$(uname -m)" = "x86_64" ]; then \
+		cargo test --manifest-path tools/crate-cli/Cargo.toml; \
+	else \
+		echo "$(YELLOW)crate-cli: host has no prebuilt bliss/aubio bindings; testing analysis build$(NC)"; \
+		cargo test --manifest-path tools/crate-cli/Cargo.toml --no-default-features --features analysis; \
+	fi
+	@echo "$(YELLOW)Rust: listen desktop Tauri shell$(NC)"
+	@cargo test --manifest-path app/listen-desktop/src-tauri/Cargo.toml
+
+.PHONY: dev-test-frontend
+dev-test-frontend: ## Run frontend lint, typecheck, tests, and builds
+	@echo "$(YELLOW)Frontend: @crate/ui typecheck + build$(NC)"
+	@npm run --workspace=app/shared/ui typecheck
+	@npm run --workspace=app/shared/ui build
+	@echo "$(YELLOW)Frontend: admin lint + typecheck + test + build$(NC)"
+	@npm run --workspace=app/ui lint
+	@npm run --workspace=app/ui typecheck
+	@npm run --workspace=app/ui test
+	@npm run --workspace=app/ui build
+	@echo "$(YELLOW)Frontend: listen lint + typecheck + test + build$(NC)"
+	@npm run --workspace=app/listen lint
+	@npm run --workspace=app/listen typecheck
+	@npm run --workspace=app/listen test
+	@npm run --workspace=app/listen build
+	@echo "$(YELLOW)Frontend: desktop typecheck + build$(NC)"
+	@npm run --workspace=app/listen-desktop typecheck
+	@npm run --workspace=app/listen-desktop build
 
 .PHONY: regression-api
 regression-api: ## Critical backend contracts (Explore/search/system playlists)

@@ -139,11 +139,14 @@ def _vector_distance(
         float(vector[index]) * float(target[index]) for index in range(len(target))
     )
     left_norm = sum(float(value) * float(value) for value in vector) ** 0.5
-    if target_norm is None:
-        target_norm = sum(float(value) * float(value) for value in target) ** 0.5
-    if left_norm <= 0 or target_norm <= 0:
+    effective_target_norm = (
+        sum(float(value) * float(value) for value in target) ** 0.5
+        if target_norm is None
+        else target_norm
+    )
+    if left_norm <= 0 or effective_target_norm <= 0:
         return _coerce_float(candidate.get("distance")) or 1.0
-    return max(0.0, min(2.0, 1.0 - (dot / (left_norm * target_norm))))
+    return max(0.0, min(2.0, 1.0 - (dot / (left_norm * effective_target_norm))))
 
 
 def _find_best_candidate(

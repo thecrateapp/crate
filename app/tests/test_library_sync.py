@@ -311,9 +311,7 @@ class TestSyncAlbum:
                         }
                     ],
                 ),
-                patch(
-                    "crate.library_sync.upsert_artist", side_effect=_capture_artist
-                ),
+                patch("crate.library_sync.upsert_artist", side_effect=_capture_artist),
                 patch("crate.library_sync.get_album_id_by_path", return_value=None),
                 patch("crate.library_sync.get_tracks_by_album_id", return_value={}),
                 patch("crate.library_sync.delete_track_by_path"),
@@ -840,9 +838,7 @@ class TestSyncAlbum:
                     return_value=[existing_album],
                 ),
                 patch("crate.library_sync.get_album_track_count", return_value=1),
-                patch(
-                    "crate.library_sync.upsert_artist", side_effect=_capture_artist
-                ),
+                patch("crate.library_sync.upsert_artist", side_effect=_capture_artist),
                 patch("crate.library_sync.delete_album"),
             ):
                 sync = LibrarySync(config)

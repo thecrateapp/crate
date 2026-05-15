@@ -232,7 +232,12 @@ def find_candidate_rows(
                 .all()
             )
 
-    return [_normalize_track_row(row) for row in rows]
+    normalized_rows: list[dict] = []
+    for row in rows:
+        normalized = _normalize_track_row(row)
+        if normalized is not None:
+            normalized_rows.append(normalized)
+    return normalized_rows
 
 
 __all__ = [

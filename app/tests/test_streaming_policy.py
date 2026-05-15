@@ -181,7 +181,9 @@ def test_resolve_playback_falls_back_to_original_when_variant_metadata_fails(
         raise AssertionError("metadata failure should not enqueue a variant task")
 
     monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
-    monkeypatch.setattr("crate.streaming.service.get_variant_by_cache_key", lambda _key: None)
+    monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key", lambda _key: None
+    )
     monkeypatch.setattr("crate.streaming.service.ensure_variant_record", fail_ensure)
     monkeypatch.setattr("crate.streaming.service.create_task_dedup", fail_enqueue)
 

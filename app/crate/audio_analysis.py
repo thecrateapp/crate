@@ -8,6 +8,7 @@ Three-tier analysis:
 Supports single-track and batch analysis for throughput optimization.
 """
 
+import importlib
 import logging
 import warnings
 from pathlib import Path
@@ -21,6 +22,11 @@ log = logging.getLogger(__name__)
 
 _BACKEND = "none"
 _BACKEND_CHECKED = False
+
+
+def _essentia_standard() -> Any:
+    """Return the dynamic Essentia standard module."""
+    return importlib.import_module("essentia.standard")
 
 
 def _detect_backend():
@@ -442,7 +448,8 @@ def _empty_result() -> dict:
 
 
 def _analyze_essentia(filepath: str) -> dict:
-    from essentia.standard import MonoLoader
+    standard = _essentia_standard()
+    MonoLoader = standard.MonoLoader
 
     result = _empty_result()
     try:
@@ -474,7 +481,8 @@ def _analyze_essentia(filepath: str) -> dict:
 
 def _analyze_batch_essentia(filepaths: list) -> list:
     """Batch analysis: signal features sequentially, PANNs in batches."""
-    from essentia.standard import MonoLoader
+    standard = _essentia_standard()
+    MonoLoader = standard.MonoLoader
 
     use_panns = _panns_available()
     items = []  # (filepath, audio_44k, audio_32k, result)
@@ -552,12 +560,11 @@ def _batch_panns_inference(items: list):
 
 def _extract_signal_features(audio: np.ndarray, result: dict, filepath: str = ""):
     """Extract BPM, key, loudness, dynamic range from audio signal."""
-    from essentia.standard import (
-        RhythmExtractor2013,
-        KeyExtractor,
-        DynamicComplexity,
-        LoudnessEBUR128,
-    )
+    standard = _essentia_standard()
+    RhythmExtractor2013 = standard.RhythmExtractor2013
+    KeyExtractor = standard.KeyExtractor
+    DynamicComplexity = standard.DynamicComplexity
+    LoudnessEBUR128 = standard.LoudnessEBUR128
 
     # BPM
     try:
@@ -635,15 +642,14 @@ def _apply_hybrid_from_probs(
     audio_44k: np.ndarray, probs: np.ndarray, lb_to_ix: dict, result: dict
 ):
     """Compute hybrid features from PANNs probs + Essentia signal features."""
-    from essentia.standard import (
-        Danceability,
-        Energy,
-        Spectrum,
-        SpectralComplexity,
-        MFCC,
-        FrameGenerator,
-        Windowing,
-    )
+    standard = _essentia_standard()
+    Danceability = standard.Danceability
+    Energy = standard.Energy
+    Spectrum = standard.Spectrum
+    SpectralComplexity = standard.SpectralComplexity
+    MFCC = standard.MFCC
+    FrameGenerator = standard.FrameGenerator
+    Windowing = standard.Windowing
 
     def ws(group: str) -> float:
         return _weighted_sum(probs, _LABEL_GROUPS[group], lb_to_ix)
@@ -796,17 +802,16 @@ def _apply_hybrid_from_probs(
 
 
 def _analyze_essentia_heuristic(audio: np.ndarray, result: dict):
-    from essentia.standard import (
-        Danceability,
-        Energy,
-        SpectralCentroidTime,
-        ZeroCrossingRate,
-        Spectrum,
-        SpectralComplexity,
-        MFCC,
-        FrameGenerator,
-        Windowing,
-    )
+    standard = _essentia_standard()
+    Danceability = standard.Danceability
+    Energy = standard.Energy
+    SpectralCentroidTime = standard.SpectralCentroidTime
+    ZeroCrossingRate = standard.ZeroCrossingRate
+    Spectrum = standard.Spectrum
+    SpectralComplexity = standard.SpectralComplexity
+    MFCC = standard.MFCC
+    FrameGenerator = standard.FrameGenerator
+    Windowing = standard.Windowing
 
     tempo_val = result["bpm"] or 120.0
 

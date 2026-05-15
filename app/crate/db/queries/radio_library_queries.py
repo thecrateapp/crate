@@ -102,7 +102,7 @@ def get_random_library_seed_rows(limit: int = 30, *, session=None) -> list[dict]
             return []
 
         start_id = random.randint(1, max_id)
-        rows = (
+        rows = list(
             s.execute(
                 text(
                     """
@@ -120,9 +120,8 @@ def get_random_library_seed_rows(limit: int = 30, *, session=None) -> list[dict]
             .all()
         )
         if len(rows) < limit:
-            rows = (
-                list(rows)
-                + s.execute(
+            rows += list(
+                s.execute(
                     text(
                         """
                     SELECT t.id AS track_id, t.artist, t.bliss_vector

@@ -605,9 +605,7 @@ class TestArtistEnrichment:
         assert [len(call[1]["artists"]) for call in created] == [20, 20, 5]
         assert {call[2] for call in created} == {"parent-task"}
 
-    def test_process_new_content_refreshes_artist_summary_in_finally(
-        self, monkeypatch
-    ):
+    def test_process_new_content_refreshes_artist_summary_in_finally(self, monkeypatch):
         from crate.worker_handlers import enrichment as worker_enrichment
 
         calls: list[tuple[str, str]] = []

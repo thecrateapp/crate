@@ -732,9 +732,9 @@ _STATIC_RUNTIME_GRAPH = _build_static_runtime_graph()
 
 def _load_shared_taxonomy_revision() -> str | None:
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if redis_client:
             value = redis_client.get(_RUNTIME_GRAPH_REVISION_KEY)
             if value:
@@ -758,9 +758,9 @@ def _publish_shared_taxonomy_revision(revision: str | None = None) -> str:
     revision_value = revision or datetime.now(timezone.utc).isoformat()
 
     try:
-        from crate.db.cache_runtime import _get_redis
+        from crate.db.cache_runtime import get_redis
 
-        redis_client = _get_redis()
+        redis_client = get_redis()
         if redis_client:
             redis_client.set(_RUNTIME_GRAPH_REVISION_KEY, revision_value)
     except Exception:
@@ -1337,7 +1337,7 @@ def _aggregate_genre_rows(rows: list[dict]) -> list[dict]:
             bucket["score"] += score
             if raw_name not in bucket["sources"]:
                 bucket["sources"].append(raw_name)
-            if canonical:
+            if canonical and slug:
                 bucket["name"] = graph["nodes_by_slug"][slug]["name"]
                 bucket["canonical"] = True
                 bucket["top_level_slug"] = get_top_level_slug(slug) or slug
