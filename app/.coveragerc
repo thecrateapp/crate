@@ -1,0 +1,15 @@
+[run]
+source = crate
+branch = true
+omit =
+    */migrations/*
+    */tests/*
+    */test_*
+
+[report]
+exclude_also =
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @(abc\.)?abstractmethod

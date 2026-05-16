@@ -44,48 +44,38 @@ fn test_scan_directory_returns_structured_payload() {
     assert!(result.artists[0].albums[0].has_cover);
 }
 
-#[test]
-fn test_scan_directory_accepts_artist_root() {
+#[rstest::rstest]
+#[case::artist_root(vec!["Artist Root", "Album One"], false)]
+#[case::year_bucket(vec!["Artist Root", "2024", "Album One"], false)]
+#[case::album_root(vec!["Artist Root", "Album One"], true)]
+fn test_scan_directory_accepts_various_roots(
+    #[case] segments: Vec<&str>,
+    #[case] scan_at_album: bool,
+) {
     let dir = TempDir::new().unwrap();
-    let artist_dir = dir.path().join("Artist Root");
-    let album_dir = artist_dir.join("Album One");
+    let album_dir = path_from_segments(dir.path(), &segments);
     std::fs::create_dir_all(&album_dir).unwrap();
     common::create_test_wav_at(&album_dir, "01 - Track.wav", 440.0, 1.0);
 
-    let result = crate_cli::scan::scan_directory(artist_dir, "wav".to_string(), false, false);
+    let scan_root = if scan_at_album {
+        album_dir
+    } else {
+        dir.path().join(segments[0])
+    };
+    let result = crate_cli::scan::scan_directory(scan_root, "wav".to_string(), false, false);
 
+    let album_name = segments.last().unwrap();
     assert_eq!(result.total_files, 1);
     assert_eq!(result.artists[0].name, "Artist Root");
-    assert_eq!(result.artists[0].albums[0].name, "Album One");
+    assert_eq!(result.artists[0].albums[0].name, *album_name);
 }
 
-#[test]
-fn test_scan_directory_accepts_year_bucket_artist_root() {
-    let dir = TempDir::new().unwrap();
-    let artist_dir = dir.path().join("Artist Root");
-    let album_dir = artist_dir.join("2024").join("Album One");
-    std::fs::create_dir_all(&album_dir).unwrap();
-    common::create_test_wav_at(&album_dir, "01 - Track.wav", 440.0, 1.0);
-
-    let result = crate_cli::scan::scan_directory(artist_dir, "wav".to_string(), false, false);
-
-    assert_eq!(result.total_files, 1);
-    assert_eq!(result.artists[0].name, "Artist Root");
-    assert_eq!(result.artists[0].albums[0].name, "Album One");
-}
-
-#[test]
-fn test_scan_directory_accepts_album_root() {
-    let dir = TempDir::new().unwrap();
-    let album_dir = dir.path().join("Artist Root").join("Album One");
-    std::fs::create_dir_all(&album_dir).unwrap();
-    common::create_test_wav_at(&album_dir, "01 - Track.wav", 440.0, 1.0);
-
-    let result = crate_cli::scan::scan_directory(album_dir, "wav".to_string(), false, false);
-
-    assert_eq!(result.total_files, 1);
-    assert_eq!(result.artists[0].name, "Artist Root");
-    assert_eq!(result.artists[0].albums[0].name, "Album One");
+fn path_from_segments(base: &std::path::Path, segments: &[&str]) -> std::path::PathBuf {
+    let mut path = base.to_path_buf();
+    for seg in segments {
+        path.push(seg);
+    }
+    path
 }
 
 #[test]

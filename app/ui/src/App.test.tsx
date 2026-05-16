@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { screen, waitFor } from "@testing-library/react";
+import { Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
@@ -8,15 +8,8 @@ vi.mock("@/lib/api", () => ({
   api: apiMock,
 }));
 
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: vi.fn(),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
-import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 describe("ProtectedRoute", () => {
   beforeEach(() => {
@@ -24,31 +17,22 @@ describe("ProtectedRoute", () => {
   });
 
   it("redirects to login when user is not authenticated", () => {
-    vi.mocked(useAuth).mockReturnValue({
-      user: null,
-      loading: false,
-      logout: vi.fn(),
-      isAdmin: false,
-      refetch: vi.fn(),
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <Routes>
-          <Route
-            path="/login"
-            element={<div data-testid="login-page">Login</div>}
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <div data-testid="dashboard">Dashboard</div>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </MemoryRouter>,
+    renderWithAdminProviders(
+      <Routes>
+        <Route
+          path="/login"
+          element={<div data-testid="login-page">Login</div>}
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <div data-testid="dashboard">Dashboard</div>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>,
+      { route: "/dashboard", auth: { user: null } },
     );
 
     expect(screen.getByTestId("login-page")).toBeInTheDocument();
@@ -56,36 +40,33 @@ describe("ProtectedRoute", () => {
   });
 
   it("renders children when user is authenticated admin", async () => {
-    vi.mocked(useAuth).mockReturnValue({
-      user: {
-        id: 1,
-        email: "admin@example.test",
-        name: "Admin",
-        role: "admin",
+    renderWithAdminProviders(
+      <Routes>
+        <Route
+          path="/login"
+          element={<div data-testid="login-page">Login</div>}
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <div data-testid="dashboard">Dashboard</div>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>,
+      {
+        route: "/dashboard",
+        auth: {
+          user: {
+            id: 1,
+            email: "admin@example.test",
+            name: "Admin",
+            role: "admin",
+          },
+          isAdmin: true,
+        },
       },
-      loading: false,
-      logout: vi.fn(),
-      isAdmin: true,
-      refetch: vi.fn(),
-    });
-
-    render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <Routes>
-          <Route
-            path="/login"
-            element={<div data-testid="login-page">Login</div>}
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <div data-testid="dashboard">Dashboard</div>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </MemoryRouter>,
     );
 
     await waitFor(() => {

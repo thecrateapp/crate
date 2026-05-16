@@ -2,41 +2,39 @@ package routes
 
 import (
 	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseCacheInvalidationEvent(t *testing.T) {
-	event, ok := parseCacheInvalidationEvent(`{"id":42,"scope":"library","ts":123.4}`)
-	if !ok {
-		t.Fatal("expected valid cache event")
-	}
-	if event.ID != 42 || event.Scope != "library" {
-		t.Fatalf("event = %#v", event)
-	}
+	t.Run("valid event", func(t *testing.T) {
+		event, ok := parseCacheInvalidationEvent(`{"id":42,"scope":"library","ts":123.4}`)
+		assert.True(t, ok, "expected valid cache event")
+		assert.Equal(t, int64(42), event.ID)
+		assert.Equal(t, "library", event.Scope)
+	})
 
-	if _, ok := parseCacheInvalidationEvent(`{"id":0,"scope":"library"}`); ok {
-		t.Fatal("accepted event without positive id")
-	}
+	t.Run("rejects event without positive id", func(t *testing.T) {
+		_, ok := parseCacheInvalidationEvent(`{"id":0,"scope":"library"}`)
+		assert.False(t, ok, "accepted event without positive id")
+	})
 }
 
 func TestWriteCacheInvalidationSSE(t *testing.T) {
 	rec := httptest.NewRecorder()
 	err := writeCacheInvalidationSSE(rec, cacheInvalidationEvent{ID: 42, Scope: "library"})
-	if err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
+	assert.NoError(t, err)
 	got := rec.Body.String()
-	if !strings.Contains(got, "id: 42\n") || !strings.Contains(got, "data: library\n\n") {
-		t.Fatalf("sse = %q", got)
-	}
+	assert.Contains(t, got, "id: 42\n")
+	assert.Contains(t, got, "data: library\n\n")
 }
 
 func TestParseLastEventID(t *testing.T) {
-	if id, ok := parseLastEventID("42"); !ok || id != 42 {
-		t.Fatalf("id=%d ok=%v", id, ok)
-	}
-	if _, ok := parseLastEventID("nope"); ok {
-		t.Fatal("accepted invalid id")
-	}
+	id, ok := parseLastEventID("42")
+	assert.True(t, ok)
+	assert.Equal(t, int64(42), id)
+
+	_, ok = parseLastEventID("nope")
+	assert.False(t, ok, "accepted invalid id")
 }

@@ -1,6 +1,6 @@
 @import "../../shared/fonts/poppins.css";
 @import "tailwindcss";
-@import "@crate/ui/tokens/index.css";
+@import "../../shared/ui/tokens/index.css";
 
 @theme inline {
   --color-background: #07070b;

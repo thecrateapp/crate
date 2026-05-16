@@ -269,8 +269,8 @@ fn timestamp_seconds() -> f64 {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use tempfile::TempDir;
 
     use serde_json::json;
 
@@ -278,7 +278,8 @@ mod tests {
 
     #[test]
     fn writes_manifest_and_prunes_lru_artifacts() {
-        let root = test_dir("cache");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         let old_dir = root.join("album/aa/aa/old");
         fs::create_dir_all(&old_dir).unwrap();
         fs::write(old_dir.join("old.zip"), b"old bytes").unwrap();
@@ -323,14 +324,4 @@ mod tests {
         assert_eq!(result.pruned.removed, 1);
     }
 
-    fn test_dir(name: &str) -> PathBuf {
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        std::env::temp_dir().join(format!(
-            "crate-media-worker-{name}-{}-{millis}",
-            std::process::id()
-        ))
-    }
 }

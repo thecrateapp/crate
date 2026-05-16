@@ -69,5 +69,13 @@ jobs:
             --tb=short \
             -q \
             --cov=crate \
-            --cov-report=term
+            --cov-report=term \
+            --cov-report=xml \
+            --cov-fail-under=50
         working-directory: app
+
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: app/coverage.xml
+          flags: python

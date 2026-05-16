@@ -26,6 +26,7 @@ ort = { version = "=2.0.0-rc.12", features = ["download-binaries"], optional = t
 
 [dev-dependencies]
 tempfile = "3"
+rstest = "0.24"
 
 [profile.release]
 lto = true

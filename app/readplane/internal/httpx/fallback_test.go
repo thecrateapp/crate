@@ -1,6 +1,10 @@
 package httpx
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestSingleJoiningSlash(t *testing.T) {
 	cases := []struct {
@@ -14,8 +18,6 @@ func TestSingleJoiningSlash(t *testing.T) {
 		{"/root", "api/auth/me", "/root/api/auth/me"},
 	}
 	for _, tt := range cases {
-		if got := singleJoiningSlash(tt.a, tt.b); got != tt.want {
-			t.Fatalf("singleJoiningSlash(%q, %q) = %q, want %q", tt.a, tt.b, got, tt.want)
-		}
+		assert.Equal(t, tt.want, singleJoiningSlash(tt.a, tt.b))
 	}
 }

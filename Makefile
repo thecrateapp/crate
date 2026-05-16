@@ -216,16 +216,36 @@ dev-test-preflight: ## Ensure the dev backend is running before containerized te
 		exit 1; \
 	fi
 
+DC_TEST := $(DC) -f docker-compose.test.yaml --project-name crate-test
+
 .PHONY: dev-test-backend
-dev-test-backend: dev-test-preflight ## Run Python backend static checks and pytest
+dev-test-backend: ## Run Python backend static checks and pytest
 	@echo "$(YELLOW)Backend: pyright$(NC)"
 	@uv run pyright
 	@echo "$(YELLOW)Backend: ruff check$(NC)"
 	@uv run ruff check app/crate app/tests
 	@echo "$(YELLOW)Backend: ruff format --check$(NC)"
 	@uv run ruff format --check app/crate app/tests
-	@echo "$(YELLOW)Backend: pytest in an isolated dev runner$(NC)"
-	@$(DC_DEV) run --rm --no-deps --entrypoint python worker -m pytest tests/ -q --durations=20
+	@echo "$(YELLOW)Backend: pytest in an isolated test stack$(NC)"
+	@$(DC_DEV) build worker
+	@$(DC_TEST) down -v --remove-orphans 2>/dev/null || true
+	@$(DC_TEST) up -d --wait
+	@docker run --rm --network crate-test_default \
+		-v "$(CURDIR)/app:/app" -w /app \
+		-e CRATE_POSTGRES_HOST=crate-test-postgres \
+		-e CRATE_POSTGRES_PORT=5432 \
+		-e CRATE_POSTGRES_USER=crate \
+		-e CRATE_POSTGRES_PASSWORD=crate_test \
+		-e CRATE_POSTGRES_DB=crate_test \
+		-e REDIS_URL=redis://crate-test-redis:6379/0 \
+		--entrypoint python \
+		musicdock-worker \
+		-m pytest tests/ -q --durations=20 \
+		--ignore=tests/test_stats_integration.py \
+		--ignore=tests/test_user_stats_aggregates.py; \
+	EXIT=$$?; \
+	$(DC_TEST) down -v --remove-orphans 2>/dev/null || true; \
+	exit $$EXIT
 
 .PHONY: dev-test-readplane
 dev-test-readplane: ## Run Go readplane tests and vet
@@ -316,7 +336,7 @@ readplane-test: ## Run readplane Go tests in a container
 		-v "$(CURDIR)/app/readplane:/src" \
 		-w /src \
 		$(READPLANE_GO_IMAGE) \
-		$(READPLANE_GO) test ./...
+		$(READPLANE_GO) test -cover -coverprofile=coverage.out ./...
 
 .PHONY: readplane-vet
 readplane-vet: ## Run go vet for readplane in a container

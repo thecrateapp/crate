@@ -46,8 +46,6 @@ for mod_name in (
     "thefuzz",
     "thefuzz.fuzz",
     "rich",
-    "librosa",
-    "soundfile",
     "jwt",
     "bcrypt",
 ):
@@ -279,3 +277,9 @@ def test_app():
         app = create_app()
         client = TestClient(app)
         yield client
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (deselect with -m 'not slow')"
+    )
