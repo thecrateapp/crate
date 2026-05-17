@@ -234,6 +234,37 @@ def test_execute_smart_rules_caps_genre_playlists_by_artist_by_default(pg_db):
     }
 
 
+def test_execute_smart_rules_count_only_matches_single_genre(pg_db):
+    from crate.db.playlists import execute_smart_rules
+
+    _seed_smart_playlist_artist(
+        pg_db,
+        artist_name="Counted Screamo Band",
+        genre="screamo",
+        track_count=3,
+        popularity_start=1.0,
+    )
+    _seed_smart_playlist_artist(
+        pg_db,
+        artist_name="Uncounted Hardcore Band",
+        genre="hardcore",
+        track_count=2,
+        popularity_start=0.8,
+    )
+
+    total = execute_smart_rules(
+        {
+            "match": "all",
+            "rules": [{"field": "genre", "op": "contains", "value": "screamo"}],
+            "limit": 50,
+            "sort": "random",
+        },
+        count_only=True,
+    )
+
+    assert total == 3
+
+
 def test_execute_smart_rules_backfills_with_related_genres_before_repeating_artists(
     pg_db, monkeypatch
 ):
