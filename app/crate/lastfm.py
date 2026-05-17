@@ -9,11 +9,16 @@ import musicbrainzngs
 
 from crate.db.cache_musicbrainz import get_mb_cache, set_mb_cache
 from crate.db.cache_store import get_cache, set_cache
+from crate.slugs import slugify
 
 LASTFM_BASE = "http://ws.audioscrobbler.com/2.0/"
 FANART_BASE = "https://webservice.fanart.tv/v3/music/"
 LASTFM_PLACEHOLDER_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
 log = logging.getLogger(__name__)
+
+
+def _artist_match_key(value: str | None) -> str:
+    return slugify(value or "", fallback="")
 
 
 def _lastfm_key() -> str | None:
@@ -65,13 +70,7 @@ def get_artist_info(artist_name: str) -> dict | None:
     bio_content = re.sub(r"Read more on Last\.fm\.?$", "", bio_content).strip()
     bio_content = re.sub(r"<[^>]+>", "", bio_content).strip()
 
-    images = artist.get("image", [])
-    image_url = None
-    for img in reversed(images):  # largest last
-        url = img.get("#text", "")
-        if url and LASTFM_PLACEHOLDER_HASH not in url:
-            image_url = url
-            break
+    image_url = _lastfm_image_url(artist.get("image", []))
 
     tags = [t["name"] for t in artist.get("tags", {}).get("tag", [])]
     # Get similar artists from dedicated endpoint (more results than artist.getinfo)
@@ -93,7 +92,7 @@ def get_artist_info(artist_name: str) -> dict | None:
 
 
 def _artist_info_cache_key(artist_name: str) -> str:
-    return f"lastfm:artist:v2:{artist_name.lower()}"
+    return f"lastfm:artist:v3:{artist_name.lower()}"
 
 
 def get_cached_artist_info(artist_name: str) -> dict | None:
@@ -179,13 +178,41 @@ def _get_similar_artists(artist_name: str, limit: int = 30) -> list[dict]:
             return []
         data = resp.json()
         artists = data.get("similarartists", {}).get("artist", [])
-        return [
-            {"name": a["name"], "match": float(a.get("match", 0))}
-            for a in artists[:limit]
-        ]
+        similar = []
+        for artist in artists[:limit]:
+            name = artist.get("name")
+            if not name:
+                continue
+            try:
+                match = float(artist.get("match") or 0)
+            except (TypeError, ValueError):
+                match = 0.0
+            similar.append(
+                {
+                    "name": name,
+                    "match": match,
+                    "image_url": _lastfm_image_url(artist.get("image", [])),
+                    "url": artist.get("url")
+                    or f"https://www.last.fm/music/{quote(name, safe='')}",
+                    "source": "lastfm",
+                }
+            )
+        return similar
     except Exception:
         log.debug("Last.fm getsimilar failed for %s", artist_name)
         return []
+
+
+def _lastfm_image_url(images: list[dict] | None) -> str | None:
+    if isinstance(images, dict):
+        images = [images]
+    for img in reversed(images or []):  # largest last
+        if not isinstance(img, dict):
+            continue
+        url = img.get("#text", "")
+        if url and LASTFM_PLACEHOLDER_HASH not in url:
+            return url
+    return None
 
 
 def download_artist_image(image_url: str) -> bytes | None:
@@ -234,7 +261,7 @@ def get_fanart_artist_image(artist_name: str) -> str | None:
 
     cache_key = f"fanart:artist:{artist_name.lower()}"
     cached = get_cache(cache_key, max_age_seconds=86400 * 7)  # 7 days
-    if cached:
+    if cached and cached.get("url"):
         return cached.get("url")
 
     mbid = _get_artist_mbid(artist_name)
@@ -352,7 +379,7 @@ def _deezer_artist_image(artist_name: str) -> str | None:
     """Search Deezer for artist image URL. No auth needed."""
     cache_key = f"deezer:artist_img:{artist_name.lower()}"
     cached = get_cache(cache_key, max_age_seconds=86400 * 7)
-    if cached:
+    if cached and cached.get("url"):
         return cached.get("url")
 
     try:
@@ -363,17 +390,51 @@ def _deezer_artist_image(artist_name: str) -> str | None:
         )
         resp.raise_for_status()
         data = resp.json()
+        fallback_url = None
+        target_key = _artist_match_key(artist_name)
         for a in data.get("data", []):
-            if a.get("name", "").lower() == artist_name.lower():
-                url = a.get("picture_xl") or a.get("picture_big")
-                if url:
-                    set_cache(cache_key, {"url": url}, ttl=604800)
-                    return url
+            url = a.get("picture_xl") or a.get("picture_big")
+            if not url:
+                continue
+            fallback_url = fallback_url or url
+            if _artist_match_key(a.get("name", "")) == target_key:
+                set_cache(cache_key, {"url": url}, ttl=604800)
+                return url
+        if fallback_url:
+            set_cache(cache_key, {"url": fallback_url}, ttl=604800)
+            return fallback_url
     except Exception:
         log.debug("Deezer lookup failed for %s", artist_name)
 
     set_cache(cache_key, {"url": None}, ttl=604800)
     return None
+
+
+def get_best_artist_image_url(artist_name: str) -> str | None:
+    """Return the best external artist image URL without downloading bytes."""
+    cache_key = f"artist:image_url:{artist_name.lower()}"
+    cached = get_cache(cache_key, max_age_seconds=86400 * 7)
+    if cached and cached.get("url"):
+        return cached.get("url")
+
+    url = get_fanart_artist_image(artist_name)
+    if not url:
+        url = _deezer_artist_image(artist_name)
+    if not url:
+        try:
+            from crate.spotify import search_artist as spotify_search
+
+            sp = spotify_search(artist_name)
+            if sp and sp.get("images"):
+                url = sp["images"][0].get("url") if sp["images"] else None
+        except Exception:
+            url = None
+    if not url:
+        info = get_artist_info(artist_name)
+        url = info.get("image_url") if info else None
+
+    set_cache(cache_key, {"url": url}, ttl=604800)
+    return url
 
 
 def get_best_artist_image(artist_name: str) -> bytes | None:

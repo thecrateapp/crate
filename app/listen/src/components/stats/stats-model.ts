@@ -2,9 +2,10 @@ import type { Track } from "@/contexts/PlayerContext";
 import { toPlayableTrack } from "@/lib/playable-track";
 
 export type StatsWindow = "7d" | "30d" | "90d" | "365d" | "all_time";
+export type StatsPeriodKey = StatsWindow | `month:${string}`;
 
 export interface StatsOverview {
-  window: StatsWindow;
+  window: StatsPeriodKey;
   play_count: number;
   complete_play_count: number;
   skip_count: number;
@@ -29,7 +30,7 @@ export interface StatsTrendPoint {
 }
 
 export interface StatsTrends {
-  window: StatsWindow;
+  window: StatsPeriodKey;
   points: StatsTrendPoint[];
 }
 
@@ -85,12 +86,12 @@ export interface StatsGenre {
 }
 
 export interface StatsListResponse<T> {
-  window: StatsWindow;
+  window: StatsPeriodKey;
   items: T[];
 }
 
 export interface ReplayMix {
-  window: StatsWindow;
+  window: StatsPeriodKey;
   title: string;
   subtitle: string;
   track_count: number;
@@ -98,8 +99,92 @@ export interface ReplayMix {
   items: StatsTrack[];
 }
 
+export interface StatsStoryArtistSignal {
+  artist_name: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  play_count: number;
+  minutes_listened: number;
+  previous_play_count?: number | null;
+  delta_play_count?: number | null;
+  first_played_at?: string | null;
+  last_seen_at?: string | null;
+}
+
+export interface StatsRhythm {
+  peak_hour?: number | null;
+  peak_hour_label?: string | null;
+  peak_weekday?: string | null;
+  peak_hour_play_count: number;
+  peak_weekday_play_count: number;
+}
+
+export interface StatsAudioProfile {
+  energy: number;
+  danceability: number;
+  valence: number;
+  bpm?: number | null;
+}
+
+export interface StatsMonthlySnapshotArtist {
+  artist_name: string;
+  play_count: number;
+  minutes_listened: number;
+}
+
+export interface StatsMonthlySnapshotCover {
+  track_id?: number | null;
+  track_entity_uid?: string | null;
+  track_path?: string | null;
+  title: string;
+  artist: string;
+  artist_id?: number | null;
+  artist_slug?: string | null;
+  album: string;
+  album_id?: number | null;
+  album_slug?: string | null;
+}
+
+export interface StatsMonthlySnapshot {
+  period_kind?: "all_time" | "month";
+  month_key: string;
+  month_start: string;
+  title: string;
+  subtitle: string;
+  play_count: number;
+  minutes_listened: number;
+  active_days: number;
+  top_artists: StatsMonthlySnapshotArtist[];
+  covers: StatsMonthlySnapshotCover[];
+}
+
+export interface StatsStory {
+  window: StatsPeriodKey;
+  movers: StatsStoryArtistSignal[];
+  discoveries: StatsStoryArtistSignal[];
+  comebacks: StatsStoryArtistSignal[];
+  rhythm: StatsRhythm;
+  audio_profile: StatsAudioProfile;
+  monthly_snapshots: StatsMonthlySnapshot[];
+}
+
+export interface StatsSubject {
+  kind: "user" | "instance" | string;
+  user_id?: number | null;
+  username?: string | null;
+  display_name?: string | null;
+  avatar?: string | null;
+}
+
+export interface StatsAffinity {
+  affinity_score: number;
+  affinity_band: "low" | "medium" | "high" | "very_high" | string;
+  affinity_reasons: string[];
+}
+
 export interface StatsDashboard {
-  window: StatsWindow;
+  window: StatsPeriodKey;
+  subject?: StatsSubject | null;
   overview: StatsOverview;
   trends: StatsTrends;
   top_tracks: StatsListResponse<StatsTrack>;
@@ -107,6 +192,8 @@ export interface StatsDashboard {
   top_albums: StatsListResponse<StatsAlbum>;
   top_genres: StatsListResponse<StatsGenre>;
   replay: ReplayMix;
+  story?: StatsStory;
+  viewer_affinity?: StatsAffinity | null;
 }
 
 export interface RecapHighlight {

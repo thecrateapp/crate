@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from crate.worker_handlers.acquisition import (
+    _finalize_upgrade_quarantine,
     _handle_tidal_download,
     _handle_library_upload,
     _locate_soulseek_download_file,
@@ -222,3 +223,57 @@ def test_tidal_download_task_raises_when_inner_returns_error(monkeypatch, tmp_pa
             "error": "Partial Tidal download: got 0/4 tracks (phase: download)",
         },
     ]
+
+
+def test_finalize_upgrade_unquarantines_in_place_replacement(monkeypatch):
+    calls: list[tuple[str, int]] = []
+    events: list[dict] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.unquarantine_album",
+        lambda album_id: calls.append(("unquarantine", album_id)) or True,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.delete_quarantined_album",
+        lambda album_id: calls.append(("delete", album_id)) or {"id": album_id},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda _task_id, _event, payload: events.append(payload),
+    )
+
+    _finalize_upgrade_quarantine(
+        task_id="task-upgrade",
+        upgrade_album_id=42,
+        original_album_path="/music/artist/album",
+        moved_albums=[{"path": "/music/artist/album"}],
+    )
+
+    assert calls == [("unquarantine", 42)]
+    assert "in-place" in events[0]["message"]
+
+
+def test_finalize_upgrade_deletes_old_row_for_relocated_replacement(monkeypatch):
+    calls: list[tuple[str, int]] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.unquarantine_album",
+        lambda album_id: calls.append(("unquarantine", album_id)) or True,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.delete_quarantined_album",
+        lambda album_id: calls.append(("delete", album_id)) or {"id": album_id},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _finalize_upgrade_quarantine(
+        task_id="task-upgrade",
+        upgrade_album_id=42,
+        original_album_path="/music/artist/old-album",
+        moved_albums=[{"path": "/music/artist/new-album"}],
+    )
+
+    assert calls == [("delete", 42)]

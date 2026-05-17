@@ -14,6 +14,7 @@ from crate.db.home_builder_discovery import (
 )
 from crate.db.home_builder_curated_lists import (
     _build_core_playlists,
+    _build_core_discovery_artists,
     _build_favorite_artists,
     _build_radio_stations,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "_artwork_artists",
     "_artwork_tracks",
     "_build_artist_core_rows",
+    "_build_core_discovery_artists",
     "_build_core_playlists",
     "_build_custom_mix_summaries",
     "_build_favorite_artists",

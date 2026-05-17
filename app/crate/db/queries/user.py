@@ -1,4 +1,5 @@
 from datetime import date
+from math import cos, radians
 
 from crate.db.queries.shows_shared import dedupe_show_rows
 from crate.db.serialize import serialize_rows
@@ -143,11 +144,30 @@ def get_upcoming_shows(
     }
     geo_clause = ""
     if user_lat is not None and user_lon is not None:
-        geo_clause = "AND (s.latitude BETWEEN :lat_min AND :lat_max AND s.longitude BETWEEN :lon_min AND :lon_max OR s.latitude IS NULL)"
+        lon_scale = max(1.0, 111.320 * abs(cos(radians(user_lat))))
+        distance_sql = """
+            6371 * acos(
+                LEAST(1.0, GREATEST(-1.0,
+                    cos(radians(:lat)) * cos(radians(s.latitude))
+                    * cos(radians(s.longitude) - radians(:lon))
+                    + sin(radians(:lat)) * sin(radians(s.latitude))
+                ))
+            )
+        """
+        geo_clause = f"""
+                  AND s.latitude IS NOT NULL
+                  AND s.longitude IS NOT NULL
+                  AND s.latitude BETWEEN :lat_min AND :lat_max
+                  AND s.longitude BETWEEN :lon_min AND :lon_max
+                  AND ({distance_sql}) <= :radius
+        """
+        params["lat"] = user_lat
+        params["lon"] = user_lon
+        params["radius"] = user_radius
         params["lat_min"] = user_lat - user_radius / 111.0
         params["lat_max"] = user_lat + user_radius / 111.0
-        params["lon_min"] = user_lon - user_radius / 70.0
-        params["lon_max"] = user_lon + user_radius / 70.0
+        params["lon_min"] = user_lon - user_radius / lon_scale
+        params["lon_max"] = user_lon + user_radius / lon_scale
     with read_scope() as session:
         # geo_clause is a hardcoded SQL fragment built internally above;
         # it contains no user input — only parameter placeholders.

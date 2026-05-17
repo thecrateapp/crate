@@ -12,6 +12,10 @@ import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
+import {
+  EditorialPlaylistArtwork,
+  editorialPlaylistLabel,
+} from "@/components/playlists/EditorialPlaylistArtwork";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn } from "@/lib/utils";
@@ -86,6 +90,10 @@ export function PlaylistCard({
     onStartRadio,
   });
   const actionMenu = useItemActionMenu(actions);
+  const editorialLabel = editorialPlaylistLabel(
+    name,
+    isSmart ? "Core Tracks" : "Crate Selects",
+  );
 
   return (
     <div
@@ -114,13 +122,24 @@ export function PlaylistCard({
       )}
     >
       <div className="relative mb-2 overflow-hidden rounded-lg bg-white/5">
-        <PlaylistArtwork
-          name={name}
-          coverDataUrl={coverDataUrl}
-          tracks={tracks}
-          showCrateMark={crateManaged}
-          className="aspect-square rounded-lg transition-transform group-hover:scale-[1.02]"
-        />
+        {crateManaged ? (
+          <EditorialPlaylistArtwork
+            title={editorialLabel.title}
+            kicker={editorialLabel.kicker}
+            coverDataUrl={coverDataUrl}
+            tracks={tracks}
+            variant="core"
+            className="aspect-square rounded-lg transition-transform group-hover:scale-[1.02]"
+          />
+        ) : (
+          <PlaylistArtwork
+            name={name}
+            coverDataUrl={coverDataUrl}
+            tracks={tracks}
+            showCrateMark={false}
+            className="aspect-square rounded-lg transition-transform group-hover:scale-[1.02]"
+          />
+        )}
         {systemPlaylist && onToggleFollow ? (
           <ActionIconButton
             variant="card"

@@ -466,8 +466,92 @@ class ReplayMixResponse(BaseModel):
     items: list[StatsTrackResponse] = Field(default_factory=list)
 
 
+class StatsStoryArtistSignalResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    play_count: int
+    minutes_listened: float | int
+    previous_play_count: int | None = None
+    delta_play_count: int | None = None
+    first_played_at: datetime | str | None = None
+    last_seen_at: datetime | str | None = None
+
+
+class StatsRhythmResponse(BaseModel):
+    peak_hour: int | None = None
+    peak_hour_label: str | None = None
+    peak_weekday: str | None = None
+    peak_hour_play_count: int = 0
+    peak_weekday_play_count: int = 0
+
+
+class StatsAudioProfileResponse(BaseModel):
+    energy: float | int = 0
+    danceability: float | int = 0
+    valence: float | int = 0
+    bpm: float | int | None = None
+
+
+class StatsMonthlySnapshotArtistResponse(BaseModel):
+    artist_name: str
+    play_count: int
+    minutes_listened: float | int
+
+
+class StatsMonthlySnapshotCoverResponse(BaseModel):
+    track_id: int | None = None
+    track_entity_uid: str | None = None
+    track_path: str | None = None
+    title: str
+    artist: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    album: str
+    album_id: int | None = None
+    album_slug: str | None = None
+
+
+class StatsMonthlySnapshotResponse(BaseModel):
+    period_kind: str = "month"
+    month_key: str
+    month_start: date_type | str
+    title: str
+    subtitle: str
+    play_count: int
+    minutes_listened: float | int
+    active_days: int
+    top_artists: list[StatsMonthlySnapshotArtistResponse] = Field(default_factory=list)
+    covers: list[StatsMonthlySnapshotCoverResponse] = Field(default_factory=list)
+
+
+class StatsStoryResponse(BaseModel):
+    window: str
+    movers: list[StatsStoryArtistSignalResponse] = Field(default_factory=list)
+    discoveries: list[StatsStoryArtistSignalResponse] = Field(default_factory=list)
+    comebacks: list[StatsStoryArtistSignalResponse] = Field(default_factory=list)
+    rhythm: StatsRhythmResponse
+    audio_profile: StatsAudioProfileResponse
+    monthly_snapshots: list[StatsMonthlySnapshotResponse] = Field(default_factory=list)
+
+
+class StatsSubjectResponse(BaseModel):
+    kind: str = "user"
+    user_id: int | None = None
+    username: str | None = None
+    display_name: str | None = None
+    avatar: str | None = None
+
+
+class StatsAffinityResponse(BaseModel):
+    affinity_score: int
+    affinity_band: str
+    affinity_reasons: list[str] = Field(default_factory=list)
+
+
 class StatsDashboardResponse(BaseModel):
     window: str
+    subject: StatsSubjectResponse | None = None
     overview: StatsOverviewResponse
     trends: StatsTrendsResponse
     top_tracks: TopTracksResponse
@@ -475,6 +559,8 @@ class StatsDashboardResponse(BaseModel):
     top_albums: TopAlbumsResponse
     top_genres: TopGenresResponse
     replay: ReplayMixResponse
+    story: StatsStoryResponse
+    viewer_affinity: StatsAffinityResponse | None = None
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):

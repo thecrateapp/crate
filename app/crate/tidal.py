@@ -774,7 +774,10 @@ def download(
 
 
 def move_to_library_detailed(
-    processing_path: str, library_path: str
+    processing_path: str,
+    library_path: str,
+    *,
+    replace_existing_audio: bool = False,
 ) -> list[dict[str, object]]:
     """Move downloaded files from processing dir to library.
 
@@ -820,6 +823,7 @@ def move_to_library_detailed(
                         managed_track_names=managed_track_names,
                         artist_name=artist_name,
                         album_name=album_name,
+                        replace_existing_audio=replace_existing_audio,
                     )
                     key = (artist_name, album_name, str(target_album_dir))
                     imported_targets[key] = {
@@ -851,6 +855,7 @@ def move_to_library_detailed(
                         artist_name=artist_name,
                         album_name=album_name,
                         album_entity_uid=target_album_dir.name,
+                        replace_existing_audio=replace_existing_audio,
                     )
                     if managed_track_names
                     else target_album_dir / album_item.name

@@ -651,7 +651,18 @@ export function Home() {
         <>
           <ListeningHistorySection
             items={currentDiscovery?.listening_history || []}
-            onOpenHistory={() => navigate("/stats")}
+            onOpenHistory={(item) => {
+              if (!item) {
+                navigate("/stats");
+                return;
+              }
+              if (item.kind === "all_time") {
+                navigate("/stats?window=all_time");
+                return;
+              }
+              const month = item.period_start.slice(0, 7);
+              navigate(`/stats?month=${encodeURIComponent(month)}`);
+            }}
           />
 
           <HomeReplaySection

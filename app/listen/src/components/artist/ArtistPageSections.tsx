@@ -3,12 +3,14 @@ import { useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
+import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { useMemo } from "react";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import {
   buildArtistAlbumCover,
   buildArtistPhotoUrl,
   type ArtistAlbum,
+  type ArtistPlaylistAppearance,
   type ArtistTopTrack,
 } from "@/components/artist/artist-model";
 import {
@@ -221,7 +223,15 @@ export function ArtistShowsSection({
 }
 
 interface RelatedArtistsSectionProps {
-  artists: { name: string; match: number; id?: number; slug?: string }[];
+  artists: {
+    name: string;
+    match: number;
+    id?: number;
+    slug?: string;
+    image_url?: string | null;
+    url?: string | null;
+    source?: string | null;
+  }[];
 }
 
 export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
@@ -233,35 +243,86 @@ export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
         Related Artists
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {artists.slice(0, 15).map((artist) => (
-          <ArtistCard
-            key={artist.id ?? artist.name}
-            name={artist.name}
-            artistId={artist.id}
-            artistSlug={artist.slug}
-            photo={
-              artist.id
-                ? buildArtistPhotoUrl(artist.name, artist.id, artist.slug)
-                : undefined
-            }
-            subtitle={
-              artist.match
-                ? `${Math.round(artist.match * 100)}% match`
-                : undefined
-            }
-            href={
-              artist.id
-                ? artistPagePath({
-                    artistId: artist.id,
-                    artistSlug: artist.slug,
-                  })
-                : `https://www.last.fm/music/${encodeURIComponent(artist.name)}`
-            }
-            external={!artist.id}
-            large
-            layout="grid"
-          />
-        ))}
+        {artists.slice(0, 15).map((artist) => {
+          const inLibrary = artist.id != null;
+          return (
+            <ArtistCard
+              key={artist.id ?? artist.name}
+              name={artist.name}
+              artistId={artist.id}
+              artistSlug={artist.slug}
+              photo={
+                inLibrary
+                  ? buildArtistPhotoUrl(artist.name, artist.id, artist.slug)
+                  : artist.image_url || undefined
+              }
+              subtitle={
+                artist.match
+                  ? `${Math.round(artist.match * 100)}% match`
+                  : undefined
+              }
+              href={
+                inLibrary
+                  ? artistPagePath({
+                      artistId: artist.id,
+                      artistSlug: artist.slug,
+                    })
+                  : artist.url ||
+                    `https://www.last.fm/music/${encodeURIComponent(
+                      artist.name,
+                    )}`
+              }
+              external={!inLibrary}
+              imageTone={inLibrary ? "normal" : "muted"}
+              large
+              layout="grid"
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+interface ArtistAppearsOnSectionProps {
+  playlists: ArtistPlaylistAppearance[];
+}
+
+export function ArtistAppearsOnSection({
+  playlists,
+}: ArtistAppearsOnSectionProps) {
+  const navigate = useNavigate();
+  if (!playlists.length) return null;
+
+  return (
+    <section>
+      <h2 className="mb-4 text-lg font-semibold text-foreground">Appears On</h2>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {playlists.slice(0, 8).map((playlist) => {
+          const artistTrackCount = playlist.artist_track_count ?? 0;
+          return (
+            <PlaylistCard
+              key={playlist.id}
+              playlistId={playlist.id}
+              name={playlist.name}
+              isSmart={!!playlist.is_smart}
+              description={playlist.description ?? undefined}
+              tracks={playlist.artwork_tracks}
+              coverDataUrl={playlist.cover_data_url}
+              meta={
+                artistTrackCount > 0
+                  ? `${artistTrackCount} track${
+                      artistTrackCount === 1 ? "" : "s"
+                    } here`
+                  : `${playlist.track_count ?? 0} tracks`
+              }
+              systemPlaylist
+              crateManaged={playlist.scope === "system"}
+              layout="grid"
+              onClick={() => navigate(`/curation/playlist/${playlist.id}`)}
+            />
+          );
+        })}
       </div>
     </section>
   );

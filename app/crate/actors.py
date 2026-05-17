@@ -129,7 +129,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "scan_missing_covers": TaskPoolConfig("fast", 3, 3600, 0),
     "fetch_artwork_all": TaskPoolConfig("fast", 3, 3600, 0),
     "backfill_similarities": TaskPoolConfig("fast", 3, 3600, 0),
-    "sync_shows": TaskPoolConfig("fast", 3, 600, 1),
+    "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "cleanup_incomplete_downloads": TaskPoolConfig("default", 3, 600, 0),
     # Storage migration (priority 1 — user-initiated, long-running)
     "migrate_storage_v2": TaskPoolConfig(

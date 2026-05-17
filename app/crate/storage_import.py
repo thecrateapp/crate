@@ -210,6 +210,7 @@ def resolve_managed_track_destination(
     artist_name: str,
     album_name: str,
     album_entity_uid: str,
+    replace_existing_audio: bool = False,
 ) -> Path:
     tags = read_tags(src)
     track_uid = track_entity_uid(
@@ -224,7 +225,7 @@ def resolve_managed_track_destination(
         musicbrainz_albumid=tags.get("musicbrainz_albumid"),
     )
     dest = target_album_dir / f"{track_uid}{src.suffix.lower()}"
-    if dest.exists():
+    if dest.exists() and not replace_existing_audio:
         collision_uid = uuid.uuid5(
             track_uid, f"collision:{src.name.lower()}:{src.stat().st_size}"
         )
@@ -239,6 +240,7 @@ def move_album_tree(
     managed_track_names: bool,
     artist_name: str,
     album_name: str,
+    replace_existing_audio: bool = False,
 ) -> int:
     moved = 0
     if managed_track_names:
@@ -254,6 +256,7 @@ def move_album_tree(
                     artist_name=artist_name,
                     album_name=album_name,
                     album_entity_uid=album_entity_uid,
+                    replace_existing_audio=replace_existing_audio,
                 )
             else:
                 dest = target_album_dir / src.name

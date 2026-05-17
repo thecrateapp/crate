@@ -20,6 +20,7 @@ import {
   FileJson,
   HardDrive,
   Headphones,
+  ListMusic,
   MapPin,
   Music,
   AudioWaveform,
@@ -73,6 +74,8 @@ interface ArtistHeroSectionProps {
   onAnalyze: () => void;
   onRepair: () => void;
   metadataAction?: "lyrics" | "portable" | "export" | null;
+  corePlaylistCreating?: boolean;
+  onCreateCorePlaylist?: () => void;
   onSyncLyrics?: () => void;
   onWritePortableMetadata?: () => void;
   onExportRichMetadata?: () => void;
@@ -113,6 +116,8 @@ export function ArtistHeroSection({
   onAnalyze,
   onRepair,
   metadataAction = null,
+  corePlaylistCreating = false,
+  onCreateCorePlaylist,
   onSyncLyrics,
   onWritePortableMetadata,
   onExportRichMetadata,
@@ -340,6 +345,21 @@ export function ArtistHeroSection({
               <Button size="sm" variant="outline" onClick={onAnalyze}>
                 <AudioWaveform size={14} className="mr-1" /> Analyze
               </Button>
+              {isAdmin && onCreateCorePlaylist ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onCreateCorePlaylist}
+                  disabled={corePlaylistCreating}
+                >
+                  {corePlaylistCreating ? (
+                    <RefreshCw size={14} className="mr-1 animate-spin" />
+                  ) : (
+                    <ListMusic size={14} className="mr-1" />
+                  )}
+                  Core Tracks
+                </Button>
+              ) : null}
               {isAdmin && onSyncLyrics ? (
                 <Button
                   size="sm"

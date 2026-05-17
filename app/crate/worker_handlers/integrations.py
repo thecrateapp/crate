@@ -3,6 +3,7 @@ import logging
 
 from crate.db.events import emit_task_event
 from crate.db.jobs.integrations import get_artists_with_similar_json
+from crate.db.queries.shows import get_show_sync_locations
 from crate.db.repositories.library import get_library_artists
 from crate.db.repositories.shows import delete_past_shows, upsert_show
 from crate.db.similarities import bulk_upsert_similarities, mark_library_status
@@ -10,6 +11,19 @@ from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
+
+
+def _merge_ticketmaster_events(event_groups: list[list[dict]]) -> list[dict]:
+    merged: dict[str, dict] = {}
+    anonymous: list[dict] = []
+    for events in event_groups:
+        for event in events:
+            event_id = str(event.get("id") or "").strip()
+            if event_id:
+                merged.setdefault(event_id, event)
+            else:
+                anonymous.append(event)
+    return [*merged.values(), *anonymous]
 
 
 def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
@@ -24,6 +38,7 @@ def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
     total = len(artists)
     synced = 0
     shows_found = 0
+    sync_locations = get_show_sync_locations()
 
     p = TaskProgress(phase="fetching", phase_count=2, total=total)
 
@@ -37,7 +52,23 @@ def _handle_sync_shows(task_id: str, params: dict, config: dict) -> dict:
             emit_progress(task_id, p)
 
         try:
-            events = tm_get_shows(name, limit=20)
+            event_groups = [tm_get_shows(name, limit=30)]
+            for location in sync_locations:
+                lat = location.get("latitude")
+                lon = location.get("longitude")
+                if lat is None or lon is None:
+                    continue
+                event_groups.append(
+                    tm_get_shows(
+                        name,
+                        country_code=str(location.get("country_code") or ""),
+                        limit=50,
+                        latitude=float(lat),
+                        longitude=float(lon),
+                        radius_km=int(location.get("show_radius_km") or 60),
+                    )
+                )
+            events = _merge_ticketmaster_events(event_groups)
             for event in events:
                 external_id = event.get("id")
                 if not external_id:

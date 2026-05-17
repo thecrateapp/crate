@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import {
   ArrowLeft,
+  BarChart3,
   Loader2,
   Music4,
   UserPlus,
@@ -213,34 +214,47 @@ export function UserProfile() {
             </div>
           </div>
 
-          {!isOwnProfile ? (
-            <button
-              type="button"
-              onClick={handleFollowToggle}
-              disabled={busy}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
-                data.relationship_state.following
-                  ? "border border-white/15 bg-white/5 text-foreground hover:bg-white/10"
-                  : "bg-primary text-primary-foreground hover:bg-primary/90"
-              }`}
-            >
-              {busy ? (
-                <Loader2 size={15} className="animate-spin" />
-              ) : data.relationship_state.following ? (
-                <UserRoundCheck size={15} />
-              ) : (
-                <UserPlus size={15} />
-              )}
-              {data.relationship_state.following ? "Following" : "Follow"}
-            </button>
-          ) : (
+          <div className="flex flex-wrap items-center gap-2">
             <Link
-              to="/settings"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
+              to={
+                isOwnProfile
+                  ? "/stats"
+                  : `/users/${data.username || username}/stats`
+              }
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
             >
-              Edit account
+              <BarChart3 size={15} />
+              View Listening DNA
             </Link>
-          )}
+            {!isOwnProfile ? (
+              <button
+                type="button"
+                onClick={handleFollowToggle}
+                disabled={busy}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
+                  data.relationship_state.following
+                    ? "border border-white/15 bg-white/5 text-foreground hover:bg-white/10"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                }`}
+              >
+                {busy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : data.relationship_state.following ? (
+                  <UserRoundCheck size={15} />
+                ) : (
+                  <UserPlus size={15} />
+                )}
+                {data.relationship_state.following ? "Following" : "Follow"}
+              </button>
+            ) : (
+              <Link
+                to="/settings"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10"
+              >
+                Edit account
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-4">

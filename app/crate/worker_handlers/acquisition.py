@@ -20,6 +20,7 @@ from crate.db.jobs.acquisition import update_artist_latest_release_date
 from crate.db.repositories.library import (
     delete_quarantined_album,
     get_library_album,
+    get_library_album_by_id,
     get_library_artist,
     get_library_artists,
     get_library_tracks,
@@ -322,6 +323,60 @@ def _emit_acquisition_completed_for_albums(
         )
 
 
+def _upgrade_album_id(params: dict) -> int | None:
+    raw = params.get("upgrade_album_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _finalize_upgrade_quarantine(
+    *,
+    task_id: str,
+    upgrade_album_id: int | None,
+    original_album_path: str,
+    moved_albums: list[dict],
+) -> None:
+    if not upgrade_album_id:
+        return
+
+    moved_paths = {
+        str(item.get("path") or "").strip() for item in moved_albums if item.get("path")
+    }
+
+    # Managed V2 upgrades usually re-import into the same album directory.
+    # In that case sync_album updates the quarantined album row in-place, so
+    # deleting the quarantined row would delete the fresh replacement too.
+    if original_album_path and original_album_path in moved_paths:
+        if unquarantine_album(upgrade_album_id):
+            emit_task_event(
+                task_id,
+                "info",
+                {
+                    "message": f"Finalized album upgrade in-place (id={upgrade_album_id})"
+                },
+            )
+        return
+
+    try:
+        deleted = delete_quarantined_album(upgrade_album_id)
+        if deleted:
+            emit_task_event(
+                task_id,
+                "info",
+                {"message": f"Replaced old album records (id={upgrade_album_id})"},
+            )
+    except Exception:
+        log.warning(
+            "Failed to clean up quarantined album %s",
+            upgrade_album_id,
+            exc_info=True,
+        )
+
+
 def _tidal_download_inner(task_id, params, config, url, quality, download_id, lib):
     from crate.library_sync import LibrarySync
     from crate.m4a_fix import repair_tidal_artifacts
@@ -346,9 +401,12 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         }
 
     # Quarantine old album if this is a quality upgrade
-    upgrade_album_id = params.get("upgrade_album_id")
+    upgrade_album_id = _upgrade_album_id(params)
+    upgrade_album_path = ""
     if upgrade_album_id:
-        if quarantine_album(int(upgrade_album_id), task_id):
+        upgrade_album = get_library_album_by_id(upgrade_album_id)
+        upgrade_album_path = str((upgrade_album or {}).get("path") or "")
+        if quarantine_album(upgrade_album_id, task_id):
             emit_task_event(
                 task_id,
                 "info",
@@ -648,7 +706,11 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
         set_cache(f"processing:{staged.lower()}", True, ttl=3600)
 
     try:
-        moved_albums = move_to_library_detailed(result["path"], str(lib))
+        moved_albums = move_to_library_detailed(
+            result["path"],
+            str(lib),
+            replace_existing_audio=bool(upgrade_album_id),
+        )
         modified_artists = sorted(
             {
                 str(item.get("artist") or "")
@@ -767,23 +829,12 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
                 "Failed to mark release %s as downloaded", new_release_id, exc_info=True
             )
 
-    # Clean up quarantined album DB records after successful upgrade
-    # (files not deleted — new download may share the same directory)
-    if upgrade_album_id:
-        try:
-            deleted = delete_quarantined_album(int(upgrade_album_id))
-            if deleted:
-                emit_task_event(
-                    task_id,
-                    "info",
-                    {"message": f"Replaced old album records (id={upgrade_album_id})"},
-                )
-        except Exception:
-            log.warning(
-                "Failed to clean up quarantined album %s",
-                upgrade_album_id,
-                exc_info=True,
-            )
+    _finalize_upgrade_quarantine(
+        task_id=task_id,
+        upgrade_album_id=upgrade_album_id,
+        original_album_path=upgrade_album_path,
+        moved_albums=moved_albums,
+    )
 
     _emit_acquisition_completed_for_albums(
         task_id=task_id,
@@ -840,10 +891,10 @@ def _handle_tidal_download(task_id: str, params: dict, config: dict) -> dict:
                     exc_info=True,
                 )
         # Restore quarantined album on failure
-        upgrade_album_id = params.get("upgrade_album_id")
+        upgrade_album_id = _upgrade_album_id(params)
         if upgrade_album_id:
             try:
-                unquarantine_album(int(upgrade_album_id))
+                unquarantine_album(upgrade_album_id)
                 log.info(
                     "Restored quarantined album %s after download failure",
                     upgrade_album_id,
@@ -1370,6 +1421,8 @@ def _move_soulseek_completed_files(
     artist: str,
     album: str,
     completed_files: list[dict],
+    *,
+    replace_existing_audio: bool = False,
 ) -> dict[str, object]:
     import re
 
@@ -1408,6 +1461,7 @@ def _move_soulseek_completed_files(
                     artist_name=artist,
                     album_name=clean_album,
                     album_entity_uid=target_dir.name,
+                    replace_existing_audio=replace_existing_audio,
                 )
                 if managed_track_names
                 else target_dir / found.name
@@ -1438,9 +1492,12 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
     original_files = params.get("files", [])
 
     # Quarantine old album if this is a quality upgrade
-    upgrade_album_id = params.get("upgrade_album_id")
+    upgrade_album_id = _upgrade_album_id(params)
+    upgrade_album_path = ""
     if upgrade_album_id:
-        if quarantine_album(int(upgrade_album_id), task_id):
+        upgrade_album = get_library_album_by_id(upgrade_album_id)
+        upgrade_album_path = str((upgrade_album or {}).get("path") or "")
+        if quarantine_album(upgrade_album_id, task_id):
             emit_task_event(
                 task_id,
                 "info",
@@ -1517,7 +1574,7 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
         # Incomplete download — restore quarantined album
         if upgrade_album_id:
             try:
-                unquarantine_album(int(upgrade_album_id))
+                unquarantine_album(upgrade_album_id)
             except Exception:
                 log.warning(
                     "Failed to unquarantine album %s", upgrade_album_id, exc_info=True
@@ -1534,7 +1591,11 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
 
     if completed_files and artist:
         moved_info = _move_soulseek_completed_files(
-            config, artist, album, completed_files
+            config,
+            artist,
+            album,
+            completed_files,
+            replace_existing_audio=bool(upgrade_album_id),
         )
         moved = int(str(moved_info.get("moved") or 0))
 
@@ -1571,26 +1632,17 @@ def _handle_soulseek_download(task_id: str, params: dict, config: dict) -> dict:
                 "Sync failed for Soulseek import %s / %s", artist, album, exc_info=True
             )
 
-    # Clean up quarantined album after successful upgrade
     if upgrade_album_id and moved > 0:
-        try:
-            deleted = delete_quarantined_album(int(upgrade_album_id))
-            if deleted:
-                emit_task_event(
-                    task_id,
-                    "info",
-                    {"message": f"Replaced old album records (id={upgrade_album_id})"},
-                )
-        except Exception:
-            log.warning(
-                "Failed to clean up quarantined album %s",
-                upgrade_album_id,
-                exc_info=True,
-            )
+        _finalize_upgrade_quarantine(
+            task_id=task_id,
+            upgrade_album_id=upgrade_album_id,
+            original_album_path=upgrade_album_path,
+            moved_albums=[moved_info],
+        )
     elif upgrade_album_id and moved == 0:
         # Download produced no files — restore the old album
         try:
-            unquarantine_album(int(upgrade_album_id))
+            unquarantine_album(upgrade_album_id)
         except Exception:
             log.warning(
                 "Failed to unquarantine album %s", upgrade_album_id, exc_info=True

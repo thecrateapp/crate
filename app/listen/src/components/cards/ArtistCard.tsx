@@ -24,6 +24,7 @@ interface ArtistCardProps {
   compact?: boolean;
   href?: string;
   external?: boolean;
+  imageTone?: "normal" | "muted";
   large?: boolean;
   layout?: "rail" | "grid";
   fillGrid?: boolean;
@@ -39,6 +40,7 @@ export function ArtistCard({
   compact,
   href,
   external = false,
+  imageTone = "normal",
   large = false,
   layout = "rail",
   fillGrid = false,
@@ -90,7 +92,11 @@ export function ArtistCard({
             src={photoUrl}
             alt={name}
             loading="lazy"
-            className="w-full h-full object-cover"
+            className={cn(
+              "h-full w-full object-cover",
+              imageTone === "muted" &&
+                "grayscale saturate-0 brightness-[0.52] contrast-125 transition duration-300 group-hover:brightness-[0.72]",
+            )}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}

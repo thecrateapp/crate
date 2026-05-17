@@ -25,6 +25,7 @@ from crate.db.queries.user_library_stats_tops import (
     get_top_genres,
     get_top_tracks,
 )
+from crate.db.queries.user_library_stats_story import get_stats_story
 from crate.db.queries.user_library_stats_trends import (
     get_stats_trend_points,
     get_stats_trends,
@@ -39,6 +40,7 @@ __all__ = [
     "get_replay_mix",
     "get_saved_albums",
     "get_stats_overview",
+    "get_stats_story",
     "get_stats_trend_points",
     "get_stats_trends",
     "get_top_albums",

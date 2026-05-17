@@ -6,6 +6,7 @@ import {
   artistShowToUpcomingItem,
   type ArtistShowEvent,
 } from "@/components/upcoming/UpcomingRows";
+import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 
 export interface ArtistAlbum {
   id: number;
@@ -41,6 +42,9 @@ export interface ArtistInfo {
     match: number;
     id?: number;
     slug?: string;
+    image_url?: string | null;
+    url?: string | null;
+    source?: string | null;
   }[];
   listeners: number;
   playcount: number;
@@ -94,6 +98,20 @@ export interface ArtistPageEnrichment {
   };
 }
 
+export interface ArtistPlaylistAppearance {
+  id: number;
+  name: string;
+  description?: string | null;
+  cover_data_url?: string | null;
+  is_smart?: boolean | null;
+  is_curated?: boolean | null;
+  scope?: string | null;
+  track_count?: number | null;
+  total_duration?: number | null;
+  artist_track_count?: number | null;
+  artwork_tracks?: PlaylistArtworkTrack[];
+}
+
 export interface ArtistPageData {
   artist: ArtistData;
   info: ArtistInfo;
@@ -103,6 +121,7 @@ export interface ArtistPageData {
     configured: boolean;
     source: string;
   };
+  appears_on: ArtistPlaylistAppearance[];
   enrichment: ArtistPageEnrichment;
   artist_hot_rank?: number | null;
 }

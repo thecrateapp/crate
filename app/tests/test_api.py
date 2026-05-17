@@ -1800,6 +1800,44 @@ class TestPlaylistCurationAPI:
         assert data["playlist"]["tracks"][0]["title"] == "Locust Reign"
         assert data["history"][0]["triggered_by"] == "manual"
 
+    def test_admin_system_playlist_from_blueprint_is_idempotent(self, test_app):
+        existing = {
+            "id": 42,
+            "name": "Screamo Core Tracks",
+            "description": "Existing",
+            "scope": "system",
+            "generation_mode": "smart",
+            "is_curated": True,
+            "is_active": True,
+            "track_count": 0,
+            "total_duration": 0,
+            "follower_count": 0,
+            "artwork_tracks": [],
+        }
+
+        with (
+            patch(
+                "crate.api.system_playlists.get_system_playlist_by_curation_key",
+                return_value=existing,
+            ) as get_existing,
+            patch(
+                "crate.api.system_playlists.create_playlist",
+                side_effect=AssertionError("unexpected playlist creation"),
+            ),
+        ):
+            resp = test_app.post(
+                "/api/admin/system-playlists/from-blueprint",
+                json={
+                    "target_type": "genre",
+                    "target_name": "screamo",
+                    "blueprint_key": "genre-primer",
+                },
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["id"] == 42
+        get_existing.assert_called_once()
+
 
 class TestAcquisitionAPI:
     def test_acquisition_snapshot_collapses_tidal_and_soulseek_state(self, test_app):

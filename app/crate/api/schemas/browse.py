@@ -162,6 +162,10 @@ class SimilarArtistResponse(BaseModel):
     name: str | None = None
     id: int | None = None
     slug: str | None = None
+    match: float | None = None
+    image_url: str | None = None
+    url: str | None = None
+    source: str | None = None
 
 
 class ArtistInfoResponse(BaseModel):
@@ -185,6 +189,16 @@ class ArtistShowEventResponse(BaseModel):
     @classmethod
     def coerce_id_to_str(cls, v: Any) -> str:
         return str(v)
+
+    @field_validator("show_id", mode="before")
+    @classmethod
+    def coerce_show_id_to_int(cls, v: Any) -> int | None:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
 
     @field_validator("date", mode="before")
     @classmethod
@@ -215,11 +229,16 @@ class ArtistShowsResponse(BaseModel):
     source: str
 
 
+class ArtistPlaylistAppearanceResponse(CuratedPlaylistSummaryResponse):
+    artist_track_count: int = 0
+
+
 class ArtistPageResponse(BaseModel):
     artist: ArtistDetailResponse
     info: ArtistInfoResponse = Field(default_factory=ArtistInfoResponse)
     top_tracks: list[ArtistTopTrackResponse] = Field(default_factory=list)
     shows: ArtistShowsResponse
+    appears_on: list[ArtistPlaylistAppearanceResponse] = Field(default_factory=list)
     enrichment: ArtistEnrichmentResponse = Field(
         default_factory=ArtistEnrichmentResponse
     )

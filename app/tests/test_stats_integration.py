@@ -1,5 +1,7 @@
 """Integration tests for stats and play events — real DB, no mocks."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from sqlalchemy import text
 
@@ -220,6 +222,80 @@ class TestRecordPlayEvent:
         assert row["was_skipped"] is True
         assert row["was_completed"] is False
         assert row["track_entity_uid"] == data["concubine"]["entity_uid"]
+
+
+class TestStatsStory:
+    def test_story_detects_discovery_comeback_and_audio_profile(self, stats_db):
+        db, data = stats_db
+        now = datetime.now(timezone.utc)
+        current_at = now - timedelta(days=3)
+        old_at = now - timedelta(days=95)
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET energy = 0.8,
+                        danceability = 0.35,
+                        valence = 0.22,
+                        bpm = 148
+                    WHERE id IN (:converge_id, :botch_id)
+                    """
+                ),
+                {
+                    "converge_id": data["concubine"]["id"],
+                    "botch_id": data["hutton"]["id"],
+                },
+            )
+
+        db.record_play_event(
+            TEST_USER_ID,
+            **_make_event(
+                data["concubine"],
+                started_at=old_at.isoformat(),
+                ended_at=(old_at + timedelta(minutes=2)).isoformat(),
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+        )
+        db.record_play_event(
+            TEST_USER_ID,
+            **_make_event(
+                data["concubine"],
+                started_at=current_at.isoformat(),
+                ended_at=(current_at + timedelta(minutes=2)).isoformat(),
+                played_seconds=94.0,
+                was_completed=True,
+                album_id=data["album_jd"],
+            ),
+        )
+        db.record_play_event(
+            TEST_USER_ID,
+            **_make_event(
+                data["hutton"],
+                started_at=current_at.isoformat(),
+                ended_at=(current_at + timedelta(minutes=5)).isoformat(),
+                played_seconds=250.0,
+                was_completed=True,
+                album_id=data["album_botch"],
+            ),
+        )
+
+        from crate.db.queries.user_library_stats_story import get_stats_story
+
+        story = get_stats_story(TEST_USER_ID, window="30d")
+
+        assert story["window"] == "30d"
+        assert any(item["artist_name"] == "Botch" for item in story["discoveries"])
+        assert any(item["artist_name"] == "Converge" for item in story["comebacks"])
+        assert story["rhythm"]["peak_hour_label"]
+        assert story["audio_profile"]["energy"] == pytest.approx(0.8)
+        assert story["monthly_snapshots"]
+        assert any(
+            snapshot["play_count"] >= 2 for snapshot in story["monthly_snapshots"]
+        )
 
 
 class TestAggregatesAndOverview:

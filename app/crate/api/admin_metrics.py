@@ -380,7 +380,7 @@ def metrics_dashboard(
 )
 def llm_status(request: Request):
     _require_admin(request)
-    from crate.llm import get_config
+    from crate.llm import get_config, get_provider_api_key, get_provider_key_names
 
     config = get_config()
 
@@ -397,7 +397,14 @@ def llm_status(request: Request):
                 [m["name"] for m in resp.json().get("models", [])] if available else []
             )
         else:
-            available = True  # Cloud providers assumed available if key is set
+            key_names = get_provider_key_names(config["provider"])
+            if key_names:
+                available = bool(get_provider_api_key(config["provider"]))
+                if not available:
+                    error = f"{' or '.join(key_names)} not set"
+            else:
+                available = False
+                error = f"Unsupported LLM provider: {config['provider']}"
             models = []
     except Exception as e:
         error = str(e)

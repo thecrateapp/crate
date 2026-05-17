@@ -88,6 +88,14 @@ def _decode_mapping(data: dict) -> dict[str, str]:
     return decoded
 
 
+def _redis_key_type(redis_client, key: str) -> str | None:
+    type_fn = getattr(redis_client, "type", None)
+    if type_fn is None:
+        return None
+    key_type = type_fn(key)
+    return key_type.decode() if isinstance(key_type, bytes) else str(key_type)
+
+
 def _percentile(values: list[float], percentile: float) -> float:
     if not values:
         return 0.0
@@ -709,6 +717,10 @@ def flush_to_postgres(period: str = "hour"):
 
                     # Only flush buckets older than 10 minutes
                     if bucket_ts > _minute_bucket() - 600:
+                        continue
+
+                    key_type = _redis_key_type(r, key)
+                    if key_type is not None and key_type != "hash":
                         continue
 
                     data = r.hgetall(key)

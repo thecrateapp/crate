@@ -205,8 +205,9 @@ sync_config() {
   scp \
     "$TMP_DIR/docker-compose.yaml" \
     "$TMP_DIR/docker-compose.project.yaml" \
-    "$TMP_DIR/.env" \
     "$REMOTE:$SERVER_PATH/"
+  scp "$TMP_DIR/.env" "$REMOTE:$SERVER_PATH/.deploy/env.candidate"
+  ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
 
   scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"
   ssh_remote "chmod +x '$REMOTE_SCRIPT_PATH'"
