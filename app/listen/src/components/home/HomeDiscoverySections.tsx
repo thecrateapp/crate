@@ -25,6 +25,7 @@ import {
   SectionRail,
   useSectionRail,
 } from "@/components/home/HomeSections";
+import { EditorialPlaylistArtwork } from "@/components/playlists/EditorialPlaylistArtwork";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import {
   albumCoverApiUrl,
@@ -87,10 +88,36 @@ const HISTORY_TONES = [
   "from-fuchsia-300/30 via-purple-950/65 to-black",
 ];
 
-function historyLabel(item: HomeListeningHistoryCard, index: number): string {
-  if (index === 0 && item.title === "My Most Listened")
-    return "MY MOST LISTENED";
+function historyLabel(item: HomeListeningHistoryCard): string {
+  if (item.kind === "all_time") return "MY MOST LISTENED";
   return item.period_label;
+}
+
+function historyKicker(item: HomeListeningHistoryCard): string {
+  if (item.kind === "all_time") return "Crate History";
+  const date = new Date(`${item.period_start}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "Listening History";
+  return String(date.getFullYear());
+}
+
+function historyDisplayTitle(item: HomeListeningHistoryCard): string {
+  if (item.kind === "all_time") return item.title;
+  if (item.title !== "My Most Listened") return item.title;
+  const date = new Date(`${item.period_start}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return item.title;
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatHistoryMinutes(minutes: number): string {
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = Math.round(minutes % 60);
+    return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+  }
+  return `${Math.round(minutes)}m`;
 }
 
 function recentArtwork(item: HomeRecentItem): string | null {
@@ -832,22 +859,21 @@ export function ListeningHistorySection({
   onOpenHistory,
 }: {
   items: HomeListeningHistoryCard[];
-  onOpenHistory: () => void;
+  onOpenHistory: (item?: HomeListeningHistoryCard) => void;
 }) {
-  const rail = useSectionRail(items.length);
   if (!items.length) return null;
+  const featured = items.slice(0, 4);
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Your listening history"
-        subtitle="Monthly snapshots of what actually stayed on repeat."
-        actionLabel="View all"
-        onAction={onOpenHistory}
-        railControls={rail}
+        title="Your Listening DNA"
+        subtitle="All-time and monthly snapshots from your real listening signal."
+        actionLabel="Open DNA"
+        onAction={() => onOpenHistory()}
       />
-      <SectionRail railRef={rail.railRef}>
-        {items.map((item, index) => (
+      <div className="flex flex-wrap gap-5">
+        {featured.map((item, index) => (
           <ListeningHistoryCard
             key={item.id}
             item={item}
@@ -855,7 +881,7 @@ export function ListeningHistorySection({
             onOpen={onOpenHistory}
           />
         ))}
-      </SectionRail>
+      </div>
     </section>
   );
 }
@@ -867,49 +893,42 @@ function ListeningHistoryCard({
 }: {
   item: HomeListeningHistoryCard;
   index: number;
-  onOpen: () => void;
+  onOpen: (item: HomeListeningHistoryCard) => void;
 }) {
-  const tone = HISTORY_TONES[index % HISTORY_TONES.length];
   const artists = item.subtitle || "Your most played music from this period.";
 
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className="group w-[196px] flex-shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 lg:w-[calc((100%-5rem)/6)] xl:w-[calc((100%-6rem)/7)]"
+      onClick={() => onOpen(item)}
+      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:w-56"
     >
-      <div
+      <EditorialPlaylistArtwork
+        title={historyLabel(item)}
+        kicker={historyKicker(item)}
+        tracks={item.artwork_tracks}
+        variant="history"
         className={cn(
-          "relative aspect-[1.08] overflow-hidden rounded-[2px] border border-white/8 bg-gradient-to-br",
-          tone,
+          "aspect-[1.12] rounded-2xl bg-gradient-to-br shadow-xl shadow-black/20 transition duration-300 group-hover:border-primary/30 group-hover:brightness-110",
+          HISTORY_TONES[index % HISTORY_TONES.length],
         )}
-      >
-        <div className="absolute inset-0 opacity-45 mix-blend-screen transition duration-500 group-hover:scale-[1.04] group-hover:opacity-60">
-          <PlaylistArtwork
-            name={item.title}
-            tracks={item.artwork_tracks}
-            className="h-full w-full rounded-none"
-          />
+        textClassName={cn(
+          item.kind === "all_time"
+            ? "[&_div:first-child]:text-[clamp(1.2rem,13cqw,2.45rem)]"
+            : "[&_div:first-child]:text-[clamp(2rem,20cqw,3.35rem)]",
+        )}
+      />
+      <div className="mt-2.5 flex min-h-[5.4rem] flex-col">
+        <div className="truncate text-sm font-black tracking-[-0.035em] text-foreground">
+          {historyDisplayTitle(item)}
         </div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.25),transparent_32%),linear-gradient(180deg,transparent,rgba(0,0,0,0.62))]" />
-        <div className="absolute right-3 top-3 grid grid-cols-3 gap-0.5 opacity-90">
-          {Array.from({ length: 6 }).map((_, dot) => (
-            <span key={dot} className="h-1.5 w-1.5 rotate-45 bg-white/70" />
-          ))}
-        </div>
-        <div className="absolute inset-x-3 bottom-3">
-          <div className="max-w-[92%] text-[clamp(1.7rem,3vw,3.1rem)] font-black uppercase leading-[0.82] tracking-[-0.08em] text-white text-pretty">
-            {historyLabel(item, index)}
-          </div>
-        </div>
-      </div>
-      <div className="mt-3 space-y-1">
-        <div className="truncate text-sm font-semibold text-foreground">
-          {item.title}
-        </div>
-        <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
           {artists}
         </p>
+        <div className="mt-auto text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
+          {item.play_count} plays ·{" "}
+          {formatHistoryMinutes(item.minutes_listened)}
+        </div>
       </div>
     </button>
   );
@@ -1182,12 +1201,6 @@ export function CoreTracksPlaylistCard({
           </button>
         </div>
       </div>
-      <div className="truncate text-sm font-semibold text-foreground">
-        {item.name}
-      </div>
-      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
-        Core Tracks
-      </div>
       <ItemActionMenu
         actions={actions}
         open={actionMenu.open}
@@ -1221,7 +1234,7 @@ export function EssentialsSection({
     <section className="space-y-4">
       <SectionHeader
         title="Core tracks"
-        subtitle="Artist-focused sets built from the names most present in your listening."
+        subtitle="Discovery-forward artist sets, ending with familiar anchors."
         actionLabel="View all"
         onAction={() => onViewAll("core-tracks")}
         railControls={rail}

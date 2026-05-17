@@ -1,6 +1,7 @@
 import logging
 import json
 from typing import Any
+from urllib.parse import quote
 
 import mutagen
 from fastapi import APIRouter, Query, Request
@@ -59,6 +60,7 @@ from crate.db.repositories.library import (
     get_library_artist_by_entity_uid,
     get_library_artist_by_slug,
 )
+from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.queries.browse_artist import (
     check_artists_in_library,
     get_all_artist_genre_map,
@@ -87,7 +89,11 @@ from crate.db.queries.shows import (
 )
 from crate.db.releases import get_new_releases
 from crate.db.similarities import get_artist_network
-from crate.lastfm import get_artist_info, get_cached_artist_info, get_top_tracks
+from crate.lastfm import (
+    get_artist_info,
+    get_cached_artist_info,
+    get_top_tracks,
+)
 from crate.storage_layout import resolve_artist_dir
 from crate.track_versions import canonical_track_title_key, track_variant_rank
 
@@ -154,6 +160,10 @@ def _lookup_artist_refs(names: list[str]) -> dict[str, dict]:
     return get_artist_refs_by_names_full(names)
 
 
+def _external_artist_photo_url(name: str) -> str:
+    return f"/api/network/external-artist/photo?name={quote(name, safe='')}"
+
+
 def _show_lineup_artists(show: dict, refs_by_name: dict[str, dict]) -> list[dict]:
     lineup = show.get("lineup") if isinstance(show.get("lineup"), list) else None
     names = lineup or ([show.get("artist_name")] if show.get("artist_name") else [])
@@ -176,12 +186,21 @@ def _enrich_similar_artists(similar: list[dict]) -> list[dict]:
     refs = get_similar_artist_refs(names)
 
     enriched: list[dict] = []
-    for item in similar:
+    for index, item in enumerate(similar):
         current = dict(item)
-        ref = refs.get((current.get("name") or "").lower())
+        name = str(current.get("name") or "").strip()
+        ref = refs.get(name.lower())
         if ref:
             current.setdefault("id", ref.get("id"))
             current.setdefault("slug", ref.get("slug"))
+        elif index < 15:
+            current["image_url"] = _external_artist_photo_url(name)
+            try:
+                info = get_cached_artist_info(name)
+            except Exception:
+                info = None
+            if info and not current.get("url"):
+                current["url"] = info.get("url")
         enriched.append(current)
     return enriched
 
@@ -249,7 +268,7 @@ def _build_artist_page_payload(
     stats_limit: int,
 ) -> dict | JSONResponse:
     cache_key = (
-        f"listen:artist_page:{user_id}:{artist_id}:"
+        f"listen:artist_page:v4:{user_id}:{artist_id}:"
         f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=300)
@@ -273,6 +292,12 @@ def _build_artist_page_payload(
         name=artist_name,
         limit=shows_limit,
         country="",
+    )
+    appears_on_payload = get_public_system_playlists_for_artist(
+        artist_id=artist_id,
+        artist_slug=artist_slug,
+        artist_name=artist_name,
+        limit=8,
     )
 
     try:
@@ -298,6 +323,7 @@ def _build_artist_page_payload(
         "info": info_payload,
         "top_tracks": top_tracks_payload,
         "shows": shows_payload,
+        "appears_on": appears_on_payload,
         "enrichment": enrichment_payload,
         "artist_hot_rank": artist_hot_rank,
     }
@@ -348,6 +374,8 @@ def _artist_library_info_payload(name: str) -> dict:
 
 def _get_artist_page_info(name: str) -> dict:
     info = get_cached_artist_info(name)
+    if not info:
+        info = get_artist_info(name)
     if info:
         enriched = dict(info)
         enriched["similar"] = _enrich_similar_artists(info.get("similar") or [])
@@ -1639,7 +1667,7 @@ def api_artist_setlist_playable(request: Request, name: str):
     responses=AUTH_ERROR_RESPONSES,
     summary="List upcoming releases and shows",
 )
-def api_upcoming(request: Request):
+def api_upcoming(request: Request, limit: int = Query(5000, ge=1, le=10000)):
     from datetime import datetime, timezone
 
     _require_auth(request)
@@ -1673,7 +1701,7 @@ def api_upcoming(request: Request):
             }
         )
 
-    shows = db_get_shows(limit=1000)
+    shows = db_get_shows(limit=limit)
     refs_by_name = _lookup_artist_refs(
         [
             artist_name
@@ -1741,6 +1769,40 @@ def api_artist_network(request: Request, name: str, depth: int = 2):
     _require_auth(request)
 
     return get_artist_network(name, depth=min(depth, 3), limit_per_level=15)
+
+
+@router.get(
+    "/api/network/external-artist/photo",
+    responses=_IMAGE_RESPONSES,
+    summary="Resolve a best-effort photo for an external artist",
+)
+def api_external_artist_photo(
+    request: Request,
+    name: str = Query(""),
+    size: int | None = Query(None, ge=32, le=2048),
+    image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+):
+    _require_auth(request)
+    artist_name = name.strip()
+    if not artist_name:
+        return Response(status_code=404)
+    try:
+        from crate.lastfm import get_best_artist_image
+
+        image_data = get_best_artist_image(artist_name)
+    except Exception:
+        image_data = None
+    if not image_data:
+        return Response(status_code=404)
+    return build_image_response(
+        image_data,
+        "image/jpeg",
+        size=size,
+        output_format=image_format,
+        headers={
+            "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000"
+        },
+    )
 
 
 @router.get(

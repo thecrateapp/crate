@@ -1,6 +1,7 @@
 """Schema models for curation and admin system-playlist endpoints."""
 
 from typing import Any
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +22,15 @@ class CreateSystemPlaylistRequest(BaseModel):
     category: str | None = None
 
 
+class CreateSystemPlaylistFromBlueprintRequest(BaseModel):
+    target_type: Literal["artist", "genre"]
+    target_name: str
+    blueprint_key: str
+    is_curated: bool = True
+    is_active: bool = True
+    featured_rank: int | None = None
+
+
 class UpdateSystemPlaylistRequest(BaseModel):
     name: str | None = None
     description: str | None = None
@@ -37,6 +47,25 @@ class UpdateSystemPlaylistRequest(BaseModel):
 
 class PreviewSystemPlaylistRequest(BaseModel):
     smart_rules: dict[str, Any] | None = None
+
+
+class GeneratePlaylistDescriptionRequest(BaseModel):
+    apply: bool = False
+    smart_rules: dict[str, Any] | None = None
+
+
+class GeneratePlaylistDescriptionResponse(BaseModel):
+    description: str
+    applied: bool = False
+
+
+class SystemPlaylistBlueprintResponse(BaseModel):
+    key: str
+    name: str
+    description: str
+    target_type: str
+    category: str
+    smart_rules: dict[str, Any]
 
 
 class SystemPlaylistSummaryResponse(PlaylistSummaryResponse):

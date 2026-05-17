@@ -240,6 +240,7 @@ export type HomeRecentItem =
 
 export interface HomeGeneratedPlaylistSummary {
   id: string;
+  playlist_id?: number;
   name: string;
   description: string;
   artwork_tracks: PlaylistArtworkTrack[];
@@ -247,11 +248,13 @@ export interface HomeGeneratedPlaylistSummary {
   track_count: number;
   badge: string;
   kind: "mix" | "core";
+  source?: "system";
+  recommendation_source?: "discovery" | "comfort";
 }
 
 export interface HomeListeningHistoryCard {
   id: string;
-  kind: "month";
+  kind: "all_time" | "month";
   title: string;
   period_label: string;
   period_start: string;
@@ -362,6 +365,7 @@ export interface HomeDiscoveryPayload {
 
 export interface HomeGeneratedPlaylistDetail {
   id: string;
+  playlist_id?: number;
   name: string;
   description: string;
   artwork_tracks: PlaylistArtworkTrack[];
@@ -370,6 +374,8 @@ export interface HomeGeneratedPlaylistDetail {
   total_duration: number;
   badge: string;
   kind: "mix" | "core";
+  source?: "system";
+  recommendation_source?: "discovery" | "comfort";
   tracks: HomeRecommendedTrack[];
 }
 

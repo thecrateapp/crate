@@ -27,10 +27,11 @@ import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
-  PlaylistArtwork,
-  type PlaylistArtworkTrack,
-} from "@/components/playlists/PlaylistArtwork";
+  EditorialPlaylistArtwork,
+  editorialPlaylistLabel,
+} from "@/components/playlists/EditorialPlaylistArtwork";
 import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
@@ -436,6 +437,10 @@ export function CuratedPlaylist() {
             ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
             : "Offline copy failed. Retry to finish the playlist mirror."
           : null;
+  const editorialLabel = editorialPlaylistLabel(
+    data.name,
+    data.is_smart ? "Core Tracks" : "Crate Selects",
+  );
 
   async function handleToggleOffline() {
     if (!data) return;
@@ -467,12 +472,12 @@ export function CuratedPlaylist() {
 
       <div className="flex flex-col gap-6 md:flex-row">
         <div className="w-[220px] max-w-full shrink-0">
-          <PlaylistArtwork
-            name={data.name}
+          <EditorialPlaylistArtwork
+            title={editorialLabel.title}
+            kicker={editorialLabel.kicker}
             coverDataUrl={data.cover_data_url}
             tracks={data.artwork_tracks}
-            showCrateMark
-            crateMarkClassName="right-3.5 top-3.5 [&_img]:h-4.5 [&_img]:w-4.5"
+            variant="core"
             className="aspect-square rounded-3xl shadow-2xl"
           />
         </div>

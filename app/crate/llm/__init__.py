@@ -17,6 +17,18 @@ Usage:
     preset = ask_structured(EqPreset, "Generate a 10-band EQ for death metal")
 """
 
-from crate.llm.provider import ask, ask_structured, get_config
+from crate.llm.provider import (
+    ask,
+    ask_structured,
+    get_config,
+    get_provider_api_key,
+    get_provider_key_names,
+)
 
-__all__ = ["ask", "ask_structured", "get_config"]
+__all__ = [
+    "ask",
+    "ask_structured",
+    "get_config",
+    "get_provider_api_key",
+    "get_provider_key_names",
+]

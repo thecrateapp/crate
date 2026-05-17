@@ -343,6 +343,107 @@ class TestLastfmGetArtistInfo:
             result = get_artist_info("Radiohead")
             assert result is None
 
+    def test_get_similar_artists_includes_lastfm_image_metadata(self):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "similarartists": {
+                "artist": [
+                    {
+                        "name": "Chelsea Wolfe",
+                        "match": "0.91",
+                        "url": "https://www.last.fm/music/Chelsea+Wolfe",
+                        "image": [
+                            {
+                                "#text": "https://lastfm.example/2a96cbd8b46e442fc41c2b86b821562f.png",
+                                "size": "small",
+                            },
+                            {
+                                "#text": "https://lastfm.example/chelsea-wolfe.jpg",
+                                "size": "extralarge",
+                            },
+                        ],
+                    },
+                    {
+                        "name": "No Image",
+                        "match": "not-a-float",
+                        "image": [],
+                    },
+                ]
+            }
+        }
+
+        with (
+            patch("crate.lastfm._lastfm_key", return_value="test_key"),
+            patch("crate.lastfm.requests.get", return_value=mock_response),
+        ):
+            from crate.lastfm import _get_similar_artists
+
+            result = _get_similar_artists("Emma Ruth Rundle")
+
+        assert result[0] == {
+            "name": "Chelsea Wolfe",
+            "match": 0.91,
+            "image_url": "https://lastfm.example/chelsea-wolfe.jpg",
+            "url": "https://www.last.fm/music/Chelsea+Wolfe",
+            "source": "lastfm",
+        }
+        assert result[1] == {
+            "name": "No Image",
+            "match": 0.0,
+            "image_url": None,
+            "url": "https://www.last.fm/music/No%20Image",
+            "source": "lastfm",
+        }
+
+    def test_get_best_artist_image_url_uses_deezer_when_lastfm_has_no_image(self):
+        with (
+            patch("crate.lastfm.get_cache", return_value=None),
+            patch("crate.lastfm.get_fanart_artist_image", return_value=None),
+            patch(
+                "crate.lastfm._deezer_artist_image",
+                return_value="https://deezer.example/poison-the-well.jpg",
+            ),
+            patch("crate.lastfm.set_cache") as mock_set,
+        ):
+            from crate.lastfm import get_best_artist_image_url
+
+            result = get_best_artist_image_url("Poison The Well")
+
+        assert result == "https://deezer.example/poison-the-well.jpg"
+        mock_set.assert_called_with(
+            "artist:image_url:poison the well",
+            {"url": "https://deezer.example/poison-the-well.jpg"},
+            ttl=604800,
+        )
+
+    def test_deezer_artist_image_retries_cached_negative_and_accepts_first_match(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "data": [
+                {
+                    "name": "slowthai",
+                    "picture_xl": "https://deezer.example/slowthai.jpg",
+                }
+            ]
+        }
+
+        with (
+            patch("crate.lastfm.get_cache", return_value={"url": None}),
+            patch("crate.lastfm.requests.get", return_value=mock_response),
+            patch("crate.lastfm.set_cache") as mock_set,
+        ):
+            from crate.lastfm import _deezer_artist_image
+
+            result = _deezer_artist_image("slowthai")
+
+        assert result == "https://deezer.example/slowthai.jpg"
+        mock_set.assert_called_with(
+            "deezer:artist_img:slowthai",
+            {"url": "https://deezer.example/slowthai.jpg"},
+            ttl=604800,
+        )
+
 
 class TestCachingBehavior:
     def test_spotify_uses_cache_on_second_call(self):

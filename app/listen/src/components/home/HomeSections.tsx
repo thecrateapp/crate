@@ -20,10 +20,11 @@ import {
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
+import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
-  PlaylistArtwork,
-  type PlaylistArtworkTrack,
-} from "@/components/playlists/PlaylistArtwork";
+  EditorialPlaylistArtwork,
+  editorialPlaylistLabel,
+} from "@/components/playlists/EditorialPlaylistArtwork";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
@@ -273,6 +274,10 @@ export function FeaturedPlaylistCard({
     onPlay,
   });
   const actionMenu = useItemActionMenu(actions);
+  const editorialLabel = editorialPlaylistLabel(
+    name,
+    isSmart ? "Core Tracks" : "Crate Selects",
+  );
 
   return (
     <div
@@ -291,11 +296,11 @@ export function FeaturedPlaylistCard({
       className="group w-[180px] flex-shrink-0 cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl"
     >
       <div className="relative">
-        <PlaylistArtwork
-          name={name}
+        <EditorialPlaylistArtwork
+          title={editorialLabel.title}
+          kicker={editorialLabel.kicker}
           coverDataUrl={coverDataUrl}
           tracks={tracks}
-          showCrateMark
           className="aspect-square rounded-3xl shadow-xl transition-transform group-hover:scale-[1.02]"
         />
       </div>

@@ -17,6 +17,7 @@ import { GenreTaxonomyTree } from "@/components/genres/GenreTaxonomyTree";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
+import { createSystemPlaylistFromBlueprint } from "@/lib/system-playlist-blueprints";
 import { waitForTask } from "@/lib/tasks";
 import { formatNumber } from "@/lib/utils";
 import {
@@ -679,21 +680,15 @@ function GenreView({ slug }: { slug: string }) {
     if (!genre) return;
     setCreating(true);
     try {
-      const { id } = await api<{ id: number }>("/api/playlists", "POST", {
-        name: `${genre.name} Mix`,
-        is_smart: true,
-        smart_rules: {
-          match: "all",
-          rules: [{ field: "genre", op: "contains", value: genre.name }],
-          limit: 50,
-          sort: "random",
-        },
+      const playlist = await createSystemPlaylistFromBlueprint({
+        targetType: "genre",
+        targetName: genre.slug || genre.name,
+        blueprintKey: "genre-primer",
       });
-      await api(`/api/playlists/${id}/generate`, "POST");
-      toast.success(`Created "${genre.name} Mix" playlist`);
-      navigate("/playlists");
+      toast.success(`Created "${playlist.name}"`);
+      navigate(`/playlists/${playlist.id}`);
     } catch {
-      toast.error("Failed to create playlist");
+      toast.error("Failed to create editorial playlist");
     } finally {
       setCreating(false);
     }
@@ -846,7 +841,7 @@ function GenreView({ slug }: { slug: string }) {
             />
             {(genre.artists.length > 0 || genre.albums.length > 0) && (
               <TaskButton
-                label="Generate Playlist"
+                label="Core Tracks"
                 busy={creating}
                 onClick={createSmartPlaylist}
                 icon={ListMusic}

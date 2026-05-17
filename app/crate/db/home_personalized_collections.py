@@ -5,6 +5,7 @@ from crate.db.home_builders import (
     _artwork_tracks,
     _build_artist_core_rows,
     _build_core_playlists,
+    _build_core_discovery_artists,
     _build_custom_mix_summaries,
     _build_favorite_artists,
     _build_mix_rows,
@@ -16,11 +17,13 @@ from crate.db.home_builders import (
     _get_library_artist,
     _track_payload,
 )
+from crate.db.home_builder_curated_lists import SYSTEM_PLAYLIST_HOME_PREFIX
 from crate.db.home_context import (
     get_cached_home_context,
     merged_artists_from_context,
     recent_releases_from_context,
 )
+from crate.db.repositories.playlists import get_playlist, get_playlist_tracks
 from crate.track_versions import dedupe_track_variants
 
 
@@ -60,6 +63,35 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
     mix = get_home_mix(user_id, playlist_id, limit=limit)
     if mix:
         return mix
+
+    if playlist_id.startswith(SYSTEM_PLAYLIST_HOME_PREFIX):
+        try:
+            system_playlist_id = int(
+                playlist_id.removeprefix(SYSTEM_PLAYLIST_HOME_PREFIX)
+            )
+        except ValueError:
+            return None
+        playlist = get_playlist(system_playlist_id)
+        if not playlist or playlist.get("scope") != "system":
+            return None
+        if not playlist.get("is_active", False):
+            return None
+        tracks = get_playlist_tracks(system_playlist_id)[:limit]
+        return {
+            "id": playlist_id,
+            "playlist_id": system_playlist_id,
+            "name": playlist.get("name") or "Core Tracks",
+            "description": playlist.get("description") or "Editorial core tracks.",
+            "artwork_tracks": playlist.get("artwork_tracks") or _artwork_tracks(tracks),
+            "artwork_artists": _artwork_artists(tracks),
+            "track_count": len(tracks),
+            "total_duration": sum(int(row.get("duration") or 0) for row in tracks),
+            "badge": "Core Tracks"
+            if playlist.get("generation_mode") == "smart"
+            else "Crate Selects",
+            "kind": "core",
+            "tracks": [_track_payload(row) for row in tracks],
+        }
 
     core_prefix = "core-tracks-artist-"
     if not playlist_id.startswith(core_prefix):
@@ -155,7 +187,18 @@ def get_home_favorite_artists(user_id: int) -> list[dict]:
 
 def get_home_essentials(user_id: int) -> list[dict]:
     ctx = get_cached_home_context(user_id)
-    return _build_core_playlists(user_id, merged_artists_from_context(ctx), 7)
+    discovery_artists = _build_core_discovery_artists(
+        user_id,
+        top_genres_lower=ctx["top_genres_lower"],
+        interest_artists_lower=ctx["interest_artists_lower"],
+        limit=14,
+    )
+    return _build_core_playlists(
+        user_id,
+        merged_artists_from_context(ctx),
+        7,
+        discovery_artists=discovery_artists,
+    )
 
 
 __all__ = [

@@ -8,6 +8,13 @@ import numpy as np
 import pytest
 
 
+def _librosa_available() -> bool:
+    try:
+        return importlib.util.find_spec("librosa") is not None
+    except ValueError:
+        return False
+
+
 def _create_sine_wav(
     path: str, freq: float = 440.0, duration: float = 3.0, sr: int = 22050
 ):
@@ -24,7 +31,7 @@ def _create_sine_wav(
 
 class TestAnalyzeTrack:
     def test_analyze_sine_wave(self):
-        if importlib.util.find_spec("librosa") is None:
+        if not _librosa_available():
             pytest.skip("librosa not available")
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -52,7 +59,7 @@ class TestAnalyzeTrack:
             os.unlink(tmppath)
 
     def test_analyze_invalid_file(self):
-        if importlib.util.find_spec("librosa") is None:
+        if not _librosa_available():
             pytest.skip("librosa not available")
 
         from crate.audio_analysis import analyze_track
@@ -64,7 +71,7 @@ class TestAnalyzeTrack:
 
     def test_analyze_short_audio(self):
         """Audio shorter than 2 seconds should return all None."""
-        if importlib.util.find_spec("librosa") is None:
+        if not _librosa_available():
             pytest.skip("librosa not available")
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -83,7 +90,7 @@ class TestAnalyzeTrack:
             os.unlink(tmppath)
 
     def test_analyze_returns_mood_dict(self):
-        if importlib.util.find_spec("librosa") is None:
+        if not _librosa_available():
             pytest.skip("librosa not available")
 
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
