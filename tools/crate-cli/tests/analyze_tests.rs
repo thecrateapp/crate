@@ -89,27 +89,20 @@ fn test_analyze_batch_parallel() {
     }
 }
 
-#[test]
-fn test_analyze_invalid_file() {
+#[rstest::rstest]
+#[case::invalid("not_audio.txt", b"this is not audio data")]
+#[case::empty("empty.wav", b"")]
+fn test_analyze_error_files(#[case] filename: &str, #[case] content: &[u8]) {
     let dir = TempDir::new().unwrap();
-    let bad_path = dir.path().join("not_audio.txt");
-    std::fs::write(&bad_path, b"this is not audio data").unwrap();
+    let bad_path = dir.path().join(filename);
+    std::fs::write(&bad_path, content).unwrap();
 
     let result = analyze_track(&bad_path);
     assert!(
         result.error.is_some(),
-        "Non-audio file should produce error"
+        "{} should produce error",
+        filename
     );
-}
-
-#[test]
-fn test_analyze_empty_file() {
-    let dir = TempDir::new().unwrap();
-    let empty_path = dir.path().join("empty.wav");
-    std::fs::write(&empty_path, b"").unwrap();
-
-    let result = analyze_track(&empty_path);
-    assert!(result.error.is_some(), "Empty file should produce error");
 }
 
 #[test]

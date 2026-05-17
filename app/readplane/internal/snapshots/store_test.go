@@ -4,112 +4,93 @@ import (
 	"container/list"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestDecodePayloadKeepsObjectShape(t *testing.T) {
-	payload, err := DecodePayload([]byte(`{"hero":[{"name":"Converge"}]}`))
-	if err != nil {
-		t.Fatalf("DecodePayload returned error: %v", err)
-	}
-	if _, ok := payload["hero"]; !ok {
-		t.Fatalf("payload = %+v", payload)
-	}
+func TestDecodePayload(t *testing.T) {
+	t.Run("keeps object shape", func(t *testing.T) {
+		payload, err := DecodePayload([]byte(`{"hero":[{"name":"Converge"}]}`))
+		assert.NoError(t, err)
+		_, ok := payload["hero"]
+		assert.True(t, ok, "payload = %+v", payload)
+	})
+
+	t.Run("wraps non-object in value key", func(t *testing.T) {
+		payload, err := DecodePayload([]byte(`["a","b"]`))
+		assert.NoError(t, err)
+		_, ok := payload["value"]
+		assert.True(t, ok, "payload = %+v", payload)
+	})
 }
 
-func TestDecodePayloadWrapsNonObject(t *testing.T) {
-	payload, err := DecodePayload([]byte(`["a","b"]`))
-	if err != nil {
-		t.Fatalf("DecodePayload returned error: %v", err)
-	}
-	if _, ok := payload["value"]; !ok {
-		t.Fatalf("payload = %+v", payload)
-	}
-}
-
-func TestSnapshotFreshnessAcceptsFreshSnapshot(t *testing.T) {
+func TestSnapshotFreshness(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
-	stale, usable := SnapshotFreshness(now.Add(-time.Minute), nil, now, 10*time.Minute, time.Hour)
-	if stale || !usable {
-		t.Fatalf("stale=%v usable=%v", stale, usable)
-	}
+
+	t.Run("accepts fresh snapshot", func(t *testing.T) {
+		stale, usable := SnapshotFreshness(now.Add(-time.Minute), nil, now, 10*time.Minute, time.Hour)
+		assert.False(t, stale)
+		assert.True(t, usable)
+	})
+
+	t.Run("accepts recent stale snapshot", func(t *testing.T) {
+		staleAfter := now.Add(-time.Second)
+		stale, usable := SnapshotFreshness(now.Add(-20*time.Minute), &staleAfter, now, 10*time.Minute, time.Hour)
+		assert.True(t, stale)
+		assert.True(t, usable)
+	})
+
+	t.Run("rejects too old snapshot", func(t *testing.T) {
+		stale, usable := SnapshotFreshness(now.Add(-2*time.Hour), nil, now, 10*time.Minute, time.Hour)
+		assert.True(t, stale)
+		assert.False(t, usable)
+	})
 }
 
-func TestSnapshotFreshnessAcceptsRecentStaleSnapshot(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	staleAfter := now.Add(-time.Second)
-	stale, usable := SnapshotFreshness(now.Add(-20*time.Minute), &staleAfter, now, 10*time.Minute, time.Hour)
-	if !stale || !usable {
-		t.Fatalf("stale=%v usable=%v", stale, usable)
-	}
-}
+func TestSnapshotCache(t *testing.T) {
+	t.Run("expires and returns copy", func(t *testing.T) {
+		now := time.Unix(1_700_000_000, 0)
+		store := &Store{
+			cacheTTL:        time.Second,
+			cacheMaxEntries: 1000,
+			cache:           make(map[string]*list.Element),
+			cacheList:       list.New(),
+		}
+		key := cacheKey("home:discovery", "7")
+		store.cacheSet(key, &Row{Payload: map[string]any{"title": "Home"}}, now)
 
-func TestSnapshotFreshnessRejectsTooOldSnapshot(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	stale, usable := SnapshotFreshness(now.Add(-2*time.Hour), nil, now, 10*time.Minute, time.Hour)
-	if !stale || usable {
-		t.Fatalf("stale=%v usable=%v", stale, usable)
-	}
-}
+		first := store.cacheGet(key, now.Add(500*time.Millisecond))
+		assert.NotNil(t, first, "expected cached row")
+		first.Payload["title"] = "mutated"
 
-func TestSnapshotCacheExpiresAndReturnsCopy(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	store := &Store{
-		cacheTTL:        time.Second,
-		cacheMaxEntries: 1000,
-		cache:           make(map[string]*list.Element),
-		cacheList:       list.New(),
-	}
-	key := cacheKey("home:discovery", "7")
-	store.cacheSet(key, &Row{Payload: map[string]any{"title": "Home"}}, now)
+		second := store.cacheGet(key, now.Add(600*time.Millisecond))
+		assert.NotNil(t, second, "expected cached row")
+		assert.Equal(t, "Home", second.Payload["title"])
 
-	first := store.cacheGet(key, now.Add(500*time.Millisecond))
-	if first == nil {
-		t.Fatal("expected cached row")
-	}
-	first.Payload["title"] = "mutated"
+		expired := store.cacheGet(key, now.Add(2*time.Second))
+		assert.Nil(t, expired, "expected expired cache entry, got %+v", expired)
+	})
 
-	second := store.cacheGet(key, now.Add(600*time.Millisecond))
-	if second == nil {
-		t.Fatal("expected cached row")
-	}
-	if second.Payload["title"] != "Home" {
-		t.Fatalf("cached row was mutated: %+v", second.Payload)
-	}
+	t.Run("LRU evicts oldest", func(t *testing.T) {
+		now := time.Unix(1_700_000_000, 0)
+		store := &Store{
+			cacheTTL:        time.Hour,
+			cacheMaxEntries: 3,
+			cache:           make(map[string]*list.Element),
+			cacheList:       list.New(),
+		}
 
-	expired := store.cacheGet(key, now.Add(2*time.Second))
-	if expired != nil {
-		t.Fatalf("expected expired cache entry, got %+v", expired)
-	}
-}
+		store.cacheSet("a", &Row{Payload: map[string]any{"k": "a"}}, now)
+		store.cacheSet("b", &Row{Payload: map[string]any{"k": "b"}}, now)
+		store.cacheSet("c", &Row{Payload: map[string]any{"k": "c"}}, now)
+		_ = store.cacheGet("a", now)
+		store.cacheSet("d", &Row{Payload: map[string]any{"k": "d"}}, now)
 
-func TestSnapshotCacheLRUEvictsOldest(t *testing.T) {
-	now := time.Unix(1_700_000_000, 0)
-	store := &Store{
-		cacheTTL:        time.Hour,
-		cacheMaxEntries: 3,
-		cache:           make(map[string]*list.Element),
-		cacheList:       list.New(),
-	}
-
-	store.cacheSet("a", &Row{Payload: map[string]any{"k": "a"}}, now)
-	store.cacheSet("b", &Row{Payload: map[string]any{"k": "b"}}, now)
-	store.cacheSet("c", &Row{Payload: map[string]any{"k": "c"}}, now)
-	// access a so b becomes LRU
-	_ = store.cacheGet("a", now)
-	store.cacheSet("d", &Row{Payload: map[string]any{"k": "d"}}, now)
-
-	if store.cacheGet("b", now) != nil {
-		t.Fatal("expected b to be evicted")
-	}
-	if store.cacheGet("a", now) == nil {
-		t.Fatal("expected a to still be present")
-	}
-	if store.cacheGet("c", now) == nil {
-		t.Fatal("expected c to still be present")
-	}
-	if store.cacheGet("d", now) == nil {
-		t.Fatal("expected d to be present")
-	}
+		assert.Nil(t, store.cacheGet("b", now), "expected b to be evicted")
+		assert.NotNil(t, store.cacheGet("a", now), "expected a to still be present")
+		assert.NotNil(t, store.cacheGet("c", now), "expected c to still be present")
+		assert.NotNil(t, store.cacheGet("d", now), "expected d to be present")
+	})
 }
 
 func TestDecoratedPayloadDoesNotMutateNestedSnapshotPayload(t *testing.T) {
@@ -130,7 +111,6 @@ func TestDecoratedPayloadDoesNotMutateNestedSnapshotPayload(t *testing.T) {
 
 	originalMix := row.Payload["custom_mixes"].([]any)[0].(map[string]any)
 	originalArtist := originalMix["artwork_artists"].([]any)[0].(map[string]any)
-	if _, ok := originalArtist["album"]; ok {
-		t.Fatalf("decorated payload mutated original nested payload: %+v", originalArtist)
-	}
+	_, ok := originalArtist["album"]
+	assert.False(t, ok, "decorated payload mutated original nested payload: %+v", originalArtist)
 }

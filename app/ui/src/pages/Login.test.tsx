@@ -1,61 +1,48 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { Route, Routes } from "react-router";
 import { Login } from "./Login";
-
-vi.mock("react-router", () => ({
-  Navigate: ({ to }: { to: string }) => (
-    <div data-testid="navigate">Navigate to {to}</div>
-  ),
-  useSearchParams: () => [new URLSearchParams()],
-}));
-
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: vi.fn(),
-}));
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/lib/api")>();
   return { ...mod, api: vi.fn(() => Promise.resolve({})) };
 });
 
-import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 
 const mockApi = vi.mocked(api);
-const mockUseAuth = vi.mocked(useAuth);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockUseAuth.mockReturnValue({
-    user: null,
-    loading: false,
-    refetch: vi.fn(),
-  } as any);
 });
 
 describe("Login", () => {
   it("shows loading spinner when auth is loading", () => {
-    mockUseAuth.mockReturnValue({
-      user: null,
-      loading: true,
-      refetch: vi.fn(),
-    } as any);
-    const { container } = render(<Login />);
+    const { container } = renderWithAdminProviders(<Login />, {
+      auth: { user: null, loading: true },
+    });
     expect(container.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("redirects when user is already logged in", () => {
-    mockUseAuth.mockReturnValue({
-      user: { id: 1 },
-      loading: false,
-      refetch: vi.fn(),
-    } as any);
-    render(<Login />);
-    expect(screen.getByTestId("navigate")).toHaveTextContent("Navigate to /");
+    renderWithAdminProviders(
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<div data-testid="home">Home</div>} />
+      </Routes>,
+      {
+        route: "/login",
+        auth: { user: { id: 1, email: "", name: "", role: "user" } },
+      },
+    );
+    expect(screen.getByTestId("home")).toBeInTheDocument();
   });
 
   it("renders login form", () => {
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null },
+    });
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(
@@ -65,9 +52,9 @@ describe("Login", () => {
 
   it("submits login and calls api", async () => {
     const refetch = vi.fn().mockResolvedValue(undefined);
-    mockUseAuth.mockReturnValue({ user: null, loading: false, refetch } as any);
-
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null, refetch },
+    });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "a@b.com" },
     });
@@ -90,7 +77,9 @@ describe("Login", () => {
       return Promise.resolve({});
     });
 
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null },
+    });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "a@b.com" },
     });
@@ -110,7 +99,9 @@ describe("Login", () => {
       return Promise.resolve({});
     });
 
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null },
+    });
     await waitFor(() => {
       expect(screen.getByText(/invite-only/i)).toBeInTheDocument();
     });
@@ -126,7 +117,9 @@ describe("Login", () => {
       return Promise.resolve({});
     });
 
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null },
+    });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "a@b.com" },
     });
@@ -148,7 +141,9 @@ describe("Login", () => {
       return Promise.resolve({});
     });
 
-    render(<Login />);
+    renderWithAdminProviders(<Login />, {
+      auth: { user: null },
+    });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: "a@b.com" },
     });

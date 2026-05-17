@@ -7,6 +7,15 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test-setup.ts"],
+    coverage: {
+      exclude: ["src/test-setup.ts", "src/test/**", "**/*.test.{ts,tsx}"],
+      thresholds: {
+        lines: 50,
+        branches: 40,
+        functions: 50,
+        statements: 50,
+      },
+    },
   },
   resolve: {
     alias: {

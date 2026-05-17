@@ -21,7 +21,7 @@ export interface AuthUser {
   connected_accounts?: Array<{ provider: string; status: string }>;
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   logout: () => void;
@@ -29,7 +29,7 @@ interface AuthContextValue {
   refetch: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

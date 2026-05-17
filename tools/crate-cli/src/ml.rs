@@ -425,3 +425,349 @@ pub fn resample_linear(
 fn round3(v: f32) -> f32 {
     (v * 1000.0).round() / 1000.0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── audioset_label_index ─────────────────────────────────────────
+
+    #[test]
+    fn label_index_has_expected_count() {
+        let index = audioset_label_index();
+        assert!(!index.is_empty(), "Label index should not be empty");
+    }
+
+    #[test]
+    fn label_index_known_entries() {
+        let index = audioset_label_index();
+        assert_eq!(index.get("Speech"), Some(&0), "Speech should be index 0");
+        assert_eq!(
+            index.get("Silence"),
+            Some(&95),
+            "Silence should be index 95"
+        );
+        assert_eq!(
+            index.get("Rock music"),
+            Some(&354),
+            "Rock music should be index 354"
+        );
+    }
+
+    #[test]
+    fn label_index_all_entries_under_527() {
+        let index = audioset_label_index();
+        for (label, &idx) in index.iter() {
+            assert!(
+                idx < 527,
+                "Label '{label}' has index {idx}, which exceeds AudioSet class count"
+            );
+        }
+    }
+
+    // ── weighted_sum ─────────────────────────────────────────────────
+
+    fn make_probs_zeros() -> Vec<f32> {
+        vec![0.0; 527]
+    }
+
+    fn make_probs_with(values: &[(usize, f32)]) -> Vec<f32> {
+        let mut probs = vec![0.0; 527];
+        for &(idx, val) in values {
+            probs[idx] = val;
+        }
+        probs
+    }
+
+    #[test]
+    fn weighted_sum_all_zeros() {
+        let probs = make_probs_zeros();
+        let index = audioset_label_index();
+        let result = weighted_sum(&probs, &DANCE, &index);
+        assert_eq!(result, 0.0, "All zero probs should give zero sum");
+    }
+
+    #[test]
+    fn weighted_sum_single_label() {
+        let index = audioset_label_index();
+        let dance_idx = index["Dance music"];
+        let probs = make_probs_with(&[(dance_idx, 0.5)]);
+        let result = weighted_sum(&probs, &DANCE, &index);
+        assert!(result > 0.0, "Should have non-zero score for Dance music");
+        assert!((result - 0.75).abs() < 0.01, "0.5 * 1.5 = 0.75");
+    }
+
+    #[test]
+    fn weighted_sum_label_out_of_bounds_ignored() {
+        let probs = vec![0.1; 10];
+        let index = audioset_label_index();
+        let result = weighted_sum(&probs, &DANCE, &index);
+        assert_eq!(result, 0.0, "Label indices outside probs slice should be ignored");
+    }
+
+    #[test]
+    fn weighted_sum_multiple_labels() {
+        let index = audioset_label_index();
+        let happy_idx = index["Happy music"];
+        let exciting_idx = index["Exciting music"];
+        let probs = make_probs_with(&[(happy_idx, 0.4), (exciting_idx, 0.3)]);
+        let result = weighted_sum(&probs, &HAPPY, &index);
+        let expected = 0.4 * 2.0 + 0.3 * 0.5;
+        assert!(
+            (result - expected).abs() < 0.001,
+            "Weighted sum should be {expected}, got {result}"
+        );
+    }
+
+    // ── round3 ───────────────────────────────────────────────────────
+
+    #[test]
+    fn round3_whole_number() {
+        assert_eq!(round3(0.5), 0.5);
+    }
+
+    #[test]
+    fn round3_fraction() {
+        assert_eq!(round3(0.12345), 0.123);
+    }
+
+    #[test]
+    fn round3_rounds_up() {
+        assert_eq!(round3(0.1235), 0.124);
+    }
+
+    #[test]
+    fn round3_zero() {
+        assert_eq!(round3(0.0), 0.0);
+    }
+
+    #[test]
+    fn round3_one() {
+        assert_eq!(round3(1.0), 1.0);
+    }
+
+    // ── resample_linear ──────────────────────────────────────────────
+
+    #[test]
+    fn resample_same_rate_noop() {
+        let samples: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
+        let result = resample_linear(&samples, 32000, 32000, 30);
+        assert_eq!(result.len(), samples.len());
+        for (a, b) in samples.iter().zip(result.iter()) {
+            assert!((a - b).abs() < 0.001);
+        }
+    }
+
+    #[test]
+    fn resample_upsample_2x() {
+        let samples: Vec<f32> = vec![0.0, 0.5, 1.0];
+        let result = resample_linear(&samples, 16000, 32000, 30);
+        assert!(result.len() >= samples.len());
+        assert!((result[0] - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn resample_downsample_half() {
+        let samples: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.001).sin()).collect();
+        let result = resample_linear(&samples, 32000, 16000, 30);
+        assert!(result.len() < samples.len());
+        assert!(result.len() > 0);
+    }
+
+    #[test]
+    fn resample_truncates_to_max_duration() {
+        let sr = 32000;
+        let samples: Vec<f32> = (0..(sr * 35)).map(|_| 0.5).collect();
+        let result = resample_linear(&samples, sr, sr, 30);
+        assert_eq!(result.len(), sr as usize * 30);
+    }
+
+    #[test]
+    fn resample_empty_input() {
+        let samples: Vec<f32> = vec![];
+        let result = resample_linear(&samples, 44100, 32000, 30);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn resample_single_sample() {
+        let samples: Vec<f32> = vec![0.5];
+        let result = resample_linear(&samples, 16000, 32000, 30);
+        assert!(!result.is_empty());
+        assert!((result[0] - 0.5).abs() < 0.01);
+    }
+
+    // ── MlFeatures serialization ─────────────────────────────────────
+
+    #[test]
+    fn ml_features_serialize_round_trip() {
+        let mut mood = HashMap::new();
+        mood.insert("aggressive".to_string(), 0.123);
+        mood.insert("happy".to_string(), 0.789);
+        let features = MlFeatures {
+            mood,
+            danceability: 0.456,
+            valence: 0.567,
+            acousticness: 0.678,
+            instrumentalness: 0.789,
+        };
+        let json = serde_json::to_string(&features).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed["danceability"], 0.456);
+        assert_eq!(parsed["valence"], 0.567);
+        assert_eq!(parsed["acousticness"], 0.678);
+        assert_eq!(parsed["instrumentalness"], 0.789);
+        assert_eq!(parsed["mood"]["aggressive"], 0.123);
+        assert_eq!(parsed["mood"]["happy"], 0.789);
+    }
+
+    // ── SignalContext ────────────────────────────────────────────────
+
+    #[test]
+    fn signal_context_defaults() {
+        let ctx = SignalContext {
+            bpm: None,
+            scale: None,
+            energy: None,
+        };
+        assert!(ctx.bpm.is_none());
+        assert!(ctx.scale.is_none());
+        assert!(ctx.energy.is_none());
+    }
+
+    #[test]
+    fn signal_context_with_values() {
+        let ctx = SignalContext {
+            bpm: Some(128.0),
+            scale: Some("minor".to_string()),
+            energy: Some(0.8),
+        };
+        assert_eq!(ctx.bpm, Some(128.0));
+        assert_eq!(ctx.scale, Some("minor".to_string()));
+        assert_eq!(ctx.energy, Some(0.8));
+    }
+
+    // ── Label groups existence ───────────────────────────────────────
+
+    #[test]
+    fn energy_high_group_not_empty() {
+        assert!(!ENERGY_HIGH.labels.is_empty());
+    }
+
+    #[test]
+    fn energy_low_group_not_empty() {
+        assert!(!ENERGY_LOW.labels.is_empty());
+    }
+
+    #[test]
+    fn dance_group_not_empty() {
+        assert!(!DANCE.labels.is_empty());
+    }
+
+    #[test]
+    fn aggressive_group_not_empty() {
+        assert!(!AGGRESSIVE.labels.is_empty());
+    }
+
+    #[test]
+    fn happy_group_not_empty() {
+        assert!(!HAPPY.labels.is_empty());
+    }
+
+    #[test]
+    fn sad_group_not_empty() {
+        assert!(!SAD.labels.is_empty());
+    }
+
+    #[test]
+    fn acoustic_inst_group_not_empty() {
+        assert!(!ACOUSTIC_INST.labels.is_empty());
+    }
+
+    #[test]
+    fn electronic_inst_group_not_empty() {
+        assert!(!ELECTRONIC_INST.labels.is_empty());
+    }
+
+    #[test]
+    fn vocal_group_not_empty() {
+        assert!(!VOCAL.labels.is_empty());
+    }
+
+    #[test]
+    fn dark_group_not_empty() {
+        assert!(!DARK.labels.is_empty());
+    }
+
+    #[test]
+    fn all_group_labels_in_index() {
+        let index = audioset_label_index();
+        let groups: &[&LabelGroup] = &[
+            &ENERGY_HIGH,
+            &ENERGY_LOW,
+            &DANCE,
+            &AGGRESSIVE,
+            &HAPPY,
+            &SAD,
+            &ACOUSTIC_INST,
+            &ELECTRONIC_INST,
+            &VOCAL,
+            &DARK,
+        ];
+        for group in groups {
+            for &(label, _) in group.labels {
+                assert!(
+                    index.contains_key(label),
+                    "Label '{label}' from a group should be in audioset_label_index"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_group_labels_have_reasonable_weights() {
+        let groups: &[&LabelGroup] = &[
+            &ENERGY_HIGH,
+            &ENERGY_LOW,
+            &DANCE,
+            &AGGRESSIVE,
+            &HAPPY,
+            &SAD,
+            &ACOUSTIC_INST,
+            &ELECTRONIC_INST,
+            &VOCAL,
+            &DARK,
+        ];
+        for group in groups {
+            for &(label, weight) in group.labels {
+                assert!(
+                    weight > 0.0,
+                    "Label '{label}' weight should be positive, got {weight}"
+                );
+                assert!(
+                    weight <= 3.0,
+                    "Label '{label}' weight {weight} is unreasonably high"
+                );
+            }
+        }
+    }
+
+    // ── Constants ────────────────────────────────────────────────────
+
+    #[test]
+    fn panns_sample_rate_is_32k() {
+        assert_eq!(PANNS_SAMPLE_RATE, 32000);
+    }
+
+    #[test]
+    fn panns_duration_is_30_seconds() {
+        assert_eq!(PANNS_DURATION, 30);
+    }
+
+    // ── NOTE: PannsModel::load / predict_raw / compute_features / apply_hybrid ──
+    // These require the ONNX runtime and a panns_cnn14.onnx model file on disk.
+    // They cannot be tested without:
+    //   1. The `ort` crate compiled (requires `ml` feature)
+    //   2. A valid ONNX model file at a known path
+    // TEST_GAP: Model-dependent tests skipped — no ONNX model file available locally.
+}

@@ -68,3 +68,38 @@ jobs:
           target: media-worker
           push: false
           tags: crate-media-worker:ci
+
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Install system deps (crate-cli)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libsqlite3-dev
+
+      - name: Run crate-cli tests with coverage
+        working-directory: tools/crate-cli
+        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+
+      - name: Run media-worker tests with coverage
+        working-directory: app/media-worker
+        run: cargo llvm-cov --locked --lcov --output-path lcov.info
+
+      - name: Upload coverage reports to Codecov
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: codecov/codecov-action@v5
+        with:
+          files: tools/crate-cli/lcov.info,app/media-worker/lcov.info
+          flags: rust

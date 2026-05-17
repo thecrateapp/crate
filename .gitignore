@@ -13,6 +13,10 @@ node_modules/
 dist/
 coverage/
 **/coverage/
+coverage.out
+**/coverage.out
+lcov.info
+**/lcov.info
 
 # Python
 __pycache__/
