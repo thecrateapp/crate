@@ -6,13 +6,13 @@ Docs: https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2
 
 import os
 import logging
-import re
 import threading
 import time
 import requests
 
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import get_cache, set_cache
+from crate.show_filters import is_tribute_candidate, normalize_show_name
 
 log = logging.getLogger(__name__)
 
@@ -22,17 +22,6 @@ MIN_REQUEST_INTERVAL_SECONDS = float(
     os.environ.get("CRATE_TICKETMASTER_MIN_REQUEST_INTERVAL_SECONDS", "0.25")
 )
 MAX_RETRIES = 2
-TRIBUTE_MARKERS = (
-    "tribute",
-    "tributo",
-    "homenaje",
-    "celebrating",
-    "celebration of",
-    "experience",
-    "performs",
-    "plays",
-    "the music of",
-)
 _REQUEST_LOCK = threading.Lock()
 _LAST_REQUEST_AT = 0.0
 
@@ -79,14 +68,11 @@ def _ticketmaster_get(path: str, params: dict) -> requests.Response | None:
 
 
 def _normalize_artist_name(value: str) -> str:
-    normalized = value.lower().replace("&", " and ")
-    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
-    return " ".join(normalized.split())
+    return normalize_show_name(value)
 
 
 def _is_tribute_candidate(value: str) -> bool:
-    normalized = _normalize_artist_name(value)
-    return any(marker in normalized for marker in TRIBUTE_MARKERS)
+    return is_tribute_candidate(value)
 
 
 def _artist_names_match(candidate: str, target: str) -> bool:
@@ -115,7 +101,7 @@ def _search_attractions(artist_name: str) -> list[dict]:
     if not key:
         return []
 
-    cache_key = f"ticketmaster:attractions:v1:{_normalize_artist_name(artist_name)}"
+    cache_key = f"ticketmaster:attractions:v2:{_normalize_artist_name(artist_name)}"
     cached = get_cache(cache_key)
     if cached is not None:
         return cached
@@ -147,6 +133,18 @@ def _search_attractions(artist_name: str) -> list[dict]:
 def _event_matches_artist(event: dict, artist_name: str) -> bool:
     attractions = event.get("_embedded", {}).get("attractions", [])
     return bool(_matching_attractions(attractions, artist_name))
+
+
+def _event_has_tribute_signal(event: dict) -> bool:
+    attraction_names = [
+        str(attraction.get("name") or "")
+        for attraction in event.get("_embedded", {}).get("attractions", [])
+    ]
+    return any(
+        _is_tribute_candidate(value)
+        for value in [str(event.get("name") or ""), *attraction_names]
+        if value
+    )
 
 
 def _location_cache_part(
@@ -182,7 +180,7 @@ def search_events(
     requested_size = max(1, min(size, 200))
     normalized_country = country_code.strip().upper()
     cache_key = (
-        "ticketmaster:events:v2:"
+        "ticketmaster:events:v3:"
         f"{_normalize_artist_name(artist_name)}:{normalized_country}:"
         f"{requested_size}:{_location_cache_part(latitude=latitude, longitude=longitude, radius_km=radius_km)}"
     )
@@ -226,6 +224,8 @@ def search_events(
         events = []
         seen_ids: set[str] = set()
         for e in raw_events:
+            if _event_has_tribute_signal(e):
+                continue
             if not _event_matches_artist(e, artist_name):
                 continue
             event_id = str(e.get("id") or "").strip()
