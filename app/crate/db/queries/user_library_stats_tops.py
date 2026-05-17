@@ -484,6 +484,8 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
     all_time_card = _get_all_time_history_card(user_id)
     if all_time_card:
         cards.append(all_time_card)
+    if len(cards) >= limit:
+        return cards[:limit]
     for (year, month), bucket in sorted(buckets.items(), reverse=True):
         top_artists = [artist for artist, _ in bucket["artist_counts"].most_common(5)]
         period_start = bucket["period_start"]
@@ -504,7 +506,7 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
         )
         if len(cards) >= limit:
             break
-    return cards
+    return cards[:limit]
 
 
 __all__ = [

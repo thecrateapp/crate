@@ -270,7 +270,7 @@ class TestShowsUpcomingQueries:
         shows = get_upcoming_shows_near(48.8566, 2.3522, radius_km=10)
         assert shows == []
 
-    def test_get_upcoming_shows_near_includes_null_lat(self, pg_db):
+    def test_get_upcoming_shows_near_excludes_null_coordinates(self, pg_db):
         from crate.db.queries.shows_upcoming_queries import get_upcoming_shows_near
         from crate.db.tx import transaction_scope
 
@@ -278,7 +278,7 @@ class TestShowsUpcomingQueries:
             self._insert_show(session, {"latitude": None, "longitude": None})
 
         shows = get_upcoming_shows_near(52.52, 13.405, radius_km=10)
-        assert len(shows) == 1
+        assert shows == []
 
     def test_get_all_shows_empty(self, pg_db):
         from crate.db.queries.shows_upcoming_queries import get_all_shows

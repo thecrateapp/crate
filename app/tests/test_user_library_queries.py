@@ -1184,13 +1184,14 @@ class TestStatsTops:
         assert len(cards) >= 1
         card = cards[0]
         assert "id" in card
-        assert card["kind"] == "month"
+        assert card["kind"] == "all_time"
         assert "title" in card
         assert "period_start" in card
         assert "top_artists" in card
         assert "play_count" in card
         assert "minutes_listened" in card
         assert "artwork_tracks" in card
+        assert any(month_card["kind"] == "month" for month_card in cards)
 
     def test_get_listening_history_cards_empty(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_listening_history_cards
@@ -1480,7 +1481,7 @@ class TestTimeBasedQueries:
 class TestAggregationVerification:
     def test_daily_listening_aggregates_match_raw_events(self, lib_db):
         pg_db, data = lib_db
-        ts = datetime.now(timezone.utc) - timedelta(days=1)
+        ts = datetime(2026, 5, 16, 12, tzinfo=timezone.utc)
 
         # 2 completed, 1 skipped on the same day
         pg_db.record_play_event(
@@ -1505,7 +1506,7 @@ class TestAggregationVerification:
             device_type="web",
             app_platform="listen-web",
         )
-        ts2 = datetime.now(timezone.utc) - timedelta(days=1, hours=2)
+        ts2 = ts - timedelta(hours=2)
         pg_db.record_play_event(
             TEST_USER_ID,
             track_id=data["tracks"]["Concubine"]["id"],
@@ -1528,7 +1529,7 @@ class TestAggregationVerification:
             device_type="web",
             app_platform="listen-web",
         )
-        ts3 = datetime.now(timezone.utc) - timedelta(days=1, hours=3)
+        ts3 = ts - timedelta(hours=3)
         pg_db.record_play_event(
             TEST_USER_ID,
             track_id=data["tracks"]["Forsaken"]["id"],
@@ -1602,7 +1603,7 @@ class TestAggregationVerification:
     def test_unique_artists_in_daily_aggregation(self, lib_db):
         pg_db, data = lib_db
 
-        ts = datetime.now(timezone.utc) - timedelta(days=1)
+        ts = datetime(2026, 5, 16, 12, tzinfo=timezone.utc)
         for track_title in ("Concubine", "Forsaken", "Hutton's Great Heat Engine"):
             pg_db.record_play_event(
                 TEST_USER_ID,
