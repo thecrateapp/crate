@@ -265,6 +265,105 @@ def test_execute_smart_rules_count_only_matches_single_genre(pg_db):
     assert total == 3
 
 
+def test_execute_smart_rules_dedupes_artist_playlist_track_versions(pg_db):
+    from crate.db.playlists import execute_smart_rules
+
+    artist_name = "Gojira Version Fixture"
+    pg_db.upsert_artist(
+        {
+            "name": artist_name,
+            "album_count": 2,
+            "track_count": 3,
+            "total_size": 0,
+            "formats": ["flac"],
+        }
+    )
+    special_album_id = pg_db.upsert_album(
+        {
+            "artist": artist_name,
+            "name": "L'Enfant Sauvage (Special Edition)",
+            "path": "/music/gojira-version-fixture/special",
+            "track_count": 2,
+            "total_size": 0,
+            "formats": ["flac"],
+            "year": "2012",
+        }
+    )
+    original_album_id = pg_db.upsert_album(
+        {
+            "artist": artist_name,
+            "name": "L'Enfant Sauvage",
+            "path": "/music/gojira-version-fixture/original",
+            "track_count": 1,
+            "total_size": 0,
+            "formats": ["flac"],
+            "year": "2012",
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": special_album_id,
+            "artist": artist_name,
+            "album": "L'Enfant Sauvage (Special Edition)",
+            "filename": "10-born-in-winter.flac",
+            "title": "Born in Winter",
+            "track_number": 10,
+            "format": "flac",
+            "duration": 231,
+            "size": 123,
+            "path": "/music/gojira-version-fixture/special/10-born-in-winter.flac",
+            "popularity_score": 1.0,
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": original_album_id,
+            "artist": artist_name,
+            "album": "L'Enfant Sauvage",
+            "filename": "10-born-in-winter.flac",
+            "title": "Born in Winter",
+            "track_number": 10,
+            "format": "flac",
+            "duration": 231,
+            "size": 123,
+            "path": "/music/gojira-version-fixture/original/10-born-in-winter.flac",
+            "popularity_score": 0.9,
+        }
+    )
+    pg_db.upsert_track(
+        {
+            "album_id": original_album_id,
+            "artist": artist_name,
+            "album": "L'Enfant Sauvage",
+            "filename": "11-another-song.flac",
+            "title": "Another Song",
+            "track_number": 11,
+            "format": "flac",
+            "duration": 180,
+            "size": 123,
+            "path": "/music/gojira-version-fixture/original/11-another-song.flac",
+            "popularity_score": 0.8,
+        }
+    )
+
+    results = execute_smart_rules(
+        {
+            "match": "all",
+            "rules": [{"field": "artist", "op": "eq", "value": artist_name}],
+            "limit": 2,
+            "sort": "popularity",
+        }
+    )
+
+    assert {track["title"] for track in results} == {
+        "Born in Winter",
+        "Another Song",
+    }
+    assert [track for track in results if track["title"] == "Born in Winter"][0][
+        "album"
+    ] == "L'Enfant Sauvage"
+
+
 def test_execute_smart_rules_backfills_with_related_genres_before_repeating_artists(
     pg_db, monkeypatch
 ):

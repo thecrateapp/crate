@@ -32,6 +32,7 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
     deduplicate_artist = rules.get(
         "deduplicate_artist", has_genre_rule and not has_artist_rule
     )
+    deduplicate_variants = rules.get("deduplicate_variants", True)
     max_per_artist = _positive_int(rules.get("max_per_artist"), default=2)
     max_per_album = _positive_int(rules.get("max_per_album"), default=2)
     expand_related_genres = bool(rules.get("expand_related_genres", has_genre_rule))
@@ -45,6 +46,7 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
             sort=sort,
             count_only=count_only,
             deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
             max_per_artist=max_per_artist,
             max_per_album=max_per_album,
             expand_related_genres=expand_related_genres,
@@ -78,8 +80,11 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
             sort_clause, genre_score_exprs, match_mode
         )
 
-        fetch_limit = (
-            _diverse_fetch_limit(limit, max_per_artist) if deduplicate_artist else limit
+        fetch_limit = _smart_fetch_limit(
+            limit,
+            max_per_artist=max_per_artist,
+            deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
         )
         rows = _fetch_smart_rule_rows(
             session,
@@ -90,6 +95,8 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
         )
 
     results = [dict(row) for row in rows]
+    if deduplicate_variants:
+        results = dedupe_track_variants(results)
 
     if deduplicate_artist and max_per_artist > 0:
         if expand_related_genres:
@@ -132,6 +139,7 @@ def _execute_single_genre_rules(
     sort: str,
     count_only: bool,
     deduplicate_artist: bool,
+    deduplicate_variants: bool,
     max_per_artist: int,
     max_per_album: int,
     expand_related_genres: bool,
@@ -140,8 +148,11 @@ def _execute_single_genre_rules(
         if count_only:
             return _count_single_genre_rule_rows(session, values=values)
 
-        fetch_limit = (
-            _diverse_fetch_limit(limit, max_per_artist) if deduplicate_artist else limit
+        fetch_limit = _smart_fetch_limit(
+            limit,
+            max_per_artist=max_per_artist,
+            deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
         )
         rows = _fetch_single_genre_rule_rows(
             session,
@@ -151,6 +162,8 @@ def _execute_single_genre_rules(
         )
 
     results = [dict(row) for row in rows]
+    if deduplicate_variants:
+        results = dedupe_track_variants(results)
 
     if deduplicate_artist and max_per_artist > 0:
         if expand_related_genres:
@@ -220,6 +233,20 @@ def _diverse_fetch_limit(limit: int, max_per_artist: int) -> int:
     if limit <= 0:
         return 0
     return min(max(limit * max(max_per_artist * 6, 12), 200), 2000)
+
+
+def _smart_fetch_limit(
+    limit: int,
+    *,
+    max_per_artist: int,
+    deduplicate_artist: bool,
+    deduplicate_variants: bool,
+) -> int:
+    if deduplicate_artist:
+        return _diverse_fetch_limit(limit, max_per_artist)
+    if deduplicate_variants:
+        return min(max(limit * 4, 200), 1000)
+    return limit
 
 
 def _fetch_smart_rule_rows(
