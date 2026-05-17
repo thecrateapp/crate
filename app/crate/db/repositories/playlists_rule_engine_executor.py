@@ -32,9 +32,25 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
     deduplicate_artist = rules.get(
         "deduplicate_artist", has_genre_rule and not has_artist_rule
     )
+    deduplicate_variants = rules.get("deduplicate_variants", True)
     max_per_artist = _positive_int(rules.get("max_per_artist"), default=2)
     max_per_album = _positive_int(rules.get("max_per_album"), default=2)
     expand_related_genres = bool(rules.get("expand_related_genres", has_genre_rule))
+
+    single_genre_values = _single_genre_contains_values(rule_list)
+    if single_genre_values is not None:
+        return _execute_single_genre_rules(
+            rule_list=rule_list,
+            values=single_genre_values,
+            limit=limit,
+            sort=sort,
+            count_only=count_only,
+            deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
+            max_per_artist=max_per_artist,
+            max_per_album=max_per_album,
+            expand_related_genres=expand_related_genres,
+        )
 
     where, params, genre_score_exprs = build_rule_conditions(rule_list, match_mode)
 
@@ -64,8 +80,11 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
             sort_clause, genre_score_exprs, match_mode
         )
 
-        fetch_limit = (
-            _diverse_fetch_limit(limit, max_per_artist) if deduplicate_artist else limit
+        fetch_limit = _smart_fetch_limit(
+            limit,
+            max_per_artist=max_per_artist,
+            deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
         )
         rows = _fetch_smart_rule_rows(
             session,
@@ -76,6 +95,8 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
         )
 
     results = [dict(row) for row in rows]
+    if deduplicate_variants:
+        results = dedupe_track_variants(results)
 
     if deduplicate_artist and max_per_artist > 0:
         if expand_related_genres:
@@ -110,12 +131,82 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
     return results[:limit]
 
 
+def _execute_single_genre_rules(
+    *,
+    rule_list: list[dict],
+    values: list[str],
+    limit: int,
+    sort: str,
+    count_only: bool,
+    deduplicate_artist: bool,
+    deduplicate_variants: bool,
+    max_per_artist: int,
+    max_per_album: int,
+    expand_related_genres: bool,
+) -> list[dict] | int:
+    with read_scope() as session:
+        if count_only:
+            return _count_single_genre_rule_rows(session, values=values)
+
+        fetch_limit = _smart_fetch_limit(
+            limit,
+            max_per_artist=max_per_artist,
+            deduplicate_artist=deduplicate_artist,
+            deduplicate_variants=deduplicate_variants,
+        )
+        rows = _fetch_single_genre_rule_rows(
+            session,
+            values=values,
+            sort_clause=SORT_MAP.get(sort, "RANDOM()"),
+            limit=fetch_limit,
+        )
+
+    results = [dict(row) for row in rows]
+    if deduplicate_variants:
+        results = dedupe_track_variants(results)
+
+    if deduplicate_artist and max_per_artist > 0:
+        if expand_related_genres:
+            expanded_rules = _expand_related_genre_rules(rule_list)
+            expanded_values = _single_genre_contains_values(expanded_rules) or values
+            if expanded_values != values:
+                with read_scope() as session:
+                    expanded_rows = _fetch_single_genre_rule_rows(
+                        session,
+                        values=expanded_values,
+                        sort_clause=SORT_MAP.get(sort, "RANDOM()"),
+                        limit=max(fetch_limit, _diverse_fetch_limit(limit, 1)),
+                    )
+                results = _merge_smart_rows(
+                    results, [dict(row) for row in expanded_rows]
+                )
+
+        return _select_diverse_smart_rows(
+            results,
+            limit=limit,
+            max_per_artist=max_per_artist,
+            max_per_album=max_per_album,
+        )
+
+    return results[:limit]
+
+
 def _positive_int(value: object, *, default: int) -> int:
     try:
         parsed = int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return default
     return parsed if parsed > 0 else default
+
+
+def _single_genre_contains_values(rule_list: list[dict]) -> list[str] | None:
+    if len(rule_list) != 1:
+        return None
+    rule = rule_list[0]
+    if rule.get("field") != "genre" or rule.get("op") != "contains":
+        return None
+    values = _split_rule_values(rule.get("value"))
+    return values or None
 
 
 def _has_genre_rule(rule_list: list[dict]) -> bool:
@@ -144,6 +235,20 @@ def _diverse_fetch_limit(limit: int, max_per_artist: int) -> int:
     return min(max(limit * max(max_per_artist * 6, 12), 200), 2000)
 
 
+def _smart_fetch_limit(
+    limit: int,
+    *,
+    max_per_artist: int,
+    deduplicate_artist: bool,
+    deduplicate_variants: bool,
+) -> int:
+    if deduplicate_artist:
+        return _diverse_fetch_limit(limit, max_per_artist)
+    if deduplicate_variants:
+        return min(max(limit * 4, 200), 1000)
+    return limit
+
+
 def _fetch_smart_rule_rows(
     session,
     *,
@@ -169,6 +274,120 @@ def _fetch_smart_rule_rows(
             WHERE ({where})
               AND (t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
             ORDER BY {sort_clause}
+            LIMIT :lim
+            """
+            ),
+            query_params,
+        )
+        .mappings()
+        .all()
+    )
+
+
+def _single_genre_match_sql(values: list[str]) -> tuple[str, str, str, dict]:
+    params = {f"genre_{index}": f"%{value}%" for index, value in enumerate(values)}
+    genre_matches = [
+        f"(g.name ILIKE :{param} OR g.slug ILIKE :{param})" for param in params
+    ]
+    track_matches = [f"t.genre ILIKE :{param}" for param in params]
+    genre_match_sql = " OR ".join(genre_matches) if genre_matches else "FALSE"
+    track_match_sql = " OR ".join(track_matches) if track_matches else "FALSE"
+    score_sql = f"""GREATEST(
+        CASE WHEN ({track_match_sql}) THEN 1.0 ELSE 0.0 END,
+        COALESCE(album_genre_matches.genre_score, 0.0),
+        COALESCE(artist_genre_matches.genre_score, 0.0)
+    )"""
+    return genre_match_sql, track_match_sql, score_sql, params
+
+
+def _single_genre_ctes(genre_match_sql: str) -> str:
+    return f"""
+        WITH album_genre_matches AS (
+            SELECT ag.album_id, MAX(ag.weight) AS genre_score
+            FROM album_genres ag
+            JOIN genres g ON g.id = ag.genre_id
+            WHERE {genre_match_sql}
+            GROUP BY ag.album_id
+        ),
+        artist_genre_matches AS (
+            SELECT arg.artist_name, MAX(arg.weight) AS genre_score
+            FROM artist_genres arg
+            JOIN genres g ON g.id = arg.genre_id
+            WHERE {genre_match_sql}
+            GROUP BY arg.artist_name
+        )
+    """
+
+
+def _single_genre_from_join_sql() -> str:
+    return """
+        FROM library_tracks t
+        LEFT JOIN library_albums a ON t.album_id = a.id
+        LEFT JOIN library_artists a_artist ON t.artist = a_artist.name
+        LEFT JOIN album_genre_matches ON album_genre_matches.album_id = t.album_id
+        LEFT JOIN artist_genre_matches ON artist_genre_matches.artist_name = t.artist
+    """
+
+
+def _single_genre_where_sql(track_match_sql: str) -> str:
+    return f"""
+        WHERE (t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
+          AND (
+              {track_match_sql}
+              OR album_genre_matches.album_id IS NOT NULL
+              OR artist_genre_matches.artist_name IS NOT NULL
+          )
+    """
+
+
+def _count_single_genre_rule_rows(session, *, values: list[str]) -> int:
+    genre_match_sql, track_match_sql, _score_sql, params = _single_genre_match_sql(
+        values
+    )
+    row = (
+        session.execute(
+            text(
+                f"""
+            {_single_genre_ctes(genre_match_sql)}
+            SELECT COUNT(*) AS cnt
+            {_single_genre_from_join_sql()}
+            {_single_genre_where_sql(track_match_sql)}
+            """
+            ),
+            params,
+        )
+        .mappings()
+        .first()
+    )
+    return row["cnt"] if row else 0
+
+
+def _fetch_single_genre_rule_rows(
+    session,
+    *,
+    values: list[str],
+    sort_clause: str,
+    limit: int,
+):
+    genre_match_sql, track_match_sql, score_sql, params = _single_genre_match_sql(
+        values
+    )
+    query_params = {**params, "lim": limit}
+    return (
+        session.execute(
+            text(
+                f"""
+            {_single_genre_ctes(genre_match_sql)}
+            SELECT t.id, t.id AS track_id,
+                   t.entity_uid::text AS entity_uid, t.storage_id::text AS storage_id,
+                   t.path, t.path AS track_path, t.title, t.artist, a.name AS album,
+                   t.duration, t.format, t.bpm, t.energy, t.genre, t.year,
+                   a.id AS album_id, a.slug AS album_slug,
+                   a_artist.id AS artist_id, a_artist.slug AS artist_slug,
+                   {score_sql} AS genre_relevance_score
+            {_single_genre_from_join_sql()}
+            {_single_genre_where_sql(track_match_sql)}
+            ORDER BY genre_relevance_score DESC, {sort_clause}
             LIMIT :lim
             """
             ),

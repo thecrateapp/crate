@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from crate.db.queries.shows_shared import dedupe_show_rows
+from crate.show_filters import show_has_tribute_signal
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
@@ -16,7 +17,7 @@ def get_upcoming_shows(
 ) -> list[dict]:
     today = datetime.now(timezone.utc).date()
     conditions = ["date >= :today", "status != 'cancelled'"]
-    params: dict[str, object] = {"today": today, "lim": limit * 3}
+    params: dict[str, object] = {"today": today, "lim": limit * 5}
     if artist_name:
         conditions.append("artist_name = :artist_name")
         params["artist_name"] = artist_name
@@ -41,7 +42,8 @@ def get_upcoming_shows(
             .mappings()
             .all()
         )
-    return dedupe_show_rows([dict(row) for row in rows])[:limit]
+    clean_rows = [dict(row) for row in rows if not show_has_tribute_signal(dict(row))]
+    return dedupe_show_rows(clean_rows)[:limit]
 
 
 def get_upcoming_shows_near(
@@ -91,7 +93,7 @@ def get_upcoming_shows_near(
                     "lat_max": lat_max,
                     "lon_min": lon_min,
                     "lon_max": lon_max,
-                    "lim": limit * 3,
+                    "lim": limit * 5,
                 },
             )
             .mappings()
@@ -101,6 +103,8 @@ def get_upcoming_shows_near(
     result: list[dict] = []
     for row in rows:
         item = dict(row)
+        if show_has_tribute_signal(item):
+            continue
         dist = item.pop("distance_km", None)
         if dist is not None and dist <= radius_km:
             result.append(item)

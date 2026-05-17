@@ -4,6 +4,7 @@ from math import cos, radians
 from crate.db.queries.shows_shared import dedupe_show_rows
 from crate.db.serialize import serialize_rows
 from crate.db.tx import read_scope
+from crate.show_filters import show_has_tribute_signal
 from sqlalchemy import text
 
 
@@ -208,7 +209,10 @@ def get_upcoming_shows(
             .mappings()
             .all()
         )
-        return dedupe_show_rows(serialize_rows(rows))[:limit]
+        clean_rows = [
+            row for row in serialize_rows(rows) if not show_has_tribute_signal(row)
+        ]
+        return dedupe_show_rows(clean_rows)[:limit]
 
 
 def get_artist_genres_for_names(artist_names: list[str]) -> dict[str, list[str]]:

@@ -22,7 +22,7 @@ _ALT_MARKER_RE = re.compile(
 )
 _STUDIOISH_MARKER_RE = re.compile(
     r"\b("
-    r"remaster(?:ed)?|mono|stereo|anniversary edition|deluxe edition"
+    r"remaster(?:ed)?|mono|stereo|anniversary edition|deluxe edition|special edition"
     r")\b",
     re.IGNORECASE,
 )
@@ -90,6 +90,13 @@ def track_variant_rank(title: str) -> int:
     return max(_variant_marker_rank(marker) for marker in markers)
 
 
+def _row_variant_rank(row: dict) -> int:
+    return max(
+        track_variant_rank(str(row.get("title") or "")),
+        _variant_marker_rank(str(row.get("album") or "")),
+    )
+
+
 def canonical_track_title_key(title: str) -> str:
     working = unicodedata.normalize("NFKC", title or "").strip()
     while working:
@@ -120,10 +127,33 @@ def track_song_identity(row: dict) -> tuple[str, str] | None:
 
 
 def prefers_track_variant(candidate: dict, current: dict) -> bool:
-    candidate_rank = track_variant_rank(str(candidate.get("title") or ""))
-    current_rank = track_variant_rank(str(current.get("title") or ""))
+    candidate_rank = _row_variant_rank(candidate)
+    current_rank = _row_variant_rank(current)
     if candidate_rank != current_rank:
         return candidate_rank < current_rank
+    return False
+
+
+def _duration_value(row: dict) -> float | None:
+    raw_duration = row.get("duration")
+    if raw_duration is None:
+        return None
+    try:
+        duration = float(raw_duration)
+    except (TypeError, ValueError):
+        return None
+    return duration if duration > 0 else None
+
+
+def _has_near_duplicate_duration(entries: list[tuple[int, dict]]) -> bool:
+    durations = [_duration_value(row) for _index, row in entries]
+    durations = [duration for duration in durations if duration is not None]
+    if len(durations) < 2:
+        return False
+    for index, duration in enumerate(durations):
+        for other in durations[index + 1 :]:
+            if abs(duration - other) <= 3:
+                return True
     return False
 
 
@@ -148,10 +178,12 @@ def dedupe_track_variants(rows: list[dict]) -> list[dict]:
             _normalized_track_title_key(str(row.get("title") or ""))
             for _index, row in entries
         }
-        ranks = [
-            track_variant_rank(str(row.get("title") or "")) for _index, row in entries
-        ]
-        has_version_signal = any(rank > 0 for rank in ranks) or len(raw_title_keys) > 1
+        ranks = [_row_variant_rank(row) for _index, row in entries]
+        has_version_signal = (
+            any(rank > 0 for rank in ranks)
+            or len(raw_title_keys) > 1
+            or _has_near_duplicate_duration(entries)
+        )
         if not has_version_signal:
             ordered.extend(entries)
             continue

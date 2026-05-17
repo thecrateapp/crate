@@ -14,6 +14,11 @@ import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
+import {
+  buildUpcomingCityOptions,
+  buildUpcomingGenreOptions,
+  filterUpcomingItems,
+} from "./upcoming-filters";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -165,38 +170,13 @@ export function Upcoming() {
     fetchItems();
   }, []);
 
-  // Apply type + search filter first
-  const typeFiltered = useMemo(() => {
-    let list = items;
-    if (search)
-      list = list.filter((i) =>
-        i.artist.toLowerCase().includes(search.toLowerCase()),
-      );
-    if (filter === "releases") list = list.filter((i) => i.type === "release");
-    else if (filter === "shows") list = list.filter((i) => i.type === "show");
-    return list;
-  }, [items, search, filter]);
-
-  // Derived filter options from type-filtered list (so genres/cities adjust per view)
   const availableGenres = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const i of typeFiltered) {
-      for (const g of i.genres || []) counts[g] = (counts[g] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 30);
-  }, [typeFiltered]);
+    return buildUpcomingGenreOptions(items, { type: filter, search });
+  }, [items, filter, search]);
 
   const availableCities = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const i of typeFiltered) {
-      if (i.city) counts[i.city] = (counts[i.city] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 50);
-  }, [typeFiltered]);
+    return buildUpcomingCityOptions(items, { type: filter });
+  }, [items, filter]);
 
   // Reset genre/city filter if the selected value is no longer available
   useEffect(() => {
@@ -208,21 +188,14 @@ export function Upcoming() {
       setCityFilter("");
   }, [cityFilter, availableCities]);
 
-  // Apply genre + city filters
   const filtered = useMemo(() => {
-    let list = typeFiltered;
-    if (genreFilter)
-      list = list.filter((i) =>
-        (i.genres || []).some(
-          (g) => g.toLowerCase() === genreFilter.toLowerCase(),
-        ),
-      );
-    if (cityFilter)
-      list = list.filter(
-        (i) => i.city?.toLowerCase() === cityFilter.toLowerCase(),
-      );
-    return list;
-  }, [typeFiltered, genreFilter, cityFilter]);
+    return filterUpcomingItems(items, {
+      type: filter,
+      search,
+      genre: genreFilter,
+      city: cityFilter,
+    });
+  }, [items, filter, search, genreFilter, cityFilter]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = filtered.filter(
