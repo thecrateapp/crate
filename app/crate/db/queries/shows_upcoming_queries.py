@@ -75,10 +75,10 @@ def get_upcoming_shows_near(
                 FROM shows
                 WHERE date >= :today
                   AND status != 'cancelled'
-                  AND (
-                      (latitude BETWEEN :lat_min AND :lat_max AND longitude BETWEEN :lon_min AND :lon_max)
-                      OR latitude IS NULL
-                  )
+                  AND latitude IS NOT NULL
+                  AND longitude IS NOT NULL
+                  AND latitude BETWEEN :lat_min AND :lat_max
+                  AND longitude BETWEEN :lon_min AND :lon_max
                 ORDER BY date ASC
                 LIMIT :lim
                 """

@@ -15,6 +15,8 @@ from crate.api.schemas.social import (
     SocialUnfollowResponse,
     SocialUserRelationResponse,
 )
+from crate.api.schemas.me import StatsDashboardResponse
+from crate.api.me import _get_cached_stats_dashboard
 from crate.db.queries.social import (
     get_followers,
     get_following,
@@ -111,6 +113,60 @@ def social_profile_page(request: Request, username: str):
     profile["followers_preview"] = get_followers(target_user_id, limit=8)
     profile["following_preview"] = get_following(target_user_id, limit=8)
     return profile
+
+
+@router.get(
+    "/api/users/{username}/stats/dashboard",
+    response_model=StatsDashboardResponse,
+    responses=_SOCIAL_RESPONSES,
+    summary="Get a public user's Listening DNA dashboard",
+)
+def social_profile_stats_dashboard(
+    request: Request,
+    username: str,
+    window: str = Query("30d"),
+    month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    tracks_limit: int = Query(12, ge=1, le=50),
+    artists_limit: int = Query(10, ge=1, le=50),
+    albums_limit: int = Query(10, ge=1, le=50),
+    genres_limit: int = Query(10, ge=1, le=50),
+    replay_limit: int = Query(36, ge=1, le=100),
+):
+    viewer = _require_auth(request)
+    profile = get_public_user_profile_by_username(username)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        payload = dict(
+            _get_cached_stats_dashboard(
+                profile["id"],
+                window=window,
+                month=month,
+                tracks_limit=tracks_limit,
+                artists_limit=artists_limit,
+                albums_limit=albums_limit,
+                genres_limit=genres_limit,
+                replay_limit=replay_limit,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payload["subject"] = {
+        "kind": "user",
+        "user_id": profile["id"],
+        "username": profile.get("username"),
+        "display_name": profile.get("display_name"),
+        "avatar": profile.get("avatar"),
+    }
+    if viewer["id"] != profile["id"]:
+        payload["viewer_affinity"] = {
+            key: value
+            for key, value in get_affinity(viewer["id"], profile["id"]).items()
+            if key in {"affinity_score", "affinity_band", "affinity_reasons"}
+        }
+    return payload
 
 
 @router.get(

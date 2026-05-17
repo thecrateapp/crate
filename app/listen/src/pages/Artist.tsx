@@ -7,6 +7,7 @@ import { ArtistHeroSection } from "@/components/artist/ArtistHeroSection";
 import { ArtistSetlistModal } from "@/components/artist/ArtistSetlistSection";
 import {
   ArtistAlbumsSection,
+  ArtistAppearsOnSection,
   ArtistShowsSection,
   ArtistTopTracksSection,
   RelatedArtistsSection,
@@ -172,6 +173,7 @@ export function Artist() {
   }
 
   const similarArtists = info?.similar ?? [];
+  const appearsOn = pageData?.appears_on ?? [];
   const following = isFollowing(data?.id);
   const artistShowItems = buildArtistShowItems(showsData?.events ?? []);
   const albumsSorted = sortArtistAlbumsByYear(data?.albums ?? []);
@@ -262,6 +264,7 @@ export function Artist() {
           coverFallback={coverFallback}
         />
         <ArtistAlbumsSection artistName={data.name} albums={albumsSorted} />
+        <ArtistAppearsOnSection playlists={appearsOn} />
         <ArtistShowsSection
           shows={visibleShowItems}
           expandedShowId={expandedShowId}

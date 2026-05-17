@@ -61,18 +61,18 @@ export function WindowPicker({
   value,
   onChange,
 }: {
-  value: StatsWindow;
+  value: StatsWindow | null;
   onChange: (value: StatsWindow) => void;
 }) {
   return (
-    <div className="inline-flex rounded-2xl border border-white/10 bg-white/[0.03] p-1">
+    <div className="inline-flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-black/25 p-1 shadow-2xl shadow-black/20 backdrop-blur">
       {STATS_WINDOW_OPTIONS.map((option) => (
         <button
           key={option.value}
           onClick={() => onChange(option.value)}
-          className={`rounded-xl px-3 py-1.5 text-sm transition-colors ${
+          className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-black uppercase tracking-[0.12em] transition-all ${
             value === option.value
-              ? "bg-primary text-primary-foreground"
+              ? "bg-primary text-primary-foreground shadow-[0_0_24px_rgba(34,211,238,0.28)]"
               : "text-muted-foreground hover:bg-white/5 hover:text-white"
           }`}
         >
@@ -134,7 +134,7 @@ export function TrendChart({
 
   if (loading) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/10 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
         Loading trend data...
       </div>
     );
@@ -142,17 +142,17 @@ export function TrendChart({
 
   if (points.length === 0) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-black/10 text-sm text-muted-foreground">
+      <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
         Start listening and your daily curve will appear here.
       </div>
     );
   }
 
   return (
-    <div className="h-72 rounded-2xl border border-white/10 bg-black/10 p-3">
+    <div className="h-72 rounded-[1.35rem] border border-white/10 bg-[radial-gradient(circle_at_20%_12%,rgba(34,211,238,0.10),transparent_30%),rgba(0,0,0,0.24)] p-3">
       <ResponsiveLine
         data={data}
-        margin={{ top: 20, right: 20, bottom: 40, left: 50 }}
+        margin={{ top: 22, right: 22, bottom: 40, left: 48 }}
         xScale={{ type: "point" }}
         yScale={{
           type: "linear",
@@ -165,14 +165,19 @@ export function TrendChart({
         axisRight={null}
         colors={["#22d3ee"]}
         enableGridX={false}
-        pointSize={7}
+        enableArea
+        areaOpacity={0.18}
+        pointSize={8}
         pointColor="#22d3ee"
-        pointBorderWidth={0}
+        pointBorderWidth={2}
+        pointBorderColor="#071017"
+        lineWidth={3}
+        curve="monotoneX"
         useMesh
         theme={{
-          text: { fill: "rgba(255,255,255,0.45)", fontSize: 11 },
+          text: { fill: "rgba(255,255,255,0.5)", fontSize: 11 },
           axis: {
-            ticks: { text: { fill: "rgba(255,255,255,0.35)" } },
+            ticks: { text: { fill: "rgba(255,255,255,0.38)" } },
             legend: { text: { fill: "rgba(255,255,255,0.35)" } },
             domain: { line: { stroke: "rgba(255,255,255,0.08)" } },
           },

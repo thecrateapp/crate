@@ -30,6 +30,7 @@ import {
 } from "@/components/artist/artistPageData";
 import type { ArtistData, TabKey } from "@/components/artist/artistPageTypes";
 import { api } from "@/lib/api";
+import { createSystemPlaylistFromBlueprint } from "@/lib/system-playlist-blueprints";
 import {
   artistActionApiPath,
   artistApiPath,
@@ -93,6 +94,7 @@ export function Artist() {
   >([]);
   const [tidalMissingLoaded, setTidalMissingLoaded] = useState(false);
   const [downloadingDiscog, setDownloadingDiscog] = useState(false);
+  const [creatingCorePlaylist, setCreatingCorePlaylist] = useState(false);
   const [allTrackTitles, setAllTrackTitles] = useState<
     {
       title: string;
@@ -327,6 +329,23 @@ export function Artist() {
     }
   }
 
+  async function createArtistCorePlaylist() {
+    setCreatingCorePlaylist(true);
+    try {
+      const playlist = await createSystemPlaylistFromBlueprint({
+        targetType: "artist",
+        targetName: artistName,
+        blueprintKey: "artist-essentials",
+      });
+      toast.success(`Created "${playlist.name}"`);
+      navigate(`/playlists/${playlist.id}`);
+    } catch {
+      toast.error("Failed to create artist core playlist");
+    } finally {
+      setCreatingCorePlaylist(false);
+    }
+  }
+
   async function queueArtistMetadataAction(
     action: Exclude<ArtistMetadataAction, null>,
   ) {
@@ -405,6 +424,14 @@ export function Artist() {
         onAnalyze={() => {
           void analyzeArtist();
         }}
+        corePlaylistCreating={creatingCorePlaylist}
+        onCreateCorePlaylist={
+          isAdmin && totalTracks > 0
+            ? () => {
+                void createArtistCorePlaylist();
+              }
+            : undefined
+        }
         onRepair={() => {
           void repairArtist();
         }}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from crate.db.home_builders import (
     _build_core_playlists,
+    _build_core_discovery_artists,
     _build_custom_mix_summaries,
     _build_home_upcoming,
     _build_mix_rows,
@@ -133,11 +134,22 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
         }
 
     if section_id == "core-tracks":
+        discovery_artists = _build_core_discovery_artists(
+            user_id,
+            top_genres_lower=top_genres_lower,
+            interest_artists_lower=interest_artists_lower,
+            limit=max(limit, 14),
+        )
         return {
             "id": section_id,
             "title": "Core tracks",
-            "subtitle": "Artist-focused sets built from the names most present in your listening.",
-            "items": _build_core_playlists(user_id, top_artists, min(limit, 7)),
+            "subtitle": "Discovery-forward artist sets, ending with familiar anchors.",
+            "items": _build_core_playlists(
+                user_id,
+                top_artists,
+                min(limit, 7),
+                discovery_artists=discovery_artists,
+            ),
         }
 
     return None
@@ -190,6 +202,12 @@ def build_home_discovery_payload(user_id: int) -> dict:
         precomputed_mixes=precomputed_mixes,
     )
     merged_artists = merged_artists_from_context(context)
+    discovery_artists = _build_core_discovery_artists(
+        user_id,
+        top_genres_lower=top_genres_lower,
+        interest_artists_lower=interest_artists_lower,
+        limit=14,
+    )
 
     return {
         "hero": hero,
@@ -199,7 +217,9 @@ def build_home_discovery_payload(user_id: int) -> dict:
         "recommended_tracks": [_track_payload(row) for row in recommended_tracks],
         "radio_stations": _build_radio_stations(merged_artists, top_albums, 14),
         "favorite_artists": get_home_favorite_artists(user_id),
-        "essentials": _build_core_playlists(user_id, merged_artists, 7),
+        "essentials": _build_core_playlists(
+            user_id, merged_artists, 7, discovery_artists=discovery_artists
+        ),
         "recent_global_artists": _build_recent_global_artists(7),
         "listening_history": get_listening_history_cards(user_id, limit=8),
         "replay": get_replay_mix(user_id, window="30d", limit=18),

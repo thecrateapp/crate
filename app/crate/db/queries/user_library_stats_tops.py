@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 
 from sqlalchemy import text
 
@@ -275,6 +275,126 @@ def _history_subtitle(top_artists: list[str]) -> str:
     return f"{top_artists[0]}, {top_artists[1]}, {top_artists[2]} and more"
 
 
+def _get_all_time_history_card(user_id: int) -> dict | None:
+    with read_scope() as session:
+        totals = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        COUNT(*)::integer AS play_count,
+                        COALESCE(SUM(played_seconds), 0) / 60.0 AS minutes_listened
+                    FROM user_play_events
+                    WHERE user_id = :user_id
+                    """
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .first()
+        )
+        if not totals or int(totals.get("play_count") or 0) <= 0:
+            return None
+
+        artist_rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT COALESCE(NULLIF(TRIM(artist), ''), 'Unknown artist') AS artist_name
+                    FROM user_play_events
+                    WHERE user_id = :user_id
+                      AND COALESCE(NULLIF(TRIM(artist), ''), '') <> ''
+                    GROUP BY 1
+                    ORDER BY COUNT(*) DESC, COALESCE(SUM(played_seconds), 0) DESC, artist_name
+                    LIMIT 5
+                    """
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .all()
+        )
+        cover_rows = (
+            session.execute(
+                text(
+                    """
+                    WITH ranked AS (
+                        SELECT
+                            COALESCE(lt.id, upe.track_id) AS track_id,
+                            COALESCE(lt.entity_uid::text, upe.track_entity_uid::text) AS track_entity_uid,
+                            COALESCE(lt.path, upe.track_path) AS track_path,
+                            COALESCE(lt.title, upe.title) AS title,
+                            COALESCE(lt.artist, upe.artist) AS artist,
+                            COALESCE(lt.album, upe.album) AS album,
+                            art.id AS artist_id,
+                            art.entity_uid::text AS artist_entity_uid,
+                            art.slug AS artist_slug,
+                            COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
+                            COALESCE(alb_by_id.entity_uid::text, alb_by_name.entity_uid::text) AS album_entity_uid,
+                            COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
+                            COUNT(*)::integer AS play_count
+                        FROM user_play_events upe
+                        LEFT JOIN library_tracks lt
+                          ON lt.id = upe.track_id
+                          OR (
+                            upe.track_id IS NULL
+                            AND upe.track_entity_uid IS NOT NULL
+                            AND lt.entity_uid = upe.track_entity_uid
+                          )
+                        LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
+                        LEFT JOIN library_albums alb_by_name
+                          ON alb_by_id.id IS NULL
+                         AND alb_by_name.artist = COALESCE(lt.artist, upe.artist)
+                         AND alb_by_name.name = COALESCE(lt.album, upe.album)
+                        LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, upe.artist)
+                        WHERE upe.user_id = :user_id
+                          AND COALESCE(NULLIF(TRIM(COALESCE(lt.artist, upe.artist)), ''), '') <> ''
+                          AND COALESCE(NULLIF(TRIM(COALESCE(lt.album, upe.album)), ''), '') <> ''
+                        GROUP BY
+                            COALESCE(lt.id, upe.track_id),
+                            COALESCE(lt.entity_uid::text, upe.track_entity_uid::text),
+                            COALESCE(lt.path, upe.track_path),
+                            COALESCE(lt.title, upe.title),
+                            COALESCE(lt.artist, upe.artist),
+                            COALESCE(lt.album, upe.album),
+                            art.id,
+                            art.entity_uid::text,
+                            art.slug,
+                            COALESCE(alb_by_id.id, alb_by_name.id),
+                            COALESCE(alb_by_id.entity_uid::text, alb_by_name.entity_uid::text),
+                            COALESCE(alb_by_id.slug, alb_by_name.slug)
+                    )
+                    SELECT *
+                    FROM ranked
+                    ORDER BY play_count DESC
+                    LIMIT 4
+                    """
+                ),
+                {"user_id": user_id},
+            )
+            .mappings()
+            .all()
+        )
+
+    top_artists = [
+        str(row.get("artist_name") or "").strip()
+        for row in artist_rows
+        if str(row.get("artist_name") or "").strip()
+    ]
+    return {
+        "id": "all-time",
+        "kind": "all_time",
+        "title": "My Most Listened",
+        "period_label": "MY MOST LISTENED",
+        "period_start": "all_time",
+        "subtitle": _history_subtitle(top_artists),
+        "top_artists": top_artists,
+        "play_count": int(totals.get("play_count") or 0),
+        "minutes_listened": round(float(totals.get("minutes_listened") or 0), 1),
+        "artwork_tracks": [dict(row) for row in cover_rows],
+    }
+
+
 def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
     with read_scope() as session:
         rows = (
@@ -360,8 +480,10 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
                 }
             )
 
-    now = datetime.now(timezone.utc)
     cards: list[dict] = []
+    all_time_card = _get_all_time_history_card(user_id)
+    if all_time_card:
+        cards.append(all_time_card)
     for (year, month), bucket in sorted(buckets.items(), reverse=True):
         top_artists = [artist for artist, _ in bucket["artist_counts"].most_common(5)]
         period_start = bucket["period_start"]
@@ -370,9 +492,7 @@ def get_listening_history_cards(user_id: int, limit: int = 8) -> list[dict]:
             {
                 "id": f"month-{year}-{month:02d}",
                 "kind": "month",
-                "title": "My Most Listened"
-                if year == now.year and month == now.month
-                else f"{month_name} {year}",
+                "title": f"{month_name} {year}",
                 "period_label": month_name.upper(),
                 "period_start": period_start.isoformat(),
                 "subtitle": _history_subtitle(top_artists),

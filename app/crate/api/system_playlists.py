@@ -1,7 +1,7 @@
 import asyncio
 from typing import AsyncIterator
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
@@ -14,8 +14,12 @@ from crate.api.openapi_responses import (
 from crate.api.playlist_utils import apply_playlist_cover_payload
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.curation import (
+    CreateSystemPlaylistFromBlueprintRequest,
     CreateSystemPlaylistRequest,
+    GeneratePlaylistDescriptionRequest,
+    GeneratePlaylistDescriptionResponse,
     PreviewSystemPlaylistRequest,
+    SystemPlaylistBlueprintResponse,
     SystemPlaylistDetailResponse,
     SystemPlaylistEditorSnapshotResponse,
     SystemPlaylistGenerateResponse,
@@ -33,10 +37,12 @@ from crate.db.repositories.playlists import (
     get_playlist,
     get_playlist_followers_count,
     get_playlist_tracks,
+    get_system_playlist_by_curation_key,
     list_system_playlists,
     set_generation_status,
     update_playlist,
 )
+from crate.playlist_blueprints import blueprint_curation_key, find_playlist_blueprint
 from crate.db.repositories.tasks import create_task
 
 router = APIRouter(prefix="/api/admin/system-playlists", tags=["admin"])
@@ -208,6 +214,81 @@ def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistReq
 
     playlist = _require_system_playlist(playlist_id)
     return _serialize_admin_playlist(playlist)
+
+
+@router.post(
+    "/from-blueprint",
+    response_model=SystemPlaylistSummaryResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Create or reuse a system playlist from an editorial blueprint",
+)
+def admin_create_system_playlist_from_blueprint(
+    request: Request, body: CreateSystemPlaylistFromBlueprintRequest
+):
+    admin = _require_admin(request)
+    target_type = body.target_type
+    target_name = body.target_name.strip()
+    blueprint_key = body.blueprint_key.strip()
+    if not target_name:
+        raise HTTPException(status_code=422, detail="target_name is required")
+    if not blueprint_key:
+        raise HTTPException(status_code=422, detail="blueprint_key is required")
+
+    blueprint = find_playlist_blueprint(
+        target_type=target_type,
+        target_name=target_name,
+        blueprint_key=blueprint_key,
+    )
+    if not blueprint:
+        raise HTTPException(status_code=404, detail="Playlist blueprint not found")
+
+    curation_key = blueprint_curation_key(blueprint, target_name)
+    existing = get_system_playlist_by_curation_key(curation_key)
+    if existing:
+        return _serialize_admin_playlist(existing)
+
+    playlist_id = create_playlist(
+        name=blueprint["name"],
+        description=blueprint["description"],
+        user_id=None,
+        is_smart=True,
+        smart_rules=blueprint["smart_rules"],
+        scope="system",
+        generation_mode="smart",
+        is_curated=body.is_curated,
+        is_active=body.is_active,
+        managed_by_user_id=admin.get("id"),
+        curation_key=curation_key,
+        featured_rank=body.featured_rank,
+        category=blueprint["category"],
+    )
+    set_generation_status(playlist_id, "queued")
+    create_task(
+        "generate_system_playlist",
+        {
+            "playlist_id": playlist_id,
+            "triggered_by": f"blueprint:{blueprint['key']}",
+        },
+    )
+    playlist = _require_system_playlist(playlist_id)
+    return _serialize_admin_playlist(playlist)
+
+
+@router.get(
+    "/blueprints",
+    response_model=list[SystemPlaylistBlueprintResponse],
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Preview virtual editorial playlist blueprints",
+)
+def admin_system_playlist_blueprints(
+    request: Request,
+    artist_name: str | None = Query(None),
+    genre_name: str | None = Query(None),
+):
+    _require_admin(request)
+    from crate.playlist_blueprints import build_playlist_blueprints
+
+    return build_playlist_blueprints(artist_name=artist_name, genre_name=genre_name)
 
 
 @router.get(
@@ -461,6 +542,47 @@ def admin_preview_system_playlist(
         "avg_year": int(sum(years) / len(years)) if years else None,
         "year_range": [min(years), max(years)] if years else None,
     }
+
+
+@router.post(
+    "/{playlist_id}/ai-description",
+    response_model=GeneratePlaylistDescriptionResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Generate an editorial playlist description with the configured LLM",
+)
+def admin_generate_playlist_description(
+    request: Request,
+    playlist_id: int,
+    body: GeneratePlaylistDescriptionRequest | None = None,
+):
+    _require_admin(request)
+    playlist = _require_system_playlist(playlist_id)
+    rules = (
+        body.smart_rules
+        if body and body.smart_rules is not None
+        else playlist.get("smart_rules")
+    )
+    try:
+        from crate.llm.prompts.playlist_description import (
+            generate_playlist_description,
+        )
+
+        response = generate_playlist_description(
+            name=playlist.get("name") or "Untitled playlist",
+            category=playlist.get("category"),
+            smart_rules=rules,
+            tracks=get_playlist_tracks(playlist_id)[:60],
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"LLM description generation failed: {exc}",
+        ) from exc
+
+    applied = bool(body and body.apply)
+    if applied:
+        update_playlist(playlist_id, description=response.description)
+    return {"description": response.description, "applied": applied}
 
 
 @router.post(

@@ -93,6 +93,16 @@ from crate.db.queries.user import (
     get_upcoming_shows,
 )
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
+from crate.db.queries.user_library_stats_month import (
+    get_month_replay_mix,
+    get_month_stats_overview,
+    get_month_stats_trends,
+    get_month_top_albums,
+    get_month_top_artists,
+    get_month_top_genres,
+    get_month_top_tracks,
+    month_period_key,
+)
 from crate.db.queries.user_library import (
     get_followed_artists,
     get_liked_tracks,
@@ -101,6 +111,7 @@ from crate.db.queries.user_library import (
     get_replay_mix,
     get_saved_albums,
     get_stats_overview,
+    get_stats_story,
     get_stats_trends,
     get_top_albums,
     get_top_artists,
@@ -290,19 +301,48 @@ def _get_cached_stats_dashboard(
     user_id: int,
     *,
     window: str,
+    month: str | None = None,
     tracks_limit: int,
     artists_limit: int,
     albums_limit: int,
     genres_limit: int,
     replay_limit: int,
 ) -> dict:
+    period_key = month_period_key(month) if month else window
     cache_key = (
-        f"listen:stats_dashboard:{user_id}:{window}:"
+        f"listen:stats_dashboard:v3:{user_id}:{period_key}:"
         f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
     if cached is not None:
         return cached
+
+    if month:
+        payload = {
+            "window": period_key,
+            "overview": get_month_stats_overview(user_id, month),
+            "trends": get_month_stats_trends(user_id, month),
+            "top_tracks": {
+                "window": period_key,
+                "items": get_month_top_tracks(user_id, month, limit=tracks_limit),
+            },
+            "top_artists": {
+                "window": period_key,
+                "items": get_month_top_artists(user_id, month, limit=artists_limit),
+            },
+            "top_albums": {
+                "window": period_key,
+                "items": get_month_top_albums(user_id, month, limit=albums_limit),
+            },
+            "top_genres": {
+                "window": period_key,
+                "items": get_month_top_genres(user_id, month, limit=genres_limit),
+            },
+            "replay": get_month_replay_mix(user_id, month, limit=replay_limit),
+            "story": get_stats_story(user_id, window=window, month=month),
+        }
+        set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
+        return payload
 
     payload = {
         "window": window,
@@ -325,6 +365,7 @@ def _get_cached_stats_dashboard(
             "items": get_top_genres(user_id, window=window, limit=genres_limit),
         },
         "replay": get_replay_mix(user_id, window=window, limit=replay_limit),
+        "story": get_stats_story(user_id, window=window),
     }
     set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
     return payload
@@ -882,6 +923,7 @@ def stats_replay(
 def stats_dashboard(
     request: Request,
     window: str = Query("30d"),
+    month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     tracks_limit: int = Query(10, ge=1, le=100),
     artists_limit: int = Query(8, ge=1, le=100),
     albums_limit: int = Query(8, ge=1, le=100),
@@ -893,6 +935,7 @@ def stats_dashboard(
         return _get_cached_stats_dashboard(
             user["id"],
             window=window,
+            month=month,
             tracks_limit=tracks_limit,
             artists_limit=artists_limit,
             albums_limit=albums_limit,

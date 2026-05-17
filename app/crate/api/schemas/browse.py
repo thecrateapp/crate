@@ -162,6 +162,10 @@ class SimilarArtistResponse(BaseModel):
     name: str | None = None
     id: int | None = None
     slug: str | None = None
+    match: float | None = None
+    image_url: str | None = None
+    url: str | None = None
+    source: str | None = None
 
 
 class ArtistInfoResponse(BaseModel):
@@ -225,11 +229,16 @@ class ArtistShowsResponse(BaseModel):
     source: str
 
 
+class ArtistPlaylistAppearanceResponse(CuratedPlaylistSummaryResponse):
+    artist_track_count: int = 0
+
+
 class ArtistPageResponse(BaseModel):
     artist: ArtistDetailResponse
     info: ArtistInfoResponse = Field(default_factory=ArtistInfoResponse)
     top_tracks: list[ArtistTopTrackResponse] = Field(default_factory=list)
     shows: ArtistShowsResponse
+    appears_on: list[ArtistPlaylistAppearanceResponse] = Field(default_factory=list)
     enrichment: ArtistEnrichmentResponse = Field(
         default_factory=ArtistEnrichmentResponse
     )

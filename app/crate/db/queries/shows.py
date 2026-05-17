@@ -1,6 +1,7 @@
 from crate.db.queries.shows_location_queries import (
     get_show_cities,
     get_show_countries,
+    get_show_sync_locations,
     get_unique_user_cities,
 )
 from crate.db.queries.shows_upcoming_queries import (
@@ -21,6 +22,7 @@ __all__ = [
     "get_show_cities",
     "get_show_countries",
     "get_show_reminders",
+    "get_show_sync_locations",
     "get_unique_user_cities",
     "get_upcoming_show_counts",
     "get_upcoming_shows",

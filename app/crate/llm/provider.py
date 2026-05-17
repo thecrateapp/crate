@@ -1,7 +1,7 @@
 """LLM provider abstraction via LiteLLM + instructor.
 
 Supports: Ollama (default), OpenAI, Anthropic, Gemini, Groq, etc.
-Config priority: function arg > DB setting > env var > default (ollama).
+Config priority: function arg > DB setting > env var > detected provider > Ollama.
 """
 
 import json
@@ -18,21 +18,58 @@ T = TypeVar("T", bound=BaseModel)
 
 # ── Config ──────────────────────────────────────────────────────
 
-_DEFAULT_MODEL = "ollama/llama3.1:8b"
+_DEFAULT_OLLAMA_MODEL = "ollama/llama3.1:8b"
+_DEFAULT_GEMINI_MODEL = "gemini/gemini-2.5-flash"
 _OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+
+_PROVIDER_API_KEYS = {
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "gemini": ("GEMINI_API_KEY", "AUDIOMUSE_GEMINI_API_KEY"),
+    "groq": ("GROQ_API_KEY",),
+    "openai": ("OPENAI_API_KEY",),
+}
+
+
+def _provider_from_model(model: str) -> str:
+    return model.split("/")[0] if "/" in model else "openai"
+
+
+def get_provider_key_names(provider: str) -> tuple[str, ...]:
+    return _PROVIDER_API_KEYS.get(provider, ())
+
+
+def get_provider_api_key(provider: str) -> str | None:
+    for name in get_provider_key_names(provider):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value
+    return None
+
+
+def _env_default_model() -> str:
+    model = os.environ.get("LLM_PROVIDER", "").strip()
+    if model:
+        return model
+    if get_provider_api_key("gemini"):
+        return _DEFAULT_GEMINI_MODEL
+    return _DEFAULT_OLLAMA_MODEL
+
+
+def _normalize_model(value: str | None) -> str:
+    return value.strip() if value and value.strip() else _env_default_model()
 
 
 def get_config() -> dict:
     """Return current LLM config from DB settings, env, or defaults."""
     from crate.db.cache_settings import get_setting
 
-    model = get_setting("llm_model", os.environ.get("LLM_PROVIDER", _DEFAULT_MODEL))
+    model = _normalize_model(get_setting("llm_model", _env_default_model()))
     ollama_url = get_setting("llm_ollama_url", _OLLAMA_URL)
 
     return {
         "model": model,
         "ollama_url": ollama_url,
-        "provider": model.split("/")[0] if "/" in model else "openai",
+        "provider": _provider_from_model(model),
     }
 
 
@@ -49,9 +86,9 @@ def _get_model() -> str:
     try:
         from crate.db.cache_settings import get_setting
 
-        return get_setting("llm_model", os.environ.get("LLM_PROVIDER", _DEFAULT_MODEL))
+        return _normalize_model(get_setting("llm_model", _env_default_model()))
     except Exception:
-        return os.environ.get("LLM_PROVIDER", _DEFAULT_MODEL)
+        return _env_default_model()
 
 
 # ── Direct Ollama API (no litellm dependency needed) ────────────
@@ -107,9 +144,7 @@ def _litellm_chat(model: str, messages: list[dict], json_mode: bool = False) -> 
 
 def _gemini_chat(model: str, messages: list[dict], json_mode: bool = False) -> str:
     """Call Google Gemini API directly."""
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get(
-        "AUDIOMUSE_GEMINI_API_KEY", ""
-    )
+    api_key = get_provider_api_key("gemini")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not set")
 

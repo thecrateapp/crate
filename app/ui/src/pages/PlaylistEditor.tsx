@@ -41,7 +41,8 @@ import {
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
-import { api, apiSseUrl } from "@/lib/api";
+import { useLLMStatus } from "@/hooks/use-llm";
+import { ApiError, api, apiSseUrl } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 
 interface Playlist {
@@ -129,6 +130,19 @@ interface FilterOptions {
   formats: string[];
   keys: string[];
   artists: string[];
+}
+
+function apiErrorDetail(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  try {
+    const parsed = JSON.parse(error.message) as { detail?: unknown };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail;
+    }
+  } catch {
+    return error.message || fallback;
+  }
+  return error.message || fallback;
 }
 
 const CATEGORY_OPTIONS = [
@@ -346,6 +360,10 @@ export function PlaylistEditor() {
   const { data: filterOptions } = useApi<FilterOptions>(
     "/api/playlists/filter-options",
   );
+  const llmStatus = useLLMStatus();
+  const llmAvailable = llmStatus?.available ?? false;
+  const llmUnavailableReason =
+    llmStatus?.error || "Configure an LLM provider before generating copy.";
   const [liveSurface, setLiveSurface] = useState<PlaylistEditorSurface | null>(
     null,
   );
@@ -388,6 +406,7 @@ export function PlaylistEditor() {
   const [sort, setSort] = useState("random");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [describing, setDescribing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -503,6 +522,30 @@ export function PlaylistEditor() {
       setPreviewing(false);
     }
   }, [currentSmartRules, id]);
+
+  const handleGenerateDescription = useCallback(async () => {
+    if (!llmAvailable) {
+      toast.error(llmUnavailableReason);
+      return;
+    }
+    setDescribing(true);
+    try {
+      const result = await api<{ description: string }>(
+        `/api/admin/system-playlists/${id}/ai-description`,
+        "POST",
+        {
+          apply: false,
+          smart_rules: isSmart ? currentSmartRules : null,
+        },
+      );
+      setDescription(result.description);
+      toast.success("AI description generated");
+    } catch (error) {
+      toast.error(apiErrorDetail(error, "Failed to generate description"));
+    } finally {
+      setDescribing(false);
+    }
+  }, [currentSmartRules, id, isSmart, llmAvailable, llmUnavailableReason]);
 
   const handleDuplicate = useCallback(async () => {
     try {
@@ -780,6 +823,23 @@ export function PlaylistEditor() {
                   rows={5}
                   placeholder="Editorial description shown in listen"
                 />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateDescription}
+                    disabled={describing || !name.trim() || !llmAvailable}
+                    title={!llmAvailable ? llmUnavailableReason : undefined}
+                  >
+                    {describing ? (
+                      <Loader2 size={14} className="mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles size={14} className="mr-2" />
+                    )}
+                    Generate with AI
+                  </Button>
+                </div>
               </Field>
 
               <div className="flex flex-wrap gap-2 border-t border-white/10 pt-4">

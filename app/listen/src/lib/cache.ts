@@ -111,6 +111,9 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/me/albums")) scopes.push("saved_albums");
   else if (url.startsWith("/api/me/history")) scopes.push("history");
   else if (url.startsWith("/api/me/stats")) scopes.push("history");
+  else if (url.startsWith("/api/users/") && url.includes("/stats"))
+    scopes.push("history");
+  else if (url.startsWith("/api/stats/dashboard")) scopes.push("history");
   else if (url.startsWith("/api/me/upcoming"))
     scopes.push("upcoming", "follows", "library");
   else if (url.startsWith("/api/me/shows")) scopes.push("shows");
