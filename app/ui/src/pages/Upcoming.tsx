@@ -119,6 +119,18 @@ function getArtistHref(artist: UpcomingArtistRef | null | undefined) {
   });
 }
 
+function getReleaseAlbumHref(item: UpcomingItem) {
+  if (item.type !== "release") return undefined;
+  if (item.album_id == null && !item.album_slug) return undefined;
+  return albumPagePath({
+    albumId: item.album_id,
+    albumSlug: item.album_slug,
+    albumName: item.title,
+    artistSlug: item.artist_slug,
+    artistName: item.artist,
+  });
+}
+
 function ArtistTextLink({
   artist,
   className,
@@ -558,6 +570,7 @@ function EventCard({
     ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
   const timeStr = item.time ? item.time.slice(0, 5) : "";
+  const albumHref = getReleaseAlbumHref(item);
 
   return (
     <div
@@ -601,9 +614,18 @@ function EventCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium text-white">
-              {item.title}
-            </span>
+            {albumHref ? (
+              <Link
+                to={albumHref}
+                className="truncate text-sm font-medium text-white transition-colors hover:text-primary"
+              >
+                {item.title}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-medium text-white">
+                {item.title}
+              </span>
+            )}
             {item.tidal_url && <CrateChip active>Lossless</CrateChip>}
           </div>
           <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-white/55">
@@ -637,6 +659,15 @@ function EventCard({
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {albumHref ? (
+            <Link
+              to={albumHref}
+              className="inline-flex h-9 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Open album
+            </Link>
+          ) : null}
           {item.status === "detected" &&
             item.tidal_url &&
             onDownload &&
@@ -879,6 +910,7 @@ function ReleasePopoverContent({
         year: "numeric",
       })
     : "";
+  const albumHref = getReleaseAlbumHref(item);
 
   return (
     <div className="overflow-hidden rounded-md bg-transparent">
@@ -898,14 +930,9 @@ function ReleasePopoverContent({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          {item.album_id != null ? (
+          {albumHref ? (
             <Link
-              to={albumPagePath({
-                albumId: item.album_id,
-                albumSlug: item.album_slug,
-                artistName: item.artist,
-                albumName: item.title,
-              })}
+              to={albumHref}
               className="font-bold text-sm truncate block hover:text-foreground transition-colors"
             >
               {item.title}

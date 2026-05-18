@@ -62,6 +62,9 @@ const NewReleases = lazy(() =>
 const Upcoming = lazy(() =>
   import("@/pages/Upcoming").then((m) => ({ default: m.Upcoming })),
 );
+const Bandcamp = lazy(() =>
+  import("@/pages/Bandcamp").then((m) => ({ default: m.Bandcamp })),
+);
 const Setup = lazy(() =>
   import("@/pages/Setup").then((m) => ({ default: m.Setup })),
 );
@@ -156,6 +159,7 @@ export default function App() {
                 <Route path="profile" element={<ProfileRedirect />} />
                 <Route path="new-releases" element={<NewReleases />} />
                 <Route path="upcoming" element={<Upcoming />} />
+                <Route path="bandcamp" element={<Bandcamp />} />
               </Route>
             </Routes>
           </Suspense>

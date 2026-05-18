@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { type ComponentType, useCallback, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import {
   Plus,
   Heart,
   Users,
   Disc,
   ListMusic,
+  Download,
+  ExternalLink,
   Loader2,
   Play,
   Pencil,
@@ -16,6 +18,7 @@ import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
+import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -35,7 +38,7 @@ import {
 } from "@crate/ui/primitives/AppModal";
 import { type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
-import { api } from "@/lib/api";
+import { api, apiAssetUrl } from "@/lib/api";
 import { formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -47,7 +50,15 @@ import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 
-type Tab = "playlists" | "artists" | "albums" | "liked";
+type Tab =
+  | "playlists"
+  | "artists"
+  | "albums"
+  | "liked"
+  | "bandcamp"
+  | "contributions";
+
+type TabIcon = ComponentType<{ size?: number; className?: string }>;
 
 interface MeStats {
   followed_artists: number;
@@ -143,15 +154,68 @@ interface SavedAlbum {
   total_duration: number;
 }
 
-const tabs: { key: Tab; label: string; icon: typeof ListMusic }[] = [
+interface BandcampCollectionResponse {
+  items: BandcampItem[];
+  total: number;
+}
+
+interface ContributionsResponse {
+  items: LibraryContribution[];
+  total: number;
+}
+
+interface BandcampTaskResponse {
+  task_id: string;
+  status: string;
+}
+
+interface BandcampItem {
+  id: number;
+  bandcamp_item_id?: number | null;
+  artist_name?: string | null;
+  album_title?: string | null;
+  track_title?: string | null;
+  item_url?: string | null;
+  cover_url?: string | null;
+  owned?: boolean | null;
+  downloadable?: boolean | null;
+  latest_import_status?: string | null;
+}
+
+interface LibraryContribution {
+  id: number;
+  album_id?: number | null;
+  album_entity_uid?: string | null;
+  album_slug?: string | null;
+  artist_name: string;
+  album_name: string;
+  source: string;
+  source_ref: string;
+  status: string;
+  imported_at?: string | null;
+  track_entity_uids?: string[];
+  track_count?: number | null;
+  total_duration?: number | null;
+  has_cover?: boolean | null;
+}
+
+const tabs: { key: Tab; label: string; icon: TabIcon }[] = [
   { key: "playlists", label: "Playlists", icon: ListMusic },
   { key: "artists", label: "Artists", icon: Users },
   { key: "albums", label: "Albums", icon: Disc },
   { key: "liked", label: "Liked", icon: Heart },
+  { key: "bandcamp", label: "Bandcamp", icon: BandcampLogo },
+  { key: "contributions", label: "Contributions", icon: Plus },
 ];
 
 function parseTab(value: string | null): Tab {
-  if (value === "artists" || value === "albums" || value === "liked")
+  if (
+    value === "artists" ||
+    value === "albums" ||
+    value === "liked" ||
+    value === "bandcamp" ||
+    value === "contributions"
+  )
     return value;
   return "playlists";
 }
@@ -524,6 +588,485 @@ function AlbumsTab() {
   );
 }
 
+function BandcampTab() {
+  const {
+    data: collection,
+    loading: collectionLoading,
+    refetch: refetchCollection,
+  } = useApi<BandcampCollectionResponse>("/api/bandcamp/me/collection");
+  const {
+    data: contributions,
+    loading: contributionsLoading,
+    refetch: refetchContributions,
+  } = useApi<ContributionsResponse>("/api/me/contributions?source=bandcamp");
+  const { data: wishlist, loading: wishlistLoading } =
+    useApi<BandcampCollectionResponse>("/api/bandcamp/me/wishlist");
+  const [busyItemId, setBusyItemId] = useState<number | null>(null);
+  const [withdrawTarget, setWithdrawTarget] =
+    useState<LibraryContribution | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  async function importItem(item: BandcampItem) {
+    const itemId = item.bandcamp_item_id ?? item.id;
+    if (!itemId) return;
+    setBusyItemId(item.id);
+    try {
+      const response = await api<BandcampTaskResponse>(
+        "/api/bandcamp/me/imports",
+        "POST",
+        { bandcamp_item_id: itemId, format: "flac" },
+      );
+      toast.success(`Bandcamp import queued (${response.task_id})`);
+      refetchCollection();
+      refetchContributions();
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to import Bandcamp item");
+    } finally {
+      setBusyItemId(null);
+    }
+  }
+
+  function exportContribution(contribution: LibraryContribution) {
+    window.open(
+      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  async function withdrawContribution() {
+    if (!withdrawTarget) return;
+    setWithdrawing(true);
+    try {
+      const response = await api<BandcampTaskResponse>(
+        `/api/me/contributions/${withdrawTarget.id}/withdraw`,
+        "POST",
+      );
+      toast.success(`Bandcamp removal queued (${response.task_id})`);
+      setWithdrawTarget(null);
+      refetchCollection();
+      refetchContributions();
+    } catch (error) {
+      toast.error(
+        (error as Error).message || "Failed to remove Bandcamp contribution",
+      );
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  const purchases = collection?.items ?? [];
+  const importedContributions = contributions?.items ?? [];
+  const wishlistCount = wishlist?.total ?? 0;
+
+  if (collectionLoading || wishlistLoading || contributionsLoading)
+    return <Spinner />;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#1da0c3]/15 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-primary">
+              <BandcampLogo size={13} />
+              Bandcamp
+            </div>
+            <h2 className="mt-3 text-xl font-black text-foreground">
+              Synced purchases
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sync keeps your Bandcamp purchases here. Import downloads the
+              audio and adds it to your Crate library.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <StatBox value={purchases.length} label="Purchases" />
+            <StatBox value={importedContributions.length} label="In Crate" />
+            <StatBox value={wishlistCount} label="Wishlist" />
+          </div>
+        </div>
+      </div>
+
+      {importedContributions.length ? (
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-primary">
+              Imported into Crate
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Portable exports are generated with Crate metadata. Removing a
+              contribution only deletes the album when nobody else owns that
+              library copy.
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {importedContributions.map((contribution) => (
+              <article
+                key={contribution.id}
+                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+              >
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
+                  {contribution.album_id ? (
+                    <img
+                      src={albumCoverApiUrl({
+                        albumId: contribution.album_id,
+                        albumEntityUid: contribution.album_entity_uid,
+                        artistName: contribution.artist_name,
+                        albumName: contribution.album_name,
+                      })}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <BandcampLogo size={20} className="text-primary/70" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-sm font-black text-foreground">
+                    {contribution.album_name}
+                  </h4>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {contribution.artist_name}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!contribution.album_id}
+                  onClick={() => exportContribution(contribution)}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+                >
+                  <Download size={14} />
+                  Export
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWithdrawTarget(contribution)}
+                  className="inline-flex min-h-10 items-center rounded-full border border-red-400/20 px-3 text-xs font-bold text-red-300"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {!purchases.length ? (
+        <div className="space-y-3">
+          <EmptyState message="No Bandcamp purchases synced yet. Connect and sync Bandcamp from Settings." />
+          <Link
+            to="/settings"
+            className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm font-bold text-black"
+          >
+            Open settings
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {purchases.map((item) => (
+            <article
+              key={`${item.id}-${item.item_url}`}
+              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+            >
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
+                {item.cover_url ? (
+                  <img
+                    src={item.cover_url}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <BandcampLogo size={22} className="text-primary/70" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-black text-foreground">
+                  {bandcampItemTitle(item)}
+                </h3>
+                <p className="truncate text-xs text-muted-foreground">
+                  {item.artist_name || "Bandcamp"}
+                </p>
+              </div>
+              {item.latest_import_status === "completed" ? (
+                <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                  Imported
+                </span>
+              ) : item.downloadable ? (
+                <button
+                  type="button"
+                  disabled={busyItemId === item.id}
+                  onClick={() => void importItem(item)}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-black disabled:opacity-50"
+                >
+                  {busyItemId === item.id ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  Import
+                </button>
+              ) : null}
+              {item.item_url ? (
+                <button
+                  type="button"
+                  onClick={() => window.open(item.item_url || "", "_blank")}
+                  className="inline-flex min-h-10 items-center rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground"
+                >
+                  <ExternalLink size={14} />
+                </button>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+
+      <AppModal
+        open={Boolean(withdrawTarget)}
+        onClose={() => {
+          if (!withdrawing) setWithdrawTarget(null);
+        }}
+      >
+        <ModalHeader>
+          <h2 className="text-lg font-black text-foreground">
+            Remove Bandcamp contribution?
+          </h2>
+          <ModalCloseButton
+            disabled={withdrawing}
+            onClick={() => setWithdrawTarget(null)}
+          />
+        </ModalHeader>
+        <ModalBody>
+          <p className="text-sm text-muted-foreground">
+            This withdraws your Bandcamp copy of{" "}
+            <span className="font-bold text-foreground">
+              {withdrawTarget?.album_name}
+            </span>
+            . If no other user owns this library copy, Crate will permanently
+            remove the album files and database rows in a worker task.
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <button
+            type="button"
+            disabled={withdrawing}
+            onClick={() => setWithdrawTarget(null)}
+            className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+          >
+            Keep it
+          </button>
+          <button
+            type="button"
+            disabled={withdrawing}
+            onClick={() => void withdrawContribution()}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-red-400 px-4 text-sm font-black text-black disabled:opacity-50"
+          >
+            {withdrawing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : null}
+            Remove contribution
+          </button>
+        </ModalFooter>
+      </AppModal>
+    </div>
+  );
+}
+
+function contributionSourceLabel(source: string): string {
+  if (source === "bandcamp") return "Bandcamp";
+  if (source === "admin_upload") return "Admin upload";
+  if (source === "listen_upload") return "Upload";
+  return source || "Contribution";
+}
+
+function ContributionArtwork({
+  contribution,
+}: {
+  contribution: LibraryContribution;
+}) {
+  return (
+    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
+      {contribution.album_id ? (
+        <img
+          src={albumCoverApiUrl({
+            albumId: contribution.album_id,
+            albumEntityUid: contribution.album_entity_uid,
+            artistName: contribution.artist_name,
+            albumName: contribution.album_name,
+          })}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-primary/70">
+          {contribution.source === "bandcamp" ? (
+            <BandcampLogo size={20} />
+          ) : (
+            <Plus size={20} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContributionsTab() {
+  const {
+    data,
+    loading,
+    refetch: refetchContributions,
+  } = useApi<ContributionsResponse>("/api/me/contributions");
+  const [withdrawTarget, setWithdrawTarget] =
+    useState<LibraryContribution | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  if (loading) return <Spinner />;
+
+  const contributions = data?.items ?? [];
+
+  function exportContribution(contribution: LibraryContribution) {
+    window.open(
+      apiAssetUrl(`/api/me/contributions/${contribution.id}/export`),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  async function withdrawContribution() {
+    if (!withdrawTarget) return;
+    setWithdrawing(true);
+    try {
+      const response = await api<BandcampTaskResponse>(
+        `/api/me/contributions/${withdrawTarget.id}/withdraw`,
+        "POST",
+      );
+      toast.success(`Removal queued (${response.task_id})`);
+      setWithdrawTarget(null);
+      refetchContributions();
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to remove contribution");
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <h2 className="text-xl font-black text-foreground">
+          Your contributions
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Albums you brought into this Crate instance. You can download a
+          portable export or withdraw your contribution; the shared library copy
+          is deleted only when nobody else has contributed it.
+        </p>
+      </div>
+
+      {!contributions.length ? (
+        <EmptyState message="You have not contributed any albums yet." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {contributions.map((contribution) => (
+            <article
+              key={contribution.id}
+              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+            >
+              <ContributionArtwork contribution={contribution} />
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-black text-foreground">
+                  {contribution.album_name}
+                </h3>
+                <p className="truncate text-xs text-muted-foreground">
+                  {contribution.artist_name}
+                </p>
+                <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary/80">
+                  {contributionSourceLabel(contribution.source)}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={!contribution.album_id}
+                onClick={() => exportContribution(contribution)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
+              >
+                <Download size={14} />
+                Export
+              </button>
+              <button
+                type="button"
+                onClick={() => setWithdrawTarget(contribution)}
+                className="inline-flex min-h-10 items-center rounded-full border border-red-400/20 px-3 text-xs font-bold text-red-300"
+              >
+                <Trash2 size={14} />
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <AppModal
+        open={Boolean(withdrawTarget)}
+        onClose={() => {
+          if (!withdrawing) setWithdrawTarget(null);
+        }}
+      >
+        <ModalHeader>
+          <h2 className="text-lg font-black text-foreground">
+            Remove contribution?
+          </h2>
+          <ModalCloseButton
+            disabled={withdrawing}
+            onClick={() => setWithdrawTarget(null)}
+          />
+        </ModalHeader>
+        <ModalBody>
+          <p className="text-sm text-muted-foreground">
+            This withdraws your contribution of{" "}
+            <span className="font-bold text-foreground">
+              {withdrawTarget?.album_name}
+            </span>
+            . If no other user contributed this library copy, Crate will
+            permanently remove the album files and database rows in a worker
+            task.
+          </p>
+        </ModalBody>
+        <ModalFooter>
+          <button
+            type="button"
+            disabled={withdrawing}
+            onClick={() => setWithdrawTarget(null)}
+            className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
+          >
+            Keep it
+          </button>
+          <button
+            type="button"
+            disabled={withdrawing}
+            onClick={() => void withdrawContribution()}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-red-400 px-4 text-sm font-black text-black disabled:opacity-50"
+          >
+            {withdrawing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : null}
+            Remove contribution
+          </button>
+        </ModalFooter>
+      </AppModal>
+    </div>
+  );
+}
+
+function bandcampItemTitle(item: BandcampItem): string {
+  return (
+    item.album_title || item.track_title || item.artist_name || "Bandcamp item"
+  );
+}
+
 type LikedSort = "recent" | "title" | "artist" | "album";
 
 function LikedTab() {
@@ -738,6 +1281,8 @@ export function Library() {
       {tab === "artists" && <ArtistsTab key={refreshKey} />}
       {tab === "albums" && <AlbumsTab key={refreshKey} />}
       {tab === "liked" && <LikedTab key={refreshKey} />}
+      {tab === "bandcamp" && <BandcampTab key={refreshKey} />}
+      {tab === "contributions" && <ContributionsTab key={refreshKey} />}
     </div>
   );
 }

@@ -31,6 +31,8 @@ interface AlbumCardProps {
   albumSlug?: string;
   year?: string;
   cover?: string;
+  isPreRelease?: boolean;
+  releaseDate?: string | null;
   compact?: boolean;
   layout?: "rail" | "grid";
 }
@@ -44,6 +46,7 @@ interface AlbumData {
     entity_uid?: string;
     filename: string;
     path: string;
+    is_available?: boolean;
     length_sec: number;
     tags: {
       title: string;
@@ -60,6 +63,8 @@ export const AlbumCard = memo(function AlbumCard({
   albumSlug,
   year,
   cover,
+  isPreRelease = false,
+  releaseDate,
   compact,
   layout = "rail",
 }: AlbumCardProps) {
@@ -117,19 +122,22 @@ export const AlbumCard = memo(function AlbumCard({
           albumName: album,
         }),
       );
-      const playerTracks: Track[] = (data.tracks || []).map((track) =>
-        toPlayableTrack(
-          {
-            id: track.id,
-            entity_uid: track.entity_uid,
-            title: track.tags?.title || track.filename || "Unknown",
-            artist: data.artist,
-            album: data.display_name || data.name,
-            path: track.path,
-          },
-          { cover: coverUrl },
-        ),
-      );
+      const playerTracks: Track[] = (data.tracks || [])
+        .filter((track) => track.is_available !== false)
+        .map((track) =>
+          toPlayableTrack(
+            {
+              id: track.id,
+              entity_uid: track.entity_uid,
+              title: track.tags?.title || track.filename || "Unknown",
+              artist: data.artist,
+              album: data.display_name || data.name,
+              path: track.path,
+              library_track_id: track.id > 0 ? track.id : undefined,
+            },
+            { cover: coverUrl },
+          ),
+        );
       if (playerTracks.length > 0) {
         playAll(playerTracks, 0, {
           type: "album",
@@ -229,6 +237,11 @@ export const AlbumCard = memo(function AlbumCard({
           compact
           className="absolute left-2 top-2 z-10"
         />
+        {isPreRelease ? (
+          <span className="absolute left-2 bottom-2 z-10 rounded-full border border-primary/25 bg-black/55 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary backdrop-blur-sm">
+            Pre-release
+          </span>
+        ) : null}
         <div className="absolute inset-0 hidden bg-black/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-black/40">
           <button
             className="flex h-10 w-10 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
@@ -253,7 +266,14 @@ export const AlbumCard = memo(function AlbumCard({
         {album}
       </div>
       <div className="truncate text-xs text-muted-foreground">
-        {year ? `${year} · ${artist}` : artist}
+        {isPreRelease && releaseDate
+          ? `Releases ${new Date(`${releaseDate}T12:00:00`).toLocaleDateString(
+              "en-US",
+              { month: "short", day: "numeric" },
+            )} · ${artist}`
+          : year
+            ? `${year} · ${artist}`
+            : artist}
         {offlineMeta ? (
           <span
             className={cn(

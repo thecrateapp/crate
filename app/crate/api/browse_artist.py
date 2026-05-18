@@ -87,7 +87,7 @@ from crate.db.queries.shows import (
     get_show_countries,
     get_upcoming_shows as db_get_shows,
 )
-from crate.db.releases import get_new_releases
+from crate.db.releases import get_new_releases, get_upcoming_releases_for_artist
 from crate.db.similarities import get_artist_network
 from crate.lastfm import (
     get_artist_info,
@@ -95,6 +95,7 @@ from crate.lastfm import (
     get_top_tracks,
 )
 from crate.storage_layout import resolve_artist_dir
+from crate.slugs import build_public_album_slug
 from crate.track_versions import canonical_track_title_key, track_variant_rank
 
 log = logging.getLogger(__name__)
@@ -268,7 +269,7 @@ def _build_artist_page_payload(
     stats_limit: int,
 ) -> dict | JSONResponse:
     cache_key = (
-        f"listen:artist_page:v4:{user_id}:{artist_id}:"
+        f"listen:artist_page:v5:{user_id}:{artist_id}:"
         f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=300)
@@ -1691,11 +1692,12 @@ def api_upcoming(request: Request, limit: int = Query(5000, ge=1, le=10000)):
                 "artist_slug": release.get("artist_slug"),
                 "title": release.get("album_title", ""),
                 "album_id": release.get("album_id"),
-                "album_slug": release.get("album_slug"),
+                "album_slug": release.get("album_slug")
+                or build_public_album_slug(release.get("album_title")),
                 "subtitle": release.get("release_type") or "Album",
                 "cover_url": release.get("cover_url"),
                 "status": release.get("status", "detected"),
-                "tidal_url": release.get("tidal_url"),
+                "tidal_url": release.get("tidal_url") or release.get("source_url"),
                 "release_id": release.get("id"),
                 "is_upcoming": bool(scheduled_date and scheduled_date >= today),
             }
@@ -1844,28 +1846,99 @@ def api_artist(request: Request, name: str):
     top_genres = get_artist_top_genres(canonical)
     genre_profile = build_genre_profile(get_artist_genre_profile(canonical), limit=8)
 
+    upcoming_releases = get_upcoming_releases_for_artist(canonical)
+    upcoming_releases_by_slug = {
+        build_public_album_slug(release.get("album_title")): release
+        for release in upcoming_releases
+        if release.get("album_title")
+    }
     albums = []
+    existing_album_slugs: set[str] = set()
+    merged_release_slugs: set[str] = set()
     for album in albums_data:
+        album_slug = build_public_album_slug(album["name"])
+        existing_album_slugs.add(album_slug)
+        release = upcoming_releases_by_slug.get(album_slug)
+        if release:
+            merged_release_slugs.add(album_slug)
+        tracklist = release.get("tracklist_json") if release else None
+        release_track_count = len(tracklist) if isinstance(tracklist, list) else 0
+        release_declared_tracks = int(release.get("tracks") or 0) if release else 0
         albums.append(
             {
                 "id": album["id"],
                 "entity_uid": album.get("entity_uid"),
-                "slug": album.get("slug"),
+                "slug": album_slug if release else album.get("slug"),
                 "name": album["name"],
                 "display_name": display_name(album["name"]),
-                "tracks": album["track_count"],
+                "tracks": release_track_count
+                or release_declared_tracks
+                or album["track_count"],
                 "formats": album.get("formats", []),
                 "bit_depth": album_quality.get(album["id"], {}).get("bit_depth"),
                 "sample_rate": album_quality.get(album["id"], {}).get("sample_rate"),
                 "size_mb": round(album["total_size"] / (1024**2))
                 if album["total_size"]
                 else 0,
-                "year": album.get("year", ""),
-                "has_cover": bool(album.get("has_cover")),
-                "musicbrainz_albumid": album.get("musicbrainz_albumid"),
+                "year": str(release.get("release_date") or "")[:4]
+                if release
+                else album.get("year", ""),
+                "has_cover": bool(release.get("cover_url"))
+                if release
+                else bool(album.get("has_cover")),
+                "cover_url": release.get("cover_url") if release else None,
+                "musicbrainz_albumid": release.get("mb_release_group_id")
+                if release
+                else album.get("musicbrainz_albumid"),
                 "popularity": album.get("popularity"),
                 "popularity_score": album.get("popularity_score"),
                 "popularity_confidence": album.get("popularity_confidence"),
+                "is_pre_release": bool(release),
+                "release_date": release.get("release_date") if release else None,
+                "release_status": release.get("status") if release else None,
+                "release_type": (release.get("release_type") or "Album")
+                if release
+                else None,
+                "source_url": (
+                    release.get("source_url") or release.get("tidal_url") or ""
+                )
+                if release
+                else None,
+            }
+        )
+
+    for release in upcoming_releases:
+        release_slug = build_public_album_slug(release.get("album_title"))
+        if release_slug in existing_album_slugs or release_slug in merged_release_slugs:
+            continue
+        tracklist = release.get("tracklist_json")
+        track_count = len(tracklist) if isinstance(tracklist, list) else 0
+        albums.append(
+            {
+                "id": -int(release["id"]),
+                "entity_uid": None,
+                "slug": release_slug,
+                "name": release["album_title"],
+                "display_name": display_name(release["album_title"]),
+                "tracks": track_count or int(release.get("tracks") or 0),
+                "formats": [],
+                "bit_depth": None,
+                "sample_rate": None,
+                "size_mb": 0,
+                "year": str(release.get("release_date") or "")[:4],
+                "has_cover": bool(release.get("cover_url")),
+                "cover_url": release.get("cover_url") or "",
+                "musicbrainz_albumid": release.get("mb_release_group_id"),
+                "popularity": None,
+                "popularity_score": None,
+                "popularity_confidence": None,
+                "is_pre_release": True,
+                "release_date": release.get("release_date"),
+                "release_status": release.get("status"),
+                "release_type": release.get("release_type") or "Album",
+                "source_url": release.get("source_url")
+                or release.get("tidal_url")
+                or "",
             }
         )
 

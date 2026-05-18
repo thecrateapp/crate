@@ -529,6 +529,26 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        "crate.worker_handlers.bandcamp",
+        "BANDCAMP_TASK_HANDLERS",
+        (
+            "bandcamp_connect_credentials",
+            "bandcamp_sync_collection",
+            "bandcamp_import_purchase",
+            "bandcamp_radar_refresh",
+            "bandcamp_withdraw_contribution",
+            "bandcamp_cleanup_user_contributions",
+        ),
+    ),
+    (
+        "crate.worker_handlers.contributions",
+        "CONTRIBUTION_TASK_HANDLERS",
+        (
+            "library_withdraw_contribution",
+            "library_cleanup_user_contributions",
+        ),
+    ),
+    (
         "crate.worker_handlers.library",
         "LIBRARY_TASK_HANDLERS",
         (

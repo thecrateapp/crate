@@ -22,6 +22,7 @@ export interface AlbumPlaybackTrack {
   valence?: number | null;
   bliss_vector?: number[] | null;
   path: string;
+  is_available?: boolean;
   tags: {
     title: string;
   };
@@ -37,6 +38,7 @@ export interface AlbumPlaybackData {
   artist: string;
   name: string;
   display_name: string;
+  cover_url?: string | null;
   tracks: AlbumPlaybackTrack[];
 }
 
@@ -49,49 +51,53 @@ function scoreTrackQuality(track: AlbumPlaybackTrack): number {
 }
 
 export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
-  const cover = albumCoverApiUrl(
-    {
-      albumId: data.id,
-      albumEntityUid: data.entity_uid,
-      artistEntityUid: data.artist_entity_uid,
-      albumSlug: data.slug,
-      artistName: data.artist,
-      albumName: data.name,
-    },
-    { size: 512 },
-  );
-
-  return data.tracks.map((track) =>
-    toPlayableTrack(
+  const cover =
+    data.cover_url ||
+    albumCoverApiUrl(
       {
-        id: track.id,
-        entity_uid: track.entity_uid,
-        title: track.tags.title || track.filename,
-        artist: data.artist,
-        artist_id: data.artist_id,
-        artist_entity_uid: data.artist_entity_uid,
-        artist_slug: data.artist_slug,
-        album: data.display_name || data.name,
-        album_id: data.id,
-        album_entity_uid: data.entity_uid,
-        album_slug: data.slug,
-        path: track.path,
-        library_track_id: track.id,
-        format: track.format || undefined,
-        bitrate: track.bitrate,
-        sample_rate: track.sample_rate,
-        bit_depth: track.bit_depth,
-        bpm: track.bpm,
-        audio_key: track.audio_key,
-        audio_scale: track.audio_scale,
-        energy: track.energy,
-        danceability: track.danceability,
-        valence: track.valence,
-        bliss_vector: track.bliss_vector,
+        albumId: data.id,
+        albumEntityUid: data.entity_uid,
+        artistEntityUid: data.artist_entity_uid,
+        albumSlug: data.slug,
+        artistName: data.artist,
+        albumName: data.name,
       },
-      { cover },
-    ),
-  );
+      { size: 512 },
+    );
+
+  return data.tracks
+    .filter((track) => track.is_available !== false)
+    .map((track) =>
+      toPlayableTrack(
+        {
+          id: track.id,
+          entity_uid: track.entity_uid,
+          title: track.tags.title || track.filename,
+          artist: data.artist,
+          artist_id: data.artist_id,
+          artist_entity_uid: data.artist_entity_uid,
+          artist_slug: data.artist_slug,
+          album: data.display_name || data.name,
+          album_id: data.id > 0 ? data.id : undefined,
+          album_entity_uid: data.entity_uid,
+          album_slug: data.slug,
+          path: track.path,
+          library_track_id: track.id > 0 ? track.id : undefined,
+          format: track.format || undefined,
+          bitrate: track.bitrate,
+          sample_rate: track.sample_rate,
+          bit_depth: track.bit_depth,
+          bpm: track.bpm,
+          audio_key: track.audio_key,
+          audio_scale: track.audio_scale,
+          energy: track.energy,
+          danceability: track.danceability,
+          valence: track.valence,
+          bliss_vector: track.bliss_vector,
+        },
+        { cover },
+      ),
+    );
 }
 
 export function buildAlbumQualityBadges(
@@ -100,6 +106,7 @@ export function buildAlbumQualityBadges(
   const byFormat = new Map<string, AlbumPlaybackTrack>();
 
   for (const track of tracks) {
+    if (track.is_available === false) continue;
     const format = (track.format || "").trim().toLowerCase();
     if (!format) continue;
 

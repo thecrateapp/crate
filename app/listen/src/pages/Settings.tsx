@@ -15,7 +15,7 @@ import {
   setSmartPlaylistSuggestionsPreference,
   type PlaybackDeliveryPolicy,
 } from "@/lib/player-playback-prefs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   ArrowDownToLine,
@@ -35,12 +35,14 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { ServersSection } from "@/components/settings/ServersSection";
 import { api } from "@/lib/api";
 import { isMobileAudioRuntime } from "@/lib/mobile-audio-mode";
+import { isTauriRuntime } from "@/lib/platform";
 import {
   subscribeSleepTimer,
   startSleepTimer,
@@ -72,6 +74,43 @@ interface UserSession {
   device_label?: string | null;
 }
 
+interface BandcampStatus {
+  connected: boolean;
+  status: string;
+  bridge_enabled: boolean;
+  bridge_ready?: boolean;
+  bridge_backend?: string | null;
+  bridge_message?: string | null;
+  username?: string | null;
+  display_name?: string | null;
+  image_url?: string | null;
+  last_sync_at?: string | null;
+  last_error?: string | null;
+}
+
+interface BandcampTaskResponse {
+  task_id: string;
+  status: string;
+}
+
+interface BandcampTaskDetail {
+  id: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled" | string;
+  error?: string | null;
+  result?: {
+    synced?: number;
+    imports_queued?: number;
+    imports_skipped_existing?: number;
+    counts?: Record<string, number>;
+    matches_created?: number;
+    radar_upserted?: number;
+  } | null;
+}
+
+interface BandcampCookieEventPayload {
+  cookie?: string;
+}
+
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -84,6 +123,10 @@ function formatBytes(bytes: number): string {
   return `${
     value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)
   } ${units[unitIndex]}`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function Section({
@@ -493,6 +536,8 @@ export function Settings() {
 
       <ScrobbleSection />
 
+      <BandcampSection />
+
       <Section title="Quick links">
         <div className="flex flex-col gap-2">
           <Link
@@ -592,6 +637,315 @@ function SleepTimerSection() {
           >
             Cancel
           </button>
+        </div>
+      ) : null}
+    </Section>
+  );
+}
+
+function BandcampSection() {
+  const [status, setStatus] = useState<BandcampStatus | null>(null);
+  const [counts, setCounts] = useState({
+    collection: 0,
+    wishlist: 0,
+    following: 0,
+  });
+  const [bandcampCookie, setBandcampCookie] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const loadBandcamp = useCallback(async () => {
+    const nextStatus = await api<BandcampStatus>("/api/bandcamp/me/status");
+    setStatus(nextStatus);
+    if (!nextStatus.connected) {
+      setCounts({ collection: 0, wishlist: 0, following: 0 });
+      return;
+    }
+    const [collection, wishlist, following] = await Promise.all([
+      api<{ total: number }>("/api/bandcamp/me/collection").catch(() => ({
+        total: 0,
+      })),
+      api<{ total: number }>("/api/bandcamp/me/wishlist").catch(() => ({
+        total: 0,
+      })),
+      api<{ total: number }>("/api/bandcamp/me/following").catch(() => ({
+        total: 0,
+      })),
+    ]);
+    setCounts({
+      collection: collection.total || 0,
+      wishlist: wishlist.total || 0,
+      following: following.total || 0,
+    });
+  }, []);
+
+  const connectWithCookie = useCallback(
+    async (
+      cookie: string,
+      connectionMethod: "manual_cookie" | "native_desktop" = "manual_cookie",
+    ) => {
+      const trimmedCookie = cookie.trim();
+      if (!trimmedCookie) {
+        toast.error("Paste the Bandcamp identity cookie first");
+        return;
+      }
+      setBusy(
+        connectionMethod === "native_desktop"
+          ? "tauri-connect"
+          : "cookie-connect",
+      );
+      try {
+        await api<BandcampStatus>("/api/bandcamp/me/connect/cookie", "POST", {
+          cookie: trimmedCookie,
+          connection_method: connectionMethod,
+        });
+        toast.success("Bandcamp connected");
+        setBandcampCookie("");
+        await loadBandcamp();
+      } catch (error) {
+        toast.error((error as Error).message || "Failed to connect Bandcamp");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [loadBandcamp],
+  );
+
+  useEffect(() => {
+    loadBandcamp().catch(() => {});
+  }, [loadBandcamp]);
+
+  useEffect(() => {
+    if (!isTauriRuntime) return;
+
+    const handleBandcampCookie = (event: Event) => {
+      const payload = (event as CustomEvent<BandcampCookieEventPayload>).detail;
+      if (!payload?.cookie) return;
+      void connectWithCookie(payload.cookie, "native_desktop");
+    };
+
+    window.addEventListener("crate:bandcamp-cookie", handleBandcampCookie);
+    return () => {
+      window.removeEventListener("crate:bandcamp-cookie", handleBandcampCookie);
+    };
+  }, [connectWithCookie]);
+
+  const openTauriBandcampInterceptor = async () => {
+    if (!window.__crateTauriInvoke) {
+      toast.error("Bandcamp desktop connector is not available");
+      return;
+    }
+    setBusy("tauri-connect");
+    try {
+      await window.__crateTauriInvoke("open_bandcamp_cookie_interceptor");
+      toast.info("Finish Bandcamp login in the opened window");
+      window.setTimeout(
+        () => {
+          setBusy((current) => (current === "tauri-connect" ? null : current));
+        },
+        5 * 60 * 1000,
+      );
+    } catch (error) {
+      toast.error(
+        (error as Error).message || "Failed to open Bandcamp login window",
+      );
+      setBusy(null);
+    }
+  };
+
+  const syncBandcamp = async () => {
+    setBusy("sync");
+    try {
+      const result = await api<BandcampTaskResponse>(
+        "/api/bandcamp/me/sync",
+        "POST",
+      );
+      toast.success("Bandcamp sync started");
+      const deadline = Date.now() + 5 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await delay(1500);
+        const task = await api<BandcampTaskDetail>(
+          `/api/tasks/${encodeURIComponent(result.task_id)}`,
+        );
+        if (task.status === "completed") {
+          await loadBandcamp();
+          const synced = task.result?.synced;
+          const importsQueued = task.result?.imports_queued ?? 0;
+          const skippedExisting = task.result?.imports_skipped_existing ?? 0;
+          const suffix = [
+            synced != null ? `${synced} synced` : null,
+            importsQueued ? `${importsQueued} imports queued` : null,
+            skippedExisting ? `${skippedExisting} already in Crate` : null,
+          ]
+            .filter(Boolean)
+            .join(", ");
+          toast.success(
+            suffix
+              ? `Bandcamp sync complete (${suffix})`
+              : "Bandcamp sync complete",
+          );
+          return;
+        }
+        if (task.status === "failed" || task.status === "cancelled") {
+          toast.error(task.error || "Bandcamp sync failed");
+          return;
+        }
+      }
+      toast.info("Bandcamp sync is still running in the background");
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to sync Bandcamp");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disconnectBandcamp = async () => {
+    setBusy("disconnect");
+    try {
+      await api("/api/bandcamp/me/disconnect", "POST");
+      toast.success("Bandcamp disconnected");
+      await loadBandcamp();
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to disconnect Bandcamp");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const connectedName =
+    status?.display_name || status?.username || "Bandcamp account";
+
+  return (
+    <Section
+      title="Bandcamp"
+      description="Sync purchases, wishlist and follows so Crate can help you support artists and import music you own."
+    >
+      <div className="rounded-2xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            {status?.image_url ? (
+              <img
+                src={status.image_url}
+                alt=""
+                className="h-11 w-11 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-primary">
+                <BandcampLogo size={20} />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {status?.connected ? connectedName : "Not connected"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {status?.connected
+                  ? `Collection ${counts.collection} · Wishlist ${counts.wishlist} · Following ${counts.following}`
+                  : isTauriRuntime
+                    ? "Connect in a dedicated Bandcamp desktop window"
+                    : "Paste your Bandcamp identity cookie to attach your collection"}
+              </p>
+            </div>
+          </div>
+          {status?.connected ? (
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/library?tab=bandcamp"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
+              >
+                <BandcampLogo size={14} />
+                View purchases
+              </Link>
+              <button
+                onClick={syncBandcamp}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {busy === "sync" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                Sync
+              </button>
+              <button
+                onClick={disconnectBandcamp}
+                disabled={busy !== null}
+                className="rounded-full border border-red-400/25 px-4 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10 disabled:opacity-50"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : null}
+        </div>
+        {status?.last_error ? (
+          <p className="mt-3 text-xs text-red-300">{status.last_error}</p>
+        ) : null}
+      </div>
+
+      {!status?.connected ? (
+        <div className="space-y-4 rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4">
+          {isTauriRuntime ? (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
+                <Smartphone
+                  size={16}
+                  className="mt-0.5 shrink-0 text-yellow-300"
+                />
+                <p>
+                  Crate Desktop opens Bandcamp in a controlled window and reads
+                  the resulting session cookie from the native webview. Your
+                  password stays on Bandcamp.
+                </p>
+              </div>
+              <button
+                onClick={openTauriBandcampInterceptor}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {busy === "tauri-connect" ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <BandcampLogo size={14} />
+                )}
+                Connect in Bandcamp window
+              </button>
+            </div>
+          ) : null}
+
+          <div className="space-y-3">
+            <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
+              <Lock size={16} className="mt-0.5 shrink-0 text-yellow-300" />
+              <p>
+                On web or mobile, open Bandcamp in your browser and copy the
+                cookie named{" "}
+                <span className="font-mono text-yellow-50">identity</span> from{" "}
+                <span className="font-mono text-yellow-50">bandcamp.com</span>.
+                You can also paste the full{" "}
+                <span className="font-mono text-yellow-50">Cookie</span> header
+                if you have it.
+              </p>
+            </div>
+            <textarea
+              value={bandcampCookie}
+              onChange={(event) => setBandcampCookie(event.target.value)}
+              rows={3}
+              spellCheck={false}
+              placeholder="identity=... or just the identity cookie value"
+              className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-white/25 focus:border-primary/50"
+            />
+            <button
+              onClick={() => void connectWithCookie(bandcampCookie)}
+              disabled={busy !== null || !bandcampCookie.trim()}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === "cookie-connect" ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <BandcampLogo size={14} />
+              )}
+              Connect with cookie
+            </button>
+          </div>
         </div>
       ) : null}
     </Section>

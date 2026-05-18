@@ -25,6 +25,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 
+import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
@@ -62,6 +63,7 @@ const navItems = [
   { section: "Music" },
   { to: "/upcoming", icon: Calendar, label: "Upcoming" },
   { to: "/new-releases", icon: Sparkles, label: "New Releases" },
+  { to: "/bandcamp", icon: BandcampLogo, label: "Bandcamp", adminOnly: true },
   { to: "/playlists", icon: ListMusic, label: "System Playlists" },
   { to: "/download", icon: Download, label: "Acquisition" },
   { section: "Insights" },

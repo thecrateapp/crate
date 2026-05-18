@@ -87,6 +87,51 @@ def get_track_seed(track_ref: str, *, session=None) -> tuple[list[float], str] |
     return vector, label
 
 
+def get_album_seed_context(
+    album_ref: str, *, session=None
+) -> tuple[list[list[float]], str, dict] | None:
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text(
+                    """
+                SELECT
+                    t.id AS track_id,
+                    t.artist,
+                    t.bliss_vector,
+                    a.name AS album,
+                    a.artist AS album_artist
+                FROM library_tracks t
+                JOIN library_albums a ON a.id = t.album_id
+                WHERE t.bliss_vector IS NOT NULL
+                  AND (
+                    CAST(a.id AS text) = :album_ref
+                    OR (a.entity_uid IS NOT NULL AND CAST(a.entity_uid AS text) = :album_ref)
+                  )
+                ORDER BY t.disc_number, t.track_number, t.id
+                """
+                ),
+                {"album_ref": album_ref},
+            )
+            .mappings()
+            .all()
+        )
+
+    vectors = [list(row["bliss_vector"]) for row in rows]
+    if not vectors:
+        return None
+
+    first = rows[0]
+    label = f"{first['album']} — {first['album_artist']}"
+    context = _seed_context_from_rows(rows)
+    album_artist = (first.get("album_artist") or "").strip()
+    if album_artist:
+        artists = context["seed_artists"]
+        if album_artist.lower() not in {artist.lower() for artist in artists}:
+            context["seed_artists"] = [album_artist, *artists]
+    return vectors, label, context
+
+
 def get_playlist_seed_context(
     playlist_id: int, limit: int = 30, *, session=None
 ) -> tuple[list[list[float]], str, dict] | None:
@@ -282,6 +327,7 @@ def get_home_playlist_seed(
 
 
 __all__ = [
+    "get_album_seed_context",
     "get_home_playlist_seed_context",
     "get_home_playlist_seed",
     "get_playlist_seed_context",

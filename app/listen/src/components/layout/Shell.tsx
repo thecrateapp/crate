@@ -24,6 +24,7 @@ import {
   Zap,
   Loader2,
 } from "lucide-react";
+import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { toast } from "sonner";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
@@ -316,6 +317,7 @@ function Sidebar() {
                   label: "Liked Tracks",
                 },
                 { to: "/library?tab=artists", icon: Users, label: "Artists" },
+                { to: "/bandcamp", icon: BandcampLogo, label: "Bandcamp" },
               ].map(({ to, icon: Icon, label }) => (
                 <button
                   key={label}

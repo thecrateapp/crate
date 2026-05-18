@@ -110,15 +110,20 @@ export function ArtistAlbumsSection({
             key={album.id}
             artist={artistName}
             album={album.display_name || album.name}
-            albumId={album.id}
+            albumId={album.is_pre_release ? undefined : album.id}
             albumSlug={album.slug}
             year={album.year?.slice(0, 4)}
-            cover={buildArtistAlbumCover(
-              artistName,
-              album.name,
-              album.id,
-              album.slug,
-            )}
+            cover={
+              album.cover_url ||
+              buildArtistAlbumCover(
+                artistName,
+                album.name,
+                album.id,
+                album.slug,
+              )
+            }
+            isPreRelease={album.is_pre_release}
+            releaseDate={album.release_date}
             layout="grid"
           />
         ))}

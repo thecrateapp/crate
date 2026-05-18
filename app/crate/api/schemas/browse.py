@@ -110,6 +110,12 @@ class ArtistAlbumSummaryResponse(IdentityFieldsMixin):
     popularity: int | None = None
     popularity_score: float | None = None
     popularity_confidence: float | None = None
+    cover_url: str | None = None
+    is_pre_release: bool = False
+    release_date: str | None = None
+    release_status: str | None = None
+    release_type: str | None = None
+    source_url: str | None = None
 
 
 class ArtistDetailResponse(IdentityFieldsMixin):
@@ -404,6 +410,9 @@ class AlbumTrackResponse(BaseModel):
     lyrics: AlbumTrackLyricsResponse = Field(default_factory=AlbumTrackLyricsResponse)
     tags: AlbumTrackTagsResponse
     path: str
+    is_available: bool = True
+    source: str | None = None
+    source_url: str | None = None
 
     @field_validator("entity_uid", "storage_id", mode="before")
     @classmethod
@@ -427,11 +436,20 @@ class AlbumDetailResponse(IdentityFieldsMixin):
     total_length_sec: int
     has_cover: bool
     cover_file: str | None = None
+    cover_url: str | None = None
     tracks: list[AlbumTrackResponse] = Field(default_factory=list)
     album_tags: dict[str, Any] = Field(default_factory=dict)
     musicbrainz_albumid: str | None = None
     genres: list[str] = Field(default_factory=list)
     genre_profile: list[GenreProfileResponse] = Field(default_factory=list)
+    contributors: list[dict[str, Any]] = Field(default_factory=list)
     popularity: int | None = None
     popularity_score: float | None = None
     popularity_confidence: float | None = None
+    playable_track_count: int | None = None
+    is_pre_release: bool = False
+    release_date: str | None = None
+    release_status: str | None = None
+    release_type: str | None = None
+    source_name: str | None = None
+    source_url: str | None = None

@@ -40,6 +40,11 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     monkeypatch.setattr(
         radio_engine, "get_discovery_seed_sources", lambda *_args, **_kwargs: {1: rows}
     )
+    monkeypatch.setattr(
+        radio_engine,
+        "get_discovery_excluded_artist_keys",
+        lambda *_args, **_kwargs: ["artist 0"],
+    )
 
     resolved = radio_engine.resolve_discovery_seed(9)
 
@@ -48,6 +53,7 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert label == "Your recent likes"
     assert context["seed_artists"] == ["Artist 0", "Artist 1"]
     assert context["seed_track_ids"] == [0, 1, 2, 3, 4]
+    assert context["discovery_excluded_artist_keys"] == ["artist 0"]
 
 
 def test_start_radio_reuses_single_read_session(monkeypatch):
@@ -105,14 +111,16 @@ def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(
     ]
     captured_queries = []
 
-    def fake_find_candidate_rows(*args, **kwargs):
+    def fake_discovery_rows(*args, **kwargs):
         captured_queries.append({"args": args, "kwargs": kwargs})
         return candidates
 
     monkeypatch.setattr(
         radio_engine, "_load_radio_graphs", lambda **_kwargs: ({}, {}, {})
     )
-    monkeypatch.setattr(radio_engine, "find_candidate_rows", fake_find_candidate_rows)
+    monkeypatch.setattr(
+        radio_engine, "_discovery_radio_candidate_rows", fake_discovery_rows
+    )
 
     session = {
         "id": "session",
@@ -122,6 +130,8 @@ def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(
         "seed_label": "Your recent likes",
         "seed_artists": ["Seed Artist"],
         "seed_genres": ["hardcore punk"],
+        "seed_track_ids": [],
+        "discovery_excluded_artist_keys": [],
         "used_track_ids": [],
         "used_titles": [],
         "recent_artists": [],
@@ -133,9 +143,379 @@ def test_generate_batch_wires_hybrid_scoring_and_retries_disliked_candidates(
 
     assert [track["track_id"] for track in tracks] == [2]
     assert len(captured_queries) == 1
-    assert captured_queries[0]["kwargs"]["limit"] == 60
+    assert captured_queries[0]["kwargs"]["count"] == 1
     assert set(session["used_track_ids"]) == {1, 2}
     assert session["current_target"][0] > 0.06
+
+
+def test_discovery_radio_targets_related_unfollowed_artists_with_small_familiar_slice(
+    monkeypatch,
+):
+    from crate import radio_engine
+
+    captured: dict = {}
+    fresh_candidates = [
+        _candidate(1, title="Nation", artist="Home Front", vector=_vector(0.9))
+        | {"radio_source": "similar"},
+        _candidate(2, title="Ded Wurst", artist="Ditz", vector=_vector(0.8))
+        | {"radio_source": "similar"},
+        _candidate(3, title="Dogma", artist="Sprints", vector=_vector(0.7))
+        | {"radio_source": "similar"},
+        _candidate(4, title="Cool World", artist="Chat Pile", vector=_vector(0.6))
+        | {"radio_source": "genre"},
+    ]
+
+    def fake_seeded_rows(
+        _target,
+        _exclude_ids,
+        *,
+        seed_artists,
+        similar_artist_keys,
+        seed_genres,
+        excluded_artist_keys,
+        limit,
+        session=None,
+    ):
+        captured["seed_artists"] = seed_artists
+        captured["similar_artist_keys"] = similar_artist_keys
+        captured["excluded_artist_keys"] = excluded_artist_keys
+        return fresh_candidates
+
+    monkeypatch.setattr(
+        radio_engine,
+        "_load_radio_graphs",
+        lambda **_kwargs: (
+            {
+                "high vis": {
+                    "home front": 1.0,
+                    "pearl jam": 0.9,
+                    "ditz": 0.8,
+                    "sprints": 0.7,
+                }
+            },
+            {
+                "high vis": {"post-punk": 1.0},
+                "home front": {"post-punk": 1.0},
+                "ditz": {"post-punk": 1.0},
+                "sprints": {"post-punk": 1.0},
+                "chat pile": {"post-punk": 0.8},
+            },
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        radio_engine, "find_seeded_radio_candidate_rows", fake_seeded_rows
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: [
+            _candidate(
+                5, title="Guided Tour", artist="High Vis", vector=_vector(0.5)
+            )
+        ],
+    )
+
+    session = {
+        "id": "session",
+        "current_target": _vector(0.1),
+        "seed_vector": _vector(0.1),
+        "seed_type": "discovery",
+        "seed_label": "Your recent likes",
+        "seed_artists": ["High Vis"],
+        "seed_genres": [],
+        "seed_track_ids": [],
+        "discovery_excluded_artist_keys": ["high vis", "pearl jam"],
+        "used_track_ids": [],
+        "used_titles": [],
+        "recent_artists": [],
+        "recent_tracks": [],
+        "disliked_vectors": [],
+    }
+
+    tracks = radio_engine._generate_batch(session, count=5)
+
+    assert [track["artist"] for track in tracks].count("High Vis") == 1
+    assert [track["artist"] for track in tracks[:4]] == [
+        "Home Front",
+        "Ditz",
+        "Sprints",
+        "Chat Pile",
+    ]
+    assert captured["seed_artists"] == []
+    assert captured["similar_artist_keys"] == ["home front", "ditz", "sprints"]
+    assert "high vis" in captured["excluded_artist_keys"]
+    assert "pearl jam" in captured["excluded_artist_keys"]
+
+
+def test_discovery_radio_skips_global_bliss_fallback_when_fresh_pool_is_enough(
+    monkeypatch,
+):
+    from crate import radio_engine
+
+    monkeypatch.setattr(
+        radio_engine,
+        "find_seeded_radio_candidate_rows",
+        lambda *_args, **_kwargs: [
+            _candidate(1, title="Nation", artist="Home Front", vector=_vector(0.9))
+            | {"radio_source": "similar"},
+            _candidate(2, title="Ded Wurst", artist="Ditz", vector=_vector(0.8))
+            | {"radio_source": "similar"},
+            _candidate(3, title="Dogma", artist="Sprints", vector=_vector(0.7))
+            | {"radio_source": "similar"},
+        ],
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("global bliss fallback should be lazy for discovery")
+        ),
+    )
+
+    rows = radio_engine._discovery_radio_candidate_rows(
+        _vector(0.1),
+        used_track_ids=[],
+        seed_artists=["High Vis"],
+        seed_genres=[],
+        excluded_artist_keys=["high vis"],
+        sim_graph={"high vis": {"home front": 1.0, "ditz": 0.8}},
+        genre_map={},
+        count=3,
+    )
+
+    assert [row["artist"] for row in rows] == ["Home Front", "Ditz", "Sprints"]
+
+
+def test_artist_radio_uses_graph_pool_instead_of_global_bliss(monkeypatch):
+    from crate import radio_engine
+
+    candidates = [
+        _candidate(1, title="Games of Power", artist="Home Front", vector=_vector(0.8))
+        | {"radio_source": "similar"},
+        _candidate(2, title="Ded Wurst", artist="Ditz", vector=_vector(0.7))
+        | {"radio_source": "similar"},
+        _candidate(3, title="Guided Tour", artist="High Vis", vector=_vector(0.2))
+        | {"radio_source": "seed"},
+    ]
+    captured: dict = {}
+
+    def fake_artist_rows(
+        _target,
+        _exclude_ids,
+        *,
+        seed_artists,
+        similar_artist_keys,
+        seed_genres,
+        limit,
+        session=None,
+    ):
+        captured["seed_artists"] = seed_artists
+        captured["similar_artist_keys"] = similar_artist_keys
+        captured["seed_genres"] = seed_genres
+        captured["limit"] = limit
+        return candidates
+
+    monkeypatch.setattr(
+        radio_engine,
+        "_load_radio_graphs",
+        lambda **_kwargs: (
+            {"high vis": {"home front": 1.0, "ditz": 0.52}},
+            {
+                "high vis": {"post-punk": 1.0, "post-hardcore": 0.5},
+                "home front": {"post-punk": 0.9},
+                "ditz": {"post-punk": 0.8},
+            },
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        radio_engine, "find_seeded_radio_candidate_rows", fake_artist_rows
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("artist radio should not start from global bliss")
+        ),
+    )
+
+    session = {
+        "id": "session",
+        "current_target": _vector(0.1),
+        "seed_vector": _vector(0.1),
+        "seed_type": "artist",
+        "seed_label": "High Vis",
+        "seed_artists": ["High Vis"],
+        "seed_genres": [],
+        "seed_track_ids": [],
+        "used_track_ids": [],
+        "used_titles": [],
+        "recent_artists": [],
+        "recent_tracks": [],
+        "disliked_vectors": [],
+    }
+
+    tracks = radio_engine._generate_batch(session, count=2)
+
+    assert [track["artist"] for track in tracks] == ["Home Front", "Ditz"]
+    assert captured["seed_artists"] == ["High Vis"]
+    assert captured["similar_artist_keys"] == ["home front", "ditz"]
+    assert "post-punk" in captured["seed_genres"]
+
+
+def test_artist_radio_treats_bliss_as_last_resort_when_candidates_leak_in():
+    from crate import radio_engine
+
+    rows = [
+        _candidate(1, title="Live Rarity", artist="Pearl Jam", vector=_vector(1.0))
+        | {"radio_source": "bliss"},
+        _candidate(2, title="Games of Power", artist="Home Front", vector=_vector(0.0))
+        | {"radio_source": "similar"},
+    ]
+
+    candidate = radio_engine._select_radio_candidate_from_rows(
+        rows,
+        _vector(1.0),
+        used_ids=set(),
+        used_titles=set(),
+        recent_artists=[],
+        sim_graph={"high vis": {"home front": 1.0}},
+        genre_map={
+            "high vis": {"post-punk": 1.0},
+            "home front": {"post-punk": 1.0},
+            "pearl jam": {"grunge": 1.0},
+        },
+        member_graph={},
+        target_artists=["High Vis"],
+        artist_affinity_cache={},
+        genre_overlap_cache={},
+        genre_overlap=radio_engine.make_radio_genre_overlap_scorer(
+            {
+                "high vis": {"post-punk": 1.0},
+                "home front": {"post-punk": 1.0},
+                "pearl jam": {"grunge": 1.0},
+            },
+            ["High Vis"],
+        ),
+        radio_profile="contextual",
+    )
+
+    assert candidate is not None
+    assert candidate["artist"] == "Home Front"
+
+
+def test_album_radio_uses_contextual_pool_and_excludes_seed_tracks(monkeypatch):
+    from crate import radio_engine
+
+    captured: dict = {}
+
+    def fake_seeded_rows(
+        _target,
+        exclude_ids,
+        *,
+        seed_artists,
+        similar_artist_keys,
+        seed_genres,
+        limit,
+        session=None,
+    ):
+        captured["exclude_ids"] = set(exclude_ids)
+        captured["seed_artists"] = seed_artists
+        return [
+            _candidate(
+                20, title="Nation", artist="Home Front", vector=_vector(0.8)
+            )
+            | {"radio_source": "similar"}
+        ]
+
+    monkeypatch.setattr(
+        radio_engine,
+        "_load_radio_graphs",
+        lambda **_kwargs: (
+            {"high vis": {"home front": 1.0}},
+            {
+                "high vis": {"post-punk": 1.0},
+                "home front": {"post-punk": 0.9},
+            },
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        radio_engine, "find_seeded_radio_candidate_rows", fake_seeded_rows
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("album radio should not start from global bliss")
+        ),
+    )
+
+    session = {
+        "id": "session",
+        "current_target": _vector(0.1),
+        "seed_vector": _vector(0.1),
+        "seed_type": "album",
+        "seed_label": "Guided Tour — High Vis",
+        "seed_artists": ["High Vis"],
+        "seed_genres": [],
+        "seed_track_ids": [10, 11],
+        "used_track_ids": [],
+        "used_titles": [],
+        "recent_artists": [],
+        "recent_tracks": [],
+        "disliked_vectors": [],
+    }
+
+    tracks = radio_engine._generate_batch(session, count=1)
+
+    assert tracks[0]["artist"] == "Home Front"
+    assert captured["seed_artists"] == ["High Vis"]
+    assert {10, 11}.issubset(captured["exclude_ids"])
+
+
+def test_track_radio_keeps_bliss_meaningful_inside_contextual_pool():
+    from crate import radio_engine
+
+    rows = [
+        _candidate(
+            1, title="Far Graph Match", artist="Home Front", vector=_vector(-1.0)
+        )
+        | {"radio_source": "similar"},
+        _candidate(2, title="Close Graph Match", artist="Ditz", vector=_vector(1.0))
+        | {"radio_source": "similar"},
+    ]
+
+    candidate = radio_engine._select_radio_candidate_from_rows(
+        rows,
+        _vector(1.0),
+        used_ids=set(),
+        used_titles=set(),
+        recent_artists=[],
+        sim_graph={"high vis": {"home front": 1.0, "ditz": 0.52}},
+        genre_map={
+            "high vis": {"post-punk": 1.0},
+            "home front": {"post-punk": 1.0},
+            "ditz": {"post-punk": 1.0},
+        },
+        member_graph={},
+        target_artists=["High Vis"],
+        artist_affinity_cache={},
+        genre_overlap_cache={},
+        genre_overlap=radio_engine.make_radio_genre_overlap_scorer(
+            {
+                "high vis": {"post-punk": 1.0},
+                "home front": {"post-punk": 1.0},
+                "ditz": {"post-punk": 1.0},
+            },
+            ["High Vis"],
+        ),
+        radio_profile="track",
+    )
+
+    assert candidate is not None
+    assert candidate["artist"] == "Ditz"
 
 
 def test_next_tracks_resaves_session_to_refresh_ttl(monkeypatch):

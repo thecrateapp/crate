@@ -1,9 +1,15 @@
 package routes
 
 import (
+	"io"
+	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
+	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 )
 
 func TestRoutePartsDecodesSegments(t *testing.T) {
@@ -65,5 +71,43 @@ func TestReservedGenreRoute(t *testing.T) {
 	}
 	if isReservedGenreRoute("punk") {
 		t.Fatal("treated a normal genre slug as reserved")
+	}
+}
+
+func TestCatalogPayloadFallbacksOnNotFoundWhenConfigured(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Crate-Readplane-Fallback") != "1" {
+			t.Fatalf("missing fallback header")
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"source": "fastapi"})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	if err != nil {
+		t.Fatalf("fallback setup failed: %v", err)
+	}
+	server := &Server{
+		fallback: fallback,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	req := httptest.NewRequest("GET", "/api/artist-slugs/quicksand/albums/bring-on-the-psychics", nil)
+	rec := httptest.NewRecorder()
+
+	server.writeCatalogPayloadOrFallbackNotFound(
+		rec,
+		req,
+		nil,
+		catalog.ErrNotFound,
+		"Album unavailable",
+		"Not found",
+	)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("X-Crate-Readplane"); got != "fallback" {
+		t.Fatalf("X-Crate-Readplane = %q, want fallback", got)
 	}
 }

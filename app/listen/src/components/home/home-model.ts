@@ -89,10 +89,20 @@ export interface HomeUpcomingItem {
   artist: string;
   artist_id?: number;
   artist_slug?: string;
+  album_id?: number;
+  album_slug?: string;
   title: string;
   subtitle: string;
+  cover_url?: string | null;
+  status?: string | null;
+  tidal_url?: string | null;
+  venue?: string | null;
+  city?: string | null;
+  country?: string | null;
+  url?: string | null;
   is_upcoming: boolean;
   user_attending?: boolean;
+  probable_setlist?: unknown[];
 }
 
 export interface HomeUpcomingInsight {

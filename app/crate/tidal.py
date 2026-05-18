@@ -14,6 +14,7 @@ import requests
 
 from crate.db.cache_settings import get_setting
 from crate.storage_import import (
+    DEFAULT_AUDIO_EXTENSIONS,
     infer_album_identity,
     move_album_tree,
     resolve_import_album_target,
@@ -60,12 +61,17 @@ def _save_auth_data(data: dict) -> None:
 
 
 def _configured_country_code() -> str:
+    env_country = os.environ.get("TIDAL_COUNTRY_CODE") or os.environ.get(
+        "REACT_APP_TIDAL_COUNTRY_CODE"
+    )
+    if env_country and env_country.strip():
+        return env_country.strip().upper()
     try:
-        value = get_setting("tidal_country", "US")
+        value = get_setting("tidal_country", "ES")
     except Exception:
-        value = "US"
-    country = str(value or "US").strip().upper()
-    return country or "US"
+        value = "ES"
+    country = str(value or "ES").strip().upper()
+    return country or "ES"
 
 
 def _sync_tiddl_country_code() -> None:
@@ -238,7 +244,7 @@ def get_album_track_count(album_id: str) -> int | None:
         resp = requests.get(
             f"https://api.tidal.com/v2/albums/{album_id}",
             headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
-            params={"countryCode": get_setting("tidal_country", "US")},
+            params={"countryCode": _configured_country_code()},
             timeout=10,
         )
         if resp.status_code == 200:
@@ -260,7 +266,7 @@ def get_artist_albums(
             f"https://api.tidal.com/v1/artists/{artist_id}/albums",
             headers={"Authorization": f"Bearer {token}"},
             params={
-                "countryCode": get_setting("tidal_country", "US"),
+                "countryCode": _configured_country_code(),
                 "limit": limit,
                 "offset": 0,
             },
@@ -321,7 +327,7 @@ def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
             f"https://api.tidal.com/v1/albums/{album_id}/tracks",
             headers={"Authorization": f"Bearer {token}"},
             params={
-                "countryCode": get_setting("tidal_country", "US"),
+                "countryCode": _configured_country_code(),
                 "limit": 100,
                 "offset": 0,
             },
@@ -376,6 +382,37 @@ def get_album_tracks(album_id: str, _retried: bool = False) -> list[dict]:
         return []
 
 
+def album_tracks_to_release_tracklist(tracks: list[dict]) -> list[dict]:
+    """Normalize Tidal album tracks into the new_releases tracklist shape."""
+    tracklist: list[dict] = []
+    for index, track in enumerate(tracks, start=1):
+        title = str(track.get("display_title") or track.get("title") or "").strip()
+        if not title:
+            continue
+        try:
+            position = int(track.get("track_number") or index)
+        except (TypeError, ValueError):
+            position = index
+        try:
+            disc = int(track.get("volume_number") or 1)
+        except (TypeError, ValueError):
+            disc = 1
+        tracklist.append(
+            {
+                "position": position,
+                "disc": disc,
+                "title": title,
+                "duration": track.get("duration") or 0,
+                "source": "tidal",
+                "tidal_id": str(track.get("id") or ""),
+                "source_url": track.get("url") or "",
+                "isrc": track.get("isrc") or "",
+                "quality": track.get("quality") or [],
+            }
+        )
+    return tracklist
+
+
 # ── Search ───────────────────────────────────────────────────────
 
 
@@ -412,7 +449,7 @@ def search(
                 "type": types.get(content_type, "ALBUMS,ARTISTS,TRACKS"),
                 "limit": limit,
                 "offset": offset,
-                "countryCode": get_setting("tidal_country", "US"),
+                "countryCode": _configured_country_code(),
             },
             timeout=10,
         )
@@ -722,6 +759,22 @@ def download(
 
         inspection = inspect_download_tree(processing_dir)
         error_lines = [line for line in output_lines if line.startswith("Error:")]
+        zero_download = inspection["audio_file_count"] == 0 and any(
+            "Total downloads: 0" in line for line in output_lines
+        )
+        if proc.returncode == 0 and zero_download:
+            error_tail = "\n".join(line for line in output_lines[-10:] if line)
+            log.warning("tiddl produced no audio files for %s: %s", url, error_tail)
+            return {
+                "success": False,
+                "error": error_tail or "tiddl produced no audio files",
+                "path": str(processing_dir),
+                "files": inspection["files"],
+                "file_count": inspection["file_count"],
+                "audio_file_count": inspection["audio_file_count"],
+                "invalid_audio_files": inspection["invalid_audio_files"],
+                "temp_artifact_files": inspection["temp_artifact_files"],
+            }
 
         if proc.returncode != 0:
             error_tail = "\n".join(output_lines[-10:])
@@ -802,6 +855,52 @@ def move_to_library_detailed(
 
     if not src.exists():
         return []
+
+    root_files = [p for p in sorted(src.iterdir()) if p.is_file()]
+    root_audio_files = [
+        p for p in root_files if p.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+    ]
+    if root_audio_files:
+        artist_name, album_name = infer_album_identity(src)
+        _, target_album_dir, managed_track_names = resolve_import_album_target(
+            dst, artist_name, album_name
+        )
+        moved = 0
+        for file_path in root_files:
+            if (
+                managed_track_names
+                and file_path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            ):
+                dest_file = resolve_managed_track_destination(
+                    file_path,
+                    target_album_dir,
+                    artist_name=artist_name,
+                    album_name=album_name,
+                    album_entity_uid=target_album_dir.name,
+                    replace_existing_audio=replace_existing_audio,
+                )
+            else:
+                dest_file = target_album_dir / file_path.name
+            try:
+                if dest_file.exists():
+                    dest_file.unlink()
+                dest_file.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(file_path), str(dest_file))
+                moved += 1
+            except Exception:
+                log.warning(
+                    "move_to_library: failed to move root file %s -> %s",
+                    file_path,
+                    dest_file,
+                    exc_info=True,
+                )
+        key = (artist_name, album_name, str(target_album_dir))
+        imported_targets[key] = {
+            "artist": artist_name,
+            "album": album_name,
+            "path": str(target_album_dir),
+            "moved": moved,
+        }
 
     for item in sorted(src.iterdir()):
         if not item.is_dir():

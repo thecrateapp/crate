@@ -11,12 +11,14 @@ from crate.db.queries.paths_artist_graph_queries import (
 from crate.db.queries.paths_bliss_candidate_queries import (
     find_anchor_track_row,
     find_candidate_rows,
+    find_seeded_radio_candidate_rows,
 )
 
 
 __all__ = [
     "find_anchor_track_row",
     "find_candidate_rows",
+    "find_seeded_radio_candidate_rows",
     "load_artist_genres",
     "load_artist_radio_graphs",
     "load_artist_similarity_graph",

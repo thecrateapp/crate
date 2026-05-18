@@ -76,6 +76,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
     "upload_image": TaskPoolConfig("default", 0, 60, 0),
     "library_upload": TaskPoolConfig("default", 0, 7200, 1),
+    "library_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
+    "library_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
     "import_queue_item": TaskPoolConfig("default", 0, 3600, 0),
     "import_queue_all": TaskPoolConfig("default", 0, 14400, 0),
     "import_queue_remove": TaskPoolConfig("default", 0, 300, 0),
@@ -130,6 +132,12 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "fetch_artwork_all": TaskPoolConfig("fast", 3, 3600, 0),
     "backfill_similarities": TaskPoolConfig("fast", 3, 3600, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
+    "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
+    "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
+    "bandcamp_import_purchase": TaskPoolConfig("default", 0, 14400, 0),
+    "bandcamp_radar_refresh": TaskPoolConfig("fast", 2, 600, 1),
+    "bandcamp_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
+    "bandcamp_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
     "cleanup_incomplete_downloads": TaskPoolConfig("default", 3, 600, 0),
     # Storage migration (priority 1 — user-initiated, long-running)
     "migrate_storage_v2": TaskPoolConfig(
@@ -265,7 +273,9 @@ def _release_db_heavy_lock(task_id: str):
 # aggressively.  Allow at most 2 concurrent downloads across all
 # workers via a Redis-based counting semaphore.
 
-DOWNLOAD_TASK_TYPES = frozenset({"tidal_download", "soulseek_download"})
+DOWNLOAD_TASK_TYPES = frozenset(
+    {"tidal_download", "soulseek_download", "bandcamp_import_purchase"}
+)
 
 
 def _is_download_allowed() -> bool:

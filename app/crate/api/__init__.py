@@ -135,6 +135,7 @@ def create_app() -> FastAPI:
                 "offline",
                 "social",
                 "jam",
+                "bandcamp",
                 "browse",
                 "playlists",
                 "radio",
@@ -168,6 +169,7 @@ def create_app() -> FastAPI:
                 "batch",
                 "acquisition",
                 "tidal",
+                "bandcamp",
             },
             title="Crate Collection Operations API",
             summary="Artwork, metadata, import, acquisition, and maintenance workflows for the library.",
@@ -291,6 +293,7 @@ def create_app() -> FastAPI:
     from crate.api.system_playlists import router as system_playlists_router
     from crate.api.genres import router as genres_router
     from crate.api.tidal import router as tidal_router
+    from crate.api.bandcamp import router as bandcamp_router
     from crate.api.acquisition import router as acquisition_router
     from crate.api.me import router as me_router
     from crate.api.radio import router as radio_router
@@ -321,6 +324,7 @@ def create_app() -> FastAPI:
     app.include_router(system_playlists_router)
     app.include_router(genres_router)
     app.include_router(tidal_router)
+    app.include_router(bandcamp_router)
     app.include_router(acquisition_router)
     app.include_router(enrichment_router)
     app.include_router(analytics_router)

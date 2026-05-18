@@ -6,6 +6,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from crate.acquisition_tasks import (
     build_tidal_download_params,
@@ -13,7 +14,7 @@ from crate.acquisition_tasks import (
 )
 from crate.audio import get_audio_files, read_tags
 from crate.db.cache_settings import get_setting
-from crate.db.cache_store import delete_cache, set_cache
+from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.domain_events import append_domain_event
 from crate.db.events import emit_task_event
 from crate.db.jobs.acquisition import update_artist_latest_release_date
@@ -27,13 +28,18 @@ from crate.db.repositories.library import (
     quarantine_album,
     unquarantine_album,
 )
+from crate.db.queries.browse import find_album_row
+from crate.db.repositories.library_contributions import record_album_contribution
 from crate.db.releases import (
     mark_release_downloaded,
     mark_release_downloading,
     upsert_new_release,
 )
-from crate.db.repositories.tasks import create_task_dedup
-from crate.db.tidal import get_tidal_download, update_tidal_download
+from crate.db.repositories.tasks import (
+    create_task_dedup,
+    find_active_task_by_type_params,
+)
+from crate.db.tidal import add_tidal_download, get_tidal_download, update_tidal_download
 from crate.db.repositories.user_library import follow_artist, like_track, save_album
 from crate.task_progress import (
     TaskProgress,
@@ -42,6 +48,7 @@ from crate.task_progress import (
     entity_label,
 )
 from crate.storage_import import (
+    infer_album_identity,
     resolve_import_album_target,
     resolve_managed_track_destination,
 )
@@ -79,6 +86,19 @@ def _emit_acquisition_domain_event(
         scope="library.acquisition",
         subject_key=artist or album or task_id,
     )
+
+
+def _broadcast_release_cache_invalidation(artist_name: str) -> None:
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        scopes = ["library", "upcoming", "home"]
+        artist_row = get_library_artist(artist_name)
+        if artist_row and artist_row.get("id"):
+            scopes.append(f"artist:{artist_row['id']}")
+        broadcast_invalidation(*dict.fromkeys(scopes))
+    except Exception:
+        log.debug("Failed to broadcast release cache invalidation", exc_info=True)
 
 
 def _sanitize_import_name(name: str) -> str:
@@ -225,6 +245,30 @@ def _find_album_dirs_recursive(root: Path, extensions: set[str]) -> list[Path]:
     return album_dirs
 
 
+def _uploaded_album_already_in_library(album_dir: Path) -> dict | None:
+    artist, album = _uploaded_album_identity(album_dir)
+    if not artist or not album:
+        return None
+    existing = find_album_row(artist, album)
+    if not existing:
+        return None
+    return {
+        "artist": artist,
+        "album": album,
+        "album_id": existing.get("id"),
+        "path": existing.get("path"),
+    }
+
+
+def _uploaded_album_identity(album_dir: Path) -> tuple[str, str]:
+    artist, album = infer_album_identity(album_dir)
+    return artist.strip(), album.strip()
+
+
+def _uploaded_album_identity_key(artist: str, album: str) -> tuple[str, str]:
+    return artist.casefold(), album.casefold()
+
+
 def _safe_extract_zip(zip_path: Path, dest_dir: Path):
     with zipfile.ZipFile(zip_path, "r") as archive:
         for member in archive.infolist():
@@ -274,6 +318,10 @@ def _seed_uploaded_library(user_id: int | None, imported_albums: list[dict]):
 
         album_row = get_library_album(artist, album)
         if not album_row:
+            album_id = item.get("album_id")
+            if album_id:
+                album_row = get_library_album_by_id(int(album_id))
+        if not album_row:
             continue
 
         album_id = album_row["id"]
@@ -286,6 +334,51 @@ def _seed_uploaded_library(user_id: int | None, imported_albums: list[dict]):
             if track_id and track_id not in seen_track_ids:
                 like_track(user_id, track_id=track_id)
                 seen_track_ids.add(track_id)
+
+
+def _record_uploaded_library_contributions(
+    *,
+    user_id: int | None,
+    source: str,
+    source_ref: str,
+    imported_albums: list[dict],
+) -> list[dict]:
+    if not user_id:
+        return []
+
+    contributions: list[dict] = []
+    for item in imported_albums:
+        artist = str(item.get("artist") or "").strip()
+        album = str(item.get("album") or "").strip()
+        if not artist or not album:
+            continue
+        album_row = get_library_album(artist, album)
+        if not album_row:
+            continue
+        tracks = get_library_tracks(int(album_row["id"]))
+        track_entity_uids = [
+            str(track["entity_uid"])
+            for track in tracks
+            if track.get("entity_uid") is not None
+        ]
+        contribution = record_album_contribution(
+            user_id=int(user_id),
+            source=source,
+            source_ref=f"{source_ref}:{album_row['id']}",
+            album_id=int(album_row["id"]),
+            album_entity_uid=album_row.get("entity_uid"),
+            artist_name=artist,
+            album_name=album,
+            track_entity_uids=track_entity_uids,
+            metadata={
+                "task_source_ref": source_ref,
+                "source_path": item.get("source_path"),
+                "dest": item.get("dest"),
+                "status": item.get("status"),
+            },
+        )
+        contributions.append(contribution)
+    return contributions
 
 
 def _emit_acquisition_completed_for_albums(
@@ -567,7 +660,8 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
     content_type = str(
         params.get("entity_type") or params.get("content_type") or "album"
     )
-    if content_type == "album" and result.get("success"):
+    is_preview_download = bool(params.get("preview_for_new_release_id"))
+    if content_type == "album" and result.get("success") and not is_preview_download:
         album_id = url.rstrip("/").split("/")[-1]
         expected = get_album_track_count(album_id)
         if not expected:
@@ -644,6 +738,13 @@ def _tidal_download_inner(task_id, params, config, url, quality, download_id, li
                         download_id, status="failed", error=message[:200]
                     )
                 return {"error": message, "phase": "download"}
+    if is_preview_download and result.get("success"):
+        actual_audio = result.get("audio_file_count", result.get("file_count", 0))
+        if not actual_audio:
+            message = "Tidal preview download produced no playable files"
+            if download_id:
+                update_tidal_download(download_id, status="failed", error=message)
+            return {"error": message, "phase": "download"}
 
     if download_id:
         update_tidal_download(download_id, status="processing")
@@ -929,7 +1030,7 @@ def _find_tidal_release_match(artist_name: str, title: str) -> dict:
             title_match = tidal_album.get("title", "").lower()
             if title.lower() in title_match or title_match in title.lower():
                 return {
-                    "tidal_url": tidal_album.get("url", ""),
+                    "tidal_url": _normalize_tidal_url(tidal_album.get("url", "")),
                     "tidal_id": str(tidal_album.get("id", "")),
                     "cover_url": tidal_album.get("cover", ""),
                     "tracks": tidal_album.get("tracks", 0),
@@ -945,6 +1046,226 @@ def _find_tidal_release_match(artist_name: str, title: str) -> dict:
         "tracks": 0,
         "quality": "",
     }
+
+
+def _get_tidal_release_tracklist(album_id: str) -> list[dict]:
+    if not album_id:
+        return []
+    from crate import tidal as tidal_mod
+
+    try:
+        return tidal_mod.album_tracks_to_release_tracklist(
+            tidal_mod.get_album_tracks(album_id)
+        )
+    except Exception:
+        log.debug("Tidal album tracklist failed for %s", album_id, exc_info=True)
+        return []
+
+
+def _normalize_tidal_url(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    path = parsed.path.strip("/")
+    if parsed.netloc and "tidal.com" in parsed.netloc and path:
+        return f"https://tidal.com/{path}"
+    return raw
+
+
+def _norm_release_match(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
+
+
+def _tidal_track_matches(track: dict, artist_name: str, title: str) -> bool:
+    return _norm_release_match(track.get("artist", "")) == _norm_release_match(
+        artist_name
+    ) and _norm_release_match(track.get("title", "")) == _norm_release_match(title)
+
+
+def _quality_label(value) -> str:
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value if item)
+    return str(value or "")
+
+
+def _quality_values(value) -> list[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    if isinstance(value, str) and value:
+        return [value]
+    return []
+
+
+def _find_tidal_preview_tracks(artist_name: str, tracklist: list[dict]) -> dict:
+    from crate import tidal as tidal_mod
+
+    preview_tracks: list[dict] = []
+    best_cover = ""
+    best_source_url = ""
+    best_source_album = ""
+    best_quality: list[str] = []
+    seen_track_ids: set[str] = set()
+
+    for track in tracklist[:8]:
+        title = str(track.get("title") or "").strip()
+        if not title:
+            continue
+        try:
+            results = tidal_mod.search(
+                f"{title} {artist_name}", content_type="tracks", limit=10
+            )
+        except Exception:
+            log.debug(
+                "Tidal preview search failed for %s - %s",
+                artist_name,
+                title,
+                exc_info=True,
+            )
+            continue
+
+        album_by_title = {}
+        for album in results.get("albums", []):
+            if _norm_release_match(album.get("artist", "")) == _norm_release_match(
+                artist_name
+            ):
+                album_by_title[_norm_release_match(album.get("title", ""))] = album
+        match = next(
+            (
+                tidal_track
+                for tidal_track in results.get("tracks", [])
+                if _tidal_track_matches(tidal_track, artist_name, title)
+            ),
+            None,
+        )
+        if not match:
+            continue
+
+        track_id = str(match.get("id") or "")
+        if track_id and track_id in seen_track_ids:
+            continue
+        if track_id:
+            seen_track_ids.add(track_id)
+
+        album = album_by_title.get(_norm_release_match(match.get("album", ""))) or {}
+        cover_url = str(album.get("cover") or "")
+        source_url = _normalize_tidal_url(
+            str(album.get("url") or match.get("url") or "")
+        )
+        track_url = _normalize_tidal_url(str(match.get("url") or source_url))
+        quality = _quality_values(match.get("quality") or album.get("quality"))
+        if cover_url and not best_cover:
+            best_cover = cover_url
+        if source_url and not best_source_url:
+            best_source_url = source_url
+            best_source_album = str(album.get("title") or match.get("album") or title)
+        if quality and not best_quality:
+            best_quality = quality
+
+        preview_tracks.append(
+            {
+                "source": "tidal",
+                "id": track_id,
+                "title": match.get("title") or title,
+                "duration": match.get("duration") or track.get("duration"),
+                "position": track.get("position"),
+                "url": track_url,
+                "source_url": source_url,
+                "album": match.get("album") or album.get("title") or "",
+                "quality": quality,
+            }
+        )
+
+    return {
+        "preview_tracks": preview_tracks,
+        "cover_url": best_cover,
+        "source_url": best_source_url,
+        "source_album": best_source_album,
+        "source_name": "tidal" if preview_tracks else "",
+        "quality": _quality_label(best_quality),
+    }
+
+
+def _queue_release_preview_download(
+    release_id: int,
+    *,
+    artist_name: str,
+    source_album: str,
+    source_url: str,
+    cover_url: str,
+) -> str:
+    if not source_url:
+        return ""
+
+    clean_url = _normalize_tidal_url(source_url)
+    tidal_id = clean_url.rstrip("/").split("/")[-1]
+    quality = get_setting("tidal_quality", "max")
+    download_id = add_tidal_download(
+        tidal_url=clean_url,
+        tidal_id=tidal_id,
+        content_type="album",
+        title=f"{artist_name} - {source_album}",
+        artist=artist_name,
+        cover_url=cover_url or None,
+        quality=quality,
+        status="queued",
+        priority=10,
+        source="new_release_preview",
+        metadata={
+            "preview_for_new_release_id": release_id,
+            "preview_album": source_album,
+        },
+    )
+    task_params = build_tidal_download_params(
+        url=clean_url,
+        quality=quality,
+        download_id=download_id,
+        content_type="album",
+        artist=artist_name,
+        album=source_album,
+        cover_url=cover_url,
+    )
+    task_params["preview_for_new_release_id"] = release_id
+    dedup_key = tidal_download_dedup_key(task_params)
+    task_id = create_task_dedup(
+        "tidal_download",
+        task_params,
+        dedup_key=dedup_key,
+    ) or find_active_task_by_type_params(
+        "tidal_download", task_params, dedup_key=dedup_key
+    )
+    if task_id:
+        update_tidal_download(download_id, task_id=task_id)
+    return task_id or ""
+
+
+def _find_cover_art_archive_release_group_cover(mbid: str) -> str:
+    release_group_id = (mbid or "").strip()
+    if not release_group_id:
+        return ""
+
+    cache_key = f"caa:release-group-cover:{release_group_id}"
+    cached = get_cache(cache_key)
+    if cached is not None:
+        return str(cached or "")
+
+    url = f"https://coverartarchive.org/release-group/{release_group_id}/front-500"
+    try:
+        import requests
+
+        response = requests.head(url, timeout=6, allow_redirects=False)
+        if response.status_code in {200, 302, 307}:
+            set_cache(cache_key, url, ttl=86400 * 30)
+            return url
+        if response.status_code == 404:
+            set_cache(cache_key, "", ttl=86400)
+    except Exception:
+        log.debug(
+            "Cover Art Archive lookup failed for release group %s",
+            release_group_id,
+            exc_info=True,
+        )
+    return ""
 
 
 def _register_new_release(
@@ -973,20 +1294,80 @@ def _register_new_release(
     if isinstance(artist_credit, str) and "various" in artist_credit.lower():
         return 0, False
 
+    release_group_id = str(release.get("mbid", ""))
     tidal_data = _find_tidal_release_match(artist_name, title)
+    try:
+        from crate.musicbrainz_ext import get_release_group_tracklist
+
+        tracklist = get_release_group_tracklist(release_group_id)
+    except Exception:
+        log.debug("Failed to load MB tracklist for %s", release_group_id, exc_info=True)
+        tracklist = []
+    tidal_tracklist = _get_tidal_release_tracklist(tidal_data["tidal_id"])
+    if tidal_tracklist and len(tidal_tracklist) > len(tracklist):
+        tracklist = tidal_tracklist
+    preview_data = _find_tidal_preview_tracks(artist_name, tracklist)
+    cover_source = ""
+    cover_url = tidal_data["cover_url"]
+    if cover_url:
+        cover_source = "tidal"
+    if not cover_url and preview_data["cover_url"]:
+        cover_url = preview_data["cover_url"]
+        cover_source = "tidal"
+    if not cover_url:
+        cover_url = _find_cover_art_archive_release_group_cover(release_group_id)
+        cover_source = "cover_art_archive" if cover_url else ""
+    source_url = tidal_data["tidal_url"] or preview_data["source_url"]
+    source_name = "tidal" if source_url else ""
     release_id = upsert_new_release(
         artist_name=artist_name,
         album_title=title,
         tidal_id=tidal_data["tidal_id"],
         tidal_url=tidal_data["tidal_url"],
-        cover_url=tidal_data["cover_url"],
+        cover_url=cover_url,
         year=year,
-        tracks=tidal_data["tracks"],
-        quality=tidal_data["quality"],
+        tracks=tidal_data["tracks"] or len(tracklist),
+        quality=_quality_label(tidal_data["quality"] or preview_data["quality"]),
         release_date=release_date,
         release_type=release.get("type", "Album"),
-        mb_release_group_id=release.get("mbid", ""),
+        mb_release_group_id=release_group_id,
+        source_name=source_name,
+        source_url=source_url,
+        cover_source=cover_source,
+        tracklist=tracklist,
+        preview_tracks=preview_data["preview_tracks"],
     )
+    _broadcast_release_cache_invalidation(artist_name)
+    if preview_data["preview_tracks"] and source_url:
+        try:
+            preview_task_id = _queue_release_preview_download(
+                release_id,
+                artist_name=artist_name,
+                source_album=preview_data["source_album"] or title,
+                source_url=source_url,
+                cover_url=cover_url,
+            )
+            if preview_task_id:
+                emit_task_event(
+                    task_id,
+                    "new_release_preview_download_queued",
+                    {
+                        "message": (
+                            f"Queued {len(preview_data['preview_tracks'])} Tidal preview "
+                            f"track(s) for {artist_name} - {title}"
+                        ),
+                        "artist": artist_name,
+                        "album": title,
+                        "preview_task_id": preview_task_id,
+                    },
+                )
+        except Exception:
+            log.debug(
+                "Failed to queue preview download for %s - %s",
+                artist_name,
+                title,
+                exc_info=True,
+            )
     emit_task_event(
         task_id,
         "new_release_found",
@@ -1770,6 +2151,8 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
 
     queue = ImportQueue(config)
     imported_albums: list[dict] = []
+    skipped_existing_uploads: list[dict] = []
+    seen_upload_identities: set[tuple[str, str]] = set()
 
     p_upload.phase = "importing"
     p_upload.phase_index = 1
@@ -1779,6 +2162,57 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
     for index, album_dir in enumerate(album_dirs, start=1):
         if is_cancelled(task_id):
             break
+
+        upload_artist, upload_album = _uploaded_album_identity(album_dir)
+        upload_key = _uploaded_album_identity_key(upload_artist, upload_album)
+        if upload_key in seen_upload_identities:
+            skipped_existing_uploads.append(
+                {
+                    "source_path": str(album_dir),
+                    "artist": upload_artist,
+                    "album": upload_album,
+                    "reason": "duplicate_in_upload",
+                }
+            )
+            emit_item_event(
+                task_id,
+                level="info",
+                message=f"Skipped duplicate upload album {upload_artist} — {upload_album}",
+                artist=upload_artist,
+                album=upload_album,
+            )
+            p_upload.done = index
+            p_upload.item = entity_label(artist=upload_artist, album=upload_album)
+            emit_progress(task_id, p_upload)
+            continue
+        seen_upload_identities.add(upload_key)
+
+        existing_album = _uploaded_album_already_in_library(album_dir)
+        if existing_album:
+            skipped_existing_uploads.append(
+                {
+                    "source_path": str(album_dir),
+                    "reason": "already_in_library",
+                    **existing_album,
+                }
+            )
+            emit_item_event(
+                task_id,
+                level="info",
+                message=(
+                    f"Skipped existing album "
+                    f"{existing_album['artist']} — {existing_album['album']}"
+                ),
+                artist=str(existing_album["artist"]),
+                album=str(existing_album["album"]),
+            )
+            p_upload.done = index
+            p_upload.item = entity_label(
+                artist=str(existing_album["artist"]),
+                album=str(existing_album["album"]),
+            )
+            emit_progress(task_id, p_upload)
+            continue
 
         result = queue.import_item(str(album_dir))
         if result.get("error"):
@@ -1837,11 +2271,12 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
         if not artist or not album_dir.is_dir():
             continue
         try:
-            sync.sync_album(album_dir, artist)
+            result = sync.sync_album(album_dir, artist)
             completed_albums.append(
                 {
                     "artist": artist,
                     "album": album,
+                    "album_id": result.get("album_id"),
                     "path": str(album_dir),
                     "moved": len(get_audio_files(album_dir, list(extensions))),
                 }
@@ -1852,6 +2287,12 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
             )
 
     _seed_uploaded_library(uploader_user_id, imported_albums)
+    contributions = _record_uploaded_library_contributions(
+        user_id=uploader_user_id,
+        source=str(params.get("source") or "upload"),
+        source_ref=str(params.get("source_ref") or task_id),
+        imported_albums=imported_albums,
+    )
 
     if completed_albums:
         _emit_acquisition_completed_for_albums(
@@ -1874,6 +2315,8 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
         "zip_archives": zip_count,
         "loose_audio_files": loose_audio_count,
         "imported_albums": imported_albums,
+        "skipped_existing_uploads": skipped_existing_uploads,
+        "contributions": contributions,
     }
 
 

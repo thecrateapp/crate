@@ -20,6 +20,7 @@ export function initTauriRuntime(): void {
   ensureDesktopWindowSize();
   installNativeHttpFetch();
   void initTrayBridge();
+  void initBandcampCookieBridge();
   installDeepLinkBridge();
   void initDeepLinks();
 }
@@ -68,8 +69,9 @@ function isHttpRequest(
 
 async function initDeepLinks(): Promise<void> {
   try {
-    const { getCurrent, onOpenUrl } =
-      await import("@tauri-apps/plugin-deep-link");
+    const { getCurrent, onOpenUrl } = await import(
+      "@tauri-apps/plugin-deep-link"
+    );
     const { listen } = await import("@tauri-apps/api/event");
 
     await listen<string[]>("crate:deep-link", (event) => {
@@ -115,6 +117,24 @@ async function initTrayBridge(): Promise<void> {
     recordDevLog(
       "tauri",
       "tray bridge failed",
+      err instanceof Error ? err.message : String(err),
+      "warn",
+    );
+  }
+}
+
+async function initBandcampCookieBridge(): Promise<void> {
+  try {
+    const { listen } = await import("@tauri-apps/api/event");
+    await listen<{ cookie: string }>("crate:bandcamp-cookie", (event) => {
+      window.dispatchEvent(
+        new CustomEvent("crate:bandcamp-cookie", { detail: event.payload }),
+      );
+    });
+  } catch (err) {
+    recordDevLog(
+      "tauri",
+      "Bandcamp cookie bridge failed",
       err instanceof Error ? err.message : String(err),
       "warn",
     );

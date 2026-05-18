@@ -39,6 +39,7 @@ import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
@@ -97,6 +98,9 @@ interface AlbumTrack {
     musicbrainz_trackid: string;
   };
   path: string;
+  is_available?: boolean;
+  source?: string | null;
+  source_url?: string | null;
 }
 
 interface AlbumData {
@@ -115,6 +119,7 @@ interface AlbumData {
   total_length_sec: number;
   has_cover: boolean;
   cover_file: string | null;
+  cover_url?: string | null;
   tracks: AlbumTrack[];
   album_tags: {
     artist: string;
@@ -125,6 +130,24 @@ interface AlbumData {
   };
   genres: string[];
   genre_profile?: GenreProfileItem[];
+  contributors?: AlbumContributor[];
+  playable_track_count?: number | null;
+  is_pre_release?: boolean;
+  release_date?: string | null;
+  release_status?: string | null;
+  release_type?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+}
+
+interface AlbumContributor {
+  user_id: number;
+  user_email?: string | null;
+  user_username?: string | null;
+  user_name?: string | null;
+  user_avatar?: string | null;
+  source?: string | null;
+  imported_at?: string | null;
 }
 
 export function Album() {
@@ -218,17 +241,19 @@ export function Album() {
     );
   }
 
-  const coverUrl = albumCoverApiUrl(
-    {
-      albumId: data.id,
-      albumEntityUid: data.entity_uid,
-      artistEntityUid: data.artist_entity_uid,
-      albumSlug: data.slug,
-      artistName: data.artist,
-      albumName: data.name,
-    },
-    { size: 768 },
-  );
+  const coverUrl =
+    data.cover_url ||
+    albumCoverApiUrl(
+      {
+        albumId: data.id,
+        albumEntityUid: data.entity_uid,
+        artistEntityUid: data.artist_entity_uid,
+        albumSlug: data.slug,
+        artistName: data.artist,
+        albumName: data.name,
+      },
+      { size: 768 },
+    );
   const artistPhotoUrl = artistPhotoApiUrl(
     {
       artistId: data.artist_id,
@@ -242,13 +267,26 @@ export function Album() {
   const albumId = data.id;
   const artistName = data.artist;
   const albumTracks = data.tracks;
+  const playableAlbumTracks = albumTracks.filter(
+    (track) => track.is_available !== false,
+  );
+  const isPreRelease = Boolean(data.is_pre_release);
+  const canPersistAlbum = !isPreRelease && albumId > 0;
   const year = data.album_tags?.year?.slice(0, 4);
   const genre =
     data.genres.length > 0 ? data.genres.join(", ") : data.album_tags?.genre;
+  const primaryContributor = data.contributors?.[0] ?? null;
+  const primaryContributorName =
+    primaryContributor?.user_name ||
+    primaryContributor?.user_username ||
+    primaryContributor?.user_email ||
+    "";
+  const visibleContributor =
+    primaryContributorName && primaryContributor ? primaryContributor : null;
   const playerTracks: Track[] = buildAlbumPlayerTracks(data);
-  const saved = isSaved(albumId);
-  const offlineState = getAlbumState(albumId);
-  const offlineRecord = getAlbumRecord(albumId);
+  const saved = canPersistAlbum ? isSaved(albumId) : false;
+  const offlineState = getAlbumState(canPersistAlbum ? albumId : undefined);
+  const offlineRecord = canPersistAlbum ? getAlbumRecord(albumId) : null;
   const offlineBusy = isOfflineBusy(offlineState);
   const offlineProgress = offlineRecord?.trackCount
     ? `${Math.min(
@@ -266,8 +304,8 @@ export function Album() {
           : offlineBusy
             ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
             : "Make available offline";
-  const offlineStatusDetail =
-    offlineState === "ready"
+  const offlineStatusDetail = canPersistAlbum
+    ? offlineState === "ready"
       ? offlineRecord?.trackCount
         ? `${offlineRecord.trackCount} track${
             offlineRecord.trackCount === 1 ? "" : "s"
@@ -279,7 +317,8 @@ export function Album() {
           ? offlineRecord?.readyTrackCount
             ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
             : "Offline copy failed. Retry to finish the album mirror."
-          : null;
+          : null
+    : null;
 
   const qualityBadges = buildAlbumQualityBadges(albumTracks);
   const hasMultipleDiscs = albumTracks.some(
@@ -298,16 +337,20 @@ export function Album() {
           artistName,
           albumName: displayName,
         }),
-        radio: {
-          seedType: "album",
-          seedId: albumId,
-        },
+        radio: !isPreRelease
+          ? {
+              seedType: "album",
+              seedId: albumId,
+            }
+          : undefined,
       });
     }
   };
 
   const handlePlayTrack = (trackId: number) => {
-    const startIndex = data.tracks.findIndex((track) => track.id === trackId);
+    const startIndex = playableAlbumTracks.findIndex(
+      (track) => track.id === trackId,
+    );
     if (startIndex < 0) return;
     handlePlay(startIndex);
   };
@@ -325,14 +368,20 @@ export function Album() {
         artistName,
         albumName: displayName,
       }),
-      radio: {
-        seedType: "album",
-        seedId: albumId,
-      },
+      radio: !isPreRelease
+        ? {
+            seedType: "album",
+            seedId: albumId,
+          }
+        : undefined,
     });
   };
 
   async function handleAlbumRadio() {
+    if (isPreRelease) {
+      toast.info("Album radio will be available when the release lands");
+      return;
+    }
     try {
       const radio = await fetchAlbumRadio({
         albumId,
@@ -381,6 +430,7 @@ export function Album() {
   }
 
   async function handleToggleSaved() {
+    if (!canPersistAlbum) return;
     try {
       if (saved) {
         await unsaveAlbum(albumId);
@@ -395,6 +445,7 @@ export function Album() {
   }
 
   async function handleToggleOffline() {
+    if (!canPersistAlbum) return;
     try {
       const result = await toggleAlbumOffline({ albumId, title: displayName });
       toast.success(
@@ -407,7 +458,7 @@ export function Album() {
     }
   }
 
-  const playlistTracksPayload = albumTracks.map((track) => ({
+  const playlistTracksPayload = playableAlbumTracks.map((track) => ({
     ...toTrackReferencePayload({
       id: track.id,
       entity_uid: track.entity_uid,
@@ -456,7 +507,7 @@ export function Album() {
   function handleCreatePlaylistFromAlbum() {
     openCreatePlaylist({
       name: displayName,
-      tracks: albumTracks.map((track) =>
+      tracks: playableAlbumTracks.map((track) =>
         toPlayableTrack({
           id: track.id,
           entity_uid: track.entity_uid,
@@ -513,7 +564,7 @@ export function Album() {
     <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
       {/* Header */}
       <div className="relative min-h-[520px] overflow-hidden sm:h-[430px] sm:min-h-0 lg:h-[460px]">
-        {data.has_cover ? (
+        {data.has_cover || data.cover_url ? (
           <img
             src={coverUrl}
             alt=""
@@ -537,7 +588,7 @@ export function Album() {
             {/* Cover */}
             <div className="w-[200px] flex-shrink-0 self-center sm:w-[240px] sm:self-auto lg:w-[280px]">
               <div className="aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10">
-                {data.has_cover ? (
+                {data.has_cover || data.cover_url ? (
                   <img
                     src={coverUrl}
                     alt={displayName}
@@ -557,10 +608,15 @@ export function Album() {
             {/* Info */}
             <div className="flex min-w-0 flex-col justify-end text-left">
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                {isPreRelease ? (
+                  <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                    Pre-release
+                  </span>
+                ) : null}
                 <h1 className="max-w-4xl text-2xl font-bold text-foreground sm:text-4xl">
                   {displayName}
                 </h1>
-                <OfflineBadge state={offlineState} />
+                {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
               </div>
               <button
                 className="mb-3 inline-flex items-center gap-2 self-start text-sm text-muted-foreground transition-colors hover:text-primary"
@@ -588,10 +644,25 @@ export function Album() {
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 {year && <span>{year}</span>}
+                {isPreRelease && data.release_date ? (
+                  <span>
+                    Releases{" "}
+                    {new Date(
+                      `${data.release_date}T12:00:00`,
+                    ).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                ) : null}
                 {!data.genre_profile?.length && genre ? (
                   <span>{genre}</span>
                 ) : null}
                 {data.track_count > 0 && <span>{data.track_count} tracks</span>}
+                {isPreRelease ? (
+                  <span>{playerTracks.length} available now</span>
+                ) : null}
                 {data.total_length_sec > 0 && (
                   <span className="flex items-center gap-1">
                     <Clock size={11} />
@@ -605,6 +676,37 @@ export function Album() {
                   />
                 ))}
               </div>
+
+              {visibleContributor ? (
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/8 ring-1 ring-white/10">
+                    {visibleContributor.user_avatar ? (
+                      <img
+                        src={visibleContributor.user_avatar}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <User size={13} />
+                    )}
+                  </span>
+                  <span>
+                    Added to Crate by{" "}
+                    <span className="font-medium text-foreground/85">
+                      {primaryContributorName}
+                    </span>
+                    {visibleContributor.source ? (
+                      <span className="text-muted-foreground/70">
+                        {" "}
+                        via {visibleContributor.source}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              ) : null}
 
               {data.genre_profile && data.genre_profile.length > 0 ? (
                 <GenrePillRow
@@ -629,67 +731,82 @@ export function Album() {
       <div className="px-4 py-4 sm:px-6">
         <div className="mx-auto flex w-full max-w-[1480px] items-center gap-2">
           <button
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
             onClick={() => handlePlay()}
+            disabled={playerTracks.length === 0}
             aria-label="Play"
           >
             <Play size={16} fill="currentColor" />
             Play
           </button>
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
             onClick={handleShuffle}
+            disabled={playerTracks.length === 0}
             aria-label="Shuffle"
           >
             <Shuffle size={16} />
           </button>
-          <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
-            onClick={handleAlbumRadio}
-            aria-label="Album Radio"
-          >
-            <Radio size={16} />
-          </button>
-          <button
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-              offlineState === "ready"
-                ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                : offlineBusy
-                  ? "border border-primary/25 bg-primary/10 text-primary"
-                  : offlineState === "error"
-                    ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                    : "border border-white/15 text-foreground hover:bg-white/5"
-            }`}
-            onClick={handleToggleOffline}
-            disabled={!offlineSupported || offlineBusy}
-            aria-label={
-              offlineState === "ready"
-                ? "Remove offline copy"
-                : "Make available offline"
-            }
-            title={offlineButtonLabel}
-          >
-            {offlineState === "ready" ? (
-              <CheckCircle2 size={16} />
-            ) : offlineBusy ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : offlineState === "error" ? (
-              <AlertCircle size={16} />
-            ) : (
-              <ArrowDownToLine size={16} />
-            )}
-          </button>
-          <button
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
-              saved
-                ? "border border-primary/30 bg-primary/15 text-primary"
-                : "border border-white/15 text-foreground hover:bg-white/5"
-            }`}
-            onClick={handleToggleSaved}
-            aria-label={saved ? "Remove from collection" : "Add to collection"}
-          >
-            <Heart size={16} className={saved ? "fill-current" : ""} />
-          </button>
+          {!isPreRelease ? (
+            <button
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
+              onClick={handleAlbumRadio}
+              aria-label="Album Radio"
+            >
+              <Radio size={16} />
+            </button>
+          ) : null}
+          {canPersistAlbum ? (
+            <button
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                offlineState === "ready"
+                  ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                  : offlineBusy
+                    ? "border border-primary/25 bg-primary/10 text-primary"
+                    : offlineState === "error"
+                      ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
+                      : "border border-white/15 text-foreground hover:bg-white/5"
+              }`}
+              onClick={handleToggleOffline}
+              disabled={!offlineSupported || offlineBusy}
+              aria-label={
+                offlineState === "ready"
+                  ? "Remove offline copy"
+                  : "Make available offline"
+              }
+              title={offlineButtonLabel}
+            >
+              {offlineState === "ready" ? (
+                <CheckCircle2 size={16} />
+              ) : offlineBusy ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : offlineState === "error" ? (
+                <AlertCircle size={16} />
+              ) : (
+                <ArrowDownToLine size={16} />
+              )}
+            </button>
+          ) : null}
+          {canPersistAlbum ? (
+            <button
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                saved
+                  ? "border border-primary/30 bg-primary/15 text-primary"
+                  : "border border-white/15 text-foreground hover:bg-white/5"
+              }`}
+              onClick={handleToggleSaved}
+              aria-label={
+                saved ? "Remove from collection" : "Add to collection"
+              }
+            >
+              <Heart size={16} className={saved ? "fill-current" : ""} />
+            </button>
+          ) : null}
+          <BandcampSupportButton
+            entityType="album"
+            entityUid={data.entity_uid}
+            artistName={data.artist}
+          />
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
@@ -705,6 +822,7 @@ export function Album() {
                   coverUrl={coverUrl}
                   displayName={displayName}
                   saved={saved}
+                  canPersistAlbum={canPersistAlbum}
                   playlists={playlists}
                   playlistPickerOpen={playlistPickerOpen}
                   onTogglePlaylistPicker={handleTogglePlaylistPicker}
@@ -754,6 +872,7 @@ export function Album() {
                     coverUrl={coverUrl}
                     displayName={displayName}
                     saved={saved}
+                    canPersistAlbum={canPersistAlbum}
                     playlists={playlists}
                     playlistPickerOpen={playlistPickerOpen}
                     onTogglePlaylistPicker={handleTogglePlaylistPicker}
@@ -806,6 +925,15 @@ export function Album() {
         </div>
       ) : null}
 
+      {isPreRelease ? (
+        <div className="px-4 sm:px-6 pb-4">
+          <div className="mx-auto w-full max-w-[1480px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
+            This pre-release is already part of the discography. Tracks become
+            playable here as soon as Crate has them in the library.
+          </div>
+        </div>
+      ) : null}
+
       {/* Track List */}
       <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 pb-8">
         {hasMultipleDiscs
@@ -846,7 +974,9 @@ export function Album() {
                         danceability: t.danceability,
                         valence: t.valence,
                         bliss_vector: t.bliss_vector,
-                        library_track_id: t.id,
+                        library_track_id:
+                          t.is_available === false ? undefined : t.id,
+                        disabled: t.is_available === false,
                       })}
                       index={parseInt(t.tags.tracknumber) || idx + 1}
                       albumCover={coverUrl}
@@ -888,7 +1018,8 @@ export function Album() {
                   danceability: t.danceability,
                   valence: t.valence,
                   bliss_vector: t.bliss_vector,
-                  library_track_id: t.id,
+                  library_track_id: t.is_available === false ? undefined : t.id,
+                  disabled: t.is_available === false,
                 })}
                 index={parseInt(t.tags.tracknumber) || idx + 1}
                 albumCover={coverUrl}
@@ -909,6 +1040,7 @@ function AlbumMenuContent({
   coverUrl,
   displayName,
   saved,
+  canPersistAlbum,
   playlists,
   playlistPickerOpen,
   onTogglePlaylistPicker,
@@ -928,6 +1060,7 @@ function AlbumMenuContent({
   coverUrl: string;
   displayName: string;
   saved: boolean;
+  canPersistAlbum: boolean;
   playlists: { id: number; name: string }[];
   playlistPickerOpen: boolean;
   onTogglePlaylistPicker: () => void;
@@ -953,7 +1086,7 @@ function AlbumMenuContent({
     <>
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <div className="w-12 h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
-          {data.has_cover ? (
+          {data.has_cover || coverUrl ? (
             <img
               src={coverUrl}
               alt={displayName}
@@ -1014,28 +1147,32 @@ function AlbumMenuContent({
             ))}
           </div>
         )}
-        <AppMenuButton onClick={onToggleSaved}>
-          <Heart
-            size={15}
-            className={saved ? "fill-current text-primary" : ""}
-          />
-          {saved ? "Remove from collection" : "Add to collection"}
-        </AppMenuButton>
-        <AppMenuButton
-          onClick={onToggleOffline}
-          disabled={!offlineSupported || isOfflineBusy(offlineState)}
-        >
-          {offlineState === "ready" ? (
-            <CheckCircle2 size={15} className="text-cyan-200" />
-          ) : isOfflineBusy(offlineState) ? (
-            <Loader2 size={15} className="animate-spin text-primary" />
-          ) : offlineState === "error" ? (
-            <AlertCircle size={15} className="text-amber-200" />
-          ) : (
-            <ArrowDownToLine size={15} />
-          )}
-          {offlineLabel}
-        </AppMenuButton>
+        {canPersistAlbum ? (
+          <AppMenuButton onClick={onToggleSaved}>
+            <Heart
+              size={15}
+              className={saved ? "fill-current text-primary" : ""}
+            />
+            {saved ? "Remove from collection" : "Add to collection"}
+          </AppMenuButton>
+        ) : null}
+        {canPersistAlbum ? (
+          <AppMenuButton
+            onClick={onToggleOffline}
+            disabled={!offlineSupported || isOfflineBusy(offlineState)}
+          >
+            {offlineState === "ready" ? (
+              <CheckCircle2 size={15} className="text-cyan-200" />
+            ) : isOfflineBusy(offlineState) ? (
+              <Loader2 size={15} className="animate-spin text-primary" />
+            ) : offlineState === "error" ? (
+              <AlertCircle size={15} className="text-amber-200" />
+            ) : (
+              <ArrowDownToLine size={15} />
+            )}
+            {offlineLabel}
+          </AppMenuButton>
+        ) : null}
         <AppMenuButton onClick={onGoToArtist}>
           <User size={15} /> Go to artist
         </AppMenuButton>

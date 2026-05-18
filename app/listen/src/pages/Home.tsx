@@ -42,6 +42,7 @@ import type {
   HomeRecommendedTrack,
   HomeSectionId,
   HomeUpcomingInsight,
+  HomeUpcomingItem,
   ReplayMix,
 } from "@/components/home/home-model";
 import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
@@ -477,6 +478,27 @@ export function Home() {
     }
   }
 
+  async function playUpcomingSetlist(item: HomeUpcomingItem) {
+    try {
+      if (item.type !== "show" || !item.artist_id) return;
+      const queue = await fetchPlayableSetlist({
+        artistId: item.artist_id,
+        artistName: item.artist,
+      });
+      if (!queue.length) {
+        toast.info("No probable setlist tracks matched your library");
+        return;
+      }
+      playAll(queue, 0, {
+        type: "playlist",
+        name: `${item.artist} Probable Setlist`,
+      });
+      toast.success(`Playing probable setlist: ${queue.length} tracks`);
+    } catch {
+      toast.error("Failed to load probable setlist");
+    }
+  }
+
   function playReplayMix() {
     if (!replay?.items?.length) return;
     const queue: Track[] = replay.items.map((item) =>
@@ -638,6 +660,7 @@ export function Home() {
         previewItems={upcomingPreview}
         summary={upcoming?.summary}
         onOpenUpcoming={() => navigate("/upcoming")}
+        onPlaySetlist={(item) => void playUpcomingSetlist(item)}
       />
 
       <HomeShowPrepSection

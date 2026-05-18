@@ -265,6 +265,65 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
     return grouped
 
 
+def get_discovery_excluded_artist_keys(user_id: int, *, session=None) -> list[str]:
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text(
+                    """
+                WITH followed AS (
+                    SELECT artist_name
+                    FROM user_follows
+                    WHERE user_id = :uid
+                ),
+                liked AS (
+                    SELECT t.artist AS artist_name
+                    FROM user_liked_tracks lt
+                    JOIN library_tracks t ON t.id = lt.track_id
+                    WHERE lt.user_id = :uid
+                ),
+                saved AS (
+                    SELECT a.artist AS artist_name
+                    FROM user_saved_albums sa
+                    JOIN library_albums a ON a.id = sa.album_id
+                    WHERE sa.user_id = :uid
+                ),
+                recent_plays AS (
+                    SELECT COALESCE(NULLIF(TRIM(pe.artist), ''), t.artist) AS artist_name
+                    FROM user_play_events pe
+                    LEFT JOIN library_tracks t
+                      ON t.id = pe.track_id
+                      OR (pe.track_id IS NULL AND pe.track_entity_uid IS NOT NULL
+                          AND t.entity_uid = pe.track_entity_uid)
+                    WHERE pe.user_id = :uid
+                      AND (
+                        pe.ended_at IS NULL
+                        OR pe.ended_at > now() - INTERVAL '180 days'
+                      )
+                    ORDER BY pe.ended_at DESC NULLS LAST
+                    LIMIT 200
+                )
+                SELECT DISTINCT LOWER(TRIM(artist_name)) AS artist_key
+                FROM (
+                    SELECT artist_name FROM followed
+                    UNION ALL
+                    SELECT artist_name FROM liked
+                    UNION ALL
+                    SELECT artist_name FROM saved
+                    UNION ALL
+                    SELECT artist_name FROM recent_plays
+                ) known
+                WHERE artist_name IS NOT NULL AND TRIM(artist_name) != ''
+                """
+                ),
+                {"uid": user_id},
+            )
+            .mappings()
+            .all()
+        )
+    return [str(row["artist_key"]) for row in rows if row.get("artist_key")]
+
+
 def load_feedback_history(
     user_id: int, max_age_days: int = 90, *, session=None
 ) -> tuple[list[list[float]], list[list[float]]]:
@@ -319,6 +378,7 @@ def load_feedback_history(
 
 __all__ = [
     "count_user_radio_signals",
+    "get_discovery_excluded_artist_keys",
     "get_discovery_seed_sources",
     "get_followed_artist_seed_rows",
     "get_followed_artist_vectors",

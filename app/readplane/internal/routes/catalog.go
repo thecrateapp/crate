@@ -196,8 +196,11 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
+		if s.fallback.ServeHTTP(w, r) {
+			return
+		}
 		payload, err := s.catalog.AlbumByArtistAndAlbumSlug(r.Context(), parts[0], parts[2])
-		s.writeCatalogPayload(w, r, payload, err, "Album unavailable", "Not found")
+		s.writeCatalogPayloadOrFallbackNotFound(w, r, payload, err, "Album unavailable", "Not found")
 		return
 	}
 	s.fallbackOrRouteMiss(w, r)
@@ -381,6 +384,13 @@ func (s *Server) writeCatalogPayload(w http.ResponseWriter, r *http.Request, pay
 	}
 	httpx.MarkReadplane(w, "miss")
 	httpx.WriteError(w, http.StatusServiceUnavailable, fallbackDetail)
+}
+
+func (s *Server) writeCatalogPayloadOrFallbackNotFound(w http.ResponseWriter, r *http.Request, payload any, err error, fallbackDetail string, notFoundDetail string) {
+	if errors.Is(err, catalog.ErrNotFound) && s.fallback.ServeHTTP(w, r) {
+		return
+	}
+	s.writeCatalogPayload(w, r, payload, err, fallbackDetail, notFoundDetail)
 }
 
 func (s *Server) catalogUnavailable(w http.ResponseWriter, r *http.Request, detail string) {

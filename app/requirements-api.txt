@@ -13,6 +13,7 @@ alembic>=1.13
 redis>=5.0
 bcrypt>=4.0
 pyjwt>=2.8
+cryptography>=42.0
 Pillow>=10.0
 tiddl>=3.3.0
 dramatiq[redis]>=1.17

@@ -163,6 +163,10 @@ export function Upload() {
               <li>Library sync and enrichment run in the background.</li>
               <li>Uploaded tracks are liked for you automatically.</li>
               <li>Uploaded albums are saved and artists are followed.</li>
+              <li>
+                Your upload is attributed to you, with export and withdrawal
+                controls in Library.
+              </li>
             </ul>
             <button
               onClick={handleSubmit}

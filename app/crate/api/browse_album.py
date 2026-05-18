@@ -1,5 +1,6 @@
-from pathlib import Path
 import logging
+from pathlib import Path
+import re
 import shutil
 from typing import Any, Mapping
 
@@ -36,6 +37,11 @@ from crate.db.repositories.library import (
     get_library_artist_by_slug,
     get_library_tracks,
 )
+from crate.db.repositories.library_contributions import list_album_contributors
+from crate.db.releases import (
+    find_upcoming_release_by_artist_album_slug,
+    get_artist_release_track_matches,
+)
 from crate.db.queries.browse import (
     get_album_genre_ids,
     get_related_albums,
@@ -46,6 +52,7 @@ from crate.db.repositories.tasks import create_task
 from crate.slugs import build_public_album_slug
 from crate.db.queries.streaming_admin import get_track_variant_summaries
 from crate.storage_layout import resolve_album_dir
+from crate.track_versions import canonical_track_title_key
 
 router = APIRouter(tags=["browse"])
 log = logging.getLogger(__name__)
@@ -120,6 +127,335 @@ def _album_slug_matches(
         if artist and slug.startswith(f"{artist}-"):
             candidates.add(slug[len(artist) + 1 :])
     return requested in candidates
+
+
+def _json_list(value: Any) -> list[dict]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, str):
+        try:
+            import json
+
+            parsed = json.loads(value)
+        except Exception:
+            return []
+        return (
+            [item for item in parsed if isinstance(item, dict)]
+            if isinstance(parsed, list)
+            else []
+        )
+    return []
+
+
+def _relative_track_path(path: str | None) -> str:
+    if not path:
+        return ""
+    try:
+        return str(Path(path).relative_to(library_path()))
+    except Exception:
+        return str(path)
+
+
+def _take_release_track_match(
+    matches: dict[str, list[dict]],
+    title: str,
+    used_ids: set[int],
+    *,
+    album_title: str = "",
+) -> dict | None:
+    key = canonical_track_title_key(title)
+    if not key:
+        return None
+    candidates = matches.get(key, [])
+    title_slug = build_public_album_slug(title)
+    if album_title:
+        release_slug = build_public_album_slug(album_title)
+        candidates = sorted(
+            candidates,
+            key=lambda track: (
+                build_public_album_slug(str(track.get("album") or "")) != release_slug,
+                build_public_album_slug(str(track.get("album_slug") or ""))
+                != release_slug,
+            ),
+        )
+    for track in candidates:
+        if build_public_album_slug(str(track.get("title") or "")) != title_slug:
+            continue
+        track_id = int(track.get("id") or 0)
+        if track_id and track_id not in used_ids:
+            used_ids.add(track_id)
+            return track
+    return None
+
+
+def _tidal_album_id_from_release(release: Mapping[str, Any]) -> str:
+    explicit = str(release.get("tidal_id") or "").strip()
+    if explicit:
+        return explicit
+    for value in (release.get("source_url"), release.get("tidal_url")):
+        raw = str(value or "")
+        match = re.search(r"(?:tidal\.com/album/|/album/)(\d+)", raw)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _release_tracklist_from_tidal_source(release: Mapping[str, Any]) -> list[dict]:
+    album_id = _tidal_album_id_from_release(release)
+    if not album_id:
+        return []
+
+    cache_key = f"tidal:release-tracklist:{album_id}"
+    cached = get_cache(cache_key)
+    if isinstance(cached, list):
+        return _json_list(cached)
+
+    try:
+        from crate import tidal as tidal_mod
+
+        tracklist = tidal_mod.album_tracks_to_release_tracklist(
+            tidal_mod.get_album_tracks(album_id)
+        )
+    except Exception:
+        log.debug(
+            "Failed to load Tidal release tracklist for %s", album_id, exc_info=True
+        )
+        return []
+
+    if tracklist:
+        set_cache(cache_key, tracklist, ttl=86400)
+    return tracklist
+
+
+def _release_tracklist_from_musicbrainz_source(
+    release: Mapping[str, Any],
+) -> list[dict]:
+    release_group_id = str(release.get("mb_release_group_id") or "").strip()
+    if not release_group_id:
+        return []
+
+    cache_key = f"mb:release-tracklist:{release_group_id}"
+    cached = get_cache(cache_key)
+    if isinstance(cached, list):
+        return _json_list(cached)
+
+    try:
+        from crate.musicbrainz_ext import get_release_group_tracklist
+
+        tracklist = get_release_group_tracklist(release_group_id)
+    except Exception:
+        log.debug(
+            "Failed to load MusicBrainz release tracklist for %s",
+            release_group_id,
+            exc_info=True,
+        )
+        return []
+
+    if tracklist:
+        set_cache(cache_key, tracklist, ttl=86400)
+    return tracklist
+
+
+def _pre_release_track_payload(
+    *,
+    release_id: int,
+    release: Mapping[str, Any],
+    planned: Mapping[str, Any],
+    local_track: Mapping[str, Any] | None,
+    preview_track: Mapping[str, Any] | None,
+    position: int,
+) -> dict:
+    title = str(planned.get("title") or (preview_track or {}).get("title") or "")
+    duration = planned.get("duration") or (preview_track or {}).get("duration") or 0
+    track_number = int(planned.get("position") or position)
+    if local_track:
+        size = int(local_track.get("size") or 0)
+        duration = local_track.get("duration") or duration or 0
+        return {
+            "id": local_track["id"],
+            "entity_uid": local_track.get("entity_uid"),
+            "storage_id": local_track.get("storage_id"),
+            "filename": local_track.get("filename") or title,
+            "format": local_track.get("format") or "",
+            "size_mb": round(size / (1024**2), 1) if size else 0,
+            "bitrate": int(local_track["bitrate"]) // 1000
+            if local_track.get("bitrate")
+            else None,
+            "sample_rate": local_track.get("sample_rate"),
+            "bit_depth": local_track.get("bit_depth"),
+            "bpm": local_track.get("bpm"),
+            "audio_key": local_track.get("audio_key"),
+            "audio_scale": local_track.get("audio_scale"),
+            "energy": local_track.get("energy"),
+            "danceability": local_track.get("danceability"),
+            "valence": local_track.get("valence"),
+            "bliss_vector": local_track.get("bliss_vector"),
+            "length_sec": round(float(duration)) if duration else 0,
+            "popularity": local_track.get("popularity"),
+            "popularity_score": local_track.get("popularity_score"),
+            "popularity_confidence": local_track.get("popularity_confidence"),
+            "rating": local_track.get("rating", 0) or 0,
+            "stream_variants": [],
+            "lyrics": {
+                "status": "none",
+                "found": False,
+                "has_plain": False,
+                "has_synced": False,
+                "provider": "lrclib",
+                "updated_at": None,
+            },
+            "tags": {
+                "title": local_track.get("title") or title,
+                "artist": local_track.get("artist") or release.get("artist_name") or "",
+                "album": release.get("album_title") or "",
+                "albumartist": release.get("artist_name") or "",
+                "tracknumber": str(track_number),
+                "discnumber": str(local_track.get("disc_number") or 1),
+                "date": str(release.get("release_date") or "")[:4],
+                "genre": local_track.get("genre") or "",
+                "musicbrainz_albumid": release.get("mb_release_group_id"),
+                "musicbrainz_trackid": planned.get("recording_mbid"),
+            },
+            "path": _relative_track_path(str(local_track.get("path") or "")),
+            "is_available": True,
+            "source": "library",
+        }
+
+    return {
+        "id": -(int(release_id) * 1000 + track_number),
+        "entity_uid": None,
+        "storage_id": None,
+        "filename": title,
+        "format": "",
+        "size_mb": 0,
+        "bitrate": None,
+        "sample_rate": None,
+        "bit_depth": None,
+        "bpm": None,
+        "audio_key": None,
+        "audio_scale": None,
+        "energy": None,
+        "danceability": None,
+        "valence": None,
+        "bliss_vector": None,
+        "length_sec": round(float(duration)) if duration else 0,
+        "popularity": None,
+        "popularity_score": None,
+        "popularity_confidence": None,
+        "rating": 0,
+        "stream_variants": [],
+        "lyrics": {
+            "status": "none",
+            "found": False,
+            "has_plain": False,
+            "has_synced": False,
+            "provider": "lrclib",
+            "updated_at": None,
+        },
+        "tags": {
+            "title": title,
+            "artist": release.get("artist_name") or "",
+            "album": release.get("album_title") or "",
+            "albumartist": release.get("artist_name") or "",
+            "tracknumber": str(track_number),
+            "discnumber": "1",
+            "date": str(release.get("release_date") or "")[:4],
+            "genre": "",
+            "musicbrainz_albumid": release.get("mb_release_group_id"),
+            "musicbrainz_trackid": planned.get("recording_mbid"),
+        },
+        "path": "",
+        "is_available": False,
+        "source": "pre_release",
+        "source_url": (preview_track or {}).get("source_url")
+        or (preview_track or {}).get("url"),
+    }
+
+
+def _pre_release_album_payload(
+    request: Request, artist: Mapping[str, Any], release: Mapping[str, Any]
+) -> dict:
+    _require_auth(request)
+    release_id = int(release["id"])
+    tracklist = _json_list(release.get("tracklist_json"))
+    preview_tracks = _json_list(release.get("preview_tracks_json"))
+    if not tracklist:
+        tracklist = _release_tracklist_from_musicbrainz_source(release)
+    if not tracklist:
+        tracklist = _release_tracklist_from_tidal_source(release)
+    if not tracklist:
+        tracklist = preview_tracks
+
+    preview_by_title = {
+        canonical_track_title_key(str(track.get("title") or "")): track
+        for track in preview_tracks
+        if track.get("title")
+    }
+    local_matches = get_artist_release_track_matches(str(artist["name"]))
+    used_ids: set[int] = set()
+    tracks = []
+    for index, planned in enumerate(tracklist, start=1):
+        title = str(planned.get("title") or "")
+        preview_track = preview_by_title.get(canonical_track_title_key(title))
+        local_track = _take_release_track_match(
+            local_matches,
+            title,
+            used_ids,
+            album_title=str(release.get("album_title") or ""),
+        )
+        tracks.append(
+            _pre_release_track_payload(
+                release_id=release_id,
+                release=release,
+                planned=planned,
+                local_track=local_track,
+                preview_track=preview_track,
+                position=index,
+            )
+        )
+
+    playable_count = sum(1 for track in tracks if track.get("is_available"))
+    total_length = sum(int(track.get("length_sec") or 0) for track in tracks)
+    release_date = str(release.get("release_date") or "")
+    return {
+        "id": -release_id,
+        "entity_uid": None,
+        "slug": build_public_album_slug(str(release.get("album_title") or "")),
+        "artist_id": artist.get("id"),
+        "artist_entity_uid": artist.get("entity_uid"),
+        "artist_slug": artist.get("slug"),
+        "artist": artist["name"],
+        "name": release.get("album_title") or "",
+        "display_name": display_name(str(release.get("album_title") or "")),
+        "path": "",
+        "track_count": max(len(tracks), int(release.get("tracks") or 0)),
+        "playable_track_count": playable_count,
+        "total_size_mb": 0,
+        "total_length_sec": total_length,
+        "has_cover": bool(release.get("cover_url")),
+        "cover_file": None,
+        "cover_url": release.get("cover_url") or "",
+        "tracks": tracks,
+        "album_tags": {
+            "artist": artist["name"],
+            "album": release.get("album_title") or "",
+            "year": release_date[:4],
+            "genre": "",
+            "musicbrainz_albumid": release.get("mb_release_group_id"),
+        },
+        "musicbrainz_albumid": release.get("mb_release_group_id"),
+        "genres": [],
+        "genre_profile": [],
+        "popularity": None,
+        "popularity_score": None,
+        "popularity_confidence": None,
+        "is_pre_release": True,
+        "release_date": release_date,
+        "release_status": release.get("status") or "detected",
+        "release_type": release.get("release_type") or "Album",
+        "source_name": release.get("source_name") or "",
+        "source_url": release.get("source_url") or release.get("tidal_url") or "",
+    }
 
 
 @router.get(
@@ -314,6 +650,7 @@ def api_album(request: Request, artist: str, album: str):
         "musicbrainz_albumid": db_mbid,
         "genres": album_genres,
         "genre_profile": genre_profile,
+        "contributors": list_album_contributors(int(album_data["id"])),
         "popularity": album_data.get("popularity"),
         "popularity_score": album_data.get("popularity_score"),
         "popularity_confidence": album_data.get("popularity_confidence"),
@@ -332,6 +669,10 @@ def api_album_by_artist_slug(request: Request, artist_slug: str, album_slug: str
     artist = get_library_artist_by_slug(artist_slug)
     if not artist:
         return JSONResponse({"error": "Not found"}, status_code=404)
+
+    release = find_upcoming_release_by_artist_album_slug(artist["name"], album_slug)
+    if release:
+        return _pre_release_album_payload(request, artist, release)
 
     album = next(
         (

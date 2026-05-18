@@ -1,7 +1,9 @@
 import datetime as dt
 from datetime import datetime
 
-from sqlalchemy import Date, DateTime, Integer, Text, UniqueConstraint
+from typing import Any
+
+from sqlalchemy import JSON, Date, DateTime, Integer, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crate.db.engine import Base
@@ -28,3 +30,8 @@ class NewRelease(Base):
     release_date: Mapped[dt.date | None] = mapped_column(Date)
     release_type: Mapped[str | None] = mapped_column(Text, server_default="Album")
     mb_release_group_id: Mapped[str | None] = mapped_column(Text)
+    source_name: Mapped[str | None] = mapped_column(Text)
+    source_url: Mapped[str | None] = mapped_column(Text)
+    cover_source: Mapped[str | None] = mapped_column(Text)
+    tracklist_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)
+    preview_tracks_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON)

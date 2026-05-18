@@ -58,6 +58,7 @@ export interface TrackRowData {
   valence?: number | null;
   bliss_vector?: number[] | null;
   library_track_id?: number;
+  disabled?: boolean;
 }
 
 interface TrackRowPlaylistOption {
@@ -104,6 +105,7 @@ export const TrackRow = memo(function TrackRow({
   const { isLiked, toggleTrackLike } = useLikedTracks();
   const { getTrackState } = useOffline();
   const hasTrackRef = hasPlayableTrackReference(track);
+  const disabled = Boolean(track.disabled);
 
   const liked = isLiked(
     track.library_track_id ?? (typeof track.id === "number" ? track.id : null),
@@ -142,6 +144,7 @@ export const TrackRow = memo(function TrackRow({
   const actionMenu = useItemActionMenu(actions);
 
   function handleActivate() {
+    if (disabled) return;
     if (isActive) {
       if (isPlaying) {
         pause();
@@ -172,9 +175,14 @@ export const TrackRow = memo(function TrackRow({
     <div
       className={cn(
         "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer",
-        isActive ? "bg-primary/10" : "hover:bg-white/5",
+        disabled
+          ? "cursor-not-allowed opacity-55"
+          : isActive
+            ? "bg-primary/10"
+            : "hover:bg-white/5",
       )}
       onContextMenu={(event) => {
+        if (disabled) return;
         onActionMenuOpen?.();
         actionMenu.handleContextMenu(event);
       }}
@@ -192,7 +200,7 @@ export const TrackRow = memo(function TrackRow({
               isActive ? "bg-black/40" : "bg-black/0 group-hover:bg-black/45"
             }`}
           >
-            {isActive && isPlaying ? (
+            {disabled ? null : isActive && isPlaying ? (
               <Pause size={16} className="text-white" fill="currentColor" />
             ) : (
               <Play
@@ -209,7 +217,11 @@ export const TrackRow = memo(function TrackRow({
         </div>
       ) : (
         <div className="w-8 text-center flex-shrink-0">
-          {isActive && isPlaying ? (
+          {disabled ? (
+            <span className="text-xs text-muted-foreground">
+              {index != null ? index : track.track_number || "-"}
+            </span>
+          ) : isActive && isPlaying ? (
             <Pause size={14} className="text-primary mx-auto" />
           ) : (
             <>
@@ -241,6 +253,11 @@ export const TrackRow = memo(function TrackRow({
             subtle
             className="flex-shrink-0"
           />
+          {disabled ? (
+            <span className="flex-shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-white/45">
+              Soon
+            </span>
+          ) : null}
         </div>
         {(showArtist || showAlbum || offlineLabel) && (
           <div className="text-xs text-muted-foreground truncate">
@@ -314,53 +331,67 @@ export const TrackRow = memo(function TrackRow({
       )}
 
       {/* Like + Actions */}
-      <ActionIconButton
-        variant="row"
-        active={liked}
-        className={`h-9 w-9 flex-shrink-0 transition-opacity ${
-          liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
-        }`}
-        title={liked ? "Unlike" : "Like"}
-        onClick={async (e) => {
-          e.stopPropagation();
-          const path = track.path || "";
-          const trackEntityUid = track.entity_uid ?? null;
-          const libraryTrackId =
-            track.library_track_id ??
-            (typeof track.id === "number" ? track.id : undefined);
-          if (!hasTrackRef) return;
-          try {
-            await toggleTrackLike(libraryTrackId ?? null, trackEntityUid, path);
-          } catch {
-            // Keep row interaction non-blocking; caller surfaces persistence elsewhere.
-          }
-        }}
-      >
-        <Heart size={14} className={liked ? "fill-current" : ""} />
-      </ActionIconButton>
+      {!disabled ? (
+        <ActionIconButton
+          variant="row"
+          active={liked}
+          className={`h-9 w-9 flex-shrink-0 transition-opacity ${
+            liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
+          }`}
+          title={liked ? "Unlike" : "Like"}
+          onClick={async (e) => {
+            e.stopPropagation();
+            const path = track.path || "";
+            const trackEntityUid = track.entity_uid ?? null;
+            const libraryTrackId =
+              track.library_track_id ??
+              (typeof track.id === "number" ? track.id : undefined);
+            if (!hasTrackRef) return;
+            try {
+              await toggleTrackLike(
+                libraryTrackId ?? null,
+                trackEntityUid,
+                path,
+              );
+            } catch {
+              // Keep row interaction non-blocking; caller surfaces persistence elsewhere.
+            }
+          }}
+        >
+          <Heart size={14} className={liked ? "fill-current" : ""} />
+        </ActionIconButton>
+      ) : (
+        <div className="h-9 w-9 flex-shrink-0" />
+      )}
 
-      <div className="flex-shrink-0 flex gap-1 opacity-100 md:opacity-65 md:group-hover:opacity-100 transition-opacity">
-        <ItemActionMenuButton
-          buttonRef={actionMenu.triggerRef}
-          hasActions={actionMenu.hasActions}
-          onClick={(event) => {
-            onActionMenuOpen?.();
-            actionMenu.openFromTrigger(event);
-          }}
-          onContextMenu={(event) => {
-            onActionMenuOpen?.();
-            actionMenu.handleContextMenu(event);
-          }}
-          className="h-9 w-9"
+      {!disabled ? (
+        <div className="flex-shrink-0 flex gap-1 opacity-100 md:opacity-65 md:group-hover:opacity-100 transition-opacity">
+          <ItemActionMenuButton
+            buttonRef={actionMenu.triggerRef}
+            hasActions={actionMenu.hasActions}
+            onClick={(event) => {
+              onActionMenuOpen?.();
+              actionMenu.openFromTrigger(event);
+            }}
+            onContextMenu={(event) => {
+              onActionMenuOpen?.();
+              actionMenu.handleContextMenu(event);
+            }}
+            className="h-9 w-9"
+          />
+        </div>
+      ) : (
+        <div className="h-9 w-9 flex-shrink-0" />
+      )}
+      {!disabled ? (
+        <ItemActionMenu
+          actions={actions}
+          open={actionMenu.open}
+          position={actionMenu.position}
+          menuRef={actionMenu.menuRef}
+          onClose={actionMenu.close}
         />
-      </div>
-      <ItemActionMenu
-        actions={actions}
-        open={actionMenu.open}
-        position={actionMenu.position}
-        menuRef={actionMenu.menuRef}
-        onClose={actionMenu.close}
-      />
+      ) : null}
     </div>
   );
 });

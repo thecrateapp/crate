@@ -87,6 +87,8 @@ from crate.db.repositories.auth import (
     update_user_last_login,
     upsert_user_external_identity,
 )
+from crate.db.repositories.library_contributions import list_user_album_contributions
+from crate.db.repositories.tasks import create_task
 from crate.db.cache_settings import get_setting, set_setting
 
 log = logging.getLogger(__name__)
@@ -2395,5 +2397,11 @@ async def admin_delete_user(request: Request, user_id: int):
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    contributions = list_user_album_contributions(user_id)
+    if contributions:
+        create_task(
+            "library_cleanup_user_contributions",
+            {"user_id": user_id, "contributions": contributions},
+        )
     delete_user(user_id)
     return {"ok": True}

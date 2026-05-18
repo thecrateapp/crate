@@ -9,6 +9,8 @@ export interface UpcomingItem {
   artist: string;
   artist_id?: number;
   artist_slug?: string;
+  album_id?: number;
+  album_slug?: string;
   title: string;
   subtitle: string;
   cover_url: string | null;

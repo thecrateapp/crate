@@ -41,9 +41,11 @@ from crate.db.paths_candidates import (
     _vector_distance,
 )
 from crate.db.paths_similarity import _artist_affinity, make_radio_genre_overlap_scorer
-from crate.db.queries.paths import find_candidate_rows
+from crate.db.queries.paths import find_candidate_rows, find_seeded_radio_candidate_rows
 from crate.db.queries.radio import (
     count_user_radio_signals,
+    get_album_seed_context,
+    get_discovery_excluded_artist_keys,
     get_discovery_seed_sources,
     get_home_playlist_seed_context,
     get_playlist_seed_context,
@@ -68,8 +70,47 @@ _RADIO_PREFETCH_LIMIT = 120
 _RADIO_PREFETCH_MULTIPLIER = 3
 _MAX_GENERATION_ATTEMPT_MULTIPLIER = 2
 _SEED_ANCHOR_BLEND = 0.02
+_CONTEXTUAL_RADIO_SEED_ANCHOR_BLEND = 0.10
+_TRACK_RADIO_SEED_ANCHOR_BLEND = 0.06
+_RADIO_DRIFT_SIGMA = 0.02
+_CONTEXTUAL_RADIO_DRIFT_SIGMA = 0.004
+_TRACK_RADIO_DRIFT_SIGMA = 0.008
 _GRAPH_CACHE_TTL_SECONDS = 3600
 _DB_EXCLUDE_ID_LIMIT = 50
+_SEEDED_RADIO_SIMILAR_LIMIT = 24
+_SEEDED_RADIO_CANDIDATE_POOL_SIZE = 140
+_CONTEXTUAL_RADIO_W_BLISS = 0.01
+_CONTEXTUAL_RADIO_W_ARTIST_AFFINITY = 0.44
+_CONTEXTUAL_RADIO_W_GENRE_OVERLAP = 0.26
+_TRACK_RADIO_W_BLISS = 0.16
+_TRACK_RADIO_W_ARTIST_AFFINITY = 0.30
+_TRACK_RADIO_W_GENRE_OVERLAP = 0.20
+_CONTEXTUAL_RADIO_SOURCE_PENALTY = {
+    "seed": 0.32,
+    "similar": 0.0,
+    "genre": 0.08,
+    "bliss": 0.35,
+}
+_TRACK_RADIO_SOURCE_PENALTY = {
+    "seed": 0.22,
+    "similar": 0.0,
+    "genre": 0.06,
+    "bliss": 0.20,
+}
+_DISCOVERY_FRESH_RATIO = 0.80
+_DISCOVERY_RADIO_SOURCE_PENALTY = {
+    "similar": -0.06,
+    "genre": -0.03,
+    "bliss": 0.08,
+}
+_SEEDED_CONTEXT_RADIO_TYPES = {
+    "artist",
+    "album",
+    "track",
+    "playlist",
+    "home-playlist",
+    "genre",
+}
 
 _graph_cache: (
     tuple[
@@ -173,12 +214,19 @@ def _vectors_from_rows(rows: list[dict]) -> list[list[float]]:
 
 
 def _seed_result_from_rows(
-    rows: list[dict], label: str, *, minimum: int = 1
+    rows: list[dict],
+    label: str,
+    *,
+    minimum: int = 1,
+    extra_context: dict | None = None,
 ) -> tuple[list[float], str, dict] | None:
     vectors = _vectors_from_rows(rows)
     if len(vectors) < minimum:
         return None
-    return _centroid(vectors), label, _seed_context_from_rows(rows)
+    context = _seed_context_from_rows(rows)
+    if extra_context:
+        context.update(extra_context)
+    return _centroid(vectors), label, context
 
 
 def clear_radio_graph_cache() -> None:
@@ -217,6 +265,8 @@ def resolve_discovery_seed(
     order (likes > follows > saved albums > recent plays > library mix).
     """
     sources = get_discovery_seed_sources(user_id, session=session)
+    excluded_artist_keys = get_discovery_excluded_artist_keys(user_id, session=session)
+    extra_context = {"discovery_excluded_artist_keys": excluded_artist_keys}
 
     priority_labels = {
         1: "Your recent likes",
@@ -229,13 +279,20 @@ def resolve_discovery_seed(
     for priority in [1, 2, 3, 4]:
         rows = sources.get(priority, [])
         label = priority_labels[priority]
-        resolved = _seed_result_from_rows(rows, label, minimum=minimums[priority])
+        resolved = _seed_result_from_rows(
+            rows,
+            label,
+            minimum=minimums[priority],
+            extra_context=extra_context,
+        )
         if resolved:
             return resolved
 
     # Library mix (fallback)
     trending = get_random_library_seed_rows(limit=30, session=session)
-    resolved = _seed_result_from_rows(trending, "Library mix")
+    resolved = _seed_result_from_rows(
+        trending, "Library mix", extra_context=extra_context
+    )
     if resolved:
         return resolved
 
@@ -260,6 +317,13 @@ def _resolve_seed(
 ) -> tuple[list[float], str, dict] | None:
     if seed_type == "track":
         return get_track_seed_context(seed_value, session=session)
+
+    if seed_type == "album":
+        resolved = get_album_seed_context(seed_value, session=session)
+        if not resolved:
+            return None
+        vectors, label, context = resolved
+        return _centroid(vectors), label, context
 
     if seed_type == "playlist":
         try:
@@ -340,6 +404,10 @@ def start_radio(
             "seed_artists": seed_context.get("seed_artists") or [],
             "seed_genres": seed_context.get("seed_genres") or [],
             "seed_track_ids": seed_context.get("seed_track_ids") or [],
+            "discovery_excluded_artist_keys": seed_context.get(
+                "discovery_excluded_artist_keys"
+            )
+            or [],
             "initial_target": initial_target,
             "current_target": initial_target,
             "liked_vectors": [],
@@ -466,6 +534,217 @@ def _title_key(candidate: dict) -> str:
     return f"{candidate.get('artist') or ''}::{candidate.get('title') or ''}".lower()
 
 
+def _radio_profile(seed_type: str | None) -> str:
+    if seed_type == "track":
+        return "track"
+    if seed_type in _SEEDED_CONTEXT_RADIO_TYPES:
+        return "contextual"
+    return "discovery"
+
+
+def _seeded_radio_similar_keys(
+    seed_artists: list[str],
+    sim_graph: dict[str, dict[str, float]],
+    *,
+    excluded_artist_keys: set[str] | None = None,
+    limit: int = _SEEDED_RADIO_SIMILAR_LIMIT,
+) -> list[str]:
+    seed_keys = {artist.lower().strip() for artist in seed_artists if artist}
+    excluded_keys = excluded_artist_keys or set()
+    scored: dict[str, float] = {}
+    for seed_key in seed_keys:
+        for artist_key, score in sim_graph.get(seed_key, {}).items():
+            normalized = artist_key.lower().strip()
+            if not normalized or normalized in seed_keys or normalized in excluded_keys:
+                continue
+            scored[normalized] = max(scored.get(normalized, 0.0), float(score or 0.0))
+    return [
+        artist_key
+        for artist_key, _score in sorted(
+            scored.items(), key=lambda item: item[1], reverse=True
+        )[:limit]
+    ]
+
+
+def _seeded_radio_genres(
+    seed_artists: list[str],
+    seed_genres: list[str],
+    genre_map: dict[str, dict[str, float]],
+    *,
+    limit: int = 8,
+) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+
+    def add(raw_genre: str) -> None:
+        genre = raw_genre.lower().strip()
+        if genre and genre not in seen:
+            seen.add(genre)
+            result.append(genre)
+
+    for genre in seed_genres:
+        add(genre)
+
+    weighted: dict[str, float] = {}
+    for artist in seed_artists:
+        for genre, weight in genre_map.get(artist.lower().strip(), {}).items():
+            weighted[genre] = max(weighted.get(genre, 0.0), float(weight or 0.0))
+    for genre, _weight in sorted(
+        weighted.items(), key=lambda item: item[1], reverse=True
+    ):
+        add(genre)
+        if len(result) >= limit:
+            break
+
+    return result[:limit]
+
+
+def _seeded_radio_candidate_rows(
+    target: list[float],
+    used_track_ids: list[int],
+    seed_track_ids: list[int],
+    seed_artists: list[str],
+    seed_genres: list[str],
+    sim_graph: dict[str, dict[str, float]],
+    genre_map: dict[str, dict[str, float]],
+    *,
+    count: int,
+    db_session=None,
+) -> list[dict]:
+    if not seed_artists and not seed_genres:
+        return []
+
+    exclude_ids = _db_exclude_ids(used_track_ids + seed_track_ids)
+    limit = min(
+        _SEEDED_RADIO_CANDIDATE_POOL_SIZE,
+        max(_RADIO_CANDIDATE_POOL_SIZE, count * _RADIO_PREFETCH_MULTIPLIER * 2),
+    )
+    rows = find_seeded_radio_candidate_rows(
+        target,
+        exclude_ids,
+        seed_artists=seed_artists,
+        similar_artist_keys=_seeded_radio_similar_keys(seed_artists, sim_graph),
+        seed_genres=_seeded_radio_genres(seed_artists, seed_genres, genre_map),
+        limit=limit,
+        session=db_session,
+    )
+    if len(rows) >= count:
+        return rows
+
+    fallback = find_candidate_rows(
+        target,
+        exclude_ids,
+        limit=min(_RADIO_CANDIDATE_POOL_SIZE, max(count, count - len(rows)) * 2),
+        session=db_session,
+    )
+    existing_ids = {row.get("id") for row in rows}
+    for row in fallback:
+        if row.get("id") in existing_ids:
+            continue
+        row = dict(row)
+        row["radio_source"] = "bliss"
+        rows.append(row)
+    return rows
+
+
+def _discovery_radio_candidate_rows(
+    target: list[float],
+    used_track_ids: list[int],
+    seed_artists: list[str],
+    seed_genres: list[str],
+    excluded_artist_keys: list[str],
+    sim_graph: dict[str, dict[str, float]],
+    genre_map: dict[str, dict[str, float]],
+    *,
+    count: int,
+    db_session=None,
+) -> list[dict]:
+    excluded_keys = {
+        key.lower().strip() for key in excluded_artist_keys if key and key.strip()
+    }
+    seed_artist_keys = {
+        artist.lower().strip() for artist in seed_artists if artist and artist.strip()
+    }
+    effective_excluded = excluded_keys | seed_artist_keys
+    similar_keys = _seeded_radio_similar_keys(
+        seed_artists,
+        sim_graph,
+        excluded_artist_keys=effective_excluded,
+        limit=max(_SEEDED_RADIO_SIMILAR_LIMIT, count * 2),
+    )
+    discovery_rows = find_seeded_radio_candidate_rows(
+        target,
+        _db_exclude_ids(used_track_ids),
+        seed_artists=[],
+        similar_artist_keys=similar_keys,
+        seed_genres=_seeded_radio_genres(seed_artists, seed_genres, genre_map),
+        excluded_artist_keys=sorted(effective_excluded),
+        limit=min(
+            _SEEDED_RADIO_CANDIDATE_POOL_SIZE,
+            max(_RADIO_CANDIDATE_POOL_SIZE, count * _RADIO_PREFETCH_MULTIPLIER * 2),
+        ),
+        session=db_session,
+    )
+
+    rows: list[dict] = []
+    seen_ids: set[int] = set()
+    for row in discovery_rows:
+        row = dict(row)
+        if row.get("id") in seen_ids:
+            continue
+        if str(row.get("radio_source") or "").lower() == "seed":
+            row["radio_source"] = "similar"
+        rows.append(row)
+        seen_ids.add(row["id"])
+
+    if len(rows) >= count:
+        return rows
+
+    fallback = find_candidate_rows(
+        target,
+        _db_exclude_ids(used_track_ids),
+        limit=min(_RADIO_PREFETCH_LIMIT, max(_RADIO_CANDIDATE_POOL_SIZE, count * 2)),
+        session=db_session,
+    )
+    for row in fallback:
+        if row.get("id") in seen_ids:
+            continue
+        row = dict(row)
+        row["radio_source"] = "bliss"
+        rows.append(row)
+        seen_ids.add(row["id"])
+    return rows
+
+
+def _seeded_radio_source_penalty(candidate: dict, radio_profile: str) -> float:
+    source = str(candidate.get("radio_source") or "").lower()
+    if radio_profile == "discovery":
+        return _DISCOVERY_RADIO_SOURCE_PENALTY.get(source, 0.0)
+    if radio_profile == "track":
+        return _TRACK_RADIO_SOURCE_PENALTY.get(source, 0.16)
+    return _CONTEXTUAL_RADIO_SOURCE_PENALTY.get(source, 0.18)
+
+
+def _seeded_radio_weights(radio_profile: str) -> tuple[float, float, float]:
+    if radio_profile == "track":
+        return (
+            _TRACK_RADIO_W_BLISS,
+            _TRACK_RADIO_W_ARTIST_AFFINITY,
+            _TRACK_RADIO_W_GENRE_OVERLAP,
+        )
+    if radio_profile == "contextual":
+        return (
+            _CONTEXTUAL_RADIO_W_BLISS,
+            _CONTEXTUAL_RADIO_W_ARTIST_AFFINITY,
+            _CONTEXTUAL_RADIO_W_GENRE_OVERLAP,
+        )
+    return (_W_BLISS, _W_ARTIST_AFFINITY, _W_GENRE_OVERLAP)
+
+
+def _is_discovery_fresh_candidate(candidate: dict) -> bool:
+    return str(candidate.get("radio_source") or "").lower() in {"similar", "genre"}
+
+
 def _select_radio_candidate_from_rows(
     rows: list[dict],
     target: list[float],
@@ -481,6 +760,7 @@ def _select_radio_candidate_from_rows(
     genre_overlap_cache: dict[str, float],
     genre_overlap,
     recent_tracks: list[dict] | None = None,
+    radio_profile: str = "discovery",
 ) -> dict | None:
     track_context = _latest_track_context(recent_tracks)
     target_norm = sum(v * v for v in target) ** 0.5
@@ -526,15 +806,21 @@ def _select_radio_candidate_from_rows(
             overlap = genre_overlap(artist, target_artists, genre_map)
             genre_overlap_cache[artist_key] = overlap
 
+        bliss_weight, affinity_weight, genre_weight = _seeded_radio_weights(
+            radio_profile
+        )
+        source_penalty = _seeded_radio_source_penalty(candidate, radio_profile)
+
         score = (
-            _W_BLISS * (distance / max_dist)
-            + _W_ARTIST_AFFINITY * (1.0 - affinity)
-            + _W_GENRE_OVERLAP * (1.0 - overlap)
+            bliss_weight * (distance / max_dist)
+            + affinity_weight * (1.0 - affinity)
+            + genre_weight * (1.0 - overlap)
             + _W_BPM * _bpm_penalty(candidate, track_context)
             + _W_KEY * _key_penalty(candidate, track_context)
             + _W_ENERGY * _energy_penalty(candidate, track_context)
             + _W_ERA * _era_penalty(candidate, track_context)
             + _curation_penalty(candidate)
+            + source_penalty
         )
 
         if artist in recent_artists[-2:]:
@@ -561,15 +847,22 @@ def _generate_batch(
 
     target = session["current_target"]
     used_track_ids = list(session["used_track_ids"])
-    used_ids = set(used_track_ids)
+    seed_track_ids = [int(track_id) for track_id in session.get("seed_track_ids") or []]
+    used_ids = set(used_track_ids) | set(seed_track_ids)
     used_titles = set(session["used_titles"])
     recent_artists = list(session["recent_artists"])
     recent_tracks = list(session.get("recent_tracks") or [])
     disliked_vecs = session["disliked_vectors"]
+    discovery_excluded_artist_keys = list(
+        session.get("discovery_excluded_artist_keys") or []
+    )
 
-    target_artists = list(session.get("seed_artists") or [])
-    if not target_artists and session.get("seed_type") == "artist":
-        target_artists = [session["seed_label"]]
+    radio_profile = _radio_profile(session.get("seed_type"))
+    is_seeded_context_radio = radio_profile != "discovery"
+    seed_artists = list(session.get("seed_artists") or [])
+    if not seed_artists and session.get("seed_type") == "artist":
+        seed_artists = [session["seed_label"]]
+    target_artists = list(seed_artists)
     seed_genres = [genre for genre in (session.get("seed_genres") or []) if genre]
     if seed_genres:
         genre_map = dict(genre_map)
@@ -579,15 +872,30 @@ def _generate_batch(
     genre_overlap = make_radio_genre_overlap_scorer(genre_map, target_artists)
 
     tracks: list[dict] = []
-    candidate_rows = find_candidate_rows(
-        target,
-        _db_exclude_ids(used_track_ids),
-        limit=min(
-            _RADIO_PREFETCH_LIMIT,
-            max(_RADIO_CANDIDATE_POOL_SIZE, count * _RADIO_PREFETCH_MULTIPLIER),
-        ),
-        session=db_session,
-    )
+    if is_seeded_context_radio:
+        candidate_rows = _seeded_radio_candidate_rows(
+            target,
+            used_track_ids,
+            seed_track_ids,
+            seed_artists,
+            seed_genres,
+            sim_graph,
+            genre_map,
+            count=count,
+            db_session=db_session,
+        )
+    else:
+        candidate_rows = _discovery_radio_candidate_rows(
+            target,
+            used_track_ids,
+            seed_artists,
+            seed_genres,
+            discovery_excluded_artist_keys,
+            sim_graph,
+            genre_map,
+            count=count,
+            db_session=db_session,
+        )
     max_attempts = min(
         len(candidate_rows),
         max(count + 5, count * _MAX_GENERATION_ATTEMPT_MULTIPLIER),
@@ -595,15 +903,37 @@ def _generate_batch(
     attempts = 0
     artist_affinity_cache: dict[tuple[str, tuple[str, ...]], float] = {}
     genre_overlap_cache: dict[str, float] = {}
+    discovery_fresh_target = int(round(count * _DISCOVERY_FRESH_RATIO))
+    discovery_fresh_count = 0
 
     while len(tracks) < count and attempts < max_attempts:
         attempts += 1
         import random
 
-        drift = [target[d] + random.gauss(0, 0.02) for d in range(len(target))]
+        if radio_profile == "track":
+            drift_sigma = _TRACK_RADIO_DRIFT_SIGMA
+        elif radio_profile == "contextual":
+            drift_sigma = _CONTEXTUAL_RADIO_DRIFT_SIGMA
+        else:
+            drift_sigma = _RADIO_DRIFT_SIGMA
+        drift = [target[d] + random.gauss(0, drift_sigma) for d in range(len(target))]
+        rows_for_selection = candidate_rows
+        if radio_profile == "discovery":
+            if discovery_fresh_count < discovery_fresh_target:
+                fresh_rows = [
+                    row for row in candidate_rows if _is_discovery_fresh_candidate(row)
+                ]
+                rows_for_selection = fresh_rows or candidate_rows
+            else:
+                fallback_rows = [
+                    row
+                    for row in candidate_rows
+                    if not _is_discovery_fresh_candidate(row)
+                ]
+                rows_for_selection = fallback_rows or candidate_rows
 
         candidate = _select_radio_candidate_from_rows(
-            candidate_rows,
+            rows_for_selection,
             drift,
             used_ids,
             used_titles,
@@ -616,6 +946,7 @@ def _generate_batch(
             genre_overlap_cache=genre_overlap_cache,
             genre_overlap=genre_overlap,
             recent_tracks=recent_tracks,
+            radio_profile=radio_profile,
         )
 
         if not candidate:
@@ -646,10 +977,26 @@ def _generate_batch(
 
         cand_vec = candidate.get("bliss_vector")
         if cand_vec:
-            target = _lerp(target, cand_vec, 0.15)
+            if radio_profile == "track":
+                target_blend = 0.10
+            elif radio_profile == "contextual":
+                target_blend = 0.08
+            else:
+                target_blend = 0.15
+            target = _lerp(target, cand_vec, target_blend)
             seed_vector = session.get("seed_vector")
             if seed_vector:
-                target = _lerp(target, seed_vector, _SEED_ANCHOR_BLEND)
+                if radio_profile == "track":
+                    seed_anchor_blend = _TRACK_RADIO_SEED_ANCHOR_BLEND
+                elif radio_profile == "contextual":
+                    seed_anchor_blend = _CONTEXTUAL_RADIO_SEED_ANCHOR_BLEND
+                else:
+                    seed_anchor_blend = _SEED_ANCHOR_BLEND
+                target = _lerp(
+                    target,
+                    seed_vector,
+                    seed_anchor_blend,
+                )
 
         tracks.append(
             {
@@ -673,6 +1020,8 @@ def _generate_batch(
                 "distance": round(candidate["distance"], 6),
             }
         )
+        if radio_profile == "discovery" and _is_discovery_fresh_candidate(candidate):
+            discovery_fresh_count += 1
 
     # Update session state
     session["used_track_ids"] = used_track_ids

@@ -6,6 +6,8 @@ from crate.db.cache_store import get_cache, set_cache
 
 log = logging.getLogger(__name__)
 
+musicbrainzngs.set_useragent("crate", "1.0", "https://github.com/thecrateapp/crate")
+
 
 def _search_mbid(name: str) -> str | None:
     from thefuzz import fuzz
@@ -143,3 +145,75 @@ def get_artist_releases(mbid: str) -> list[dict]:
     except Exception:
         log.debug("MB releases failed for %s", mbid, exc_info=True)
         return []
+
+
+def get_release_group_tracklist(release_group_mbid: str) -> list[dict]:
+    """Return the best known tracklist for a MusicBrainz release group."""
+    mbid = (release_group_mbid or "").strip()
+    if not mbid:
+        return []
+
+    cache_key = f"mb:release-group-tracks:{mbid}"
+    cached = get_cache(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        result = musicbrainzngs.browse_releases(
+            release_group=mbid,
+            includes=["recordings"],
+            limit=10,
+        )
+    except Exception:
+        log.debug("MB release-group tracklist failed for %s", mbid, exc_info=True)
+        return []
+
+    releases = result.get("release-list", [])
+    releases.sort(key=_release_tracklist_preference)
+    for release in releases:
+        tracks = _extract_release_tracks(release)
+        if tracks:
+            set_cache(cache_key, tracks, ttl=86400)
+            return tracks
+
+    set_cache(cache_key, [], ttl=86400)
+    return []
+
+
+def _release_tracklist_preference(release: dict) -> tuple[int, int, str]:
+    country = str(release.get("country") or "")
+    country_rank = 0 if country in {"XW", "US", "GB"} else 1
+    track_count = 0
+    for medium in release.get("medium-list") or []:
+        track_count += len(medium.get("track-list") or [])
+    return (country_rank, -track_count, str(release.get("date") or "9999-12-31"))
+
+
+def _extract_release_tracks(release: dict) -> list[dict]:
+    tracks: list[dict] = []
+    for medium in release.get("medium-list") or []:
+        for track in medium.get("track-list") or []:
+            recording = track.get("recording") or {}
+            title = recording.get("title") or track.get("title") or ""
+            if not title:
+                continue
+            position = len(tracks) + 1
+            try:
+                position = int(track.get("position") or track.get("number") or position)
+            except (TypeError, ValueError):
+                pass
+            length = track.get("track_or_recording_length") or track.get("length")
+            duration = None
+            try:
+                duration = round(int(length) / 1000) if length else None
+            except (TypeError, ValueError):
+                duration = None
+            tracks.append(
+                {
+                    "position": position,
+                    "title": title,
+                    "duration": duration,
+                    "recording_mbid": recording.get("id", ""),
+                }
+            )
+    return tracks

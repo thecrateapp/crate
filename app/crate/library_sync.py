@@ -836,7 +836,7 @@ class LibrarySync:
                 exc_info=True,
             )
 
-        _, _, synced_paths = upsert_scanned_album(
+        _, album_id, synced_paths = upsert_scanned_album(
             artist_payload=artist_payload,
             album_payload=album_payload,
             track_payloads=track_data_list,
@@ -847,6 +847,7 @@ class LibrarySync:
             delete_track_by_path(old_path)
 
         return {
+            "album_id": album_id,
             "track_count": len(track_data_list),
             "total_size": total_size,
             "formats": formats_list,

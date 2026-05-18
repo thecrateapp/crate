@@ -99,6 +99,8 @@ def get_upcoming_releases(
                 nr.artist_name,
                 la.id AS artist_id,
                 la.slug AS artist_slug,
+                lalb.id AS album_id,
+                lalb.slug AS album_slug,
                 nr.album_title,
                 nr.cover_url,
                 nr.status,
@@ -108,6 +110,9 @@ def get_upcoming_releases(
                 nr.detected_at
             FROM new_releases nr
             LEFT JOIN library_artists la ON la.name = nr.artist_name
+            LEFT JOIN library_albums lalb
+              ON lalb.artist_id = la.id
+             AND LOWER(lalb.name) = LOWER(nr.album_title)
             WHERE nr.artist_name = ANY(:followed_names)
               AND nr.status != 'dismissed'
               AND (

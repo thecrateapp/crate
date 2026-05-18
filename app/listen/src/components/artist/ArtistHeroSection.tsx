@@ -18,6 +18,7 @@ import {
   type ArtistData,
   type ArtistInfo,
 } from "@/components/artist/artist-model";
+import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { AppMenuButton, AppPopover } from "@crate/ui/primitives/AppPopover";
 import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
@@ -290,6 +291,11 @@ export function ArtistHeroSection({
           >
             {following ? <UserCheck size={16} /> : <UserPlus size={16} />}
           </button>
+          <BandcampSupportButton
+            entityType="artist"
+            entityUid={artist.entity_uid}
+            artistName={artist.name}
+          />
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"

@@ -4,6 +4,7 @@ import { toPlayableTrack } from "@/lib/playable-track";
 
 type TrackRowDataInput = PlayableTrackInput & {
   track_number?: number | null;
+  disabled?: boolean;
 };
 
 export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
@@ -35,5 +36,6 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
     valence: track.valence,
     bliss_vector: track.blissVector,
     library_track_id: track.libraryTrackId,
+    disabled: input.disabled,
   };
 }
