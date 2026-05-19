@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 from crate.bandcamp.collection_sync import (
@@ -28,8 +29,15 @@ from crate.bandcamp.downloads import (
     download_purchase_with_command,
 )
 from crate.bandcamp.matcher import create_matches_for_bandcamp_item
+from crate.bandcamp.search import (
+    BandcampSearchError,
+    find_bandcamp_url_in_metadata,
+    find_exact_album_url,
+    find_exact_artist_url,
+)
 from crate.db.events import emit_task_event
 from crate.db.repositories.bandcamp import (
+    backfill_confirmed_bandcamp_entity_urls,
     complete_pairing_challenge,
     create_bandcamp_import,
     get_bandcamp_global_import_guard,
@@ -38,11 +46,15 @@ from crate.db.repositories.bandcamp import (
     get_existing_bandcamp_library_import,
     get_latest_bandcamp_import_for_item,
     get_user_owned_bandcamp_item,
+    list_bandcamp_item_ids,
+    list_library_albums_missing_bandcamp_urls,
+    list_library_artists_missing_bandcamp_urls,
     mark_connection_error,
     mark_connection_synced,
     mark_bandcamp_imports_withdrawn,
     mark_user_bandcamp_items_removed,
     refresh_bandcamp_radar_for_user,
+    set_library_entity_bandcamp_url,
     set_bandcamp_import_task,
     update_bandcamp_import_status,
     upsert_connection,
@@ -66,6 +78,7 @@ log = logging.getLogger(__name__)
 _BANDCAMP_IMPORT_ACTIVE_STATUSES = {"queued", "downloading", "importing"}
 _BANDCAMP_IMPORT_DONE_STATUSES = {"completed"}
 _BANDCAMP_SOURCE_REF_RE = re.compile(r"^bandcamp:(?P<item_id>\d+)(?::\d+)?$")
+_BANDCAMP_PUBLIC_SEARCH_DELAY_SECONDS = 0.35
 
 
 def _queue_missing_bandcamp_import(
@@ -404,6 +417,159 @@ def _handle_bandcamp_sync_collection(task_id: str, params: dict, config: dict) -
         raise
 
 
+def _handle_bandcamp_backfill_entity_urls(
+    task_id: str,
+    params: dict,
+    config: dict,
+) -> dict:
+    limit = max(1, min(int(params.get("limit") or 100), 5000))
+    public_search = bool(params.get("public_search", True))
+    include_artists = bool(params.get("artists", True))
+    include_albums = bool(params.get("albums", True))
+    progress = TaskProgress(
+        phase="bandcamp_backfill",
+        phase_count=1,
+        total=1,
+        done=0,
+    )
+    emit_progress(task_id, progress)
+    emit_task_event(
+        task_id,
+        "bandcamp.backfill.started",
+        {
+            "message": "Backfilling Bandcamp entity URLs",
+            "limit": limit,
+            "public_search": public_search,
+        },
+    )
+
+    if is_cancelled(task_id):
+        return {"cancelled": True}
+
+    item_ids = list_bandcamp_item_ids(limit=limit)
+    matches_created = 0
+    with transaction_scope() as session:
+        for item_id in item_ids:
+            matches_created += len(
+                create_matches_for_bandcamp_item(item_id, session=session)
+            )
+        internal_backfill = backfill_confirmed_bandcamp_entity_urls(
+            limit=limit,
+            session=session,
+        )
+
+    public_artist_updates = 0
+    public_album_updates = 0
+    public_errors = 0
+    artist_targets = (
+        list_library_artists_missing_bandcamp_urls(limit=limit)
+        if public_search and include_artists
+        else []
+    )
+    album_targets = (
+        list_library_albums_missing_bandcamp_urls(limit=limit)
+        if public_search and include_albums
+        else []
+    )
+    progress.total = max(len(artist_targets) + len(album_targets), 1)
+    emit_progress(task_id, progress, force=True)
+
+    index = 0
+    for row in artist_targets:
+        index += 1
+        if is_cancelled(task_id):
+            return {"cancelled": True}
+        try:
+            url = find_bandcamp_url_in_metadata(
+                row.get("urls_json"),
+                entity_type="artist",
+            )
+            source = "bandcamp:metadata_url"
+            if not url:
+                url = find_exact_artist_url(
+                    str(row.get("name") or ""),
+                    allow_search=False,
+                )
+                source = "bandcamp:direct_probe"
+            if url and set_library_entity_bandcamp_url(
+                entity_type="artist",
+                entity_uid=str(row["entity_uid"]),
+                url=url,
+                source=source,
+            ):
+                public_artist_updates += 1
+        except BandcampSearchError as exc:
+            public_errors += 1
+            emit_task_event(
+                task_id,
+                "bandcamp.backfill.lookup_error",
+                {"message": str(exc), "entity_type": "artist"},
+            )
+        progress.done = index
+        if index == progress.total or index % 10 == 0:
+            emit_progress(task_id, progress)
+        if index < progress.total:
+            time.sleep(_BANDCAMP_PUBLIC_SEARCH_DELAY_SECONDS)
+
+    if public_search and include_albums and public_artist_updates:
+        album_targets = list_library_albums_missing_bandcamp_urls(limit=limit)
+
+    for row in album_targets:
+        index += 1
+        if is_cancelled(task_id):
+            return {"cancelled": True}
+        try:
+            artist_url = row.get(
+                "artist_bandcamp_url"
+            ) or find_bandcamp_url_in_metadata(
+                row.get("artist_urls_json"),
+                entity_type="artist",
+            )
+            url = find_exact_album_url(
+                str(row.get("artist") or ""),
+                str(row.get("name") or ""),
+                artist_url=str(artist_url or ""),
+                allow_search=False,
+            )
+            if url and set_library_entity_bandcamp_url(
+                entity_type="album",
+                entity_uid=str(row["entity_uid"]),
+                url=url,
+                source="bandcamp:direct_probe",
+            ):
+                public_album_updates += 1
+        except BandcampSearchError as exc:
+            public_errors += 1
+            emit_task_event(
+                task_id,
+                "bandcamp.backfill.lookup_error",
+                {"message": str(exc), "entity_type": "album"},
+            )
+        progress.done = index
+        if index == progress.total or index % 10 == 0:
+            emit_progress(task_id, progress)
+        if index < progress.total:
+            time.sleep(_BANDCAMP_PUBLIC_SEARCH_DELAY_SECONDS)
+
+    result = {
+        "items_scanned": len(item_ids),
+        "matches_created": matches_created,
+        "confirmed_urls_scanned": internal_backfill.get("scanned", 0),
+        "confirmed_urls_updated": internal_backfill.get("updated", 0),
+        "public_artist_urls_updated": public_artist_updates,
+        "public_album_urls_updated": public_album_updates,
+        "public_search_errors": public_errors,
+    }
+    progress.done = progress.total
+    emit_progress(task_id, progress, force=True)
+    emit_task_event(
+        task_id,
+        "bandcamp.backfill.succeeded",
+        {"message": "Bandcamp entity URL backfill completed", **result},
+    )
+    return result
+
+
 def _handle_bandcamp_import_purchase(task_id: str, params: dict, config: dict) -> dict:
     user_id = int(params["user_id"])
     connection_id = int(params["connection_id"])
@@ -682,6 +848,9 @@ def _handle_bandcamp_cleanup_user_contributions(
             return {"cancelled": True, "deleted": deleted, "skipped": skipped}
 
         album_id = contribution.get("album_id")
+        if album_id is None:
+            skipped += 1
+            continue
         try:
             album_id_int = int(album_id)
         except (TypeError, ValueError):
@@ -733,6 +902,7 @@ BANDCAMP_TASK_HANDLERS: dict[str, TaskHandler] = {
     "bandcamp_sync_collection": _handle_bandcamp_sync_collection,
     "bandcamp_import_purchase": _handle_bandcamp_import_purchase,
     "bandcamp_radar_refresh": _handle_bandcamp_radar_refresh,
+    "bandcamp_backfill_entity_urls": _handle_bandcamp_backfill_entity_urls,
     "bandcamp_withdraw_contribution": _handle_bandcamp_withdraw_contribution,
     "bandcamp_cleanup_user_contributions": _handle_bandcamp_cleanup_user_contributions,
 }

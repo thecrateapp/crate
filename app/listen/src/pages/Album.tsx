@@ -41,6 +41,7 @@ import { QualityBadge } from "@/components/player/bar/QualityBadge";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -58,6 +59,11 @@ import {
   buildAlbumPlayerTracks,
   buildAlbumQualityBadges,
 } from "@/pages/album-model";
+import {
+  contributionSourceLabel,
+  contributorDisplayName,
+  contributorProfilePath,
+} from "@/lib/contributions";
 
 function albumGenreSlug(name: string) {
   return name
@@ -276,11 +282,11 @@ export function Album() {
   const genre =
     data.genres.length > 0 ? data.genres.join(", ") : data.album_tags?.genre;
   const primaryContributor = data.contributors?.[0] ?? null;
-  const primaryContributorName =
-    primaryContributor?.user_name ||
-    primaryContributor?.user_username ||
-    primaryContributor?.user_email ||
-    "";
+  const primaryContributorName = contributorDisplayName(primaryContributor);
+  const primaryContributorPath = contributorProfilePath(primaryContributor);
+  const primaryContributorSource = contributionSourceLabel(
+    primaryContributor?.source,
+  );
   const visibleContributor =
     primaryContributorName && primaryContributor ? primaryContributor : null;
   const playerTracks: Track[] = buildAlbumPlayerTracks(data);
@@ -695,13 +701,23 @@ export function Album() {
                   </span>
                   <span>
                     Added to Crate by{" "}
-                    <span className="font-medium text-foreground/85">
-                      {primaryContributorName}
-                    </span>
-                    {visibleContributor.source ? (
+                    {primaryContributorPath ? (
+                      <UserProfileLink
+                        username={primaryContributor?.user_username}
+                        to={primaryContributorPath}
+                        className="font-medium text-foreground/85 transition-colors hover:text-primary"
+                      >
+                        {primaryContributorName}
+                      </UserProfileLink>
+                    ) : (
+                      <span className="font-medium text-foreground/85">
+                        {primaryContributorName}
+                      </span>
+                    )}
+                    {primaryContributorSource ? (
                       <span className="text-muted-foreground/70">
                         {" "}
-                        via {visibleContributor.source}
+                        via {primaryContributorSource}
                       </span>
                     ) : null}
                   </span>
@@ -729,7 +745,7 @@ export function Album() {
 
       {/* Action Row */}
       <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] items-center gap-2">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-wrap items-center gap-2">
           <button
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
             onClick={() => handlePlay()}
@@ -802,11 +818,6 @@ export function Album() {
               <Heart size={16} className={saved ? "fill-current" : ""} />
             </button>
           ) : null}
-          <BandcampSupportButton
-            entityType="album"
-            entityUid={data.entity_uid}
-            artistName={data.artist}
-          />
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
@@ -912,6 +923,11 @@ export function Album() {
               </AppModal>
             )}
           </div>
+          <BandcampSupportButton
+            entityType="album"
+            entityUid={data.entity_uid}
+            className="ml-auto shrink-0"
+          />
         </div>
       </div>
 

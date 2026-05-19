@@ -69,6 +69,7 @@ import {
   markSseChannelOpen,
   onSseChannelState,
 } from "@/lib/sse";
+import { onCacheInvalidation } from "@/lib/cache";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray } from "@/lib/utils";
 
@@ -270,6 +271,35 @@ export function Home() {
         "visibilitychange",
         maybeRecoverFromDegradedStream,
       );
+    };
+  }, [refreshLiveDiscovery]);
+
+  useEffect(() => {
+    let refreshTimer: number | null = null;
+    const scheduleFreshRefresh = () => {
+      if (refreshTimer != null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        void refreshLiveDiscovery(true);
+      }, 250);
+    };
+    const unsubscribe = onCacheInvalidation((scope) => {
+      if (
+        scope === "home" ||
+        scope === "library" ||
+        scope === "upcoming" ||
+        scope.startsWith("artist:") ||
+        scope.startsWith("album:") ||
+        scope.startsWith("playlist:")
+      ) {
+        scheduleFreshRefresh();
+      }
+    });
+    return () => {
+      unsubscribe();
+      if (refreshTimer != null) {
+        window.clearTimeout(refreshTimer);
+      }
     };
   }, [refreshLiveDiscovery]);
 

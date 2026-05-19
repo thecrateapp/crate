@@ -38,10 +38,27 @@ _OPS_INVALIDATION_SCOPES = {
     "playlists",
 }
 
+_HOME_GLOBAL_INVALIDATION_SCOPES = {
+    "home",
+    "library",
+    "shows",
+    "upcoming",
+    "curation",
+    "playlists",
+}
+
+_HOME_GLOBAL_INVALIDATION_PREFIXES = ("artist:", "album:", "playlist:")
+
 
 def _refreshes_ops_from_invalidation(scope: str) -> bool:
     return scope in _OPS_INVALIDATION_SCOPES or scope.startswith(
         ("artist:", "album:", "playlist:")
+    )
+
+
+def _refreshes_recent_home_from_invalidation(scope: str) -> bool:
+    return scope in _HOME_GLOBAL_INVALIDATION_SCOPES or scope.startswith(
+        _HOME_GLOBAL_INVALIDATION_PREFIXES
     )
 
 
@@ -89,6 +106,7 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
         return {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0}
 
     refresh_ops = False
+    refresh_recent_home = False
     refresh_home_users: set[int] = set()
     event_ids: list[str] = []
 
@@ -111,6 +129,8 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
             try:
                 if not _queue_post_acquisition_processing(payload):
                     continue
+                refresh_ops = True
+                refresh_recent_home = True
             except Exception:
                 log.debug("Failed to queue post-acquisition processing", exc_info=True)
 
@@ -133,6 +153,8 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
             )
             if _refreshes_ops_from_invalidation(invalidation_scope):
                 refresh_ops = True
+            if _refreshes_recent_home_from_invalidation(invalidation_scope):
+                refresh_recent_home = True
             if invalidation_scope.startswith("home:user:"):
                 try:
                     refresh_home_users.add(int(invalidation_scope.split(":")[-1]))
@@ -149,6 +171,9 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
     for user_id in sorted(refresh_home_users):
         get_cached_home_discovery(user_id, fresh=True)
         home_refreshes += 1
+
+    if refresh_recent_home:
+        home_refreshes += warm_recent_home_discovery_snapshots()
 
     if event_ids:
         mark_domain_events_processed(event_ids)

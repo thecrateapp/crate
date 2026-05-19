@@ -218,7 +218,9 @@ def test_process_domain_events_does_not_refresh_ops_for_home_only_invalidation(
     assert calls["processed"] == [["1682349000020-0"]]
 
 
-def test_process_domain_events_refreshes_ops_for_ops_relevant_invalidation(monkeypatch):
+def test_process_domain_events_refreshes_ops_and_recent_home_for_catalog_invalidation(
+    monkeypatch,
+):
     from crate import projector
 
     calls = {"ops": [], "home": [], "processed": []}
@@ -248,16 +250,70 @@ def test_process_domain_events_refreshes_ops_for_ops_relevant_invalidation(monke
     )
     monkeypatch.setattr(
         projector,
+        "list_recent_home_user_ids",
+        lambda window_minutes=30, limit=10: [5],
+    )
+    monkeypatch.setattr(
+        projector,
         "mark_domain_events_processed",
         lambda event_ids: calls["processed"].append(event_ids),
     )
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 0}
+    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 1}
     assert calls["ops"] == [True]
-    assert calls["home"] == []
+    assert calls["home"] == [(5, True)]
     assert calls["processed"] == [["1682349000021-0"]]
+
+
+def test_process_domain_events_refreshes_recent_home_for_global_home_invalidation(
+    monkeypatch,
+):
+    from crate import projector
+
+    calls = {"ops": [], "home": [], "processed": []}
+
+    monkeypatch.setattr(
+        projector,
+        "list_domain_events",
+        lambda limit, unprocessed_only=True: [
+            {
+                "id": "1682349000022-0",
+                "event_type": "ui.invalidate",
+                "scope": "ui.invalidate",
+                "subject_key": "home",
+                "payload_json": {"scope": "home"},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
+    )
+    monkeypatch.setattr(
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "list_recent_home_user_ids",
+        lambda window_minutes=30, limit=10: [7, 9],
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_events_processed",
+        lambda event_ids: calls["processed"].append(event_ids),
+    )
+
+    result = projector.process_domain_events(limit=50)
+
+    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 2}
+    assert calls["ops"] == []
+    assert calls["home"] == [(7, True), (9, True)]
+    assert calls["processed"] == [["1682349000022-0"]]
 
 
 def test_process_domain_events_queues_post_acquisition_processing_when_artist_is_idle(
@@ -265,6 +321,7 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
 ):
     from crate import projector
 
+    calls = {"ops": [], "home": []}
     queued: list[tuple[str, bool]] = []
     processed: list[list[str]] = []
 
@@ -299,10 +356,19 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
         ),
     )
     monkeypatch.setattr(
-        projector, "get_cached_ops_snapshot", lambda fresh=False: {"status": {}}
+        projector,
+        "get_cached_ops_snapshot",
+        lambda fresh=False: calls["ops"].append(fresh) or {"status": {}},
     )
     monkeypatch.setattr(
-        projector, "get_cached_home_discovery", lambda user_id, fresh=False: {}
+        projector,
+        "get_cached_home_discovery",
+        lambda user_id, fresh=False: calls["home"].append((user_id, fresh)) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "list_recent_home_user_ids",
+        lambda window_minutes=30, limit=10: [7],
     )
     monkeypatch.setattr(
         projector,
@@ -312,8 +378,10 @@ def test_process_domain_events_queues_post_acquisition_processing_when_artist_is
 
     result = projector.process_domain_events(limit=10)
 
-    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 0}
+    assert result == {"processed": 1, "ops_refreshes": 1, "home_refreshes": 1}
     assert queued == [("Terror", True)]
+    assert calls["ops"] == [True]
+    assert calls["home"] == [(7, True)]
     assert processed == [["1682349000030-0"]]
 
 

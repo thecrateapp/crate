@@ -63,6 +63,7 @@ def test_should_append_invalidation_domain_event_is_selective():
     from crate.api import cache_events
 
     assert cache_events._should_append_invalidation_domain_event("library") is True
+    assert cache_events._should_append_invalidation_domain_event("home") is True
     assert cache_events._should_append_invalidation_domain_event("artist:7") is True
     assert cache_events._should_append_invalidation_domain_event("playlist:42") is True
     assert cache_events._should_append_invalidation_domain_event("home:user:9") is True
@@ -70,7 +71,6 @@ def test_should_append_invalidation_domain_event_is_selective():
     assert cache_events._should_append_invalidation_domain_event("likes") is False
     assert cache_events._should_append_invalidation_domain_event("follows") is False
     assert cache_events._should_append_invalidation_domain_event("history") is False
-    assert cache_events._should_append_invalidation_domain_event("home") is False
 
 
 def test_do_broadcast_only_appends_projector_relevant_invalidation_events(monkeypatch):
@@ -78,15 +78,19 @@ def test_do_broadcast_only_appends_projector_relevant_invalidation_events(monkey
 
     fake_redis = _FakeRedis()
     appended: list[tuple[str, dict, str, str]] = []
+    calls: list[str] = []
 
     monkeypatch.setattr(cache_events, "_get_redis", lambda: fake_redis)
     monkeypatch.setattr(
-        cache_events, "_clear_backend_cache_for_scopes", lambda scopes: None
+        cache_events,
+        "_clear_backend_cache_for_scopes",
+        lambda scopes: calls.append(f"clear:{','.join(scopes)}"),
     )
     monkeypatch.setattr(
         "crate.db.domain_events.append_domain_event",
         lambda event_type, payload, scope=None, subject_key=None, session=None: (
-            appended.append((event_type, payload, scope or "", subject_key or ""))
+            calls.append(f"append:{subject_key}")
+            or appended.append((event_type, payload, scope or "", subject_key or ""))
         ),
     )
 
@@ -101,6 +105,11 @@ def test_do_broadcast_only_appends_projector_relevant_invalidation_events(monkey
         cache_events._LIVE_CHANNEL,
         cache_events._LIVE_CHANNEL,
         cache_events._LIVE_CHANNEL,
+    ]
+    assert calls == [
+        "clear:likes,library,home:user:7",
+        "append:library",
+        "append:home:user:7",
     ]
     assert appended == [
         (

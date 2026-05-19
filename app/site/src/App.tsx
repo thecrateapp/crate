@@ -4,6 +4,7 @@ import { Hero } from "@/components/Hero";
 import { FeatureShowcase } from "@/components/FeatureShowcase";
 import { WhatIsCrate } from "@/components/WhatIsCrate";
 import { ValueProps } from "@/components/ValueProps";
+import { BandcampSection } from "@/components/BandcampSection";
 import { WhoIsItFor } from "@/components/WhoIsItFor";
 import { Screenshots } from "@/components/Screenshots";
 import { Comparison } from "@/components/Comparison";
@@ -68,6 +69,7 @@ function HomePage() {
       <WhatIsCrate />
       <Screenshots />
       <ValueProps />
+      <BandcampSection />
       <WhoIsItFor />
       <WhyCrateTeaser />
       <Comparison />

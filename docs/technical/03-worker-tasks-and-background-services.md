@@ -9,9 +9,11 @@ work cannot starve playback or interactive admin/listen traffic.
 Anything that can mutate the library or perform long-running work belongs here:
 
 - downloads
+- Bandcamp collection sync and purchase imports
 - file moves
 - tag writes
 - image writes
+- user upload normalization and contribution withdrawal
 - scans and repairs
 - enrichment fan-out
 - storage migration
@@ -136,6 +138,17 @@ Queues:
 - `heavy` — reserved for heavier CPU paths
 - `playback` — playback preparation and transcode jobs
 
+Bandcamp work is split by cost and risk:
+
+- `bandcamp_sync_collection` runs on `maintenance` and records collection,
+  wishlist, following, match candidates, and Radar entries.
+- `bandcamp_import_purchase` runs on `default`, downloads an owned purchase into
+  staging, reuses the upload/import path, records contribution provenance, and
+  skips content that already exists in the shared library.
+- `bandcamp_radar_refresh` runs on `fast`.
+- contribution withdrawal/cleanup runs on `default` because it can delete
+  library files when no other active contributor remains.
+
 Priority bands broadly map to:
 
 - urgent user actions
@@ -176,7 +189,8 @@ processes.
 
 ### Download semaphore
 
-Tidal and Soulseek transfers are globally capped using a Redis semaphore.
+Tidal, Soulseek, and Bandcamp import transfers are globally capped using a
+Redis semaphore.
 
 ## Service loop responsibilities
 

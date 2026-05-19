@@ -176,6 +176,22 @@ Redis now carries several distinct concerns:
 That makes Redis operationally central even though PostgreSQL remains the
 durable source of truth.
 
+## External session material
+
+Bandcamp connection state is stored as encrypted credential payloads in
+PostgreSQL (`credential_secrets`) and referenced from `bandcamp_connections`.
+
+Operationally important variables:
+
+- `CRATE_CREDENTIAL_KEY`: stable Fernet key for encrypted external sessions.
+  If unset, Crate derives a key from `JWT_SECRET`, which is acceptable for dev
+  but fragile if production rotates JWT secrets.
+- `CRATE_BANDCAMP_COLLECTION_SYNC_*`: collection sync backend, timeout, page
+  size, and max page controls.
+- `CRATE_BANDCAMP_DOWNLOAD_*`: purchase download backend and timeout controls.
+- `CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_*`: optional server-side credential
+  bridge, disabled by default.
+
 ## Deployment caveat
 
 `make deploy` is image-first: it expects the release images built by GitHub

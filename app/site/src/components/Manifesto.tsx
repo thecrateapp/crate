@@ -65,16 +65,17 @@ export function Manifesto() {
         </p>
 
         <p className="text-[18px] font-medium leading-[1.7] text-white/85">
-          In a system like this, piracy is not theft. It's self-defense.
+          In a system designed to extract, refusing to feed the machine is not
+          cynicism. It's self-defense.
         </p>
 
         <p>
           But let's be clear about what that means. This is not a call to stop
-          paying artists. It's a call to stop paying middlemen. Pirate the
-          catalog that the labels hold hostage — the music that already made its
-          money ten times over. Then spend every cent you save on concert
-          tickets, Bandcamp purchases, merch tables, and direct support. Pirate
-          from the corporation. Pay the artist. The two acts belong together.
+          paying artists. It's a call to stop paying middlemen. Build your
+          library from the music you buy on Bandcamp, the records you pick up at
+          shows, the files you already own. Then spend every cent you save on
+          concert tickets, merch tables, and direct support. Own your music. Pay
+          the artist. The two acts belong together.
         </p>
 
         <p>

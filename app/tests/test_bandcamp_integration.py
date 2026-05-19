@@ -402,6 +402,107 @@ def test_bandcamp_web_resolves_pagedata_and_stat_download_url():
     )
 
 
+def test_bandcamp_search_parser_extracts_artist_and_album_results():
+    from crate.bandcamp.search import (
+        find_exact_album_url,
+        find_exact_artist_url,
+        parse_bandcamp_search_results,
+    )
+
+    html = """
+    <li class="searchresult">
+      <div class="itemtype">ARTIST</div>
+      <div class="heading"><a href="https://slowthai.bandcamp.com">slowthai</a></div>
+    </li>
+    <li class="searchresult">
+      <div class="itemtype">ALBUM</div>
+      <div class="heading"><a href="https://artist.bandcamp.com/album/lp">LP</a></div>
+      <div class="subhead">by Artist</div>
+    </li>
+    """
+    results = parse_bandcamp_search_results(html)
+
+    assert results[0].url == "https://slowthai.bandcamp.com"
+    assert results[1].artist == "by Artist"
+    assert (
+        find_exact_artist_url("slowthai", search_fn=lambda *_a, **_k: results)
+        == "https://slowthai.bandcamp.com"
+    )
+    assert (
+        find_exact_album_url("Artist", "LP", search_fn=lambda *_a, **_k: results)
+        == "https://artist.bandcamp.com/album/lp"
+    )
+
+
+def test_bandcamp_direct_probe_resolves_artist_and_album_urls(monkeypatch):
+    from crate.bandcamp import search as bandcamp_search
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, url: str, text: str):
+            self.url = url
+            self.text = text
+
+    def fake_get(url: str, **_kwargs):
+        if url == "https://highvis.bandcamp.com":
+            return Response(
+                "https://highvis.bandcamp.com/",
+                """
+                <html><head>
+                  <title>Merch | High Vis</title>
+                  <meta property="og:site_name" content="High Vis" />
+                </head></html>
+                """,
+            )
+        if url == "https://highvis.bandcamp.com/album/blending":
+            return Response(
+                url,
+                """
+                <html><head>
+                  <title>Blending | High Vis</title>
+                  <meta property="og:title" content="Blending, by High Vis" />
+                  <meta property="og:site_name" content="High Vis" />
+                </head></html>
+                """,
+            )
+        response = Response(url, "")
+        response.status_code = 404
+        return response
+
+    monkeypatch.setattr(bandcamp_search.requests, "get", fake_get)
+
+    assert (
+        bandcamp_search.find_exact_artist_url("High Vis", allow_search=False)
+        == "https://highvis.bandcamp.com"
+    )
+    assert (
+        bandcamp_search.find_exact_album_url(
+            "High Vis",
+            "Blending",
+            allow_search=False,
+        )
+        == "https://highvis.bandcamp.com/album/blending"
+    )
+
+
+def test_bandcamp_search_reports_client_challenge(monkeypatch):
+    from crate.bandcamp import search as bandcamp_search
+
+    class Response:
+        status_code = 200
+        text = "<html><head><title>Client Challenge</title></head></html>"
+
+    monkeypatch.setattr(
+        bandcamp_search.requests,
+        "get",
+        lambda *_a, **_k: Response(),
+    )
+
+    with pytest.raises(bandcamp_search.BandcampSearchError):
+        bandcamp_search.search_bandcamp("High Vis")
+
+
 def test_bandcamp_credential_worker_stores_connection(pg_db, monkeypatch):
     monkeypatch.setenv("JWT_SECRET", "test-secret-key-1234-12345678901234")
     monkeypatch.setenv("CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED", "true")
@@ -1299,6 +1400,66 @@ def test_bandcamp_match_endpoint_exposes_confirmed_artist_link(bandcamp_api_clie
     assert any(row["bandcamp_item_id"] == item["id"] for row in listed)
 
 
+def test_bandcamp_link_uses_persisted_artist_and_album_urls(pg_db):
+    from crate.db.repositories.bandcamp import get_bandcamp_link_for_entity
+    from crate.db.tx import transaction_scope
+
+    artist_uid = str(uuid.uuid4())
+    album_uid = str(uuid.uuid4())
+    artist_name = f"Persisted Bandcamp Artist {uuid.uuid4().hex[:6]}"
+    with transaction_scope() as session:
+        session.execute(
+            text("""
+            INSERT INTO library_artists (
+                id, entity_uid, name, album_count, track_count, total_size,
+                has_photo, bandcamp_url, bandcamp_url_source
+            )
+            VALUES (
+                :id, CAST(:artist_uid AS uuid), :artist, 1, 10, 0, 0,
+                'https://persistedartist.bandcamp.com', 'bandcamp:test'
+            )
+            """),
+            {
+                "id": 900000 + int(uuid.uuid4().hex[:5], 16),
+                "artist_uid": artist_uid,
+                "artist": artist_name,
+            },
+        )
+        session.execute(
+            text("""
+            INSERT INTO library_albums (
+                entity_uid, artist, name, path, track_count, total_size,
+                total_duration, has_cover, bandcamp_url, bandcamp_url_source
+            )
+            VALUES (
+                CAST(:album_uid AS uuid), :artist, :album, :path, 10, 0,
+                0, 0, 'https://persistedartist.bandcamp.com/album/lp',
+                'bandcamp:test'
+            )
+            """),
+            {
+                "album_uid": album_uid,
+                "artist": artist_name,
+                "album": "Persisted LP",
+                "path": f"/music/{uuid.uuid4().hex}",
+            },
+        )
+
+    artist_link = get_bandcamp_link_for_entity(
+        entity_type="artist",
+        entity_uid=artist_uid,
+    )
+    album_link = get_bandcamp_link_for_entity(
+        entity_type="album",
+        entity_uid=album_uid,
+    )
+
+    assert artist_link["artist_url"] == "https://persistedartist.bandcamp.com"
+    assert artist_link["link_source"] == "entity_url"
+    assert album_link["album_url"] == "https://persistedartist.bandcamp.com/album/lp"
+    assert album_link["link_source"] == "entity_url"
+
+
 def test_bandcamp_manual_confirm_persists_artist_url(pg_db):
     artist_uid = str(uuid.uuid4())
     artist_name = f"Manual Bandcamp Artist {uuid.uuid4().hex[:6]}"
@@ -1464,6 +1625,100 @@ def test_bandcamp_matcher_confirms_exact_artist_album(pg_db):
         == "https://matchartist.bandcamp.com/album/exact-lp"
     )
     assert album_bandcamp["bandcamp_url_source"] == "bandcamp:sync"
+
+
+def test_bandcamp_url_backfill_worker_updates_missing_artist_and_album_urls(
+    pg_db, monkeypatch
+):
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.worker_handlers import bandcamp as worker_bandcamp
+
+    artist_uid = str(uuid.uuid4())
+    album_uid = str(uuid.uuid4())
+    artist_name = f"Backfill Bandcamp Artist {uuid.uuid4().hex[:6]}"
+    album_name = "Backfill LP"
+    with transaction_scope() as session:
+        session.execute(
+            text("""
+            INSERT INTO library_artists (
+                id, entity_uid, name, album_count, track_count, total_size, has_photo
+            )
+            VALUES (
+                :id, CAST(:entity_uid AS uuid), :name, 1, 10, 0, 0
+            )
+            """),
+            {
+                "id": 900000 + int(uuid.uuid4().hex[:5], 16),
+                "entity_uid": artist_uid,
+                "name": artist_name,
+            },
+        )
+        session.execute(
+            text("""
+            INSERT INTO library_albums (
+                entity_uid, artist, name, path, track_count, total_size,
+                total_duration, has_cover
+            )
+            VALUES (
+                CAST(:entity_uid AS uuid), :artist, :name, :path, 10, 0, 0, 0
+            )
+            """),
+            {
+                "entity_uid": album_uid,
+                "artist": artist_name,
+                "name": album_name,
+                "path": f"/music/{uuid.uuid4().hex}",
+            },
+        )
+
+    monkeypatch.setattr(worker_bandcamp, "emit_task_event", lambda *a, **k: None)
+    monkeypatch.setattr(worker_bandcamp, "emit_progress", lambda *a, **k: None)
+    monkeypatch.setattr(worker_bandcamp.time, "sleep", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        worker_bandcamp,
+        "find_exact_artist_url",
+        lambda name, **_kwargs: (
+            "https://backfillartist.bandcamp.com" if name == artist_name else None
+        ),
+    )
+    monkeypatch.setattr(
+        worker_bandcamp,
+        "find_exact_album_url",
+        lambda artist, album, **_kwargs: (
+            "https://backfillartist.bandcamp.com/album/backfill-lp"
+            if artist == artist_name and album == album_name
+            else None
+        ),
+    )
+
+    result = worker_bandcamp._handle_bandcamp_backfill_entity_urls(
+        "task-backfill",
+        {"limit": 5000, "public_search": True},
+        {},
+    )
+
+    assert result["public_artist_urls_updated"] >= 1
+    assert result["public_album_urls_updated"] >= 1
+    with read_scope() as session:
+        artist_url = session.execute(
+            text("""
+            SELECT bandcamp_url
+            FROM library_artists
+            WHERE entity_uid = CAST(:entity_uid AS uuid)
+            """),
+            {"entity_uid": artist_uid},
+        ).scalar_one()
+        album_url = session.execute(
+            text("""
+            SELECT bandcamp_url
+            FROM library_albums
+            WHERE entity_uid = CAST(:entity_uid AS uuid)
+            """),
+            {"entity_uid": album_uid},
+        ).scalar_one()
+
+    assert artist_url == "https://backfillartist.bandcamp.com"
+    assert album_url == "https://backfillartist.bandcamp.com/album/backfill-lp"
 
 
 def test_bandcamp_radar_refresh_builds_wishlist_candidates(pg_db):

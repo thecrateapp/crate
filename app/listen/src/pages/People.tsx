@@ -5,6 +5,7 @@ import { Loader2, Search, UserRoundPlus, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { api } from "@/lib/api";
 
 interface SocialSummary {
@@ -214,9 +215,10 @@ export function People() {
           {results.map((item) => {
             const label = item.display_name || item.username || "Unknown user";
             return (
-              <Link
+              <UserProfileLink
                 key={item.id}
-                to={item.username ? `/users/${item.username}` : "/people"}
+                username={item.username}
+                hoverClassName="block"
                 className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
               >
                 <UserAvatar
@@ -241,7 +243,7 @@ export function People() {
                   <UserRoundPlus size={13} />
                   View profile
                 </div>
-              </Link>
+              </UserProfileLink>
             );
           })}
         </div>

@@ -9,6 +9,7 @@ from crate.api.openapi_responses import (
 from crate.api.schemas.social import (
     SocialFollowResponse,
     SocialMeResponse,
+    SocialProfileCardResponse,
     SocialProfileDetailResponse,
     SocialProfilePageResponse,
     SocialSearchResultResponse,
@@ -20,6 +21,8 @@ from crate.api.me import _get_cached_stats_dashboard
 from crate.db.queries.social import (
     get_followers,
     get_following,
+    get_profile_contributions_preview,
+    get_profile_card_summary,
     get_public_playlists_for_user,
     get_public_user_profile,
     get_public_user_profile_by_username,
@@ -42,6 +45,49 @@ _SOCIAL_RESPONSES = merge_responses(
         422: error_response("The request payload failed validation."),
     },
 )
+
+
+def _profile_card_badges(summary: dict) -> list[dict]:
+    stats = summary.get("stats") or {}
+    contributions = int(stats.get("contributions") or 0)
+    public_playlists = int(stats.get("public_playlists") or 0)
+    minutes_30d = float(stats.get("minutes_30d") or 0)
+    bandcamp_contributions = int(summary.get("bandcamp_contributions") or 0)
+
+    badges: list[dict] = []
+    if contributions >= 10:
+        badges.append(
+            {"key": "scene-builder", "label": "Scene builder", "tone": "gold"}
+        )
+    elif contributions > 0:
+        badges.append({"key": "contributor", "label": "Contributor", "tone": "cyan"})
+
+    if bandcamp_contributions > 0:
+        badges.append(
+            {
+                "key": "bandcamp-supporter",
+                "label": "Bandcamp supporter",
+                "tone": "green",
+            }
+        )
+
+    if public_playlists >= 3:
+        badges.append({"key": "curator", "label": "Curator", "tone": "rose"})
+    elif public_playlists > 0:
+        badges.append(
+            {"key": "playlist-maker", "label": "Playlist maker", "tone": "cyan"}
+        )
+
+    if minutes_30d >= 600:
+        badges.append(
+            {"key": "deep-listener", "label": "Deep listener", "tone": "neutral"}
+        )
+    elif minutes_30d >= 120:
+        badges.append(
+            {"key": "active-listener", "label": "Active listener", "tone": "neutral"}
+        )
+
+    return badges[:4]
 
 
 @router.get(
@@ -95,6 +141,28 @@ def social_profile(request: Request, username: str):
 
 
 @router.get(
+    "/api/users/{username}/card",
+    response_model=SocialProfileCardResponse,
+    responses=_SOCIAL_RESPONSES,
+    summary="Get a compact public user profile card",
+)
+def social_profile_card(request: Request, username: str):
+    viewer = _require_auth(request)
+    profile = get_public_user_profile_by_username(username)
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_user_id = profile["id"]
+    summary = get_profile_card_summary(target_user_id)
+    profile["relationship_state"] = get_relationship_state(viewer["id"], target_user_id)
+    profile.update(get_affinity(viewer["id"], target_user_id))
+    profile["top_genre"] = summary.get("top_genre")
+    profile["stats"] = summary.get("stats") or {}
+    profile["badges"] = _profile_card_badges(summary)
+    return profile
+
+
+@router.get(
     "/api/users/{username}/page",
     response_model=SocialProfilePageResponse,
     responses=_SOCIAL_RESPONSES,
@@ -110,6 +178,13 @@ def social_profile_page(request: Request, username: str):
     profile["public_playlists"] = get_public_playlists_for_user(target_user_id)
     profile["relationship_state"] = get_relationship_state(viewer["id"], target_user_id)
     profile.update(get_affinity(viewer["id"], target_user_id))
+    summary = get_profile_card_summary(target_user_id)
+    profile["top_genre"] = summary.get("top_genre")
+    profile["stats"] = summary.get("stats") or {}
+    profile["badges"] = _profile_card_badges(summary)
+    profile["contributions_preview"] = get_profile_contributions_preview(
+        target_user_id, limit=8
+    )
     profile["followers_preview"] = get_followers(target_user_id, limit=8)
     profile["following_preview"] = get_following(target_user_id, limit=8)
     return profile

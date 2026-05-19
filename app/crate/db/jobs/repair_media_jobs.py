@@ -104,7 +104,26 @@ def get_tracks_by_paths(paths: list[str]) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def count_valid_album_tracks(album_id: int) -> int:
+    with transaction_scope() as session:
+        row = session.execute(
+            text(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM library_tracks
+                WHERE album_id = :album_id
+                  AND NULLIF(BTRIM(title), '') IS NOT NULL
+                  AND COALESCE(track_number, 0) > 0
+                  AND COALESCE(duration, 0) > 1
+                """
+            ),
+            {"album_id": album_id},
+        ).scalar_one()
+    return int(row or 0)
+
+
 __all__ = [
+    "count_valid_album_tracks",
     "get_tracks_by_paths",
     "merge_album_folder",
     "reassign_album_artist",

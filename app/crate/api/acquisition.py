@@ -520,9 +520,7 @@ async def acquisition_upload(request: Request, files: list[UploadFile] = File(..
             "staging_dir": str(staging_dir),
             "uploader_user_id": user["id"],
             "files": saved_files,
-            "source": "admin_upload"
-            if user.get("role") == "admin"
-            else "listen_upload",
+            "source": "upload",
         },
     )
     return {

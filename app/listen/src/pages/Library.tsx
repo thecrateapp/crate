@@ -39,6 +39,7 @@ import {
 import { type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { api, apiAssetUrl } from "@/lib/api";
+import { contributionSourceLabel } from "@/lib/contributions";
 import { formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -873,13 +874,6 @@ function BandcampTab() {
       </AppModal>
     </div>
   );
-}
-
-function contributionSourceLabel(source: string): string {
-  if (source === "bandcamp") return "Bandcamp";
-  if (source === "admin_upload") return "Admin upload";
-  if (source === "listen_upload") return "Upload";
-  return source || "Contribution";
 }
 
 function ContributionArtwork({

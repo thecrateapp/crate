@@ -136,6 +136,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
     "bandcamp_import_purchase": TaskPoolConfig("default", 0, 14400, 0),
     "bandcamp_radar_refresh": TaskPoolConfig("fast", 2, 600, 1),
+    "bandcamp_backfill_entity_urls": TaskPoolConfig("maintenance", 2, 7200, 0),
     "bandcamp_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "bandcamp_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
     "cleanup_incomplete_downloads": TaskPoolConfig("default", 3, 600, 0),

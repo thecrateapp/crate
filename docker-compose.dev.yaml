@@ -141,7 +141,9 @@ services:
     ports:
       - "8585:8585"
     networks:
-      - crate-dev
+      crate-dev:
+        aliases:
+          - crate-api
     depends_on:
       postgres:
         condition: service_healthy

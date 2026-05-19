@@ -249,7 +249,7 @@ export function ArtistHeroSection({
       </div>
 
       <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] items-center gap-2">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-wrap items-center gap-2">
           <button
             className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             onClick={onPlay}
@@ -291,11 +291,6 @@ export function ArtistHeroSection({
           >
             {following ? <UserCheck size={16} /> : <UserPlus size={16} />}
           </button>
-          <BandcampSupportButton
-            entityType="artist"
-            entityUid={artist.entity_uid}
-            artistName={artist.name}
-          />
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
@@ -319,6 +314,11 @@ export function ArtistHeroSection({
               </AppModal>
             ) : null}
           </div>
+          <BandcampSupportButton
+            entityType="artist"
+            entityUid={artist.entity_uid}
+            className="ml-auto shrink-0"
+          />
         </div>
       </div>
     </>

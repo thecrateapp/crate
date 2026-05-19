@@ -57,6 +57,7 @@ import { fetchPlaylistRadio } from "@/lib/radio";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 
 interface PlaylistTrack {
@@ -848,9 +849,19 @@ export function Playlist() {
                   className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {label}
-                    </div>
+                    {member.username ? (
+                      <UserProfileLink
+                        username={member.username}
+                        hoverClassName="block"
+                        className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
+                      >
+                        {label}
+                      </UserProfileLink>
+                    ) : (
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {label}
+                      </div>
+                    )}
                     <div className="truncate text-xs text-muted-foreground">
                       {member.username ? `@${member.username}` : "Profile"} ·{" "}
                       {member.role}

@@ -39,6 +39,8 @@ The admin app is still a fairly traditional operator SPA:
 - notifications and tooling affordances
 - snapshot-backed ops/dashboard contexts
 - route-driven page composition
+- acquisition surfaces for Tidal, Soulseek, uploads, imports, and Bandcamp
+  matching/sync visibility
 
 One notable current addition is the admin dashboard's visibility into runtime
 eventing:
@@ -69,6 +71,14 @@ The bulk of routing and provider composition lives in `app-shell/`:
 - `AppRouter.tsx`
 - `RouteGuards.tsx`
 - `route-table.tsx`
+
+Listen also owns the user-facing pieces of contribution-based acquisition:
+
+- Settings exposes Bandcamp connection/sync controls.
+- Upload lets a user contribute audio files or ZIP archives.
+- Library has a Contributions tab for portable export and withdrawal.
+- Album and Artist pages can show Bandcamp support CTAs when confirmed links
+  exist.
 
 ### Routing
 
@@ -169,3 +179,11 @@ Both apps still mostly use:
 
 But many complex surfaces now sit on top of snapshot/read-model endpoints rather
 than bespoke “dashboard-only” assembly code inside the page itself.
+
+Home discovery is snapshot-backed and streamed through
+`/api/me/home/discovery-stream`. Listen also subscribes to the replayable cache
+invalidation feed for catalog-like scopes (`home`, `library`, `upcoming`,
+`artist:*`, `album:*`, `playlist:*`) and forces a fresh home discovery fetch
+when those events arrive. This is important for Bandcamp imports and uploads:
+the user expects sections such as Just Landed to update after the worker commits
+new library content.

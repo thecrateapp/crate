@@ -15,6 +15,7 @@ export default defineConfig({
       ".crate.local",
       ".dev.lespedants.org",
       ".dev.cratemusic.app",
+      "www.dev.cratemusic.app",
       ".cratemusic.app",
     ],
     fs: {

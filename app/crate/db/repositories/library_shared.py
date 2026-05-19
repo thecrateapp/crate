@@ -65,6 +65,9 @@ class LibraryArtistRow(TypedDict):
     discogs_members_json: Any | None
     latest_release_date: str | None
     content_hash: str | None
+    bandcamp_url: str | None
+    bandcamp_url_source: str | None
+    bandcamp_url_updated_at: Any | None
 
 
 class LibraryAlbumRow(TypedDict):
@@ -95,6 +98,9 @@ class LibraryAlbumRow(TypedDict):
     popularity_confidence: float | None
     quarantined_at: Any | None
     quarantine_task_id: str | None
+    bandcamp_url: str | None
+    bandcamp_url_source: str | None
+    bandcamp_url_updated_at: Any | None
 
 
 class LibraryTrackRow(TypedDict):
@@ -199,6 +205,9 @@ def artist_to_dict(artist) -> LibraryArtistRow | None:
         "discogs_members_json": artist.discogs_members_json,
         "latest_release_date": artist.latest_release_date,
         "content_hash": artist.content_hash,
+        "bandcamp_url": artist.bandcamp_url,
+        "bandcamp_url_source": artist.bandcamp_url_source,
+        "bandcamp_url_updated_at": artist.bandcamp_url_updated_at,
     }
 
 
@@ -236,6 +245,9 @@ def album_to_dict(album) -> LibraryAlbumRow | None:
         "popularity_confidence": album.popularity_confidence,
         "quarantined_at": album.quarantined_at,
         "quarantine_task_id": album.quarantine_task_id,
+        "bandcamp_url": album.bandcamp_url,
+        "bandcamp_url_source": album.bandcamp_url_source,
+        "bandcamp_url_updated_at": album.bandcamp_url_updated_at,
     }
 
 

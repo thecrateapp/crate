@@ -20,14 +20,12 @@ interface BandcampLinkState {
 interface BandcampSupportButtonProps {
   entityType: "artist" | "album";
   entityUid?: string | null;
-  artistName?: string;
   className?: string;
 }
 
 export function BandcampSupportButton({
   entityType,
   entityUid,
-  artistName,
   className = "",
 }: BandcampSupportButtonProps) {
   const [link, setLink] = useState<BandcampLinkState | null>(null);
@@ -50,21 +48,43 @@ export function BandcampSupportButton({
 
   if (!link) return null;
 
-  const url = link.item_url || link.album_url || link.artist_url || "";
+  const url =
+    entityType === "artist"
+      ? link.artist_url || ""
+      : link.album_url || link.item_url || "";
+  if (!url) return null;
+  const latestImportStatus = link.latest_import_status || "";
+  const importInProgress = ["queued", "downloading", "importing"].includes(
+    latestImportStatus,
+  );
+  const ownedAlbum = entityType === "album" && Boolean(link.user_owned);
   const canImport =
-    entityType === "album" &&
+    ownedAlbum &&
     link.bandcamp_item_id &&
-    link.user_owned &&
     link.user_downloadable &&
-    link.latest_import_status !== "completed";
+    latestImportStatus !== "completed" &&
+    !importInProgress;
+  const ownedLabel = importInProgress
+    ? "Importing from Bandcamp"
+    : "Owned on Bandcamp";
   const label =
     entityType === "artist"
-      ? `Support ${artistName || "artist"}`
+      ? "Support on Bandcamp"
       : canImport
         ? "Import from Bandcamp"
-        : link.user_owned
-          ? "Open on Bandcamp"
-          : "Buy this album";
+        : "Buy this album on Bandcamp";
+
+  if (ownedAlbum && !canImport) {
+    return (
+      <span
+        className={`inline-flex h-10 items-center gap-2 rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 px-4 text-sm font-medium text-[#7ee7ff]/90 ${className}`}
+      >
+        <BandcampLogo size={15} />
+        <span className="hidden sm:inline">{ownedLabel}</span>
+        <span className="sm:hidden">Owned</span>
+      </span>
+    );
+  }
 
   const handleClick = async () => {
     if (canImport && link.bandcamp_item_id) {

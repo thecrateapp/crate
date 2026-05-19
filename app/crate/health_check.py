@@ -23,6 +23,7 @@ from crate.db.queries.health import (
     get_duplicate_tracks,
     get_orphan_albums,
     get_orphan_tracks,
+    get_shadow_quality_tracks,
     get_tracks_sample,
     get_tracks_tag_sample,
     get_zombie_artists,
@@ -474,7 +475,7 @@ class LibraryHealthCheck:
 
     def _check_duplicate_tracks(self) -> list[dict]:
         """Detect tracks that appear multiple times in the same album
-        (same artist + title, different file paths)."""
+        (same artist + title + track number, different file paths)."""
         rows = get_duplicate_tracks()
         return [
             {
@@ -484,7 +485,29 @@ class LibraryHealthCheck:
                     "artist": r["artist"],
                     "album": r["album"],
                     "title": r["title"],
+                    "track_number": r.get("track_number"),
+                    "disc_number": r.get("disc_number"),
                     "count": r["cnt"],
+                    "paths": r.get("paths", []),
+                },
+            }
+            for r in rows
+        ]
+
+    def _check_shadow_quality_tracks(self) -> list[dict]:
+        rows = get_shadow_quality_tracks()
+        return [
+            {
+                "check": "shadow_quality_tracks",
+                "severity": "medium",
+                "details": {
+                    "album_id": r["album_id"],
+                    "artist": r["artist"],
+                    "album": r["album"],
+                    "canonical_album_path": r["canonical_album_path"],
+                    "valid_count": r["valid_count"],
+                    "count": r["cnt"],
+                    "formats": r.get("formats", []),
                     "paths": r.get("paths", []),
                 },
             }

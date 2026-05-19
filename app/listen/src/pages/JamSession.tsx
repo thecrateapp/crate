@@ -47,6 +47,7 @@ import {
 } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { api } from "@/lib/api";
 import { useJamWebSocket } from "@/hooks/use-jam-websocket";
 import { useJamSessionState } from "@/hooks/use-jam-session-state";
@@ -1395,9 +1396,10 @@ export function JamSession() {
           <h2 className="text-lg font-semibold text-foreground">Members</h2>
           <div className="mt-4 space-y-3">
             {room.members.map((member) => (
-              <Link
+              <UserProfileLink
                 key={`${member.room_id}-${member.user_id}`}
-                to={member.username ? `/users/${member.username}` : "/people"}
+                username={member.username}
+                hoverClassName="block"
                 className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
               >
                 <div className="flex min-w-0 items-center gap-3">
@@ -1420,7 +1422,7 @@ export function JamSession() {
                 <div className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground">
                   {member.user_id === room.host_user_id ? "Host" : "Collab"}
                 </div>
-              </Link>
+              </UserProfileLink>
             ))}
           </div>
         </section>

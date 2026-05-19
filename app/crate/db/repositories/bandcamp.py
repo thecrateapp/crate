@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from urllib.parse import urlparse, urlunparse
 
 from sqlalchemy import text
@@ -15,6 +15,10 @@ from crate.db.tx import optional_scope
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _rowcount(result: Any) -> int:
+    return int(getattr(cast(Any, result), "rowcount", 0) or 0)
 
 
 def _clean_bandcamp_url(url: Any, *, keep_path: bool) -> str | None:
@@ -54,12 +58,12 @@ def _bandcamp_album_url_from_item(item: Mapping[Any, Any]) -> str | None:
 def _sync_confirmed_bandcamp_entity_url(
     session,
     match: Mapping[Any, Any],
-) -> None:
+) -> bool:
     if match.get("status") != "confirmed":
-        return
+        return False
     entity_type = str(match.get("entity_type") or "")
     if entity_type not in {"artist", "album"}:
-        return
+        return False
 
     row = (
         session.execute(
@@ -82,7 +86,7 @@ def _sync_confirmed_bandcamp_entity_url(
         .first()
     )
     if not row:
-        return
+        return False
 
     url = (
         _bandcamp_artist_url_from_item(row)
@@ -90,12 +94,12 @@ def _sync_confirmed_bandcamp_entity_url(
         else _bandcamp_album_url_from_item(row)
     )
     if not url:
-        return
+        return False
 
     now = _now()
     source = f"bandcamp:{row['source'] or 'match'}"
     if entity_type == "artist":
-        session.execute(
+        result = session.execute(
             text("""
             UPDATE library_artists
             SET bandcamp_url = :url,
@@ -110,9 +114,9 @@ def _sync_confirmed_bandcamp_entity_url(
                 "updated_at": now,
             },
         )
-        return
+        return bool(_rowcount(result))
 
-    session.execute(
+    result = session.execute(
         text("""
         UPDATE library_albums
         SET bandcamp_url = :url,
@@ -127,6 +131,84 @@ def _sync_confirmed_bandcamp_entity_url(
             "updated_at": now,
         },
     )
+    return bool(_rowcount(result))
+
+
+def _persisted_bandcamp_link_for_entity(
+    session,
+    *,
+    entity_type: str,
+    entity_uid: str,
+) -> dict | None:
+    if entity_type == "artist":
+        row = (
+            session.execute(
+                text("""
+                SELECT
+                    entity_uid::text AS entity_uid,
+                    bandcamp_url,
+                    bandcamp_url_source,
+                    bandcamp_url_updated_at
+                FROM library_artists
+                WHERE entity_uid = CAST(:entity_uid AS uuid)
+                  AND NULLIF(trim(coalesce(bandcamp_url, '')), '') IS NOT NULL
+                LIMIT 1
+                """),
+                {"entity_uid": entity_uid},
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            return None
+        url = _clean_bandcamp_url(row["bandcamp_url"], keep_path=False)
+        if not url:
+            return None
+        return {
+            "entity_type": "artist",
+            "entity_uid": row["entity_uid"],
+            "artist_url": url,
+            "match_status": None,
+            "match_source": row.get("bandcamp_url_source"),
+            "link_source": "entity_url",
+            "bandcamp_url_updated_at": row.get("bandcamp_url_updated_at"),
+        }
+
+    if entity_type == "album":
+        row = (
+            session.execute(
+                text("""
+                SELECT
+                    entity_uid::text AS entity_uid,
+                    bandcamp_url,
+                    bandcamp_url_source,
+                    bandcamp_url_updated_at
+                FROM library_albums
+                WHERE entity_uid = CAST(:entity_uid AS uuid)
+                  AND NULLIF(trim(coalesce(bandcamp_url, '')), '') IS NOT NULL
+                LIMIT 1
+                """),
+                {"entity_uid": entity_uid},
+            )
+            .mappings()
+            .first()
+        )
+        if not row:
+            return None
+        url = _clean_bandcamp_url(row["bandcamp_url"], keep_path=True)
+        if not url:
+            return None
+        return {
+            "entity_type": "album",
+            "entity_uid": row["entity_uid"],
+            "album_url": url,
+            "match_status": None,
+            "match_source": row.get("bandcamp_url_source"),
+            "link_source": "entity_url",
+            "bandcamp_url_updated_at": row.get("bandcamp_url_updated_at"),
+        }
+
+    return None
 
 
 def get_connection_for_user(user_id: int, *, session=None) -> dict | None:
@@ -630,7 +712,7 @@ def mark_user_bandcamp_items_removed(
                 "now": now,
             },
         )
-        return int(getattr(result, "rowcount", 0) or 0)
+        return _rowcount(result)
 
 
 def get_user_owned_bandcamp_item(
@@ -891,7 +973,7 @@ def mark_bandcamp_imports_withdrawn(
             """),
             {"user_id": user_id, "bandcamp_item_id": bandcamp_item_id},
         )
-    return int(result.rowcount or 0)
+    return _rowcount(result)
 
 
 def get_bandcamp_import(
@@ -1155,7 +1237,155 @@ def get_bandcamp_link_for_entity(
             .mappings()
             .first()
         )
-    return serialize_row(row) if row else None
+        if row:
+            return serialize_row(row)
+        fallback = _persisted_bandcamp_link_for_entity(
+            s,
+            entity_type=entity_type,
+            entity_uid=entity_uid,
+        )
+    return serialize_row(fallback) if fallback else None
+
+
+def list_bandcamp_item_ids(*, limit: int = 10000, session=None) -> list[int]:
+    capped_limit = max(1, min(int(limit), 50000))
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text("""
+                SELECT id
+                FROM bandcamp_items
+                ORDER BY updated_at DESC, id DESC
+                LIMIT :limit
+                """),
+                {"limit": capped_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [int(row["id"]) for row in rows]
+
+
+def backfill_confirmed_bandcamp_entity_urls(
+    *,
+    limit: int = 10000,
+    session=None,
+) -> dict[str, int]:
+    capped_limit = max(1, min(int(limit), 50000))
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text("""
+                SELECT *
+                FROM bandcamp_library_matches
+                WHERE status = 'confirmed'
+                  AND entity_type IN ('artist', 'album')
+                ORDER BY updated_at DESC, id DESC
+                LIMIT :limit
+                """),
+                {"limit": capped_limit},
+            )
+            .mappings()
+            .all()
+        )
+        updated = 0
+        for row in rows:
+            if _sync_confirmed_bandcamp_entity_url(s, row):
+                updated += 1
+    return {"scanned": len(rows), "updated": updated}
+
+
+def list_library_artists_missing_bandcamp_urls(
+    *,
+    limit: int = 100,
+    session=None,
+) -> list[dict]:
+    capped_limit = max(1, min(int(limit), 5000))
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text("""
+                SELECT entity_uid::text AS entity_uid, name, urls_json
+                FROM library_artists
+                WHERE entity_uid IS NOT NULL
+                  AND NULLIF(trim(coalesce(name, '')), '') IS NOT NULL
+                  AND NULLIF(trim(coalesce(bandcamp_url, '')), '') IS NULL
+                ORDER BY album_count DESC NULLS LAST, name ASC
+                LIMIT :limit
+                """),
+                {"limit": capped_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [serialize_row(row) for row in rows]
+
+
+def list_library_albums_missing_bandcamp_urls(
+    *,
+    limit: int = 100,
+    session=None,
+) -> list[dict]:
+    capped_limit = max(1, min(int(limit), 5000))
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text("""
+                SELECT
+                    alb.entity_uid::text AS entity_uid,
+                    alb.artist,
+                    alb.name,
+                    la.bandcamp_url AS artist_bandcamp_url,
+                    la.urls_json AS artist_urls_json
+                FROM library_albums alb
+                LEFT JOIN library_artists la ON la.name = alb.artist
+                WHERE alb.entity_uid IS NOT NULL
+                  AND NULLIF(trim(coalesce(alb.artist, '')), '') IS NOT NULL
+                  AND NULLIF(trim(coalesce(alb.name, '')), '') IS NOT NULL
+                  AND NULLIF(trim(coalesce(alb.bandcamp_url, '')), '') IS NULL
+                ORDER BY alb.year DESC NULLS LAST, alb.artist ASC, alb.name ASC
+                LIMIT :limit
+                """),
+                {"limit": capped_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [serialize_row(row) for row in rows]
+
+
+def set_library_entity_bandcamp_url(
+    *,
+    entity_type: str,
+    entity_uid: str,
+    url: str,
+    source: str,
+    session=None,
+) -> bool:
+    keep_path = entity_type == "album"
+    cleaned_url = _clean_bandcamp_url(url, keep_path=keep_path)
+    if not cleaned_url or entity_type not in {"artist", "album"}:
+        return False
+    table = "library_artists" if entity_type == "artist" else "library_albums"
+    now = _now()
+    with optional_scope(session) as s:
+        result = s.execute(
+            text(f"""
+            UPDATE {table}
+            SET bandcamp_url = :url,
+                bandcamp_url_source = :source,
+                bandcamp_url_updated_at = :updated_at
+            WHERE entity_uid = CAST(:entity_uid AS uuid)
+              AND NULLIF(trim(coalesce(bandcamp_url, '')), '') IS NULL
+            """),
+            {
+                "entity_uid": entity_uid,
+                "url": cleaned_url,
+                "source": source,
+                "updated_at": now,
+            },
+        )
+    return bool(_rowcount(result))
 
 
 def list_bandcamp_match_candidates_for_name(

@@ -111,7 +111,7 @@ def get_upcoming_releases(
             FROM new_releases nr
             LEFT JOIN library_artists la ON la.name = nr.artist_name
             LEFT JOIN library_albums lalb
-              ON lalb.artist_id = la.id
+              ON LOWER(lalb.artist) = LOWER(nr.artist_name)
              AND LOWER(lalb.name) = LOWER(nr.album_title)
             WHERE nr.artist_name = ANY(:followed_names)
               AND nr.status != 'dismissed'

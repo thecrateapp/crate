@@ -247,6 +247,24 @@ export function Bandcamp() {
               <Radar className="h-4 w-4" />
               Refresh Radar
             </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                queueTask(
+                  "/api/bandcamp/admin/backfill-urls?limit=250&public_search=true",
+                  "Bandcamp URL backfill",
+                )
+              }
+              disabled={busyAction !== null}
+              className="gap-2 rounded-full"
+            >
+              {busyAction === "Bandcamp URL backfill" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="h-4 w-4" />
+              )}
+              Backfill URLs
+            </Button>
           </div>
         </div>
       </section>

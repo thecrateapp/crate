@@ -97,8 +97,8 @@ export function Hero() {
             The Crate Manifesto
           </div>
           <blockquote className="text-[24px] font-medium leading-[1.28] tracking-tight text-white/78 sm:text-[34px]">
-            "In a system where artists earn $0.003 per stream while platforms
-            collect billions, piracy is not theft. It's self-defense."
+            "Buy on Bandcamp. Own your files. Run your server. In a system
+            designed to extract, self-hosting is self-defense."
           </blockquote>
           <a
             href="/why"

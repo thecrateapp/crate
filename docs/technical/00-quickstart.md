@@ -179,7 +179,22 @@ Open `https://listen.your-domain.com` and sign in. This is the listening app —
 
 **iPhone:** Open the listen URL in Safari → Share → Add to Home Screen.
 
-## 5. Subsonic clients
+## 5. Bring in owned music
+
+Crate can start with an existing `/music` folder, but users can also contribute
+music after the instance is running.
+
+- **Bandcamp:** open Listen → Settings → Bandcamp, connect the account, then
+  sync purchases. Owned downloadable purchases can be imported into the shared
+  library with contributor attribution.
+- **Uploads:** open Listen → Upload or Admin → Acquisition → Upload to add
+  loose audio files or ZIP archives.
+
+Both paths stage files first, import through the worker, sync into PostgreSQL,
+record contribution provenance, and refresh the relevant Listen/Admin read
+models through cache/domain events.
+
+## 6. Subsonic clients
 
 Crate is Subsonic-compatible. Point any client at `https://api.your-domain.com/rest`:
 

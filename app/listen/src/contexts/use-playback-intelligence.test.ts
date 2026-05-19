@@ -246,6 +246,27 @@ describe("radio refill effect", () => {
   });
 });
 
+describe("album continuation prefetch", () => {
+  it("appends near-end continuation tracks without advancing playback", async () => {
+    mockInfiniteCont.mockResolvedValue([TRACK_B]);
+    const { opts, actions } = baseOptions({
+      queue: [TRACK_A, TRACK_C],
+      currentIndex: 0,
+    });
+
+    renderHook(() => usePlaybackIntelligence(opts));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockInfiniteCont).toHaveBeenCalled();
+    expect(actions.appendTracks).toHaveBeenCalledWith([TRACK_B]);
+    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
+  });
+});
+
 describe("resetPlaybackIntelligence", () => {
   it("aborts in-flight fetches and clears signatures", async () => {
     mockInfiniteCont.mockImplementation(() => new Promise(() => {})); // never resolves

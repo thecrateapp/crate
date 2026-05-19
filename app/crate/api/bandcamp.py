@@ -606,6 +606,30 @@ def api_admin_bandcamp_collection(
     return BandcampCollectionResponse(items=items, total=len(items))
 
 
+@router.post(
+    "/admin/backfill-urls",
+    response_model=BandcampTaskResponse,
+    responses=_RESPONSES,
+    summary="Backfill Bandcamp URLs for local artists and albums",
+)
+def api_admin_bandcamp_backfill_urls(
+    request: Request,
+    limit: int = 100,
+    public_search: bool = True,
+):
+    _require_admin(request)
+    task_id = create_task(
+        "bandcamp_backfill_entity_urls",
+        {
+            "limit": max(1, min(limit, 5000)),
+            "public_search": public_search,
+            "artists": True,
+            "albums": True,
+        },
+    )
+    return BandcampTaskResponse(task_id=task_id, status="queued")
+
+
 @router.get(
     "/me/collection",
     response_model=BandcampCollectionResponse,

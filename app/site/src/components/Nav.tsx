@@ -6,6 +6,7 @@ const NAV_LINKS = [
   { href: "/#what-is-crate", label: "What is Crate?" },
   { href: "/why-crate", label: "Why Crate?" },
   { href: "/#features", label: "Features" },
+  { href: "/#bandcamp", label: "Bandcamp" },
   { href: "/#screenshots", label: "Screenshots" },
   { href: "/#compare", label: "Compare" },
   { href: "/#stack", label: "Stack" },
