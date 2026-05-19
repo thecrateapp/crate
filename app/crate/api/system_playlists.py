@@ -5,12 +5,12 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.playlist_utils import apply_playlist_cover_payload
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.curation import (
@@ -57,6 +57,10 @@ _SYSTEM_PLAYLIST_RESPONSES = merge_responses(
         422: error_response("The request payload failed validation."),
     },
 )
+
+
+def _require_playlist_curator(request: Request) -> dict:
+    return require_permission(request, "curation.playlists.write")
 
 
 def _serialize_admin_playlist(playlist: dict, *, include_tracks: bool = False) -> dict:
@@ -156,7 +160,7 @@ def _validate_generation_mode(
 def admin_list_system_playlists(
     request: Request, curated_only: bool = False, include_inactive: bool = True
 ):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlists = list_system_playlists(
         only_curated=curated_only,
         only_active=not include_inactive,
@@ -171,7 +175,7 @@ def admin_list_system_playlists(
     summary="Create a system playlist",
 )
 def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistRequest):
-    admin = _require_admin(request)
+    admin = _require_playlist_curator(request)
     if not body.name.strip():
         raise HTTPException(status_code=422, detail="Name is required")
     mode = _validate_generation_mode(body.generation_mode, body.smart_rules)
@@ -225,7 +229,7 @@ def admin_create_system_playlist(request: Request, body: CreateSystemPlaylistReq
 def admin_create_system_playlist_from_blueprint(
     request: Request, body: CreateSystemPlaylistFromBlueprintRequest
 ):
-    admin = _require_admin(request)
+    admin = _require_playlist_curator(request)
     target_type = body.target_type
     target_name = body.target_name.strip()
     blueprint_key = body.blueprint_key.strip()
@@ -285,7 +289,7 @@ def admin_system_playlist_blueprints(
     artist_name: str | None = Query(None),
     genre_name: str | None = Query(None),
 ):
-    _require_admin(request)
+    _require_playlist_curator(request)
     from crate.playlist_blueprints import build_playlist_blueprints
 
     return build_playlist_blueprints(artist_name=artist_name, genre_name=genre_name)
@@ -298,7 +302,7 @@ def admin_system_playlist_blueprints(
     summary="Get a system playlist with tracks",
 )
 def admin_get_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     return _serialize_admin_playlist(playlist, include_tracks=True)
 
@@ -310,7 +314,7 @@ def admin_get_system_playlist(request: Request, playlist_id: int):
     summary="Get the canonical editor snapshot for a system playlist",
 )
 def admin_get_system_playlist_editor_snapshot(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     return _build_system_playlist_editor_surface(playlist_id)
 
 
@@ -320,7 +324,7 @@ def admin_get_system_playlist_editor_snapshot(request: Request, playlist_id: int
     summary="Stream system playlist editor updates",
 )
 async def admin_stream_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     _require_system_playlist(playlist_id)
     return StreamingResponse(
         _stream_system_playlist_editor(playlist_id),
@@ -338,7 +342,7 @@ async def admin_stream_system_playlist(request: Request, playlist_id: int):
 def admin_update_system_playlist(
     request: Request, playlist_id: int, body: UpdateSystemPlaylistRequest
 ):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
 
     next_mode = body.generation_mode or playlist.get("generation_mode") or "static"
@@ -422,7 +426,7 @@ def admin_update_system_playlist(
     summary="Delete a system playlist",
 )
 def admin_delete_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     delete_playlist_cover(playlist.get("cover_path"))
     delete_playlist(playlist_id)
@@ -436,7 +440,7 @@ def admin_delete_system_playlist(request: Request, playlist_id: int):
     summary="Activate a system playlist",
 )
 def admin_activate_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     _require_system_playlist(playlist_id)
     update_playlist(playlist_id, is_active=True)
     playlist = _require_system_playlist(playlist_id)
@@ -450,7 +454,7 @@ def admin_activate_system_playlist(request: Request, playlist_id: int):
     summary="Deactivate a system playlist",
 )
 def admin_deactivate_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     _require_system_playlist(playlist_id)
     update_playlist(playlist_id, is_active=False)
     playlist = _require_system_playlist(playlist_id)
@@ -464,7 +468,7 @@ def admin_deactivate_system_playlist(request: Request, playlist_id: int):
     summary="Enqueue regeneration of a smart system playlist",
 )
 def admin_generate_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     if playlist.get("generation_mode") != "smart" or not playlist.get("smart_rules"):
         raise HTTPException(status_code=400, detail="Not a smart system playlist")
@@ -490,7 +494,7 @@ def admin_preview_system_playlist(
     playlist_id: int,
     body: PreviewSystemPlaylistRequest | None = None,
 ):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     rules = (
         body.smart_rules
@@ -555,7 +559,7 @@ def admin_generate_playlist_description(
     playlist_id: int,
     body: GeneratePlaylistDescriptionRequest | None = None,
 ):
-    _require_admin(request)
+    _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     rules = (
         body.smart_rules
@@ -591,7 +595,7 @@ def admin_generate_playlist_description(
     summary="Duplicate a system playlist",
 )
 def admin_duplicate_system_playlist(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     _require_system_playlist(playlist_id)
     new_playlist = duplicate_playlist(playlist_id)
     if not new_playlist:
@@ -619,6 +623,6 @@ def admin_duplicate_system_playlist(request: Request, playlist_id: int):
     summary="Get generation history for a playlist",
 )
 def admin_generation_history(request: Request, playlist_id: int):
-    _require_admin(request)
+    _require_playlist_curator(request)
     _require_system_playlist(playlist_id)
     return get_generation_history(playlist_id, limit=10)

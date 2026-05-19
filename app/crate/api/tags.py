@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from crate.api.auth import _require_admin
 from crate.api._deps import (
     album_names_from_entity_uid,
     album_names_from_id,
@@ -14,6 +13,7 @@ from crate.api.openapi_responses import (
 )
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.utility import AlbumTagsUpdate, TrackTagsUpdate
+from crate.api.permissions import require_permission
 from crate.db.repositories.library import get_track_path_by_id
 from crate.db.repositories.tasks import create_task
 
@@ -31,7 +31,7 @@ _TAG_RESPONSES = merge_responses(
 def _update_album_tags(
     request: Request, artist: str, album: str, data: AlbumTagsUpdate
 ):
-    _require_admin(request)
+    actor = require_permission(request, "library.metadata.write")
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
     if not album_dir or not album_dir.is_dir():
@@ -50,6 +50,7 @@ def _update_album_tags(
             "album_folder": album,
             "album_fields": album_fields,
             "track_tags": data.tracks,
+            "actor_user_id": actor.get("id"),
         },
     )
     return {"task_id": task_id}
@@ -84,7 +85,7 @@ def api_update_tags_by_entity_uid(
 
 
 def _update_track_tags(request: Request, filepath: str, data: TrackTagsUpdate):
-    _require_admin(request)
+    actor = require_permission(request, "library.metadata.write")
     lib = library_path()
     track_path = safe_path(lib, filepath)
     if not track_path or not track_path.is_file():
@@ -95,6 +96,7 @@ def _update_track_tags(request: Request, filepath: str, data: TrackTagsUpdate):
         {
             "filepath": filepath,
             "tags": data.model_dump(),
+            "actor_user_id": actor.get("id"),
         },
     )
     return {"task_id": task_id}
@@ -107,7 +109,6 @@ def _update_track_tags(request: Request, filepath: str, data: TrackTagsUpdate):
     summary="Queue a track-tag update",
 )
 def api_update_track_tags_by_id(request: Request, track_id: int, data: TrackTagsUpdate):
-    _require_admin(request)
     filepath = get_track_path_by_id(track_id)
     if not filepath:
         raise HTTPException(status_code=404, detail="Not found")

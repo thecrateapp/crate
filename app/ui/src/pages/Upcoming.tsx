@@ -12,6 +12,7 @@ import {
 } from "@crate/ui/shadcn/popover";
 import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 import {
@@ -153,6 +154,13 @@ function ArtistTextLink({
 }
 
 export function Upcoming() {
+  const { isAdmin, hasCapability, hasAnyCapability } = useAuth();
+  const canCurateShows = hasCapability("curation.shows.write");
+  const canCurateReleases = hasCapability("curation.releases.write");
+  const canAcquireReleases = hasAnyCapability([
+    "curation.releases.write",
+    "library.tidal.manage",
+  ]);
   const [items, setItems] = useState<UpcomingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TypeFilter>("all");
@@ -280,6 +288,8 @@ export function Upcoming() {
     (i) => i.type === "release" && i.is_upcoming,
   ).length;
   const showCount = items.filter((i) => i.type === "show").length;
+  const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
+  const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
 
   return (
     <div className="space-y-6">
@@ -327,16 +337,20 @@ export function Upcoming() {
                 Calendar
               </CratePill>
             </div>
-            <Button size="sm" onClick={syncShows} disabled={syncing}>
-              <RefreshCw
-                size={14}
-                className={cn("mr-1", syncing && "animate-spin")}
-              />
-              Sync shows
-            </Button>
-            <ActionIconButton onClick={clearCaches} title="Clear caches">
-              <Trash2 size={15} />
-            </ActionIconButton>
+            {canCurateShows ? (
+              <Button size="sm" onClick={syncShows} disabled={syncing}>
+                <RefreshCw
+                  size={14}
+                  className={cn("mr-1", syncing && "animate-spin")}
+                />
+                Sync shows
+              </Button>
+            ) : null}
+            {isAdmin ? (
+              <ActionIconButton onClick={clearCaches} title="Clear caches">
+                <Trash2 size={15} />
+              </ActionIconButton>
+            ) : null}
           </div>
         </div>
 
@@ -442,8 +456,8 @@ export function Upcoming() {
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={downloadRelease}
-                  onDismiss={dismissRelease}
+                  onDownload={releaseDownload}
+                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                 />
@@ -460,8 +474,8 @@ export function Upcoming() {
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={downloadRelease}
-                  onDismiss={dismissRelease}
+                  onDownload={releaseDownload}
+                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                 />
@@ -479,8 +493,8 @@ export function Upcoming() {
           onMonthChange={(dir) =>
             setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1))
           }
-          onDownload={downloadRelease}
-          onDismiss={dismissRelease}
+          onDownload={releaseDownload}
+          onDismiss={releaseDismiss}
           onShowClick={(item, idx) => {
             setView("list");
             setExpandedId(itemKey(item, idx));
@@ -503,8 +517,8 @@ function MonthGroup({
 }: {
   month: string;
   items: UpcomingItem[];
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
 }) {
@@ -716,8 +730,8 @@ function CalendarView({
   items: UpcomingItem[];
   month: Date;
   onMonthChange: (dir: number) => void;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   onShowClick: (item: UpcomingItem, index: number) => void;
 }) {
   const year = month.getFullYear();
@@ -843,8 +857,8 @@ function CalendarPill({
   onShowClick,
 }: {
   item: UpcomingItem;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   onShowClick: () => void;
 }) {
   const isShow = item.type === "show";
@@ -898,8 +912,8 @@ function ReleasePopoverContent({
   onDismiss,
 }: {
   item: UpcomingItem;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
 }) {
   const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
   const dateStr = dateObj
@@ -958,24 +972,28 @@ function ReleasePopoverContent({
           <Calendar size={11} /> {dateStr}
         </div>
 
-        {item.status === "detected" && item.release_id && (
-          <div className="flex gap-2">
-            {item.tidal_url && (
-              <button
-                onClick={() => onDownload(item.release_id!)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
-              >
-                <Download size={12} /> Download
-              </button>
-            )}
-            <button
-              onClick={() => onDismiss(item.release_id!)}
-              className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        {item.status === "detected" &&
+          item.release_id &&
+          (onDownload || onDismiss) && (
+            <div className="flex gap-2">
+              {item.tidal_url && onDownload && (
+                <button
+                  onClick={() => onDownload(item.release_id!)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
+                >
+                  <Download size={12} /> Download
+                </button>
+              )}
+              {onDismiss ? (
+                <button
+                  onClick={() => onDismiss(item.release_id!)}
+                  className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
+                >
+                  Dismiss
+                </button>
+              ) : null}
+            </div>
+          )}
         {item.status === "downloaded" && (
           <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
             Downloaded

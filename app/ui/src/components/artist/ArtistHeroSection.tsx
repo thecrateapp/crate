@@ -60,6 +60,13 @@ interface ArtistHeroSectionProps {
   tags: string[];
   enriching: boolean;
   isAdmin: boolean;
+  canEditArtwork?: boolean;
+  canEnrich?: boolean;
+  canAnalyze?: boolean;
+  canCreateCorePlaylist?: boolean;
+  canQueueMetadata?: boolean;
+  canRepair?: boolean;
+  canDelete?: boolean;
   photoLoaded: boolean;
   photoError: boolean;
   photoCacheBust: string;
@@ -102,6 +109,13 @@ export function ArtistHeroSection({
   tags,
   enriching,
   isAdmin,
+  canEditArtwork = isAdmin,
+  canEnrich = isAdmin,
+  canAnalyze = isAdmin,
+  canCreateCorePlaylist = isAdmin,
+  canQueueMetadata = isAdmin,
+  canRepair = isAdmin,
+  canDelete = isAdmin,
   photoLoaded,
   photoError,
   photoCacheBust,
@@ -159,7 +173,7 @@ export function ArtistHeroSection({
         }}
       />
 
-      {isAdmin ? (
+      {canEditArtwork ? (
         <ImageCropUpload
           endpoint={artistArtworkApiPath(
             { artistId, artistEntityUid },
@@ -198,7 +212,7 @@ export function ArtistHeroSection({
                 </span>
               </div>
             )}
-            {isAdmin ? (
+            {canEditArtwork ? (
               <ImageCropUpload
                 endpoint={artistArtworkApiPath(
                   { artistId, artistEntityUid },
@@ -330,22 +344,26 @@ export function ArtistHeroSection({
             ) : null}
 
             <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="default"
-                disabled={enriching}
-                onClick={onEnrich}
-              >
-                <RefreshCw
-                  size={14}
-                  className={`mr-1 ${enriching ? "animate-spin" : ""}`}
-                />{" "}
-                {enriching ? "Enriching..." : "Enrich"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={onAnalyze}>
-                <AudioWaveform size={14} className="mr-1" /> Analyze
-              </Button>
-              {isAdmin && onCreateCorePlaylist ? (
+              {canEnrich ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={enriching}
+                  onClick={onEnrich}
+                >
+                  <RefreshCw
+                    size={14}
+                    className={`mr-1 ${enriching ? "animate-spin" : ""}`}
+                  />{" "}
+                  {enriching ? "Enriching..." : "Enrich"}
+                </Button>
+              ) : null}
+              {canAnalyze ? (
+                <Button size="sm" variant="outline" onClick={onAnalyze}>
+                  <AudioWaveform size={14} className="mr-1" /> Analyze
+                </Button>
+              ) : null}
+              {canCreateCorePlaylist && onCreateCorePlaylist ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -360,7 +378,7 @@ export function ArtistHeroSection({
                   Core Tracks
                 </Button>
               ) : null}
-              {isAdmin && onSyncLyrics ? (
+              {canQueueMetadata && onSyncLyrics ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -375,7 +393,7 @@ export function ArtistHeroSection({
                   Lyrics
                 </Button>
               ) : null}
-              {isAdmin && onWritePortableMetadata ? (
+              {canQueueMetadata && onWritePortableMetadata ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -390,7 +408,7 @@ export function ArtistHeroSection({
                   Metadata
                 </Button>
               ) : null}
-              {isAdmin && onExportRichMetadata ? (
+              {canQueueMetadata && onExportRichMetadata ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -405,7 +423,7 @@ export function ArtistHeroSection({
                   Export
                 </Button>
               ) : null}
-              {showRepairAction && (
+              {canRepair && showRepairAction && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -416,7 +434,7 @@ export function ArtistHeroSection({
                   {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
                 </Button>
               )}
-              {isAdmin && (
+              {canDelete && (
                 <Button
                   size="sm"
                   variant="outline"

@@ -79,6 +79,8 @@ function NodeDetailPanel({
   onAction,
   actionBusy,
   onRefetch,
+  canCurate,
+  canCreatePlaylists,
 }: {
   node: TaxonomyNode;
   nodeMap: Map<string, TaxonomyNode>;
@@ -87,6 +89,8 @@ function NodeDetailPanel({
   onAction: (key: string) => void;
   actionBusy: (key: string) => boolean;
   onRefetch?: () => void;
+  canCurate: boolean;
+  canCreatePlaylists: boolean;
 }) {
   const hasPreset = node.eq_gains !== null;
   const empty = node.artist_count === 0 && node.album_count === 0;
@@ -215,31 +219,35 @@ function NodeDetailPanel({
           Actions
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionButton
-            label="Sync MusicBrainz"
-            icon={Network}
-            busy={actionBusy("mb-sync")}
-            onClick={() => onAction("mb-sync")}
-          />
-          <ActionButton
-            label="Enrich description"
-            icon={Sparkles}
-            busy={actionBusy("enrich")}
-            onClick={() => onAction("enrich")}
-          />
-          <ActionButton
-            label="Infer taxonomy"
-            icon={Tag}
-            busy={actionBusy("infer")}
-            onClick={() => onAction("infer")}
-          />
-          <ActionButton
-            label="Clean invalid"
-            icon={AlertTriangle}
-            busy={actionBusy("cleanup")}
-            onClick={() => onAction("cleanup")}
-          />
-          {!empty && (
+          {canCurate ? (
+            <>
+              <ActionButton
+                label="Sync MusicBrainz"
+                icon={Network}
+                busy={actionBusy("mb-sync")}
+                onClick={() => onAction("mb-sync")}
+              />
+              <ActionButton
+                label="Enrich description"
+                icon={Sparkles}
+                busy={actionBusy("enrich")}
+                onClick={() => onAction("enrich")}
+              />
+              <ActionButton
+                label="Infer taxonomy"
+                icon={Tag}
+                busy={actionBusy("infer")}
+                onClick={() => onAction("infer")}
+              />
+              <ActionButton
+                label="Clean invalid"
+                icon={AlertTriangle}
+                busy={actionBusy("cleanup")}
+                onClick={() => onAction("cleanup")}
+              />
+            </>
+          ) : null}
+          {canCreatePlaylists && !empty && (
             <ActionButton
               label="Generate playlist"
               icon={ListMusic}
@@ -276,29 +284,32 @@ function NodeDetailPanel({
       )}
 
       {/* EQ Preset — full editor, same as genre detail page */}
-      <GenreEqEditor
-        canonicalSlug={node.slug}
-        canonicalName={node.name}
-        initialGains={node.eq_gains}
-        initialResolved={
-          node.eq_preset_source === "inherited" && node.eq_preset_inherited_from
-            ? {
-                gains: node.eq_gains ?? [],
-                source: "inherited",
-                slug: node.eq_preset_inherited_from,
-                name: node.eq_preset_inherited_from,
-              }
-            : node.eq_gains
+      {canCurate ? (
+        <GenreEqEditor
+          canonicalSlug={node.slug}
+          canonicalName={node.name}
+          initialGains={node.eq_gains}
+          initialResolved={
+            node.eq_preset_source === "inherited" &&
+            node.eq_preset_inherited_from
               ? {
-                  gains: node.eq_gains,
-                  source: "direct",
-                  slug: node.slug,
-                  name: node.name,
+                  gains: node.eq_gains ?? [],
+                  source: "inherited",
+                  slug: node.eq_preset_inherited_from,
+                  name: node.eq_preset_inherited_from,
                 }
-              : null
-        }
-        onSaved={onRefetch}
-      />
+              : node.eq_gains
+                ? {
+                    gains: node.eq_gains,
+                    source: "direct",
+                    slug: node.slug,
+                    name: node.name,
+                  }
+                : null
+          }
+          onSaved={onRefetch}
+        />
+      ) : null}
 
       {/* Parent chain */}
       {node.parent_slugs.length > 0 && (
@@ -386,9 +397,13 @@ function ActionButton({
 export function GenreTaxonomyTree({
   filter = "",
   hideEmpty = false,
+  canCurate = false,
+  canCreatePlaylists = false,
 }: {
   filter?: string;
   hideEmpty?: boolean;
+  canCurate?: boolean;
+  canCreatePlaylists?: boolean;
 }) {
   const { data, refetch } = useApi<TaxonomyTree>("/api/genres/taxonomy/tree");
   const { pollTask } = useTaskPoll();
@@ -459,6 +474,11 @@ export function GenreTaxonomyTree({
   const runAction = useCallback(
     (key: string) => {
       if (busy[key] || !selectedSlug) return;
+      const taxonomyAction = ["mb-sync", "enrich", "infer", "cleanup"].includes(
+        key,
+      );
+      if (taxonomyAction && !canCurate) return;
+      if (key === "playlist" && !canCreatePlaylists) return;
       setBusy((prev) => ({ ...prev, [key]: true }));
 
       const actions: Record<
@@ -540,7 +560,7 @@ export function GenreTaxonomyTree({
         }
       })();
     },
-    [busy, selectedSlug, pollTask, refetch],
+    [busy, canCreatePlaylists, canCurate, selectedSlug, pollTask, refetch],
   );
 
   const isBusy = useCallback((key: string) => !!busy[key], [busy]);
@@ -664,6 +684,8 @@ export function GenreTaxonomyTree({
               onAction={runAction}
               actionBusy={isBusy}
               onRefetch={refetch}
+              canCurate={canCurate}
+              canCreatePlaylists={canCreatePlaylists}
             />
           </div>
         ) : (

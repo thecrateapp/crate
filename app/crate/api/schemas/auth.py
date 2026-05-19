@@ -27,6 +27,10 @@ class CreateUserRequest(BaseModel):
     role: str = "user"
 
 
+class UpdateUserRoleRequest(BaseModel):
+    role: str
+
+
 class OAuthStartRequest(BaseModel):
     return_to: str | None = None
     invite_token: str | None = None
@@ -158,6 +162,7 @@ class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
     bio: str | None = None
     session_id: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)
 
 
@@ -216,6 +221,7 @@ class AdminUserSummaryResponse(AuthUserPublicResponse):
 
     username: str | None = None
     bio: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
     google_id: str | None = None
     has_password: bool = False
     active_sessions: int | None = None

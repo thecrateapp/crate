@@ -115,9 +115,16 @@ export function Artist() {
   const [issueCountOverride, setIssueCountOverride] = useState<number | null>(
     null,
   );
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasCapability } = useAuth();
+  const canEditMetadata = hasCapability("library.metadata.write");
+  const canRepairArtist = hasCapability("library.repair.run");
+  const canCreatePlaylists = hasCapability("curation.playlists.write");
+  const canDownloadTidal = hasCapability("library.tidal.manage");
+  const canDeleteArtist =
+    hasCapability("library.artist.remove") &&
+    hasCapability("library.files.delete");
   const rawIssueCount = data?.issue_count ?? 0;
-  const shouldLoadRepairPlanSummary = isAdmin && rawIssueCount > 0;
+  const shouldLoadRepairPlanSummary = canRepairArtist && rawIssueCount > 0;
   const repairPlanEndpoint = shouldLoadRepairPlanSummary
     ? artistManagementApiPath(
         { artistId: data?.id, artistEntityUid: data?.entity_uid },
@@ -232,7 +239,7 @@ export function Artist() {
   const letter = artistName.charAt(0).toUpperCase();
   const issueCount =
     issueCountOverride ?? repairPlanSummary?.total ?? rawIssueCount;
-  const showRepairAction = issueCount > 0;
+  const showRepairAction = canRepairArtist && issueCount > 0;
 
   const sortedAlbums = [...data.albums].sort((a, b) => {
     if (sort === "year") return (b.year || "").localeCompare(a.year || "");
@@ -401,6 +408,13 @@ export function Artist() {
         tags={allTags}
         enriching={enriching}
         isAdmin={isAdmin}
+        canEditArtwork={canEditMetadata}
+        canEnrich={canEditMetadata}
+        canAnalyze={isAdmin}
+        canCreateCorePlaylist={canCreatePlaylists}
+        canQueueMetadata={canEditMetadata}
+        canRepair={canRepairArtist}
+        canDelete={canDeleteArtist}
         photoLoaded={photoLoaded}
         photoError={photoError}
         photoCacheBust={photoCacheBust}
@@ -426,7 +440,7 @@ export function Artist() {
         }}
         corePlaylistCreating={creatingCorePlaylist}
         onCreateCorePlaylist={
-          isAdmin && totalTracks > 0
+          canCreatePlaylists && totalTracks > 0
             ? () => {
                 void createArtistCorePlaylist();
               }
@@ -496,6 +510,7 @@ export function Artist() {
             showMissing={showMissing}
             sort={sort}
             downloadingDiscog={downloadingDiscog}
+            canDownloadTidal={canDownloadTidal}
             onToggleShowMissing={() => setShowMissing(!showMissing)}
             onSortChange={setSort}
             onDownloadDiscography={() => {

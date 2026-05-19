@@ -13,6 +13,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.tasks import (
     AdminTasksSnapshotResponse,
@@ -67,6 +68,10 @@ _TASK_RESPONSES = merge_responses(
 )
 
 
+def _require_task_operator(request: Request) -> dict:
+    return require_permission(request, "ops.tasks.manage")
+
+
 async def _tasks_stream(limit: int) -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_tasks_surface(limit=limit))}\n\n"
     pubsub = None
@@ -101,7 +106,7 @@ async def _tasks_stream(limit: int) -> AsyncIterator[str]:
     summary="Get the canonical admin tasks snapshot",
 )
 def api_admin_tasks_snapshot(request: Request, fresh: bool = False, limit: int = 100):
-    _require_admin(request)
+    _require_task_operator(request)
     return get_cached_tasks_surface(limit=limit, fresh=fresh)
 
 
@@ -111,7 +116,7 @@ def api_admin_tasks_snapshot(request: Request, fresh: bool = False, limit: int =
     summary="Stream admin task snapshot updates",
 )
 async def api_admin_tasks_stream(request: Request, limit: int = 100):
-    _require_admin(request)
+    _require_task_operator(request)
     safe_limit = min(max(limit, 1), 200)
     return StreamingResponse(
         _tasks_stream(safe_limit),
@@ -191,7 +196,7 @@ def api_backfill_track_fingerprints(request: Request):
 )
 def api_backfill_similarities(request: Request):
     """Populate artist_similarities table from existing similar_json data."""
-    _require_admin(request)
+    require_permission(request, "library.metadata.write")
     pending = list_tasks(status="pending", task_type="backfill_similarities", limit=1)
     running = list_tasks(status="running", task_type="backfill_similarities", limit=1)
     if pending or running:
@@ -208,7 +213,7 @@ def api_backfill_similarities(request: Request):
 )
 def api_sync_shows(request: Request):
     """Trigger a sync_shows task to fetch shows from Ticketmaster into DB."""
-    _require_admin(request)
+    require_permission(request, "curation.shows.write")
     pending = list_tasks(status="pending", task_type="sync_shows", limit=1)
     running = list_tasks(status="running", task_type="sync_shows", limit=1)
     if pending or running:
@@ -225,7 +230,7 @@ def api_sync_shows(request: Request):
 )
 def api_sync_library(request: Request):
     """Create a library_sync task to re-sync the filesystem to DB."""
-    _require_admin(request)
+    require_permission(request, "library.import.manage")
     running = list_tasks(status="running", task_type="library_sync", limit=1)
     pending = list_tasks(status="pending", task_type="library_sync", limit=1)
     if running or pending:
@@ -325,7 +330,7 @@ def api_worker_status(request: Request):
 )
 def api_set_worker_slots(request: Request, body: WorkerSlotsRequest):
     """Set max/min worker slots. Workers read this on next poll."""
-    _require_admin(request)
+    _require_task_operator(request)
     slots = body.slots
     min_slots = body.min_slots
     if slots is not None:
@@ -352,7 +357,7 @@ def api_set_worker_slots(request: Request, body: WorkerSlotsRequest):
 )
 def api_restart_worker(request: Request):
     """Restart the worker container."""
-    _require_admin(request)
+    _require_task_operator(request)
     ok = restart_container("crate-worker")
     if ok:
         return {"status": "restarting"}
@@ -367,7 +372,7 @@ def api_restart_worker(request: Request):
 )
 def api_cancel_all_tasks(request: Request):
     """Cancel all running and pending tasks."""
-    _require_admin(request)
+    _require_task_operator(request)
     running = list_tasks(status="running")
     pending = list_tasks(status="pending")
     cancelled = 0
@@ -410,7 +415,7 @@ def api_get_schedules(request: Request):
 )
 def api_set_schedules(request: Request, body: WorkerSchedulesUpdateRequest):
     """Update task schedules. Body: {task_type: interval_seconds, ...}. Set to 0 to disable."""
-    _require_admin(request)
+    _require_task_operator(request)
     current = get_schedules()
     for k, v in body.root.items():
         if isinstance(v, (int, float)) and v >= 0:
@@ -439,7 +444,7 @@ def _format_interval(seconds: int) -> str:
 )
 def api_clean_tasks_by_status(request: Request, status: str):
     """Delete all tasks with the given status. Allowed: completed, cancelled, failed."""
-    _require_admin(request)
+    _require_task_operator(request)
     from fastapi import HTTPException
 
     allowed = {"completed", "cancelled", "failed"}
@@ -459,7 +464,7 @@ def api_clean_tasks_by_status(request: Request, status: str):
 )
 def api_cleanup_tasks(request: Request, body: TaskCleanupRequest | None = None):
     """Delete completed/failed/cancelled tasks older than N days."""
-    _require_admin(request)
+    _require_task_operator(request)
     from datetime import datetime, timezone, timedelta
 
     days = body.older_than_days if body else 7
@@ -476,7 +481,7 @@ def api_cleanup_tasks(request: Request, body: TaskCleanupRequest | None = None):
 )
 def api_retry_task(request: Request, body: TaskRetryRequest):
     """Retry a failed task by creating a new one with the same type and params (dispatches to Dramatiq)."""
-    _require_admin(request)
+    _require_task_operator(request)
     task_id = body.task_id
     if not task_id:
         return JSONResponse({"error": "task_id required"}, status_code=400)
@@ -502,7 +507,7 @@ def api_retry_task(request: Request, body: TaskRetryRequest):
     summary="Cancel a pending or running task",
 )
 def api_cancel_task(request: Request, task_id: str):
-    _require_admin(request)
+    _require_task_operator(request)
     task = get_task(task_id)
     if not task:
         return JSONResponse({"error": "Task not found"}, status_code=404)

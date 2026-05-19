@@ -12,9 +12,11 @@ import {
   HeartPulse,
   Download,
   ListMusic,
+  ListTodo,
   Settings,
   RefreshCw,
   Stethoscope,
+  Server,
   User,
   Disc3,
   Search,
@@ -27,6 +29,9 @@ import {
   FileInput,
   FileJson,
   Tags,
+  Calendar,
+  Activity,
+  ScrollText,
 } from "lucide-react";
 
 interface SearchResults {
@@ -42,10 +47,18 @@ interface SearchResults {
   }[];
 }
 
+const COMMAND_SYNC_LIBRARY = ["library.import.manage"] as const;
+const COMMAND_REPAIR_RUN = ["library.repair.run"] as const;
+const COMMAND_METADATA_WRITE = ["library.metadata.write"] as const;
+const COMMAND_ADMIN_ONLY = ["admin.access"] as const;
+const COMMAND_SYNC_SHOWS = ["curation.shows.write"] as const;
+const COMMAND_GENRE_CURATION = ["curation.genres.write"] as const;
+const COMMAND_RELEASE_CURATION = ["curation.releases.write"] as const;
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { hasAnyCapability } = useAuth();
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResults | null>(
     null,
@@ -94,6 +107,121 @@ export function CommandPalette() {
     setQuery("");
   }
 
+  const commandActions = [
+    {
+      label: "Sync Library",
+      capabilities: COMMAND_SYNC_LIBRARY,
+      icon: RefreshCw,
+      run: () => api("/api/tasks/sync-library", "POST"),
+    },
+    {
+      label: "Run Health Check",
+      toastLabel: "Health Check",
+      capabilities: COMMAND_REPAIR_RUN,
+      icon: Stethoscope,
+      run: () => api("/api/manage/health-check", "POST"),
+    },
+    {
+      label: "Analyze All Tracks (BPM, Key, Energy)",
+      toastLabel: "Audio Analysis",
+      capabilities: COMMAND_ADMIN_ONLY,
+      icon: BrainCircuit,
+      run: () => api("/api/manage/analyze-all", "POST"),
+    },
+    {
+      label: "Compute Bliss Vectors",
+      toastLabel: "Compute Bliss vectors",
+      capabilities: COMMAND_ADMIN_ONLY,
+      icon: Radio,
+      run: () => api("/api/manage/compute-bliss", "POST"),
+    },
+    {
+      label: "Compute Popularity (Last.fm)",
+      toastLabel: "Compute Popularity",
+      capabilities: COMMAND_ADMIN_ONLY,
+      icon: BarChart2,
+      run: () => api("/api/manage/compute-popularity", "POST"),
+    },
+    {
+      label: "Backfill Audio Fingerprints (Chromaprint)",
+      toastLabel: "Backfill audio fingerprints",
+      capabilities: COMMAND_ADMIN_ONLY,
+      icon: BrainCircuit,
+      run: () => api("/api/tasks/backfill-track-fingerprints", "POST"),
+    },
+    {
+      label: "Enrich MusicBrainz IDs",
+      toastLabel: "Enrich MBIDs",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: Sparkles,
+      run: () => api("/api/manage/enrich-mbids", "POST"),
+    },
+    {
+      label: "Sync Missing Lyrics",
+      toastLabel: "Sync Lyrics",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: FileJson,
+      run: () => api("/api/manage/sync-lyrics", "POST", { limit: 1000 }),
+    },
+    {
+      label: "Write Portable Metadata",
+      toastLabel: "Portable Metadata",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: Tags,
+      run: () =>
+        api("/api/manage/portable-metadata", "POST", {
+          write_audio_tags: true,
+          write_sidecars: true,
+        }),
+    },
+    {
+      label: "Rehydrate From Portable Metadata",
+      toastLabel: "Portable Metadata Rehydrate",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: FileInput,
+      run: () => api("/api/manage/portable-metadata/rehydrate", "POST"),
+    },
+    {
+      label: "Export Rich Metadata Index",
+      toastLabel: "Rich Metadata Export",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: Archive,
+      run: () =>
+        api("/api/manage/portable-metadata/export-rich", "POST", {
+          include_audio: false,
+          write_rich_tags: false,
+        }),
+    },
+    {
+      label: "Backfill Artist Similarities",
+      toastLabel: "Backfill Similarities",
+      capabilities: COMMAND_METADATA_WRITE,
+      icon: Sparkles,
+      run: () => api("/api/tasks/backfill-similarities", "POST"),
+    },
+    {
+      label: "Sync Shows (Ticketmaster)",
+      toastLabel: "Sync Shows",
+      capabilities: COMMAND_SYNC_SHOWS,
+      icon: Sparkles,
+      run: () => api("/api/tasks/sync-shows", "POST"),
+    },
+    {
+      label: "Clean Invalid Genre Taxonomy Nodes",
+      toastLabel: "Genre taxonomy cleanup",
+      capabilities: COMMAND_GENRE_CURATION,
+      icon: Sparkles,
+      run: () => api("/api/genres/taxonomy/cleanup-invalid", "POST"),
+    },
+    {
+      label: "Check New Releases (MusicBrainz)",
+      toastLabel: "Check New Releases",
+      capabilities: COMMAND_RELEASE_CURATION,
+      icon: Sparkles,
+      run: () => api("/api/acquisition/new-releases/check", "POST"),
+    },
+  ].filter((item) => hasAnyCapability(item.capabilities));
+
   if (!open) return null;
 
   return (
@@ -130,228 +258,147 @@ export function CommandPalette() {
                 className="text-xs text-muted-foreground px-2 py-1"
               >
                 {[
-                  { label: "Dashboard", path: "/", icon: LayoutDashboard },
-                  { label: "Browse", path: "/browse", icon: Library },
-                  { label: "Insights", path: "/insights", icon: BarChart3 },
-                  { label: "Health", path: "/health", icon: HeartPulse },
-                  { label: "Acquisition", path: "/download", icon: Download },
+                  {
+                    label: "Dashboard",
+                    path: "/",
+                    icon: LayoutDashboard,
+                    capabilities: ["admin.access"],
+                  },
+                  {
+                    label: "Browse",
+                    path: "/browse",
+                    icon: Library,
+                    capabilities: ["library.view"],
+                  },
+                  {
+                    label: "Insights",
+                    path: "/insights",
+                    icon: BarChart3,
+                    capabilities: ["library.view"],
+                  },
+                  {
+                    label: "Health",
+                    path: "/health",
+                    icon: HeartPulse,
+                    capabilities: ["library.repair.run"],
+                  },
+                  {
+                    label: "System Health",
+                    path: "/system",
+                    icon: Activity,
+                    capabilities: ["ops.health.view"],
+                  },
+                  {
+                    label: "Tasks",
+                    path: "/tasks",
+                    icon: ListTodo,
+                    capabilities: ["ops.tasks.manage"],
+                  },
+                  {
+                    label: "Logs",
+                    path: "/logs",
+                    icon: ScrollText,
+                    capabilities: ["ops.logs.view"],
+                  },
+                  {
+                    label: "Stack",
+                    path: "/stack",
+                    icon: Server,
+                    capabilities: ["ops.runtime.manage"],
+                  },
+                  {
+                    label: "Users",
+                    path: "/users",
+                    icon: User,
+                    capabilities: ["users.view"],
+                  },
+                  {
+                    label: "Acquisition",
+                    path: "/download",
+                    icon: Download,
+                    capabilities: [
+                      "library.import.manage",
+                      "library.tidal.manage",
+                    ],
+                  },
+                  {
+                    label: "Bandcamp",
+                    path: "/bandcamp",
+                    icon: Archive,
+                    capabilities: ["library.bandcamp.manage"],
+                  },
                   {
                     label: "System Playlists",
                     path: "/playlists",
                     icon: ListMusic,
+                    capabilities: ["curation.playlists.write"],
                   },
-                  { label: "Discovery", path: "/discover", icon: Compass },
-                  { label: "Settings", path: "/settings", icon: Settings },
-                ].map((item) => (
-                  <Command.Item
-                    key={item.path}
-                    onSelect={() => go(item.path)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                  >
-                    <item.icon size={14} className="text-muted-foreground" />
-                    {item.label}
-                  </Command.Item>
-                ))}
+                  {
+                    label: "Upcoming",
+                    path: "/upcoming",
+                    icon: Calendar,
+                    capabilities: [
+                      "curation.shows.write",
+                      "curation.releases.write",
+                      "library.tidal.manage",
+                    ],
+                  },
+                  {
+                    label: "New Releases",
+                    path: "/new-releases",
+                    icon: Sparkles,
+                    capabilities: [
+                      "curation.releases.write",
+                      "library.tidal.manage",
+                    ],
+                  },
+                  {
+                    label: "Discovery",
+                    path: "/discover",
+                    icon: Compass,
+                    capabilities: ["library.view"],
+                  },
+                  {
+                    label: "Settings",
+                    path: "/settings",
+                    icon: Settings,
+                    capabilities: ["admin.access"],
+                  },
+                ]
+                  .filter((item) => hasAnyCapability(item.capabilities))
+                  .map((item) => (
+                    <Command.Item
+                      key={item.path}
+                      onSelect={() => go(item.path)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
+                    >
+                      <item.icon size={14} className="text-muted-foreground" />
+                      {item.label}
+                    </Command.Item>
+                  ))}
               </Command.Group>
             )}
 
-            {!query && isAdmin && (
+            {!query && commandActions.length > 0 && (
               <Command.Group
                 heading="Actions"
                 className="text-xs text-muted-foreground px-2 py-1"
               >
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/tasks/sync-library", "POST"),
-                      "Sync Library",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <RefreshCw size={14} className="text-muted-foreground" />
-                  Sync Library
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/manage/health-check", "POST"),
-                      "Health Check",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Stethoscope size={14} className="text-muted-foreground" />
-                  Run Health Check
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/manage/analyze-all", "POST"),
-                      "Audio Analysis",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <BrainCircuit size={14} className="text-muted-foreground" />
-                  Analyze All Tracks (BPM, Key, Energy)
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/manage/compute-bliss", "POST"),
-                      "Compute Bliss vectors",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Radio size={14} className="text-muted-foreground" />
-                  Compute Bliss Vectors
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/manage/compute-popularity", "POST"),
-                      "Compute Popularity",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <BarChart2 size={14} className="text-muted-foreground" />
-                  Compute Popularity (Last.fm)
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/manage/enrich-mbids", "POST"),
-                      "Enrich MBIDs",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Sparkles size={14} className="text-muted-foreground" />
-                  Enrich MusicBrainz IDs
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () =>
-                        api("/api/tasks/backfill-track-fingerprints", "POST"),
-                      "Backfill audio fingerprints",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <BrainCircuit size={14} className="text-muted-foreground" />
-                  Backfill Audio Fingerprints (Chromaprint)
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () =>
-                        api("/api/manage/sync-lyrics", "POST", { limit: 1000 }),
-                      "Sync Lyrics",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <FileJson size={14} className="text-muted-foreground" />
-                  Sync Missing Lyrics
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () =>
-                        api("/api/manage/portable-metadata", "POST", {
-                          write_audio_tags: true,
-                          write_sidecars: true,
-                        }),
-                      "Portable Metadata",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Tags size={14} className="text-muted-foreground" />
-                  Write Portable Metadata
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () =>
-                        api("/api/manage/portable-metadata/rehydrate", "POST"),
-                      "Portable Metadata Rehydrate",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <FileInput size={14} className="text-muted-foreground" />
-                  Rehydrate From Portable Metadata
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () =>
-                        api(
-                          "/api/manage/portable-metadata/export-rich",
-                          "POST",
-                          { include_audio: false, write_rich_tags: false },
-                        ),
-                      "Rich Metadata Export",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Archive size={14} className="text-muted-foreground" />
-                  Export Rich Metadata Index
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/tasks/backfill-similarities", "POST"),
-                      "Backfill Similarities",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Sparkles size={14} className="text-muted-foreground" />
-                  Backfill Artist Similarities
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/tasks/sync-shows", "POST"),
-                      "Sync Shows",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Sparkles size={14} className="text-muted-foreground" />
-                  Sync Shows (Ticketmaster)
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/genres/taxonomy/cleanup-invalid", "POST"),
-                      "Genre taxonomy cleanup",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Sparkles size={14} className="text-muted-foreground" />
-                  Clean Invalid Genre Taxonomy Nodes
-                </Command.Item>
-                <Command.Item
-                  onSelect={() =>
-                    action(
-                      () => api("/api/acquisition/new-releases/check", "POST"),
-                      "Check New Releases",
-                    )
-                  }
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
-                >
-                  <Sparkles size={14} className="text-muted-foreground" />
-                  Check New Releases (MusicBrainz)
-                </Command.Item>
+                {commandActions.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Command.Item
+                      key={item.label}
+                      onSelect={() =>
+                        action(item.run, item.toastLabel ?? item.label)
+                      }
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-accent data-[selected=true]:bg-accent"
+                    >
+                      <Icon size={14} className="text-muted-foreground" />
+                      {item.label}
+                    </Command.Item>
+                  );
+                })}
               </Command.Group>
             )}
 

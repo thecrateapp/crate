@@ -9,14 +9,25 @@ from fastapi import APIRouter, Request
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
+from crate.api.permissions import require_any_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.operations import AdminOpsSnapshotResponse
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.snapshot_events import snapshot_channel
 
 router = APIRouter(tags=["admin"])
+
+_OPS_SNAPSHOT_CAPABILITIES = (
+    "ops.health.view",
+    "ops.logs.view",
+    "ops.tasks.manage",
+    "ops.runtime.manage",
+)
+
+
+def _require_ops_snapshot_viewer(request: Request) -> dict:
+    return require_any_permission(request, _OPS_SNAPSHOT_CAPABILITIES)
 
 
 @router.get(
@@ -26,7 +37,7 @@ router = APIRouter(tags=["admin"])
     summary="Get the canonical admin operational snapshot",
 )
 def api_admin_ops_snapshot(request: Request, fresh: bool = False):
-    _require_admin(request)
+    _require_ops_snapshot_viewer(request)
     return get_cached_ops_snapshot(fresh=fresh)
 
 
@@ -64,7 +75,7 @@ async def _ops_stream() -> AsyncIterator[str]:
     summary="Stream admin operational snapshot updates",
 )
 async def api_admin_ops_stream(request: Request):
-    _require_admin(request)
+    _require_ops_snapshot_viewer(request)
     return StreamingResponse(
         _ops_stream(),
         media_type="text/event-stream",

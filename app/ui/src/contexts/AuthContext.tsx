@@ -18,7 +18,55 @@ export interface AuthUser {
   avatar?: string;
   username?: string | null;
   bio?: string | null;
+  capabilities?: string[];
   connected_accounts?: Array<{ provider: string; status: string }>;
+}
+
+export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
+  "ops.health.view",
+  "ops.logs.view",
+  "ops.tasks.manage",
+  "ops.runtime.manage",
+  "library.metadata.write",
+  "library.track.remove",
+  "library.album.remove",
+  "library.artist.remove",
+  "library.files.delete",
+  "library.repair.run",
+  "library.import.manage",
+  "library.bandcamp.manage",
+  "library.tidal.manage",
+  "curation.playlists.write",
+  "curation.genres.write",
+  "curation.shows.write",
+  "curation.releases.write",
+] as const;
+
+function hasLegacyAdminRole(user: AuthUser | null): boolean {
+  return user?.role === "admin" || user?.role === "owner";
+}
+
+export function userHasCapability(
+  user: AuthUser | null,
+  capability: string,
+): boolean {
+  if (!user) return false;
+  if (hasLegacyAdminRole(user)) return true;
+  return Boolean(user.capabilities?.includes(capability));
+}
+
+export function userHasAnyCapability(
+  user: AuthUser | null,
+  capabilities: readonly string[],
+): boolean {
+  return capabilities.some((capability) => userHasCapability(user, capability));
+}
+
+export function userCanAccessAdminConsole(user: AuthUser | null): boolean {
+  return (
+    userHasCapability(user, "admin.access") ||
+    userHasAnyCapability(user, ADMIN_CONSOLE_ENTRY_CAPABILITIES)
+  );
 }
 
 interface AuthContextValue {
@@ -26,6 +74,9 @@ interface AuthContextValue {
   loading: boolean;
   logout: () => void;
   isAdmin: boolean;
+  canAccessAdmin: boolean;
+  hasCapability: (capability: string) => boolean;
+  hasAnyCapability: (capabilities: readonly string[]) => boolean;
   refetch: () => void;
 }
 
@@ -110,7 +161,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         logout,
-        isAdmin: user?.role === "admin",
+        isAdmin: userHasCapability(user, "admin.access"),
+        canAccessAdmin: userCanAccessAdminConsole(user),
+        hasCapability: (capability) => userHasCapability(user, capability),
+        hasAnyCapability: (capabilities) =>
+          userHasAnyCapability(user, capabilities),
         refetch: fetchUser,
       }}
     >

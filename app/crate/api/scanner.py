@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from crate.api.auth import _require_admin
 from crate.api._deps import get_config
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.operations import (
     FixIssuesResponse,
     FixRequest,
@@ -34,6 +34,10 @@ _SCANNER_RESPONSES = merge_responses(
 )
 
 
+def _require_repair_operator(request: Request) -> dict:
+    return require_permission(request, "library.repair.run")
+
+
 @router.post(
     "/api/scan",
     response_model=ScanStartResponse,
@@ -41,7 +45,7 @@ _SCANNER_RESPONSES = merge_responses(
     summary="Queue a library scan",
 )
 def start_scan(request: Request, body: ScanRequest | None = None):
-    _require_admin(request)
+    _require_repair_operator(request)
     running = list_tasks(status="running", task_type="scan", limit=1)
     if running:
         return JSONResponse({"error": "Scan already in progress"}, status_code=409)
@@ -103,7 +107,7 @@ def api_status(request: Request):
     summary="List issues from the latest scan",
 )
 def api_issues(request: Request, type: str | None = None):
-    _require_admin(request)
+    _require_repair_operator(request)
     latest = get_latest_scan()
     if not latest:
         return []
@@ -121,7 +125,7 @@ def api_issues(request: Request, type: str | None = None):
     summary="Dry-run or queue issue fixes from the latest scan",
 )
 def fix_issues(request: Request, body: FixRequest | None = None):
-    _require_admin(request)
+    _require_repair_operator(request)
     dry_run = body.dry_run if body else True
 
     running = list_tasks(status="running", task_type="scan", limit=1)

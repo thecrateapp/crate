@@ -30,6 +30,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.browse import (
     ArtistsWithShowsResponse,
     ArtistBrowseListResponse,
@@ -126,6 +127,10 @@ _IMAGE_RESPONSES = merge_responses(
         404: error_response("The requested image was not found."),
     },
 )
+
+
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
 
 
 def _artist_browse_order_sql(sort: str) -> str:
@@ -1589,7 +1594,7 @@ def api_shows_list(request: Request, city: str = "", country: str = ""):
 
 
 def api_artist_enrich(request: Request, name: str):
-    _require_auth(request)
+    _require_metadata_editor(request)
     from crate.content import queue_process_new_content_if_needed
 
     task_id = queue_process_new_content_if_needed(name, force=True, triggered_by="ui")

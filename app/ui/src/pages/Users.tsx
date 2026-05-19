@@ -81,6 +81,7 @@ interface UserRecord {
   name: string;
   avatar?: string | null;
   role: string;
+  capabilities?: string[];
   has_password?: boolean;
   active_sessions?: number;
   active_devices?: number;
@@ -139,6 +140,17 @@ interface AuthInvite {
 
 type UserFilter = "all" | "online" | "listening" | "admins";
 type SessionFilter = "active" | "recent" | "all";
+
+const ROLE_OPTIONS = [
+  { value: "owner", label: "Owner" },
+  { value: "admin", label: "Admin" },
+  { value: "ops", label: "Ops" },
+  { value: "librarian", label: "Librarian" },
+  { value: "curator", label: "Curator" },
+  { value: "editor", label: "Editor" },
+  { value: "contributor", label: "Contributor" },
+  { value: "user", label: "User" },
+];
 
 const SESSION_ACTIVE_WINDOW_MS = 3 * 60 * 1000;
 const SESSION_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -521,7 +533,7 @@ function authModeSummary(
 }
 
 export function Users() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, hasCapability } = useAuth();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -531,6 +543,9 @@ export function Users() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<UserFilter>("all");
   const [searchParams, setSearchParams] = useSearchParams();
+  const canViewUserMap = hasCapability("admin.access");
+  const canManageUsers = hasCapability("users.manage");
+  const canManageRoles = hasCapability("roles.manage");
 
   function setInspectParam(userId: number | null) {
     const next = new URLSearchParams(searchParams);
@@ -582,7 +597,7 @@ export function Users() {
   }, [currentUser?.id, detailTarget, searchParams, users]);
 
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || !canManageUsers) return;
     try {
       await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
       toast.success("User deleted");
@@ -684,25 +699,31 @@ export function Users() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setInviteOpen(true)}
-            >
-              <Send size={16} className="mr-2" />
-              Invite user
-            </Button>
-            <Button size="sm" onClick={() => setAddOpen(true)}>
-              <Plus size={16} className="mr-2" />
-              Add user
-            </Button>
+            {canManageUsers ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setInviteOpen(true)}
+                >
+                  <Send size={16} className="mr-2" />
+                  Invite user
+                </Button>
+                <Button size="sm" onClick={() => setAddOpen(true)}>
+                  <Plus size={16} className="mr-2" />
+                  Add user
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </section>
 
-      <Suspense fallback={null}>
-        <UserMap />
-      </Suspense>
+      {canViewUserMap ? (
+        <Suspense fallback={null}>
+          <UserMap />
+        </Suspense>
+      ) : null}
 
       <Card className="border-white/10 bg-panel-surface shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
         <CardContent className="space-y-4 pt-6">
@@ -885,15 +906,17 @@ export function Users() {
                         <Info size={14} className="mr-2" />
                         Inspect
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-red-500/25 text-red-300 hover:bg-red-500/10 hover:text-red-200"
-                        onClick={() => setDeleteTarget(user)}
-                      >
-                        <Trash2 size={14} className="mr-2" />
-                        Delete
-                      </Button>
+                      {canManageUsers ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/25 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                          onClick={() => setDeleteTarget(user)}
+                        >
+                          <Trash2 size={14} className="mr-2" />
+                          Delete
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -913,8 +936,11 @@ export function Users() {
         open={addOpen}
         onOpenChange={setAddOpen}
         onSuccess={fetchUsers}
+        canManageRoles={canManageRoles}
       />
-      <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+      {canManageUsers ? (
+        <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+      ) : null}
 
       <UserDetailDialog
         user={detailTarget}
@@ -925,6 +951,8 @@ export function Users() {
           }
         }}
         onSuccess={fetchUsers}
+        canManageUsers={canManageUsers}
+        canManageRoles={canManageRoles}
       />
 
       <ConfirmDialog
@@ -946,11 +974,16 @@ function UserDetailDialog({
   user,
   onOpenChange,
   onSuccess,
+  canManageUsers,
+  canManageRoles,
 }: {
   user: UserRecord | null;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  canManageUsers: boolean;
+  canManageRoles: boolean;
 }) {
+  const { user: currentUser, refetch } = useAuth();
   const open = !!user;
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -958,6 +991,8 @@ function UserDetailDialog({
   const [revokingAll, setRevokingAll] = useState(false);
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("active");
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [roleDraft, setRoleDraft] = useState("user");
+  const [roleSaving, setRoleSaving] = useState(false);
 
   async function fetchDetail(userId: number) {
     setLoading(true);
@@ -984,8 +1019,38 @@ function UserDetailDialog({
     void fetchDetail(user.id);
   }, [open, user]);
 
+  useEffect(() => {
+    if (detail?.role) {
+      setRoleDraft(detail.role);
+    }
+  }, [detail?.role]);
+
+  async function handleRoleSave() {
+    if (!detail || !canManageRoles || roleDraft === detail.role) return;
+    setRoleSaving(true);
+    try {
+      const updated = await api<UserDetail>(
+        `/api/auth/users/${detail.id}/role`,
+        "PATCH",
+        { role: roleDraft },
+      );
+      setDetail(updated);
+      toast.success("Role updated");
+      onSuccess();
+      if (currentUser?.id === detail.id) {
+        refetch();
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to update role",
+      );
+    } finally {
+      setRoleSaving(false);
+    }
+  }
+
   async function handleRevokeSession(sessionId: string) {
-    if (!detail) return;
+    if (!detail || !canManageUsers) return;
     setRevokingId(sessionId);
     try {
       await api(`/api/auth/users/${detail.id}/sessions/${sessionId}`, "DELETE");
@@ -1002,7 +1067,7 @@ function UserDetailDialog({
   }
 
   async function handleRevokeAll() {
-    if (!detail) return;
+    if (!detail || !canManageUsers) return;
     setRevokingAll(true);
     try {
       const result = await api<{ revoked: number }>(
@@ -1112,6 +1177,56 @@ function UserDetailDialog({
                         {detail.bio}
                       </p>
                     ) : null}
+                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
+                      <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        Role
+                      </div>
+                      {canManageRoles ? (
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <AdminSelect
+                            value={roleDraft}
+                            onChange={setRoleDraft}
+                            options={ROLE_OPTIONS}
+                            placeholder="Select role"
+                            allowClear={false}
+                            triggerClassName="max-w-full sm:w-48"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={roleSaving || roleDraft === detail.role}
+                            onClick={handleRoleSave}
+                          >
+                            {roleSaving ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Save role"
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-sm text-white/70">
+                          {detail.role}
+                        </div>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {(detail.capabilities || [])
+                          .slice(0, 8)
+                          .map((capability) => (
+                            <CrateChip
+                              key={capability}
+                              className="text-[10px] text-white/55"
+                            >
+                              {capability}
+                            </CrateChip>
+                          ))}
+                        {(detail.capabilities?.length ?? 0) > 8 ? (
+                          <CrateChip className="text-[10px] text-white/40">
+                            +{(detail.capabilities?.length ?? 0) - 8} more
+                          </CrateChip>
+                        ) : null}
+                      </div>
+                    </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-md border border-white/8 bg-black/15 p-3">
                         <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
@@ -1239,18 +1354,20 @@ function UserDetailDialog({
                       <div className="mt-1 text-sm text-white/78">
                         {authModeSummary(detail)}
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setPasswordDialogOpen(true)}
-                        >
-                          <Key size={14} className="mr-2" />
-                          {detail.has_password
-                            ? "Reset password"
-                            : "Set password"}
-                        </Button>
-                      </div>
+                      {canManageUsers ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPasswordDialogOpen(true)}
+                          >
+                            <Key size={14} className="mr-2" />
+                            {detail.has_password
+                              ? "Reset password"
+                              : "Set password"}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                     {sessionSourceSummary.length > 0 ? (
                       <div className="space-y-2">
@@ -1311,19 +1428,21 @@ function UserDetailDialog({
                         counted as active devices anymore.
                       </div>
                     ) : null}
-                    <div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleRevokeAll}
-                        disabled={revokingAll || detail.sessions.length === 0}
-                      >
-                        {revokingAll ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : null}
-                        Revoke all sessions
-                      </Button>
-                    </div>
+                    {canManageUsers ? (
+                      <div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleRevokeAll}
+                          disabled={revokingAll || detail.sessions.length === 0}
+                        >
+                          {revokingAll ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Revoke all sessions
+                        </Button>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               </div>
@@ -1425,23 +1544,25 @@ function UserDetailDialog({
                               {session.id}
                             </div>
                           </div>
-                          <div className="flex shrink-0 gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={
-                                !!session.revoked_at ||
-                                revokingId === session.id
-                              }
-                              onClick={() => handleRevokeSession(session.id)}
-                            >
-                              {revokingId === session.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Revoke"
-                              )}
-                            </Button>
-                          </div>
+                          {canManageUsers ? (
+                            <div className="flex shrink-0 gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                  !!session.revoked_at ||
+                                  revokingId === session.id
+                                }
+                                onClick={() => handleRevokeSession(session.id)}
+                              >
+                                {revokingId === session.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Revoke"
+                                )}
+                              </Button>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })
@@ -1457,17 +1578,19 @@ function UserDetailDialog({
         </DialogContent>
       </Dialog>
 
-      <SetPasswordDialog
-        open={passwordDialogOpen && !!detail}
-        onOpenChange={setPasswordDialogOpen}
-        user={detail}
-        onSuccess={async () => {
-          if (detail) {
-            await fetchDetail(detail.id);
-          }
-          onSuccess();
-        }}
-      />
+      {canManageUsers ? (
+        <SetPasswordDialog
+          open={passwordDialogOpen && !!detail}
+          onOpenChange={setPasswordDialogOpen}
+          user={detail}
+          onSuccess={async () => {
+            if (detail) {
+              await fetchDetail(detail.id);
+            }
+            onSuccess();
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -1623,10 +1746,12 @@ function AddUserDialog({
   open,
   onOpenChange,
   onSuccess,
+  canManageRoles,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  canManageRoles: boolean;
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -1649,7 +1774,7 @@ function AddUserDialog({
         email,
         name: name || undefined,
         password,
-        role,
+        role: canManageRoles ? role : "user",
       });
       toast.success("User created");
       onOpenChange(false);
@@ -1695,18 +1820,16 @@ function AddUserDialog({
             required
             minLength={8}
           />
-          <AdminSelect
-            value={role}
-            onChange={setRole}
-            options={[
-              { value: "admin", label: "Admin" },
-              { value: "user", label: "User" },
-              { value: "viewer", label: "Viewer" },
-            ]}
-            placeholder="Select role"
-            allowClear={false}
-            triggerClassName="max-w-full"
-          />
+          {canManageRoles ? (
+            <AdminSelect
+              value={role}
+              onChange={setRole}
+              options={ROLE_OPTIONS}
+              placeholder="Select role"
+              allowClear={false}
+              triggerClassName="max-w-full"
+            />
+          ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"

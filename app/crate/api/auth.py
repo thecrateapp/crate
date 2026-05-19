@@ -31,6 +31,8 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import get_user_capabilities, normalize_role
+from crate.api.permissions import require_permission, validate_role
 from crate.api.schemas.auth import (
     AdminAuthConfigResponse,
     AdminSetPasswordRequest,
@@ -59,8 +61,10 @@ from crate.api.schemas.auth import (
     RevokeSessionsResponse,
     SubsonicTokenResponse,
     UpdateProfileRequest,
+    UpdateUserRoleRequest,
 )
 from crate.api.schemas.common import OkResponse
+from crate.db.audit import log_audit
 from crate.db.repositories.auth import (
     consume_auth_invite,
     count_users,
@@ -551,6 +555,45 @@ def _user_public(user: dict) -> dict:
         "avatar": user["avatar"],
         "role": user["role"],
     }
+
+
+def _with_capabilities(user: dict) -> dict:
+    payload = dict(user)
+    payload["capabilities"] = sorted(get_user_capabilities(payload))
+    return payload
+
+
+def _admin_capable_roles() -> set[str]:
+    return {
+        role
+        for role in ("owner", "admin")
+        if "admin.access" in get_user_capabilities({"role": role})
+    }
+
+
+def _ensure_role_change_is_safe(actor: dict, target: dict, next_role: str) -> None:
+    next_role = validate_role(next_role)
+    current_role = normalize_role(target.get("role"))
+    if actor.get("id") == target.get("id") and next_role not in _admin_capable_roles():
+        raise HTTPException(
+            status_code=400, detail="Cannot remove your own admin access"
+        )
+    if (
+        current_role not in _admin_capable_roles()
+        or next_role in _admin_capable_roles()
+    ):
+        return
+
+    remaining_admins = [
+        user
+        for user in list_users()
+        if user.get("id") != target.get("id")
+        and normalize_role(user.get("role")) in _admin_capable_roles()
+    ]
+    if not remaining_admins:
+        raise HTTPException(
+            status_code=400, detail="At least one owner or admin must remain"
+        )
 
 
 def _is_proxyable_avatar_url(value: str) -> bool:
@@ -1229,10 +1272,19 @@ def _require_auth(request: Request) -> dict:
 
 
 def _require_admin(request: Request) -> dict:
-    user = _require_auth(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
+    return require_permission(request, "admin.access")
+
+
+def _require_users_view(request: Request) -> dict:
+    return require_permission(request, "users.view")
+
+
+def _require_users_manage(request: Request) -> dict:
+    return require_permission(request, "users.manage")
+
+
+def _require_roles_manage(request: Request) -> dict:
+    return require_permission(request, "roles.manage")
 
 
 # ── Routes ───────────────────────────────────────────────────────
@@ -1449,6 +1501,7 @@ async def auth_me(request: Request):
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
         payload["session_id"] = user.get("session_id")
+        payload["capabilities"] = sorted(get_user_capabilities(db_user))
         payload["connected_accounts"] = list_user_external_identities(user["id"])
         return payload
     return {
@@ -1457,6 +1510,7 @@ async def auth_me(request: Request):
         "name": None,
         "avatar": None,
         "role": user["role"],
+        "capabilities": sorted(get_user_capabilities(user)),
     }
 
 
@@ -2177,8 +2231,8 @@ async def apple_callback(request: Request, code: str = "", state: str = ""):
     summary="List users for administration",
 )
 async def admin_list_users(request: Request):
-    _require_admin(request)
-    return list_users()
+    _require_users_view(request)
+    return [_with_capabilities(user) for user in list_users()]
 
 
 @admin_router.get(
@@ -2242,7 +2296,7 @@ async def admin_toggle_auth_provider(
     summary="Create an authentication invite",
 )
 async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
-    user = _require_admin(request)
+    user = _require_users_manage(request)
     invite = create_auth_invite(
         user.get("id"),
         email=body.email,
@@ -2259,7 +2313,7 @@ async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
     summary="List authentication invites",
 )
 async def admin_list_auth_invites(request: Request):
-    _require_admin(request)
+    _require_users_view(request)
     return list_auth_invites()
 
 
@@ -2270,7 +2324,10 @@ async def admin_list_auth_invites(request: Request):
     summary="Create a user as an administrator",
 )
 async def admin_create_user(request: Request, body: CreateUserRequest):
-    _require_admin(request)
+    admin_user = _require_users_manage(request)
+    role = validate_role(body.role)
+    if role != "user":
+        _require_roles_manage(request)
     if len(body.password) < 8:
         raise HTTPException(
             status_code=400, detail="Password must be at least 8 characters"
@@ -2280,7 +2337,14 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
         raise HTTPException(status_code=409, detail="Email already registered")
     pw_hash = hash_password(body.password)
     user = create_user(
-        email=body.email, name=body.name, password_hash=pw_hash, role=body.role
+        email=body.email, name=body.name, password_hash=pw_hash, role=role
+    )
+    log_audit(
+        "create_user",
+        "user",
+        body.email,
+        details={"role": role, "source": "admin"},
+        user_id=admin_user.get("id"),
     )
     return _user_public(user)
 
@@ -2292,11 +2356,12 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
     summary="Get a user with sessions and linked accounts",
 )
 async def admin_get_user_detail(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     payload = _user_public(user)
+    payload["capabilities"] = sorted(get_user_capabilities(user))
     payload["username"] = user.get("username")
     payload["bio"] = user.get("bio")
     payload["has_password"] = bool(user.get("password_hash"))
@@ -2308,6 +2373,43 @@ async def admin_get_user_detail(request: Request, user_id: int):
     return payload
 
 
+@router.patch(
+    "/users/{user_id}/role",
+    response_model=AdminUserDetailResponse,
+    responses=_AUTH_ADMIN_RESPONSES,
+    summary="Update a user's role",
+)
+async def admin_update_user_role(
+    request: Request, user_id: int, body: UpdateUserRoleRequest
+):
+    admin_user = _require_roles_manage(request)
+    next_role = validate_role(body.role)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    previous_role = normalize_role(user.get("role"))
+    if previous_role == next_role:
+        return await admin_get_user_detail(request, user_id)
+
+    _ensure_role_change_is_safe(admin_user, user, next_role)
+    updated = update_user(user_id, role=next_role)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    log_audit(
+        "update_user_role",
+        "user",
+        updated["email"],
+        details={
+            "before": {"role": previous_role},
+            "after": {"role": next_role},
+            "changed_fields": ["role"],
+            "source": "admin",
+        },
+        user_id=admin_user.get("id"),
+    )
+    return await admin_get_user_detail(request, user_id)
+
+
 @router.post(
     "/users/{user_id}/set-password",
     response_model=RevokeSessionsResponse,
@@ -2317,7 +2419,7 @@ async def admin_get_user_detail(request: Request, user_id: int):
 async def admin_set_user_password(
     request: Request, user_id: int, body: AdminSetPasswordRequest
 ):
-    admin_user = _require_admin(request)
+    admin_user = _require_users_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2344,7 +2446,7 @@ async def admin_set_user_password(
     summary="List sessions for a user",
 )
 async def admin_get_user_sessions(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2358,7 +2460,7 @@ async def admin_get_user_sessions(request: Request, user_id: int):
     summary="Revoke a specific user session",
 )
 async def admin_revoke_user_session(request: Request, user_id: int, session_id: str):
-    _require_admin(request)
+    _require_users_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2378,7 +2480,7 @@ async def admin_revoke_user_session(request: Request, user_id: int, session_id: 
     summary="Revoke all sessions for a user",
 )
 async def admin_revoke_all_user_sessions(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2393,7 +2495,7 @@ async def admin_revoke_all_user_sessions(request: Request, user_id: int):
     summary="Delete a user",
 )
 async def admin_delete_user(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

@@ -18,3 +18,4 @@ Pillow>=10.0
 tiddl>=3.3.0
 dramatiq[redis]>=1.17
 device-detector>=5.0
+casbin>=1.37

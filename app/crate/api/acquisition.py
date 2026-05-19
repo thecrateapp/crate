@@ -14,12 +14,13 @@ from starlette.responses import StreamingResponse
 from crate import soulseek
 from crate import tidal
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_auth, _require_admin
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_any_permission, require_permission
 from crate.api.schemas.acquisition import (
     AcquisitionDownloadRequest,
     AcquisitionDownloadResponse,
@@ -79,6 +80,13 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     ".alac",
     ".zip",
 }
+
+
+def _require_acquisition_manager(request: Request) -> dict:
+    return require_any_permission(
+        request,
+        ("library.import.manage", "library.tidal.manage"),
+    )
 
 
 def _get_soulseek_queue_items() -> list[dict]:
@@ -241,7 +249,7 @@ async def acquisition_stream(request: Request):
 )
 def start_soulseek_search(request: Request, body: SoulseekSearchRequest):
     """Start a Soulseek search (non-blocking). Returns search_id to poll."""
-    _require_admin(request)
+    _require_acquisition_manager(request)
     query = body.query.strip()
     artist = body.artist.strip()
     album = body.album.strip()
@@ -332,7 +340,7 @@ async def stream_soulseek_search(request: Request, search_id: str):
 )
 def acquisition_download(request: Request, body: AcquisitionDownloadRequest):
     """Download from the specified source."""
-    _require_admin(request)
+    _require_acquisition_manager(request)
     source = body.source
     artist = body.artist
     album = body.album
@@ -579,7 +587,7 @@ async def api_new_releases_stream(request: Request):
 )
 def api_download_release(request: Request, release_id: int):
     """Download a detected new release via Tidal."""
-    _require_admin(request)
+    require_any_permission(request, ("curation.releases.write", "library.tidal.manage"))
     release = get_release_by_id(release_id)
     if not release or not release.get("tidal_url"):
         raise HTTPException(status_code=404, detail="Release not found or no Tidal URL")
@@ -611,7 +619,7 @@ def api_download_release(request: Request, release_id: int):
 )
 def api_dismiss_release(request: Request, release_id: int):
     """Dismiss a new release (won't be shown again)."""
-    _require_auth(request)
+    require_permission(request, "curation.releases.write")
     mark_release_dismissed(release_id)
     return {"ok": True}
 
@@ -624,7 +632,7 @@ def api_dismiss_release(request: Request, release_id: int):
 )
 def api_check_new_releases(request: Request):
     """Trigger a new release check for all library artists."""
-    _require_admin(request)
+    require_permission(request, "curation.releases.write")
     task_id = create_task("check_new_releases", {})
     return {"task_id": task_id}
 
@@ -649,7 +657,7 @@ def acquisition_queue(request: Request):
 )
 def clear_completed(request: Request):
     """Clear completed Soulseek downloads from slskd queue."""
-    _require_admin(request)
+    _require_acquisition_manager(request)
     ok = soulseek.clear_completed_downloads()
     return {"cleared": ok}
 
@@ -662,7 +670,7 @@ def clear_completed(request: Request):
 )
 def clear_errored(request: Request):
     """Clear errored/cancelled Soulseek downloads from slskd queue."""
-    _require_admin(request)
+    _require_acquisition_manager(request)
     ok = soulseek.clear_errored_downloads()
     return {"cleared": ok}
 
@@ -675,6 +683,6 @@ def clear_errored(request: Request):
 )
 def cleanup_incomplete(request: Request):
     """Create task to clean up incomplete Soulseek album downloads."""
-    _require_admin(request)
+    _require_acquisition_manager(request)
     task_id = create_task("cleanup_incomplete_downloads", {})
     return {"task_id": task_id}

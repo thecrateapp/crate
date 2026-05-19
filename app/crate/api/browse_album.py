@@ -25,6 +25,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.browse import AlbumDetailResponse, RelatedAlbumResponse
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
@@ -94,6 +95,10 @@ _ZIP_RESPONSES = merge_responses(
         404: error_response("The requested album archive was not found."),
     },
 )
+
+
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
 
 
 def _tag_text(value) -> str:
@@ -832,7 +837,7 @@ def api_cover(
 )
 def api_enrich_album(request: Request, album_id: int):
     """Enrich an album: MBID lookup, cover fetch, audio analysis, bliss."""
-    _require_auth(request)
+    _require_metadata_editor(request)
     album = get_library_album_by_id(album_id)
     if not album:
         return JSONResponse({"error": "Not found"}, status_code=404)
@@ -869,7 +874,7 @@ def api_enrich_album_by_entity_uid(request: Request, album_entity_uid: str):
 )
 def api_fetch_cover(request: Request, album_id: int):
     """Search and download a cover for an album from all available sources."""
-    _require_auth(request)
+    _require_metadata_editor(request)
     album = get_library_album_by_id(album_id)
     if not album:
         return JSONResponse({"error": "Album not found"}, status_code=404)

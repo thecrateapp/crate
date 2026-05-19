@@ -4,13 +4,14 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from crate.api.auth import _require_admin, _require_auth
+from crate.api.auth import _require_auth
 from crate.api._deps import artist_name_from_entity_uid, artist_name_from_id
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.utility import (
     ArtistAnalysisDataResponse,
     ArtistEnrichmentResponse,
@@ -81,7 +82,7 @@ def _enrich_enrichment_artist_refs(result: dict) -> dict:
 def get_artist_enrichment(request: Request, name: str):
     """Get consolidated enrichment data. Returns cached if available, otherwise fetches inline.
     For background enrichment, use POST /api/artists/{artist_id}/enrich which queues a worker task."""
-    _require_admin(request)
+    require_permission(request, "library.view")
 
     # Try cache first
     cache_key = f"enrichment:{name.lower()}"

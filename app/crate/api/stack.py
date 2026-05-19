@@ -10,12 +10,12 @@ from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.utility import (
     AdminStackSnapshotResponse,
@@ -49,6 +49,10 @@ _STACK_RESPONSES = merge_responses(
         500: error_response("The container operation failed."),
     },
 )
+
+
+def _require_stack_operator(request: Request) -> dict:
+    return require_permission(request, "ops.runtime.manage")
 
 
 async def _stack_stream() -> AsyncIterator[str]:
@@ -86,7 +90,7 @@ async def _stack_stream() -> AsyncIterator[str]:
     summary="Get the canonical admin stack snapshot",
 )
 def admin_stack_snapshot(request: Request, fresh: bool = False):
-    _require_admin(request)
+    _require_stack_operator(request)
     return get_cached_stack_surface(fresh=fresh)
 
 
@@ -96,7 +100,7 @@ def admin_stack_snapshot(request: Request, fresh: bool = False):
     summary="Stream admin stack snapshot updates",
 )
 async def admin_stack_stream(request: Request):
-    _require_admin(request)
+    _require_stack_operator(request)
     return StreamingResponse(
         _stack_stream(),
         media_type="text/event-stream",
@@ -111,7 +115,7 @@ async def admin_stack_stream(request: Request):
     summary="Get Docker stack status",
 )
 def stack_status(request: Request, fresh: bool = False):
-    _require_admin(request)
+    _require_stack_operator(request)
     snapshot = get_cached_stack_surface(fresh=fresh)
     return snapshot.get("stack") or {
         "available": False,
@@ -128,7 +132,7 @@ def stack_status(request: Request, fresh: bool = False):
     summary="Get one container from the Docker stack",
 )
 def stack_container(request: Request, name: str):
-    _require_admin(request)
+    _require_stack_operator(request)
     info = get_container(name)
     if not info:
         raise HTTPException(status_code=404, detail="Container not found")
@@ -142,7 +146,7 @@ def stack_container(request: Request, name: str):
     summary="Get recent logs for a container",
 )
 def stack_container_logs(request: Request, name: str, tail: int = 50):
-    _require_admin(request)
+    _require_stack_operator(request)
     logs = get_container_logs(name, tail)
     return {"name": name, "logs": logs}
 
@@ -154,7 +158,7 @@ def stack_container_logs(request: Request, name: str, tail: int = 50):
     summary="Restart a managed container",
 )
 def stack_restart_container(request: Request, name: str):
-    _require_admin(request)
+    _require_stack_operator(request)
     # Safety: only allow restarting crate containers
     allowed_prefixes = [
         "librarian-",
@@ -199,7 +203,7 @@ def _is_allowed(name: str) -> bool:
     summary="Stop a managed container",
 )
 def stack_stop_container(request: Request, name: str):
-    _require_admin(request)
+    _require_stack_operator(request)
     if not _is_allowed(name):
         raise HTTPException(
             status_code=403, detail=f"Cannot stop '{name}': not a managed container"
@@ -218,7 +222,7 @@ def stack_stop_container(request: Request, name: str):
     summary="Start a managed container",
 )
 def stack_start_container(request: Request, name: str):
-    _require_admin(request)
+    _require_stack_operator(request)
     if not _is_allowed(name):
         raise HTTPException(
             status_code=403, detail=f"Cannot start '{name}': not a managed container"

@@ -19,6 +19,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.management import (
@@ -158,6 +159,28 @@ _MANAGEMENT_RESPONSES = merge_responses(
 )
 
 
+def _require_repair_operator(request: Request) -> dict:
+    return require_permission(request, "library.repair.run")
+
+
+def _require_artist_removal(request: Request, mode: str) -> dict:
+    user = require_permission(request, "library.artist.remove")
+    if mode == "full":
+        require_permission(request, "library.files.delete")
+    return user
+
+
+def _require_album_removal(request: Request, mode: str) -> dict:
+    user = require_permission(request, "library.album.remove")
+    if mode == "full":
+        require_permission(request, "library.files.delete")
+    return user
+
+
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
+
+
 async def _health_stream(
     *, check_type: str | None = None, limit: int = 500
 ) -> AsyncIterator[str]:
@@ -196,7 +219,7 @@ async def _health_stream(
 def api_admin_health_snapshot(
     request: Request, check_type: str = "", fresh: bool = False, limit: int = 500
 ):
-    _require_admin(request)
+    _require_repair_operator(request)
     normalized = check_type or None
     return get_cached_health_surface(check_type=normalized, limit=limit, fresh=fresh)
 
@@ -209,7 +232,7 @@ def api_admin_health_snapshot(
 async def api_admin_health_stream(
     request: Request, check_type: str = "", limit: int = 500
 ):
-    _require_admin(request)
+    _require_repair_operator(request)
     normalized = check_type or None
     safe_limit = min(max(limit, 1), 1000)
     return StreamingResponse(
@@ -229,8 +252,8 @@ async def api_admin_health_stream(
     summary="Queue a library health check",
 )
 def run_health_check(request: Request):
-    _require_admin(request)
-    task_id = create_task("health_check", {"triggered_by": "admin"})
+    _require_repair_operator(request)
+    task_id = create_task("health_check", {"triggered_by": "console"})
     return {"task_id": task_id}
 
 
@@ -241,7 +264,7 @@ def run_health_check(request: Request):
     summary="Get the canonical library repair catalog",
 )
 def get_repair_catalog(request: Request):
-    _require_admin(request)
+    _require_repair_operator(request)
     return {"items": repair_catalog_payload()}
 
 
@@ -253,7 +276,7 @@ def get_repair_catalog(request: Request):
 )
 def get_health_report(request: Request):
     """Get persisted health issues from DB (survives restarts)."""
-    _require_admin(request)
+    _require_repair_operator(request)
     snapshot = get_cached_health_surface()
     return {
         "issues": snapshot.get("issues", []),
@@ -270,7 +293,7 @@ def get_health_report(request: Request):
 )
 def list_health_issues(request: Request, check_type: str = ""):
     """Get open health issues, optionally filtered by type."""
-    _require_admin(request)
+    _require_repair_operator(request)
     snapshot = get_cached_health_surface(check_type=check_type or None)
     return {
         "issues": snapshot.get("issues", []),
@@ -286,7 +309,7 @@ def list_health_issues(request: Request, check_type: str = ""):
     summary="Resolve a single health issue",
 )
 def api_resolve_issue(request: Request, issue_id: int):
-    _require_admin(request)
+    _require_repair_operator(request)
     resolve_issue(issue_id)
     publish_health_surface_signal()
     return {"ok": True}
@@ -299,7 +322,7 @@ def api_resolve_issue(request: Request, issue_id: int):
     summary="Dismiss a single health issue",
 )
 def api_dismiss_issue(request: Request, issue_id: int):
-    _require_admin(request)
+    _require_repair_operator(request)
     dismiss_issue(issue_id)
     publish_health_surface_signal()
     return {"ok": True}
@@ -312,7 +335,7 @@ def api_dismiss_issue(request: Request, issue_id: int):
     summary="Queue a repair run",
 )
 def run_repair(request: Request, body: RepairRequest):
-    _require_admin(request)
+    _require_repair_operator(request)
     task_id = create_task(
         "repair", {"dry_run": body.dry_run, "auto_only": body.auto_only}
     )
@@ -327,7 +350,7 @@ def run_repair(request: Request, body: RepairRequest):
 )
 def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     """Repair specific issues (individual or batch)."""
-    _require_admin(request)
+    _require_repair_operator(request)
     preview = _build_repair_preview(body.issues, auto_only=False)
     if body.plan_version and preview.get("plan_version") != body.plan_version:
         raise HTTPException(
@@ -383,7 +406,7 @@ def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     summary="Preview repair actions for specific issues",
 )
 def preview_repair_issues(request: Request, body: RepairPreviewRequest):
-    _require_admin(request)
+    _require_repair_operator(request)
     return _build_repair_preview(body.issues, auto_only=body.auto_only)
 
 
@@ -395,7 +418,7 @@ def preview_repair_issues(request: Request, body: RepairPreviewRequest):
 )
 def api_resolve_type(request: Request, check_type: str):
     """Resolve all open issues of a given check type."""
-    _require_admin(request)
+    _require_repair_operator(request)
     resolve_issues_by_type(check_type)
     publish_health_surface_signal()
     return {"ok": True, "check_type": check_type}
@@ -409,7 +432,7 @@ def api_resolve_type(request: Request, check_type: str):
 )
 def api_fix_type(request: Request, check_type: str):
     """Auto-fix all fixable issues of a given check type via repair task."""
-    _require_admin(request)
+    _require_repair_operator(request)
     catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
     if catalog_entry is None:
         return {
@@ -463,14 +486,14 @@ def api_fix_type(request: Request, check_type: str):
 
 def get_artist_health_issues(request: Request, name: str):
     """Get open health issues for a specific artist."""
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = get_artist_issues(name)
     return {"artist": name, "issues": issues, "count": len(issues)}
 
 
 def repair_artist(request: Request, name: str):
     """Repair all auto-fixable issues for a specific artist."""
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = get_artist_issues(name)
     fixable = [i for i in issues if i.get("auto_fixable")]
     if not fixable:
@@ -482,7 +505,7 @@ def repair_artist(request: Request, name: str):
 
 
 def preview_artist_repair_plan(request: Request, name: str):
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = _augment_artist_layout_issues(get_artist_issues(name), name)
     preview = _build_repair_preview(issues, auto_only=False)
     return {"artist": name, **preview}
@@ -490,7 +513,7 @@ def preview_artist_repair_plan(request: Request, name: str):
 
 def fix_artist(request: Request, name: str):
     """Consolidate an artist into its canonical entity-UID layout and resync it."""
-    _require_admin(request)
+    _require_repair_operator(request)
     task_id = create_task("fix_artist", {"artist": name})
     return {"task_id": task_id}
 
@@ -590,9 +613,9 @@ def fix_artist_by_entity_uid(request: Request, artist_entity_uid: str):
 
 
 def delete_artist(request: Request, name: str, body: DeleteRequest):
-    _require_admin(request)
     if body.mode not in ("db_only", "full"):
         raise HTTPException(status_code=422, detail="mode must be 'db_only' or 'full'")
+    _require_artist_removal(request, body.mode)
     task_id = create_task("delete_artist", {"name": name, "mode": body.mode})
     return {"task_id": task_id}
 
@@ -626,7 +649,7 @@ def delete_artist_by_entity_uid(
 
 
 def reset_enrichment(request: Request, name: str):
-    _require_admin(request)
+    _require_metadata_editor(request)
     task_id = create_task("reset_enrichment", {"artist": name})
     return {"task_id": task_id}
 
@@ -658,7 +681,7 @@ def reset_enrichment_by_entity_uid(request: Request, artist_entity_uid: str):
 
 
 def move_artist(request: Request, name: str, body: MoveRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     if not body.new_name.strip():
         raise HTTPException(status_code=422, detail="new_name cannot be empty")
     task_id = create_task(
@@ -699,9 +722,9 @@ def move_artist_by_entity_uid(
 
 
 def delete_album(request: Request, artist: str, album: str, body: DeleteRequest):
-    _require_admin(request)
     if body.mode not in ("db_only", "full"):
         raise HTTPException(status_code=422, detail="mode must be 'db_only' or 'full'")
+    _require_album_removal(request, body.mode)
     task_id = create_task(
         "delete_album", {"artist": artist, "album": album, "mode": body.mode}
     )
@@ -772,7 +795,7 @@ def rebuild_library(request: Request):
     summary="Queue portable metadata sidecar and identity tag writes",
 )
 def write_portable_metadata(request: Request, body: PortableMetadataRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("write_portable_metadata", params)
     return {"task_id": task_id}
@@ -785,7 +808,7 @@ def write_portable_metadata(request: Request, body: PortableMetadataRequest):
     summary="Queue lyrics synchronization for library tracks",
 )
 def sync_lyrics(request: Request, body: LyricsSyncRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("sync_lyrics", params)
     return {"task_id": task_id}
@@ -798,7 +821,7 @@ def sync_lyrics(request: Request, body: LyricsSyncRequest):
     summary="Queue database rehydration from portable metadata sidecars",
 )
 def rehydrate_portable_metadata(request: Request, body: PortableRehydrateRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("rehydrate_portable_metadata", params)
     return {"task_id": task_id}
@@ -811,7 +834,7 @@ def rehydrate_portable_metadata(request: Request, body: PortableRehydrateRequest
     summary="Queue rich metadata export packages",
 )
 def export_rich_metadata(request: Request, body: RichMetadataExportRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("export_rich_metadata", params)
     return {"task_id": task_id}
@@ -967,7 +990,7 @@ def compute_popularity(request: Request):
     summary="Queue MusicBrainz ID enrichment",
 )
 def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = {}
     if body:
         if body.artist:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.utility import (
     ImportItemRequest,
@@ -16,6 +16,10 @@ from crate.db.repositories.tasks import create_task
 router = APIRouter(tags=["imports"])
 
 
+def _require_import_manager(request: Request) -> dict:
+    return require_permission(request, "library.import.manage")
+
+
 @router.get(
     "/api/imports/pending",
     response_model=ImportPendingResponse,
@@ -23,7 +27,7 @@ router = APIRouter(tags=["imports"])
     summary="List pending filesystem imports",
 )
 def api_imports_pending(request: Request):
-    _require_admin(request)
+    _require_import_manager(request)
     return list_import_queue_items(status="pending")
 
 
@@ -34,7 +38,7 @@ def api_imports_pending(request: Request):
     summary="Queue import of one staged album into the library",
 )
 def api_imports_import(request: Request, data: ImportItemRequest):
-    _require_admin(request)
+    _require_import_manager(request)
     task_id = create_task(
         "import_queue_item",
         {
@@ -53,7 +57,7 @@ def api_imports_import(request: Request, data: ImportItemRequest):
     summary="Queue import of all pending staged albums",
 )
 def api_imports_import_all(request: Request):
-    _require_admin(request)
+    _require_import_manager(request)
     task_id = create_task("import_queue_all", {})
     return {"task_id": task_id, "status": "queued"}
 
@@ -65,7 +69,7 @@ def api_imports_import_all(request: Request):
     summary="Queue removal of a staged import source directory",
 )
 def api_imports_remove(request: Request, data: ImportRemoveRequest):
-    _require_admin(request)
+    _require_import_manager(request)
     task_id = create_task(
         "import_queue_remove",
         {

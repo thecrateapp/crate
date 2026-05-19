@@ -29,6 +29,9 @@ describe("ProtectedRoute", () => {
       loading: false,
       logout: vi.fn(),
       isAdmin: false,
+      canAccessAdmin: false,
+      hasCapability: vi.fn(() => false),
+      hasAnyCapability: vi.fn(() => false),
       refetch: vi.fn(),
     });
 
@@ -66,6 +69,9 @@ describe("ProtectedRoute", () => {
       loading: false,
       logout: vi.fn(),
       isAdmin: true,
+      canAccessAdmin: true,
+      hasCapability: vi.fn(() => true),
+      hasAnyCapability: vi.fn(() => true),
       refetch: vi.fn(),
     });
 

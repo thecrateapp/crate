@@ -60,6 +60,14 @@ def _escape_like(value: str) -> str:
     return f"% - {escaped}"
 
 
+def _tag_values(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list | tuple):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
 def _mark_processing(artist_name: str):
     set_cache(f"processing:{artist_name.lower()}", True, ttl=3600)
 
@@ -768,6 +776,8 @@ def _handle_update_album_tags(task_id: str, params: dict, config: dict) -> dict:
     album_folder = params.get("album_folder", "")
     album_fields = params.get("album_fields", {})
     track_tags = params.get("track_tags", {})
+    actor_user_id = params.get("actor_user_id")
+    actor_user_id = actor_user_id if isinstance(actor_user_id, int) else None
 
     album_dir = lib / artist_folder / album_folder
     if not album_dir.is_dir():
@@ -776,6 +786,7 @@ def _handle_update_album_tags(task_id: str, params: dict, config: dict) -> dict:
     tracks = get_audio_files(album_dir, list(DEFAULT_AUDIO_EXTENSIONS))
     updated = 0
     errors = []
+    changes = []
 
     for track in tracks:
         try:
@@ -783,17 +794,40 @@ def _handle_update_album_tags(task_id: str, params: dict, config: dict) -> dict:
             audio = mutagen_file(track, easy=True)
             if audio is None:
                 continue
+            fields = set(album_fields)
+            fields.update((track_tags.get(track.name) or {}).keys())
+            before = {key: _tag_values(audio.get(key)) for key in sorted(fields)}
             for key, value in album_fields.items():
                 audio[key] = value
             if track.name in track_tags:
                 for key, value in track_tags[track.name].items():
                     audio[key] = value
+            after = {key: _tag_values(audio.get(key)) for key in sorted(fields)}
             audio.save()
             updated += 1
+            if before != after:
+                changes.append({"file": track.name, "before": before, "after": after})
         except Exception as exc:
             errors.append({"file": track.name, "error": str(exc)})
 
     emit_task_event(task_id, "info", {"message": f"Updated tags: {updated} tracks"})
+    log_audit(
+        "manual_update_album_tags",
+        "album",
+        f"{artist_folder}/{album_folder}",
+        details={
+            "artist_folder": artist_folder,
+            "album_folder": album_folder,
+            "album_fields": album_fields,
+            "track_tags": track_tags,
+            "updated": updated,
+            "errors": errors,
+            "changes": changes,
+            "source": "manual_edit",
+        },
+        user_id=actor_user_id,
+        task_id=task_id,
+    )
     return {"updated": updated, "errors": errors}
 
 
@@ -803,6 +837,8 @@ def _handle_update_track_tags(task_id: str, params: dict, config: dict) -> dict:
     lib = Path(config["library_path"])
     filepath = params.get("filepath", "")
     tags = params.get("tags", {})
+    actor_user_id = params.get("actor_user_id")
+    actor_user_id = actor_user_id if isinstance(actor_user_id, int) else None
 
     track_path = lib / filepath
     if not track_path.is_file():
@@ -813,9 +849,24 @@ def _handle_update_track_tags(task_id: str, params: dict, config: dict) -> dict:
         audio = mutagen_file(track_path, easy=True)
         if audio is None:
             return {"error": "Cannot read file"}
+        before = {key: _tag_values(audio.get(key)) for key in sorted(tags)}
         for key, value in tags.items():
             audio[key] = value
+        after = {key: _tag_values(audio.get(key)) for key in sorted(tags)}
         audio.save()
+        log_audit(
+            "manual_update_track_tags",
+            "track",
+            filepath,
+            details={
+                "before": before,
+                "after": after,
+                "changed_fields": sorted(tags),
+                "source": "manual_edit",
+            },
+            user_id=actor_user_id,
+            task_id=task_id,
+        )
         return {"status": "ok", "file": track_path.name}
     except Exception as exc:
         return {"error": str(exc)}

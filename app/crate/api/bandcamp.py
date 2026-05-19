@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 
-from crate.api.auth import _require_admin, _require_auth
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES, error_response
+from crate.api.permissions import require_permission
 from crate.api.schemas.bandcamp import (
     BandcampContributionResponse,
     BandcampCollectionResponse,
@@ -54,6 +55,10 @@ _RESPONSES = {
     403: error_response("Bandcamp credential bridge is disabled."),
     404: error_response("The requested Bandcamp resource was not found."),
 }
+
+
+def _require_bandcamp_manager(request: Request) -> dict:
+    return require_permission(request, "library.bandcamp.manage")
 
 
 def _connection_status(user_id: int) -> BandcampConnectionStatusResponse:
@@ -482,7 +487,7 @@ def api_bandcamp_album_link(request: Request, album_entity_uid: str):
     summary="Create or update a Bandcamp library match",
 )
 def api_admin_bandcamp_match(request: Request, body: dict):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     entity_type = str(body.get("entity_type") or "").strip()
     if entity_type not in {"artist", "album", "track"}:
         raise HTTPException(status_code=400, detail="Unsupported entity type")
@@ -521,7 +526,7 @@ def api_admin_bandcamp_matches(
     status: str = "",
     limit: int = 100,
 ):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     normalized_status = status.strip()
     if normalized_status and normalized_status not in {
         "candidate",
@@ -543,7 +548,7 @@ def api_admin_bandcamp_matches(
     summary="Confirm a Bandcamp library match",
 )
 def api_admin_bandcamp_match_confirm(request: Request, match_id: int):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     match = set_bandcamp_library_match_status(match_id, status="confirmed")
     if not match:
         raise HTTPException(status_code=404, detail="Bandcamp match not found")
@@ -557,7 +562,7 @@ def api_admin_bandcamp_match_confirm(request: Request, match_id: int):
     summary="Reject a Bandcamp library match",
 )
 def api_admin_bandcamp_match_reject(request: Request, match_id: int):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     match = set_bandcamp_library_match_status(match_id, status="rejected")
     if not match:
         raise HTTPException(status_code=404, detail="Bandcamp match not found")
@@ -576,7 +581,7 @@ def api_admin_bandcamp_match_candidates(
     artist_name: str,
     album_title: str = "",
 ):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     if entity_type not in {"artist", "album", "track"}:
         raise HTTPException(status_code=400, detail="Unsupported entity type")
     items = list_bandcamp_match_candidates_for_name(
@@ -598,7 +603,7 @@ def api_admin_bandcamp_collection(
     relation_type: str = "",
     limit: int = 200,
 ):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     if relation_type and relation_type not in {"collection", "wishlist", "following"}:
         raise HTTPException(status_code=400, detail="Unsupported Bandcamp relation")
     capped_limit = max(1, min(limit, 500))
@@ -617,7 +622,7 @@ def api_admin_bandcamp_backfill_urls(
     limit: int = 100,
     public_search: bool = True,
 ):
-    _require_admin(request)
+    _require_bandcamp_manager(request)
     task_id = create_task(
         "bandcamp_backfill_entity_urls",
         {

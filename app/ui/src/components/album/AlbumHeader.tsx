@@ -69,6 +69,10 @@ interface AlbumHeaderProps {
     taskId: string,
   ) => void;
   isAdmin?: boolean;
+  canDownload?: boolean;
+  canEditArtwork?: boolean;
+  canEnrich?: boolean;
+  canQueueMetadata?: boolean;
   children?: React.ReactNode;
 }
 
@@ -108,6 +112,10 @@ export function AlbumHeader({
   onAnalysisComplete,
   onMetadataTaskQueued,
   isAdmin = false,
+  canDownload = true,
+  canEditArtwork = isAdmin,
+  canEnrich = isAdmin,
+  canQueueMetadata = isAdmin,
   children,
 }: AlbumHeaderProps) {
   const [coverCacheBust, setCoverCacheBust] = useState("");
@@ -286,7 +294,7 @@ export function AlbumHeader({
                 ) : null}
               </div>
             </ImageLightbox>
-            {isAdmin ? (
+            {canEditArtwork ? (
               <ImageCropUpload
                 endpoint={albumArtworkApiPath(
                   { albumId, albumEntityUid },
@@ -397,39 +405,43 @@ export function AlbumHeader({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="default"
-                onClick={handleEnrich}
-                disabled={analyzing}
-              >
-                {analyzing ? (
-                  <>
-                    <Loader2 size={14} className="mr-1 animate-spin" />
-                    Enriching...
-                  </>
-                ) : (
-                  <>
-                    <BrainCircuit size={14} className="mr-1" />
-                    Enrich
-                  </>
-                )}
-              </Button>
-              <Button size="sm" variant="outline" asChild>
-                <a
-                  href={
-                    albumActionApiPath(
-                      { albumId, albumEntityUid },
-                      "download",
-                    ) || "#"
-                  }
-                  download
+              {canEnrich ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={handleEnrich}
+                  disabled={analyzing}
                 >
-                  <Download size={14} className="mr-1" />
-                  Download
-                </a>
-              </Button>
-              {isAdmin ? (
+                  {analyzing ? (
+                    <>
+                      <Loader2 size={14} className="mr-1 animate-spin" />
+                      Enriching...
+                    </>
+                  ) : (
+                    <>
+                      <BrainCircuit size={14} className="mr-1" />
+                      Enrich
+                    </>
+                  )}
+                </Button>
+              ) : null}
+              {canDownload ? (
+                <Button size="sm" variant="outline" asChild>
+                  <a
+                    href={
+                      albumActionApiPath(
+                        { albumId, albumEntityUid },
+                        "download",
+                      ) || "#"
+                    }
+                    download
+                  >
+                    <Download size={14} className="mr-1" />
+                    Download
+                  </a>
+                </Button>
+              ) : null}
+              {canQueueMetadata ? (
                 <>
                   <Button
                     size="sm"

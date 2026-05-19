@@ -13,6 +13,7 @@ from starlette.responses import StreamingResponse
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_admin
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
+from crate.api.permissions import require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.operations import AdminLogsSnapshotResponse
 from crate.db.admin_logs_surface import (
@@ -76,6 +77,18 @@ _SUMMARY_METRICS = {
     "media_worker_cache_pruned": ("media_worker.cache.pruned", 60),
     "media_worker_cache_bytes_removed": ("media_worker.cache.bytes_removed", 60),
 }
+
+
+def _require_ops_health(request: Request) -> dict:
+    return require_permission(request, "ops.health.view")
+
+
+def _require_ops_logs(request: Request) -> dict:
+    return require_permission(request, "ops.logs.view")
+
+
+def _require_ops_runtime(request: Request) -> dict:
+    return require_permission(request, "ops.runtime.manage")
 
 
 def _build_metrics_summary() -> dict:
@@ -292,7 +305,7 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     summary="Current metrics snapshot",
 )
 def metrics_summary(request: Request):
-    _require_admin(request)
+    _require_ops_health(request)
     return _build_metrics_summary()
 
 
@@ -311,7 +324,7 @@ def metrics_timeseries(
         60, ge=1, le=2880, description="Minutes of recent data (for period=minute)"
     ),
 ):
-    _require_admin(request)
+    _require_ops_health(request)
     from crate.metrics import query_recent, query_historical, query_recent_rolled
 
     metric_name = _DASHBOARD_TIMESERIES.get(name, name)
@@ -349,7 +362,7 @@ def metrics_routes(
     limit: int = Query(20, ge=1, le=100, description="Maximum routes to return"),
     target: str | None = Query(None, description="Optional target filter, e.g. api"),
 ):
-    _require_admin(request)
+    _require_ops_health(request)
     from crate.metrics import query_route_latency
 
     return {
@@ -370,7 +383,7 @@ def metrics_dashboard(
     period: str = Query("minute", description="Granularity: minute or hour"),
     minutes: int = Query(60, ge=1, le=2880, description="Minutes of recent data"),
 ):
-    _require_admin(request)
+    _require_ops_health(request)
     safe_period = period if period in {"minute", "hour", "day"} else "minute"
     return _build_metrics_dashboard(safe_period, minutes)
 
@@ -426,7 +439,7 @@ def llm_status(request: Request):
 )
 def metrics_system(request: Request):
     """Disk usage, DB pool status, analysis progress."""
-    _require_admin(request)
+    _require_ops_health(request)
     return _build_metrics_system()
 
 
@@ -440,7 +453,7 @@ def admin_logs(
     since: str | None = Query(None),
     limit: int = Query(100, ge=1, le=500),
 ):
-    _require_admin(request)
+    _require_ops_logs(request)
     from crate.db.worker_logs import query_logs
 
     return query_logs(
@@ -457,7 +470,7 @@ def admin_logs(
     "/logs/workers", responses=AUTH_ERROR_RESPONSES, summary="List known workers"
 )
 def admin_workers(request: Request):
-    _require_admin(request)
+    _require_ops_logs(request)
     from crate.db.worker_logs import list_known_workers
 
     return list_known_workers()
@@ -472,7 +485,7 @@ def admin_workers(request: Request):
 def admin_logs_snapshot(
     request: Request, fresh: bool = False, limit: int = Query(100, ge=1, le=200)
 ):
-    _require_admin(request)
+    _require_ops_logs(request)
     return get_cached_logs_surface(limit=limit, fresh=fresh)
 
 
@@ -509,7 +522,7 @@ async def _admin_logs_stream(limit: int) -> AsyncIterator[str]:
     summary="Stream admin logs snapshot updates",
 )
 async def admin_logs_stream(request: Request, limit: int = Query(100, ge=1, le=200)):
-    _require_admin(request)
+    _require_ops_logs(request)
     return StreamingResponse(
         _admin_logs_stream(limit),
         media_type="text/event-stream",
@@ -523,7 +536,7 @@ async def admin_logs_stream(request: Request, limit: int = Query(100, ge=1, le=2
     summary="Download policy status and suggested limits",
 )
 def admin_download_policy(request: Request):
-    _require_admin(request)
+    _require_ops_runtime(request)
     from crate.db.cache_settings import get_setting
     from crate.actors import (
         _is_download_allowed,
@@ -572,7 +585,7 @@ class DownloadPolicyUpdate(BaseModel):
     summary="Update download policy settings",
 )
 def update_download_policy(request: Request, body: DownloadPolicyUpdate):
-    _require_admin(request)
+    _require_ops_runtime(request)
     from crate.db.cache_settings import set_setting
 
     if body.window_enabled is not None:

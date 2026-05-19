@@ -226,7 +226,7 @@ export function Album() {
       .catch(() => {});
   }, [data?.artist_entity_uid, data?.artist_id]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasCapability } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -405,6 +405,11 @@ export function Album() {
   const hasMusicBrainzAlbumId = Boolean(
     data.album_tags.musicbrainz_albumid?.trim(),
   );
+  const canEditMetadata = hasCapability("library.metadata.write");
+  const canDeleteAlbum =
+    hasCapability("library.album.remove") &&
+    hasCapability("library.files.delete");
+  const canDownloadAlbum = hasCapability("library.view");
 
   return (
     <div className="-mt-16 md:-mt-[6.5rem]">
@@ -433,6 +438,10 @@ export function Album() {
           Object.values(analysisData).some((t) => t.tempo != null)
         }
         isAdmin={isAdmin}
+        canDownload={canDownloadAlbum}
+        canEditArtwork={canEditMetadata}
+        canEnrich={canEditMetadata}
+        canQueueMetadata={canEditMetadata}
         onAnalysisComplete={() => {
           const endpoint = artistActionApiPath(
             {
@@ -452,15 +461,17 @@ export function Album() {
           if (action === "lyrics") setLyricsTaskId(taskId);
         }}
       >
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
-          onClick={() => setShowTags(!showTags)}
-        >
-          Edit Tags
-        </Button>
-        {!hasMusicBrainzAlbumId ? (
+        {canEditMetadata ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
+            onClick={() => setShowTags(!showTags)}
+          >
+            Edit Tags
+          </Button>
+        ) : null}
+        {canEditMetadata && !hasMusicBrainzAlbumId ? (
           <Button
             size="sm"
             variant="outline"
@@ -478,29 +489,31 @@ export function Album() {
             )}
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
-          onClick={async () => {
-            try {
-              const endpoint = albumReanalyzeApiPath({
-                albumId: data.id,
-                albumEntityUid: data.entity_uid,
-              });
-              if (!endpoint) throw new Error("album reference missing");
-              await api(endpoint, "POST");
-              toast.success("Analysis queued", {
-                description: "Background daemons will process the tracks.",
-              });
-            } catch {
-              toast.error("Failed to queue analysis");
-            }
-          }}
-        >
-          <AudioWaveform size={14} className="mr-1" /> Analyze
-        </Button>
-        {isAdmin && (
+        {isAdmin ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-white/20 text-white/70 hover:text-white hover:bg-white/10"
+            onClick={async () => {
+              try {
+                const endpoint = albumReanalyzeApiPath({
+                  albumId: data.id,
+                  albumEntityUid: data.entity_uid,
+                });
+                if (!endpoint) throw new Error("album reference missing");
+                await api(endpoint, "POST");
+                toast.success("Analysis queued", {
+                  description: "Background daemons will process the tracks.",
+                });
+              } catch {
+                toast.error("Failed to queue analysis");
+              }
+            }}
+          >
+            <AudioWaveform size={14} className="mr-1" /> Analyze
+          </Button>
+        ) : null}
+        {canDeleteAlbum && (
           <Button
             size="sm"
             variant="outline"
@@ -513,7 +526,7 @@ export function Album() {
       </AlbumHeader>
 
       <div className="mx-auto w-full max-w-[1480px] px-4 pb-12 pt-6 md:px-8">
-        {showTags && data.id != null && (
+        {showTags && canEditMetadata && data.id != null && (
           <TagEditor
             albumId={data.id}
             albumEntityUid={data.entity_uid}

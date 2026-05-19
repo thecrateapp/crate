@@ -2,13 +2,14 @@ from typing import Any, Mapping
 
 from fastapi import APIRouter, Request, HTTPException
 
-from crate.api.auth import _require_auth, _require_admin
 from crate.api._deps import artist_name_from_entity_uid, artist_name_from_id
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.tidal import (
     BatchDownloadRequest,
@@ -79,6 +80,10 @@ _TIDAL_SSE_RESPONSES = merge_responses(
 )
 
 
+def _require_tidal_manager(request: Request) -> dict:
+    return require_permission(request, "library.tidal.manage")
+
+
 # ── Auth ─────────────────────────────────────────────────────────
 
 
@@ -100,7 +105,7 @@ def tidal_status(request: Request):
 )
 async def tidal_login(request: Request):
     """Start Tidal device auth flow. Returns SSE stream with device code + result."""
-    _require_admin(request)
+    _require_tidal_manager(request)
     import asyncio
     from starlette.responses import StreamingResponse
 
@@ -123,7 +128,7 @@ async def tidal_login(request: Request):
     summary="Refresh the Tidal auth token",
 )
 def tidal_refresh(request: Request):
-    _require_admin(request)
+    _require_tidal_manager(request)
     success = tidal.refresh_token()
     return {"success": success}
 
@@ -135,7 +140,7 @@ def tidal_refresh(request: Request):
     summary="Log out from Tidal",
 )
 def tidal_logout(request: Request):
-    _require_admin(request)
+    _require_tidal_manager(request)
     success = tidal.logout()
     return {"success": success}
 
@@ -211,7 +216,7 @@ def tidal_download_missing(
     request: Request, artist: str, body: TidalDownloadMissingRequest
 ):
     """Download multiple missing albums from Tidal."""
-    _require_auth(request)
+    _require_tidal_manager(request)
     if not body.albums:
         return {"queued": 0}
 
@@ -400,7 +405,7 @@ def tidal_album_tracks(request: Request, tidal_album_id: str):
     summary="Queue a Tidal download",
 )
 def tidal_download(request: Request, body: DownloadRequest):
-    _require_auth(request)
+    _require_tidal_manager(request)
     if not tidal.is_authenticated():
         raise HTTPException(status_code=401, detail="Not authenticated with Tidal")
     if not body.url.strip():
@@ -461,7 +466,7 @@ def tidal_download(request: Request, body: DownloadRequest):
     summary="Queue multiple Tidal downloads",
 )
 def tidal_download_batch(request: Request, body: BatchDownloadRequest):
-    _require_auth(request)
+    _require_tidal_manager(request)
     if not tidal.is_authenticated():
         raise HTTPException(status_code=401, detail="Not authenticated with Tidal")
 
@@ -534,7 +539,7 @@ def get_queue(request: Request, status: str | None = None):
     summary="Add an item to the Tidal wishlist",
 )
 def add_to_wishlist(request: Request, body: WishlistRequest):
-    _require_auth(request)
+    _require_tidal_manager(request)
     url = body.url
     tidal_id = body.tidal_id or url.rstrip("/").split("/")[-1]
     dl_id = add_tidal_download(
@@ -559,7 +564,7 @@ def add_to_wishlist(request: Request, body: WishlistRequest):
     summary="Update a Tidal queue item",
 )
 def update_queue_item(request: Request, dl_id: int, body: QueueUpdateRequest):
-    _require_auth(request)
+    _require_tidal_manager(request)
     kwargs = {}
     if body.status is not None:
         kwargs["status"] = body.status
@@ -602,7 +607,7 @@ def update_queue_item(request: Request, dl_id: int, body: QueueUpdateRequest):
     summary="Remove a Tidal queue item",
 )
 def remove_queue_item(request: Request, dl_id: int):
-    _require_auth(request)
+    _require_tidal_manager(request)
     delete_tidal_download(dl_id)
     return {"ok": True}
 
@@ -750,7 +755,7 @@ def match_missing_by_id(request: Request, artist_id: int):
 
 
 def toggle_monitor(request: Request, name: str, body: MonitorRequest | None = None):
-    _require_auth(request)
+    _require_tidal_manager(request)
     enabled = body.enabled if body else True
     set_monitored_artist(name, enabled=enabled)
     return {"artist": name, "monitored": enabled}

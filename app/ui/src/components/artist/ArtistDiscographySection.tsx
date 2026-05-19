@@ -39,6 +39,7 @@ interface ArtistDiscographySectionProps {
   showMissing: boolean;
   sort: string;
   downloadingDiscog: boolean;
+  canDownloadTidal?: boolean;
   onToggleShowMissing: () => void;
   onSortChange: (value: string) => void;
   onDownloadDiscography: () => Promise<void> | void;
@@ -56,6 +57,7 @@ export function ArtistDiscographySection({
   showMissing,
   sort,
   downloadingDiscog,
+  canDownloadTidal = false,
   onToggleShowMissing,
   onSortChange,
   onDownloadDiscography,
@@ -74,7 +76,7 @@ export function ArtistDiscographySection({
               {showMissing ? "Hide" : "Show"} missing ({missingAlbums.length})
             </button>
           )}
-          {tidalMissing.length > 0 && (
+          {canDownloadTidal && tidalMissing.length > 0 && (
             <Button
               size="sm"
               variant="outline"

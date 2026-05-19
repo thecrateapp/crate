@@ -2,12 +2,12 @@ import mutagen
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import (
     DuplicateAlbumCompareResponse,
@@ -28,6 +28,12 @@ _DUPLICATES_RESPONSES = merge_responses(
 )
 
 
+def _require_duplicate_repair_operator(request: Request) -> dict:
+    user = require_permission(request, "library.repair.run")
+    require_permission(request, "library.files.delete")
+    return user
+
+
 @router.get(
     "/api/duplicates/compare",
     response_model=list[DuplicateAlbumCompareResponse],
@@ -35,7 +41,7 @@ _DUPLICATES_RESPONSES = merge_responses(
     summary="Compare duplicate album directories",
 )
 def api_duplicates_compare(request: Request, path: list[str] = Query()):
-    _require_admin(request)
+    _require_duplicate_repair_operator(request)
     if len(path) < 2:
         return JSONResponse({"error": "Need at least 2 paths"}, status_code=400)
 
@@ -95,7 +101,7 @@ def api_duplicates_compare(request: Request, path: list[str] = Query()):
     summary="Queue duplicate resolution",
 )
 def api_duplicates_resolve(request: Request, data: ResolveRequest):
-    _require_admin(request)
+    _require_duplicate_repair_operator(request)
     if not data.keep or not data.remove:
         return JSONResponse(
             {"error": "Need 'keep' and 'remove' paths"}, status_code=400
