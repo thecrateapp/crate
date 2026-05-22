@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner", () => ({
@@ -19,14 +20,15 @@ describe("RadioFeedback", () => {
     mockSendRadioFeedback.mockClear();
   });
 
-  it("skips to the next track immediately on dislike", () => {
+  it("skips to the next track immediately on dislike", async () => {
     const onDislike = vi.fn();
 
     render(
       <RadioFeedback sessionId="sess-1" trackId={42} onDislike={onDislike} />,
     );
 
-    fireEvent.click(screen.getByTitle("Less like this"));
+    const user = userEvent.setup();
+    await user.click(screen.getByTitle("Less like this"));
 
     expect(mockSendRadioFeedback).toHaveBeenCalledWith("sess-1", 42, "dislike");
     expect(onDislike).toHaveBeenCalledTimes(1);

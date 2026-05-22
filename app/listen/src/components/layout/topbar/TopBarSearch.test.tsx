@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
@@ -33,12 +34,13 @@ describe("TopBarSearch", () => {
   });
 
   it("starts collapsed, expands from the search icon, and closes on escape", async () => {
+    const user = userEvent.setup();
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
     expect(searchButton.getAttribute("aria-expanded")).toBe("false");
 
-    fireEvent.click(searchButton);
+    await user.click(searchButton);
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("true");
@@ -51,7 +53,7 @@ describe("TopBarSearch", () => {
       expect(document.activeElement).toBe(input);
     });
 
-    fireEvent.keyDown(input, { key: "Escape" });
+    await user.keyboard("{Escape}");
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("false");
@@ -59,17 +61,18 @@ describe("TopBarSearch", () => {
   });
 
   it("opens on hover and collapses again when idle", async () => {
+    const user = userEvent.setup();
     mockHoverPointer(true);
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
-    fireEvent.mouseEnter(searchButton);
+    await user.hover(searchButton);
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("true");
     });
 
-    fireEvent.mouseLeave(searchButton);
+    await user.unhover(searchButton);
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("false");
@@ -77,24 +80,26 @@ describe("TopBarSearch", () => {
   });
 
   it("ignores hover on touch-only devices", async () => {
+    const user = userEvent.setup();
     mockHoverPointer(false);
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
-    fireEvent.mouseEnter(searchButton);
+    await user.hover(searchButton);
 
     expect(searchButton.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("stays open after click even if mouseleave fires before focus settles", async () => {
+    const user = userEvent.setup();
     renderWithListenProviders(<TopBarSearch />);
 
     const searchButton = screen.getByRole("button", { name: "Search" });
     const container = searchButton.parentElement?.parentElement;
     expect(container).not.toBeNull();
 
-    fireEvent.click(searchButton);
-    fireEvent.mouseLeave(container!);
+    await user.click(searchButton);
+    await user.unhover(container!);
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("true");

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -204,7 +205,8 @@ describe("AuthProvider", () => {
     );
 
     expect(await screen.findByText("user:11")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "logout" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "logout" }));
 
     await waitFor(() => {
       expect(setAuthTokenMock).toHaveBeenCalledWith(null);

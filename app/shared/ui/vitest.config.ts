@@ -14,6 +14,15 @@ export default defineConfig({
       "domain/**/*.test.tsx",
     ],
     setupFiles: ["test-setup.ts"],
+    coverage: {
+      exclude: ["test-setup.ts", "**/*.test.{ts,tsx}"],
+      thresholds: {
+        lines: 50,
+        branches: 40,
+        functions: 50,
+        statements: 50,
+      },
+    },
   },
   resolve: {
     alias: [

@@ -759,8 +759,8 @@ fn safe_leaf_name(raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use tempfile::TempDir;
 
     use serde_json::json;
 
@@ -773,7 +773,8 @@ mod tests {
 
     #[test]
     fn builds_album_zip_with_sidecar() {
-        let root = test_dir("album_zip");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         fs::create_dir_all(&root).unwrap();
         let track = root.join("track.flac");
         let cover = root.join("cover.jpg");
@@ -823,7 +824,8 @@ mod tests {
 
     #[test]
     fn sanitizes_traversal_paths() {
-        let root = test_dir("traversal");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         fs::create_dir_all(&root).unwrap();
         let track = root.join("track.flac");
         fs::write(&track, b"fake flac").unwrap();
@@ -861,7 +863,8 @@ mod tests {
 
     #[test]
     fn album_package_registers_download_cache_manifest() {
-        let root = test_dir("album_cache");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         let cache_root = root.join("cache");
         fs::create_dir_all(&root).unwrap();
         let track = root.join("track.flac");
@@ -907,7 +910,8 @@ mod tests {
 
     #[test]
     fn builds_track_artifact_copy() {
-        let root = test_dir("track_artifact");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         fs::create_dir_all(&root).unwrap();
         let source = root.join("source.flac");
         let output = root.join("track.flac");
@@ -934,7 +938,8 @@ mod tests {
 
     #[test]
     fn emits_progress_events_and_honors_cancel_file() {
-        let root = test_dir("progress");
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().to_path_buf();
         fs::create_dir_all(&root).unwrap();
         let source = root.join("source.flac");
         let output = root.join("track.flac");
@@ -979,17 +984,6 @@ mod tests {
             (2..1_000_000).map(|i| format!("file ({i}).txt")).collect();
         names.insert("file.txt".to_string());
         assert!(unique_name("file.txt", &mut names).is_err());
-    }
-
-    fn test_dir(name: &str) -> PathBuf {
-        let millis = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        std::env::temp_dir().join(format!(
-            "crate-media-worker-{name}-{}-{millis}",
-            std::process::id()
-        ))
     }
 
     fn contains(haystack: &[u8], needle: &[u8]) -> bool {

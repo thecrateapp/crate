@@ -36,9 +36,13 @@ fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
     stream.set_write_timeout(Some(Duration::from_secs(300)))?;
 
     let request = read_request(stream)?;
+    handle_request(request, stream)
+}
+
+fn handle_request<W: Write>(request: Request, writer: &mut W) -> io::Result<()> {
     match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/healthz") => write_json(
-            stream,
+            writer,
             200,
             json!({"ok": true, "service": "crate-media-worker"}),
         ),
@@ -48,12 +52,12 @@ fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
                 Ok(job) => {
                     let result = build_album_package(job);
                     let status = if result.ok { 200 } else { 500 };
-                    write_json(stream, status, serde_json::to_value(result).unwrap_or_else(|err| {
+                    write_json(writer, status, serde_json::to_value(result).unwrap_or_else(|err| {
                         json!({"ok": false, "errors": [format!("serialize response: {err}")]})
                     }))
                 }
                 Err(err) => write_json(
-                    stream,
+                    writer,
                     400,
                     json!({"ok": false, "errors": [format!("invalid package job: {err}")]}),
                 ),
@@ -66,7 +70,7 @@ fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
                     let result = build_track_artifact(job);
                     let status = if result.ok { 200 } else { 500 };
                     write_json(
-                        stream,
+                        writer,
                         status,
                         serde_json::to_value(result).unwrap_or_else(|err| {
                             json!({"ok": false, "errors": [format!("serialize response: {err}")]})
@@ -74,14 +78,14 @@ fn handle_connection(stream: &mut TcpStream) -> io::Result<()> {
                     )
                 }
                 Err(err) => write_json(
-                    stream,
+                    writer,
                     400,
                     json!({"ok": false, "errors": [format!("invalid track artifact job: {err}")]}),
                 ),
             }
         }
         _ => write_json(
-            stream,
+            writer,
             404,
             json!({"ok": false, "errors": ["unknown route"]}),
         ),
@@ -94,7 +98,7 @@ struct Request {
     body: Vec<u8>,
 }
 
-fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
+fn read_request<R: Read>(stream: &mut R) -> io::Result<Request> {
     let mut buffer = Vec::with_capacity(8192);
     let mut chunk = [0_u8; 4096];
     let header_end;
@@ -172,7 +176,11 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
 }
 
-fn write_json(stream: &mut TcpStream, status: u16, payload: serde_json::Value) -> io::Result<()> {
+fn write_json<W: Write>(
+    stream: &mut W,
+    status: u16,
+    payload: serde_json::Value,
+) -> io::Result<()> {
     let status_text = match status {
         200 => "OK",
         400 => "Bad Request",
@@ -188,4 +196,147 @@ fn write_json(stream: &mut TcpStream, status: u16, payload: serde_json::Value) -
         body.len()
     )?;
     stream.write_all(&body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    // ── find_header_end ──────────────────────────────────────────────
+
+    #[test]
+    fn find_header_end_at_start() {
+        let buf = b"GET / HTTP/1.1\r\nHost: x\r\n\r\nbody";
+        let pos = find_header_end(buf);
+        assert!(pos.is_some());
+        let pos = pos.unwrap();
+        assert_eq!(&buf[pos..pos + 4], b"\r\n\r\n");
+    }
+
+    #[test]
+    fn find_header_end_in_middle() {
+        let buf = b"header\r\n\r\nbody continues";
+        let pos = find_header_end(buf);
+        assert!(pos.is_some());
+        let pos = pos.unwrap();
+        assert_eq!(&buf[pos..pos + 4], b"\r\n\r\n");
+    }
+
+    #[test]
+    fn find_header_end_not_found() {
+        let buf = b"partial header without ending";
+        assert_eq!(find_header_end(buf), None);
+    }
+
+    #[test]
+    fn find_header_end_empty_buffer() {
+        let buf: &[u8] = b"";
+        assert_eq!(find_header_end(buf), None);
+    }
+
+    #[test]
+    fn find_header_end_small_buffer() {
+        let buf: &[u8] = b"abc";
+        assert_eq!(find_header_end(buf), None);
+    }
+
+    #[test]
+    fn find_header_end_only_crlfcrlf() {
+        let buf: &[u8] = b"\r\n\r\n";
+        assert_eq!(find_header_end(buf), Some(0));
+    }
+
+    // ── HTTP routing tests ───────────────────────────────────────────
+
+    fn send_raw_request(raw: &[u8]) -> Vec<u8> {
+        let mut input = Cursor::new(raw.to_vec());
+        let request = read_request(&mut input).unwrap();
+        let mut response = Vec::new();
+        handle_request(request, &mut response).unwrap();
+        response
+    }
+
+    fn build_request(method: &str, path: &str, body: &[u8]) -> Vec<u8> {
+        let mut req = format!(
+            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        req.extend_from_slice(body);
+        req
+    }
+
+    #[test]
+    fn healthz_returns_200() {
+        let req = build_request("GET", "/healthz", b"");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("200 OK"));
+        assert!(body.contains("\"ok\":true"));
+        assert!(body.contains("crate-media-worker"));
+    }
+
+    #[test]
+    fn unknown_route_returns_404() {
+        let req = build_request("GET", "/nonexistent", b"");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("404 Not Found"));
+        assert!(body.contains("unknown route"));
+    }
+
+    #[test]
+    fn unknown_method_on_known_path_returns_404() {
+        let req = build_request("DELETE", "/healthz", b"");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("404 Not Found"));
+    }
+
+    #[test]
+    fn album_package_invalid_json_returns_400() {
+        let req = build_request("POST", "/v1/packages/album", b"not valid json");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("400 Bad Request"));
+        assert!(body.contains("invalid package job"));
+    }
+
+    #[test]
+    fn track_artifact_invalid_json_returns_400() {
+        let req = build_request("POST", "/v1/packages/track", b"garbage");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("400 Bad Request"));
+        assert!(body.contains("invalid track artifact job"));
+    }
+
+    #[test]
+    fn response_has_json_content_type() {
+        let req = build_request("GET", "/healthz", b"");
+        let resp = send_raw_request(&req);
+        let body = String::from_utf8_lossy(&resp);
+        assert!(body.contains("Content-Type: application/json"));
+    }
+
+    // ── read_request unit tests ──────────────────────────────────────
+
+    #[test]
+    fn read_request_parses_method_and_path() {
+        let raw = build_request("POST", "/api/test", b"hello");
+        let mut input = Cursor::new(raw);
+        let req = read_request(&mut input).unwrap();
+        assert_eq!(req.method, "POST");
+        assert_eq!(req.path, "/api/test");
+        assert_eq!(req.body, b"hello");
+    }
+
+    #[test]
+    fn read_request_empty_body() {
+        let raw = build_request("GET", "/test", b"");
+        let mut input = Cursor::new(raw);
+        let req = read_request(&mut input).unwrap();
+        assert_eq!(req.body, b"");
+    }
 }

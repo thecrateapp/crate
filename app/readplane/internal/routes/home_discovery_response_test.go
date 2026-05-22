@@ -4,10 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
 )
 
-func TestHomeDiscoveryHTTPPayloadMatchesFastAPIResponseModelDefaults(t *testing.T) {
+func TestHomeDiscoveryHTTPPayload(t *testing.T) {
 	builtAt := time.Date(2026, 5, 5, 10, 0, 0, 0, time.UTC)
 	staleAfter := builtAt.Add(10 * time.Minute)
 	row := &snapshots.Row{
@@ -34,28 +36,24 @@ func TestHomeDiscoveryHTTPPayloadMatchesFastAPIResponseModelDefaults(t *testing.
 
 	payload := homeDiscoveryHTTPPayload(row)
 	snapshot, ok := payload["snapshot"].(map[string]any)
-	if !ok {
-		t.Fatalf("snapshot = %#v", payload["snapshot"])
-	}
-	if _, ok := snapshot["source_seq"]; ok {
-		t.Fatalf("source_seq should be omitted from HTTP response model payload")
-	}
-	if _, ok := payload["recommended_tracks"].([]any); !ok {
-		t.Fatalf("recommended_tracks default missing: %#v", payload["recommended_tracks"])
-	}
+	assert.True(t, ok, "snapshot = %#v", payload["snapshot"])
+
+	_, ok = snapshot["source_seq"]
+	assert.False(t, ok, "source_seq should be omitted from HTTP response model payload")
+
+	_, ok = payload["recommended_tracks"].([]any)
+	assert.True(t, ok, "recommended_tracks default missing: %#v", payload["recommended_tracks"])
 
 	mixes := payload["custom_mixes"].([]any)
 	card := mixes[0].(map[string]any)
-	if card["title"] != nil {
-		t.Fatalf("title default = %#v", card["title"])
-	}
-	if _, ok := card["tracks"].([]any); !ok {
-		t.Fatalf("tracks default missing: %#v", card["tracks"])
-	}
+	assert.Nil(t, card["title"], "title default = %#v", card["title"])
+
+	_, ok = card["tracks"].([]any)
+	assert.True(t, ok, "tracks default missing: %#v", card["tracks"])
 
 	artists := card["artwork_artists"].([]any)
 	artist := artists[0].(map[string]any)
-	if artist["album"] != nil || artist["album_id"] != nil || artist["artist"] != nil {
-		t.Fatalf("artwork defaults not applied: %#v", artist)
-	}
+	assert.Nil(t, artist["album"])
+	assert.Nil(t, artist["album_id"])
+	assert.Nil(t, artist["artist"])
 }

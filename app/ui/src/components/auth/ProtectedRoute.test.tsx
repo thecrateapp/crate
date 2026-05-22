@@ -1,62 +1,36 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-
-vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: vi.fn(),
-}));
-
-import { useAuth } from "@/contexts/AuthContext";
 import { CapabilityRoute, ProtectedRoute } from "./ProtectedRoute";
-
-function mockAuth(value: Partial<ReturnType<typeof useAuth>>) {
-  vi.mocked(useAuth).mockReturnValue({
-    user: null,
-    loading: false,
-    logout: vi.fn(),
-    isAdmin: false,
-    canAccessAdmin: false,
-    hasCapability: vi.fn(() => false),
-    hasAnyCapability: vi.fn(() => false),
-    refetch: vi.fn(),
-    ...value,
-  } as ReturnType<typeof useAuth>);
-}
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 describe("ProtectedRoute", () => {
   it("shows spinner while loading", () => {
-    mockAuth({ loading: true });
-    render(
-      <MemoryRouter>
-        <ProtectedRoute>
-          <div>Protected</div>
-        </ProtectedRoute>
-      </MemoryRouter>,
+    renderWithAdminProviders(
+      <ProtectedRoute>
+        <div>Protected</div>
+      </ProtectedRoute>,
+      { auth: { loading: true } },
     );
     expect(document.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("shows admin required message when not admin", () => {
-    mockAuth({
-      user: { id: 1, email: "user@example.com", name: "User", role: "user" },
-      loading: false,
-      isAdmin: false,
-      canAccessAdmin: false,
-    });
-    render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
-        <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <div>Protected</div>
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/login" element={<div>Login</div>} />
-        </Routes>
-      </MemoryRouter>,
+    renderWithAdminProviders(
+      <ProtectedRoute>
+        <div>Protected</div>
+      </ProtectedRoute>,
+      {
+        auth: {
+          user: {
+            id: 1,
+            email: "user@example.com",
+            name: "User",
+            role: "user",
+          },
+          isAdmin: false,
+          canAccessAdmin: false,
+        },
+      },
     );
     expect(
       screen.getByText(/Admin console access required/i),
@@ -65,74 +39,76 @@ describe("ProtectedRoute", () => {
   });
 
   it("renders children when authenticated as admin", () => {
-    mockAuth({
-      user: { id: 1, email: "admin@example.com", name: "Admin", role: "admin" },
-      loading: false,
-      isAdmin: true,
-      canAccessAdmin: true,
-      hasCapability: vi.fn(() => true),
-      hasAnyCapability: vi.fn(() => true),
-    });
-    render(
-      <MemoryRouter>
-        <ProtectedRoute>
-          <div>Protected</div>
-        </ProtectedRoute>
-      </MemoryRouter>,
+    renderWithAdminProviders(
+      <ProtectedRoute>
+        <div>Protected</div>
+      </ProtectedRoute>,
+      {
+        auth: {
+          user: {
+            id: 1,
+            email: "admin@example.com",
+            name: "Admin",
+            role: "admin",
+          },
+          isAdmin: true,
+          canAccessAdmin: true,
+        },
+      },
     );
     expect(screen.getByText("Protected")).toBeInTheDocument();
   });
 
   it("renders children for partial console roles", () => {
-    mockAuth({
-      user: {
-        id: 2,
-        email: "editor@example.com",
-        name: "Editor",
-        role: "editor",
-        capabilities: ["library.view", "library.metadata.write"],
+    renderWithAdminProviders(
+      <ProtectedRoute>
+        <div>Protected</div>
+      </ProtectedRoute>,
+      {
+        auth: {
+          user: {
+            id: 2,
+            email: "editor@example.com",
+            name: "Editor",
+            role: "editor",
+            capabilities: ["library.view", "library.metadata.write"],
+          },
+          loading: false,
+          isAdmin: false,
+          canAccessAdmin: true,
+          hasCapability: vi.fn((capability: string) =>
+            ["library.view", "library.metadata.write"].includes(capability),
+          ),
+          hasAnyCapability: vi.fn((capabilities) =>
+            capabilities.some((capability: string) =>
+              ["library.view", "library.metadata.write"].includes(capability),
+            ),
+          ),
+        },
       },
-      loading: false,
-      isAdmin: false,
-      canAccessAdmin: true,
-      hasCapability: vi.fn((capability: string) =>
-        ["library.view", "library.metadata.write"].includes(capability),
-      ),
-      hasAnyCapability: vi.fn((capabilities) =>
-        capabilities.some((capability: string) =>
-          ["library.view", "library.metadata.write"].includes(capability),
-        ),
-      ),
-    });
-    render(
-      <MemoryRouter>
-        <ProtectedRoute>
-          <div>Protected</div>
-        </ProtectedRoute>
-      </MemoryRouter>,
     );
     expect(screen.getByText("Protected")).toBeInTheDocument();
   });
 
   it("blocks a console route when the role lacks the route capability", () => {
-    mockAuth({
-      user: {
-        id: 2,
-        email: "editor@example.com",
-        name: "Editor",
-        role: "editor",
-        capabilities: ["library.view", "library.metadata.write"],
+    renderWithAdminProviders(
+      <CapabilityRoute anyOf={["admin.access"]}>
+        <div>Protected</div>
+      </CapabilityRoute>,
+      {
+        auth: {
+          user: {
+            id: 2,
+            email: "editor@example.com",
+            name: "Editor",
+            role: "editor",
+            capabilities: ["library.view", "library.metadata.write"],
+          },
+          loading: false,
+          canAccessAdmin: true,
+          hasAnyCapability: vi.fn(() => false),
+        },
       },
-      loading: false,
-      canAccessAdmin: true,
-      hasAnyCapability: vi.fn(() => false),
-    });
-    render(
-      <MemoryRouter>
-        <CapabilityRoute anyOf={["admin.access"]}>
-          <div>Protected</div>
-        </CapabilityRoute>
-      </MemoryRouter>,
     );
     expect(screen.getByText(/Permission required/i)).toBeInTheDocument();
     expect(screen.queryByText("Protected")).not.toBeInTheDocument();

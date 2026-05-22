@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { screen, waitFor } from "@testing-library/react";
 import { OAuthButtons } from "./OAuthButtons";
+import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
@@ -19,11 +19,7 @@ describe("OAuthButtons", () => {
       },
     });
 
-    render(
-      <MemoryRouter>
-        <OAuthButtons />
-      </MemoryRouter>,
-    );
+    renderWithAdminProviders(<OAuthButtons />);
 
     await waitFor(() => {
       expect(
@@ -37,11 +33,7 @@ describe("OAuthButtons", () => {
       google: { enabled: false, configured: false, login_url: null },
     });
 
-    const { container } = render(
-      <MemoryRouter>
-        <OAuthButtons />
-      </MemoryRouter>,
-    );
+    const { container } = renderWithAdminProviders(<OAuthButtons />);
 
     await waitFor(() => {
       expect(container.firstChild).toBeNull();

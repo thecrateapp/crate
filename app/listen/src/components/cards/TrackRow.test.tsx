@@ -1,4 +1,5 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -48,7 +49,7 @@ describe("TrackRow playback behavior", () => {
     toggleTrackLikeMock.mockReset();
   });
 
-  it("preserves quality metadata when playback starts from a row queue", () => {
+  it("preserves quality metadata when playback starts from a row queue", async () => {
     const playAll = vi.fn();
     const tracks: TrackRowData[] = [
       {
@@ -87,7 +88,8 @@ describe("TrackRow playback behavior", () => {
       },
     );
 
-    fireEvent.click(screen.getByText("Track One"));
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Track One"));
 
     expect(playAll).toHaveBeenCalledWith(
       [

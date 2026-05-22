@@ -81,21 +81,17 @@ fn test_bliss_invalid_file() {
     assert!(result.features.is_empty());
 }
 
-#[test]
-fn test_euclidean_distance_identical() {
-    let a = vec![1.0, 2.0, 3.0];
-    let b = vec![1.0, 2.0, 3.0];
+#[rstest::rstest]
+#[case::identical(vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 0.0)]
+#[case::different_lengths(vec![1.0, 2.0], vec![1.0, 2.0, 3.0], f32::MAX)]
+fn test_euclidean_distance(#[case] a: Vec<f32>, #[case] b: Vec<f32>, #[case] expected: f32) {
     let dist = euclidean_distance(&a, &b);
-    assert!(
-        (dist - 0.0).abs() < f32::EPSILON,
-        "Identical vectors should have 0 distance"
-    );
-}
-
-#[test]
-fn test_euclidean_distance_different_lengths() {
-    let a = vec![1.0, 2.0];
-    let b = vec![1.0, 2.0, 3.0];
-    let dist = euclidean_distance(&a, &b);
-    assert_eq!(dist, f32::MAX, "Different-length vectors should return MAX");
+    if expected == f32::MAX {
+        assert_eq!(dist, f32::MAX, "Different-length vectors should return MAX");
+    } else {
+        assert!(
+            (dist - expected).abs() < f32::EPSILON,
+            "Identical vectors should have 0 distance"
+        );
+    }
 }

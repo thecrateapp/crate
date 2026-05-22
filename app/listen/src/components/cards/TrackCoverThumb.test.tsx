@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { TrackCoverThumb } from "./TrackCoverThumb";
 
 describe("TrackCoverThumb", () => {

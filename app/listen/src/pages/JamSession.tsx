@@ -1536,6 +1536,7 @@ export function JamSession() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      aria-label={`Move ${track.title} up`}
                       onClick={() => handleMoveInRoomQueue(index, index - 1)}
                       disabled={index === 0}
                       className="rounded-full border border-white/10 p-1.5 text-muted-foreground hover:bg-white/5 disabled:opacity-30"
@@ -1544,6 +1545,7 @@ export function JamSession() {
                     </button>
                     <button
                       type="button"
+                      aria-label={`Move ${track.title} down`}
                       onClick={() => handleMoveInRoomQueue(index, index + 1)}
                       disabled={index === sharedQueue.length - 1}
                       className="rounded-full border border-white/10 p-1.5 text-muted-foreground hover:bg-white/5 disabled:opacity-30"
@@ -1552,6 +1554,7 @@ export function JamSession() {
                     </button>
                     <button
                       type="button"
+                      aria-label={`Remove ${track.title} from queue`}
                       onClick={() => handleRemoveFromRoomQueue(index)}
                       className="rounded-full border border-red-500/20 p-1.5 text-red-300 hover:bg-red-500/10"
                     >

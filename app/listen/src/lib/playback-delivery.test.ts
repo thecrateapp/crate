@@ -110,6 +110,31 @@ describe("preparePlaybackDelivery", () => {
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("prepares a 2-track window on save-data connections", async () => {
+    const tracks = Array.from({ length: 4 }, (_, index) =>
+      makeTrack(index + 1),
+    );
+    apiFetchMock.mockResolvedValueOnce({});
+
+    // Simulate save-data: connection.saveData + non-mobile viewport so
+    // the save-data path (2 tracks) wins over the mobile path (5).
+    const navigatorWithConnection = globalThis.navigator as unknown as Record<
+      string,
+      unknown
+    >;
+    navigatorWithConnection.connection = { saveData: true };
+    mockMatchMedia(false);
+
+    preparePlaybackDelivery(tracks, 0, "balanced");
+    await vi.advanceTimersByTimeAsync(300);
+
+    const request = apiFetchMock.mock.calls[0]?.[1];
+    const body = JSON.parse(String(request?.body));
+    expect(body.tracks).toHaveLength(2);
+
+    delete navigatorWithConnection.connection;
+  });
+
   it("retries the same batch after a transient prepare failure", async () => {
     apiFetchMock
       .mockRejectedValueOnce(new Error("network"))
