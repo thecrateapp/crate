@@ -12,7 +12,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import text
 
 from crate.db.repositories.settings import get_setting
-from crate.db.tx import optional_scope, transaction_scope
+from crate.db.tx import optional_scope
 
 
 class CredentialSecretError(RuntimeError):
@@ -171,10 +171,3 @@ def redacted(value: str) -> str:
     if len(value) <= 8:
         return "********"
     return f"{value[:3]}...{value[-3:]}"
-
-
-def store_secret_transactional(
-    scope: str, payload: dict[str, Any], *, ttl_seconds: int | None = None
-) -> str:
-    with transaction_scope() as session:
-        return store_secret(scope, payload, ttl_seconds=ttl_seconds, session=session)

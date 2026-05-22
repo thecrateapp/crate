@@ -622,7 +622,10 @@ def api_artists(
         COALESCE(la.dir_mtime, EXTRACT(EPOCH FROM la.updated_at)::bigint) AS recent_sort
     """
     joins = ""
-    where_clauses = ["1=1"]
+    where_clauses = [
+        "la.name NOT LIKE '.%'",
+        "COALESCE(la.folder_name, '') NOT LIKE '.%'",
+    ]
     params: dict = {}
 
     if genre:
@@ -1971,4 +1974,16 @@ def api_artist(request: Request, name: str):
         "popularity": artist.get("popularity"),
         "popularity_score": artist.get("popularity_score"),
         "popularity_confidence": artist.get("popularity_confidence"),
+        "bio": artist.get("bio"),
+        "tags_json": _coerce_json_list(artist.get("tags_json")),
+        "urls_json": artist.get("urls_json")
+        if isinstance(artist.get("urls_json"), dict)
+        else {},
+        "mbid": artist.get("mbid"),
+        "country": artist.get("country"),
+        "area": artist.get("area"),
+        "formed": artist.get("formed"),
+        "ended": artist.get("ended"),
+        "artist_type": artist.get("artist_type"),
+        "bandcamp_url": artist.get("bandcamp_url"),
     }

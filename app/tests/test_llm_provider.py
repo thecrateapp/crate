@@ -40,7 +40,9 @@ def test_llm_status_requires_cloud_provider_key(monkeypatch):
 
     from crate.api import admin_metrics
 
-    monkeypatch.setattr(admin_metrics, "_require_admin", lambda request: {"id": 1})
+    monkeypatch.setattr(
+        admin_metrics, "_require_llm_status_viewer", lambda request: {"id": 1}
+    )
     with patch("crate.db.cache_settings.get_setting", side_effect=_settings_default):
         result = admin_metrics.llm_status(cast(Any, object()))
 

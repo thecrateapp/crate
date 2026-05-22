@@ -244,10 +244,50 @@ def list_user_album_contributions(
     return [_serialize_row(row) for row in rows]
 
 
+def list_library_contributions(
+    *,
+    source: str = "",
+    status: str = "active",
+    limit: int = 100,
+    session=None,
+) -> list[dict]:
+    capped_limit = max(1, min(limit, 500))
+    with optional_scope(session) as s:
+        rows = (
+            s.execute(
+                text("""
+                SELECT
+                    lc.*,
+                    u.email AS user_email,
+                    u.username AS user_username,
+                    u.name AS user_name,
+                    u.avatar AS user_avatar,
+                    la.slug AS album_slug,
+                    la.has_cover,
+                    la.path AS album_path,
+                    la.track_count,
+                    la.total_duration
+                FROM library_contributions lc
+                JOIN users u ON u.id = lc.user_id
+                LEFT JOIN library_albums la ON la.id = lc.album_id
+                WHERE (:status = '' OR lc.status = :status)
+                  AND (:source = '' OR lc.source = :source)
+                ORDER BY lc.imported_at DESC
+                LIMIT :limit
+                """),
+                {"source": source, "status": status, "limit": capped_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [_serialize_row(row) for row in rows]
+
+
 __all__ = [
     "count_active_album_contributors",
     "get_user_album_contribution",
     "list_album_contributors",
+    "list_library_contributions",
     "list_user_album_contributions",
     "mark_album_contribution_withdrawn",
     "record_album_contribution",

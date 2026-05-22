@@ -21,12 +21,34 @@ _USER_UPDATABLE_FIELDS = frozenset(
         "username",
         "bio",
         "role",
+        "status",
+        "status_reason",
+        "suspended_at",
+        "suspended_by",
+        "deleted_at",
+        "deleted_by",
         "password_hash",
         "google_id",
         "avatar",
         "subsonic_token",
     }
 )
+
+VALID_USER_STATUSES = frozenset({"active", "suspended", "deleted"})
+
+
+def normalize_user_status(status: str | None) -> str:
+    normalized = (status or "active").strip().lower()
+    return normalized if normalized in VALID_USER_STATUSES else "active"
+
+
+def validate_user_status(status: str | None) -> str:
+    normalized = (status or "active").strip().lower()
+    if normalized not in VALID_USER_STATUSES:
+        supported = ", ".join(sorted(VALID_USER_STATUSES))
+        raise ValueError(f"Unsupported user status '{status}'. Supported: {supported}")
+    return normalized
+
 
 _USER_LOCATION_FIELDS = frozenset(
     {
@@ -98,6 +120,47 @@ def update_user(user_id: int, *, session=None, **fields) -> dict | None:
         return _impl(s)
 
 
+def update_user_status(
+    user_id: int,
+    status: str,
+    *,
+    reason: str | None = None,
+    actor_user_id: int | None = None,
+    session=None,
+) -> dict | None:
+    next_status = validate_user_status(status)
+    now = datetime.now(timezone.utc)
+
+    def _impl(s) -> dict | None:
+        user = s.get(User, user_id)
+        if user is None:
+            return None
+
+        user.status = next_status
+        user.status_reason = (reason or "").strip() or None
+        if next_status == "active":
+            user.suspended_at = None
+            user.suspended_by = None
+            user.deleted_at = None
+            user.deleted_by = None
+        elif next_status == "suspended":
+            user.suspended_at = now
+            user.suspended_by = actor_user_id
+            user.deleted_at = None
+            user.deleted_by = None
+        elif next_status == "deleted":
+            user.deleted_at = now
+            user.deleted_by = actor_user_id
+            if user.suspended_at is None:
+                user.suspended_at = now
+                user.suspended_by = actor_user_id
+        s.flush()
+        return model_to_dict(user)
+
+    with optional_scope(session) as s:
+        return _impl(s)
+
+
 def update_user_location(user_id: int, *, session=None, **fields) -> dict | None:
     if not fields:
         return get_user_by_id(user_id, session=session)
@@ -137,7 +200,10 @@ __all__ = [
     "get_users_presence",
     "list_users",
     "list_users_map_rows",
+    "normalize_user_status",
     "update_user",
     "update_user_last_login",
     "update_user_location",
+    "update_user_status",
+    "validate_user_status",
 ]

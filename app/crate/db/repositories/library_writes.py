@@ -9,6 +9,7 @@ from crate.db.repositories.library_enrichment_writes import (
     set_track_rating,
     update_artist_enrichment,
     update_artist_has_photo,
+    update_artist_metadata,
 )
 from crate.db.repositories.library_quarantine import (
     delete_quarantined_album,
@@ -32,6 +33,7 @@ __all__ = [
     "unquarantine_album",
     "update_artist_enrichment",
     "update_artist_has_photo",
+    "update_artist_metadata",
     "update_track_analysis",
     "upsert_album",
     "upsert_artist",

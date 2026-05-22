@@ -134,6 +134,23 @@ def create_library_catalog_schema(cur) -> None:
     )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS library_field_locks (
+            entity_type TEXT NOT NULL,
+            entity_id BIGINT NOT NULL,
+            field_name TEXT NOT NULL,
+            locked_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            locked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            reason TEXT,
+            source TEXT NOT NULL DEFAULT 'manual_edit',
+            PRIMARY KEY (entity_type, entity_id, field_name)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_library_field_locks_entity
+        ON library_field_locks(entity_type, entity_id)
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS library_tracks (
             id SERIAL PRIMARY KEY,
             storage_id UUID,

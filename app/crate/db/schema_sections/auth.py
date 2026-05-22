@@ -12,6 +12,12 @@ def create_auth_schema(cur) -> None:
             password_hash TEXT,
             avatar TEXT,
             role TEXT NOT NULL DEFAULT 'user',
+            status TEXT NOT NULL DEFAULT 'active',
+            status_reason TEXT,
+            suspended_at TIMESTAMPTZ,
+            suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            deleted_at TIMESTAMPTZ,
+            deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
             google_id TEXT UNIQUE,
             created_at TIMESTAMPTZ NOT NULL,
             last_login TIMESTAMPTZ,
@@ -27,6 +33,19 @@ def create_auth_schema(cur) -> None:
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id)")
+    cur.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'"
+    )
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS status_reason TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ")
+    cur.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_by INTEGER REFERENCES users(id) ON DELETE SET NULL"
+    )
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
+    cur.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL"
+    )
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (

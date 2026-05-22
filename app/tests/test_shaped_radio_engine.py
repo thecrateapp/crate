@@ -210,9 +210,7 @@ def test_discovery_radio_targets_related_unfollowed_artists_with_small_familiar_
         radio_engine,
         "find_candidate_rows",
         lambda *_args, **_kwargs: [
-            _candidate(
-                5, title="Guided Tour", artist="High Vis", vector=_vector(0.5)
-            )
+            _candidate(5, title="Guided Tour", artist="High Vis", vector=_vector(0.5))
         ],
     )
 
@@ -423,9 +421,7 @@ def test_album_radio_uses_contextual_pool_and_excludes_seed_tracks(monkeypatch):
         captured["exclude_ids"] = set(exclude_ids)
         captured["seed_artists"] = seed_artists
         return [
-            _candidate(
-                20, title="Nation", artist="Home Front", vector=_vector(0.8)
-            )
+            _candidate(20, title="Nation", artist="Home Front", vector=_vector(0.8))
             | {"radio_source": "similar"}
         ]
 

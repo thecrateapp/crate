@@ -11,7 +11,7 @@ class LibraryFixer:
     def __init__(self, config: dict):
         self.config = config
         self.threshold = config.get("confidence_threshold", 90)
-        self.trash_dir = Path(config.get("library_path", "/music")) / ".librarian-trash"
+        self.trash_dir = Path(config.get("library_path", "/music")) / ".crate-trash"
 
     def fix(self, issues: list[Issue], dry_run: bool = True):
         auto = [i for i in issues if i.confidence >= self.threshold]
@@ -53,7 +53,7 @@ class LibraryFixer:
         }.get(issue_type)
 
     def _safe_move_to_trash(self, path: Path, dry_run: bool):
-        """Move to .librarian-trash instead of deleting."""
+        """Move to .crate-trash instead of deleting."""
         dest = self.trash_dir / path.relative_to(Path(self.config["library_path"]))
         if dry_run:
             log.info("  [DRY] Would move to trash: %s -> %s", path, dest)

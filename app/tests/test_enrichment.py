@@ -76,7 +76,21 @@ class TestSetlistfmProbableSetlist:
             from crate.setlistfm import get_probable_setlist
 
             result = get_probable_setlist("Radiohead")
-            assert result == [{"title": "Creep", "frequency": 0.8}]
+            assert result is not None
+            assert result[0]["title"] == "Creep"
+            assert result[0]["frequency"] == 0.8
+
+    def test_get_probable_setlist_normalizes_cached_object_shape(self):
+        cached = {"songs": {"song": {"name": "Una historia con las manos"}}}
+        with patch("crate.setlistfm.get_cache", return_value=cached):
+            from crate.setlistfm import get_probable_setlist
+
+            result = get_probable_setlist("Biznaga")
+
+        assert result is not None
+        assert result[0]["title"] == "Una historia con las manos"
+        assert result[0]["frequency"] == 1.0
+        assert result[0]["play_count"] == 1
 
     def test_get_probable_setlist_from_api(self):
         setlist_data = {
@@ -124,6 +138,33 @@ class TestSetlistfmProbableSetlist:
             # "Everything In Its Right Place" appears most frequently
             assert result[0]["title"] == "Everything In Its Right Place"
             assert result[0]["play_count"] == 3
+
+    def test_get_probable_setlist_accepts_setlistfm_object_shapes(self):
+        setlist_data = {
+            "setlist": {
+                "eventDate": "2024-06-01",
+                "sets": {
+                    "set": {
+                        "song": {
+                            "name": "Una historia con las manos",
+                        }
+                    }
+                },
+            }
+        }
+        with (
+            patch("crate.setlistfm.get_cache", return_value=None),
+            patch("crate.setlistfm.search_artist", return_value="mbid-123"),
+            patch("crate.setlistfm.get_setlists", return_value=setlist_data),
+            patch("crate.setlistfm.set_cache"),
+        ):
+            from crate.setlistfm import get_probable_setlist
+
+            result = get_probable_setlist("Biznaga", num_setlists=1)
+
+        assert result is not None
+        assert result[0]["title"] == "Una historia con las manos"
+        assert result[0]["play_count"] == 1
 
     def test_get_probable_setlist_no_mbid(self):
         with (
@@ -636,6 +677,7 @@ class TestArtistEnrichment:
             "has_musicbrainz": True,
             "has_fanart": True,
             "has_discogs": True,
+            "has_bandcamp": False,
         }
 
         mock_set_cache.assert_called_once()

@@ -18,12 +18,14 @@ import {
   Disc3,
   Archive,
   FileJson,
+  GitMerge,
   HardDrive,
   Headphones,
   ListMusic,
   MapPin,
   Music,
   AudioWaveform,
+  Pencil,
   RefreshCw,
   Tags,
   Trash2,
@@ -63,10 +65,12 @@ interface ArtistHeroSectionProps {
   canEditArtwork?: boolean;
   canEnrich?: boolean;
   canAnalyze?: boolean;
+  canEditMetadata?: boolean;
   canCreateCorePlaylist?: boolean;
   canQueueMetadata?: boolean;
   canRepair?: boolean;
   canDelete?: boolean;
+  canMerge?: boolean;
   photoLoaded: boolean;
   photoError: boolean;
   photoCacheBust: string;
@@ -79,6 +83,7 @@ interface ArtistHeroSectionProps {
   onPhotoUploaded: () => void;
   onEnrich: () => void;
   onAnalyze: () => void;
+  onEditMetadata?: () => void;
   onRepair: () => void;
   metadataAction?: "lyrics" | "portable" | "export" | null;
   corePlaylistCreating?: boolean;
@@ -86,6 +91,7 @@ interface ArtistHeroSectionProps {
   onSyncLyrics?: () => void;
   onWritePortableMetadata?: () => void;
   onExportRichMetadata?: () => void;
+  onMerge?: () => void;
   onDelete: () => void;
 }
 
@@ -112,10 +118,12 @@ export function ArtistHeroSection({
   canEditArtwork = isAdmin,
   canEnrich = isAdmin,
   canAnalyze = isAdmin,
+  canEditMetadata = isAdmin,
   canCreateCorePlaylist = isAdmin,
   canQueueMetadata = isAdmin,
   canRepair = isAdmin,
   canDelete = isAdmin,
+  canMerge = isAdmin,
   photoLoaded,
   photoError,
   photoCacheBust,
@@ -128,6 +136,7 @@ export function ArtistHeroSection({
   onPhotoUploaded,
   onEnrich,
   onAnalyze,
+  onEditMetadata,
   onRepair,
   metadataAction = null,
   corePlaylistCreating = false,
@@ -135,6 +144,7 @@ export function ArtistHeroSection({
   onSyncLyrics,
   onWritePortableMetadata,
   onExportRichMetadata,
+  onMerge,
   onDelete,
 }: ArtistHeroSectionProps) {
   const backgroundUrl = artistBackgroundApiUrl(
@@ -363,6 +373,11 @@ export function ArtistHeroSection({
                   <AudioWaveform size={14} className="mr-1" /> Analyze
                 </Button>
               ) : null}
+              {canEditMetadata && onEditMetadata ? (
+                <Button size="sm" variant="outline" onClick={onEditMetadata}>
+                  <Pencil size={14} className="mr-1" /> Edit
+                </Button>
+              ) : null}
               {canCreateCorePlaylist && onCreateCorePlaylist ? (
                 <Button
                   size="sm"
@@ -434,6 +449,11 @@ export function ArtistHeroSection({
                   {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
                 </Button>
               )}
+              {canMerge && onMerge ? (
+                <Button size="sm" variant="outline" onClick={onMerge}>
+                  <GitMerge size={14} className="mr-1" /> Merge Alias
+                </Button>
+              ) : null}
               {canDelete && (
                 <Button
                   size="sm"

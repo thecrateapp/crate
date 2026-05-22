@@ -135,6 +135,16 @@ class ArtistDetailResponse(IdentityFieldsMixin):
     popularity: int | None = None
     popularity_score: float | None = None
     popularity_confidence: float | None = None
+    bio: str | None = None
+    tags_json: list[str] = Field(default_factory=list)
+    urls_json: dict[str, str] = Field(default_factory=dict)
+    mbid: str | None = None
+    country: str | None = None
+    area: str | None = None
+    formed: str | None = None
+    ended: str | None = None
+    artist_type: str | None = None
+    bandcamp_url: str | None = None
 
 
 class ArtistTopTrackResponse(IdentityFieldsMixin):

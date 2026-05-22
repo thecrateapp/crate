@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_auth, _require_admin
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -70,6 +70,10 @@ _TASK_RESPONSES = merge_responses(
 
 def _require_task_operator(request: Request) -> dict:
     return require_permission(request, "ops.tasks.manage")
+
+
+def _require_analysis_manager(request: Request) -> dict:
+    return require_permission(request, "library.analysis.manage")
 
 
 async def _tasks_stream(limit: int) -> AsyncIterator[str]:
@@ -175,7 +179,7 @@ def api_tasks(
 )
 def api_backfill_track_fingerprints(request: Request):
     """Populate entity-stable audio fingerprints for tracks missing them."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     pending = list_tasks(
         status="pending", task_type="backfill_track_audio_fingerprints", limit=1
     )

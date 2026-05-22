@@ -190,6 +190,9 @@ def get_stats_recent_albums(limit: int = 10) -> list[dict]:
                 SELECT a.id, a.slug, a.artist, ar.id AS artist_id, ar.slug AS artist_slug, a.name, a.year, a.dir_mtime
                 FROM library_albums a
                 LEFT JOIN library_artists ar ON ar.name = a.artist
+                WHERE a.artist NOT LIKE '.%'
+                  AND a.path NOT LIKE '%/.%'
+                  AND a.quarantined_at IS NULL
                 ORDER BY dir_mtime DESC NULLS LAST LIMIT :limit
                 """
                 ),

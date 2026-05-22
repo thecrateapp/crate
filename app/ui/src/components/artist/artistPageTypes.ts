@@ -17,6 +17,16 @@ export interface ArtistData {
   popularity?: number | null;
   popularity_score?: number | null;
   popularity_confidence?: number | null;
+  bio?: string | null;
+  tags_json?: string[];
+  urls_json?: Record<string, string>;
+  mbid?: string | null;
+  country?: string | null;
+  area?: string | null;
+  formed?: string | null;
+  ended?: string | null;
+  artist_type?: string | null;
+  bandcamp_url?: string | null;
 }
 
 export interface ArtistAlbumSummary {

@@ -126,7 +126,7 @@ class TestRepairCatalog:
             repair,
             "_fix_duplicate_tracks",
             return_value={
-                "action": "delete_duplicate_tracks",
+                "action": "quarantine_duplicate_tracks",
                 "target": "Terror/Still Suffer/A Deeper Struggle",
                 "details": {
                     "keep_path": "/music/a.m4a",
@@ -137,7 +137,7 @@ class TestRepairCatalog:
                 },
                 "applied": False,
                 "fs_write": True,
-                "message": "Would delete 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle",
+                "message": "Would quarantine 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle",
             },
         ) as mock_fix:
             result = repair.preview(report, auto_only=False)
@@ -153,7 +153,7 @@ class TestRepairCatalog:
         assert result["items"][0]["scope"] == "hybrid"
         assert result["items"][0]["requires_confirmation"] is True
         assert result["items"][0]["message"] == (
-            "Would delete 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle"
+            "Would quarantine 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle"
         )
 
     def test_preview_returns_executable_artist_layout_fix_action(self):
@@ -430,7 +430,7 @@ class TestDuplicateTrackRepair:
             assert result["details"]["keep_path"] == str(flac_file)
             assert result["details"]["remove_paths"] == [str(m4a_file)]
 
-    def test_duplicate_track_apply_deletes_redundant_file(self):
+    def test_duplicate_track_apply_quarantines_redundant_file(self):
         from crate.repair import LibraryRepair
 
         with tempfile.TemporaryDirectory() as lib:
@@ -506,10 +506,19 @@ class TestDuplicateTrackRepair:
             assert result is not None
             assert result["applied"] is True
             assert dupe_file.exists() is False
+            assert (
+                Path(lib)
+                / ".crate-trash"
+                / "tracks"
+                / "Terror"
+                / "Still Suffer"
+                / "08 - A Deeper Struggle (1).m4a"
+            ).exists()
             assert keep_file.exists() is True
             mock_delete_track.assert_called_once_with(str(dupe_file))
             mock_log_audit.assert_called_once()
             assert result["details"]["removed_paths"] == [str(dupe_file)]
+            assert result["details"]["quarantined_paths"]
             assert result["details"]["enrich_artist"] == "Terror"
 
     def test_duplicate_track_stays_manual_when_fingerprints_conflict(self):

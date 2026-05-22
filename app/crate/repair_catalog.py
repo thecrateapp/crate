@@ -146,6 +146,7 @@ REPAIR_CATALOG: tuple[RepairCatalogEntry, ...] = (
         "destructive",
         "hybrid",
         requires_confirmation=True,
+        supports_global_scope=False,
     ),
     RepairCatalogEntry(
         "shadow_quality_tracks",

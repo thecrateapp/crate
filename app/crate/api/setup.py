@@ -5,13 +5,13 @@ import logging
 from fastapi import APIRouter, Request, HTTPException
 
 from crate.auth import hash_password
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     OpenApiResponses,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import (
     SetupAdminRequest,
@@ -51,6 +51,10 @@ def _is_setup_needed() -> bool:
         return count_users() == 0
     except Exception:
         return True
+
+
+def _require_settings_manager(request: Request) -> dict:
+    return require_permission(request, "settings.manage")
 
 
 @router.get(
@@ -99,7 +103,7 @@ def setup_save_keys(request: Request, body: SetupKeysRequest):
     if _is_setup_needed():
         raise HTTPException(status_code=400, detail="Create admin first")
 
-    _require_admin(request)
+    _require_settings_manager(request)
 
     keys = {
         "lastfm_apikey": body.lastfm_apikey,
@@ -127,7 +131,7 @@ def setup_start_scan(request: Request):
     if _is_setup_needed():
         raise HTTPException(status_code=400, detail="Create admin first")
 
-    _require_admin(request)
+    _require_settings_manager(request)
 
     task_id = create_task("library_pipeline")
     return {"task_id": task_id}
@@ -141,7 +145,7 @@ def setup_start_scan(request: Request):
 )
 def setup_check(request: Request):
     """Check what's configured. Requires admin."""
-    _require_admin(request)
+    _require_settings_manager(request)
 
     stats = get_library_stats()
 

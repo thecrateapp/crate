@@ -21,8 +21,11 @@ import {
   Activity,
   AudioWaveform,
   ScrollText,
+  ShieldCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  Trash2,
+  HandHeart,
 } from "lucide-react";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -75,6 +78,18 @@ const navItems = [
     label: "Library Health",
     badgeKey: "issue_count" as const,
     capabilities: ["library.repair.run"],
+  },
+  {
+    to: "/trash",
+    icon: Trash2,
+    label: "Library Trash",
+    capabilities: ["library.track.remove"],
+  },
+  {
+    to: "/contributions",
+    icon: HandHeart,
+    label: "Contributions",
+    capabilities: ["library.import.manage"],
   },
   { section: "Music" },
   {
@@ -141,7 +156,7 @@ const navItems = [
     to: "/analysis",
     icon: AudioWaveform,
     label: "Analysis",
-    capabilities: ["admin.access"],
+    capabilities: ["library.analysis.manage"],
   },
   {
     to: "/tasks",
@@ -169,10 +184,16 @@ const navItems = [
     capabilities: ["users.view"],
   },
   {
+    to: "/roles",
+    icon: ShieldCheck,
+    label: "Roles",
+    capabilities: ["roles.view"],
+  },
+  {
     to: "/settings",
     icon: Settings,
     label: "Settings",
-    capabilities: ["admin.access"],
+    capabilities: ["settings.manage"],
   },
 ] as const;
 

@@ -25,8 +25,12 @@ def test_roles_are_checked_through_casbin_policy():
     from crate.api.permissions import has_capability
 
     assert has_capability({"role": "editor"}, "library.metadata.write")
+    assert has_capability({"role": "librarian"}, "library.analysis.manage")
     assert not has_capability({"role": "editor"}, "users.manage")
+    assert not has_capability({"role": "editor"}, "users.status.manage")
     assert has_capability({"role": "admin"}, "users.manage")
+    assert has_capability({"role": "admin"}, "users.delete")
+    assert has_capability({"role": "admin"}, "roles.assign")
     assert not has_capability({"role": "user"}, "admin.access")
 
 
@@ -162,6 +166,128 @@ def test_admin_update_user_role_prevents_self_lockout(monkeypatch):
     assert exc.value.status_code == 400
 
 
+def test_admin_update_user_status_suspends_revokes_and_audits(monkeypatch):
+    from crate.api.auth import admin_update_user_status
+    from crate.api.schemas.auth import UpdateUserStatusRequest
+
+    target = {
+        "id": 2,
+        "email": "listener@test.com",
+        "name": "Listener",
+        "avatar": None,
+        "role": "user",
+        "status": "active",
+    }
+    updated = {**target, "status": "suspended", "status_reason": "abuse"}
+    lookups = [target, updated]
+    audit = MagicMock()
+    revoked: list[tuple[int, str | None]] = []
+
+    monkeypatch.setattr(
+        "crate.api.auth.get_user_by_id", lambda _user_id: lookups.pop(0)
+    )
+    monkeypatch.setattr(
+        "crate.api.auth.update_user_status",
+        lambda _user_id, _status, **_kwargs: updated,
+    )
+    monkeypatch.setattr(
+        "crate.api.auth.list_sessions",
+        lambda *_args, **_kwargs: [{"id": "session-1"}, {"id": "session-2"}],
+    )
+    monkeypatch.setattr(
+        "crate.api.auth.revoke_other_sessions",
+        lambda user_id, current_session_id: (
+            revoked.append((user_id, current_session_id)) or 2
+        ),
+    )
+    monkeypatch.setattr("crate.api.auth._invalidate_auth_session", lambda _id: None)
+    monkeypatch.setattr("crate.api.auth._invalidate_auth_user", lambda _id: None)
+    monkeypatch.setattr("crate.api.auth.list_user_external_identities", lambda _id: [])
+    monkeypatch.setattr("crate.api.auth.get_user_presence", lambda _id: {})
+    monkeypatch.setattr("crate.api.auth.log_audit", audit)
+
+    result = asyncio.run(
+        admin_update_user_status(
+            _request_for("admin", user_id=1),  # type: ignore[arg-type]
+            2,
+            UpdateUserStatusRequest(status="suspended", reason="abuse"),
+        )
+    )
+
+    assert result["status"] == "suspended"
+    assert revoked == [(2, None)]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "update_user_status",
+        "user",
+        "listener@test.com",
+    )
+    assert audit.call_args.kwargs["details"]["before"] == {"status": "active"}
+    assert audit.call_args.kwargs["details"]["after"] == {"status": "suspended"}
+
+
+def test_admin_update_user_status_prevents_self_disable(monkeypatch):
+    from crate.api.auth import admin_update_user_status
+    from crate.api.schemas.auth import UpdateUserStatusRequest
+
+    monkeypatch.setattr(
+        "crate.api.auth.get_user_by_id",
+        lambda _id: {
+            "id": 1,
+            "email": "admin@test.com",
+            "name": "Admin",
+            "avatar": None,
+            "role": "admin",
+            "status": "active",
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            admin_update_user_status(
+                _request_for("admin", user_id=1),  # type: ignore[arg-type]
+                1,
+                UpdateUserStatusRequest(status="suspended"),
+            )
+        )
+
+    assert exc.value.status_code == 400
+
+
+def test_admin_delete_user_is_soft_delete(monkeypatch):
+    from crate.api.auth import admin_delete_user
+
+    target = {
+        "id": 2,
+        "email": "deleted@test.com",
+        "name": "Deleted",
+        "avatar": None,
+        "role": "user",
+        "status": "active",
+    }
+    status_updates: list[tuple[int, str]] = []
+
+    monkeypatch.setattr("crate.api.auth.get_user_by_id", lambda _user_id: target)
+    monkeypatch.setattr("crate.api.auth.list_user_album_contributions", lambda _id: [])
+    monkeypatch.setattr("crate.api.auth.create_task", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.auth.update_user_status",
+        lambda user_id, status, **_kwargs: (
+            status_updates.append((user_id, status)) or {**target, "status": status}
+        ),
+    )
+    monkeypatch.setattr("crate.api.auth._revoke_user_sessions", lambda *_args: 0)
+    monkeypatch.setattr("crate.api.auth._invalidate_auth_user", lambda _id: None)
+    monkeypatch.setattr("crate.api.auth.log_audit", MagicMock())
+
+    result = asyncio.run(
+        admin_delete_user(_request_for("admin", user_id=1), 2)  # type: ignore[arg-type]
+    )
+
+    assert result == {"ok": True}
+    assert status_updates == [(2, "deleted")]
+
+
 def test_admin_list_users_rejects_regular_user():
     from crate.api.auth import admin_list_users
 
@@ -182,6 +308,26 @@ def test_admin_create_invite_rejects_user_without_manage_capability():
                 AuthInviteRequest(email="invitee@example.test"),
             )
         )
+
+    assert exc.value.status_code == 403
+
+
+def test_auth_provider_config_requires_auth_manage():
+    from crate.api.auth import admin_get_auth_config
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            admin_get_auth_config(_request_for("ops"))  # type: ignore[arg-type]
+        )
+
+    assert exc.value.status_code == 403
+
+
+def test_settings_requires_settings_manage():
+    from crate.api.settings import get_settings
+
+    with pytest.raises(HTTPException) as exc:
+        get_settings(_request_for("ops"))  # type: ignore[arg-type]
 
     assert exc.value.status_code == 403
 
@@ -237,6 +383,466 @@ def test_tags_api_queues_actor_user_id_for_metadata_edit(tmp_path, monkeypatch):
     ]
 
 
+def test_artist_metadata_api_queues_actor_user_id(monkeypatch):
+    from crate.api.schemas.utility import ArtistMetadataUpdate
+    from crate.api.tags import _update_artist_metadata
+
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.tags.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-2",
+    )
+
+    response = _update_artist_metadata(
+        _request_for("editor", user_id=77),  # type: ignore[arg-type]
+        {"id": 12, "entity_uid": "artist-uid", "name": "High Vis"},
+        ArtistMetadataUpdate(bio="South London", tags=["post-punk"]),
+    )
+
+    assert response == {"task_id": "task-2"}
+    assert created == [
+        (
+            "update_artist_metadata",
+            {
+                "artist_id": 12,
+                "artist_entity_uid": "artist-uid",
+                "artist_name": "High Vis",
+                "metadata": {"bio": "South London", "tags": ["post-punk"]},
+                "actor_user_id": 77,
+            },
+        )
+    ]
+
+
+def test_track_quarantine_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import quarantine_track_by_id
+    from crate.api.schemas.management import TrackQuarantineRequest
+
+    track = {
+        "id": 9,
+        "entity_uid": "track-uid",
+        "path": "/music/Artist/Album/01.flac",
+    }
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.get_library_track_by_id", lambda _track_id: track
+    )
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-3",
+    )
+
+    response = quarantine_track_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        9,
+        TrackQuarantineRequest(reason="duplicate"),
+    )
+
+    assert response == {"task_id": "task-3"}
+    assert created == [
+        (
+            "library_track_quarantine",
+            {
+                "track_id": 9,
+                "track_entity_uid": "track-uid",
+                "track_path": "/music/Artist/Album/01.flac",
+                "reason": "duplicate",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_track_restore_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import restore_quarantined_track
+    from crate.api.schemas.management import TrackRestoreRequest
+
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-4",
+    )
+
+    response = restore_quarantined_track(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        TrackRestoreRequest(
+            quarantine_path="Artist/Album/01.flac",
+            reason="restore mistake",
+        ),
+    )
+
+    assert response == {"task_id": "task-4"}
+    assert created == [
+        (
+            "library_track_restore",
+            {
+                "quarantine_path": "Artist/Album/01.flac",
+                "target_path": None,
+                "reason": "restore mistake",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_album_move_to_artist_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import move_album_to_artist_by_id
+    from crate.api.schemas.management import AlbumMoveToArtistRequest
+
+    album = {
+        "id": 4,
+        "entity_uid": "album-uid",
+        "path": "/music/Artist/Album",
+    }
+    target_artist = {
+        "id": 22,
+        "name": "Target Artist",
+        "folder_name": "target-artist-uid",
+    }
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.get_library_album_by_id", lambda _album_id: album
+    )
+    monkeypatch.setattr(
+        "crate.api.management.get_library_artist_by_id",
+        lambda _artist_id: target_artist,
+    )
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-7",
+    )
+
+    response = move_album_to_artist_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        4,
+        AlbumMoveToArtistRequest(target_artist_id=22, reason="wrong artist"),
+    )
+
+    assert response == {"task_id": "task-7"}
+    assert created == [
+        (
+            "library_album_move_to_artist",
+            {
+                "album_id": 4,
+                "album_entity_uid": "album-uid",
+                "album_path": "/music/Artist/Album",
+                "target_artist_id": 22,
+                "target_artist": "Target Artist",
+                "target_artist_folder": "target-artist-uid",
+                "reason": "wrong artist",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_album_merge_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import merge_album_by_id
+    from crate.api.schemas.management import AlbumMergeRequest
+
+    source_album = {
+        "id": 4,
+        "entity_uid": "source-album-uid",
+        "path": "/music/Artist/Source Album",
+    }
+    target_album = {
+        "id": 22,
+        "entity_uid": "target-album-uid",
+        "path": "/music/Artist/Target Album",
+    }
+    created: list[tuple[str, dict]] = []
+
+    def fake_get_album(album_id: int):
+        if album_id == 4:
+            return source_album
+        if album_id == 22:
+            return target_album
+        return None
+
+    monkeypatch.setattr("crate.api.management.get_library_album_by_id", fake_get_album)
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-9",
+    )
+
+    response = merge_album_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        4,
+        AlbumMergeRequest(target_album_id=22, reason="duplicate album"),
+    )
+
+    assert response == {"task_id": "task-9"}
+    assert created == [
+        (
+            "library_album_merge",
+            {
+                "source_album_id": 4,
+                "source_album_entity_uid": "source-album-uid",
+                "source_album_path": "/music/Artist/Source Album",
+                "target_album_id": 22,
+                "target_album_entity_uid": "target-album-uid",
+                "target_album_path": "/music/Artist/Target Album",
+                "reason": "duplicate album",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_album_split_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import split_album_by_id
+    from crate.api.schemas.management import AlbumSplitRequest
+
+    album = {
+        "id": 4,
+        "entity_uid": "album-uid",
+        "path": "/music/Artist/Album",
+    }
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.get_library_album_by_id", lambda _album_id: album
+    )
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-11",
+    )
+
+    response = split_album_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        4,
+        AlbumSplitRequest(
+            target_album_name="New Album",
+            track_ids=[1, 2],
+            reason="wrong album",
+        ),
+    )
+
+    assert response == {"task_id": "task-11"}
+    assert created == [
+        (
+            "library_album_split",
+            {
+                "album_id": 4,
+                "album_entity_uid": "album-uid",
+                "album_path": "/music/Artist/Album",
+                "target_album_name": "New Album",
+                "track_ids": [1, 2],
+                "reason": "wrong album",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_artist_merge_api_queues_actor_user_id(monkeypatch):
+    from crate.api.management import merge_artist_by_id
+    from crate.api.schemas.management import ArtistMergeRequest
+
+    source_artist = {
+        "id": 4,
+        "entity_uid": "source-artist-uid",
+        "name": "Source Artist",
+        "folder_name": "source-artist-uid",
+    }
+    target_artist = {
+        "id": 22,
+        "entity_uid": "target-artist-uid",
+        "name": "Target Artist",
+        "folder_name": "target-artist-uid",
+    }
+    created: list[tuple[str, dict]] = []
+
+    def fake_get_artist(artist_id: int):
+        if artist_id == 4:
+            return source_artist
+        if artist_id == 22:
+            return target_artist
+        return None
+
+    monkeypatch.setattr(
+        "crate.api.management.get_library_artist_by_id", fake_get_artist
+    )
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-10",
+    )
+
+    response = merge_artist_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        4,
+        ArtistMergeRequest(target_artist_id=22, reason="same artist"),
+    )
+
+    assert response == {"task_id": "task-10"}
+    assert created == [
+        (
+            "library_artist_merge",
+            {
+                "source_artist_id": 4,
+                "source_artist_entity_uid": "source-artist-uid",
+                "source_artist": "Source Artist",
+                "source_artist_folder": "source-artist-uid",
+                "target_artist_id": 22,
+                "target_artist_entity_uid": "target-artist-uid",
+                "target_artist": "Target Artist",
+                "target_artist_folder": "target-artist-uid",
+                "reason": "same artist",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_track_hard_delete_api_requires_file_delete_and_queues(monkeypatch):
+    from crate.api.management import hard_delete_track_by_id
+    from crate.api.schemas.management import TrackQuarantineRequest
+
+    track = {
+        "id": 9,
+        "entity_uid": "track-uid",
+        "path": "/music/Artist/Album/01.flac",
+    }
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.get_library_track_by_id", lambda _track_id: track
+    )
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-5",
+    )
+
+    response = hard_delete_track_by_id(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        9,
+        TrackQuarantineRequest(reason="bad duplicate"),
+    )
+
+    assert response == {"task_id": "task-5"}
+    assert created == [
+        (
+            "library_track_hard_delete",
+            {
+                "track_id": 9,
+                "track_entity_uid": "track-uid",
+                "track_path": "/music/Artist/Album/01.flac",
+                "reason": "bad duplicate",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_list_quarantined_tracks_reads_crate_trash(tmp_path, monkeypatch):
+    from crate.api.management import list_quarantined_tracks
+
+    quarantined = tmp_path / ".crate-trash" / "tracks" / "Artist" / "Album"
+    quarantined.mkdir(parents=True)
+    track = quarantined / "01.flac"
+    ignored = quarantined / "cover.jpg"
+    track.write_bytes(b"fake")
+    ignored.write_bytes(b"image")
+
+    monkeypatch.setattr(
+        "crate.config.load_config",
+        lambda: {"library_path": str(tmp_path)},
+    )
+    monkeypatch.setattr("crate.api.management._require_track_removal", lambda _req: {})
+    monkeypatch.setattr(
+        "crate.api.management.read_tags",
+        lambda _path: {
+            "title": "Concubine",
+            "artist": "Converge",
+            "album": "Jane Doe",
+            "albumartist": "Converge",
+            "tracknumber": "1/12",
+            "discnumber": "1",
+            "date": "2001",
+            "genre": "hardcore",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.api.management.read_audio_quality",
+        lambda _path: {
+            "duration": 79.0,
+            "bitrate": 912000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+    )
+
+    response = list_quarantined_tracks(_request_for("librarian"))  # type: ignore[arg-type]
+
+    assert response["count"] == 1
+    assert response["items"][0]["quarantine_path"] == "Artist/Album/01.flac"
+    assert response["items"][0]["filename"] == "01.flac"
+    assert response["items"][0]["title"] == "Concubine"
+    assert response["items"][0]["artist"] == "Converge"
+    assert response["items"][0]["album"] == "Jane Doe"
+    assert response["items"][0]["track_number"] == "1/12"
+    assert response["items"][0]["duration"] == 79.0
+    assert response["items"][0]["size_bytes"] == 4
+    assert response["items"][0]["suggested_target_path"] == "Artist/Album/01.flac"
+
+
+def test_quarantined_track_hard_delete_api_requires_file_delete(monkeypatch):
+    from crate.api.management import hard_delete_quarantined_track
+    from crate.api.schemas.management import TrackQuarantineFileRequest
+
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-6",
+    )
+
+    response = hard_delete_quarantined_track(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        TrackQuarantineFileRequest(
+            quarantine_path="Artist/Album/01.flac",
+            reason="not needed",
+        ),
+    )
+
+    assert response == {"task_id": "task-6"}
+    assert created == [
+        (
+            "library_quarantined_track_hard_delete",
+            {
+                "quarantine_path": "Artist/Album/01.flac",
+                "reason": "not needed",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
+def test_list_contributions_requires_import_manager(monkeypatch):
+    from crate.api.management import list_contributions
+
+    monkeypatch.setattr(
+        "crate.api.management.list_library_contributions",
+        lambda **_kwargs: [
+            {
+                "id": 1,
+                "user_id": 2,
+                "user_email": "user@example.test",
+                "source": "bandcamp",
+                "source_ref": "bandcamp:123",
+                "album_id": 44,
+                "album_entity_uid": None,
+                "artist_name": "Artist",
+                "album_name": "Album",
+                "status": "active",
+            }
+        ],
+    )
+
+    response = list_contributions(_request_for("librarian"))  # type: ignore[arg-type]
+
+    assert response["count"] == 1
+    assert response["items"][0]["source"] == "bandcamp"
+    assert response["items"][0]["user_email"] == "user@example.test"
+
+
 def test_update_track_tags_writes_audit_entry(tmp_path, monkeypatch):
     from crate.worker_handlers.management import _handle_update_track_tags
 
@@ -271,6 +877,695 @@ def test_update_track_tags_writes_audit_entry(tmp_path, monkeypatch):
     assert audit.call_args.kwargs["user_id"] == 42
     assert audit.call_args.kwargs["details"]["before"] == {"title": ["Old Song"]}
     assert audit.call_args.kwargs["details"]["after"] == {"title": ["New Song"]}
+
+
+def test_update_artist_metadata_writes_audit_and_invalidates(monkeypatch):
+    from crate.worker_handlers.management import _handle_update_artist_metadata
+
+    audit = MagicMock()
+    invalidations: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_update_artist_metadata",
+        lambda **_kwargs: {
+            "artist_id": 12,
+            "artist_entity_uid": "artist-uid",
+            "artist_name": "High Vis",
+            "before": {"bio": "Old"},
+            "after": {"bio": "New"},
+            "changed_fields": ["bio"],
+        },
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    result = _handle_update_artist_metadata(
+        "task-2",
+        {
+            "artist_id": 12,
+            "artist_entity_uid": "artist-uid",
+            "artist_name": "High Vis",
+            "metadata": {"bio": "New"},
+            "actor_user_id": 77,
+        },
+        {},
+    )
+
+    assert result == {
+        "status": "ok",
+        "artist": "High Vis",
+        "changed": 1,
+        "changed_fields": ["bio"],
+    }
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "manual_update_artist_metadata",
+        "artist",
+        "High Vis",
+    )
+    assert audit.call_args.kwargs["user_id"] == 77
+    assert audit.call_args.kwargs["details"]["before"] == {"bio": "Old"}
+    assert audit.call_args.kwargs["details"]["after"] == {"bio": "New"}
+    assert invalidations == [("library", "home", "artist:12")]
+
+
+def test_quarantine_track_moves_file_deletes_db_and_invalidates(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_quarantine_track
+
+    source = tmp_path / "Artist" / "Album" / "01 - Song.flac"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"fake")
+    deleted: list[str] = []
+    invalidations: list[tuple[str, ...]] = []
+    audit = MagicMock()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.resolve_library_track_reference",
+        lambda **_kwargs: {
+            "id": 9,
+            "entity_uid": "track-uid",
+            "album_id": 4,
+            "artist": "Artist",
+            "album": "Album",
+            "title": "Song",
+            "filename": "01 - Song.flac",
+            "path": str(source),
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_delete_track",
+        lambda path: deleted.append(path),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    result = _handle_quarantine_track(
+        "task-3",
+        {"track_id": 9, "reason": "duplicate", "actor_user_id": 88},
+        {"library_path": str(tmp_path)},
+    )
+
+    expected_destination = (
+        tmp_path / ".crate-trash" / "tracks" / "Artist" / "Album" / "01 - Song.flac"
+    )
+    assert result == {
+        "status": "ok",
+        "track_id": 9,
+        "source_path": str(source),
+        "quarantine_path": str(expected_destination),
+    }
+    assert not source.exists()
+    assert expected_destination.read_bytes() == b"fake"
+    assert deleted == [str(source)]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "quarantine_track",
+        "track",
+        "Artist/Album/Song",
+    )
+    assert audit.call_args.kwargs["user_id"] == 88
+    assert audit.call_args.kwargs["details"]["reason"] == "duplicate"
+    assert invalidations == [("library", "home", "album:4")]
+
+
+def test_restore_track_moves_file_back_and_invalidates(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_restore_track
+
+    quarantined = tmp_path / ".crate-trash" / "tracks" / "Artist" / "Album" / "01.flac"
+    quarantined.parent.mkdir(parents=True)
+    quarantined.write_bytes(b"fake")
+    invalidations: list[tuple[str, ...]] = []
+    audit = MagicMock()
+
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(scopes),
+    )
+
+    result = _handle_restore_track(
+        "task-4",
+        {
+            "quarantine_path": "Artist/Album/01.flac",
+            "actor_user_id": 88,
+            "reason": "mistake",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    restored = tmp_path / "Artist" / "Album" / "01.flac"
+    assert result == {
+        "status": "ok",
+        "quarantine_path": str(quarantined),
+        "target_path": str(restored),
+    }
+    assert restored.read_bytes() == b"fake"
+    assert not quarantined.exists()
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "restore_quarantined_track",
+        "track",
+        "Artist/Album/01.flac",
+    )
+    assert audit.call_args.kwargs["user_id"] == 88
+    assert invalidations == [("library", "home")]
+
+
+def test_hard_delete_quarantined_track_deletes_crate_trash_file(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_hard_delete_quarantined_track
+
+    quarantined = tmp_path / ".crate-trash" / "tracks" / "Artist" / "Album" / "01.flac"
+    quarantined.parent.mkdir(parents=True)
+    quarantined.write_bytes(b"fake")
+    audit = MagicMock()
+
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_hard_delete_quarantined_track(
+        "task-7",
+        {
+            "quarantine_path": "Artist/Album/01.flac",
+            "actor_user_id": 88,
+            "reason": "not needed",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "ok",
+        "quarantine_path": str(quarantined),
+        "deleted": True,
+    }
+    assert not quarantined.exists()
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "hard_delete_quarantined_track",
+        "track",
+        "Artist/Album/01.flac",
+    )
+
+
+def test_hard_delete_track_deletes_file_and_db(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_hard_delete_track
+
+    source = tmp_path / "Artist" / "Album" / "01.flac"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"fake")
+    deleted: list[str] = []
+    audit = MagicMock()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.resolve_library_track_reference",
+        lambda **_kwargs: {
+            "id": 9,
+            "entity_uid": "track-uid",
+            "album_id": 4,
+            "artist": "Artist",
+            "album": "Album",
+            "title": "Song",
+            "filename": "01.flac",
+            "path": str(source),
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_delete_track",
+        lambda path: deleted.append(path),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_hard_delete_track(
+        "task-5",
+        {"track_id": 9, "reason": "bad duplicate", "actor_user_id": 88},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "ok",
+        "track_id": 9,
+        "deleted_path": str(source),
+    }
+    assert not source.exists()
+    assert deleted == [str(source)]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "hard_delete_track",
+        "track",
+        "Artist/Album/Song",
+    )
+
+
+def test_move_track_moves_file_to_target_album_and_rescans(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_move_track
+
+    source = tmp_path / "Artist" / "Source Album" / "01.flac"
+    target_album_dir = tmp_path / "Artist" / "Target Album"
+    source.parent.mkdir(parents=True)
+    target_album_dir.mkdir(parents=True)
+    source.write_bytes(b"fake")
+    deleted: list[str] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.resolve_library_track_reference",
+        lambda **_kwargs: {
+            "id": 9,
+            "entity_uid": "track-uid",
+            "album_id": 4,
+            "artist": "Artist",
+            "album": "Source Album",
+            "title": "Song",
+            "filename": "01.flac",
+            "path": str(source),
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album_by_id",
+        lambda _album_id: {
+            "id": 22,
+            "artist": "Artist",
+            "name": "Target Album",
+            "path": str(target_album_dir),
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.db_delete_track",
+        lambda path: deleted.append(path),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_move_track(
+        "task-6",
+        {"track_id": 9, "target_album_id": 22, "actor_user_id": 88},
+        {"library_path": str(tmp_path)},
+    )
+
+    destination = target_album_dir / "01.flac"
+    assert result == {
+        "status": "ok",
+        "track_id": 9,
+        "source_path": str(source),
+        "target_path": str(destination),
+    }
+    assert destination.read_bytes() == b"fake"
+    assert not source.exists()
+    assert deleted == [str(source)]
+
+
+def test_move_album_to_artist_moves_directory_and_updates_db(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_move_album_to_artist
+
+    source_dir = tmp_path / "Source Artist" / "Album"
+    target_artist_dir = tmp_path / "target-artist-uid"
+    source_dir.mkdir(parents=True)
+    (source_dir / "01.flac").write_bytes(b"fake")
+    updated: list[tuple[int, str, str, str]] = []
+    audit = MagicMock()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album_by_id",
+        lambda _album_id: {
+            "id": 4,
+            "entity_uid": "album-uid",
+            "artist": "Source Artist",
+            "name": "Album",
+            "path": str(source_dir),
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist_by_id",
+        lambda _artist_id: {
+            "id": 22,
+            "name": "Target Artist",
+            "folder_name": "target-artist-uid",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album",
+        lambda _artist, _album: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.update_album_artist_and_path",
+        lambda album_id, old_path, new_path, artist_name: updated.append(
+            (album_id, old_path, new_path, artist_name)
+        ),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_move_album_to_artist(
+        "task-8",
+        {
+            "album_id": 4,
+            "target_artist_id": 22,
+            "actor_user_id": 88,
+            "reason": "wrong artist",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    destination = target_artist_dir / "Album"
+    assert result == {
+        "status": "ok",
+        "album_id": 4,
+        "source_path": str(source_dir),
+        "target_path": str(destination),
+        "target_artist": "Target Artist",
+    }
+    assert destination.joinpath("01.flac").read_bytes() == b"fake"
+    assert not source_dir.exists()
+    assert updated == [(4, str(source_dir), str(destination), "Target Artist")]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "move_album_to_artist",
+        "album",
+        "Source Artist/Album",
+    )
+
+
+def test_merge_album_moves_files_reassigns_tracks_and_rescans(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_merge_album
+
+    source_dir = tmp_path / "Artist" / "Duplicate Album"
+    target_dir = tmp_path / "Artist" / "Canonical Album"
+    source_dir.mkdir(parents=True)
+    target_dir.mkdir(parents=True)
+    (source_dir / "01.flac").write_bytes(b"source")
+    (target_dir / "01.flac").write_bytes(b"target")
+    updated: list[tuple[int, int, str, str, list[tuple[str, str]], str, str]] = []
+    audit = MagicMock()
+
+    def fake_get_album(album_id: int):
+        if album_id == 4:
+            return {
+                "id": 4,
+                "entity_uid": "source-album-uid",
+                "artist": "Artist",
+                "name": "Duplicate Album",
+                "path": str(source_dir),
+            }
+        if album_id == 22:
+            return {
+                "id": 22,
+                "entity_uid": "target-album-uid",
+                "artist": "Artist",
+                "name": "Canonical Album",
+                "path": str(target_dir),
+            }
+        return None
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album_by_id", fake_get_album
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_tracks",
+        lambda _album_id: [{"id": 9}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.merge_album_into_album",
+        lambda source_album_id, target_album_id, old_path, new_path, path_map, target_artist, target_album: (
+            updated.append(
+                (
+                    source_album_id,
+                    target_album_id,
+                    old_path,
+                    new_path,
+                    path_map,
+                    target_artist,
+                    target_album,
+                )
+            )
+        ),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_merge_album(
+        "task-9",
+        {
+            "source_album_id": 4,
+            "target_album_id": 22,
+            "actor_user_id": 88,
+            "reason": "duplicate",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    moved_file = target_dir / "01.task-9-1.flac"
+    assert result == {
+        "status": "ok",
+        "source_album_id": 4,
+        "target_album_id": 22,
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_paths": 1,
+        "source_tracks": 1,
+    }
+    assert moved_file.read_bytes() == b"source"
+    assert (target_dir / "01.flac").read_bytes() == b"target"
+    assert not source_dir.exists()
+    assert updated == [
+        (
+            4,
+            22,
+            str(source_dir),
+            str(target_dir),
+            [(str(source_dir / "01.flac"), str(moved_file))],
+            "Artist",
+            "Canonical Album",
+        )
+    ]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "merge_album",
+        "album",
+        "Artist/Duplicate Album",
+    )
+
+
+def test_split_album_moves_selected_tracks_to_new_album(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_split_album
+
+    source_dir = tmp_path / "Artist" / "Source Album"
+    source_dir.mkdir(parents=True)
+    selected_file = source_dir / "01.flac"
+    kept_file = source_dir / "02.flac"
+    selected_file.write_bytes(b"selected")
+    kept_file.write_bytes(b"kept")
+    created: list[tuple[int, dict, str, str, list[tuple[int, str, str]]]] = []
+    audit = MagicMock()
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album_by_id",
+        lambda _album_id: {
+            "id": 4,
+            "entity_uid": "album-uid",
+            "artist": "Artist",
+            "name": "Source Album",
+            "path": str(source_dir),
+            "formats": ["FLAC"],
+            "year": "2026",
+            "genre": "rock",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_tracks",
+        lambda _album_id: [
+            {"id": 1, "path": str(selected_file), "filename": "01.flac"},
+            {"id": 2, "path": str(kept_file), "filename": "02.flac"},
+        ],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.create_split_album_and_move_tracks",
+        lambda source_album_id, source_album, target_album_name, target_album_path, track_moves: (
+            created.append(
+                (
+                    source_album_id,
+                    source_album,
+                    target_album_name,
+                    target_album_path,
+                    track_moves,
+                )
+            )
+            or 33
+        ),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_split_album(
+        "task-11",
+        {
+            "album_id": 4,
+            "target_album_name": "New Album",
+            "track_ids": [1],
+            "actor_user_id": 88,
+            "reason": "wrong album",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    target_dir = tmp_path / "Artist" / "New Album"
+    target_file = target_dir / "01.flac"
+    assert result == {
+        "status": "ok",
+        "source_album_id": 4,
+        "target_album_id": 33,
+        "target_album": "New Album",
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_tracks": 1,
+    }
+    assert target_file.read_bytes() == b"selected"
+    assert kept_file.read_bytes() == b"kept"
+    assert created[0][0] == 4
+    assert created[0][2:] == (
+        "New Album",
+        str(target_dir),
+        [(1, str(selected_file), str(target_file))],
+    )
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "split_album",
+        "album",
+        "Artist/Source Album",
+    )
+
+
+def test_merge_artist_moves_albums_reassigns_db_and_rescans(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_merge_artist
+
+    source_dir = tmp_path / "source-artist-uid"
+    target_dir = tmp_path / "target-artist-uid"
+    source_album_dir = source_dir / "Alias Album"
+    source_album_dir.mkdir(parents=True)
+    target_dir.mkdir(parents=True)
+    (source_album_dir / "01.flac").write_bytes(b"fake")
+    merged: list[tuple[str, str, str, str]] = []
+    audit = MagicMock()
+
+    def fake_get_artist(artist_id: int):
+        if artist_id == 4:
+            return {
+                "id": 4,
+                "entity_uid": "source-artist-uid",
+                "name": "Source Artist",
+                "folder_name": "source-artist-uid",
+            }
+        if artist_id == 22:
+            return {
+                "id": 22,
+                "entity_uid": "target-artist-uid",
+                "name": "Target Artist",
+                "folder_name": "target-artist-uid",
+            }
+        return None
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist_by_id",
+        fake_get_artist,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_albums",
+        lambda artist_name: (
+            [{"id": 7, "name": "Alias Album", "track_count": 1}]
+            if artist_name == "Source Artist"
+            else []
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album",
+        lambda _artist, _album: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.merge_artist_into_artist",
+        lambda source_artist, target_artist, old_path, new_path: merged.append(
+            (source_artist, target_artist, old_path, new_path)
+        ),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_merge_artist(
+        "task-10",
+        {
+            "source_artist_id": 4,
+            "target_artist_id": 22,
+            "actor_user_id": 88,
+            "reason": "alias",
+        },
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result == {
+        "status": "ok",
+        "source_artist_id": 4,
+        "target_artist_id": 22,
+        "source_artist": "Source Artist",
+        "target_artist": "Target Artist",
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_items": 1,
+        "source_albums": 1,
+        "source_tracks": 1,
+    }
+    assert (target_dir / "Alias Album" / "01.flac").read_bytes() == b"fake"
+    assert not source_dir.exists()
+    assert merged == [
+        ("Source Artist", "Target Artist", str(source_dir), str(target_dir))
+    ]
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "merge_artist",
+        "artist",
+        "Source Artist",
+    )
 
 
 def test_system_playlists_allow_playlist_curator(monkeypatch):
@@ -532,6 +1827,35 @@ def test_tasks_snapshot_rejects_metadata_editor():
     assert exc.value.status_code == 403
 
 
+def test_backfill_audio_fingerprints_allows_librarian_without_admin_access(
+    monkeypatch,
+):
+    from crate.api.tasks import api_backfill_track_fingerprints
+
+    monkeypatch.setattr("crate.api.tasks.list_tasks", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        "crate.api.tasks.create_task",
+        lambda task_type: f"task:{task_type}",
+    )
+
+    response = api_backfill_track_fingerprints(  # type: ignore[arg-type]
+        _request_for("librarian")
+    )
+
+    assert response == {"task_id": "task:backfill_track_audio_fingerprints"}
+
+
+def test_backfill_audio_fingerprints_rejects_metadata_editor():
+    from crate.api.tasks import api_backfill_track_fingerprints
+
+    with pytest.raises(HTTPException) as exc:
+        api_backfill_track_fingerprints(  # type: ignore[arg-type]
+            _request_for("editor")
+        )
+
+    assert exc.value.status_code == 403
+
+
 def test_stack_status_allows_runtime_ops_role_without_admin_access(monkeypatch):
     from crate.api.stack import stack_status
 
@@ -576,6 +1900,57 @@ def test_logs_snapshot_rejects_regular_user():
 
     with pytest.raises(HTTPException) as exc:
         admin_logs_snapshot(_request_for("user"))  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 403
+
+
+def test_llm_status_allows_curator_without_admin_access(monkeypatch):
+    from crate.api.admin_metrics import llm_status
+
+    monkeypatch.setattr(
+        "crate.llm.get_config",
+        lambda: {
+            "provider": "gemini",
+            "model": "gemini/gemini-2.5-flash",
+            "ollama_url": "http://ollama:11434",
+        },
+    )
+    monkeypatch.setattr("crate.llm.get_provider_key_names", lambda _provider: ["KEY"])
+    monkeypatch.setattr("crate.llm.get_provider_api_key", lambda _provider: "secret")
+
+    response = llm_status(_request_for("curator"))  # type: ignore[arg-type]
+
+    assert response["available"] is True
+    assert response["provider"] == "gemini"
+
+
+def test_llm_status_rejects_regular_user():
+    from crate.api.admin_metrics import llm_status
+
+    with pytest.raises(HTTPException) as exc:
+        llm_status(_request_for("user"))  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 403
+
+
+def test_users_map_allows_admin_user_view(monkeypatch):
+    from crate.api.admin_metrics import users_map
+
+    monkeypatch.setattr(
+        "crate.db.repositories.auth.list_users_map_rows",
+        lambda: [{"id": 1, "name": "Diego"}],
+    )
+
+    response = users_map(_request_for("admin"))  # type: ignore[arg-type]
+
+    assert response == {"users": [{"id": 1, "name": "Diego"}]}
+
+
+def test_users_map_rejects_regular_user():
+    from crate.api.admin_metrics import users_map
+
+    with pytest.raises(HTTPException) as exc:
+        users_map(_request_for("user"))  # type: ignore[arg-type]
 
     assert exc.value.status_code == 403
 
@@ -716,6 +2091,37 @@ def test_metadata_task_rejects_regular_user():
             _request_for("user"),
             LyricsSyncRequest(artist="High Vis"),
         )
+
+    assert exc.value.status_code == 403
+
+
+def test_analysis_status_allows_librarian_without_admin_access(monkeypatch):
+    from crate.api.management import analysis_status
+
+    monkeypatch.setattr(
+        "crate.api.management.get_cached_ops_snapshot",
+        lambda: {"analysis": {"total": 1, "analysis_done": 1}},
+    )
+
+    response = analysis_status(_request_for("librarian"))  # type: ignore[arg-type]
+
+    assert response == {"total": 1, "analysis_done": 1}
+
+
+def test_analysis_status_rejects_metadata_editor():
+    from crate.api.management import analysis_status
+
+    with pytest.raises(HTTPException) as exc:
+        analysis_status(_request_for("editor"))  # type: ignore[arg-type]
+
+    assert exc.value.status_code == 403
+
+
+def test_library_maintenance_remains_admin_only_capability():
+    from crate.api.management import rebuild_library
+
+    with pytest.raises(HTTPException) as exc:
+        rebuild_library(_request_for("librarian"))  # type: ignore[arg-type]
 
     assert exc.value.status_code == 403
 

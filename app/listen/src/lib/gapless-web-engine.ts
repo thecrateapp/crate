@@ -40,12 +40,12 @@ export class GaplessWebEngine implements PlaybackEngine {
       seekTo(snapshot.positionMs);
     }
     if (snapshot.autoplay) {
-      play();
+      await play();
     }
   }
 
   async play(): Promise<void> {
-    play();
+    await play();
   }
 
   async pause(): Promise<void> {

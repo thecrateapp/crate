@@ -1084,7 +1084,7 @@ class LibraryRepair:
         if not remove_paths:
             return None
         result = {
-            "action": "delete_duplicate_tracks",
+            "action": "quarantine_duplicate_tracks",
             "target": f"{artist}/{album}/{title}",
             "details": {
                 "artist": artist,
@@ -1102,12 +1102,13 @@ class LibraryRepair:
 
         if dry_run:
             result["message"] = (
-                f"Would delete {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+                f"Would quarantine {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
             )
             return result
 
         removed_paths: list[str] = []
         missing_paths: list[str] = []
+        quarantined_paths: list[str] = []
         for track in remove:
             path_str = str(track.get("path") or "")
             if not path_str:
@@ -1115,12 +1116,35 @@ class LibraryRepair:
             path = Path(path_str)
             if path.exists():
                 try:
-                    path.unlink()
+                    relative_path = path.resolve(strict=False).relative_to(
+                        self.library_path.resolve()
+                    )
+                    destination = (
+                        self.library_path / ".crate-trash" / "tracks" / relative_path
+                    )
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if destination.exists():
+                        suffix = (task_id or "repair")[:8]
+                        for index in range(1, 1000):
+                            candidate = destination.with_name(
+                                f"{destination.stem}.{suffix}-{index}{destination.suffix}"
+                            )
+                            if not candidate.exists():
+                                destination = candidate
+                                break
+                        else:
+                            raise OSError(
+                                f"Could not allocate quarantine path for {path_str}"
+                            )
+                    shutil.move(str(path), str(destination))
                     removed_paths.append(path_str)
-                except OSError as exc:
-                    result["details"]["error"] = f"Failed to delete {path_str}: {exc}"
+                    quarantined_paths.append(str(destination))
+                except (OSError, ValueError) as exc:
+                    result["details"]["error"] = (
+                        f"Failed to quarantine {path_str}: {exc}"
+                    )
                     result["message"] = (
-                        f"Failed to delete duplicate track file for {artist}/{album}/{title}"
+                        f"Failed to quarantine duplicate track file for {artist}/{album}/{title}"
                     )
                     return result
             else:
@@ -1130,13 +1154,14 @@ class LibraryRepair:
 
         result["applied"] = True
         result["details"]["removed_paths"] = removed_paths
+        result["details"]["quarantined_paths"] = quarantined_paths
         if missing_paths:
             result["details"]["missing_paths"] = missing_paths
         result["message"] = (
-            f"Deleted {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+            f"Quarantined {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
         )
         log_audit(
-            "delete_duplicate_tracks",
+            "quarantine_duplicate_tracks",
             "track",
             f"{artist}/{album}/{title}",
             details=result["details"],

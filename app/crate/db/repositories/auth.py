@@ -36,10 +36,13 @@ from crate.db.repositories.auth_users import (
     get_users_presence,
     list_users,
     list_users_map_rows,
+    normalize_user_status,
     suggest_username,
     update_user,
     update_user_last_login,
     update_user_location,
+    update_user_status,
+    validate_user_status,
 )
 
 __all__ = [
@@ -67,6 +70,7 @@ __all__ = [
     "list_user_external_identities",
     "list_users",
     "list_users_map_rows",
+    "normalize_user_status",
     "revoke_other_sessions",
     "revoke_session",
     "suggest_username",
@@ -75,5 +79,7 @@ __all__ = [
     "update_user",
     "update_user_last_login",
     "update_user_location",
+    "update_user_status",
+    "validate_user_status",
     "upsert_user_external_identity",
 ]

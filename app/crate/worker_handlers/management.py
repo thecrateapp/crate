@@ -1,6 +1,9 @@
 import logging
+import re
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from crate.db.audit import log_audit, wipe_library_tables
 from crate.db.cache_runtime import get_redis
@@ -13,12 +16,25 @@ from crate.db.jobs.management import (
     find_album_path_for_match,
     rename_artist_in_db,
 )
+from crate.db.jobs.repair import (
+    create_split_album_and_move_tracks,
+    merge_album_into_album,
+    merge_artist_into_artist,
+    update_album_artist_and_path,
+)
 from crate.db.repositories.library import (
     delete_album as db_delete_album,
     delete_artist as db_delete_artist,
+    delete_track as db_delete_track,
+    get_library_album,
+    get_library_album_by_id,
     get_library_albums,
     get_library_artist,
+    get_library_artist_by_id,
     get_library_artists,
+    get_library_tracks,
+    resolve_library_track_reference,
+    update_artist_metadata as db_update_artist_metadata,
     upsert_artist,
 )
 from crate.db.repositories.playlists import (
@@ -687,6 +703,875 @@ def _handle_delete_album(task_id: str, params: dict, config: dict) -> dict:
     return {"deleted": f"{artist_name}/{album_name}", "mode": mode}
 
 
+def _resolve_library_track_path(lib: Path, track_path: str) -> tuple[Path, Path] | None:
+    if not track_path:
+        return None
+    source = Path(track_path)
+    if not source.is_absolute():
+        source = lib / source
+    lib_root = lib.resolve()
+    source_resolved = source.resolve(strict=False)
+    try:
+        relative_path = source_resolved.relative_to(lib_root)
+    except ValueError:
+        return None
+    return source_resolved, relative_path
+
+
+def _crate_trash_root(lib: Path) -> Path:
+    return lib / ".crate-trash"
+
+
+def _resolve_library_path(lib: Path, raw_path: str) -> tuple[Path, Path] | None:
+    if not raw_path:
+        return None
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = lib / path
+    lib_root = lib.resolve()
+    resolved = path.resolve(strict=False)
+    try:
+        relative_path = resolved.relative_to(lib_root)
+    except ValueError:
+        return None
+    return resolved, relative_path
+
+
+def _resolve_quarantined_track_path(
+    lib: Path, quarantine_path: str
+) -> tuple[Path, Path] | None:
+    trash_tracks = (_crate_trash_root(lib) / "tracks").resolve(strict=False)
+    source = Path(quarantine_path)
+    if not source.is_absolute():
+        source = trash_tracks / source
+    source_resolved = source.resolve(strict=False)
+    try:
+        relative_path = source_resolved.relative_to(trash_tracks)
+    except ValueError:
+        return None
+    return source_resolved, relative_path
+
+
+def _unique_file_path(destination: Path, task_id: str) -> Path:
+    if not destination.exists():
+        return destination
+    suffix = task_id[:8] or "manual"
+    for index in range(1, 1000):
+        candidate = destination.with_name(
+            f"{destination.stem}.{suffix}-{index}{destination.suffix}"
+        )
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Could not allocate unique path for {destination}")
+
+
+def _unique_quarantine_path(
+    trash_root: Path, relative_path: Path, task_id: str
+) -> Path:
+    destination = trash_root / "tracks" / relative_path
+    return _unique_file_path(destination, task_id)
+
+
+def _broadcast_track_library_invalidation(
+    track: Mapping[str, Any] | None = None,
+) -> None:
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        scopes = ["library", "home"]
+        if track and track.get("album_id"):
+            scopes.append(f"album:{track['album_id']}")
+        broadcast_invalidation(*scopes)
+    except Exception:
+        log.debug("Failed to broadcast track library invalidation", exc_info=True)
+
+
+def _handle_quarantine_track(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    track = resolve_library_track_reference(
+        track_id=params.get("track_id"),
+        track_entity_uid=params.get("track_entity_uid"),
+        track_path=params.get("track_path"),
+    )
+    if not track:
+        return {"error": "Track not found"}
+
+    track_path = str(track.get("path") or "")
+    resolved = _resolve_library_track_path(lib, track_path)
+    if resolved is None:
+        return {"error": f"Track path is outside the library: {track_path}"}
+
+    source, relative_path = resolved
+    if not source.is_file():
+        return {"error": f"Track file not found: {track_path}"}
+
+    destination = _unique_quarantine_path(
+        _crate_trash_root(lib), relative_path, task_id
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(destination))
+    db_delete_track(track_path)
+
+    title = track.get("title") or track.get("filename") or relative_path.name
+    artist = track.get("artist") or ""
+    album = track.get("album") or ""
+    target_name = f"{artist}/{album}/{title}".strip("/")
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Quarantined track: {target_name}",
+            "source_path": track_path,
+            "quarantine_path": str(destination),
+        },
+    )
+    log_audit(
+        "quarantine_track",
+        "track",
+        target_name,
+        details={
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "artist": artist,
+            "album": album,
+            "title": title,
+            "source_path": track_path,
+            "quarantine_path": str(destination),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+
+    _broadcast_track_library_invalidation(track)
+    start_scan()
+    return {
+        "status": "ok",
+        "track_id": track.get("id"),
+        "source_path": track_path,
+        "quarantine_path": str(destination),
+    }
+
+
+def _handle_hard_delete_track(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    track = resolve_library_track_reference(
+        track_id=params.get("track_id"),
+        track_entity_uid=params.get("track_entity_uid"),
+        track_path=params.get("track_path"),
+    )
+    if not track:
+        return {"error": "Track not found"}
+
+    track_path = str(track.get("path") or "")
+    resolved = _resolve_library_track_path(lib, track_path)
+    if resolved is None:
+        return {"error": f"Track path is outside the library: {track_path}"}
+
+    source, _relative_path = resolved
+    if source.exists():
+        if not source.is_file():
+            return {"error": f"Track path is not a file: {track_path}"}
+        source.unlink()
+    db_delete_track(track_path)
+
+    title = track.get("title") or track.get("filename") or source.name
+    artist = track.get("artist") or ""
+    album = track.get("album") or ""
+    target_name = f"{artist}/{album}/{title}".strip("/")
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Permanently deleted track: {target_name}",
+            "source_path": track_path,
+        },
+    )
+    log_audit(
+        "hard_delete_track",
+        "track",
+        target_name,
+        details={
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "artist": artist,
+            "album": album,
+            "title": title,
+            "source_path": track_path,
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation(track)
+    start_scan()
+    return {"status": "ok", "track_id": track.get("id"), "deleted_path": track_path}
+
+
+def _handle_restore_track(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    quarantine_path = str(params.get("quarantine_path") or "")
+    resolved = _resolve_quarantined_track_path(lib, quarantine_path)
+    if resolved is None:
+        return {"error": "Quarantine path is outside .crate-trash/tracks"}
+
+    source, original_relative_path = resolved
+    if not source.is_file():
+        return {"error": f"Quarantined track not found: {quarantine_path}"}
+
+    target_path = str(params.get("target_path") or "")
+    if target_path:
+        target_resolved = _resolve_library_path(lib, target_path)
+        if target_resolved is None:
+            return {"error": f"Target path is outside the library: {target_path}"}
+        destination, relative_destination = target_resolved
+    else:
+        relative_destination = original_relative_path
+        destination = lib / original_relative_path
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        return {"error": f"Restore target already exists: {relative_destination}"}
+    shutil.move(str(source), str(destination))
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Restored quarantined track: {relative_destination}",
+            "quarantine_path": str(source),
+            "target_path": str(destination),
+        },
+    )
+    log_audit(
+        "restore_quarantined_track",
+        "track",
+        str(relative_destination),
+        details={
+            "quarantine_path": str(source),
+            "target_path": str(destination),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation()
+    start_scan()
+    return {
+        "status": "ok",
+        "quarantine_path": str(source),
+        "target_path": str(destination),
+    }
+
+
+def _handle_hard_delete_quarantined_track(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    lib = Path(config["library_path"])
+    quarantine_path = str(params.get("quarantine_path") or "")
+    resolved = _resolve_quarantined_track_path(lib, quarantine_path)
+    if resolved is None:
+        return {"error": "Quarantine path is outside .crate-trash/tracks"}
+
+    source, original_relative_path = resolved
+    if not source.is_file():
+        return {"error": f"Quarantined track not found: {quarantine_path}"}
+
+    source.unlink()
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Deleted quarantined track: {original_relative_path}",
+            "quarantine_path": str(source),
+        },
+    )
+    log_audit(
+        "hard_delete_quarantined_track",
+        "track",
+        str(original_relative_path),
+        details={
+            "quarantine_path": str(source),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation()
+    return {
+        "status": "ok",
+        "quarantine_path": str(source),
+        "deleted": True,
+    }
+
+
+def _handle_move_track(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    track = resolve_library_track_reference(
+        track_id=params.get("track_id"),
+        track_entity_uid=params.get("track_entity_uid"),
+        track_path=params.get("track_path"),
+    )
+    if not track:
+        return {"error": "Track not found"}
+
+    target_album_id = params.get("target_album_id")
+    target_album = (
+        get_library_album_by_id(int(target_album_id)) if target_album_id else None
+    )
+    if not target_album:
+        return {"error": "Target album not found"}
+
+    track_path = str(track.get("path") or "")
+    source_resolved = _resolve_library_track_path(lib, track_path)
+    target_album_resolved = _resolve_library_path(
+        lib, str(target_album.get("path") or params.get("target_album_path") or "")
+    )
+    if source_resolved is None:
+        return {"error": f"Track path is outside the library: {track_path}"}
+    if target_album_resolved is None:
+        return {"error": "Target album path is outside the library"}
+
+    source, _source_relative = source_resolved
+    target_album_dir, target_album_relative = target_album_resolved
+    if not source.is_file():
+        return {"error": f"Track file not found: {track_path}"}
+    if not target_album_dir.is_dir():
+        return {"error": f"Target album directory not found: {target_album_relative}"}
+
+    destination = _unique_file_path(target_album_dir / source.name, task_id)
+    shutil.move(str(source), str(destination))
+    db_delete_track(track_path)
+
+    title = track.get("title") or track.get("filename") or source.name
+    target_name = f"{track.get('artist')}/{track.get('album')}/{title}".strip("/")
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Moved track to album: {target_album.get('artist')}/{target_album.get('name')}",
+            "source_path": track_path,
+            "target_path": str(destination),
+        },
+    )
+    log_audit(
+        "move_track_to_album",
+        "track",
+        target_name,
+        details={
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "source_path": track_path,
+            "target_album_id": target_album.get("id"),
+            "target_album": f"{target_album.get('artist')}/{target_album.get('name')}",
+            "target_path": str(destination),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation(track)
+    start_scan()
+    return {
+        "status": "ok",
+        "track_id": track.get("id"),
+        "source_path": track_path,
+        "target_path": str(destination),
+    }
+
+
+def _path_inside(child: Path, parent: Path) -> bool:
+    try:
+        child.resolve(strict=False).relative_to(parent.resolve(strict=False))
+        return True
+    except ValueError:
+        return False
+
+
+def _unique_directory_path(destination: Path, task_id: str) -> Path:
+    if not destination.exists():
+        return destination
+    suffix = task_id[:8] or "manual"
+    for index in range(1, 1000):
+        candidate = destination.with_name(f"{destination.name}.{suffix}-{index}")
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError(f"Could not allocate unique directory path for {destination}")
+
+
+def _safe_album_folder_name(name: str) -> str:
+    sanitized = re.sub(r'[<>:"/\\|?*]', "", name)
+    sanitized = re.sub(r"\s+", " ", sanitized).strip().rstrip(". ")
+    return sanitized or "Unknown"
+
+
+def _move_album_children(
+    source_dir: Path, target_dir: Path, task_id: str
+) -> list[tuple[str, str]]:
+    path_map: list[tuple[str, str]] = []
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
+        if child.is_dir():
+            destination = _unique_directory_path(target_dir / child.name, task_id)
+            for source_file in child.rglob("*"):
+                if source_file.is_file():
+                    path_map.append(
+                        (
+                            str(source_file),
+                            str(destination / source_file.relative_to(child)),
+                        )
+                    )
+            shutil.move(str(child), str(destination))
+            continue
+
+        destination = _unique_file_path(target_dir / child.name, task_id)
+        path_map.append((str(child), str(destination)))
+        shutil.move(str(child), str(destination))
+    return path_map
+
+
+def _handle_split_album(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    album_id = params.get("album_id")
+    album = get_library_album_by_id(int(album_id)) if album_id else None
+    if not album:
+        return {"error": "Album not found"}
+
+    target_album_name = str(params.get("target_album_name") or "").strip()
+    if not target_album_name:
+        return {"error": "Target album name is required"}
+    if target_album_name.casefold() == str(album.get("name") or "").casefold():
+        return {"error": "Target album name must be different from the source album"}
+
+    track_ids = {
+        int(track_id)
+        for track_id in (params.get("track_ids") or [])
+        if str(track_id).strip()
+    }
+    if not track_ids:
+        return {"error": "No tracks selected"}
+
+    source_tracks = get_library_tracks(int(album["id"]))
+    selected_tracks = [
+        track for track in source_tracks if int(track.get("id") or 0) in track_ids
+    ]
+    if len(selected_tracks) != len(track_ids):
+        return {"error": "One or more selected tracks were not found on this album"}
+    if len(selected_tracks) >= len(source_tracks):
+        return {"error": "Cannot split every track out of the source album"}
+
+    source_resolved = _resolve_library_path(lib, str(album.get("path") or ""))
+    if source_resolved is None:
+        return {"error": "Album path is outside the library"}
+    source_dir, source_relative = source_resolved
+    if not source_dir.is_dir():
+        return {"error": f"Album directory not found: {source_relative}"}
+
+    target_dir = source_dir.parent / _safe_album_folder_name(target_album_name)
+    if target_dir.exists():
+        return {"error": f"Target album directory already exists: {target_dir.name}"}
+
+    target_dir.mkdir(parents=True, exist_ok=False)
+    track_moves: list[tuple[int, str, str]] = []
+    try:
+        for track in selected_tracks:
+            track_path = str(track.get("path") or "")
+            resolved = _resolve_library_track_path(lib, track_path)
+            if resolved is None:
+                raise RuntimeError(f"Track path is outside the library: {track_path}")
+            source, _relative_path = resolved
+            if not source.is_file():
+                raise RuntimeError(f"Track file not found: {track_path}")
+            if not _path_inside(source, source_dir):
+                raise RuntimeError(
+                    f"Track is not inside the source album: {track_path}"
+                )
+
+            destination = _unique_file_path(target_dir / source.name, task_id)
+            shutil.move(str(source), str(destination))
+            track_moves.append((int(track["id"]), str(source), str(destination)))
+    except Exception:
+        for _track_id, _old_path, new_path in reversed(track_moves):
+            moved = Path(new_path)
+            original = Path(_old_path)
+            if moved.exists() and not original.exists():
+                original.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(moved), str(original))
+        if target_dir.exists() and not any(target_dir.iterdir()):
+            target_dir.rmdir()
+        raise
+
+    target_album_id = create_split_album_and_move_tracks(
+        int(album["id"]),
+        dict(album),
+        target_album_name,
+        str(target_dir),
+        track_moves,
+    )
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Split {len(track_moves)} track(s) into {target_album_name}",
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "target_album_id": target_album_id,
+        },
+    )
+    log_audit(
+        "split_album",
+        "album",
+        f"{album.get('artist')}/{album.get('name')}",
+        details={
+            "source_album_id": album.get("id"),
+            "source_album_entity_uid": album.get("entity_uid"),
+            "source_album": f"{album.get('artist')}/{album.get('name')}",
+            "target_album_id": target_album_id,
+            "target_album": f"{album.get('artist')}/{target_album_name}",
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "track_ids": sorted(track_ids),
+            "moved_tracks": len(track_moves),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation({"album_id": album.get("id")})
+    _broadcast_track_library_invalidation({"album_id": target_album_id})
+    start_scan()
+    return {
+        "status": "ok",
+        "source_album_id": album.get("id"),
+        "target_album_id": target_album_id,
+        "target_album": target_album_name,
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_tracks": len(track_moves),
+    }
+
+
+def _handle_merge_album(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    source_album_id = params.get("source_album_id")
+    target_album_id = params.get("target_album_id")
+    source_album = (
+        get_library_album_by_id(int(source_album_id)) if source_album_id else None
+    )
+    target_album = (
+        get_library_album_by_id(int(target_album_id)) if target_album_id else None
+    )
+    if not source_album:
+        return {"error": "Source album not found"}
+    if not target_album:
+        return {"error": "Target album not found"}
+    if int(source_album.get("id") or 0) == int(target_album.get("id") or 0):
+        return {"error": "Cannot merge an album into itself"}
+
+    source_resolved = _resolve_library_path(lib, str(source_album.get("path") or ""))
+    target_resolved = _resolve_library_path(lib, str(target_album.get("path") or ""))
+    if source_resolved is None:
+        return {"error": "Source album path is outside the library"}
+    if target_resolved is None:
+        return {"error": "Target album path is outside the library"}
+
+    source_dir, source_relative = source_resolved
+    target_dir, target_relative = target_resolved
+    if not source_dir.is_dir():
+        return {"error": f"Source album directory not found: {source_relative}"}
+    if not target_dir.is_dir():
+        return {"error": f"Target album directory not found: {target_relative}"}
+    if source_dir == target_dir or _path_inside(target_dir, source_dir):
+        return {"error": "Invalid album merge target"}
+
+    source_track_count = len(get_library_tracks(int(source_album["id"])))
+    path_map = _move_album_children(source_dir, target_dir, task_id)
+    source_dir.rmdir()
+    merge_album_into_album(
+        int(source_album["id"]),
+        int(target_album["id"]),
+        str(source_dir),
+        str(target_dir),
+        path_map,
+        str(target_album.get("artist") or ""),
+        str(target_album.get("name") or ""),
+    )
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Merged album {source_album.get('artist')}/{source_album.get('name')} "
+                f"into {target_album.get('artist')}/{target_album.get('name')}"
+            ),
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "moved_paths": len(path_map),
+        },
+    )
+    log_audit(
+        "merge_album",
+        "album",
+        f"{source_album.get('artist')}/{source_album.get('name')}",
+        details={
+            "source_album_id": source_album.get("id"),
+            "source_album_entity_uid": source_album.get("entity_uid"),
+            "source_album": f"{source_album.get('artist')}/{source_album.get('name')}",
+            "target_album_id": target_album.get("id"),
+            "target_album_entity_uid": target_album.get("entity_uid"),
+            "target_album": f"{target_album.get('artist')}/{target_album.get('name')}",
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "moved_paths": len(path_map),
+            "source_track_count": source_track_count,
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation({"album_id": source_album.get("id")})
+    _broadcast_track_library_invalidation({"album_id": target_album.get("id")})
+    start_scan()
+    return {
+        "status": "ok",
+        "source_album_id": source_album.get("id"),
+        "target_album_id": target_album.get("id"),
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_paths": len(path_map),
+        "source_tracks": source_track_count,
+    }
+
+
+def _handle_move_album_to_artist(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    album_id = params.get("album_id")
+    album = get_library_album_by_id(int(album_id)) if album_id else None
+    if not album:
+        return {"error": "Album not found"}
+
+    target_artist_id = params.get("target_artist_id")
+    target_artist = (
+        get_library_artist_by_id(int(target_artist_id)) if target_artist_id else None
+    )
+    if not target_artist:
+        return {"error": "Target artist not found"}
+
+    target_artist_name = str(
+        target_artist.get("name") or params.get("target_artist") or ""
+    )
+    if not target_artist_name.strip():
+        return {"error": "Target artist name missing"}
+
+    existing_target_album = get_library_album(
+        target_artist_name, str(album.get("name") or "")
+    )
+    if existing_target_album and int(existing_target_album.get("id") or 0) != int(
+        album.get("id") or 0
+    ):
+        return {
+            "error": f"Target artist already has an album named {album.get('name')}"
+        }
+
+    source_resolved = _resolve_library_path(lib, str(album.get("path") or ""))
+    if source_resolved is None:
+        return {"error": "Album path is outside the library"}
+    source_dir, source_relative = source_resolved
+    if not source_dir.is_dir():
+        return {"error": f"Album directory not found: {source_relative}"}
+
+    target_artist_folder = str(
+        target_artist.get("folder_name") or params.get("target_artist_folder") or ""
+    ).strip()
+    target_artist_dir = lib / (target_artist_folder or target_artist_name)
+    destination = target_artist_dir / source_dir.name
+    if destination.exists():
+        return {"error": f"Target album directory already exists: {destination}"}
+
+    target_artist_dir.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source_dir), str(destination))
+
+    update_album_artist_and_path(
+        int(album["id"]),
+        str(source_dir),
+        str(destination),
+        target_artist_name,
+    )
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Moved album to artist: {target_artist_name}/{album.get('name')}",
+            "source_path": str(source_dir),
+            "target_path": str(destination),
+        },
+    )
+    log_audit(
+        "move_album_to_artist",
+        "album",
+        f"{album.get('artist')}/{album.get('name')}",
+        details={
+            "album_id": album.get("id"),
+            "album_entity_uid": album.get("entity_uid"),
+            "album_name": album.get("name"),
+            "source_artist": album.get("artist"),
+            "target_artist_id": target_artist.get("id"),
+            "target_artist": target_artist_name,
+            "source_path": str(source_dir),
+            "target_path": str(destination),
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation(
+        {
+            "album_id": album.get("id"),
+            "artist": album.get("artist"),
+            "album": album.get("name"),
+        }
+    )
+    start_scan()
+    return {
+        "status": "ok",
+        "album_id": album.get("id"),
+        "source_path": str(source_dir),
+        "target_path": str(destination),
+        "target_artist": target_artist_name,
+    }
+
+
+def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
+    lib = Path(config["library_path"])
+    source_artist_id = params.get("source_artist_id")
+    target_artist_id = params.get("target_artist_id")
+    source_artist = (
+        get_library_artist_by_id(int(source_artist_id)) if source_artist_id else None
+    )
+    target_artist = (
+        get_library_artist_by_id(int(target_artist_id)) if target_artist_id else None
+    )
+    if not source_artist:
+        return {"error": "Source artist not found"}
+    if not target_artist:
+        return {"error": "Target artist not found"}
+    if int(source_artist.get("id") or 0) == int(target_artist.get("id") or 0):
+        return {"error": "Cannot merge an artist into itself"}
+
+    source_artist_name = str(source_artist.get("name") or "")
+    target_artist_name = str(target_artist.get("name") or "")
+    if not source_artist_name or not target_artist_name:
+        return {"error": "Artist name missing"}
+
+    source_albums = get_library_albums(source_artist_name)
+    duplicate_album_names = [
+        str(album.get("name") or "")
+        for album in source_albums
+        if get_library_album(target_artist_name, str(album.get("name") or ""))
+    ]
+    if duplicate_album_names:
+        return {
+            "error": (
+                "Target artist already has album(s): "
+                + ", ".join(sorted(filter(None, duplicate_album_names))[:5])
+            )
+        }
+
+    source_folder = str(
+        source_artist.get("folder_name")
+        or params.get("source_artist_folder")
+        or source_artist_name
+    )
+    target_folder = str(
+        target_artist.get("folder_name")
+        or params.get("target_artist_folder")
+        or target_artist_name
+    )
+    source_resolved = _resolve_library_path(lib, source_folder)
+    target_resolved = _resolve_library_path(lib, target_folder)
+    if source_resolved is None:
+        return {"error": "Source artist path is outside the library"}
+    if target_resolved is None:
+        return {"error": "Target artist path is outside the library"}
+
+    source_dir, source_relative = source_resolved
+    target_dir, _target_relative = target_resolved
+    if not source_dir.is_dir():
+        return {"error": f"Source artist directory not found: {source_relative}"}
+    if source_dir == target_dir or _path_inside(target_dir, source_dir):
+        return {"error": "Invalid artist merge target"}
+    for child in source_dir.iterdir():
+        if (target_dir / child.name).exists():
+            return {
+                "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
+            }
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    moved_items = 0
+    for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
+        shutil.move(str(child), str(target_dir / child.name))
+        moved_items += 1
+    source_dir.rmdir()
+
+    source_track_count = sum(
+        int(album.get("track_count") or 0) for album in source_albums
+    )
+    merge_artist_into_artist(
+        source_artist_name,
+        target_artist_name,
+        str(source_dir),
+        str(target_dir),
+    )
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Merged artist alias {source_artist_name} into {target_artist_name}",
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "moved_items": moved_items,
+        },
+    )
+    log_audit(
+        "merge_artist",
+        "artist",
+        source_artist_name,
+        details={
+            "source_artist_id": source_artist.get("id"),
+            "source_artist_entity_uid": source_artist.get("entity_uid"),
+            "source_artist": source_artist_name,
+            "target_artist_id": target_artist.get("id"),
+            "target_artist_entity_uid": target_artist.get("entity_uid"),
+            "target_artist": target_artist_name,
+            "source_path": str(source_dir),
+            "target_path": str(target_dir),
+            "moved_items": moved_items,
+            "source_albums": len(source_albums),
+            "source_tracks": source_track_count,
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation()
+    start_scan()
+    return {
+        "status": "ok",
+        "source_artist_id": source_artist.get("id"),
+        "target_artist_id": target_artist.get("id"),
+        "source_artist": source_artist_name,
+        "target_artist": target_artist_name,
+        "source_path": str(source_dir),
+        "target_path": str(target_dir),
+        "moved_items": moved_items,
+        "source_albums": len(source_albums),
+        "source_tracks": source_track_count,
+    }
+
+
 def _handle_move_artist(task_id: str, params: dict, config: dict) -> dict:
     name = params.get("name", "")
     new_name = params.get("new_name", "")
@@ -872,9 +1757,72 @@ def _handle_update_track_tags(task_id: str, params: dict, config: dict) -> dict:
         return {"error": str(exc)}
 
 
+def _handle_update_artist_metadata(task_id: str, params: dict, config: dict) -> dict:
+    del config
+    metadata = params.get("metadata") or {}
+    if not isinstance(metadata, dict) or not metadata:
+        return {"error": "No metadata fields provided"}
+
+    actor_user_id = params.get("actor_user_id")
+    actor_user_id = actor_user_id if isinstance(actor_user_id, int) else None
+    result = db_update_artist_metadata(
+        artist_id=params.get("artist_id"),
+        artist_entity_uid=params.get("artist_entity_uid"),
+        artist_name=params.get("artist_name"),
+        metadata=metadata,
+        locked_by_user_id=actor_user_id,
+    )
+    if result is None:
+        return {"error": "Artist not found or no editable fields provided"}
+
+    artist_name = str(result.get("artist_name") or params.get("artist_name") or "")
+    changed_fields = list(result.get("changed_fields") or [])
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Updated artist metadata for {artist_name}: "
+                f"{len(changed_fields)} field(s) changed"
+            ),
+            "changed_fields": changed_fields,
+        },
+    )
+    log_audit(
+        "manual_update_artist_metadata",
+        "artist",
+        artist_name,
+        details={
+            "before": result.get("before", {}),
+            "after": result.get("after", {}),
+            "changed_fields": changed_fields,
+            "source": "manual_edit",
+        },
+        user_id=actor_user_id,
+        task_id=task_id,
+    )
+
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        scopes = ["library", "home"]
+        if result.get("artist_id"):
+            scopes.append(f"artist:{result['artist_id']}")
+        broadcast_invalidation(*scopes)
+    except Exception:
+        log.debug("Failed to broadcast artist metadata invalidation", exc_info=True)
+
+    return {
+        "status": "ok",
+        "artist": artist_name,
+        "changed": len(changed_fields),
+        "changed_fields": changed_fields,
+    }
+
+
 def _handle_resolve_duplicates(task_id: str, params: dict, config: dict) -> dict:
     lib = Path(config["library_path"])
-    trash = lib / ".librarian-trash"
+    trash = _crate_trash_root(lib)
     keep = params.get("keep", "")
     remove_list = params.get("remove", [])
     removed = []
@@ -1412,10 +2360,20 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "library_pipeline": _handle_library_pipeline,
     "delete_artist": _handle_delete_artist,
     "delete_album": _handle_delete_album,
+    "library_track_quarantine": _handle_quarantine_track,
+    "library_track_restore": _handle_restore_track,
+    "library_track_hard_delete": _handle_hard_delete_track,
+    "library_quarantined_track_hard_delete": _handle_hard_delete_quarantined_track,
+    "library_track_move": _handle_move_track,
+    "library_album_move_to_artist": _handle_move_album_to_artist,
+    "library_album_merge": _handle_merge_album,
+    "library_album_split": _handle_split_album,
+    "library_artist_merge": _handle_merge_artist,
     "move_artist": _handle_move_artist,
     "wipe_library": _handle_wipe_library,
     "rebuild_library": _handle_rebuild_library,
     "match_apply": _handle_match_apply,
+    "update_artist_metadata": _handle_update_artist_metadata,
     "update_album_tags": _handle_update_album_tags,
     "update_track_tags": _handle_update_track_tags,
     "resolve_duplicates": _handle_resolve_duplicates,

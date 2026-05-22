@@ -36,6 +36,7 @@ from crate.bandcamp.search import (
     find_exact_artist_url,
 )
 from crate.db.events import emit_task_event
+from crate.db.jobs.bandcamp import bandcamp_write_scope
 from crate.db.repositories.bandcamp import (
     backfill_confirmed_bandcamp_entity_urls,
     complete_pairing_challenge,
@@ -68,7 +69,6 @@ from crate.db.repositories.library_contributions import (
 )
 from crate.db.repositories.library import get_library_album
 from crate.db.repositories.tasks import create_task
-from crate.db.tx import transaction_scope
 from crate.db.queries.browse import find_album_row
 from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
@@ -322,7 +322,7 @@ def _handle_bandcamp_sync_collection(task_id: str, params: dict, config: dict) -
         seen_item_ids = {relation_type: [] for relation_type in include}
         import_candidates: list[int] = []
 
-        with transaction_scope() as session:
+        with bandcamp_write_scope() as session:
             for index, synced in enumerate(sync_result.items, start=1):
                 item = upsert_bandcamp_item(synced.item, session=session)
                 local_item_id = int(item["id"])
@@ -448,7 +448,7 @@ def _handle_bandcamp_backfill_entity_urls(
 
     item_ids = list_bandcamp_item_ids(limit=limit)
     matches_created = 0
-    with transaction_scope() as session:
+    with bandcamp_write_scope() as session:
         for item_id in item_ids:
             matches_created += len(
                 create_matches_for_bandcamp_item(item_id, session=session)

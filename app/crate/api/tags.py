@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api._deps import (
@@ -12,9 +15,17 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.schemas.common import TaskEnqueueResponse
-from crate.api.schemas.utility import AlbumTagsUpdate, TrackTagsUpdate
+from crate.api.schemas.utility import (
+    AlbumTagsUpdate,
+    ArtistMetadataUpdate,
+    TrackTagsUpdate,
+)
 from crate.api.permissions import require_permission
-from crate.db.repositories.library import get_track_path_by_id
+from crate.db.repositories.library import (
+    get_library_artist_by_entity_uid,
+    get_library_artist_by_id,
+    get_track_path_by_id,
+)
 from crate.db.repositories.tasks import create_task
 
 router = APIRouter(tags=["metadata"])
@@ -26,6 +37,57 @@ _TAG_RESPONSES = merge_responses(
         422: error_response("The request payload failed validation."),
     },
 )
+
+
+def _update_artist_metadata(
+    request: Request, artist: Mapping[str, Any], data: ArtistMetadataUpdate
+):
+    actor = require_permission(request, "library.metadata.write")
+    metadata = data.model_dump(exclude_unset=True)
+    if not metadata:
+        raise HTTPException(status_code=422, detail="No metadata fields provided")
+
+    task_id = create_task(
+        "update_artist_metadata",
+        {
+            "artist_id": artist.get("id"),
+            "artist_entity_uid": artist.get("entity_uid"),
+            "artist_name": artist.get("name"),
+            "metadata": metadata,
+            "actor_user_id": actor.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.put(
+    "/api/artists/by-entity/{artist_entity_uid}/metadata",
+    response_model=TaskEnqueueResponse,
+    responses=_TAG_RESPONSES,
+    summary="Queue an artist-metadata update by entity UID",
+)
+def api_update_artist_metadata_by_entity_uid(
+    request: Request, artist_entity_uid: str, data: ArtistMetadataUpdate
+):
+    artist = get_library_artist_by_entity_uid(artist_entity_uid)
+    if not artist:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _update_artist_metadata(request, artist, data)
+
+
+@router.put(
+    "/api/artists/{artist_id}/metadata",
+    response_model=TaskEnqueueResponse,
+    responses=_TAG_RESPONSES,
+    summary="Queue an artist-metadata update",
+)
+def api_update_artist_metadata_by_id(
+    request: Request, artist_id: int, data: ArtistMetadataUpdate
+):
+    artist = get_library_artist_by_id(artist_id)
+    if not artist:
+        raise HTTPException(status_code=404, detail="Not found")
+    return _update_artist_metadata(request, artist, data)
 
 
 def _update_album_tags(

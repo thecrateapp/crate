@@ -32,6 +32,9 @@ import {
   Calendar,
   Activity,
   ScrollText,
+  ShieldCheck,
+  Trash2,
+  HandHeart,
 } from "lucide-react";
 
 interface SearchResults {
@@ -50,7 +53,7 @@ interface SearchResults {
 const COMMAND_SYNC_LIBRARY = ["library.import.manage"] as const;
 const COMMAND_REPAIR_RUN = ["library.repair.run"] as const;
 const COMMAND_METADATA_WRITE = ["library.metadata.write"] as const;
-const COMMAND_ADMIN_ONLY = ["admin.access"] as const;
+const COMMAND_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const COMMAND_SYNC_SHOWS = ["curation.shows.write"] as const;
 const COMMAND_GENRE_CURATION = ["curation.genres.write"] as const;
 const COMMAND_RELEASE_CURATION = ["curation.releases.write"] as const;
@@ -124,28 +127,28 @@ export function CommandPalette() {
     {
       label: "Analyze All Tracks (BPM, Key, Energy)",
       toastLabel: "Audio Analysis",
-      capabilities: COMMAND_ADMIN_ONLY,
+      capabilities: COMMAND_ANALYSIS_MANAGE,
       icon: BrainCircuit,
       run: () => api("/api/manage/analyze-all", "POST"),
     },
     {
       label: "Compute Bliss Vectors",
       toastLabel: "Compute Bliss vectors",
-      capabilities: COMMAND_ADMIN_ONLY,
+      capabilities: COMMAND_ANALYSIS_MANAGE,
       icon: Radio,
       run: () => api("/api/manage/compute-bliss", "POST"),
     },
     {
       label: "Compute Popularity (Last.fm)",
       toastLabel: "Compute Popularity",
-      capabilities: COMMAND_ADMIN_ONLY,
+      capabilities: COMMAND_ANALYSIS_MANAGE,
       icon: BarChart2,
       run: () => api("/api/manage/compute-popularity", "POST"),
     },
     {
       label: "Backfill Audio Fingerprints (Chromaprint)",
       toastLabel: "Backfill audio fingerprints",
-      capabilities: COMMAND_ADMIN_ONLY,
+      capabilities: COMMAND_ANALYSIS_MANAGE,
       icon: BrainCircuit,
       run: () => api("/api/tasks/backfill-track-fingerprints", "POST"),
     },
@@ -289,6 +292,12 @@ export function CommandPalette() {
                     capabilities: ["ops.health.view"],
                   },
                   {
+                    label: "Analysis",
+                    path: "/analysis",
+                    icon: BrainCircuit,
+                    capabilities: ["library.analysis.manage"],
+                  },
+                  {
                     label: "Tasks",
                     path: "/tasks",
                     icon: ListTodo,
@@ -313,6 +322,12 @@ export function CommandPalette() {
                     capabilities: ["users.view"],
                   },
                   {
+                    label: "Roles",
+                    path: "/roles",
+                    icon: ShieldCheck,
+                    capabilities: ["roles.view"],
+                  },
+                  {
                     label: "Acquisition",
                     path: "/download",
                     icon: Download,
@@ -320,6 +335,18 @@ export function CommandPalette() {
                       "library.import.manage",
                       "library.tidal.manage",
                     ],
+                  },
+                  {
+                    label: "Library Trash",
+                    path: "/trash",
+                    icon: Trash2,
+                    capabilities: ["library.track.remove"],
+                  },
+                  {
+                    label: "Contributions",
+                    path: "/contributions",
+                    icon: HandHeart,
+                    capabilities: ["library.import.manage"],
                   },
                   {
                     label: "Bandcamp",
@@ -362,7 +389,7 @@ export function CommandPalette() {
                     label: "Settings",
                     path: "/settings",
                     icon: Settings,
-                    capabilities: ["admin.access"],
+                    capabilities: ["settings.manage"],
                   },
                 ]
                   .filter((item) => hasAnyCapability(item.capabilities))

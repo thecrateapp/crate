@@ -81,6 +81,10 @@ interface UserRecord {
   name: string;
   avatar?: string | null;
   role: string;
+  status?: "active" | "suspended" | "deleted" | string;
+  status_reason?: string | null;
+  suspended_at?: string | null;
+  deleted_at?: string | null;
   capabilities?: string[];
   has_password?: boolean;
   active_sessions?: number;
@@ -138,7 +142,13 @@ interface AuthInvite {
   use_count?: number | null;
 }
 
-type UserFilter = "all" | "online" | "listening" | "admins";
+type UserFilter =
+  | "all"
+  | "online"
+  | "listening"
+  | "admins"
+  | "suspended"
+  | "deleted";
 type SessionFilter = "active" | "recent" | "all";
 
 const ROLE_OPTIONS = [
@@ -151,6 +161,14 @@ const ROLE_OPTIONS = [
   { value: "contributor", label: "Contributor" },
   { value: "user", label: "User" },
 ];
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "suspended", label: "Suspended" },
+  { value: "deleted", label: "Deleted" },
+];
+
+const MODAL_SELECT_MENU_CLASS = "z-[1600]";
 
 const SESSION_ACTIVE_WINDOW_MS = 3 * 60 * 1000;
 const SESSION_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -215,6 +233,21 @@ function formatRelativeTimestamp(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Never";
   return timeAgo(value);
+}
+
+function userStatus(user: Pick<UserRecord, "status">) {
+  return (user.status || "active").trim().toLowerCase();
+}
+
+function statusBadgeClass(status: string) {
+  if (status === "active") return "border-green-400/20 text-green-300";
+  if (status === "suspended") return "border-amber-400/25 text-amber-300";
+  if (status === "deleted") return "border-red-400/25 text-red-300";
+  return "border-white/10 text-white/55";
+}
+
+function statusLabel(status: string) {
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function sessionUaLabel(userAgent?: string | null) {
@@ -543,9 +576,19 @@ export function Users() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<UserFilter>("all");
   const [searchParams, setSearchParams] = useSearchParams();
-  const canViewUserMap = hasCapability("admin.access");
-  const canManageUsers = hasCapability("users.manage");
-  const canManageRoles = hasCapability("roles.manage");
+  const canViewUserMap = hasCapability("users.view");
+  const canCreateUsers =
+    hasCapability("users.create") || hasCapability("users.manage");
+  const canManageStatus =
+    hasCapability("users.status.manage") || hasCapability("users.manage");
+  const canManagePasswords =
+    hasCapability("users.password.manage") || hasCapability("users.manage");
+  const canManageSessions =
+    hasCapability("users.sessions.manage") || hasCapability("users.manage");
+  const canDeleteUsers =
+    hasCapability("users.delete") || hasCapability("users.manage");
+  const canAssignRoles =
+    hasCapability("roles.assign") || hasCapability("roles.manage");
 
   function setInspectParam(userId: number | null) {
     const next = new URLSearchParams(searchParams);
@@ -597,7 +640,7 @@ export function Users() {
   }, [currentUser?.id, detailTarget, searchParams, users]);
 
   async function handleDelete() {
-    if (!deleteTarget || !canManageUsers) return;
+    if (!deleteTarget || !canDeleteUsers) return;
     try {
       await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
       toast.success("User deleted");
@@ -628,7 +671,9 @@ export function Users() {
           filter === "all" ||
           (filter === "online" && user.online_now) ||
           (filter === "listening" && user.listening_now) ||
-          (filter === "admins" && user.role === "admin");
+          (filter === "admins" && user.role === "admin") ||
+          (filter === "suspended" && userStatus(user) === "suspended") ||
+          (filter === "deleted" && userStatus(user) === "deleted");
 
         const providerText = (user.connected_accounts || [])
           .map((account) => account.provider)
@@ -699,7 +744,7 @@ export function Users() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canManageUsers ? (
+            {canCreateUsers ? (
               <>
                 <Button
                   size="sm"
@@ -758,6 +803,19 @@ export function Users() {
                   label: "Admins",
                   count: users.filter((user) => user.role === "admin").length,
                 },
+                {
+                  key: "suspended",
+                  label: "Suspended",
+                  count: users.filter(
+                    (user) => userStatus(user) === "suspended",
+                  ).length,
+                },
+                {
+                  key: "deleted",
+                  label: "Deleted",
+                  count: users.filter((user) => userStatus(user) === "deleted")
+                    .length,
+                },
               ].map((item) => (
                 <CratePill
                   key={item.key}
@@ -795,6 +853,12 @@ export function Users() {
                             }
                           >
                             {user.role}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={statusBadgeClass(userStatus(user))}
+                          >
+                            {statusLabel(userStatus(user))}
                           </Badge>
                           {user.username ? (
                             <Badge variant="outline">@{user.username}</Badge>
@@ -906,12 +970,13 @@ export function Users() {
                         <Info size={14} className="mr-2" />
                         Inspect
                       </Button>
-                      {canManageUsers ? (
+                      {canDeleteUsers ? (
                         <Button
                           variant="outline"
                           size="sm"
                           className="border-red-500/25 text-red-300 hover:bg-red-500/10 hover:text-red-200"
                           onClick={() => setDeleteTarget(user)}
+                          disabled={userStatus(user) === "deleted"}
                         >
                           <Trash2 size={14} className="mr-2" />
                           Delete
@@ -936,9 +1001,9 @@ export function Users() {
         open={addOpen}
         onOpenChange={setAddOpen}
         onSuccess={fetchUsers}
-        canManageRoles={canManageRoles}
+        canAssignRoles={canAssignRoles}
       />
-      {canManageUsers ? (
+      {canCreateUsers ? (
         <InviteUserDialog open={inviteOpen} onOpenChange={setInviteOpen} />
       ) : null}
 
@@ -951,8 +1016,10 @@ export function Users() {
           }
         }}
         onSuccess={fetchUsers}
-        canManageUsers={canManageUsers}
-        canManageRoles={canManageRoles}
+        canManageStatus={canManageStatus}
+        canManagePasswords={canManagePasswords}
+        canManageSessions={canManageSessions}
+        canAssignRoles={canAssignRoles}
       />
 
       <ConfirmDialog
@@ -961,7 +1028,9 @@ export function Users() {
           if (!open) setDeleteTarget(null);
         }}
         title="Delete user"
-        description={`Are you sure you want to delete ${deleteTarget?.name}? This action cannot be undone.`}
+        description={`Soft-delete ${
+          deleteTarget?.name || deleteTarget?.email
+        }? Open sessions will be revoked and owned contributions may be queued for cleanup.`}
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDelete}
@@ -974,14 +1043,18 @@ function UserDetailDialog({
   user,
   onOpenChange,
   onSuccess,
-  canManageUsers,
-  canManageRoles,
+  canManageStatus,
+  canManagePasswords,
+  canManageSessions,
+  canAssignRoles,
 }: {
   user: UserRecord | null;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  canManageUsers: boolean;
-  canManageRoles: boolean;
+  canManageStatus: boolean;
+  canManagePasswords: boolean;
+  canManageSessions: boolean;
+  canAssignRoles: boolean;
 }) {
   const { user: currentUser, refetch } = useAuth();
   const open = !!user;
@@ -992,7 +1065,10 @@ function UserDetailDialog({
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("active");
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [roleDraft, setRoleDraft] = useState("user");
+  const [statusDraft, setStatusDraft] = useState("active");
+  const [statusReason, setStatusReason] = useState("");
   const [roleSaving, setRoleSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
 
   async function fetchDetail(userId: number) {
     setLoading(true);
@@ -1025,8 +1101,15 @@ function UserDetailDialog({
     }
   }, [detail?.role]);
 
+  useEffect(() => {
+    if (detail?.status) {
+      setStatusDraft(userStatus(detail));
+      setStatusReason(detail.status_reason ?? "");
+    }
+  }, [detail]);
+
   async function handleRoleSave() {
-    if (!detail || !canManageRoles || roleDraft === detail.role) return;
+    if (!detail || !canAssignRoles || roleDraft === detail.role) return;
     setRoleSaving(true);
     try {
       const updated = await api<UserDetail>(
@@ -1049,8 +1132,37 @@ function UserDetailDialog({
     }
   }
 
+  async function handleStatusSave() {
+    if (!detail || !canManageStatus || statusDraft === userStatus(detail))
+      return;
+    setStatusSaving(true);
+    try {
+      const updated = await api<UserDetail>(
+        `/api/auth/users/${detail.id}/status`,
+        "PATCH",
+        {
+          status: statusDraft,
+          reason: statusReason || undefined,
+          revoke_sessions: statusDraft !== "active",
+        },
+      );
+      setDetail(updated);
+      toast.success("User status updated");
+      onSuccess();
+      if (currentUser?.id === detail.id) {
+        refetch();
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to update user status",
+      );
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
   async function handleRevokeSession(sessionId: string) {
-    if (!detail || !canManageUsers) return;
+    if (!detail || !canManageSessions) return;
     setRevokingId(sessionId);
     try {
       await api(`/api/auth/users/${detail.id}/sessions/${sessionId}`, "DELETE");
@@ -1067,7 +1179,7 @@ function UserDetailDialog({
   }
 
   async function handleRevokeAll() {
-    if (!detail || !canManageUsers) return;
+    if (!detail || !canManageSessions) return;
     setRevokingAll(true);
     try {
       const result = await api<{ revoked: number }>(
@@ -1163,6 +1275,12 @@ function UserDetailDialog({
                           >
                             {detail.role}
                           </Badge>
+                          <Badge
+                            variant="outline"
+                            className={statusBadgeClass(userStatus(detail))}
+                          >
+                            {statusLabel(userStatus(detail))}
+                          </Badge>
                           {detail.username ? (
                             <Badge variant="outline">@{detail.username}</Badge>
                           ) : null}
@@ -1181,7 +1299,7 @@ function UserDetailDialog({
                       <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
                         Role
                       </div>
-                      {canManageRoles ? (
+                      {canAssignRoles ? (
                         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                           <AdminSelect
                             value={roleDraft}
@@ -1190,6 +1308,7 @@ function UserDetailDialog({
                             placeholder="Select role"
                             allowClear={false}
                             triggerClassName="max-w-full sm:w-48"
+                            menuClassName={MODAL_SELECT_MENU_CLASS}
                           />
                           <Button
                             size="sm"
@@ -1226,6 +1345,64 @@ function UserDetailDialog({
                           </CrateChip>
                         ) : null}
                       </div>
+                    </div>
+                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
+                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        <ShieldCheck size={13} />
+                        Account status
+                      </div>
+                      {canManageStatus ? (
+                        <div className="mt-3 space-y-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <AdminSelect
+                              value={statusDraft}
+                              onChange={setStatusDraft}
+                              options={STATUS_OPTIONS}
+                              placeholder="Select status"
+                              allowClear={false}
+                              triggerClassName="max-w-full sm:w-48"
+                              menuClassName={MODAL_SELECT_MENU_CLASS}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                statusSaving ||
+                                statusDraft === userStatus(detail)
+                              }
+                              onClick={handleStatusSave}
+                            >
+                              {statusSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                "Save status"
+                              )}
+                            </Button>
+                          </div>
+                          <Input
+                            value={statusReason}
+                            onChange={(event) =>
+                              setStatusReason(event.target.value)
+                            }
+                            placeholder="Reason for suspension/deletion"
+                          />
+                          {statusDraft !== "active" ? (
+                            <p className="text-xs text-amber-200/75">
+                              Saving this status revokes open sessions and
+                              blocks future login/refresh attempts.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-sm text-white/70">
+                          {statusLabel(userStatus(detail))}
+                        </div>
+                      )}
+                      {detail.status_reason ? (
+                        <div className="mt-3 text-xs text-white/42">
+                          Reason: {detail.status_reason}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-md border border-white/8 bg-black/15 p-3">
@@ -1354,7 +1531,7 @@ function UserDetailDialog({
                       <div className="mt-1 text-sm text-white/78">
                         {authModeSummary(detail)}
                       </div>
-                      {canManageUsers ? (
+                      {canManagePasswords ? (
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
                             size="sm"
@@ -1428,7 +1605,7 @@ function UserDetailDialog({
                         counted as active devices anymore.
                       </div>
                     ) : null}
-                    {canManageUsers ? (
+                    {canManageSessions ? (
                       <div>
                         <Button
                           size="sm"
@@ -1544,7 +1721,7 @@ function UserDetailDialog({
                               {session.id}
                             </div>
                           </div>
-                          {canManageUsers ? (
+                          {canManageSessions ? (
                             <div className="flex shrink-0 gap-2">
                               <Button
                                 size="sm"
@@ -1578,7 +1755,7 @@ function UserDetailDialog({
         </DialogContent>
       </Dialog>
 
-      {canManageUsers ? (
+      {canManagePasswords ? (
         <SetPasswordDialog
           open={passwordDialogOpen && !!detail}
           onOpenChange={setPasswordDialogOpen}
@@ -1746,12 +1923,12 @@ function AddUserDialog({
   open,
   onOpenChange,
   onSuccess,
-  canManageRoles,
+  canAssignRoles,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  canManageRoles: boolean;
+  canAssignRoles: boolean;
 }) {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -1774,7 +1951,7 @@ function AddUserDialog({
         email,
         name: name || undefined,
         password,
-        role: canManageRoles ? role : "user",
+        role: canAssignRoles ? role : "user",
       });
       toast.success("User created");
       onOpenChange(false);
@@ -1820,7 +1997,7 @@ function AddUserDialog({
             required
             minLength={8}
           />
-          {canManageRoles ? (
+          {canAssignRoles ? (
             <AdminSelect
               value={role}
               onChange={setRole}
@@ -1828,6 +2005,7 @@ function AddUserDialog({
               placeholder="Select role"
               allowClear={false}
               triggerClassName="max-w-full"
+              menuClassName={MODAL_SELECT_MENU_CLASS}
             />
           ) : null}
           <div className="flex justify-end gap-2 pt-2">

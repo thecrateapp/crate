@@ -163,6 +163,90 @@ def rename_artist(old_name: str, new_name: str, folder_name: str) -> None:
         )
 
 
+def merge_artist_into_artist(
+    source_artist_name: str,
+    target_artist_name: str,
+    old_path: str,
+    new_path: str,
+) -> None:
+    if not source_artist_name or not target_artist_name:
+        return
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE library_albums
+                SET artist = :target_artist,
+                    path = REPLACE(path, :old_prefix, :new_prefix),
+                    updated_at = NOW()
+                WHERE artist = :source_artist
+                  AND path LIKE :pattern
+                """
+            ),
+            {
+                "source_artist": source_artist_name,
+                "target_artist": target_artist_name,
+                "old_prefix": old_path + "/",
+                "new_prefix": new_path + "/",
+                "pattern": old_path + "/%",
+            },
+        )
+        session.execute(
+            text(
+                """
+                UPDATE library_tracks
+                SET artist = :target_artist,
+                    albumartist = :target_artist,
+                    path = REPLACE(path, :old_prefix, :new_prefix),
+                    updated_at = NOW()
+                WHERE (artist = :source_artist OR albumartist = :source_artist)
+                  AND path LIKE :pattern
+                """
+            ),
+            {
+                "source_artist": source_artist_name,
+                "target_artist": target_artist_name,
+                "old_prefix": old_path + "/",
+                "new_prefix": new_path + "/",
+                "pattern": old_path + "/%",
+            },
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO artist_genres (artist_name, genre_id, weight, source)
+                SELECT :target_artist, genre_id, weight, source
+                FROM artist_genres
+                WHERE artist_name = :source_artist
+                ON CONFLICT (artist_name, genre_id) DO UPDATE
+                SET weight = GREATEST(artist_genres.weight, EXCLUDED.weight)
+                """
+            ),
+            {
+                "source_artist": source_artist_name,
+                "target_artist": target_artist_name,
+            },
+        )
+        session.execute(
+            text("DELETE FROM artist_genres WHERE artist_name = :source_artist"),
+            {"source_artist": source_artist_name},
+        )
+        session.execute(
+            text("DELETE FROM library_artists WHERE name = :source_artist"),
+            {"source_artist": source_artist_name},
+        )
+        session.execute(
+            text(
+                """
+                UPDATE library_artists
+                SET updated_at = NOW()
+                WHERE name = :target_artist
+                """
+            ),
+            {"target_artist": target_artist_name},
+        )
+
+
 def find_canonical_artist_by_folder(folder_name: str) -> dict | None:
     with transaction_scope() as session:
         row = (
@@ -199,6 +283,7 @@ __all__ = [
     "count_artist_tracks",
     "find_artist_canonical",
     "find_canonical_artist_by_folder",
+    "merge_artist_into_artist",
     "rename_artist",
     "update_artist_has_photo",
 ]

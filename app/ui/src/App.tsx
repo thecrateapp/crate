@@ -32,6 +32,12 @@ const Insights = lazy(() =>
 const Tasks = lazy(() =>
   import("@/pages/Tasks").then((m) => ({ default: m.Tasks })),
 );
+const Trash = lazy(() =>
+  import("@/pages/Trash").then((m) => ({ default: m.Trash })),
+);
+const Contributions = lazy(() =>
+  import("@/pages/Contributions").then((m) => ({ default: m.Contributions })),
+);
 const Playlists = lazy(() =>
   import("@/pages/Playlists").then((m) => ({ default: m.Playlists })),
 );
@@ -49,6 +55,9 @@ const Login = lazy(() =>
 );
 const Users = lazy(() =>
   import("@/pages/Users").then((m) => ({ default: m.Users })),
+);
+const Roles = lazy(() =>
+  import("@/pages/Roles").then((m) => ({ default: m.Roles })),
 );
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
@@ -109,7 +118,7 @@ function ProfileRedirect() {
   const { user, loading, hasCapability } = useAuth();
   if (loading) return <PageSpinner />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!hasCapability("admin.access")) return <Navigate to="/browse" replace />;
+  if (!hasCapability("users.view")) return <Navigate to="/browse" replace />;
   return <Navigate to={`/users?inspect=${user.id}`} replace />;
 }
 
@@ -146,14 +155,17 @@ function RequireCapabilities({
   return <CapabilityRoute anyOf={anyOf}>{children}</CapabilityRoute>;
 }
 
-const ADMIN_ACCESS = ["admin.access"] as const;
 const LIBRARY_VIEW = ["library.view"] as const;
 const LIBRARY_REPAIR_RUN = ["library.repair.run"] as const;
+const LIBRARY_TRACK_REMOVE = ["library.track.remove"] as const;
 const OPS_HEALTH_VIEW = ["ops.health.view"] as const;
 const OPS_LOGS_VIEW = ["ops.logs.view"] as const;
 const OPS_TASKS_MANAGE = ["ops.tasks.manage"] as const;
 const OPS_RUNTIME_MANAGE = ["ops.runtime.manage"] as const;
+const SETTINGS_MANAGE = ["settings.manage"] as const;
+const LIBRARY_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const USERS_VIEW = ["users.view"] as const;
+const ROLES_VIEW = ["roles.view"] as const;
 const RELEASE_CURATION = [
   "curation.releases.write",
   "library.tidal.manage",
@@ -162,6 +174,7 @@ const ACQUISITION_MANAGE = [
   "library.import.manage",
   "library.tidal.manage",
 ] as const;
+const CONTRIBUTION_REVIEW = ["library.import.manage"] as const;
 const BANDCAMP_MANAGE = ["library.bandcamp.manage"] as const;
 const UPCOMING_CURATION = [
   "curation.shows.write",
@@ -239,10 +252,26 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="trash"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_TRACK_REMOVE}>
+                      <Trash />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
                   path="download"
                   element={
                     <RequireCapabilities anyOf={ACQUISITION_MANAGE}>
                       <DownloadPage />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="contributions"
+                  element={
+                    <RequireCapabilities anyOf={CONTRIBUTION_REVIEW}>
+                      <Contributions />
                     </RequireCapabilities>
                   }
                 />
@@ -257,7 +286,7 @@ export default function App() {
                 <Route
                   path="analysis"
                   element={
-                    <RequireCapabilities anyOf={ADMIN_ACCESS}>
+                    <RequireCapabilities anyOf={LIBRARY_ANALYSIS_MANAGE}>
                       <Analysis />
                     </RequireCapabilities>
                   }
@@ -343,6 +372,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="roles"
+                  element={
+                    <RequireCapabilities anyOf={ROLES_VIEW}>
+                      <Roles />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
                   path="discover"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
@@ -353,7 +390,7 @@ export default function App() {
                 <Route
                   path="settings"
                   element={
-                    <RequireCapabilities anyOf={ADMIN_ACCESS}>
+                    <RequireCapabilities anyOf={SETTINGS_MANAGE}>
                       <Settings />
                     </RequireCapabilities>
                   }

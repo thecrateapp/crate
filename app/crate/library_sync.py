@@ -325,6 +325,8 @@ class LibrarySync:
 
     def sync_artist(self, artist_dir: Path) -> int:
         """Sync a single artist folder (used by watcher for incremental sync)."""
+        if artist_dir.name.startswith(".") or artist_dir.name in self.exclude_dirs:
+            return 0
         folder_name = artist_dir.name
         artist_name = self._canonical_artist_name(artist_dir, folder_name)
         return self.sync_artist_dirs(artist_name, [artist_dir])
@@ -905,7 +907,7 @@ class LibrarySync:
 
     def remove_stale(self) -> int:
         removed = 0
-        artists, _ = get_library_artists(per_page=100000)
+        artists, _ = get_library_artists(per_page=100000, include_internal=True)
 
         # Build set of canonical artist names (those with albums) and their claimed folders
         canonical_folders = set()
@@ -914,6 +916,14 @@ class LibrarySync:
                 canonical_folders.add(row["folder_name"])
 
         for row in artists:
+            if row["name"].startswith(".") or (row.get("folder_name") or "").startswith(
+                "."
+            ):
+                delete_artist(row["name"])
+                removed += 1
+                log.info("Removed internal library artist row: %s", row["name"])
+                continue
+
             # Remove empty entries whose name is a folder name already owned by a canonical artist
             # e.g. "ModelActriz" (0 albums) when "Model/Actriz" (folder_name=ModelActriz) exists with albums
             if row["album_count"] == 0 and row["track_count"] == 0:
@@ -955,6 +965,20 @@ class LibrarySync:
         albums = get_all_album_paths()
 
         for row in albums:
+            try:
+                relative_album_path = (
+                    Path(row["path"])
+                    .resolve(strict=False)
+                    .relative_to(self.library_path.resolve(strict=False))
+                )
+            except ValueError:
+                relative_album_path = None
+            if relative_album_path and any(
+                part.startswith(".") for part in relative_album_path.parts
+            ):
+                delete_album(row["path"])
+                log.info("Removed internal library album row: %s", row["path"])
+                continue
             if not Path(row["path"]).is_dir():
                 delete_album(row["path"])
                 log.info("Removed stale album: %s", row["path"])

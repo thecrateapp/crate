@@ -1377,9 +1377,17 @@ def set_library_entity_bandcamp_url(
                 bandcamp_url_updated_at = :updated_at
             WHERE entity_uid = CAST(:entity_uid AS uuid)
               AND NULLIF(trim(coalesce(bandcamp_url, '')), '') IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM library_field_locks l
+                  WHERE l.entity_type = :entity_type
+                    AND l.entity_id = {table}.id
+                    AND l.field_name = 'bandcamp_url'
+              )
             """),
             {
                 "entity_uid": entity_uid,
+                "entity_type": entity_type,
                 "url": cleaned_url,
                 "source": source,
                 "updated_at": now,

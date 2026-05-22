@@ -11,9 +11,8 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
-from crate.api.permissions import require_permission
+from crate.api.permissions import require_any_permission, require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.operations import AdminLogsSnapshotResponse
 from crate.db.admin_logs_surface import (
@@ -89,6 +88,19 @@ def _require_ops_logs(request: Request) -> dict:
 
 def _require_ops_runtime(request: Request) -> dict:
     return require_permission(request, "ops.runtime.manage")
+
+
+def _require_llm_status_viewer(request: Request) -> dict:
+    return require_any_permission(
+        request,
+        (
+            "library.metadata.write",
+            "curation.playlists.write",
+            "curation.genres.write",
+            "curation.releases.write",
+            "ops.health.view",
+        ),
+    )
 
 
 def _build_metrics_summary() -> dict:
@@ -392,7 +404,7 @@ def metrics_dashboard(
     "/llm/status", responses=AUTH_ERROR_RESPONSES, summary="Check LLM provider status"
 )
 def llm_status(request: Request):
-    _require_admin(request)
+    _require_llm_status_viewer(request)
     from crate.llm import get_config, get_provider_api_key, get_provider_key_names
 
     config = get_config()
@@ -610,7 +622,7 @@ def update_download_policy(request: Request, body: DownloadPolicyUpdate):
     summary="Users with geolocation, online and now-playing status",
 )
 def users_map(request: Request):
-    _require_admin(request)
+    require_permission(request, "users.view")
     from crate.db.repositories.auth import list_users_map_rows
 
     return {"users": list_users_map_rows()}
