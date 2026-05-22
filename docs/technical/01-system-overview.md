@@ -109,6 +109,7 @@ The canonical telemetry path is now `user_play_events`, not the old
 
 - `crate-ui`: desktop-oriented admin SPA.
 - `crate-listen`: consumer-oriented listening app for web/PWA/Capacitor.
+- `crate-listen-desktop`: native desktop listening app (Tauri).
 
 ### Supporting integrations
 

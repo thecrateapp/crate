@@ -19,7 +19,6 @@ import {
   Layers3,
   Menu,
   Search,
-  Sparkles,
 } from "lucide-react";
 
 import { MarkdownArticle } from "@/components/MarkdownArticle";
@@ -41,27 +40,27 @@ function Header({ onMenu }: { onMenu: () => void }) {
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/8 bg-[rgba(10,10,15,0.82)] backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 border-b border-cyan-200/12 bg-[#050507]/94 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-5 sm:px-8">
         <button
           onClick={onMenu}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/8 bg-white/5 text-white/70 transition hover:bg-white/10 lg:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center border border-white/12 bg-transparent text-white/62 transition hover:border-cyan-200/28 hover:text-white lg:hidden"
           aria-label="Open navigation"
         >
           <Menu size={18} />
         </button>
         <Link to="/" className="flex items-center gap-3">
-          <img src="/icons/logo.svg" alt="Crate" className="h-9 w-9 shrink-0" />
+          <img src="/icons/logo.svg" alt="Crate" className="h-7 w-7 shrink-0" />
           <div>
-            <div className="text-sm font-semibold tracking-[0.12em] text-cyan-300 uppercase">
+            <div className="font-mono text-[12px] uppercase text-cyan-200">
               Crate Docs
             </div>
-            <div className="text-xs text-white/45">
-              Technical architecture and product internals
+            <div className="hidden font-mono text-[11px] uppercase text-white/34 sm:block">
+              Architecture / operations / source
             </div>
           </div>
         </Link>
-        <nav className="ml-auto hidden items-center gap-1 lg:flex">
+        <nav className="ml-auto hidden items-center gap-5 lg:flex">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -69,10 +68,10 @@ function Header({ onMenu }: { onMenu: () => void }) {
               end={item.to === "/"}
               className={({ isActive }) =>
                 cn(
-                  "rounded-full px-3 py-2 text-sm transition",
+                  "font-mono text-[12px] uppercase underline decoration-white/16 underline-offset-4 transition",
                   isActive
-                    ? "bg-cyan-400/12 text-cyan-200"
-                    : "text-white/55 hover:bg-white/6 hover:text-white",
+                    ? "text-cyan-200 decoration-cyan-200/45"
+                    : "text-white/50 hover:text-white",
                 )
               }
             >
@@ -120,34 +119,34 @@ function Sidebar({
     <>
       <div
         className={cn(
-          "fixed inset-0 z-20 bg-black/50 transition-opacity lg:hidden",
+          "fixed inset-0 z-20 bg-black/68 transition-opacity lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={onClose}
       />
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-30 w-[320px] border-r border-white/8 bg-[#0d0f15] p-5 transition-transform lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-30 w-[320px] border-r border-cyan-200/12 bg-[#050507]/96 p-5 transition-transform lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="mb-4">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
-            Navigation
+          <div className="mb-2 font-mono text-[12px] uppercase text-cyan-200">
+            Navigation index
           </div>
           <div className="relative">
             <Search
               size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cyan-200/42"
             />
             <input
               ref={searchRef}
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="Search docs"
-              className="h-11 w-full rounded-xl border border-white/8 bg-white/5 pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-cyan-400/60"
+              className="h-11 w-full border border-cyan-200/16 bg-[#061014]/36 pl-10 pr-3 font-mono text-[13px] text-white outline-none placeholder:text-white/30 focus:border-cyan-200/52"
             />
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-white/8 bg-white/5 px-2 py-1 text-[11px] font-medium text-white/35">
+            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 border border-white/10 bg-black/18 px-2 py-1 font-mono text-[11px] text-white/35">
               /
             </div>
           </div>
@@ -159,11 +158,11 @@ function Sidebar({
             if (!items.length) return null;
             return (
               <div key={section} className="mb-6">
-                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/40">
+                <div className="mb-2 flex items-center gap-2 font-mono text-[12px] uppercase text-white/38">
                   <SectionIcon section={section} />
                   <span>{sectionMeta[section].label}</span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-px">
                   {items.map((doc) => (
                     <NavLink
                       key={doc.id}
@@ -171,10 +170,10 @@ function Sidebar({
                       onClick={onClose}
                       className={({ isActive }) =>
                         cn(
-                          "block rounded-xl px-3 py-2.5 transition",
+                          "block border-l px-3 py-2.5 transition",
                           isActive
-                            ? "bg-cyan-400/12 text-white"
-                            : "text-white/65 hover:bg-white/5 hover:text-white",
+                            ? "border-cyan-200 bg-[#061014]/54 text-white"
+                            : "border-white/10 text-white/62 hover:border-cyan-200/38 hover:bg-white/[0.025] hover:text-white",
                         )
                       }
                     >
@@ -201,40 +200,37 @@ function HomePage() {
   const firstTechnical = technical[0];
   return (
     <div className="space-y-10">
-      <section className="overflow-hidden rounded-[28px] border border-cyan-400/15 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.18),transparent_35%),linear-gradient(180deg,rgba(15,23,42,0.7),rgba(10,10,15,0.92))] p-8 sm:p-10">
+      <section className="border-y border-cyan-200/16 bg-[#061014]/28 p-7 sm:p-10">
         <div className="max-w-3xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300">
-            <Sparkles size={14} />
+          <div className="mb-5 font-mono text-[12px] uppercase text-cyan-200">
             Crate Documentation
           </div>
-          <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
+          <h1 className="max-w-[14ch] text-[48px] font-extrabold uppercase leading-[0.9] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[76px]">
             A self-hosted music platform built for people who still care about
             their library.
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-white/70 sm:text-lg">
+          <p className="mt-6 max-w-3xl text-[17px] leading-8 text-white/66 sm:text-[20px] sm:leading-9">
             Crate manages, enriches, and streams your personal music collection.
             These docs describe how every subsystem works — the ingestion
             pipeline, audio analysis, playback engine, API surface, and the
             frontends that sit on top.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap gap-x-8 gap-y-4 py-2">
             {firstTechnical ? (
               <Link
                 to={firstTechnical.route}
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-400/15 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/25"
+                className="font-mono text-[13px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
               >
                 Start with the system overview
-                <ArrowRight size={16} />
               </Link>
             ) : null}
             <a
               href="https://github.com/thecrateapp/crate"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/75 transition hover:bg-white/10 hover:text-white"
+              className="font-mono text-[13px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
             >
               Source on GitHub
-              <ArrowRight size={16} />
             </a>
           </div>
         </div>
@@ -246,11 +242,11 @@ function HomePage() {
           return (
             <div
               key={section}
-              className="rounded-[24px] border border-white/8 bg-white/[0.03] p-6"
+              className="border border-cyan-200/14 bg-[#061014]/28 p-6"
             >
               <div className="mb-3 flex items-center gap-2 text-cyan-300">
                 <SectionIcon section={section} />
-                <span className="text-sm font-semibold uppercase tracking-[0.14em]">
+                <span className="font-mono text-[12px] uppercase">
                   {sectionMeta[section].label}
                 </span>
               </div>
@@ -260,10 +256,9 @@ function HomePage() {
               {entry ? (
                 <Link
                   to={`/${section}`}
-                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-400/16"
+                  className="mt-5 inline-flex font-mono text-[12px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
                 >
                   View all
-                  <ArrowRight size={16} />
                 </Link>
               ) : null}
             </div>
@@ -272,7 +267,7 @@ function HomePage() {
       </section>
 
       <section>
-        <div className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-white/45">
+        <div className="mb-4 flex items-center gap-2 font-mono text-[12px] uppercase text-white/45">
           <FileText size={16} />
           Reading path
         </div>
@@ -281,10 +276,10 @@ function HomePage() {
             <Link
               key={doc.id}
               to={doc.route}
-              className="group rounded-[24px] border border-white/8 bg-white/[0.03] p-6 transition hover:border-cyan-400/25 hover:bg-white/[0.05]"
+              className="group border border-white/10 bg-white/[0.018] p-6 transition hover:border-cyan-200/30 hover:bg-[#061014]/34"
             >
-              <div className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
-                Step {index + 1}
+              <div className="mb-3 font-mono text-[12px] uppercase text-cyan-200/88">
+                Step {String(index + 1).padStart(2, "0")}
               </div>
               <div className="text-xl font-semibold text-white">
                 {doc.title}
@@ -293,7 +288,9 @@ function HomePage() {
                 {doc.summary}
               </p>
               <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
-                Read document
+                <span className="font-mono text-[12px] uppercase underline decoration-cyan-200/35 underline-offset-4">
+                  Read document
+                </span>
                 <ArrowRight
                   size={16}
                   className="transition group-hover:translate-x-1"
@@ -317,18 +314,18 @@ function SectionPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/8 bg-white/[0.03] p-7 sm:p-8">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+      <section className="border-y border-cyan-200/16 bg-[#061014]/28 p-7 sm:p-8">
+        <div className="mb-4 inline-flex items-center gap-2 font-mono text-[12px] uppercase text-cyan-200">
           <SectionIcon section={typedSection} />
           {meta.label}
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        <h1 className="max-w-3xl text-[42px] font-extrabold uppercase leading-[0.95] text-white sm:text-[64px]">
           {meta.label} documentation
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 text-white/62 sm:text-base">
           {meta.description}
         </p>
-        <div className="mt-4 text-xs uppercase tracking-[0.16em] text-white/35">
+        <div className="mt-5 font-mono text-[12px] uppercase text-white/35">
           {entries.length} documents in this section
         </div>
       </section>
@@ -338,9 +335,9 @@ function SectionPage() {
           <Link
             key={doc.id}
             to={doc.route}
-            className="group rounded-[24px] border border-white/8 bg-white/[0.03] p-6 transition hover:border-cyan-400/25 hover:bg-white/[0.05]"
+            className="group border border-white/10 bg-white/[0.018] p-6 transition hover:border-cyan-200/30 hover:bg-[#061014]/34"
           >
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">
+            <div className="mb-2 font-mono text-[12px] uppercase text-cyan-200/88">
               {meta.label}
             </div>
             <div className="text-xl font-semibold text-white">{doc.title}</div>
@@ -348,7 +345,9 @@ function SectionPage() {
               {doc.summary}
             </p>
             <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
-              Read document
+              <span className="font-mono text-[12px] uppercase underline decoration-cyan-200/35 underline-offset-4">
+                Read document
+              </span>
               <ArrowRight
                 size={16}
                 className="transition group-hover:translate-x-1"
@@ -365,8 +364,8 @@ function TableOfContents({ doc }: { doc: DocEntry }) {
   if (!doc.headings.length) return null;
   return (
     <aside className="hidden xl:block">
-      <div className="sticky top-24 rounded-[24px] border border-white/8 bg-white/[0.03] p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-white/45">
+      <div className="sticky top-24 border-l border-cyan-200/18 p-5">
+        <div className="mb-3 font-mono text-[12px] uppercase text-white/45">
           On this page
         </div>
         <nav className="space-y-2">
@@ -375,7 +374,7 @@ function TableOfContents({ doc }: { doc: DocEntry }) {
               key={`${heading.level}-${heading.id}`}
               href={`#${heading.id}`}
               className={cn(
-                "block text-sm leading-5 text-white/55 transition hover:text-cyan-200",
+                "docs-toc-link block text-sm leading-5 text-white/55 transition hover:text-cyan-200",
                 heading.level === 3 && "pl-3 text-white/42",
               )}
             >
@@ -399,13 +398,15 @@ function DocPage() {
   return (
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_260px]">
       <article className="min-w-0">
-        <div className="rounded-[28px] border border-white/8 bg-white/[0.025] p-6 sm:p-8">
+        <div className="border-y border-white/10 bg-[#050507]/58 p-6 sm:p-8">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">
+            <div className="inline-flex items-center gap-2 font-mono text-[12px] uppercase text-cyan-200">
               <SectionIcon section={doc.section} />
               {sectionMeta[doc.section].label}
             </div>
-            <span className="text-[11px] text-white/30">{doc.sourcePath}</span>
+            <span className="font-mono text-[11px] text-white/30">
+              {doc.sourcePath}
+            </span>
           </div>
           <MarkdownArticle markdown={doc.markdown} />
         </div>
@@ -414,9 +415,9 @@ function DocPage() {
           {adjacent.previous ? (
             <Link
               to={adjacent.previous.route}
-              className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25"
+              className="border border-white/10 bg-white/[0.018] p-5 transition hover:border-cyan-200/30"
             >
-              <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/40">
+              <div className="mb-2 flex items-center gap-2 font-mono text-[12px] uppercase text-white/40">
                 <ArrowLeft size={14} />
                 Previous
               </div>
@@ -430,9 +431,9 @@ function DocPage() {
           {adjacent.next ? (
             <Link
               to={adjacent.next.route}
-              className="rounded-[20px] border border-white/8 bg-white/[0.03] p-5 transition hover:border-cyan-400/25"
+              className="border border-white/10 bg-white/[0.018] p-5 transition hover:border-cyan-200/30"
             >
-              <div className="mb-2 flex items-center justify-end gap-2 text-xs uppercase tracking-[0.16em] text-white/40">
+              <div className="mb-2 flex items-center justify-end gap-2 font-mono text-[12px] uppercase text-white/40">
                 Next
                 <ArrowRight size={14} />
               </div>
@@ -451,16 +452,16 @@ function DocPage() {
 
 function NotFoundPage() {
   return (
-    <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-10 text-center">
-      <div className="text-sm uppercase tracking-[0.18em] text-white/35">
+    <div className="border-y border-white/10 bg-white/[0.018] p-10 text-center">
+      <div className="font-mono text-[12px] uppercase text-white/35">
         Not found
       </div>
-      <h1 className="mt-3 text-3xl font-semibold text-white">
+      <h1 className="mt-3 text-3xl font-extrabold uppercase text-white">
         This documentation page does not exist.
       </h1>
       <Link
         to="/"
-        className="mt-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-200"
+        className="mt-6 inline-flex font-mono text-[12px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4"
       >
         Back to docs home
       </Link>
@@ -474,7 +475,7 @@ function Breadcrumbs() {
 
   if (parts.length === 0) {
     return (
-      <div className="mb-5 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/32">
+      <div className="mb-5 flex items-center gap-2 font-mono text-[12px] uppercase text-white/32">
         <Home size={14} />
         Documentation home
       </div>
@@ -489,7 +490,7 @@ function Breadcrumbs() {
   });
 
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/32">
+    <div className="mb-5 flex flex-wrap items-center gap-2 font-mono text-[12px] uppercase text-white/32">
       <Home size={14} />
       {labels.map((label, index) => (
         <div key={`${label}-${index}`} className="flex items-center gap-2">
@@ -523,7 +524,7 @@ function AppShell() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-app-surface text-white">
+    <div className="docs-shell min-h-screen bg-app-surface text-white">
       <Header onMenu={() => setMenuOpen(true)} />
       <div className="mx-auto grid max-w-[1600px] gap-0 lg:grid-cols-[320px_minmax(0,1fr)]">
         <Sidebar
@@ -533,7 +534,7 @@ function AppShell() {
           onQueryChange={setQuery}
           searchRef={searchRef}
         />
-        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="min-w-0 px-5 py-6 sm:px-8 lg:py-8">
           <Breadcrumbs />
           <Routes>
             <Route index element={<HomePage />} />

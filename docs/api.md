@@ -64,7 +64,12 @@ acquisition, stack controls, and settings.
 - browse artist/album/track endpoints
 - search and explore endpoints
 - artwork and stream delivery
-- lyrics and ancillary media lookups
+- `/api/lyrics` for timed/synced lyrics lookups
+
+### Discovery and paths
+
+- `/api/paths/*` — Music Paths (acoustic route planning through bliss vector space)
+- `/api/me/feed` — Activity feed (new albums from followed artists, new releases, shows)
 
 ### Compatibility
 
