@@ -515,9 +515,9 @@ describe("replaceTrack", () => {
 // ── Playback controls ─────────────────────────────────────────────
 
 describe("play", () => {
-  it("delegates to instance.play", () => {
+  it("delegates to instance.play", async () => {
     initPlayer();
-    play();
+    await play();
 
     expect(mock.play).toHaveBeenCalled();
   });
@@ -554,11 +554,13 @@ describe("stop", () => {
 });
 
 describe("next", () => {
-  it("delegates with crossfade", () => {
+  it("delegates with crossfade", async () => {
     initPlayer();
     gpNext();
 
-    expect(mock.next).toHaveBeenCalledWith(undefined, true, true);
+    await vi.waitFor(() => {
+      expect(mock.next).toHaveBeenCalledWith(undefined, true, true);
+    });
   });
 
   it("is a no-op when no instance exists", () => {
@@ -580,11 +582,13 @@ describe("prev", () => {
 });
 
 describe("gotoTrack", () => {
-  it("delegates by index", () => {
+  it("delegates by index", async () => {
     initPlayer();
     gotoTrack(3, true);
 
-    expect(mock.gotoTrack).toHaveBeenCalledWith(3, true);
+    await vi.waitFor(() => {
+      expect(mock.gotoTrack).toHaveBeenCalledWith(3, true);
+    });
   });
 
   it("is a no-op when no instance exists", () => {

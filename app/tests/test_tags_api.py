@@ -106,7 +106,9 @@ class TestAlbumTagsByID:
             patch(
                 "crate.api.tags.album_names_from_id", return_value=("Tool", "Lateralus")
             ),
-            patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put("/api/albums/1/tags", json={})
@@ -188,7 +190,9 @@ class TestAlbumTagsByEntityUID:
                 "crate.api.tags.album_names_from_entity_uid",
                 return_value=("Tool", "Aenima"),
             ),
-            patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put(f"/api/albums/by-entity/{uid}/tags", json={})
@@ -284,7 +288,15 @@ class TestTrackTagsByID:
         assert resp.status_code == 404
 
     def test_requires_admin(self, test_app):
-        with patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")):
+        with (
+            patch(
+                "crate.api.tags.get_track_path_by_id",
+                return_value="/music/Artist/Album/Track.flac",
+            ),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
+        ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put("/api/tracks/1/tags", json={})
 
@@ -322,7 +334,9 @@ class TestTagsAuth:
             patch(
                 "crate.api.tags.album_names_from_id", return_value=("Tool", "Lateralus")
             ),
-            patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put("/api/albums/1/tags", json={})
@@ -334,7 +348,9 @@ class TestTagsAuth:
                 "crate.api.tags.album_names_from_entity_uid",
                 return_value=("Tool", "Aenima"),
             ),
-            patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put(f"/api/albums/by-entity/{uid}/tags", json={})
@@ -345,7 +361,9 @@ class TestTagsAuth:
                 "crate.api.tags.get_track_path_by_id",
                 return_value="/music/Artist/Album/Track.flac",
             ),
-            patch("crate.api.tags._require_admin", side_effect=Exception("forbidden")),
+            patch(
+                "crate.api.tags.require_permission", side_effect=Exception("forbidden")
+            ),
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.put("/api/tracks/1/tags", json={})
