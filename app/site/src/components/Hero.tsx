@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { ArrowRight, Check, Copy } from "lucide-react";
-import { AlbumGrid } from "./AlbumGrid";
-import { GithubIcon } from "./GithubIcon";
 
 const INSTALL_COMMAND = "curl -fsSL https://cratemusic.app/install.sh | bash";
+const HELP_URL =
+  "https://github.com/thecrateapp/crate/issues/new?title=Help%20installing%20Crate";
 
-function InstallCommand() {
+function InstallerBlock() {
   const [copied, setCopied] = useState(false);
 
   async function copyInstallCommand() {
@@ -22,123 +21,143 @@ function InstallCommand() {
         document.execCommand("copy");
         document.body.removeChild(input);
       }
+
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
+      window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setCopied(false);
     }
   }
 
   return (
-    <div className="mx-auto mt-9 w-full max-w-3xl overflow-hidden rounded-lg border border-white/10 bg-[#050608] text-left shadow-[0_22px_70px_-50px_rgba(6,182,212,0.65)]">
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 bg-[#0b0d10] px-3 py-2.5 sm:px-4">
-        <div className="flex gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-        </div>
-        <button
-          type="button"
-          onClick={copyInstallCommand}
-          className="inline-flex h-8 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-2.5 text-[12px] font-medium text-white/55 transition hover:border-white/18 hover:bg-white/[0.07] hover:text-white/85"
-          aria-label={
-            copied ? "Copied installer command" : "Copy installer command"
-          }
-        >
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-          <span className="hidden sm:inline">{copied ? "copied" : "copy"}</span>
-        </button>
-      </div>
-      <pre className="overflow-x-auto px-4 py-4 font-mono text-[12px] leading-6 text-[#d6f7ff] sm:px-5 sm:text-sm">
-        <code>
-          <span className="select-none text-[#5eead4]/70">$ </span>
+    <div className="mt-6 max-w-3xl">
+      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 py-2">
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[14px] leading-7 text-cyan-100 sm:text-[15px]">
+          <span className="select-none text-cyan-200/45" aria-hidden="true">
+            $
+          </span>{" "}
           {INSTALL_COMMAND}
         </code>
-      </pre>
+        <div className="flex shrink-0 gap-x-5">
+          <button
+            type="button"
+            onClick={copyInstallCommand}
+            className="font-mono text-[12px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
+            aria-label="Copy installer command"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <a
+            href={HELP_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[12px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
+          >
+            Help
+          </a>
+        </div>
+      </div>
+      <p className="mt-1 font-mono text-[11px] uppercase text-white/28">
+        Installs Crate server on Linux (x86_64).{" "}
+        <a
+          href="https://github.com/thecrateapp/crate"
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-white/12 underline-offset-4 transition hover:text-white/38"
+        >
+          Read the source
+        </a>{" "}
+        first if you prefer.
+      </p>
     </div>
   );
 }
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <AlbumGrid />
+    <section className="relative border-b border-white/10 px-5 py-10 sm:px-8 sm:py-14">
+      <div className="hud-frame mx-auto flex max-w-[1500px] px-0 py-2 lg:min-h-[calc(100svh-7rem)] lg:items-start lg:pt-8">
+        <div className="relative isolate max-w-[1120px]">
+          <img
+            src="/icons/logo.svg"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-28 top-2 z-0 h-[360px] w-[338px] max-w-none opacity-[0.045] mix-blend-screen sm:-left-44 sm:top-0 sm:h-[540px] sm:w-[507px] lg:-left-56 lg:top-2 lg:h-[680px] lg:w-[638px] [filter:drop-shadow(0_0_50px_rgba(103,232,249,0.2))]"
+          />
 
-      <div className="relative z-10 mx-auto max-w-[1400px] px-5 pt-20 pb-24 sm:px-8 sm:pt-28 sm:pb-32">
-        {/* Logo + Crate + Motto — stacked, centered */}
-        <div className="fade-up fade-up-1 flex flex-col items-center text-center">
-          <div className="relative mb-4">
-            <div className="absolute -inset-8 rounded-full bg-cyan-400/15 blur-3xl" />
-            <img
-              src="/icons/logo.svg"
-              alt="Crate"
-              className="relative h-20 w-20 drop-shadow-[0_0_40px_rgba(6,182,212,0.5)] sm:h-28 sm:w-28 lg:h-36 lg:w-36"
-            />
+          <div className="relative z-10">
+            <p className="mb-5 font-mono text-[12px] uppercase text-cyan-200">
+              FREE MUSIC PLATFORM / OPEN SOURCE / SELF HOSTED
+            </p>
+            <h1 className="max-w-[12ch] text-[58px] font-extrabold uppercase leading-[0.86] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[92px] lg:text-[82px] xl:text-[90px] 2xl:text-[108px]">
+              Crate is not a streaming service.
+            </h1>
+
+            <p className="mt-5 text-[28px] font-extrabold uppercase leading-none tracking-normal text-cyan-200 [text-shadow:0_0_24px_rgba(103,232,249,0.22)] sm:text-[42px] lg:text-[48px]">
+              Is a tool for revolution
+            </p>
+
+            <p className="mt-6 max-w-3xl text-[18px] leading-8 text-white/68 sm:text-[21px] sm:leading-9">
+              Crate is free, open-source software for taking music back from
+              streaming platforms and returning it to the people who give it
+              meaning: fans and artists. No subscriptions. No algorithms.
+            </p>
+
+            <p className="mt-6 max-w-3xl text-[18px] leading-8 text-white/68 sm:text-[21px] sm:leading-9">
+              Install it in your server. Bring your files. Tell your friends.
+              Start a community and break with the system.
+            </p>
+            <p className="mt-6 max-w-3xl text-[18px] leading-8 text-white/68 sm:text-[21px] sm:leading-9">
+              Own your music. Support your artists. Refuse the middleman.
+            </p>
+            <InstallerBlock />
+            <div className="mt-8 flex flex-wrap gap-x-8 gap-y-4 py-4">
+              <a
+                href="/why"
+                className="font-mono text-[14px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
+              >
+                the manifesto
+              </a>
+              <a
+                href="https://github.com/thecrateapp/crate"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[14px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
+              >
+                the source
+              </a>
+              <a
+                href="https://docs.cratemusic.app/"
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-[14px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
+              >
+                the docs
+              </a>
+            </div>
           </div>
-
-          {/* Crate wordmark — outlined in accent color */}
-          <div
-            className="fade-up fade-up-1 mb-2 text-[56px] font-black leading-none tracking-[-0.04em] text-transparent sm:text-[96px] lg:text-[140px]"
-            style={{
-              WebkitTextStroke: "1.5px rgba(6, 182, 212, 0.3)",
-            }}
-          >
-            Crate
-          </div>
-
-          {/* Motto — overlaps slightly with the wordmark via negative margin */}
-          <h1 className="fade-up fade-up-2 -mt-5 text-[40px] font-semibold leading-[1] tracking-[-0.04em] text-white sm:-mt-8 sm:text-[64px] lg:-mt-12 lg:text-[88px]">
-            Own your music.
-          </h1>
-        </div>
-
-        <div className="fade-up fade-up-3 mt-9 mx-auto max-w-3xl text-center">
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-300">
-            The Crate Manifesto
-          </div>
-          <blockquote className="text-[24px] font-medium leading-[1.28] tracking-tight text-white/78 sm:text-[34px]">
-            "Buy on Bandcamp. Own your files. Run your server. In a system
-            designed to extract, self-hosting is self-defense."
-          </blockquote>
           <a
             href="/why"
-            className="group mt-7 inline-flex items-center gap-2 rounded-full bg-cyan-400 px-5 py-3 text-sm font-semibold text-[#05161c] shadow-[0_0_24px_-6px_rgba(6,182,212,0.6)] transition hover:bg-cyan-300"
+            className="mt-12 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase text-white/22 transition hover:text-white/40"
           >
             Read the manifesto
-            <ArrowRight
-              size={16}
-              className="transition group-hover:translate-x-0.5"
-            />
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              aria-hidden="true"
+              className="mt-px"
+            >
+              <path
+                d="M5 1v7M2 5l3 3 3-3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </a>
-        </div>
-
-        <div className="fade-up fade-up-4 mx-auto mt-8 max-w-2xl text-center">
-          <p className="text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
-            Crate is an open-source project for people who want to stop renting
-            their listening life from platforms. Host it yourself, bring the
-            files you care about, invite whoever you trust, and keep the music
-            close.
-          </p>
-
-          <InstallCommand />
-
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="https://docs.cratemusic.app/technical/system-overview"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/85 transition hover:border-white/25 hover:bg-white/[0.08]"
-            >
-              Read the docs
-            </a>
-            <a
-              href="https://github.com/thecrateapp/crate"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white/85 transition hover:border-white/25 hover:bg-white/[0.08]"
-            >
-              <GithubIcon size={16} />
-              See the source
-            </a>
-          </div>
         </div>
       </div>
     </section>

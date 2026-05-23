@@ -16,6 +16,8 @@ Other compose files are intentionally scoped:
 - `docker-compose.local-stack.yaml`: local override for the production-style
   stack on `*.crate.local`.
 - `docker-compose.readplane.dev.yaml`: local readplane service/proxy overlay.
+  The readplane is **not** included in the main `docker-compose.dev.yaml` by
+  default. Enable it with `docker compose -f docker-compose.dev.yaml -f docker-compose.readplane.dev.yaml up`.
 
 ### Core dev services
 
@@ -109,7 +111,7 @@ Fresh installs and upgrades therefore follow the same Alembic-based path.
 
 Crate still has two runtime DB access paths:
 
-- the legacy psycopg2 pool in `app/crate/db/core.py`
+- the legacy psycopg2 pool in `app/crate/db/core_provisioning.py`
 - the SQLAlchemy engine/session runtime in `app/crate/db/engine.py`
 
 This is a controlled compatibility posture rather than the desired end-state for

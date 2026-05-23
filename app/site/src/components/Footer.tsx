@@ -2,25 +2,31 @@ import { GithubIcon } from "./GithubIcon";
 
 export function Footer() {
   const year = new Date().getFullYear();
+
   return (
-    <footer className="relative border-t border-white/6">
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <div className="flex items-center gap-3">
-          <img src="/icons/logo.svg" alt="" className="h-7 w-7" />
-          <div>
-            <div className="text-sm font-semibold text-white">Crate</div>
-            <div className="text-[12px] text-white/40">
-              Own your music. Support your artists. Refuse the middleman.
-            </div>
+    <footer className="relative border-t border-white/10 px-5 py-10 sm:px-8">
+      <div className="mx-auto grid max-w-[1500px] gap-8 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <div className="flex items-center gap-3">
+            <img src="/icons/logo.svg" alt="" className="h-7 w-7" />
+            <span className="font-mono text-[12px] uppercase text-white/72">
+              Crate
+            </span>
           </div>
+          <p className="mt-4 max-w-xl text-[13px] leading-6 text-white/42">
+            Own your music. Support your artists. Refuse the middleman.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-5 text-[13px] text-white/50">
+        <div className="flex flex-wrap gap-x-5 gap-y-3 font-mono text-[12px] uppercase text-white/48">
+          <a href="/why" className="transition hover:text-white">
+            Manifesto
+          </a>
           <a
             href="https://docs.cratemusic.app"
             className="transition hover:text-white"
           >
-            Documentation
+            Docs
           </a>
           <a
             href="https://github.com/thecrateapp/crate"
@@ -29,9 +35,9 @@ export function Footer() {
             className="inline-flex items-center gap-1.5 transition hover:text-white"
           >
             <GithubIcon size={13} />
-            GitHub
+            Source
           </a>
-          <span className="text-white/30">© {year} The Crate Squad</span>
+          <span className="text-white/28">{year}</span>
         </div>
       </div>
     </footer>

@@ -82,7 +82,7 @@ The preferred pattern for new code is explicit SQLAlchemy `Session` work inside
 
 The runtime bootstrap is now **Alembic-only**.
 
-Current `init_db()` behavior in `app/crate/db/core.py`:
+Current `init_db()` behavior in `app/crate/db/core_provisioning.py`:
 
 1. acquire an advisory lock
 2. run `alembic upgrade head`
