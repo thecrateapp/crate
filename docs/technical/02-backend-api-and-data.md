@@ -37,9 +37,12 @@ Notable route groups:
 - `social.py`: public profiles, user search, follows, and affinity
 - `radio.py`: radio seeds and continuation
 - `jam.py`: jam rooms, invites, and websocket-connected state
+- `bandcamp.py`: per-user Bandcamp connection, collection sync, owned-purchase
+  import, Radar, artist/album links, match management, and contribution export
+  / withdrawal
 - `subsonic.py`: Open Subsonic-compatible surface under `/rest`
-- `acquisition.py`, `tidal.py`, `scanner.py`, `tasks.py`, `settings.py`,
-  `stack.py`, `enrichment.py`: admin and operational domains
+- `acquisition.py`, `tidal.py`, `imports.py`, `scanner.py`, `tasks.py`,
+  `settings.py`, `stack.py`, `enrichment.py`: admin and operational domains
 
 ### Registration order matters
 
@@ -137,6 +140,26 @@ These power system operation rather than library content.
 - social/affinity state
 - listening telemetry tables
 
+### External ownership and contribution tables
+
+Bandcamp and user uploads add a provenance layer on top of the shared library:
+
+- `credential_secrets` stores encrypted external session material by opaque
+  reference. Production should use a stable `CRATE_CREDENTIAL_KEY`.
+- `bandcamp_connections` stores one Bandcamp connection per Crate user.
+- `bandcamp_items` caches Bandcamp collection, wishlist, following, and linked
+  release/track/artist items.
+- `user_bandcamp_items` records which user owns, follows, or saved each
+  Bandcamp item.
+- `bandcamp_imports` tracks purchase-import tasks and imported Crate entity
+  references.
+- `bandcamp_library_matches` links Bandcamp items to Crate artist/album/track
+  `entity_uid`s and syncs confirmed URLs back to `library_artists` and
+  `library_albums`.
+- `bandcamp_radar_items` stores user-scoped Bandcamp discovery candidates.
+- `library_contributions` records albums a user added through Bandcamp or
+  uploads, and powers portable export plus withdrawal.
+
 ## Read plane tables
 
 The new read plane introduced several important tables:
@@ -208,6 +231,7 @@ Current notable event types include:
 
 - `ui.invalidate`
 - `ui.snapshot.updated`
+- `library.acquisition.completed`
 - `track.analysis.updated`
 - `track.bliss.updated`
 - `user.play_event.recorded`
@@ -221,6 +245,14 @@ such as:
 
 This is why many UI surfaces now behave like warmed read models rather than
 live recomputation on every request.
+
+For catalog/import changes, cache invalidation clears backend cache before the
+event is published. The projector treats global scopes such as `home`,
+`library`, `upcoming`, `curation`, `playlists`, `artist:*`, `album:*`, and
+`playlist:*` as home-relevant and warms recent user home snapshots. Listen also
+subscribes to the replayable cache invalidation SSE feed as a fallback, so home
+sections such as Just Landed can refresh even if the snapshot stream reconnects
+late.
 
 ## Listening telemetry model
 

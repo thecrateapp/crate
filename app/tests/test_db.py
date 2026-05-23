@@ -2153,6 +2153,89 @@ class TestLibraryCRUD:
         assert artist["album_count"] == 2
         assert artist["track_count"] == 15
 
+    def test_manual_artist_metadata_locks_enrichment_fields(self, pg_db):
+        from crate.db.repositories.field_locks import list_locked_fields
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_metadata,
+        )
+
+        pg_db.upsert_artist({"name": "Locked Artist"})
+        pg_db.update_artist_enrichment(
+            "Locked Artist",
+            {
+                "bio": "Original bio",
+                "tags": ["original"],
+                "country": "US",
+                "listeners": 100,
+            },
+        )
+
+        result = update_artist_metadata(
+            artist_name="Locked Artist",
+            metadata={"bio": "Manual bio", "tags": ["manual"]},
+            locked_by_user_id=1,
+        )
+
+        assert result is not None
+        assert result["changed_fields"] == ["bio", "tags"]
+
+        artist = pg_db.get_library_artist("Locked Artist")
+        assert artist is not None
+        locked_fields = list_locked_fields(entity_type="artist", entity_id=artist["id"])
+        assert {"bio", "tags"}.issubset(locked_fields)
+
+        pg_db.update_artist_enrichment(
+            "Locked Artist",
+            {
+                "bio": "Automated bio",
+                "tags": ["automated"],
+                "country": "GB",
+                "listeners": 200,
+            },
+        )
+
+        artist = pg_db.get_library_artist("Locked Artist")
+        assert artist is not None
+        assert artist["bio"] == "Manual bio"
+        assert artist["tags_json"] == ["manual"]
+        assert artist["country"] == "GB"
+        assert artist["listeners"] == 200
+
+    def test_manual_bandcamp_url_clear_blocks_bandcamp_backfill(self, pg_db):
+        from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_metadata,
+        )
+
+        pg_db.upsert_artist({"name": "Bandcamp Locked Artist"})
+        artist = pg_db.get_library_artist("Bandcamp Locked Artist")
+        assert artist is not None
+        assert artist["entity_uid"] is not None
+
+        assert set_library_entity_bandcamp_url(
+            entity_type="artist",
+            entity_uid=artist["entity_uid"],
+            url="https://locked-artist.bandcamp.com",
+            source="backfill",
+        )
+        result = update_artist_metadata(
+            artist_name="Bandcamp Locked Artist",
+            metadata={"bandcamp_url": None},
+            locked_by_user_id=1,
+        )
+        assert result is not None
+        assert result["changed_fields"] == ["bandcamp_url"]
+
+        assert not set_library_entity_bandcamp_url(
+            entity_type="artist",
+            entity_uid=artist["entity_uid"],
+            url="https://other-artist.bandcamp.com",
+            source="backfill",
+        )
+        updated = pg_db.get_library_artist("Bandcamp Locked Artist")
+        assert updated is not None
+        assert updated["bandcamp_url"] is None
+
     def test_upsert_artist_entity_uid_stays_stable_when_mbid_arrives_later(self, pg_db):
         pg_db.upsert_artist({"name": "High Vis"})
         original = pg_db.get_library_artist("High Vis")
@@ -2414,6 +2497,24 @@ class TestLibraryCRUD:
         artists, total = pg_db.get_library_artists(q="Radio")
         assert total == 1
         assert artists[0]["name"] == "Radiohead"
+
+    def test_get_library_artists_hides_internal_library_dirs_by_default(self, pg_db):
+        pg_db.upsert_artist({"name": "High Vis", "folder_name": "High Vis"})
+        pg_db.upsert_artist({"name": ".crate-trash", "folder_name": ".crate-trash"})
+
+        artists, total = pg_db.get_library_artists(per_page=100)
+
+        assert total == 1
+        assert [artist["name"] for artist in artists] == ["High Vis"]
+
+        all_artists, all_total = pg_db.get_library_artists(
+            per_page=100, include_internal=True
+        )
+        assert all_total == 2
+        assert {artist["name"] for artist in all_artists} == {
+            ".crate-trash",
+            "High Vis",
+        }
 
     def test_get_library_stats(self, pg_db):
         pg_db.upsert_artist({"name": "Stats Artist", "total_size": 500000})

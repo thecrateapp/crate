@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface OpsSnapshotMetadata {
   scope: string;
@@ -248,8 +249,15 @@ interface OpsSnapshotContextValue {
 }
 
 const OpsSnapshotContext = createContext<OpsSnapshotContextValue | null>(null);
+const OPS_SNAPSHOT_CAPABILITIES = [
+  "ops.health.view",
+  "ops.logs.view",
+  "ops.tasks.manage",
+  "ops.runtime.manage",
+] as const;
 
 export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
+  const { loading: authLoading, hasAnyCapability } = useAuth();
   const [data, setData] = useState<OpsSnapshotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -257,47 +265,63 @@ export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
   const hasLoadedRef = useRef(false);
   const inflightRefreshRef = useRef<Promise<void> | null>(null);
   const lastRefreshAtRef = useRef(0);
+  const canLoadOpsSnapshot = hasAnyCapability(OPS_SNAPSHOT_CAPABILITIES);
 
-  const refresh = useCallback(async (fresh = false) => {
-    const now = Date.now();
-    if (fresh && now - lastRefreshAtRef.current < 1500) {
-      return inflightRefreshRef.current ?? Promise.resolve();
-    }
-    if (inflightRefreshRef.current) {
-      return inflightRefreshRef.current;
-    }
-
-    lastRefreshAtRef.current = now;
-    if (!hasLoadedRef.current) setLoading(true);
-    const request = (async () => {
-      try {
-        const query = fresh ? "?fresh=1" : "";
-        const snapshot = await api<OpsSnapshotData>(
-          `/api/admin/ops-snapshot${query}`,
-        );
-        setData(snapshot);
-        setError(null);
-        hasLoadedRef.current = true;
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load operational snapshot",
-        );
-      } finally {
+  const refresh = useCallback(
+    async (fresh = false) => {
+      if (authLoading || !canLoadOpsSnapshot) {
         setLoading(false);
-        inflightRefreshRef.current = null;
+        return;
       }
-    })();
-    inflightRefreshRef.current = request;
-    return request;
-  }, []);
+      const now = Date.now();
+      if (fresh && now - lastRefreshAtRef.current < 1500) {
+        return inflightRefreshRef.current ?? Promise.resolve();
+      }
+      if (inflightRefreshRef.current) {
+        return inflightRefreshRef.current;
+      }
+
+      lastRefreshAtRef.current = now;
+      if (!hasLoadedRef.current) setLoading(true);
+      const request = (async () => {
+        try {
+          const query = fresh ? "?fresh=1" : "";
+          const snapshot = await api<OpsSnapshotData>(
+            `/api/admin/ops-snapshot${query}`,
+          );
+          setData(snapshot);
+          setError(null);
+          hasLoadedRef.current = true;
+        } catch (err) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load operational snapshot",
+          );
+        } finally {
+          setLoading(false);
+          inflightRefreshRef.current = null;
+        }
+      })();
+      inflightRefreshRef.current = request;
+      return request;
+    },
+    [authLoading, canLoadOpsSnapshot],
+  );
 
   useEffect(() => {
+    if (authLoading || !canLoadOpsSnapshot) {
+      setLoading(false);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [authLoading, canLoadOpsSnapshot, refresh]);
 
   useEffect(() => {
+    if (authLoading || !canLoadOpsSnapshot) {
+      setLoading(false);
+      return;
+    }
     let disposed = false;
     let stream: EventSource | null = null;
 
@@ -334,7 +358,7 @@ export function OpsSnapshotProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, []);
+  }, [authLoading, canLoadOpsSnapshot]);
 
   useEffect(() => {
     function refreshIfVisible() {

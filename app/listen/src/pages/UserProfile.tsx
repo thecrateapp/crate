@@ -3,8 +3,10 @@ import { Link, useParams } from "react-router";
 import {
   ArrowLeft,
   BarChart3,
+  Disc3,
   Loader2,
   Music4,
+  PackagePlus,
   UserPlus,
   UserRoundCheck,
   Users,
@@ -14,7 +16,10 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { api } from "@/lib/api";
+import { contributionSourceLabel } from "@/lib/contributions";
+import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { formatTotalDuration } from "@/lib/utils";
 
 interface RelationshipState {
@@ -43,6 +48,37 @@ interface UserListItem {
   followed_at: string;
 }
 
+interface ProfileTopGenre {
+  name: string;
+  play_count: number;
+  minutes_listened: number;
+}
+
+interface ProfileStats {
+  plays_30d: number;
+  minutes_30d: number;
+  contributions: number;
+  public_playlists: number;
+}
+
+interface ProfileBadge {
+  key: string;
+  label: string;
+  tone: "cyan" | "gold" | "green" | "rose" | "neutral" | string;
+}
+
+interface ProfileContribution {
+  id: number;
+  source: string;
+  album_id: number | null;
+  album_entity_uid: string | null;
+  album_slug: string | null;
+  artist_name: string;
+  album_name: string;
+  has_cover: boolean | null;
+  imported_at: string | null;
+}
+
 interface PublicProfile {
   id: number;
   username: string | null;
@@ -60,6 +96,10 @@ interface PublicProfile {
   affinity_reasons: string[];
   followers_preview: UserListItem[];
   following_preview: UserListItem[];
+  top_genre: ProfileTopGenre | null;
+  stats: ProfileStats;
+  badges: ProfileBadge[];
+  contributions_preview: ProfileContribution[];
 }
 
 function UserAvatar({
@@ -115,6 +155,114 @@ function affinityTone(band?: string) {
     default:
       return "border-white/10 bg-white/[0.03] text-white/70";
   }
+}
+
+function badgeTone(tone: string) {
+  switch (tone) {
+    case "gold":
+      return "border-amber-300/30 bg-amber-300/10 text-amber-200";
+    case "green":
+      return "border-emerald-300/30 bg-emerald-300/10 text-emerald-200";
+    case "rose":
+      return "border-rose-300/30 bg-rose-300/10 text-rose-200";
+    case "cyan":
+      return "border-cyan-300/30 bg-cyan-300/10 text-cyan-200";
+    default:
+      return "border-white/10 bg-white/[0.04] text-white/70";
+  }
+}
+
+function formatMinutes(minutes: number) {
+  if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = Math.round(minutes % 60);
+    return rest > 0 ? `${hours}h ${rest}m` : `${hours}h`;
+  }
+  return `${Math.round(minutes)}m`;
+}
+
+function ProfileMiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+      <div className="truncate text-lg font-black text-foreground">{value}</div>
+      <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function ContributionCard({
+  contribution,
+}: {
+  contribution: ProfileContribution;
+}) {
+  const coverUrl =
+    contribution.album_id && contribution.has_cover
+      ? albumCoverApiUrl(
+          {
+            albumId: contribution.album_id,
+            albumEntityUid: contribution.album_entity_uid,
+            artistName: contribution.artist_name,
+            albumName: contribution.album_name,
+          },
+          { size: 160 },
+        )
+      : null;
+  const albumPath = contribution.album_id
+    ? albumPagePath({
+        albumId: contribution.album_id,
+        albumEntityUid: contribution.album_entity_uid,
+        albumSlug: contribution.album_slug,
+        artistName: contribution.artist_name,
+        albumName: contribution.album_name,
+      })
+    : null;
+  const source = contributionSourceLabel(contribution.source) || "library";
+  const card = (
+    <>
+      {coverUrl ? (
+        <img
+          src={coverUrl}
+          alt=""
+          className="h-14 w-14 rounded-xl object-cover"
+        />
+      ) : (
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-cyan-300/10 text-cyan-200">
+          <Disc3 size={20} />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-foreground">
+          {contribution.album_name}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          {contribution.artist_name}
+        </div>
+        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200/80">
+          via {source}
+        </div>
+      </div>
+    </>
+  );
+
+  if (!albumPath) {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+        {card}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={albumPath}
+      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 transition-colors hover:bg-white/[0.05]"
+    >
+      {card}
+    </Link>
+  );
 }
 
 export function UserProfile() {
@@ -180,6 +328,14 @@ export function UserProfile() {
   const displayName = data.display_name || data.username || "Unknown user";
   const followers = data.followers_preview || [];
   const following = data.following_preview || [];
+  const badges = data.badges || [];
+  const stats = data.stats || {
+    plays_30d: 0,
+    minutes_30d: 0,
+    contributions: 0,
+    public_playlists: data.public_playlists.length,
+  };
+  const contributions = data.contributions_preview || [];
 
   return (
     <div className="space-y-6">
@@ -308,6 +464,58 @@ export function UserProfile() {
             </div>
           </div>
         </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
+          <div className="rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.06] p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">
+              Top sound
+            </div>
+            <div className="mt-2 truncate text-lg font-black text-foreground">
+              {data.top_genre?.name || "Still mapping"}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {data.top_genre
+                ? `${data.top_genre.play_count} plays · ${formatMinutes(
+                    data.top_genre.minutes_listened,
+                  )}`
+                : "Crate needs more listening signal."}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+            <ProfileMiniStat
+              label="30d plays"
+              value={String(stats.plays_30d)}
+            />
+            <ProfileMiniStat
+              label="30d time"
+              value={formatMinutes(stats.minutes_30d)}
+            />
+            <ProfileMiniStat label="adds" value={String(stats.contributions)} />
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Identity badges
+            </div>
+            {badges.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {badges.map((badge) => (
+                  <span
+                    key={badge.key}
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${badgeTone(
+                      badge.tone,
+                    )}`}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2 text-sm text-muted-foreground">
+                Keep listening and contributing to unlock profile badges.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
@@ -342,56 +550,86 @@ export function UserProfile() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-          <div className="flex items-center gap-2">
-            <Music4 size={16} className="text-cyan-300" />
-            <h2 className="text-lg font-semibold text-foreground">
-              Public playlists
-            </h2>
-          </div>
-          <div className="mt-4 space-y-3">
-            {data.public_playlists.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
-                No public playlists yet.
-              </div>
-            ) : (
-              data.public_playlists.map((playlist) => (
-                <Link
-                  key={playlist.id}
-                  to={`/playlist/${playlist.id}`}
-                  className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
-                >
-                  {playlist.cover_data_url ? (
-                    <img
-                      src={playlist.cover_data_url}
-                      alt={playlist.name}
-                      className="h-14 w-14 rounded-xl object-cover"
+        <section className="space-y-6">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <PackagePlus size={16} className="text-cyan-300" />
+              <h2 className="text-lg font-semibold text-foreground">
+                Library contributions
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Albums this user brought into the shared Crate library.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {contributions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground sm:col-span-2">
+                  No public contributions yet.
+                </div>
+              ) : (
+                contributions
+                  .slice(0, 6)
+                  .map((contribution) => (
+                    <ContributionCard
+                      key={contribution.id}
+                      contribution={contribution}
                     />
-                  ) : (
-                    <div className="h-14 w-14 rounded-xl bg-white/5 flex items-center justify-center text-lg font-semibold text-white/40">
-                      {playlist.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {playlist.name}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {playlist.track_count} tracks
-                      {playlist.total_duration > 0
-                        ? ` · ${formatTotalDuration(playlist.total_duration)}`
-                        : ""}
-                      {playlist.is_collaborative ? " · Collaborative" : ""}
-                    </div>
-                    {playlist.description ? (
-                      <div className="mt-1 truncate text-xs text-muted-foreground">
-                        {playlist.description}
+                  ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <Music4 size={16} className="text-cyan-300" />
+              <h2 className="text-lg font-semibold text-foreground">
+                Public playlists
+              </h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {data.public_playlists.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
+                  No public playlists yet.
+                </div>
+              ) : (
+                data.public_playlists.map((playlist) => (
+                  <Link
+                    key={playlist.id}
+                    to={`/playlist/${playlist.id}`}
+                    className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                  >
+                    {playlist.cover_data_url ? (
+                      <img
+                        src={playlist.cover_data_url}
+                        alt={playlist.name}
+                        className="h-14 w-14 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 rounded-xl bg-white/5 flex items-center justify-center text-lg font-semibold text-white/40">
+                        {playlist.name.charAt(0).toUpperCase()}
                       </div>
-                    ) : null}
-                  </div>
-                </Link>
-              ))
-            )}
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {playlist.name}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {playlist.track_count} tracks
+                        {playlist.total_duration > 0
+                          ? ` · ${formatTotalDuration(playlist.total_duration)}`
+                          : ""}
+                        {playlist.is_collaborative ? " · Collaborative" : ""}
+                      </div>
+                      {playlist.description ? (
+                        <div className="mt-1 truncate text-xs text-muted-foreground">
+                          {playlist.description}
+                        </div>
+                      ) : null}
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
           </div>
         </section>
 
@@ -412,9 +650,10 @@ export function UserProfile() {
             </div>
             <div className="mt-4 space-y-3">
               {(followers || []).slice(0, 6).map((item) => (
-                <Link
+                <UserProfileLink
                   key={`follower-${item.id}`}
-                  to={item.username ? `/users/${item.username}` : "/people"}
+                  username={item.username}
+                  hoverClassName="block"
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                 >
                   <UserAvatar
@@ -431,7 +670,7 @@ export function UserProfile() {
                       {item.username ? `@${item.username}` : "Profile"}
                     </div>
                   </div>
-                </Link>
+                </UserProfileLink>
               ))}
               {!followers || followers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
@@ -457,9 +696,10 @@ export function UserProfile() {
             </div>
             <div className="mt-4 space-y-3">
               {(following || []).slice(0, 6).map((item) => (
-                <Link
+                <UserProfileLink
                   key={`following-${item.id}`}
-                  to={item.username ? `/users/${item.username}` : "/people"}
+                  username={item.username}
+                  hoverClassName="block"
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-3 py-2.5 hover:bg-white/[0.05] transition-colors"
                 >
                   <UserAvatar
@@ -476,7 +716,7 @@ export function UserProfile() {
                       {item.username ? `@${item.username}` : "Profile"}
                     </div>
                   </div>
-                </Link>
+                </UserProfileLink>
               ))}
               {!following || following.length === 0 ? (
                 <p className="text-sm text-muted-foreground">

@@ -27,6 +27,16 @@ class CreateUserRequest(BaseModel):
     role: str = "user"
 
 
+class UpdateUserRoleRequest(BaseModel):
+    role: str
+
+
+class UpdateUserStatusRequest(BaseModel):
+    status: str
+    reason: str | None = None
+    revoke_sessions: bool = True
+
+
 class OAuthStartRequest(BaseModel):
     return_to: str | None = None
     invite_token: str | None = None
@@ -158,6 +168,7 @@ class AuthMeResponse(AuthUserPublicResponse):
     username: str | None = None
     bio: str | None = None
     session_id: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
     connected_accounts: list[AuthExternalIdentityResponse] = Field(default_factory=list)
 
 
@@ -216,6 +227,11 @@ class AdminUserSummaryResponse(AuthUserPublicResponse):
 
     username: str | None = None
     bio: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    status: str = "active"
+    status_reason: str | None = None
+    suspended_at: datetime | None = None
+    deleted_at: datetime | None = None
     google_id: str | None = None
     has_password: bool = False
     active_sessions: int | None = None
@@ -231,6 +247,10 @@ class AdminUserSummaryResponse(AuthUserPublicResponse):
 
 
 class AdminUserDetailResponse(AuthMeResponse):
+    status: str = "active"
+    status_reason: str | None = None
+    suspended_at: datetime | None = None
+    deleted_at: datetime | None = None
     has_password: bool = False
     created_at: datetime | None = None
     last_login: datetime | None = None

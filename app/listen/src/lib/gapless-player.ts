@@ -28,6 +28,14 @@ function getPlaylistInternal(): GaplessPlaylistInternal | null {
   return (instance as GaplessInternal | null)?.playlist ?? null;
 }
 
+type GaplessOutputInternal = Gapless5 & {
+  context?: AudioContext;
+  masterOut?: GainNode;
+  setOutputChain?: (i: AudioNode | null, o: AudioNode | null) => void;
+  _outputChainInput?: AudioNode | null;
+  _outputChainOutput?: AudioNode | null;
+};
+
 // The package's TS declarations don't expose these enums as named imports,
 // but the runtime constants are stable in gapless5.js:
 // LogLevel.Warning = 3, CrossfadeShape.EqualPower = 3.
@@ -77,6 +85,10 @@ let fadeSettle: (() => void) | null = null;
 // Active equalizer chain (null = direct output, no processing).
 let eqChain: EqChain | null = null;
 let eqEnabled = false;
+let lastEqGains: EqGains = [];
+let lastPlaybackRate = 1.0;
+let lifecycleRecoveryInstalled = false;
+let contextWakeInFlight: Promise<void> | null = null;
 
 const DEFAULT_FADE_MS = 220;
 
@@ -178,6 +190,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     return instance;
   }
 
+  installAudioLifecycleRecovery();
   currentCallbacks = callbacks;
   const preferHtml5Audio = stableMobileAudioPipeline;
   const probe =
@@ -303,6 +316,8 @@ export function destroyPlayer(): void {
     eqChain = null;
   }
   eqEnabled = false;
+  lastEqGains = [];
+  lastPlaybackRate = 1.0;
   if (instance) {
     try {
       instance.stop();
@@ -407,47 +422,167 @@ export function replaceTrack(index: number, url: string): void {
   // replaceTrack swaps in-place, no shuffledIndices change needed.
 }
 
-/**
- * Resume the AudioContext if it's suspended. Mobile browsers require
- * a user gesture to activate the context — we call this from every
- * user-initiated play path so the first tap always unlocks audio.
- */
-function ensureContextResumed(): void {
-  const patched = instance as
-    | (Gapless5 & {
-        context?: AudioContext;
-        masterOut?: GainNode;
-        _outputChainInput?: AudioNode | null;
-        _outputChainOutput?: AudioNode | null;
-      })
-    | null;
-  const ctx = patched?.context;
-  if (ctx?.state === "closed") {
-    const audioWindow = window as unknown as {
-      AudioContext?: typeof AudioContext;
-      webkitAudioContext?: typeof AudioContext;
-      gapless5AudioContext?: AudioContext;
-    };
-    const MaybeContext =
-      audioWindow.AudioContext || audioWindow.webkitAudioContext;
-    if (!MaybeContext || !patched) return;
-    const nextContext = new MaybeContext();
-    audioWindow.gapless5AudioContext = nextContext;
-    patched.context = nextContext;
-    patched.masterOut = nextContext.createGain();
-    patched.masterOut.connect(nextContext.destination);
-    patched._outputChainInput = null;
-    patched._outputChainOutput = null;
+function getAudioContext(): AudioContext | null {
+  return (instance as GaplessOutputInternal | null)?.context ?? null;
+}
+
+function isTauriDesktopRuntime(): boolean {
+  return (
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.listenRuntime === "tauri"
+  );
+}
+
+function installAudioLifecycleRecovery(): void {
+  if (
+    lifecycleRecoveryInstalled ||
+    typeof window === "undefined" ||
+    typeof document === "undefined"
+  ) {
     return;
   }
-  if (ctx?.state === "suspended") {
-    void ctx.resume();
+  lifecycleRecoveryInstalled = true;
+
+  const wake = (reason: string) => {
+    if (!isTauriDesktopRuntime()) return;
+    void prepareAudioForPlayback(reason);
+  };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") wake("visibilitychange");
+  });
+  window.addEventListener("focus", () => wake("focus"));
+  window.addEventListener("pageshow", () => wake("pageshow"));
+
+  if (typeof navigator !== "undefined" && navigator.mediaDevices) {
+    navigator.mediaDevices.addEventListener?.("devicechange", () =>
+      wake("devicechange"),
+    );
   }
 }
 
-export function play(): void {
+function kickAudioOutput(ctx: AudioContext, reason: string): void {
+  if (!isTauriDesktopRuntime() || ctx.state !== "running") return;
+  try {
+    const gain = ctx.createGain();
+    gain.gain.value = 0.00001;
+    const oscillator = ctx.createOscillator();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.03);
+    window.setTimeout(() => {
+      try {
+        oscillator.disconnect();
+        gain.disconnect();
+      } catch {
+        /* ignore */
+      }
+    }, 80);
+  } catch (error) {
+    recordDevLog(
+      "audio",
+      "output wake kick failed",
+      { reason, error: String(error) },
+      "debug",
+    );
+  }
+}
+
+function rebuildPlayerAfterAudioContextLoss(reason: string): void {
+  if (!instance) return;
+  const previous = instance;
+  const tracks = previous.getTracks();
+  const index = Math.max(0, Math.min(previous.getIndex(), tracks.length - 1));
+  const position = previous.getPosition();
+  const loop = previous.loop;
+  const singleMode = previous.singleMode;
+  const crossfade = previous.crossfade;
+  const preservedEqEnabled = eqEnabled;
+  const preservedEqGains = lastEqGains;
+
+  recordDevLog(
+    "audio",
+    "rebuilding player after audio context loss",
+    { reason, tracks: tracks.length, index, position },
+    "warn",
+  );
+
   stopFade();
-  ensureContextResumed();
+  if (eqChain) {
+    eqChain.dispose();
+    eqChain = null;
+  }
+  try {
+    previous.stop();
+    previous.removeAllTracks();
+  } catch {
+    /* ignore */
+  }
+
+  instance = null;
+  currentAnalyser = null;
+  currentTrackFullyBuffered = false;
+
+  const nextPlayer = initPlayer(currentCallbacks);
+  if (tracks.length > 0) {
+    loadQueue(tracks, index);
+    if (Number.isFinite(position) && position > 0) {
+      seekTo(position);
+    }
+  }
+  nextPlayer.loop = loop;
+  nextPlayer.singleMode = singleMode;
+  nextPlayer.setCrossfade(crossfade);
+  nextPlayer.setPlaybackRate(lastPlaybackRate);
+  applyVolume(lastVolume);
+  setEqualizer(preservedEqEnabled, preservedEqGains);
+}
+
+async function prepareAudioForPlayback(reason: string): Promise<void> {
+  if (contextWakeInFlight) return contextWakeInFlight;
+  contextWakeInFlight = prepareAudioForPlaybackInner(reason).finally(() => {
+    contextWakeInFlight = null;
+  });
+  return contextWakeInFlight;
+}
+
+async function prepareAudioForPlaybackInner(reason: string): Promise<void> {
+  let ctx = getAudioContext();
+  if (!ctx) return;
+
+  if (ctx.state === "closed") {
+    rebuildPlayerAfterAudioContextLoss(reason);
+    ctx = getAudioContext();
+  }
+
+  if (ctx?.state === "suspended") {
+    try {
+      await ctx.resume();
+    } catch (error) {
+      recordDevLog(
+        "audio",
+        "audio context resume failed",
+        { reason, error: String(error) },
+        "warn",
+      );
+    }
+  }
+
+  ctx = getAudioContext();
+  if (ctx?.state === "closed") {
+    rebuildPlayerAfterAudioContextLoss(`${reason}:resume-closed`);
+    ctx = getAudioContext();
+  }
+
+  if (ctx?.state === "running") {
+    kickAudioOutput(ctx, reason);
+  }
+}
+
+export async function play(): Promise<void> {
+  stopFade();
+  await prepareAudioForPlayback("play");
   instance?.play();
 }
 
@@ -466,7 +601,9 @@ export function stop(): void {
  * next track (auto-advance uses the same internal path).
  */
 export function next(): void {
-  instance?.next(undefined, true, true);
+  void prepareAudioForPlayback("next").then(() => {
+    instance?.next(undefined, true, true);
+  });
 }
 
 /**
@@ -485,8 +622,13 @@ export function gotoTrack(
   indexOrUrl: number | string,
   forcePlay = false,
 ): void {
-  if (forcePlay) ensureContextResumed();
-  instance?.gotoTrack(indexOrUrl, forcePlay);
+  if (!forcePlay) {
+    instance?.gotoTrack(indexOrUrl, forcePlay);
+    return;
+  }
+  void prepareAudioForPlayback("gotoTrack").then(() => {
+    instance?.gotoTrack(indexOrUrl, forcePlay);
+  });
 }
 
 export function seekTo(positionMs: number): void {
@@ -500,6 +642,7 @@ export function setVolume(vol: number): void {
 
 export function setPlaybackRate(rate: number): void {
   const safeRate = Math.max(0.25, Math.min(rate, 4));
+  lastPlaybackRate = safeRate;
   instance?.setPlaybackRate(safeRate);
 }
 
@@ -558,12 +701,14 @@ export function fadeOutAndPause(durationMs = DEFAULT_FADE_MS): Promise<void> {
   });
 }
 
-export function fadeInAndPlay(durationMs = DEFAULT_FADE_MS): Promise<void> {
+export async function fadeInAndPlay(
+  durationMs = DEFAULT_FADE_MS,
+): Promise<void> {
   if (!instance) return Promise.resolve();
   stopFade();
-  ensureContextResumed();
+  await prepareAudioForPlayback("fadeInAndPlay");
   applyVolume(0);
-  instance.play();
+  instance?.play();
   return new Promise((resolve) => {
     animateVolume(0, lastVolume, durationMs, resolve);
   });
@@ -600,13 +745,11 @@ export function setSingleMode(enabled: boolean): void {
  */
 export function setEqualizer(enabled: boolean, gains: EqGains): void {
   if (!instance) return;
-  const patched = instance as Gapless5 & {
-    setOutputChain: (i: AudioNode | null, o: AudioNode | null) => void;
-    context?: AudioContext;
-  };
+  const patched = instance as GaplessOutputInternal;
   if (typeof patched.setOutputChain !== "function" || !patched.context) return;
 
   eqEnabled = enabled;
+  lastEqGains = [...gains];
 
   // If the user wants flat output, skip the chain entirely — biquads
   // at 0 dB aren't quite a no-op (minor numerical error) and why pay

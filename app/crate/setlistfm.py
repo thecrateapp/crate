@@ -11,6 +11,42 @@ log = logging.getLogger(__name__)
 SETLISTFM_BASE = "https://api.setlist.fm/rest/1.0"
 
 
+def _as_list(value) -> list:
+    if isinstance(value, list):
+        return value
+    if isinstance(value, dict):
+        return [value]
+    return []
+
+
+def _song_title(song) -> str:
+    if isinstance(song, dict):
+        return str(song.get("name") or song.get("title") or "").strip()
+    return str(song or "").strip()
+
+
+def _normalize_cached_songs(value) -> list[dict] | None:
+    if isinstance(value, dict) and "song" in value:
+        songs = _as_list(value.get("song"))
+    else:
+        songs = _as_list(value)
+    normalized: list[dict] = []
+    for song in songs:
+        if not isinstance(song, dict):
+            title = _song_title(song)
+            if title:
+                normalized.append({"title": title, "frequency": 1.0, "play_count": 1})
+            continue
+        title = str(song.get("title") or song.get("name") or "").strip()
+        if not title:
+            continue
+        normalized_song = {**song, "title": title}
+        normalized_song.setdefault("frequency", 1.0)
+        normalized_song.setdefault("play_count", 1)
+        normalized.append(normalized_song)
+    return normalized or None
+
+
 def _api_key() -> str | None:
     return os.environ.get("SETLISTFM_API_KEY")
 
@@ -37,13 +73,16 @@ def search_artist(name: str) -> str | None:
     data = _api_get("search/artists", {"artistName": name, "sort": "relevance"})
     if not data:
         return None
-    artists = data.get("artist", [])
+    artists = _as_list(data.get("artist"))
     if not artists:
         return None
     for a in artists:
+        if not isinstance(a, dict):
+            continue
         if a.get("name", "").lower() == name.lower():
             return a.get("mbid")
-    return artists[0].get("mbid")
+    first = artists[0]
+    return first.get("mbid") if isinstance(first, dict) else None
 
 
 def get_setlists(mbid: str, page: int = 1, per_page: int = 20) -> dict | None:
@@ -55,7 +94,9 @@ def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
     cached = get_cache(cache_key, max_age_seconds=86400 * 7)
     if not cached:
         return None
-    return cached.get("songs")
+    if isinstance(cached, dict):
+        return _normalize_cached_songs(cached.get("songs"))
+    return _normalize_cached_songs(cached)
 
 
 def get_probable_setlist(artist_name: str, num_setlists: int = 30) -> list[dict] | None:
@@ -90,16 +131,22 @@ def _fetch_raw_setlists(mbid: str, num_setlists: int) -> list[dict]:
         data = get_setlists(mbid, page=page)
         if not data:
             break
-        page_setlists = data.get("setlist", [])
+        page_setlists = _as_list(data.get("setlist"))
         if not page_setlists:
             break
         for sl in page_setlists:
+            if not isinstance(sl, dict):
+                continue
             if len(setlists) >= num_setlists:
                 break
             songs = []
-            for s in sl.get("sets", {}).get("set", []):
-                for song in s.get("song", []):
-                    title = song.get("name", "").strip()
+            raw_sets = sl.get("sets")
+            sets = raw_sets if isinstance(raw_sets, dict) else {}
+            for s in _as_list(sets.get("set")):
+                if not isinstance(s, dict):
+                    continue
+                for song in _as_list(s.get("song")):
+                    title = _song_title(song)
                     if title:
                         songs.append(title)
             if songs:

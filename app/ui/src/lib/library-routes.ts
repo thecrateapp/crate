@@ -264,6 +264,24 @@ export function albumManagementApiPath(
   return "";
 }
 
+export function trackManagementApiPath(
+  input: TrackRouteInput,
+  suffix?: string,
+) {
+  const entityUid = input.trackEntityUid ?? input.entityUid;
+  if (entityUid) {
+    return appendSuffix(
+      `/api/manage/tracks/by-entity/${encodeEntityUid(entityUid)}`,
+      suffix,
+    );
+  }
+  const id = input.trackId ?? input.libraryTrackId ?? input.id;
+  if (id != null && String(id).trim()) {
+    return appendSuffix(`/api/manage/tracks/${encodeURIComponent(id)}`, suffix);
+  }
+  return "";
+}
+
 export function albumArtworkApiPath(
   input: AdminAlbumRouteInput,
   suffix?: string,

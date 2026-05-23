@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { ProtectedRoute } from "./ProtectedRoute";
+import { describe, expect, it, vi } from "vitest";
+import { CapabilityRoute, ProtectedRoute } from "./ProtectedRoute";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 describe("ProtectedRoute", () => {
@@ -28,10 +28,13 @@ describe("ProtectedRoute", () => {
             role: "user",
           },
           isAdmin: false,
+          canAccessAdmin: false,
         },
       },
     );
-    expect(screen.getByText(/Admin access required/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Admin console access required/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/user@example.com/i)).toBeInTheDocument();
   });
 
@@ -49,9 +52,65 @@ describe("ProtectedRoute", () => {
             role: "admin",
           },
           isAdmin: true,
+          canAccessAdmin: true,
         },
       },
     );
     expect(screen.getByText("Protected")).toBeInTheDocument();
+  });
+
+  it("renders children for partial console roles", () => {
+    renderWithAdminProviders(
+      <ProtectedRoute>
+        <div>Protected</div>
+      </ProtectedRoute>,
+      {
+        auth: {
+          user: {
+            id: 2,
+            email: "editor@example.com",
+            name: "Editor",
+            role: "editor",
+            capabilities: ["library.view", "library.metadata.write"],
+          },
+          loading: false,
+          isAdmin: false,
+          canAccessAdmin: true,
+          hasCapability: vi.fn((capability: string) =>
+            ["library.view", "library.metadata.write"].includes(capability),
+          ),
+          hasAnyCapability: vi.fn((capabilities) =>
+            capabilities.some((capability: string) =>
+              ["library.view", "library.metadata.write"].includes(capability),
+            ),
+          ),
+        },
+      },
+    );
+    expect(screen.getByText("Protected")).toBeInTheDocument();
+  });
+
+  it("blocks a console route when the role lacks the route capability", () => {
+    renderWithAdminProviders(
+      <CapabilityRoute anyOf={["admin.access"]}>
+        <div>Protected</div>
+      </CapabilityRoute>,
+      {
+        auth: {
+          user: {
+            id: 2,
+            email: "editor@example.com",
+            name: "Editor",
+            role: "editor",
+            capabilities: ["library.view", "library.metadata.write"],
+          },
+          loading: false,
+          canAccessAdmin: true,
+          hasAnyCapability: vi.fn(() => false),
+        },
+      },
+    );
+    expect(screen.getByText(/Permission required/i)).toBeInTheDocument();
+    expect(screen.queryByText("Protected")).not.toBeInTheDocument();
   });
 });

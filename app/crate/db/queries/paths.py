@@ -9,6 +9,7 @@ from crate.db.queries.paths_endpoint_queries import (
 from crate.db.queries.paths_graph_queries import (
     find_anchor_track_row,
     find_candidate_rows,
+    find_seeded_radio_candidate_rows,
     load_artist_genres,
     load_artist_radio_graphs,
     load_artist_similarity_graph,
@@ -23,6 +24,7 @@ __all__ = [
     "fetch_bliss_vectors_for_endpoint",
     "find_anchor_track_row",
     "find_candidate_rows",
+    "find_seeded_radio_candidate_rows",
     "get_music_path_row",
     "list_music_path_rows",
     "load_artist_genres",

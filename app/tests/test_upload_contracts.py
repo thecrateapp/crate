@@ -42,7 +42,7 @@ class TestUploadApiContract:
         params = mock_create_task.call_args[0][1]
         assert args[0] == "library_upload"
         assert params["uploader_user_id"] == 1
-        assert params["source"] == "admin_upload"
+        assert params["source"] == "upload"
         assert Path(params["staging_dir"]).exists()
         assert len(params["files"]) == 2
 

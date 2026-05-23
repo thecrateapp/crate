@@ -6,7 +6,7 @@ import {
   artistPagePath,
 } from "@/lib/library-routes";
 import { toast } from "sonner";
-import { Radar } from "lucide-react";
+import { MoveRight, Radar, Trash2 } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -30,6 +30,8 @@ interface MusicContextMenuProps {
   trackTitle?: string;
   albumCover?: string;
   onFindSimilar?: () => void;
+  onMoveTrack?: () => void;
+  onQuarantineTrack?: () => void;
 }
 
 export function MusicContextMenu({
@@ -43,6 +45,8 @@ export function MusicContextMenu({
   albumId,
   albumSlug,
   onFindSimilar,
+  onMoveTrack,
+  onQuarantineTrack,
 }: MusicContextMenuProps) {
   const navigate = useNavigate();
 
@@ -101,6 +105,22 @@ export function MusicContextMenu({
             <ContextMenuSeparator />
             <ContextMenuItem onClick={onFindSimilar} className="text-sm">
               <Radar size={14} className="mr-2" /> Find Similar
+            </ContextMenuItem>
+          </>
+        )}
+        {type === "track" && onMoveTrack && (
+          <ContextMenuItem onClick={onMoveTrack} className="text-sm">
+            <MoveRight size={14} className="mr-2" /> Move to Album
+          </ContextMenuItem>
+        )}
+        {type === "track" && onQuarantineTrack && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={onQuarantineTrack}
+              className="text-sm text-destructive focus:text-destructive"
+            >
+              <Trash2 size={14} className="mr-2" /> Quarantine Track
             </ContextMenuItem>
           </>
         )}

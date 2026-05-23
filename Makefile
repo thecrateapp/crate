@@ -67,8 +67,8 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@cd app/site && npm install --silent 2>/dev/null; cd ../..
 	@(nohup npm run --workspace=app/ui dev -- --port 5173 --strictPort --host > .vite/admin.log 2>&1 < /dev/null & echo $$! > .vite/admin.pid)
 	@(nohup npm run --workspace=app/listen dev -- --port 5174 --strictPort --host > .vite/listen.log 2>&1 < /dev/null & echo $$! > .vite/listen.pid)
-	@(nohup npm --prefix app/docs exec vite -- --port 5175 --strictPort --host > .vite/docs.log 2>&1 < /dev/null & echo $$! > .vite/docs.pid)
-	@(nohup npm --prefix app/site exec vite -- --port 5176 --strictPort --host > .vite/site.log 2>&1 < /dev/null & echo $$! > .vite/site.pid)
+	@(cd app/docs; nohup npm exec vite -- --port 5175 --strictPort --host > ../../.vite/docs.log 2>&1 < /dev/null & echo $$! > ../../.vite/docs.pid)
+	@(cd app/site; nohup npm exec vite -- --port 5176 --strictPort --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
 	@sleep 2
 	@echo ""
 	@echo "  $(GREEN)Admin:$(NC)  https://admin.dev.lespedants.org"

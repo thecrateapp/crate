@@ -120,3 +120,47 @@ def test_ticketmaster_search_filters_tribute_events(monkeypatch):
     )
 
     assert ticketmaster.search_events("Placebo", size=20) == []
+
+
+def test_ticketmaster_search_filters_events_with_tribute_support(monkeypatch):
+    monkeypatch.setattr(ticketmaster, "_api_key", lambda: "tm-key")
+    monkeypatch.setattr(ticketmaster, "get_cache", lambda key: None)
+    monkeypatch.setattr(ticketmaster, "set_cache", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        ticketmaster,
+        "_search_attractions",
+        lambda artist_name: [{"id": "K8vZ9171oOf", "name": "David Bowie"}],
+    )
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {
+                "_embedded": {
+                    "events": [
+                        {
+                            "id": "tribute-support-1",
+                            "name": "David Bowie",
+                            "dates": {"start": {"localDate": "2026-10-03"}},
+                            "_embedded": {
+                                "attractions": [
+                                    {"name": "David Bowie"},
+                                    {
+                                        "name": (
+                                            "The Sensational David Bowie Tribute Band"
+                                        )
+                                    },
+                                ],
+                                "venues": [{"name": "Venue"}],
+                            },
+                        }
+                    ]
+                }
+            }
+
+    monkeypatch.setattr(
+        ticketmaster.requests, "get", lambda *args, **kwargs: Response()
+    )
+
+    assert ticketmaster.search_events("David Bowie", size=20) == []

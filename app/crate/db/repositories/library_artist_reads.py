@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryArtist
 from crate.db.repositories.library_shared import artist_to_dict, LibraryArtistRow
 from crate.db.tx import read_scope
+
+
+def _public_artist_predicate():
+    return and_(
+        LibraryArtist.name.not_like(".%"),
+        or_(
+            LibraryArtist.folder_name.is_(None),
+            LibraryArtist.folder_name.not_like(".%"),
+        ),
+    )
 
 
 def get_library_artists(
@@ -16,11 +26,16 @@ def get_library_artists(
     page: int = 1,
     per_page: int = 60,
     *,
+    include_internal: bool = False,
     session: Session | None = None,
 ) -> tuple[list[LibraryArtistRow], int]:
     def impl(s: Session) -> tuple[list[LibraryArtistRow], int]:
         base = select(LibraryArtist)
         count_stmt = select(func.count()).select_from(LibraryArtist)
+        if not include_internal:
+            predicate = _public_artist_predicate()
+            base = base.where(predicate)
+            count_stmt = count_stmt.where(predicate)
         if q:
             like = f"%{q}%"
             predicate = LibraryArtist.name.ilike(like)

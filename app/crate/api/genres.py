@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from crate.api.auth import _require_auth, _require_admin
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.genres import (
     EqPresetUpdateResponse,
     GenreDetailResponse,
@@ -49,6 +50,10 @@ _GENRE_ADMIN_RESPONSES = merge_responses(
         422: error_response("The request payload failed validation."),
     },
 )
+
+
+def _require_genre_curator(request: Request) -> dict:
+    return require_permission(request, "curation.genres.write")
 
 
 def _get_or_create_task(task_type: str, params: dict, max_limit: int = 500) -> dict:
@@ -125,7 +130,7 @@ def list_unmapped_genres(request: Request, limit: int = Query(24, ge=1, le=200))
     summary="Inspect invalid genre taxonomy nodes",
 )
 def get_invalid_taxonomy_nodes(request: Request, limit: int = Query(8, ge=1, le=50)):
-    _require_admin(request)
+    _require_genre_curator(request)
     items = list_invalid_genre_taxonomy_nodes()
     return {
         "invalid_count": len(items),
@@ -229,7 +234,7 @@ def genre_detail(request: Request, slug: str):
     summary="Queue a full genre index rebuild",
 )
 def reindex_genres(request: Request):
-    _require_admin(request)
+    _require_genre_curator(request)
     task_id = create_task("index_genres")
     return {"task_id": task_id}
 
@@ -241,7 +246,7 @@ def reindex_genres(request: Request):
     summary="Queue genre taxonomy inference",
 )
 def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody | None = None):
-    _require_admin(request)
+    _require_genre_curator(request)
     body = body or InferTaxonomyBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
     return _get_or_create_task(
@@ -264,7 +269,7 @@ def infer_genre_taxonomy(request: Request, body: InferTaxonomyBody | None = None
 def enrich_genre_descriptions(
     request: Request, body: EnrichDescriptionsBody | None = None
 ):
-    _require_admin(request)
+    _require_genre_curator(request)
     body = body or EnrichDescriptionsBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
     return _get_or_create_task(
@@ -286,7 +291,7 @@ def enrich_genre_descriptions(
 def sync_musicbrainz_genre_graph(
     request: Request, body: MusicBrainzSyncBody | None = None
 ):
-    _require_admin(request)
+    _require_genre_curator(request)
     body = body or MusicBrainzSyncBody.model_validate({})
     slug = (body.focus_slug or "").strip().lower() or None
     return _get_or_create_task(
@@ -306,7 +311,7 @@ def sync_musicbrainz_genre_graph(
     summary="Queue cleanup of invalid genre taxonomy nodes",
 )
 def cleanup_invalid_taxonomy_nodes(request: Request):
-    _require_admin(request)
+    _require_genre_curator(request)
     return _get_or_create_task("cleanup_invalid_genre_taxonomy", {})
 
 
@@ -324,7 +329,7 @@ def update_genre_eq_preset(request: Request, slug: str, body: EqPresetBody):
     array must have exactly 10 floats; values are clamped to
     [EQ_GAIN_MIN, EQ_GAIN_MAX].
     """
-    _require_admin(request)
+    _require_genre_curator(request)
 
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:
@@ -376,7 +381,7 @@ def generate_genre_eq(
     apply: bool = Query(False, description="Auto-apply the generated preset"),
 ):
     """Use the configured LLM to generate a 10-band EQ preset for a genre."""
-    _require_admin(request)
+    _require_genre_curator(request)
 
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:

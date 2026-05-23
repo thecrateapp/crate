@@ -368,6 +368,7 @@ def test_openapi_types_social_routes_and_marks_them_authenticated(test_app):
     data = test_app.get("/openapi.json").json()
     me_social_operation = data["paths"]["/api/me/social"]["get"]
     profile_operation = data["paths"]["/api/users/{username}"]["get"]
+    profile_card_operation = data["paths"]["/api/users/{username}/card"]["get"]
     profile_page_operation = data["paths"]["/api/users/{username}/page"]["get"]
     followers_operation = data["paths"]["/api/users/{username}/followers"]["get"]
     follow_operation = data["paths"]["/api/users/{user_id}/follow"]["post"]
@@ -381,6 +382,14 @@ def test_openapi_types_social_routes_and_marks_them_authenticated(test_app):
     assert profile_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/SocialProfileDetailResponse")
+
+    assert profile_card_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert profile_card_operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/SocialProfileCardResponse")
 
     assert profile_page_operation["security"] == [
         {"cookieAuth": []},

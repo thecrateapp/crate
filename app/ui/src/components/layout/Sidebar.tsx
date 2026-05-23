@@ -21,10 +21,14 @@ import {
   Activity,
   AudioWaveform,
   ScrollText,
+  ShieldCheck,
   PanelLeftClose,
   PanelLeftOpen,
+  Trash2,
+  HandHeart,
 } from "lucide-react";
 
+import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
@@ -49,40 +53,178 @@ export function getStoredSidebarExpanded(): boolean {
 }
 
 const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/browse", icon: Library, label: "Browse" },
-  { to: "/discover", icon: Compass, label: "Discovery" },
+  {
+    to: "/",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    capabilities: ["admin.access"],
+  },
+  {
+    to: "/browse",
+    icon: Library,
+    label: "Browse",
+    capabilities: ["library.view"],
+  },
+  {
+    to: "/discover",
+    icon: Compass,
+    label: "Discovery",
+    capabilities: ["library.view"],
+  },
   { section: "Tools" },
   {
     to: "/health",
     icon: HeartPulse,
     label: "Library Health",
     badgeKey: "issue_count" as const,
+    capabilities: ["library.repair.run"],
+  },
+  {
+    to: "/trash",
+    icon: Trash2,
+    label: "Library Trash",
+    capabilities: ["library.track.remove"],
+  },
+  {
+    to: "/contributions",
+    icon: HandHeart,
+    label: "Contributions",
+    capabilities: ["library.import.manage"],
   },
   { section: "Music" },
-  { to: "/upcoming", icon: Calendar, label: "Upcoming" },
-  { to: "/new-releases", icon: Sparkles, label: "New Releases" },
-  { to: "/playlists", icon: ListMusic, label: "System Playlists" },
-  { to: "/download", icon: Download, label: "Acquisition" },
+  {
+    to: "/upcoming",
+    icon: Calendar,
+    label: "Upcoming",
+    capabilities: [
+      "curation.shows.write",
+      "curation.releases.write",
+      "library.tidal.manage",
+    ],
+  },
+  {
+    to: "/new-releases",
+    icon: Sparkles,
+    label: "New Releases",
+    capabilities: ["curation.releases.write", "library.tidal.manage"],
+  },
+  {
+    to: "/bandcamp",
+    icon: BandcampLogo,
+    label: "Bandcamp",
+    capabilities: ["library.bandcamp.manage"],
+  },
+  {
+    to: "/playlists",
+    icon: ListMusic,
+    label: "System Playlists",
+    capabilities: ["curation.playlists.write"],
+  },
+  {
+    to: "/download",
+    icon: Download,
+    label: "Acquisition",
+    capabilities: ["library.import.manage", "library.tidal.manage"],
+  },
   { section: "Insights" },
-  { to: "/insights", icon: BarChart3, label: "Insights" },
-  { to: "/genres", icon: Tag, label: "Genres" },
-  { to: "/timeline", icon: Clock, label: "Timeline" },
+  {
+    to: "/insights",
+    icon: BarChart3,
+    label: "Insights",
+    capabilities: ["library.view"],
+  },
+  {
+    to: "/genres",
+    icon: Tag,
+    label: "Genres",
+    capabilities: ["library.view"],
+  },
+  {
+    to: "/timeline",
+    icon: Clock,
+    label: "Timeline",
+    capabilities: ["library.view"],
+  },
   { section: "System" },
-  { to: "/system", icon: Activity, label: "System Health", adminOnly: true },
-  { to: "/analysis", icon: AudioWaveform, label: "Analysis", adminOnly: true },
+  {
+    to: "/system",
+    icon: Activity,
+    label: "System Health",
+    capabilities: ["ops.health.view"],
+  },
+  {
+    to: "/analysis",
+    icon: AudioWaveform,
+    label: "Analysis",
+    capabilities: ["library.analysis.manage"],
+  },
   {
     to: "/tasks",
     icon: ListTodo,
     label: "Tasks",
     badgeKey: "running_tasks" as const,
-    adminOnly: true,
+    capabilities: ["ops.tasks.manage"],
   },
-  { to: "/logs", icon: ScrollText, label: "Logs", adminOnly: true },
-  { to: "/stack", icon: Server, label: "Stack", adminOnly: true },
-  { to: "/users", icon: Users, label: "Users", adminOnly: true },
-  { to: "/settings", icon: Settings, label: "Settings", adminOnly: true },
+  {
+    to: "/logs",
+    icon: ScrollText,
+    label: "Logs",
+    capabilities: ["ops.logs.view"],
+  },
+  {
+    to: "/stack",
+    icon: Server,
+    label: "Stack",
+    capabilities: ["ops.runtime.manage"],
+  },
+  {
+    to: "/users",
+    icon: Users,
+    label: "Users",
+    capabilities: ["users.view"],
+  },
+  {
+    to: "/roles",
+    icon: ShieldCheck,
+    label: "Roles",
+    capabilities: ["roles.view"],
+  },
+  {
+    to: "/settings",
+    icon: Settings,
+    label: "Settings",
+    capabilities: ["settings.manage"],
+  },
 ] as const;
+
+type NavItem = (typeof navItems)[number];
+type NavLinkItem = Exclude<NavItem, { section: string }>;
+
+function isSection(
+  item: NavItem,
+): item is Extract<NavItem, { section: string }> {
+  return "section" in item;
+}
+
+function canShowNavItem(
+  item: NavLinkItem,
+  hasAnyCapability: (capabilities: readonly string[]) => boolean,
+): boolean {
+  return hasAnyCapability(item.capabilities);
+}
+
+function getVisibleNavItems(
+  hasAnyCapability: (capabilities: readonly string[]) => boolean,
+): NavItem[] {
+  return navItems.filter((item, index) => {
+    if (!isSection(item)) return canShowNavItem(item, hasAnyCapability);
+    for (const next of navItems.slice(index + 1)) {
+      if (isSection(next)) return false;
+      if (canShowNavItem(next, hasAnyCapability)) return true;
+    }
+    return false;
+  });
+}
 
 function emitSidebarExpanded(expanded: boolean) {
   try {
@@ -97,9 +239,13 @@ function emitSidebarExpanded(expanded: boolean) {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const [expanded, setExpanded] = useState(getStoredSidebarExpanded);
-  const { user, isAdmin, logout } = useAuth();
+  const { user, hasAnyCapability, logout } = useAuth();
   const { data: opsSnapshot } = useOpsSnapshot();
-  const profileHref = user ? `/users?inspect=${user.id}` : "/users";
+  const profileHref =
+    user && hasAnyCapability(["users.view"])
+      ? `/users?inspect=${user.id}`
+      : "/browse";
+  const visibleNavItems = getVisibleNavItems(hasAnyCapability);
 
   const stats = {
     issue_count: opsSnapshot?.status.issue_count || 0,
@@ -171,7 +317,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto py-3">
-        {navItems.map((item, index) => {
+        {visibleNavItems.map((item, index) => {
           if ("section" in item) {
             return expanded ? (
               <div
@@ -186,10 +332,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 className="mx-4 my-3 border-t border-white/5"
               />
             );
-          }
-
-          if ("adminOnly" in item && item.adminOnly && !isAdmin) {
-            return null;
           }
 
           const Icon = item.icon;

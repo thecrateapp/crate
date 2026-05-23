@@ -4,6 +4,7 @@ from math import cos, radians
 from crate.db.queries.shows_shared import dedupe_show_rows
 from crate.db.serialize import serialize_rows
 from crate.db.tx import read_scope
+from crate.show_filters import show_has_tribute_signal
 from sqlalchemy import text
 
 
@@ -98,6 +99,8 @@ def get_upcoming_releases(
                 nr.artist_name,
                 la.id AS artist_id,
                 la.slug AS artist_slug,
+                lalb.id AS album_id,
+                lalb.slug AS album_slug,
                 nr.album_title,
                 nr.cover_url,
                 nr.status,
@@ -107,6 +110,9 @@ def get_upcoming_releases(
                 nr.detected_at
             FROM new_releases nr
             LEFT JOIN library_artists la ON la.name = nr.artist_name
+            LEFT JOIN library_albums lalb
+              ON LOWER(lalb.artist) = LOWER(nr.artist_name)
+             AND LOWER(lalb.name) = LOWER(nr.album_title)
             WHERE nr.artist_name = ANY(:followed_names)
               AND nr.status != 'dismissed'
               AND (
@@ -208,7 +214,10 @@ def get_upcoming_shows(
             .mappings()
             .all()
         )
-        return dedupe_show_rows(serialize_rows(rows))[:limit]
+        clean_rows = [
+            row for row in serialize_rows(rows) if not show_has_tribute_signal(row)
+        ]
+        return dedupe_show_rows(clean_rows)[:limit]
 
 
 def get_artist_genres_for_names(artist_names: list[str]) -> dict[str, list[str]]:

@@ -208,7 +208,7 @@ class TestAdminTasksSnapshot:
 
     def test_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.get("/api/admin/tasks-snapshot")
@@ -437,7 +437,7 @@ class TestCancelTask:
 
     def test_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/tasks/t1/cancel")
@@ -507,7 +507,7 @@ class TestTaskEnqueue:
 
     def test_enqueue_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/tasks/sync-library")
@@ -556,7 +556,7 @@ class TestTaskCleanByStatus:
 
     def test_clean_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/tasks/clean/completed")
@@ -591,7 +591,7 @@ class TestTaskCleanup:
 
     def test_cleanup_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/tasks/cleanup")
@@ -660,7 +660,7 @@ class TestTaskRetry:
 
     def test_retry_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/tasks/retry", json={"task_id": "t1"})
@@ -697,7 +697,7 @@ class TestWorkerCancelAll:
 
     def test_cancel_all_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/worker/cancel-all")
@@ -748,7 +748,7 @@ class TestWorkerSlots:
 
     def test_set_slots_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/worker/slots", json={"slots": 5})
@@ -773,7 +773,7 @@ class TestWorkerRestart:
 
     def test_restart_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/worker/restart")
@@ -828,7 +828,7 @@ class TestWorkerSchedules:
 
     def test_update_schedules_requires_admin(self, test_app):
         with patch(
-            "crate.api.tasks._require_admin", side_effect=Exception("forbidden")
+            "crate.api.tasks.require_permission", side_effect=Exception("forbidden")
         ):
             with pytest.raises(Exception, match="forbidden"):
                 test_app.post("/api/worker/schedules", json={})

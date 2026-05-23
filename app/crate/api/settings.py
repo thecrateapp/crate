@@ -4,12 +4,12 @@ import sys
 
 from fastapi import APIRouter, Request, HTTPException
 
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.settings import (
     CacheClearRequest,
     CacheClearResponse,
@@ -51,6 +51,10 @@ _SETTINGS_RESPONSES = merge_responses(
 )
 
 
+def _require_settings_manager(request: Request) -> dict:
+    return require_permission(request, "settings.manage")
+
+
 @router.get(
     "",
     response_model=SettingsResponse,
@@ -58,7 +62,7 @@ _SETTINGS_RESPONSES = merge_responses(
     summary="Get administrative settings and runtime info",
 )
 def get_settings(request: Request):
-    _require_admin(request)
+    _require_settings_manager(request)
     return {
         "schedules": get_schedules(),
         "worker": {"max_workers": int(get_setting("max_workers", "5"))},
@@ -180,7 +184,7 @@ def _get_about_info() -> dict:
     summary="Update scheduler intervals",
 )
 def update_schedules(request: Request, body: ScheduleIntervalsRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     payload = body.root
     for key, val in payload.items():
         if not isinstance(val, int) or val < 0:
@@ -199,7 +203,7 @@ def update_schedules(request: Request, body: ScheduleIntervalsRequest):
     summary="Update worker concurrency settings",
 )
 def update_worker(request: Request, body: WorkerSettingsRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     if body.max_workers < 1 or body.max_workers > 10:
         raise HTTPException(
             status_code=422, detail="max_workers must be between 1 and 10"
@@ -215,7 +219,7 @@ def update_worker(request: Request, body: WorkerSettingsRequest):
     summary="Update enrichment source toggles",
 )
 def update_enrichment(request: Request, body: EnrichmentUpdateRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     payload = body.root
     invalid = set(payload.keys()) - VALID_ENRICHMENT_SOURCES
     if invalid:
@@ -233,7 +237,7 @@ def update_enrichment(request: Request, body: EnrichmentUpdateRequest):
     summary="Clear one or more cache namespaces",
 )
 def clear_cache(request: Request, body: CacheClearRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     cache_type = body.type
     valid_types = {"all", "enrichment", "lastfm", "analytics"}
     if cache_type not in valid_types:
@@ -279,7 +283,7 @@ def clear_cache(request: Request, body: CacheClearRequest):
     summary="Update library-related settings",
 )
 def update_library(request: Request, body: LibrarySettingsUpdateRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     if body.audio_extensions is not None:
         set_setting("audio_extensions", json.dumps(body.audio_extensions))
     return {"ok": True}
@@ -292,7 +296,7 @@ def update_library(request: Request, body: LibrarySettingsUpdateRequest):
     summary="Update processing thresholds and limits",
 )
 def update_processing(request: Request, body: ProcessingSettingsUpdateRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     if body.mb_auto_apply_threshold is not None:
         val = int(body.mb_auto_apply_threshold)
         if val < 50 or val > 100:
@@ -318,7 +322,7 @@ def update_processing(request: Request, body: ProcessingSettingsUpdateRequest):
     summary="Update Telegram integration settings",
 )
 def update_telegram(request: Request, body: TelegramSettingsUpdateRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     if body.bot_token is not None:
         token = (body.bot_token or "").strip()
         if token and "..." not in token:
@@ -337,7 +341,7 @@ def update_telegram(request: Request, body: TelegramSettingsUpdateRequest):
     summary="Send a Telegram test message",
 )
 def test_telegram(request: Request):
-    _require_admin(request)
+    _require_settings_manager(request)
     from crate.telegram import send_message
 
     ok = send_message("\u2705 Crate bot test — connection working!")
@@ -356,7 +360,7 @@ def test_telegram(request: Request):
     summary="Update Soulseek integration settings",
 )
 def update_soulseek(request: Request, body: SoulseekSettingsUpdateRequest):
-    _require_admin(request)
+    _require_settings_manager(request)
     if body.url is not None:
         set_setting("slskd_url", body.url)
     if body.quality is not None:

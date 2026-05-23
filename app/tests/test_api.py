@@ -2665,6 +2665,62 @@ class TestStackAPI:
 
 
 class TestSocialProfilePage:
+    def test_profile_card_returns_compact_social_payload(self, test_app):
+        profile = {
+            "id": 7,
+            "username": "jane",
+            "display_name": "Jane",
+            "avatar": None,
+            "bio": "hello",
+            "joined_at": "2026-01-01T00:00:00Z",
+            "followers_count": 12,
+            "following_count": 9,
+            "friends_count": 3,
+        }
+        relation = {"following": True, "followed_by": False, "is_friend": False}
+        affinity = {
+            "affinity_score": 87,
+            "affinity_band": "high",
+            "affinity_reasons": ["shared artists"],
+        }
+        summary = {
+            "top_genre": {
+                "name": "screamo",
+                "play_count": 44,
+                "minutes_listened": 180.5,
+            },
+            "stats": {
+                "plays_30d": 126,
+                "minutes_30d": 640.0,
+                "contributions": 12,
+                "public_playlists": 4,
+            },
+            "bandcamp_contributions": 2,
+        }
+
+        with (
+            patch(
+                "crate.api.social.get_public_user_profile_by_username",
+                return_value=profile,
+            ),
+            patch("crate.api.social.get_relationship_state", return_value=relation),
+            patch("crate.api.social.get_affinity", return_value=affinity),
+            patch("crate.api.social.get_profile_card_summary", return_value=summary),
+        ):
+            resp = test_app.get("/api/users/jane/card")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["username"] == "jane"
+        assert data["affinity_score"] == 87
+        assert data["top_genre"]["name"] == "screamo"
+        assert data["stats"]["plays_30d"] == 126
+        assert {badge["key"] for badge in data["badges"]} >= {
+            "scene-builder",
+            "bandcamp-supporter",
+            "curator",
+        }
+
     def test_profile_page_bundles_previews(self, test_app):
         profile = {
             "id": 7,
@@ -2711,6 +2767,33 @@ class TestSocialProfilePage:
                 "followed_at": "2026-02-02T00:00:00Z",
             }
         ]
+        summary = {
+            "top_genre": {
+                "name": "post-hardcore",
+                "play_count": 24,
+                "minutes_listened": 80.0,
+            },
+            "stats": {
+                "plays_30d": 35,
+                "minutes_30d": 140.0,
+                "contributions": 1,
+                "public_playlists": 1,
+            },
+            "bandcamp_contributions": 0,
+        }
+        contributions = [
+            {
+                "id": 31,
+                "source": "upload",
+                "album_id": 4,
+                "album_entity_uid": "9bcb4ac9-3d22-44bb-9de0-c57f78a0d1fb",
+                "album_slug": "public-record",
+                "artist_name": "Jane Band",
+                "album_name": "Public Record",
+                "has_cover": True,
+                "imported_at": "2026-03-01T00:00:00Z",
+            }
+        ]
 
         with (
             patch(
@@ -2722,6 +2805,11 @@ class TestSocialProfilePage:
             ),
             patch("crate.api.social.get_relationship_state", return_value=relation),
             patch("crate.api.social.get_affinity", return_value=affinity),
+            patch("crate.api.social.get_profile_card_summary", return_value=summary),
+            patch(
+                "crate.api.social.get_profile_contributions_preview",
+                return_value=contributions,
+            ),
             patch("crate.api.social.get_followers", return_value=followers),
             patch("crate.api.social.get_following", return_value=following),
         ):
@@ -2734,6 +2822,10 @@ class TestSocialProfilePage:
         assert data["followers_preview"][0]["username"] == "sam"
         assert data["following_preview"][0]["username"] == "lee"
         assert data["affinity_score"] == 87
+        assert data["top_genre"]["name"] == "post-hardcore"
+        assert data["stats"]["contributions"] == 1
+        assert data["badges"][0]["key"] == "contributor"
+        assert data["contributions_preview"][0]["album_name"] == "Public Record"
 
 
 class TestLibraryPlaylistsPage:

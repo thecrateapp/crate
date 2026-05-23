@@ -19,7 +19,7 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.redis_sse import close_pubsub, open_pubsub
-from crate.api.schemas.common import OkResponse
+from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.me import (
     ChangePasswordRequest,
     CitySearchResultResponse,
@@ -82,6 +82,11 @@ from crate.db.repositories.auth import (
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.home import get_cached_home_discovery, get_home_playlist, get_home_section
 from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
+from crate.db.repositories.library_contributions import (
+    get_user_album_contribution,
+    list_user_album_contributions,
+)
+from crate.db.repositories.tasks import create_task
 from crate.db.snapshot_events import snapshot_channel
 from crate.db.queries.user import (
     get_artist_genres_for_names,
@@ -120,6 +125,7 @@ from crate.db.queries.user_library import (
     get_user_library_counts,
     is_following,
 )
+from crate.slugs import build_public_album_slug
 from crate.db.repositories.shows import attend_show, create_show_reminder, unattend_show
 from crate.db.repositories.user_library import (
     follow_artist,
@@ -521,6 +527,73 @@ def my_playlists_page(request: Request):
         "playlists": get_playlists(user_id=user["id"]),
         "followed_curated_playlists": my_followed_playlists(request),
     }
+
+
+# ── Contributions ────────────────────────────────────────────
+
+
+@router.get(
+    "/contributions",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List albums contributed by the current user",
+)
+def my_library_contributions(
+    request: Request,
+    source: str = Query(default="", max_length=64),
+    status: str = Query(default="active", max_length=32),
+):
+    user = _require_auth(request)
+    items = list_user_album_contributions(
+        int(user["id"]),
+        source=source,
+        status=status,
+    )
+    return {"items": items, "total": len(items)}
+
+
+@router.get(
+    "/contributions/{contribution_id}/export",
+    responses=_ME_RESPONSES,
+    summary="Download a portable package for one contributed album",
+)
+def my_library_contribution_export(request: Request, contribution_id: int):
+    user = _require_auth(request)
+    contribution = get_user_album_contribution(
+        user_id=int(user["id"]),
+        contribution_id=contribution_id,
+    )
+    if not contribution or contribution.get("status") != "active":
+        raise HTTPException(status_code=404, detail="Contribution not found")
+    if not contribution.get("album_id"):
+        raise HTTPException(
+            status_code=404, detail="Contribution is not linked to an album"
+        )
+
+    from crate.api.browse_album import api_download_album_by_id
+
+    return api_download_album_by_id(request, int(contribution["album_id"]))
+
+
+@router.post(
+    "/contributions/{contribution_id}/withdraw",
+    response_model=TaskEnqueueResponse,
+    responses=_ME_RESPONSES,
+    summary="Withdraw one contributed album from the shared library",
+)
+def my_library_contribution_withdraw(request: Request, contribution_id: int):
+    user = _require_auth(request)
+    contribution = get_user_album_contribution(
+        user_id=int(user["id"]),
+        contribution_id=contribution_id,
+    )
+    if not contribution or contribution.get("status") != "active":
+        raise HTTPException(status_code=404, detail="Contribution not found")
+
+    task_id = create_task(
+        "library_withdraw_contribution",
+        {"user_id": int(user["id"]), "contribution_id": contribution_id},
+    )
+    return {"task_id": task_id, "status": "queued"}
 
 
 # ── Follows ──────────────────────────────────────────────────
@@ -1287,6 +1360,9 @@ def upcoming(request: Request, limit: int = 120):
                 "artist": release.get("artist_name", ""),
                 "artist_id": release.get("artist_id"),
                 "artist_slug": release.get("artist_slug"),
+                "album_id": release.get("album_id"),
+                "album_slug": release.get("album_slug")
+                or build_public_album_slug(release.get("album_title")),
                 "title": release.get("album_title", ""),
                 "subtitle": release.get("release_type") or "Album",
                 "cover_url": release.get("cover_url"),

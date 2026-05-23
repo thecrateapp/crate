@@ -8,6 +8,7 @@ from pathlib import Path
 from crate.audio import read_tags
 from crate.db.audit import log_audit
 from crate.db.jobs.repair import (
+    count_valid_album_tracks,
     count_artist_tracks,
     find_artist_canonical,
     find_canonical_artist_by_folder,
@@ -933,7 +934,25 @@ class LibraryRepair:
         )
 
     @staticmethod
-    def _duplicate_track_keep_key(track: dict) -> tuple[int, int, int, int, int, str]:
+    def _duplicate_track_format_rank(track: dict) -> int:
+        format_value = str(track.get("format") or "").strip().casefold()
+        if not format_value:
+            path = Path(str(track.get("path") or ""))
+            format_value = path.suffix.lstrip(".").casefold()
+        if format_value in {"flac", "alac", "wav", "aiff", "aif"}:
+            return 100
+        if format_value in {"m4a", "aac"}:
+            return 60
+        if format_value in {"opus", "ogg"}:
+            return 50
+        if format_value == "mp3":
+            return 40
+        return 0
+
+    @staticmethod
+    def _duplicate_track_keep_key(
+        track: dict,
+    ) -> tuple[int, int, int, int, int, int, int, int, str]:
         path = Path(str(track.get("path") or ""))
         tag_artist, tag_album, tag_title, tag_tracknumber = (
             LibraryRepair._duplicate_track_tag_identity(track)
@@ -945,8 +964,11 @@ class LibraryRepair:
             1 if path.is_file() else 0,
             readable_tag_score,
             1 if track.get("audio_fingerprint") else 0,
-            int(track.get("size") or 0),
+            LibraryRepair._duplicate_track_format_rank(track),
+            int(track.get("bit_depth") or 0),
+            int(track.get("sample_rate") or 0),
             int(track.get("bitrate") or 0),
+            int(track.get("size") or 0),
             str(track.get("path") or ""),
         )
 
@@ -958,7 +980,7 @@ class LibraryRepair:
         album = str(details.get("album") or "").strip()
         title = str(details.get("title") or "").strip()
         paths = [str(path) for path in details.get("paths", []) if path]
-        if len(paths) < 2:
+        if not artist or not album or not title or len(paths) < 2:
             return None
 
         tracks = get_tracks_by_paths(paths)
@@ -983,6 +1005,13 @@ class LibraryRepair:
             if track.get("duration") is not None
         ]
         if durations and max(durations) - min(durations) > 1.0:
+            return None
+        if any(
+            not str(track.get("title") or "").strip()
+            or int(track.get("track_number") or 0) <= 0
+            or float(track.get("duration") or 0) <= 1.0
+            for track in tracks
+        ):
             return None
 
         track_numbers = {
@@ -1055,7 +1084,7 @@ class LibraryRepair:
         if not remove_paths:
             return None
         result = {
-            "action": "delete_duplicate_tracks",
+            "action": "quarantine_duplicate_tracks",
             "target": f"{artist}/{album}/{title}",
             "details": {
                 "artist": artist,
@@ -1073,7 +1102,150 @@ class LibraryRepair:
 
         if dry_run:
             result["message"] = (
-                f"Would delete {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+                f"Would quarantine {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+            )
+            return result
+
+        removed_paths: list[str] = []
+        missing_paths: list[str] = []
+        quarantined_paths: list[str] = []
+        for track in remove:
+            path_str = str(track.get("path") or "")
+            if not path_str:
+                continue
+            path = Path(path_str)
+            if path.exists():
+                try:
+                    relative_path = path.resolve(strict=False).relative_to(
+                        self.library_path.resolve()
+                    )
+                    destination = (
+                        self.library_path / ".crate-trash" / "tracks" / relative_path
+                    )
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    if destination.exists():
+                        suffix = (task_id or "repair")[:8]
+                        for index in range(1, 1000):
+                            candidate = destination.with_name(
+                                f"{destination.stem}.{suffix}-{index}{destination.suffix}"
+                            )
+                            if not candidate.exists():
+                                destination = candidate
+                                break
+                        else:
+                            raise OSError(
+                                f"Could not allocate quarantine path for {path_str}"
+                            )
+                    shutil.move(str(path), str(destination))
+                    removed_paths.append(path_str)
+                    quarantined_paths.append(str(destination))
+                except (OSError, ValueError) as exc:
+                    result["details"]["error"] = (
+                        f"Failed to quarantine {path_str}: {exc}"
+                    )
+                    result["message"] = (
+                        f"Failed to quarantine duplicate track file for {artist}/{album}/{title}"
+                    )
+                    return result
+            else:
+                missing_paths.append(path_str)
+
+            delete_track(path_str)
+
+        result["applied"] = True
+        result["details"]["removed_paths"] = removed_paths
+        result["details"]["quarantined_paths"] = quarantined_paths
+        if missing_paths:
+            result["details"]["missing_paths"] = missing_paths
+        result["message"] = (
+            f"Quarantined {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+        )
+        log_audit(
+            "quarantine_duplicate_tracks",
+            "track",
+            f"{artist}/{album}/{title}",
+            details=result["details"],
+            task_id=task_id,
+        )
+        return result
+
+    @staticmethod
+    def _is_shadow_quality_track(track: dict, canonical_album_path: str) -> bool:
+        path = str(track.get("path") or "")
+        if not path or not canonical_album_path:
+            return False
+        if path.startswith(canonical_album_path.rstrip("/") + "/"):
+            return False
+
+        title = str(track.get("title") or "").strip()
+        try:
+            track_number = int(track.get("track_number") or 0)
+        except (TypeError, ValueError):
+            track_number = 0
+        try:
+            duration = float(track.get("duration") or 0)
+        except (TypeError, ValueError):
+            duration = 0.0
+
+        return not (title and track_number > 0 and duration > 1)
+
+    def _fix_shadow_quality_tracks(
+        self, issue: dict, dry_run: bool, task_id: str | None = None
+    ) -> dict | None:
+        details = issue.get("details", {})
+        artist = str(details.get("artist") or "").strip()
+        album = str(details.get("album") or "").strip()
+        canonical_album_path = str(details.get("canonical_album_path") or "").strip()
+        paths = [str(path) for path in details.get("paths", []) if path]
+        if not artist or not album or not canonical_album_path or not paths:
+            return None
+
+        try:
+            album_id = int(details.get("album_id") or 0)
+        except (TypeError, ValueError):
+            album_id = 0
+        if album_id <= 0:
+            return None
+
+        if count_valid_album_tracks(album_id) <= 0:
+            return None
+
+        tracks = get_tracks_by_paths(paths)
+        remove = [
+            track
+            for track in tracks
+            if int(track.get("album_id") or 0) == album_id
+            and self._is_shadow_quality_track(track, canonical_album_path)
+        ]
+        if len(remove) != len(paths):
+            return None
+
+        remove_paths = [
+            str(track.get("path") or "") for track in remove if track.get("path")
+        ]
+        if not remove_paths:
+            return None
+
+        result = {
+            "action": "delete_shadow_quality_tracks",
+            "target": f"{artist}/{album}",
+            "details": {
+                "album_id": album_id,
+                "artist": artist,
+                "album": album,
+                "canonical_album_path": canonical_album_path,
+                "remove_paths": remove_paths,
+                "duplicate_count": len(remove_paths),
+                "reason": "legacy lower-quality rows outside the canonical album folder",
+                "enrich_artist": artist,
+            },
+            "applied": False,
+            "fs_write": True,
+        }
+
+        if dry_run:
+            result["message"] = (
+                f"Would delete {len(remove_paths)} shadow quality track file(s) for {artist}/{album}"
             )
             return result
 
@@ -1091,12 +1263,11 @@ class LibraryRepair:
                 except OSError as exc:
                     result["details"]["error"] = f"Failed to delete {path_str}: {exc}"
                     result["message"] = (
-                        f"Failed to delete duplicate track file for {artist}/{album}/{title}"
+                        f"Failed to delete shadow quality track file for {artist}/{album}"
                     )
                     return result
             else:
                 missing_paths.append(path_str)
-
             delete_track(path_str)
 
         result["applied"] = True
@@ -1104,12 +1275,12 @@ class LibraryRepair:
         if missing_paths:
             result["details"]["missing_paths"] = missing_paths
         result["message"] = (
-            f"Deleted {len(remove_paths)} duplicate track file(s) for {artist}/{album}/{title}"
+            f"Deleted {len(remove_paths)} shadow quality track file(s) for {artist}/{album}"
         )
         log_audit(
-            "delete_duplicate_tracks",
-            "track",
-            f"{artist}/{album}/{title}",
+            "delete_shadow_quality_tracks",
+            "album",
+            f"{artist}/{album}",
             details=result["details"],
             task_id=task_id,
         )

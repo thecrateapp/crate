@@ -79,6 +79,7 @@ _redis: Any | None = None
 
 _PROJECTOR_RELEVANT_INVALIDATION_SCOPES = frozenset(
     {
+        "home",
         "library",
         "shows",
         "upcoming",
@@ -122,6 +123,8 @@ def _do_broadcast(scopes: tuple[str, ...] | list[str]):
         r = _get_redis()
         from crate.db.domain_events import append_domain_event
 
+        _clear_backend_cache_for_scopes(scopes)
+
         for scope in scopes:
             event_id = r.incr(_EVENT_ID_KEY)
             event = json.dumps({"id": event_id, "scope": scope, "ts": time()})
@@ -139,8 +142,6 @@ def _do_broadcast(scopes: tuple[str, ...] | list[str]):
     except Exception as exc:
         log.warning("Failed to broadcast cache invalidation for %s: %s", scopes, exc)
 
-    _clear_backend_cache_for_scopes(scopes)
-
 
 def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
     """Clear backend cache entries that correspond to the invalidated scopes."""
@@ -155,7 +156,7 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
         "likes": [],
         "saved_albums": [],
         "history": ["stats:"],
-        "library": ["discover:"],
+        "library": ["discover:", "listen:artist_page:"],
         "shows": ["shows:"],
         "upcoming": ["upcoming:"],
         "playlists": ["playlist:"],

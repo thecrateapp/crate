@@ -35,7 +35,7 @@ Crate does significant work that should not happen inline with a request:
 - metadata enrichment
 - audio analysis
 - similarity calculation
-- acquisition from Tidal and Soulseek
+- acquisition from Tidal, Soulseek, Bandcamp, and user uploads
 - image processing
 - storage migration
 - cleanup and repair
@@ -92,7 +92,8 @@ The canonical telemetry path is now `user_play_events`, not the old
 - `crate-readplane`: Go service serving selected Listen/Admin read routes,
   snapshot responses, and SSE relay with FastAPI fallback.
 - `crate-worker`: fast/default Dramatiq consumers plus the service loop,
-  scheduler, watcher, imports, cleanup, and write-capable filesystem work.
+  scheduler, watcher, imports, Bandcamp purchase ingestion, cleanup, and
+  write-capable filesystem work.
 - `crate-projector`: domain-event consumer that warms snapshots/read models.
 - `crate-maintenance-worker`: maintenance/repair/sync/enrichment queue worker.
 - `crate-analysis-worker`: heavy queue worker for audio analysis, fingerprints,
@@ -115,6 +116,7 @@ The canonical telemetry path is now `user_play_events`, not the old
 
 - Traefik in production
 - Caddy in local dev
+- Bandcamp user-owned purchase sync/imports and support links
 - Tidal acquisition through `tiddl`
 - Last.fm, MusicBrainz, Fanart.tv, Ticketmaster, Discogs, Spotify, Setlist.fm,
   `lrclib`, and others
@@ -170,6 +172,8 @@ The canonical telemetry path is now `user_play_events`, not the old
 - `app/crate/actors.py`: Dramatiq dispatch and execution wrappers
 - `app/crate/library_sync.py`: filesystem-to-DB synchronization
 - `app/crate/enrichment.py`: unified artist enrichment entrypoint
+- `app/crate/bandcamp`: Bandcamp session handling, collection sync, downloads,
+  entity matching, and user-owned purchase import
 - `app/crate/audio_analysis.py`: feature extraction
 - `app/crate/bliss.py`: similarity and transition logic
 - `app/crate/projector.py`: domain event consumption and snapshot warming
@@ -204,6 +208,11 @@ Crate intentionally uses both:
 - Dramatiq + Redis for asynchronous execution
 - Redis Streams domain events plus projector-driven snapshot warming for read
   model freshness
+
+Bandcamp imports and user uploads follow the same rule as every other
+filesystem mutation: the API only stages or enqueues work, while workers perform
+download/import/sync and emit domain events that refresh the affected home,
+library, artist, album, playlist, and ops surfaces.
 
 ### Product logic lives in the backend
 

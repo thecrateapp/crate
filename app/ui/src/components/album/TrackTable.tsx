@@ -1,10 +1,29 @@
-import { useState } from "react";
-import { BarChart3, Download, FileText, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  BarChart3,
+  Disc3,
+  Download,
+  FileText,
+  Loader2,
+  Search,
+} from "lucide-react";
 import { ResponsiveRadar } from "@nivo/radar";
 
 import { SimilarTracksPanel } from "@/components/track/SimilarTracksPanel";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@crate/ui/shadcn/dialog";
+import { Input } from "@crate/ui/shadcn/input";
 
 import {
   Table,
@@ -21,8 +40,13 @@ import {
   TooltipProvider,
 } from "@crate/ui/shadcn/tooltip";
 import { MusicContextMenu } from "@/components/ui/music-context-menu";
-import { trackDownloadApiPath } from "@/lib/library-routes";
+import {
+  trackDownloadApiPath,
+  trackManagementApiPath,
+} from "@/lib/library-routes";
+import { waitForTask } from "@/lib/tasks";
 import { formatDuration, formatBitrate } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Track {
   id?: number;
@@ -68,6 +92,23 @@ interface TrackStreamVariant {
   completed_at?: string | null;
 }
 
+interface AlbumSearchResult {
+  id?: number;
+  entity_uid?: string;
+  slug?: string;
+  artist: string;
+  artist_id?: number;
+  artist_entity_uid?: string;
+  artist_slug?: string;
+  name: string;
+  year?: string | number | null;
+  has_cover?: boolean;
+}
+
+interface SearchResponse {
+  albums?: AlbumSearchResult[];
+}
+
 export interface AudioAnalysisTrack {
   tempo: number | null;
   key: string | null;
@@ -95,6 +136,7 @@ interface TrackTableProps {
   analysisData?: Record<string, AudioAnalysisTrack>;
   syncingLyricsTrackKey?: string | null;
   onSyncTrackLyrics?: (track: Track) => void | Promise<void>;
+  onTrackQuarantined?: () => void | Promise<void>;
 }
 
 function EnergyBar({ value }: { value: number }) {
@@ -368,6 +410,165 @@ function LyricsBadge({
   );
 }
 
+function MoveTrackDialog({
+  open,
+  track,
+  currentAlbumId,
+  defaultQuery,
+  busy,
+  onOpenChange,
+  onMove,
+}: {
+  open: boolean;
+  track: Track | null;
+  currentAlbumId?: number;
+  defaultQuery: string;
+  busy: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMove: (targetAlbum: AlbumSearchResult) => void;
+}) {
+  const [query, setQuery] = useState(defaultQuery);
+  const [results, setResults] = useState<AlbumSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery(defaultQuery);
+    setResults([]);
+  }, [defaultQuery, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void api<SearchResponse>(
+        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      )
+        .then((payload) => {
+          if (!active) return;
+          setResults(payload.albums ?? []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setResults([]);
+          toast.error("Album search failed");
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, query]);
+
+  const title = track?.tags.title || track?.filename || "this track";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Move Track to Album</DialogTitle>
+          <DialogDescription>
+            Queue a worker task to move "{title}" into another album directory.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <label className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Target album
+          </label>
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="pl-9"
+              placeholder="Search albums by title or artist"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+            {searching ? (
+              <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                <Loader2 size={15} className="animate-spin" />
+                Searching albums...
+              </div>
+            ) : results.length ? (
+              <div className="divide-y divide-white/8">
+                {results.map((album) => {
+                  const isCurrentAlbum =
+                    currentAlbumId != null && album.id === currentAlbumId;
+                  return (
+                    <button
+                      key={`${album.entity_uid || album.id}-${album.artist}-${
+                        album.name
+                      }`}
+                      type="button"
+                      disabled={busy || isCurrentAlbum || album.id == null}
+                      onClick={() => onMove(album)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/45">
+                        <Disc3 size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-white/88">
+                          {album.name}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {album.artist}
+                          {album.year ? ` - ${album.year}` : ""}
+                        </div>
+                      </div>
+                      {isCurrentAlbum ? (
+                        <Badge variant="secondary">Current</Badge>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : query.trim().length >= 2 ? (
+              <div className="px-4 py-5 text-sm text-muted-foreground">
+                No matching albums found.
+              </div>
+            ) : (
+              <div className="px-4 py-5 text-sm text-muted-foreground">
+                Type at least 2 characters to search.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const FEATURE_BARS: { key: keyof AudioAnalysisTrack; label: string }[] = [
   { key: "danceability", label: "Danceability" },
   { key: "valence", label: "Valence" },
@@ -513,12 +714,22 @@ export function TrackTable({
   analysisData,
   syncingLyricsTrackKey,
   onSyncTrackLyrics,
+  onTrackQuarantined,
 }: TrackTableProps) {
+  const { hasCapability } = useAuth();
   const [similarTrack, setSimilarTrack] = useState<{
     path: string;
     title: string;
     artist: string;
   } | null>(null);
+  const [pendingQuarantineTrack, setPendingQuarantineTrack] =
+    useState<Track | null>(null);
+  const [pendingMoveTrack, setPendingMoveTrack] = useState<Track | null>(null);
+  const [quarantiningTrackKey, setQuarantiningTrackKey] = useState<
+    string | null
+  >(null);
+  const [movingTrackKey, setMovingTrackKey] = useState<string | null>(null);
+  const canQuarantineTracks = hasCapability("library.track.remove");
 
   function getTrackId(track: Track): string {
     if (track.id != null) return String(track.id);
@@ -530,6 +741,83 @@ export function TrackTable({
     if (track.entity_uid) return `uid:${track.entity_uid}`;
     if (track.path) return `path:${track.path}`;
     return `file:${track.filename}`;
+  }
+
+  async function quarantineTrack(track: Track) {
+    const endpoint = trackManagementApiPath(
+      { id: track.id, trackEntityUid: track.entity_uid },
+      "quarantine",
+    );
+    if (!endpoint) {
+      toast.error("Track reference missing");
+      return;
+    }
+
+    const trackKey = getTrackId(track);
+    setQuarantiningTrackKey(trackKey);
+    try {
+      const { task_id } = await api<{ task_id: string }>(endpoint, "POST", {
+        reason: "Manual quarantine from album view",
+      });
+      toast.success("Track quarantine queued");
+      const task = await waitForTask(task_id, 120000);
+      if (task.status === "completed") {
+        toast.success("Track moved to quarantine");
+        await onTrackQuarantined?.();
+      } else {
+        toast.error(task.error || "Track quarantine failed");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to quarantine track",
+      );
+    } finally {
+      setQuarantiningTrackKey(null);
+      setPendingQuarantineTrack(null);
+    }
+  }
+
+  async function moveTrack(track: Track, targetAlbum: AlbumSearchResult) {
+    if (targetAlbum.id == null) {
+      toast.error("Target album reference missing");
+      return;
+    }
+    const endpoint = trackManagementApiPath(
+      { id: track.id, trackEntityUid: track.entity_uid },
+      "move",
+    );
+    if (!endpoint) {
+      toast.error("Track reference missing");
+      return;
+    }
+
+    const trackKey = getTrackId(track);
+    setMovingTrackKey(trackKey);
+    try {
+      const { task_id } = await api<{ task_id: string }>(endpoint, "POST", {
+        target_album_id: targetAlbum.id,
+        reason: "Manual track move from album view",
+      });
+      toast.success("Track move queued");
+      const task = await waitForTask(task_id, 120000);
+      if (task.status === "completed") {
+        toast.success("Track moved to target album");
+        setPendingMoveTrack(null);
+        await onTrackQuarantined?.();
+      } else {
+        toast.error(task.error || "Track move failed");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to move track",
+      );
+    } finally {
+      setMovingTrackKey(null);
+    }
   }
 
   const hasAnalysis =
@@ -594,8 +882,31 @@ export function TrackTable({
                         })
                     : undefined
                 }
+                onMoveTrack={
+                  canQuarantineTracks && (track.id != null || track.entity_uid)
+                    ? () => setPendingMoveTrack(track)
+                    : undefined
+                }
+                onQuarantineTrack={
+                  canQuarantineTracks && (track.id != null || track.entity_uid)
+                    ? () => setPendingQuarantineTrack(track)
+                    : undefined
+                }
               >
-                <TableRow>
+                <TableRow
+                  aria-busy={
+                    quarantiningTrackKey === trackId ||
+                    movingTrackKey === trackId
+                      ? "true"
+                      : undefined
+                  }
+                  className={
+                    quarantiningTrackKey === trackId ||
+                    movingTrackKey === trackId
+                      ? "opacity-55"
+                      : undefined
+                  }
+                >
                   <TableCell className="text-right text-xs text-white/30">
                     {track.tags.tracknumber || index + 1}
                   </TableCell>
@@ -759,6 +1070,34 @@ export function TrackTable({
           onClose={() => setSimilarTrack(null)}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={pendingQuarantineTrack !== null}
+        onOpenChange={(open) => !open && setPendingQuarantineTrack(null)}
+        title="Quarantine Track"
+        description={`Move "${
+          pendingQuarantineTrack?.tags.title ||
+          pendingQuarantineTrack?.filename ||
+          "this track"
+        }" to .crate-trash and remove it from this album? This is reversible from the filesystem.`}
+        confirmLabel="Quarantine Track"
+        variant="destructive"
+        onConfirm={() =>
+          pendingQuarantineTrack && void quarantineTrack(pendingQuarantineTrack)
+        }
+      />
+
+      <MoveTrackDialog
+        open={pendingMoveTrack !== null}
+        track={pendingMoveTrack}
+        currentAlbumId={albumId}
+        defaultQuery={album || ""}
+        busy={movingTrackKey !== null}
+        onOpenChange={(open) => !open && setPendingMoveTrack(null)}
+        onMove={(targetAlbum) =>
+          pendingMoveTrack && void moveTrack(pendingMoveTrack, targetAlbum)
+        }
+      />
     </>
   );
 }

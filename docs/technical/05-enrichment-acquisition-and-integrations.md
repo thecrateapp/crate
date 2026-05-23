@@ -10,7 +10,7 @@ This layer spans:
 
 - artist enrichment
 - artwork sourcing
-- acquisition from paid and P2P sources
+- acquisition from paid, owned, uploaded, and P2P sources
 - show aggregation
 - completeness checks
 - post-download normalization
@@ -69,7 +69,60 @@ decoration.
 
 ## Acquisition sources
 
-Crate currently integrates strongly with two acquisition channels.
+Crate currently integrates strongly with Bandcamp, Tidal, Soulseek, and direct
+uploads.
+
+### Bandcamp
+
+Bandcamp is the main "support the artist" acquisition path. It is not treated
+as a streaming backend; it is a user-owned purchase import system.
+
+Key pieces:
+
+- API surface in `app/crate/api/bandcamp.py`
+- integration modules in `app/crate/bandcamp/`
+- persistence in `app/crate/db/repositories/bandcamp.py`
+- worker orchestration in `app/crate/worker_handlers/bandcamp.py`
+- contribution withdrawal in `app/crate/worker_handlers/contributions.py`
+
+Current capabilities:
+
+- connect a user's Bandcamp account with native/session material or a manually
+  pasted `identity` cookie
+- sync collection, wishlist, and following
+- cache Bandcamp items and user ownership/following state
+- create candidate links between Bandcamp artists/albums/tracks and Crate
+  entities
+- import owned downloadable purchases into the shared library, defaulting to
+  FLAC
+- skip imports when the same Bandcamp item or artist/album already exists in
+  the instance
+- record the importing user as a library contributor
+- expose portable export and withdrawal controls for that user's contribution
+- surface Bandcamp support CTAs on linked artists/albums in Listen
+
+Crate persists confirmed Bandcamp URLs on `library_artists` and
+`library_albums`. This keeps support links available even when the original
+Bandcamp collection sync result is no longer on the hot path.
+
+### Bandcamp connection model
+
+Normal web pages cannot read cookies from `bandcamp.com`, so Crate supports
+two practical connection paths today:
+
+- native/desktop session capture can post Bandcamp session material to
+  `/api/bandcamp/me/connect/session`
+- web/mobile users can paste the Bandcamp `identity` cookie value into Listen
+  settings, which posts to `/api/bandcamp/me/connect/cookie`
+
+The older server-side web credential bridge remains behind
+`CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=false` by default. It should be
+treated as an optional operator-controlled escape hatch, not the preferred user
+flow.
+
+Bandcamp session material is stored through encrypted `credential_secrets`.
+Production should set a stable `CRATE_CREDENTIAL_KEY` so external sessions
+remain decryptable across JWT secret rotations.
 
 ### Tidal
 
@@ -126,8 +179,8 @@ Crate uses `slskd` for the network client and adds:
 
 ## Unified acquisition philosophy
 
-Even though Tidal and Soulseek are very different sources, Crate converges them
-into one internal pattern:
+Even though Bandcamp, Tidal, Soulseek, and uploads are very different sources,
+Crate converges them into one internal pattern:
 
 1. enqueue acquisition work
 2. download to staging
@@ -136,6 +189,9 @@ into one internal pattern:
 5. move into the library
 6. sync into PostgreSQL
 7. queue enrichment and analysis follow-ups
+8. record provenance when a user contributed the content
+9. emit cache/domain events so home, browse, artist, album, playlist, and ops
+   read models become fresh
 
 This keeps the downstream pipeline largely source-agnostic.
 
@@ -149,6 +205,8 @@ The acquisition worker does more than download bytes. It also:
 - aligns staged artist names with existing folder conventions
 - triggers scans and downstream processing
 - seeds user library state in some upload/import flows
+- records `library_contributions` for user uploads and Bandcamp imports
+- emits acquisition completion events that the projector uses to warm snapshots
 
 ## Shows and live data
 

@@ -206,19 +206,76 @@ def get_all_albums_for_covers() -> list[dict]:
 
 
 def get_duplicate_tracks() -> list[dict]:
-    """Find tracks that appear multiple times in the same album
-    (same artist + album + title, different paths)."""
+    """Find real duplicate tracks inside the same album.
+
+    Rows with broken metadata (empty title, track number 0, duration 0) are
+    handled by shadow-quality repair instead of being reported as duplicates.
+    """
     with read_scope() as session:
         rows = (
             session.execute(
                 text("""
-            SELECT album_id, artist, title, album, COUNT(*) AS cnt,
+            SELECT album_id, artist, title, album, track_number, disc_number,
+                   COUNT(*) AS cnt,
                    array_agg(path ORDER BY path) AS paths
             FROM library_tracks
             WHERE album_id IS NOT NULL
-            GROUP BY album_id, artist, title, album
+              AND NULLIF(BTRIM(title), '') IS NOT NULL
+              AND COALESCE(track_number, 0) > 0
+              AND COALESCE(duration, 0) > 1
+            GROUP BY album_id, artist, title, album, track_number, disc_number
             HAVING COUNT(*) > 1
-            ORDER BY artist, album, title
+            ORDER BY artist, album, disc_number, track_number, title
+        """)
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(r) for r in rows]
+
+
+def get_shadow_quality_tracks() -> list[dict]:
+    """Find legacy lower-quality rows left behind after quality upgrades.
+
+    These rows usually still point to old artist/year folders while the album row
+    points to the canonical entity_uid folder. They have broken metadata because
+    the better copy already owns the real track identity.
+    """
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text("""
+            WITH valid_counts AS (
+                SELECT album_id, COUNT(*) AS valid_count
+                FROM library_tracks
+                WHERE album_id IS NOT NULL
+                  AND NULLIF(BTRIM(title), '') IS NOT NULL
+                  AND COALESCE(track_number, 0) > 0
+                  AND COALESCE(duration, 0) > 1
+                GROUP BY album_id
+            )
+            SELECT
+                lt.album_id,
+                la.artist,
+                la.name AS album,
+                la.path AS canonical_album_path,
+                vc.valid_count,
+                COUNT(*) AS cnt,
+                array_agg(DISTINCT LOWER(COALESCE(lt.format, '')) ORDER BY LOWER(COALESCE(lt.format, ''))) AS formats,
+                array_agg(lt.path ORDER BY lt.path) AS paths
+            FROM library_tracks lt
+            JOIN library_albums la ON la.id = lt.album_id
+            JOIN valid_counts vc ON vc.album_id = lt.album_id
+            WHERE vc.valid_count > 0
+              AND la.path IS NOT NULL
+              AND lt.path NOT LIKE la.path || '/%'
+              AND (
+                NULLIF(BTRIM(lt.title), '') IS NULL
+                OR COALESCE(lt.track_number, 0) <= 0
+                OR COALESCE(lt.duration, 0) <= 1
+              )
+            GROUP BY lt.album_id, la.artist, la.name, la.path, vc.valid_count
+            ORDER BY la.artist, la.name
         """)
             )
             .mappings()

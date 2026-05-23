@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
 from crate.api.schemas.common import SnapshotMetadataResponse
 
@@ -163,6 +163,71 @@ class AlbumTagsUpdate(BaseModel):
 
 class TrackTagsUpdate(BaseModel):
     model_config = ConfigDict(extra="allow")
+
+
+class ArtistMetadataUpdate(BaseModel):
+    bio: str | None = None
+    tags: list[str] | None = None
+    urls: dict[str, str] | None = None
+    mbid: str | None = None
+    country: str | None = None
+    area: str | None = None
+    formed: str | None = None
+    ended: str | None = None
+    artist_type: str | None = None
+    bandcamp_url: str | None = None
+
+    @field_validator(
+        "bio",
+        "mbid",
+        "country",
+        "area",
+        "formed",
+        "ended",
+        "artist_type",
+        "bandcamp_url",
+        mode="before",
+    )
+    @classmethod
+    def blank_string_to_none(cls, value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list | tuple):
+            return []
+        seen = set()
+        tags = []
+        for item in value:
+            tag = str(item).strip()
+            key = tag.lower()
+            if tag and key not in seen:
+                seen.add(key)
+                tags.append(tag)
+        return tags
+
+    @field_validator("urls", mode="before")
+    @classmethod
+    def normalize_urls(cls, value):
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            return {}
+        urls: dict[str, str] = {}
+        for raw_key, raw_url in value.items():
+            key = str(raw_key).strip()
+            url = str(raw_url).strip()
+            if key and url:
+                urls[key] = url
+        return urls
 
 
 class ArtistAnalysisTrackResponse(BaseModel):

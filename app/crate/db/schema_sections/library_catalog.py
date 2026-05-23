@@ -39,7 +39,10 @@ def create_library_catalog_schema(cur) -> None:
             discogs_profile TEXT,
             discogs_members_json JSONB,
             latest_release_date TEXT,
-            content_hash TEXT
+            content_hash TEXT,
+            bandcamp_url TEXT,
+            bandcamp_url_source TEXT,
+            bandcamp_url_updated_at TIMESTAMPTZ
         )
     """)
     cur.execute(
@@ -64,6 +67,9 @@ def create_library_catalog_schema(cur) -> None:
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_artists_name_trgm ON library_artists USING gin(name gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_library_artists_bandcamp_url ON library_artists(bandcamp_url) WHERE bandcamp_url IS NOT NULL"
     )
 
     cur.execute("""
@@ -91,6 +97,9 @@ def create_library_catalog_schema(cur) -> None:
             lastfm_listeners INTEGER,
             lastfm_playcount BIGINT,
             popularity INTEGER,
+            bandcamp_url TEXT,
+            bandcamp_url_source TEXT,
+            bandcamp_url_updated_at TIMESTAMPTZ,
             UNIQUE(artist, name)
         )
     """)
@@ -120,6 +129,26 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_albums_artist_name ON library_albums(artist, name)"
     )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_library_albums_bandcamp_url ON library_albums(bandcamp_url) WHERE bandcamp_url IS NOT NULL"
+    )
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS library_field_locks (
+            entity_type TEXT NOT NULL,
+            entity_id BIGINT NOT NULL,
+            field_name TEXT NOT NULL,
+            locked_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            locked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            reason TEXT,
+            source TEXT NOT NULL DEFAULT 'manual_edit',
+            PRIMARY KEY (entity_type, entity_id, field_name)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_library_field_locks_entity
+        ON library_field_locks(entity_type, entity_id)
+    """)
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS library_tracks (

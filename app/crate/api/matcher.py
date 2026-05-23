@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from crate.api.auth import _require_admin
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.operations import MatchApplyRequest, MatchCandidateResponse
 from crate.matcher import match_album
@@ -29,8 +29,12 @@ _MATCHER_RESPONSES = merge_responses(
 )
 
 
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
+
+
 def api_match_album(request: Request, artist: str, album: str):
-    _require_admin(request)
+    _require_metadata_editor(request)
     lib = library_path()
     album_dir = find_album_dir(lib, artist, album)
     if not album_dir:
@@ -74,7 +78,7 @@ def api_match_album_by_entity_uid(request: Request, album_entity_uid: str):
     summary="Queue tag application from a chosen match",
 )
 def api_match_apply(request: Request, data: MatchApplyRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     album = None
     if data.album_entity_uid:
         album = get_library_album_by_entity_uid(data.album_entity_uid)

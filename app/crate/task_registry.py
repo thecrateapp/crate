@@ -34,6 +34,7 @@ TASK_TYPE_LABELS: dict[str, str] = {
     # Tidal / Downloads
     "tidal_download": "Tidal Download",
     "soulseek_download": "Soulseek Download",
+    "bandcamp_backfill_entity_urls": "Bandcamp URL Backfill",
     # Genres
     "index_genres": "Genre Indexing",
     "infer_genre_taxonomy": "Taxonomy Inference",
@@ -80,6 +81,7 @@ TASK_TYPE_ICONS: dict[str, str] = {
     "backfill_track_audio_fingerprints": "\U0001f9ec",
     "tidal_download": "\U0001f4e5",
     "soulseek_download": "\U0001f4e5",
+    "bandcamp_backfill_entity_urls": "\U0001f517",
     "index_genres": "\U0001f3f7\ufe0f",
     "infer_genre_taxonomy": "\U0001f3f7\ufe0f",
     "enrich_genre_descriptions": "\U0001f4dd",

@@ -14,6 +14,7 @@ import { GridSkeleton } from "@/components/ui/grid-skeleton";
 import { GenreNetworkGraph } from "@/components/genres/GenreNetworkGraph";
 import { GenreEqEditor } from "@/components/genres/GenreEqEditor";
 import { GenreTaxonomyTree } from "@/components/genres/GenreTaxonomyTree";
+import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
@@ -199,6 +200,9 @@ export function Genres() {
 }
 
 function GenreList() {
+  const { hasCapability } = useAuth();
+  const canCurateGenres = hasCapability("curation.genres.write");
+  const canCuratePlaylists = hasCapability("curation.playlists.write");
   const {
     data: genres,
     loading,
@@ -209,7 +213,9 @@ function GenreList() {
     "/api/genres/unmapped?limit=100",
   );
   const { data: invalidTaxonomy, refetch: refetchInvalidTaxonomy } =
-    useApi<InvalidTaxonomyStatus>("/api/genres/taxonomy/invalid?limit=8");
+    useApi<InvalidTaxonomyStatus>(
+      canCurateGenres ? "/api/genres/taxonomy/invalid?limit=8" : null,
+    );
   const { pollTask } = useTaskPoll();
   const [filter, setFilter] = useState("");
   const [indexing, setIndexing] = useState(false);
@@ -220,8 +226,8 @@ function GenreList() {
   const afterSuccess = useCallback(() => {
     refetch();
     refetchUnmapped();
-    refetchInvalidTaxonomy();
-  }, [refetch, refetchUnmapped, refetchInvalidTaxonomy]);
+    if (canCurateGenres) refetchInvalidTaxonomy();
+  }, [canCurateGenres, refetch, refetchUnmapped, refetchInvalidTaxonomy]);
   const { run, isBusy } = useGenreTask(pollTask, afterSuccess);
 
   const filtered = useMemo(() => {
@@ -282,94 +288,98 @@ function GenreList() {
         title="Genres"
         description="Taxonomy curation, raw tag cleanup and discovery of the graph that organizes the musical vocabulary of the library."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <TaskButton
-              label="Sync MusicBrainz"
-              busy={isBusy("mb-sync")}
-              onClick={() =>
-                run(
-                  "mb-sync",
-                  "/api/genres/musicbrainz/sync",
-                  { limit: 80 },
-                  {
-                    successMessage: (r) =>
-                      `MusicBrainz sync: ${r.edges_synced ?? 0} edges, ${
-                        r.matched_musicbrainz ?? 0
-                      } matched`,
-                    errorMessage: "MusicBrainz sync failed",
-                    pollTimeout: 60 * 60 * 1000,
-                  },
-                )
-              }
-            />
-            <TaskButton
-              label="Enrich descriptions"
-              busy={isBusy("enrich")}
-              onClick={() =>
-                run(
-                  "enrich",
-                  "/api/genres/descriptions/enrich",
-                  { limit: 160 },
-                  {
-                    successMessage: (r) =>
-                      `Enrichment: ${r.updated ?? 0} updated, ${
-                        r.remaining_without_external ?? 0
-                      } missing`,
-                    errorMessage: "Description enrichment failed",
-                    pollTimeout: 45 * 60 * 1000,
-                  },
-                )
-              }
-            />
-            <TaskButton
-              label="Infer taxonomy"
-              busy={isBusy("infer")}
-              onClick={() =>
-                run(
-                  "infer",
-                  "/api/genres/infer",
-                  { limit: 250, aggressive: true, include_external: true },
-                  {
-                    successMessage: (r) =>
-                      `Inference: ${r.mapped ?? 0} mapped, ${
-                        r.remaining_unmapped ?? 0
-                      } unmapped`,
-                    errorMessage: "Taxonomy inference failed",
-                  },
-                )
-              }
-            />
-            <TaskButton
-              label="Clean invalid nodes"
-              busy={isBusy("cleanup-invalid")}
-              onClick={() =>
-                run(
-                  "cleanup-invalid",
-                  "/api/genres/taxonomy/cleanup-invalid",
-                  {},
-                  {
-                    successMessage: (r) =>
-                      `Cleanup: ${r.deleted_count ?? 0} invalid nodes removed`,
-                    errorMessage: "Genre taxonomy cleanup failed",
-                  },
-                )
-              }
-              icon={AlertTriangle}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={reindex}
-              disabled={indexing}
-            >
-              {indexing ? (
-                <Loader2 size={14} className="mr-2 animate-spin" />
-              ) : (
-                <RefreshCw size={14} className="mr-2" />
-              )}
-              Re-index
-            </Button>
-          </div>
+          canCurateGenres ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <TaskButton
+                label="Sync MusicBrainz"
+                busy={isBusy("mb-sync")}
+                onClick={() =>
+                  run(
+                    "mb-sync",
+                    "/api/genres/musicbrainz/sync",
+                    { limit: 80 },
+                    {
+                      successMessage: (r) =>
+                        `MusicBrainz sync: ${r.edges_synced ?? 0} edges, ${
+                          r.matched_musicbrainz ?? 0
+                        } matched`,
+                      errorMessage: "MusicBrainz sync failed",
+                      pollTimeout: 60 * 60 * 1000,
+                    },
+                  )
+                }
+              />
+              <TaskButton
+                label="Enrich descriptions"
+                busy={isBusy("enrich")}
+                onClick={() =>
+                  run(
+                    "enrich",
+                    "/api/genres/descriptions/enrich",
+                    { limit: 160 },
+                    {
+                      successMessage: (r) =>
+                        `Enrichment: ${r.updated ?? 0} updated, ${
+                          r.remaining_without_external ?? 0
+                        } missing`,
+                      errorMessage: "Description enrichment failed",
+                      pollTimeout: 45 * 60 * 1000,
+                    },
+                  )
+                }
+              />
+              <TaskButton
+                label="Infer taxonomy"
+                busy={isBusy("infer")}
+                onClick={() =>
+                  run(
+                    "infer",
+                    "/api/genres/infer",
+                    { limit: 250, aggressive: true, include_external: true },
+                    {
+                      successMessage: (r) =>
+                        `Inference: ${r.mapped ?? 0} mapped, ${
+                          r.remaining_unmapped ?? 0
+                        } unmapped`,
+                      errorMessage: "Taxonomy inference failed",
+                    },
+                  )
+                }
+              />
+              <TaskButton
+                label="Clean invalid nodes"
+                busy={isBusy("cleanup-invalid")}
+                onClick={() =>
+                  run(
+                    "cleanup-invalid",
+                    "/api/genres/taxonomy/cleanup-invalid",
+                    {},
+                    {
+                      successMessage: (r) =>
+                        `Cleanup: ${
+                          r.deleted_count ?? 0
+                        } invalid nodes removed`,
+                      errorMessage: "Genre taxonomy cleanup failed",
+                    },
+                  )
+                }
+                icon={AlertTriangle}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={reindex}
+                disabled={indexing}
+              >
+                {indexing ? (
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw size={14} className="mr-2" />
+                )}
+                Re-index
+              </Button>
+            </div>
+          ) : undefined
         }
       >
         <CrateChip icon={Tag}>{genres?.length ?? 0} total genres</CrateChip>
@@ -383,7 +393,7 @@ function GenreList() {
         >
           {unmappedGenres?.length || 0} unmapped
         </CrateChip>
-        {invalidTaxonomy ? (
+        {canCurateGenres && invalidTaxonomy ? (
           <CrateChip
             className={
               invalidTaxonomy.invalid_count > 0
@@ -487,7 +497,7 @@ function GenreList() {
             </div>
           </div>
 
-          {!!invalidTaxonomy?.invalid_count && (
+          {canCurateGenres && !!invalidTaxonomy?.invalid_count && (
             <div className="rounded-md border border-amber-500/20 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(120,53,15,0.08))] p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
               <div className="mb-3 flex items-center gap-2">
                 <AlertTriangle size={16} className="text-amber-300" />
@@ -536,7 +546,12 @@ function GenreList() {
           )}
 
           {viewMode === "tree" ? (
-            <GenreTaxonomyTree filter={filter} hideEmpty={hideEmpty} />
+            <GenreTaxonomyTree
+              filter={filter}
+              hideEmpty={hideEmpty}
+              canCurate={canCurateGenres}
+              canCreatePlaylists={canCuratePlaylists}
+            />
           ) : (
             <>
               {(unmappedGenres?.length || 0) > 0 && (
@@ -590,9 +605,11 @@ function GenreList() {
                   {genres?.length === 0 ? (
                     <div className="space-y-3">
                       <p>No genres indexed yet.</p>
-                      <Button onClick={reindex} disabled={indexing}>
-                        Index Genres
-                      </Button>
+                      {canCurateGenres ? (
+                        <Button onClick={reindex} disabled={indexing}>
+                          Index Genres
+                        </Button>
+                      ) : null}
                     </div>
                   ) : (
                     "No genres match your filter."
@@ -660,6 +677,9 @@ function GenreList() {
 // ── Genre Detail View ───────────────────────────────────────────
 
 function GenreView({ slug }: { slug: string }) {
+  const { hasCapability } = useAuth();
+  const canCurateGenres = hasCapability("curation.genres.write");
+  const canCuratePlaylists = hasCapability("curation.playlists.write");
   const {
     data: genre,
     loading,
@@ -748,106 +768,117 @@ function GenreView({ slug }: { slug: string }) {
         title={genre.name}
         description={description}
         actions={
-          <div className="flex flex-wrap gap-2">
-            {hasCanonicalTaxonomyNode ? (
-              <>
-                <TaskButton
-                  label="Sync MusicBrainz"
-                  busy={isBusy("mb-sync")}
-                  onClick={() =>
-                    run(
-                      "mb-sync",
-                      "/api/genres/musicbrainz/sync",
-                      {
-                        focus_slug: genre.canonical_slug || genre.slug,
-                        limit: 1,
-                        force: true,
-                      },
-                      {
-                        successMessage: (r) =>
-                          r.reason === "focus_slug_not_taxonomy_node"
-                            ? "Map this raw tag into the taxonomy before syncing MusicBrainz"
-                            : `MusicBrainz sync: ${r.edges_synced ?? 0} edges`,
-                        errorMessage: "MusicBrainz sync failed",
-                        pollTimeout: 60 * 60 * 1000,
-                      },
-                    )
-                  }
-                />
-                <TaskButton
-                  label="Enrich Description"
-                  busy={isBusy("enrich")}
-                  onClick={() =>
-                    run(
-                      "enrich",
-                      "/api/genres/descriptions/enrich",
-                      {
-                        focus_slug: genre.canonical_slug || genre.slug,
-                        limit: 1,
-                        force: true,
-                      },
-                      {
-                        successMessage: (r) =>
-                          r.reason === "focus_slug_not_taxonomy_node"
-                            ? "Map this raw tag into the taxonomy before enriching descriptions"
-                            : `Enrichment: ${r.updated ?? 0} updated`,
-                        errorMessage: "Description enrichment failed",
-                        pollTimeout: 45 * 60 * 1000,
-                      },
-                    )
-                  }
-                />
-              </>
-            ) : null}
-            <TaskButton
-              label="Infer Taxonomy"
-              busy={isBusy("infer")}
-              onClick={() =>
-                run(
-                  "infer",
-                  "/api/genres/infer",
-                  {
-                    focus_slug: genre.slug,
-                    limit: 1,
-                    aggressive: true,
-                    include_external: true,
-                  },
-                  {
-                    successMessage: (r) =>
-                      `Inference: ${r.mapped ?? 0} mapped, ${
-                        r.remaining_unmapped ?? 0
-                      } unmapped`,
-                    errorMessage: "Taxonomy inference failed",
-                  },
-                )
-              }
-            />
-            <TaskButton
-              label="Clean Invalid"
-              busy={isBusy("cleanup-invalid")}
-              onClick={() =>
-                run(
-                  "cleanup-invalid",
-                  "/api/genres/taxonomy/cleanup-invalid",
-                  {},
-                  {
-                    successMessage: (r) =>
-                      `Cleanup: ${r.deleted_count ?? 0} invalid nodes removed`,
-                    errorMessage: "Genre taxonomy cleanup failed",
-                  },
-                )
-              }
-              icon={AlertTriangle}
-            />
-            {(genre.artists.length > 0 || genre.albums.length > 0) && (
-              <TaskButton
-                label="Core Tracks"
-                busy={creating}
-                onClick={createSmartPlaylist}
-                icon={ListMusic}
-              />
-            )}
-          </div>
+          canCurateGenres || canCuratePlaylists ? (
+            <div className="flex flex-wrap gap-2">
+              {canCurateGenres && hasCanonicalTaxonomyNode ? (
+                <>
+                  <TaskButton
+                    label="Sync MusicBrainz"
+                    busy={isBusy("mb-sync")}
+                    onClick={() =>
+                      run(
+                        "mb-sync",
+                        "/api/genres/musicbrainz/sync",
+                        {
+                          focus_slug: genre.canonical_slug || genre.slug,
+                          limit: 1,
+                          force: true,
+                        },
+                        {
+                          successMessage: (r) =>
+                            r.reason === "focus_slug_not_taxonomy_node"
+                              ? "Map this raw tag into the taxonomy before syncing MusicBrainz"
+                              : `MusicBrainz sync: ${
+                                  r.edges_synced ?? 0
+                                } edges`,
+                          errorMessage: "MusicBrainz sync failed",
+                          pollTimeout: 60 * 60 * 1000,
+                        },
+                      )
+                    }
+                  />
+                  <TaskButton
+                    label="Enrich Description"
+                    busy={isBusy("enrich")}
+                    onClick={() =>
+                      run(
+                        "enrich",
+                        "/api/genres/descriptions/enrich",
+                        {
+                          focus_slug: genre.canonical_slug || genre.slug,
+                          limit: 1,
+                          force: true,
+                        },
+                        {
+                          successMessage: (r) =>
+                            r.reason === "focus_slug_not_taxonomy_node"
+                              ? "Map this raw tag into the taxonomy before enriching descriptions"
+                              : `Enrichment: ${r.updated ?? 0} updated`,
+                          errorMessage: "Description enrichment failed",
+                          pollTimeout: 45 * 60 * 1000,
+                        },
+                      )
+                    }
+                  />
+                </>
+              ) : null}
+              {canCurateGenres ? (
+                <>
+                  <TaskButton
+                    label="Infer Taxonomy"
+                    busy={isBusy("infer")}
+                    onClick={() =>
+                      run(
+                        "infer",
+                        "/api/genres/infer",
+                        {
+                          focus_slug: genre.slug,
+                          limit: 1,
+                          aggressive: true,
+                          include_external: true,
+                        },
+                        {
+                          successMessage: (r) =>
+                            `Inference: ${r.mapped ?? 0} mapped, ${
+                              r.remaining_unmapped ?? 0
+                            } unmapped`,
+                          errorMessage: "Taxonomy inference failed",
+                        },
+                      )
+                    }
+                  />
+                  <TaskButton
+                    label="Clean Invalid"
+                    busy={isBusy("cleanup-invalid")}
+                    onClick={() =>
+                      run(
+                        "cleanup-invalid",
+                        "/api/genres/taxonomy/cleanup-invalid",
+                        {},
+                        {
+                          successMessage: (r) =>
+                            `Cleanup: ${
+                              r.deleted_count ?? 0
+                            } invalid nodes removed`,
+                          errorMessage: "Genre taxonomy cleanup failed",
+                        },
+                      )
+                    }
+                    icon={AlertTriangle}
+                  />
+                </>
+              ) : null}
+              {canCuratePlaylists &&
+                (genre.artists.length > 0 || genre.albums.length > 0) && (
+                  <TaskButton
+                    label="Core Tracks"
+                    busy={creating}
+                    onClick={createSmartPlaylist}
+                    icon={ListMusic}
+                  />
+                )}
+            </div>
+          ) : undefined
         }
       >
         <CrateChip icon={Users}>{genre.artists.length} artists</CrateChip>
@@ -942,7 +973,7 @@ function GenreView({ slug }: { slug: string }) {
       {/* Equalizer preset editor — only for canonical taxonomy nodes.
           Raw library tags inherit via their canonical alias, so there's
           nothing to edit directly on them. */}
-      {genre.mapped && genre.canonical_slug && (
+      {canCurateGenres && genre.mapped && genre.canonical_slug && (
         <div>
           <GenreEqEditor
             canonicalSlug={genre.canonical_slug}

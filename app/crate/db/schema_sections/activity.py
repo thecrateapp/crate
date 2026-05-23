@@ -27,6 +27,31 @@ def create_activity_schema(cur) -> None:
     )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS library_contributions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            source TEXT NOT NULL,
+            source_ref TEXT NOT NULL,
+            album_id INTEGER REFERENCES library_albums(id) ON DELETE SET NULL,
+            album_entity_uid UUID,
+            artist_name TEXT NOT NULL DEFAULT '',
+            album_name TEXT NOT NULL DEFAULT '',
+            track_entity_uids UUID[] DEFAULT '{}',
+            metadata_json JSONB DEFAULT '{}'::jsonb,
+            status TEXT NOT NULL DEFAULT 'active',
+            imported_at TIMESTAMPTZ NOT NULL,
+            withdrawn_at TIMESTAMPTZ,
+            UNIQUE(user_id, source, source_ref)
+        )
+    """)
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_library_contributions_album ON library_contributions(album_id, status)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_library_contributions_user ON library_contributions(user_id, status, imported_at DESC)"
+    )
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS user_liked_tracks (
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             track_id INTEGER NOT NULL REFERENCES library_tracks(id) ON DELETE CASCADE,

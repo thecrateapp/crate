@@ -4,12 +4,14 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from crate.bandcamp.search import BandcampSearchError, find_exact_album_url
 from crate.content import compute_dir_hash as _compute_dir_hash
 from crate.db.audit import log_audit
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.events import emit_task_event
 from crate.db.genres import set_album_genres
+from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
 from crate.db.jobs.enrichment import (
     get_albums_without_mbid,
     get_album_names_for_artist,
@@ -798,6 +800,60 @@ def _process_new_content_album_mbids(
         result["steps"]["album_mbid"] = "failed"
 
 
+def _process_new_content_bandcamp_urls(
+    task_id: str,
+    result: dict,
+    albums: Sequence[Mapping[str, Any]],
+    artist_name: str,
+    album_folder: str,
+    p: TaskProgress,
+) -> None:
+    p.phase = "bandcamp_urls"
+    p.phase_index += 1
+    p.item = entity_label(artist=artist_name)
+    emit_progress(task_id, p, force=True)
+    updated = 0
+    checked = 0
+    try:
+        for album in albums:
+            if album_folder and album["name"] != album_folder:
+                continue
+            if album.get("bandcamp_url") or not album.get("entity_uid"):
+                continue
+            checked += 1
+            clean_name = _clean_album_lookup_name(
+                str(album.get("tag_album") or album["name"])
+            )
+            try:
+                url = find_exact_album_url(
+                    artist_name,
+                    clean_name,
+                    allow_search=False,
+                )
+            except BandcampSearchError:
+                log.debug(
+                    "Bandcamp album URL lookup failed for %s - %s",
+                    artist_name,
+                    clean_name,
+                    exc_info=True,
+                )
+                continue
+            if url and set_library_entity_bandcamp_url(
+                entity_type="album",
+                entity_uid=str(album["entity_uid"]),
+                url=url,
+                source="bandcamp:public_search",
+            ):
+                updated += 1
+        result["steps"]["bandcamp_urls"] = {
+            "checked": checked,
+            "updated": updated,
+        }
+    except Exception:
+        log.warning("Bandcamp URL enrichment failed", exc_info=True)
+        result["steps"]["bandcamp_urls"] = "failed"
+
+
 def _process_new_content_popularity(
     task_id: str,
     result: dict,
@@ -1182,6 +1238,9 @@ def _process_new_content_inner(
     )
     _process_new_content_album_mbids(
         task_id, result, albums, artist_name, album_folder, config, p
+    )
+    _process_new_content_bandcamp_urls(
+        task_id, result, albums, artist_name, album_folder, p
     )
     _process_new_content_lyrics(task_id, result, albums, artist_name, album_folder, p)
 

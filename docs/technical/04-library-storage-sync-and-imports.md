@@ -135,6 +135,15 @@ Imports are separate from the canonical library.
 
 Crate treats these as raw intake zones, not final library destinations.
 
+User uploads and Bandcamp purchase imports use per-task staging under `DATA_DIR`
+before anything is moved into `/music`:
+
+- direct uploads stage under `DATA_DIR/uploads`
+- Bandcamp purchase archives stage under `DATA_DIR/bandcamp-imports`
+
+Both paths converge on the same worker-owned upload/import routine once the
+audio files are available locally.
+
 ## Acquisition to library flow
 
 The normal ingestion path is:
@@ -145,8 +154,33 @@ The normal ingestion path is:
 4. files are moved into the canonical library
 5. sync indexes them
 6. post-ingest enrichment and analysis are queued
+7. cache/domain events refresh affected read models and Listen home sections
 
 The worker acquisition handler in [app/crate/worker_handlers/acquisition.py](https://github.com/thecrateapp/crate/blob/main/app/crate/worker_handlers/acquisition.py) owns a lot of this handoff logic.
+
+## User contributions
+
+Crate's library is shared per instance, but some imports have a clear user
+provenance:
+
+- Listen/Admin uploads include `uploader_user_id`.
+- Bandcamp imports include the user and Bandcamp item that proved ownership.
+- Imported albums are recorded in `library_contributions` with source,
+  source_ref, album identity, track entity ids, and metadata.
+
+The Listen library exposes a Contributions surface where a user can:
+
+- see albums they contributed
+- download a portable package for a contributed album
+- withdraw their contribution
+
+Withdrawal is deliberately conservative. The contribution row is marked
+withdrawn first. The worker deletes the album from the shared library only when
+no other active contributor remains for that album; otherwise the shared copy is
+kept and only that user's provenance is removed.
+
+When a user is deleted, Crate queues contribution cleanup so Bandcamp/imported
+content owned only by that user can be removed from the instance.
 
 ## Name sanitation and directory resolution
 
@@ -200,6 +234,7 @@ Because every source has its own quirks:
 
 - Tidal emits temporary/intermediate files
 - Soulseek can produce inconsistent folder names
+- Bandcamp downloads are user-owned archives that still need normalization
 - uploads can contain zip structure surprises
 
 Using staging/import logic gives Crate a place to normalize before the library becomes canonical.

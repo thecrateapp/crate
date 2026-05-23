@@ -5,7 +5,10 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@crate/ui/shadcn/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { OpsSnapshotProvider } from "@/contexts/OpsSnapshotContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import {
+  CapabilityRoute,
+  ProtectedRoute,
+} from "@/components/auth/ProtectedRoute";
 import { Shell } from "@/components/layout/Shell";
 
 const Dashboard = lazy(() =>
@@ -29,6 +32,12 @@ const Insights = lazy(() =>
 const Tasks = lazy(() =>
   import("@/pages/Tasks").then((m) => ({ default: m.Tasks })),
 );
+const Trash = lazy(() =>
+  import("@/pages/Trash").then((m) => ({ default: m.Trash })),
+);
+const Contributions = lazy(() =>
+  import("@/pages/Contributions").then((m) => ({ default: m.Contributions })),
+);
 const Playlists = lazy(() =>
   import("@/pages/Playlists").then((m) => ({ default: m.Playlists })),
 );
@@ -47,6 +56,9 @@ const Login = lazy(() =>
 const Users = lazy(() =>
   import("@/pages/Users").then((m) => ({ default: m.Users })),
 );
+const Roles = lazy(() =>
+  import("@/pages/Roles").then((m) => ({ default: m.Roles })),
+);
 const DownloadPage = lazy(() =>
   import("@/pages/Download").then((m) => ({ default: m.DownloadPage })),
 );
@@ -61,6 +73,9 @@ const NewReleases = lazy(() =>
 );
 const Upcoming = lazy(() =>
   import("@/pages/Upcoming").then((m) => ({ default: m.Upcoming })),
+);
+const Bandcamp = lazy(() =>
+  import("@/pages/Bandcamp").then((m) => ({ default: m.Bandcamp })),
 );
 const Setup = lazy(() =>
   import("@/pages/Setup").then((m) => ({ default: m.Setup })),
@@ -100,11 +115,73 @@ function SetupGuard() {
 }
 
 function ProfileRedirect() {
-  const { user, loading } = useAuth();
+  const { user, loading, hasCapability } = useAuth();
   if (loading) return <PageSpinner />;
   if (!user) return <Navigate to="/login" replace />;
+  if (!hasCapability("users.view")) return <Navigate to="/browse" replace />;
   return <Navigate to={`/users?inspect=${user.id}`} replace />;
 }
+
+function AdminIndex() {
+  const { hasCapability } = useAuth();
+  if (hasCapability("admin.access")) return <Dashboard />;
+  if (hasCapability("ops.tasks.manage"))
+    return <Navigate to="/tasks" replace />;
+  if (hasCapability("ops.runtime.manage"))
+    return <Navigate to="/stack" replace />;
+  if (hasCapability("ops.logs.view")) return <Navigate to="/logs" replace />;
+  if (hasCapability("ops.health.view"))
+    return <Navigate to="/system" replace />;
+  if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
+  return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
+      <p className="text-lg font-semibold text-foreground">
+        No console landing page available
+      </p>
+      <p className="max-w-md text-sm text-muted-foreground">
+        Your role can access the console, but this surface is not enabled yet.
+      </p>
+    </div>
+  );
+}
+
+function RequireCapabilities({
+  anyOf,
+  children,
+}: {
+  anyOf: readonly string[];
+  children: React.ReactNode;
+}) {
+  return <CapabilityRoute anyOf={anyOf}>{children}</CapabilityRoute>;
+}
+
+const LIBRARY_VIEW = ["library.view"] as const;
+const LIBRARY_REPAIR_RUN = ["library.repair.run"] as const;
+const LIBRARY_TRACK_REMOVE = ["library.track.remove"] as const;
+const OPS_HEALTH_VIEW = ["ops.health.view"] as const;
+const OPS_LOGS_VIEW = ["ops.logs.view"] as const;
+const OPS_TASKS_MANAGE = ["ops.tasks.manage"] as const;
+const OPS_RUNTIME_MANAGE = ["ops.runtime.manage"] as const;
+const SETTINGS_MANAGE = ["settings.manage"] as const;
+const LIBRARY_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
+const USERS_VIEW = ["users.view"] as const;
+const ROLES_VIEW = ["roles.view"] as const;
+const RELEASE_CURATION = [
+  "curation.releases.write",
+  "library.tidal.manage",
+] as const;
+const ACQUISITION_MANAGE = [
+  "library.import.manage",
+  "library.tidal.manage",
+] as const;
+const CONTRIBUTION_REVIEW = ["library.import.manage"] as const;
+const BANDCAMP_MANAGE = ["library.bandcamp.manage"] as const;
+const UPCOMING_CURATION = [
+  "curation.shows.write",
+  "curation.releases.write",
+  "library.tidal.manage",
+] as const;
+const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
 
 export default function App() {
   return (
@@ -125,37 +202,224 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Dashboard />} />
-                <Route path="browse" element={<Browse />} />
+                <Route index element={<AdminIndex />} />
+                <Route
+                  path="browse"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Browse />
+                    </RequireCapabilities>
+                  }
+                />
                 <Route
                   path="artists/:artistSlug/:albumSlug"
-                  element={<Album />}
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Album />
+                    </RequireCapabilities>
+                  }
                 />
-                <Route path="artists/:artistSlug" element={<Artist />} />
-                <Route path="artists/:artistId/:slug" element={<Artist />} />
-                <Route path="albums/:albumId/:slug" element={<Album />} />
-                <Route path="health" element={<Health />} />
-                <Route path="download" element={<DownloadPage />} />
-                <Route path="insights" element={<Insights />} />
-                <Route path="analysis" element={<Analysis />} />
-                <Route path="system" element={<SystemHealth />} />
-                <Route path="logs" element={<Logs />} />
-                <Route path="tasks" element={<Tasks />} />
-                <Route path="playlists" element={<Playlists />} />
+                <Route
+                  path="artists/:artistSlug"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Artist />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="artists/:artistId/:slug"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Artist />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="albums/:albumId/:slug"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Album />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="health"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_REPAIR_RUN}>
+                      <Health />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="trash"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_TRACK_REMOVE}>
+                      <Trash />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="download"
+                  element={
+                    <RequireCapabilities anyOf={ACQUISITION_MANAGE}>
+                      <DownloadPage />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="contributions"
+                  element={
+                    <RequireCapabilities anyOf={CONTRIBUTION_REVIEW}>
+                      <Contributions />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="insights"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Insights />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="analysis"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_ANALYSIS_MANAGE}>
+                      <Analysis />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="system"
+                  element={
+                    <RequireCapabilities anyOf={OPS_HEALTH_VIEW}>
+                      <SystemHealth />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="logs"
+                  element={
+                    <RequireCapabilities anyOf={OPS_LOGS_VIEW}>
+                      <Logs />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="tasks"
+                  element={
+                    <RequireCapabilities anyOf={OPS_TASKS_MANAGE}>
+                      <Tasks />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="playlists"
+                  element={
+                    <RequireCapabilities anyOf={SYSTEM_PLAYLISTS_WRITE}>
+                      <Playlists />
+                    </RequireCapabilities>
+                  }
+                />
                 <Route
                   path="playlists/:playlistId"
-                  element={<PlaylistEditor />}
+                  element={
+                    <RequireCapabilities anyOf={SYSTEM_PLAYLISTS_WRITE}>
+                      <PlaylistEditor />
+                    </RequireCapabilities>
+                  }
                 />
-                <Route path="stack" element={<Stack />} />
-                <Route path="genres" element={<Genres />} />
-                <Route path="genres/:slug" element={<Genres />} />
-                <Route path="timeline" element={<Timeline />} />
-                <Route path="users" element={<Users />} />
-                <Route path="discover" element={<Discover />} />
-                <Route path="settings" element={<Settings />} />
+                <Route
+                  path="stack"
+                  element={
+                    <RequireCapabilities anyOf={OPS_RUNTIME_MANAGE}>
+                      <Stack />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="genres"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Genres />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="genres/:slug"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Genres />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="timeline"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Timeline />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="users"
+                  element={
+                    <RequireCapabilities anyOf={USERS_VIEW}>
+                      <Users />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="roles"
+                  element={
+                    <RequireCapabilities anyOf={ROLES_VIEW}>
+                      <Roles />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="discover"
+                  element={
+                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
+                      <Discover />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <RequireCapabilities anyOf={SETTINGS_MANAGE}>
+                      <Settings />
+                    </RequireCapabilities>
+                  }
+                />
                 <Route path="profile" element={<ProfileRedirect />} />
-                <Route path="new-releases" element={<NewReleases />} />
-                <Route path="upcoming" element={<Upcoming />} />
+                <Route
+                  path="new-releases"
+                  element={
+                    <RequireCapabilities anyOf={RELEASE_CURATION}>
+                      <NewReleases />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="upcoming"
+                  element={
+                    <RequireCapabilities anyOf={UPCOMING_CURATION}>
+                      <Upcoming />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="bandcamp"
+                  element={
+                    <RequireCapabilities anyOf={BANDCAMP_MANAGE}>
+                      <Bandcamp />
+                    </RequireCapabilities>
+                  }
+                />
               </Route>
             </Routes>
           </Suspense>

@@ -17,6 +17,16 @@ class User(Base):
     password_hash: Mapped[str | None] = mapped_column(Text)
     avatar: Mapped[str | None] = mapped_column(Text)
     role: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
+    status_reason: Mapped[str | None] = mapped_column(Text)
+    suspended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    suspended_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL")
+    )
     google_id: Mapped[str | None] = mapped_column(Text, unique=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

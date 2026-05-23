@@ -12,7 +12,12 @@ use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem};
 #[cfg(desktop)]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(desktop)]
-use tauri::{image::Image, Emitter, LogicalSize, Manager, Size, WebviewWindow, Window};
+use tauri::webview::PageLoadEvent;
+#[cfg(desktop)]
+use tauri::{
+    image::Image, Emitter, LogicalSize, Manager, Size, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, Window,
+};
 #[cfg(desktop)]
 use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(desktop)]
@@ -63,6 +68,13 @@ pub(crate) struct DesktopMediaSessionPayload {
     is_playing: bool,
     position: f64,
     duration: f64,
+}
+
+#[cfg(desktop)]
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BandcampCookiePayload {
+    cookie: String,
 }
 
 #[cfg(desktop)]
@@ -151,6 +163,53 @@ fn ensure_desktop_window_size(window: tauri::Window) -> Result<(), String> {
 
 #[cfg(desktop)]
 #[tauri::command]
+fn open_bandcamp_cookie_interceptor(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("bandcamp-connect") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let app_for_load = app.clone();
+    let login_url = "https://bandcamp.com/login"
+        .parse()
+        .map_err(|err| format!("invalid Bandcamp login URL: {err}"))?;
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "bandcamp-connect",
+        WebviewUrl::External(login_url),
+    )
+    .title("Connect Bandcamp")
+    .inner_size(980.0, 760.0)
+    .min_inner_size(720.0, 560.0)
+    .on_page_load(move |window, payload| {
+        if !matches!(payload.event(), PageLoadEvent::Finished) {
+            return;
+        }
+        if !is_bandcamp_capture_url(payload.url().as_str()) {
+            return;
+        }
+        let Some(cookie) = bandcamp_cookie_header_from_window(&window) else {
+            return;
+        };
+
+        if let Some(main) = app_for_load.get_webview_window("main") {
+            let _ = main.emit("crate:bandcamp-cookie", BandcampCookiePayload { cookie });
+            let _ = main.show();
+            let _ = main.set_focus();
+        }
+        let _ = window.close();
+    })
+    .build()
+    .map_err(|err| err.to_string())?;
+
+    set_desktop_window_icon(&window);
+    Ok(())
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
     #[cfg(target_os = "linux")]
     {
@@ -162,6 +221,43 @@ fn linux_desktop_theme_snapshot() -> Result<Option<serde_json::Value>, String> {
     #[cfg(not(target_os = "linux"))]
     {
         Ok(None)
+    }
+}
+
+#[cfg(desktop)]
+fn is_bandcamp_capture_url(value: &str) -> bool {
+    let Ok(url) = tauri::Url::parse(value) else {
+        return false;
+    };
+    let host = url.host_str().unwrap_or_default();
+    host == "bandcamp.com" || host.ends_with(".bandcamp.com")
+}
+
+#[cfg(desktop)]
+fn bandcamp_cookie_header_from_window<R: tauri::Runtime>(
+    window: &WebviewWindow<R>,
+) -> Option<String> {
+    let url = tauri::Url::parse("https://bandcamp.com/").ok()?;
+    let cookies = window.cookies_for_url(url).ok()?;
+    let mut parts = Vec::new();
+    let mut has_identity = false;
+
+    for cookie in cookies {
+        let name = cookie.name().trim();
+        let value = cookie.value().trim();
+        if name.is_empty() || value.is_empty() {
+            continue;
+        }
+        if name == "identity" {
+            has_identity = true;
+        }
+        parts.push(format!("{name}={value}"));
+    }
+
+    if has_identity && !parts.is_empty() {
+        Some(parts.join("; "))
+    } else {
+        None
     }
 }
 
@@ -664,6 +760,7 @@ pub fn run() {
             update_desktop_media_session,
             cache_desktop_media_artwork,
             ensure_desktop_window_size,
+            open_bandcamp_cookie_interceptor,
             linux_desktop_theme_snapshot
         ])
         .build(tauri::generate_context!())
@@ -673,7 +770,9 @@ pub fn run() {
 
 #[cfg(all(test, desktop))]
 mod tests {
-    use super::{is_supported_activation_command, play_pause_command_for_state};
+    use super::{
+        is_bandcamp_capture_url, is_supported_activation_command, play_pause_command_for_state,
+    };
 
     #[test]
     fn activation_commands_include_system_media_controls() {
@@ -696,5 +795,12 @@ mod tests {
     fn play_pause_menu_resolves_to_explicit_transport_commands() {
         assert_eq!(play_pause_command_for_state(true), "pause");
         assert_eq!(play_pause_command_for_state(false), "play");
+    }
+
+    #[test]
+    fn bandcamp_capture_url_is_restricted_to_bandcamp_hosts() {
+        assert!(is_bandcamp_capture_url("https://bandcamp.com/login"));
+        assert!(is_bandcamp_capture_url("https://foo.bandcamp.com/"));
+        assert!(!is_bandcamp_capture_url("https://evil.example.com/bandcamp.com"));
     }
 }

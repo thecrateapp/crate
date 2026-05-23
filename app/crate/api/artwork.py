@@ -12,12 +12,13 @@ from crate.api._deps import (
     library_path,
     safe_path,
 )
-from crate.api.auth import _require_auth, _require_admin
+from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.artwork import (
     ArtworkApplyRequest,
     ArtworkExtractRequest,
@@ -45,6 +46,10 @@ _ARTWORK_RESPONSES = merge_responses(
         422: error_response("The request payload failed validation."),
     },
 )
+
+
+def _require_artwork_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
 
 
 @router.get(
@@ -83,7 +88,7 @@ def api_artwork_missing(request: Request):
 )
 def api_artwork_scan(request: Request, body: ArtworkScanRequest | None = None):
     """Queue a full scan for missing covers with source search. Returns task_id for SSE streaming."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     auto_apply = body.auto_apply if body else False
     task_id = create_task("scan_missing_covers", {"auto_apply": auto_apply})
     return {"task_id": task_id}
@@ -97,7 +102,7 @@ def api_artwork_scan(request: Request, body: ArtworkScanRequest | None = None):
 )
 def api_artwork_apply(request: Request, body: ArtworkApplyRequest):
     """Apply a specific cover to an album."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     task_id = create_task("apply_cover", body.model_dump(exclude_none=True))
     return {"task_id": task_id}
 
@@ -110,7 +115,7 @@ def api_artwork_apply(request: Request, body: ArtworkApplyRequest):
 )
 def api_artwork_fetch(request: Request, data: ArtworkFetchRequest):
     """Queue a task to fetch cover art from CAA."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     if not data.mbid:
         return JSONResponse({"error": "No MBID provided"}, status_code=400)
     task_id = create_task("fetch_cover", {"mbid": data.mbid, "path": data.path})
@@ -125,7 +130,7 @@ def api_artwork_fetch(request: Request, data: ArtworkFetchRequest):
 )
 def api_artwork_extract(request: Request, data: ArtworkExtractRequest):
     """Extract embedded cover — fast enough to run inline."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     lib = library_path()
     album_dir = safe_path(lib, data.path)
     if not album_dir or not album_dir.is_dir():
@@ -146,7 +151,7 @@ def api_artwork_extract(request: Request, data: ArtworkExtractRequest):
 
 def api_artwork_fetch_artist(request: Request, name: str):
     """Queue a task to fetch covers for all albums by an artist."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     task_id = create_task("fetch_artist_covers", {"artist": name})
     return {"status": "queued", "task_id": task_id}
 
@@ -185,7 +190,7 @@ def api_artwork_fetch_artist_by_entity_uid(request: Request, artist_entity_uid: 
 )
 def api_artwork_fetch_all(request: Request):
     """Queue a task to fetch all missing covers."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     task_id = create_task("fetch_artwork_all")
     return {"status": "queued", "task_id": task_id}
 
@@ -194,7 +199,7 @@ async def api_upload_cover(
     request: Request, artist: str, album: str, file: UploadFile = File(...)
 ):
     """Upload a cover image for an album. Saved to staging, worker copies to album dir."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     import base64
 
     data = await file.read()
@@ -246,7 +251,7 @@ async def api_upload_artist_photo(
     request: Request, name: str, file: UploadFile = File(...)
 ):
     """Upload artist photo. Worker saves to artist dir."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     import base64
 
     data = await file.read()
@@ -295,7 +300,7 @@ async def api_upload_background(
     request: Request, name: str, file: UploadFile = File(...)
 ):
     """Upload artist background. Worker saves to artist dir."""
-    _require_admin(request)
+    _require_artwork_editor(request)
     import base64
 
     data = await file.read()

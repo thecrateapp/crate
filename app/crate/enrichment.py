@@ -7,11 +7,13 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
+from crate.bandcamp.search import BandcampSearchError, find_exact_artist_url
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.genres import set_artist_genres
+from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
 from crate.db.repositories.library import (
     get_library_artist,
     update_artist_enrichment,
@@ -284,6 +286,32 @@ def _download_artist_photo(name: str, artist_dir: Path) -> bool:
         return False
 
 
+def _enrich_artist_bandcamp_url(
+    name: str,
+    db_artist: Mapping[str, Any] | None,
+) -> str | None:
+    if not db_artist or db_artist.get("bandcamp_url"):
+        return None
+    entity_uid = db_artist.get("entity_uid")
+    if not entity_uid:
+        return None
+    try:
+        url = find_exact_artist_url(name, allow_search=False)
+    except BandcampSearchError:
+        log.debug("Bandcamp artist URL lookup failed for %s", name, exc_info=True)
+        return None
+    if not url:
+        return None
+    if set_library_entity_bandcamp_url(
+        entity_type="artist",
+        entity_uid=str(entity_uid),
+        url=url,
+        source="bandcamp:public_search",
+    ):
+        return url
+    return None
+
+
 def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
     """Full enrichment for a single artist. Fetches all sources, persists to DB, downloads photo.
 
@@ -429,6 +457,8 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
         except Exception:
             log.debug("Failed to persist similarities for %s", name, exc_info=True)
 
+    bandcamp_url = _enrich_artist_bandcamp_url(name, db_artist)
+
     # ── Update genre index ──
     tags = persist_data.get("tags", [])
     if tags:
@@ -456,4 +486,5 @@ def enrich_artist(name: str, config: dict, force: bool = False) -> dict:
         "has_musicbrainz": "musicbrainz" in enrichment_data,
         "has_fanart": "fanart" in enrichment_data,
         "has_discogs": "discogs" in enrichment_data,
+        "has_bandcamp": bool(bandcamp_url or (db_artist or {}).get("bandcamp_url")),
     }

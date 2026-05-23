@@ -7,18 +7,18 @@
 <p align="center"><strong>Own your music.</strong></p>
 
 <p align="center">
-  A self-hosted music platform that indexes your library, enriches it with rich metadata, analyzes every track with ML models, and streams it to a dedicated listening app — so your collection stays yours.
+  A self-hosted music platform that indexes your library, enriches it with rich metadata, brings in your Bandcamp purchases and uploads, analyzes every track, and streams it to a dedicated listening app — so your collection stays yours.
 </p>
 
 ---
 
 Crate is a full-stack, self-hosted music system. It watches your filesystem,
-pulls metadata from Last.fm / MusicBrainz / Fanart.tv / Setlist.fm / Spotify,
-analyzes audio with PANNs + Essentia + bliss-rs, and exposes two separate
-frontends on top of a single FastAPI backend: an **admin** web app for library
-management and a **Listen** app (PWA + iOS + Android via Capacitor) for
-playback and discovery. Underneath that, the backend now also maintains a
-snapshot/read-model plane for admin and Listen surfaces.
+syncs/imports user-owned Bandcamp purchases and direct uploads, pulls metadata
+from Last.fm / MusicBrainz / Fanart.tv / Setlist.fm / Spotify, analyzes audio
+with PANNs + Essentia + bliss-rs, and exposes separate apps on top of a single
+FastAPI backend: an **admin** web app for library management and a **Listen**
+app (web/PWA/native shells) for playback and discovery. Underneath that, the
+backend maintains a snapshot/read-model plane for admin and Listen surfaces.
 
 ## Features
 
@@ -31,6 +31,7 @@ snapshot/read-model plane for admin and Listen surfaces.
 - Duplicate detection and resolution
 - Album art manager (6 sources: Cover Art Archive, embedded, Deezer, iTunes, Last.fm, MusicBrainz)
 - Manual image upload with crop (cover art, artist photo, background)
+- User contribution tracking for uploads and Bandcamp imports, with portable export and withdrawal controls
 
 **Enrichment pipeline**
 
@@ -59,8 +60,10 @@ snapshot/read-model plane for admin and Listen surfaces.
 
 **Acquisition**
 
+- **Bandcamp** — connect a user Bandcamp account, sync collection / wishlist / following, import owned downloadable purchases, persist artist/album Bandcamp links, and dedupe against the shared instance library
 - **Tidal** — search and download via `tiddl`, with artifact repair and best-quality-real-output fallback when a provider-labeled lossless download is not actually lossless
 - **Soulseek** — progressive search with quality filtering and alternate peer retry via `slskd`
+- **Uploads** — users can upload audio files or ZIP archives into the shared library with contributor attribution
 - Unified acquisition UI with download queue, concurrency limits (2 slots) and history
 - Automatic post-download pipeline: sync → enrich → analyze → artwork
 
@@ -75,6 +78,7 @@ snapshot/read-model plane for admin and Listen surfaces.
 - Upcoming shows near your location (Last.fm + Ticketmaster consolidated)
 - Jam sessions (shared playback invites)
 - Social layer: follow people, user connections, profile pages
+- Bandcamp support CTAs on linked artists/albums and a user library contributions view
 - Media session + lock-screen controls + keyboard shortcuts
 - PWA + native iOS / Android via Capacitor
 - Rich play events, derived listening stats, and async scrobbling
@@ -107,6 +111,7 @@ snapshot/read-model plane for admin and Listen surfaces.
 - Audit log for destructive operations
 - Three-tier cache: L1 in-memory, L2 Redis, L3 PostgreSQL
 - Snapshot-backed admin/listen surfaces warmed by domain events
+- Replayable cache invalidation and home snapshot refreshes for catalog/import changes
 - Telegram bot for status, task control, and playback notifications
 
 ## Architecture
@@ -140,23 +145,23 @@ snapshot/read-model plane for admin and Listen surfaces.
        /music read-write
 ```
 
-| Service                      | Tech                                     | Role                                                                     |
-| ---------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
-| **crate-api**                | FastAPI + Uvicorn                        | REST API, audio streaming, SSE events, snapshot-driven surfaces          |
-| **crate-readplane**          | Go                                       | Low-latency read plane for snapshot-backed Listen/Admin routes           |
-| **crate-worker**             | Python + Dramatiq (Redis broker)         | Fast/default background tasks, filesystem writes, scheduler/service loop |
-| **crate-projector**          | Python                                   | Redis/domain events → warmed PostgreSQL snapshots/read models            |
-| **crate-maintenance-worker** | Python + Dramatiq                        | Repair, enrichment, sync and maintenance queues                          |
-| **crate-analysis-worker**    | Python + native tools                    | CPU-heavy audio analysis, fingerprints and bliss vectors                 |
-| **crate-playback-worker**    | Python + ffmpeg                          | Playback preparation and transcoding work                                |
-| **crate-media-worker**       | Go/Rust-backed service                   | Lightweight media metadata/stream helper service                         |
-| **crate-ui**                 | React 19 + Vite + Tailwind 4             | Admin SPA (desktop-oriented library management)                          |
-| **crate-listen**             | React 19 + Vite + Tailwind 4 + Capacitor | Consumer listening app (PWA + iOS + Android)                             |
-| **crate-postgres**           | PostgreSQL 15                            | Persistent storage                                                       |
-| **crate-redis**              | Redis 7                                  | Cache + Dramatiq broker + invalidation replay + domain-event stream      |
-| **slskd**                    | Optional                                 | Soulseek client (REST API) for acquisition                               |
-| **proton-vpn**               | Optional                                 | HTTP proxy for scraping/acquisition workloads                            |
-| **traefik**                  | —                                        | Reverse proxy + automatic TLS (Let's Encrypt)                            |
+| Service                      | Tech                                     | Role                                                                              |
+| ---------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
+| **crate-api**                | FastAPI + Uvicorn                        | REST API, audio streaming, SSE events, snapshot-driven surfaces                   |
+| **crate-readplane**          | Go                                       | Low-latency read plane for snapshot-backed Listen/Admin routes                    |
+| **crate-worker**             | Python + Dramatiq (Redis broker)         | Fast/default background tasks, filesystem writes, imports, scheduler/service loop |
+| **crate-projector**          | Python                                   | Redis/domain events → warmed PostgreSQL snapshots/read models                     |
+| **crate-maintenance-worker** | Python + Dramatiq                        | Repair, enrichment, sync and maintenance queues                                   |
+| **crate-analysis-worker**    | Python + native tools                    | CPU-heavy audio analysis, fingerprints and bliss vectors                          |
+| **crate-playback-worker**    | Python + ffmpeg                          | Playback preparation and transcoding work                                         |
+| **crate-media-worker**       | Go/Rust-backed service                   | Lightweight media metadata/stream helper service                                  |
+| **crate-ui**                 | React 19 + Vite + Tailwind 4             | Admin SPA (desktop-oriented library management)                                   |
+| **crate-listen**             | React 19 + Vite + Tailwind 4 + Capacitor | Consumer listening app (PWA + iOS + Android)                                      |
+| **crate-postgres**           | PostgreSQL 15                            | Persistent storage                                                                |
+| **crate-redis**              | Redis 7                                  | Cache + Dramatiq broker + invalidation replay + domain-event stream               |
+| **slskd**                    | Optional                                 | Soulseek client (REST API) for acquisition                                        |
+| **proton-vpn**               | Optional                                 | HTTP proxy for scraping/acquisition workloads                                     |
+| **traefik**                  | —                                        | Reverse proxy + automatic TLS (Let's Encrypt)                                     |
 
 The API container mounts the music library as **read-only**. All filesystem modifications (tag writes, file moves, downloads) go through the worker via Dramatiq actors.
 
@@ -316,28 +321,32 @@ make dev-rebuild     # rebuild images and restart
 
 The `.env` file drives both dev and production. Required unless noted.
 
-| Variable                                                                | Required   | Description                                                                       |
-| ----------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
-| `MEDIA_DIR`                                                             | Yes        | Path to your music library (mounted into API read-only, worker read-write)        |
-| `DATA_DIR`                                                              | Yes        | Path for persistent state (DB volumes, cache, etc.)                               |
-| `DOMAIN`                                                                | Yes (prod) | Base domain used by Traefik (`admin.<DOMAIN>`, `listen.<DOMAIN>`, `api.<DOMAIN>`) |
-| `JWT_SECRET`                                                            | Yes        | Secret for JWT tokens                                                             |
-| `DEFAULT_ADMIN_PASSWORD`                                                | Yes        | Initial password for the bootstrap admin user                                     |
-| `LASTFM_APIKEY`                                                         | Yes        | Last.fm API key — used for enrichment and upcoming shows                          |
-| `LASTFM_API_SECRET`                                                     | No         | Required only for scrobbling                                                      |
-| `FANART_API_KEY`                                                        | No         | Fanart.tv — artist backgrounds and thumbnails                                     |
-| `SETLISTFM_API_KEY`                                                     | No         | Setlist.fm — probable concert setlists                                            |
-| `SPOTIFY_ID` / `SPOTIFY_SECRET`                                         | No         | Spotify — popularity score                                                        |
-| `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET`                      | No         | Discogs — catalog numbers and labels                                              |
-| `TICKETMASTER_API_KEY`                                                  | No         | Ticketmaster — upcoming shows (primary source)                                    |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                             | No         | Google OAuth login                                                                |
-| `SLSKD_API_KEY`                                                         | No         | slskd API key (Soulseek integration)                                              |
-| `SLSKD_SLSK_USERNAME` / `SLSKD_SLSK_PASSWORD`                           | No         | Soulseek network credentials                                                      |
-| `PROTONVPN_USER` / `PROTONVPN_PASS`                                     | No         | Proton VPN credentials for the scraping proxy                                     |
-| `CRATE_POSTGRES_USER` / `CRATE_POSTGRES_PASSWORD` / `CRATE_POSTGRES_DB` | Yes        | App-level Postgres role                                                           |
-| `PUID` / `PGID`                                                         | Yes        | Host UID/GID for file ownership                                                   |
-| `CRATE_IMAGE_OWNER` / `CRATE_IMAGE_REGISTRY`                            | No         | Container image namespace and registry. Defaults to `thecrateapp` / `ghcr.io`     |
-| `TZ`                                                                    | Yes        | Timezone (e.g. `Europe/Madrid`)                                                   |
+| Variable                                                                | Required   | Description                                                                                     |
+| ----------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------- |
+| `MEDIA_DIR`                                                             | Yes        | Path to your music library (mounted into API read-only, worker read-write)                      |
+| `DATA_DIR`                                                              | Yes        | Path for persistent state (DB volumes, cache, etc.)                                             |
+| `DOMAIN`                                                                | Yes (prod) | Base domain used by Traefik (`admin.<DOMAIN>`, `listen.<DOMAIN>`, `api.<DOMAIN>`)               |
+| `JWT_SECRET`                                                            | Yes        | Secret for JWT tokens                                                                           |
+| `DEFAULT_ADMIN_PASSWORD`                                                | Yes        | Initial password for the bootstrap admin user                                                   |
+| `LASTFM_APIKEY`                                                         | Yes        | Last.fm API key — used for enrichment and upcoming shows                                        |
+| `LASTFM_API_SECRET`                                                     | No         | Required only for scrobbling                                                                    |
+| `FANART_API_KEY`                                                        | No         | Fanart.tv — artist backgrounds and thumbnails                                                   |
+| `SETLISTFM_API_KEY`                                                     | No         | Setlist.fm — probable concert setlists                                                          |
+| `SPOTIFY_ID` / `SPOTIFY_SECRET`                                         | No         | Spotify — popularity score                                                                      |
+| `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET`                      | No         | Discogs — catalog numbers and labels                                                            |
+| `TICKETMASTER_API_KEY`                                                  | No         | Ticketmaster — upcoming shows (primary source)                                                  |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                             | No         | Google OAuth login                                                                              |
+| `SLSKD_API_KEY`                                                         | No         | slskd API key (Soulseek integration)                                                            |
+| `SLSKD_SLSK_USERNAME` / `SLSKD_SLSK_PASSWORD`                           | No         | Soulseek network credentials                                                                    |
+| `CRATE_CREDENTIAL_KEY`                                                  | No         | Stable Fernet key for encrypted external session material. Defaults to JWT-derived key if unset |
+| `CRATE_BANDCAMP_COLLECTION_SYNC_*`                                      | No         | Bandcamp collection sync backend, timeout, page size and max pages                              |
+| `CRATE_BANDCAMP_DOWNLOAD_*`                                             | No         | Bandcamp purchase download backend and timeout                                                  |
+| `CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_*`                                | No         | Optional server-side Bandcamp credential bridge. Disabled by default                            |
+| `PROTONVPN_USER` / `PROTONVPN_PASS`                                     | No         | Proton VPN credentials for the scraping proxy                                                   |
+| `CRATE_POSTGRES_USER` / `CRATE_POSTGRES_PASSWORD` / `CRATE_POSTGRES_DB` | Yes        | App-level Postgres role                                                                         |
+| `PUID` / `PGID`                                                         | Yes        | Host UID/GID for file ownership                                                                 |
+| `CRATE_IMAGE_OWNER` / `CRATE_IMAGE_REGISTRY`                            | No         | Container image namespace and registry. Defaults to `thecrateapp` / `ghcr.io`                   |
+| `TZ`                                                                    | Yes        | Timezone (e.g. `Europe/Madrid`)                                                                 |
 
 ## Makefile commands
 
@@ -381,6 +390,7 @@ app/
     broker.py           Dramatiq + Redis broker setup
     scheduler.py        Settings-driven recurring task scheduler
     enrichment.py       Last.fm / MusicBrainz / Fanart / Setlist pipeline
+    bandcamp/           Bandcamp session, collection sync, download and matching
     audio_analysis.py   PANNs + Essentia hybrid engine
     bliss.py            crate-cli Rust CLI integration
     tidal.py            Tidal search + download orchestration (tiddl)

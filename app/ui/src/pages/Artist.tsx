@@ -7,6 +7,7 @@ import {
   type EnrichmentData,
 } from "@/hooks/use-artist-data";
 import { ArtistHeroSection } from "@/components/artist/ArtistHeroSection";
+import { ArtistMetadataEditor } from "@/components/artist/ArtistMetadataEditor";
 import { ArtistRepairDialog } from "@/components/artist/ArtistRepairDialog";
 import { ArtistDiscographySection } from "@/components/artist/ArtistDiscographySection";
 import { ArtistAboutSection } from "@/components/artist/ArtistAboutSection";
@@ -43,12 +44,181 @@ import { waitForTask } from "@/lib/tasks";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@crate/ui/shadcn/button";
+import { Badge } from "@crate/ui/shadcn/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@crate/ui/shadcn/dialog";
+import { Input } from "@crate/ui/shadcn/input";
+import { Loader2, Search } from "lucide-react";
 
 interface ArtistRepairPlanSummary {
   total: number;
 }
 
 type ArtistMetadataAction = "lyrics" | "portable" | "export" | null;
+
+interface ArtistSearchResult {
+  id?: number;
+  entity_uid?: string;
+  slug?: string;
+  name: string;
+}
+
+interface SearchResponse {
+  artists?: ArtistSearchResult[];
+}
+
+export function MergeArtistDialog({
+  open,
+  currentArtistId,
+  currentArtistName,
+  busy,
+  onOpenChange,
+  onMerge,
+}: {
+  open: boolean;
+  currentArtistId?: number;
+  currentArtistName: string;
+  busy: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMerge: (artist: ArtistSearchResult) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ArtistSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    setResults([]);
+    setSearching(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    let active = true;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void api<SearchResponse>(
+        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
+      )
+        .then((payload) => {
+          if (!active) return;
+          setResults(payload.artists ?? []);
+        })
+        .catch(() => {
+          if (!active) return;
+          setResults([]);
+          toast.error("Artist search failed");
+        })
+        .finally(() => {
+          if (active) setSearching(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, query]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Merge Artist Alias</DialogTitle>
+          <DialogDescription>
+            Move every album from {currentArtistName} into another artist and
+            remove this duplicate artist row.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <label className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Target artist
+          </label>
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="pl-9"
+              placeholder="Search canonical artist"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
+            {searching ? (
+              <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                <Loader2 size={15} className="animate-spin" />
+                Searching artists...
+              </div>
+            ) : results.length ? (
+              <div className="divide-y divide-white/8">
+                {results.map((artist) => {
+                  const isCurrentArtist =
+                    currentArtistId != null && artist.id === currentArtistId;
+                  return (
+                    <button
+                      key={`${artist.entity_uid || artist.id}-${artist.name}`}
+                      type="button"
+                      disabled={busy || isCurrentArtist || artist.id == null}
+                      onClick={() => onMerge(artist)}
+                      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <span className="truncate text-sm font-medium text-white/88">
+                        {artist.name}
+                      </span>
+                      {isCurrentArtist ? (
+                        <Badge variant="secondary">Current</Badge>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : query.trim().length >= 2 ? (
+              <div className="px-4 py-5 text-sm text-muted-foreground">
+                No matching artists found.
+              </div>
+            ) : (
+              <div className="px-4 py-5 text-sm text-muted-foreground">
+                Type at least 2 characters to search.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // ── Main Component ──
 
@@ -59,7 +229,7 @@ export function Artist() {
   }>();
   const navigate = useNavigate();
   const artistId = artistIdParam ? Number(artistIdParam) : undefined;
-  const { data, loading } = useApi<ArtistData>(
+  const { data, loading, refetch } = useApi<ArtistData>(
     artistApiPath({
       artistId,
       artistSlug,
@@ -110,14 +280,25 @@ export function Artist() {
   const [enrichment, setEnrichment] = useState<EnrichmentData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRepairDialog, setShowRepairDialog] = useState(false);
+  const [showMetadataEditor, setShowMetadataEditor] = useState(false);
+  const [showMergeArtist, setShowMergeArtist] = useState(false);
+  const [mergingArtist, setMergingArtist] = useState(false);
   const [metadataAction, setMetadataAction] =
     useState<ArtistMetadataAction>(null);
   const [issueCountOverride, setIssueCountOverride] = useState<number | null>(
     null,
   );
-  const { isAdmin } = useAuth();
+  const { isAdmin, hasCapability } = useAuth();
+  const canEditMetadata = hasCapability("library.metadata.write");
+  const canRepairArtist = hasCapability("library.repair.run");
+  const canCreatePlaylists = hasCapability("curation.playlists.write");
+  const canDownloadTidal = hasCapability("library.tidal.manage");
+  const canDeleteArtist =
+    hasCapability("library.artist.remove") &&
+    hasCapability("library.files.delete");
+  const canMergeArtist = hasCapability("library.artist.remove");
   const rawIssueCount = data?.issue_count ?? 0;
-  const shouldLoadRepairPlanSummary = isAdmin && rawIssueCount > 0;
+  const shouldLoadRepairPlanSummary = canRepairArtist && rawIssueCount > 0;
   const repairPlanEndpoint = shouldLoadRepairPlanSummary
     ? artistManagementApiPath(
         { artistId: data?.id, artistEntityUid: data?.entity_uid },
@@ -232,7 +413,7 @@ export function Artist() {
   const letter = artistName.charAt(0).toUpperCase();
   const issueCount =
     issueCountOverride ?? repairPlanSummary?.total ?? rawIssueCount;
-  const showRepairAction = issueCount > 0;
+  const showRepairAction = canRepairArtist && issueCount > 0;
 
   const sortedAlbums = [...data.albums].sort((a, b) => {
     if (sort === "year") return (b.year || "").localeCompare(a.year || "");
@@ -379,6 +560,48 @@ export function Artist() {
     }
   }
 
+  async function mergeArtistInto(targetArtist: ArtistSearchResult) {
+    if (!data || targetArtist.id == null) return;
+    const endpoint = artistManagementApiPath(
+      { artistId: data.id, artistEntityUid: data.entity_uid },
+      "merge",
+    );
+    if (!endpoint) {
+      toast.error("Artist reference missing");
+      return;
+    }
+
+    setMergingArtist(true);
+    try {
+      const { task_id } = await api<{ task_id: string }>(endpoint, "POST", {
+        target_artist_id: targetArtist.id,
+        reason: "Manual artist alias merge from admin artist view",
+      });
+      toast.success("Artist merge queued");
+      const task = await waitForTask(task_id, 120000);
+      if (task.status === "completed") {
+        toast.success("Artist alias merged");
+        setShowMergeArtist(false);
+        navigate(
+          artistPagePath({
+            artistSlug: targetArtist.slug,
+            artistName: targetArtist.name,
+          }),
+        );
+      } else {
+        toast.error(task.error || "Artist merge failed");
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to merge artist";
+      toast.error(message);
+    } finally {
+      setMergingArtist(false);
+    }
+  }
+
   return (
     <div className="-mt-16 md:-mt-[6.5rem]">
       <ArtistHeroSection
@@ -401,6 +624,15 @@ export function Artist() {
         tags={allTags}
         enriching={enriching}
         isAdmin={isAdmin}
+        canEditArtwork={canEditMetadata}
+        canEnrich={canEditMetadata}
+        canAnalyze={isAdmin}
+        canEditMetadata={canEditMetadata}
+        canCreateCorePlaylist={canCreatePlaylists}
+        canQueueMetadata={canEditMetadata}
+        canRepair={canRepairArtist}
+        canDelete={canDeleteArtist}
+        canMerge={canMergeArtist}
         photoLoaded={photoLoaded}
         photoError={photoError}
         photoCacheBust={photoCacheBust}
@@ -426,7 +658,7 @@ export function Artist() {
         }}
         corePlaylistCreating={creatingCorePlaylist}
         onCreateCorePlaylist={
-          isAdmin && totalTracks > 0
+          canCreatePlaylists && totalTracks > 0
             ? () => {
                 void createArtistCorePlaylist();
               }
@@ -435,6 +667,7 @@ export function Artist() {
         onRepair={() => {
           void repairArtist();
         }}
+        onEditMetadata={() => setShowMetadataEditor(true)}
         metadataAction={metadataAction}
         onSyncLyrics={() => {
           void queueArtistMetadataAction("lyrics");
@@ -446,6 +679,7 @@ export function Artist() {
           void queueArtistMetadataAction("export");
         }}
         onDelete={() => setShowDeleteConfirm(true)}
+        onMerge={() => setShowMergeArtist(true)}
       />
 
       <ArtistTabsNav
@@ -496,6 +730,7 @@ export function Artist() {
             showMissing={showMissing}
             sort={sort}
             downloadingDiscog={downloadingDiscog}
+            canDownloadTidal={canDownloadTidal}
             onToggleShowMissing={() => setShowMissing(!showMissing)}
             onSortChange={setSort}
             onDownloadDiscography={() => {
@@ -601,6 +836,20 @@ export function Artist() {
         artistId={data.id}
         artistEntityUid={data.entity_uid}
         onIssueCountChange={setIssueCountOverride}
+      />
+      <ArtistMetadataEditor
+        open={showMetadataEditor}
+        onOpenChange={setShowMetadataEditor}
+        artist={data}
+        onSaved={refetch}
+      />
+      <MergeArtistDialog
+        open={showMergeArtist}
+        currentArtistId={data.id}
+        currentArtistName={data.name}
+        busy={mergingArtist}
+        onOpenChange={setShowMergeArtist}
+        onMerge={(artist) => void mergeArtistInto(artist)}
       />
     </div>
   );

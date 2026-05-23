@@ -34,6 +34,9 @@ export function createMockAuthValue(
     loading: false,
     logout: vi.fn(),
     isAdmin: true,
+    canAccessAdmin: true,
+    hasCapability: vi.fn(() => true),
+    hasAnyCapability: vi.fn(() => true),
     refetch: vi.fn(),
     ...overrides,
   };

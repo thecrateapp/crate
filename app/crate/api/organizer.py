@@ -1,25 +1,25 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from crate.api.auth import _require_admin
+from crate.api._deps import extensions, library_path, safe_path
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.schemas.utility import (
     OrganizeApplyRequest,
     OrganizeApplyResponse,
     OrganizePresetsResponse,
     OrganizePreviewResponse,
 )
-from crate.organizer import (
-    preview_organize,
-    organize_album,
-    suggest_folder_name,
-    PRESETS,
-)
-from crate.api._deps import library_path, extensions, safe_path
 from crate.db.repositories.library import get_library_album_by_id
+from crate.organizer import (
+    PRESETS,
+    organize_album,
+    preview_organize,
+    suggest_folder_name,
+)
 
 router = APIRouter(tags=["organizer"])
 
@@ -32,6 +32,10 @@ _ORGANIZER_RESPONSES = merge_responses(
 )
 
 
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
+
+
 @router.get(
     "/api/organize/presets",
     response_model=OrganizePresetsResponse,
@@ -39,14 +43,14 @@ _ORGANIZER_RESPONSES = merge_responses(
     summary="List file-organization presets",
 )
 def api_organize_presets(request: Request):
-    _require_admin(request)
+    _require_metadata_editor(request)
     return PRESETS
 
 
 def api_organize_preview(
     request: Request, artist: str, album: str, pattern: str | None = None
 ):
-    _require_admin(request)
+    _require_metadata_editor(request)
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
     if not album_dir or not album_dir.is_dir():
@@ -69,7 +73,7 @@ def api_organize_preview(
 def api_organize_apply(
     request: Request, artist: str, album: str, data: OrganizeApplyRequest | None = None
 ):
-    _require_admin(request)
+    _require_metadata_editor(request)
     lib = library_path()
     album_dir = safe_path(lib, f"{artist}/{album}")
     if not album_dir or not album_dir.is_dir():

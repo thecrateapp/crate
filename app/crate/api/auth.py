@@ -31,6 +31,9 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import ALL_CAPABILITIES, ROLE_CAPABILITIES
+from crate.api.permissions import get_user_capabilities, normalize_role
+from crate.api.permissions import require_permission, validate_role
 from crate.api.schemas.auth import (
     AdminAuthConfigResponse,
     AdminSetPasswordRequest,
@@ -59,15 +62,17 @@ from crate.api.schemas.auth import (
     RevokeSessionsResponse,
     SubsonicTokenResponse,
     UpdateProfileRequest,
+    UpdateUserRoleRequest,
+    UpdateUserStatusRequest,
 )
 from crate.api.schemas.common import OkResponse
+from crate.db.audit import log_audit
 from crate.db.repositories.auth import (
     consume_auth_invite,
     count_users,
     create_auth_invite,
     create_session,
     create_user,
-    delete_user,
     get_session,
     get_user_by_email,
     get_user_by_external_identity,
@@ -85,8 +90,11 @@ from crate.db.repositories.auth import (
     unlink_user_external_identity,
     update_user,
     update_user_last_login,
+    update_user_status,
     upsert_user_external_identity,
 )
+from crate.db.repositories.library_contributions import list_user_album_contributions
+from crate.db.repositories.tasks import create_task
 from crate.db.cache_settings import get_setting, set_setting
 
 log = logging.getLogger(__name__)
@@ -551,6 +559,108 @@ def _user_public(user: dict) -> dict:
     }
 
 
+def _user_status(user: dict | None) -> str:
+    return str((user or {}).get("status") or "active").strip().lower() or "active"
+
+
+def _ensure_user_active(user: dict | None) -> dict:
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    status = _user_status(user)
+    if status != "active":
+        raise HTTPException(status_code=403, detail=f"User account is {status}")
+    return user
+
+
+def _with_capabilities(user: dict) -> dict:
+    payload = dict(user)
+    payload["status"] = _user_status(payload)
+    payload["capabilities"] = sorted(get_user_capabilities(payload))
+    return payload
+
+
+def _admin_capable_roles() -> set[str]:
+    return {
+        role
+        for role in ("owner", "admin")
+        if "admin.access" in get_user_capabilities({"role": role})
+    }
+
+
+def _is_active_admin_capable(user: dict) -> bool:
+    return (
+        _user_status(user) == "active"
+        and normalize_role(user.get("role")) in _admin_capable_roles()
+    )
+
+
+def _ensure_role_change_is_safe(actor: dict, target: dict, next_role: str) -> None:
+    next_role = validate_role(next_role)
+    current_role = normalize_role(target.get("role"))
+    if actor.get("id") == target.get("id") and next_role not in _admin_capable_roles():
+        raise HTTPException(
+            status_code=400, detail="Cannot remove your own admin access"
+        )
+    if (
+        current_role not in _admin_capable_roles()
+        or next_role in _admin_capable_roles()
+    ):
+        return
+
+    remaining_admins = [
+        user
+        for user in list_users()
+        if user.get("id") != target.get("id") and _is_active_admin_capable(user)
+    ]
+    if not remaining_admins:
+        raise HTTPException(
+            status_code=400, detail="At least one owner or admin must remain"
+        )
+
+
+def _ensure_status_change_is_safe(actor: dict, target: dict, next_status: str) -> None:
+    current_status = _user_status(target)
+    if current_status == next_status:
+        return
+    if actor.get("id") == target.get("id") and next_status != "active":
+        raise HTTPException(status_code=400, detail="Cannot disable your own account")
+    if next_status == "active" or not _is_active_admin_capable(target):
+        return
+    remaining_admins = [
+        user
+        for user in list_users()
+        if user.get("id") != target.get("id") and _is_active_admin_capable(user)
+    ]
+    if not remaining_admins:
+        raise HTTPException(
+            status_code=400, detail="At least one owner or admin must remain"
+        )
+
+
+def _invalidate_auth_user(user_id: int) -> None:
+    from crate.api.auth_cache import invalidate_user
+
+    invalidate_user(user_id)
+
+
+def _invalidate_auth_session(session_id: str) -> None:
+    from crate.api.auth_cache import invalidate_session
+
+    invalidate_session(session_id)
+
+
+def _revoke_user_sessions(user_id: int, current_session_id: str | None = None) -> int:
+    open_session_ids = [
+        session["id"]
+        for session in list_sessions(user_id, include_revoked=False, limit=None)
+        if not current_session_id or session["id"] != current_session_id
+    ]
+    revoked = revoke_other_sessions(user_id, current_session_id)
+    for session_id in open_session_ids:
+        _invalidate_auth_session(session_id)
+    return revoked
+
+
 def _is_proxyable_avatar_url(value: str) -> bool:
     try:
         parsed = urlparse(value)
@@ -944,6 +1054,7 @@ def _build_apple_client_secret() -> str:
 def _create_login_session(
     user: dict, request: Request, *, app_id: str | None = None
 ) -> tuple[str, dict, str | None]:
+    user = _ensure_user_active(user)
     app = app_id or request.headers.get("x-crate-app")
     session_expiry_hours = _session_expiry_hours(request, app_id=app)
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
@@ -1167,7 +1278,7 @@ class AuthMiddleware:
                     payload = None
             if payload:
                 current_user = get_cached_user(payload["user_id"])
-                if current_user:
+                if current_user and _user_status(current_user) == "active":
                     user = {
                         "id": current_user["id"],
                         "email": current_user["email"],
@@ -1227,10 +1338,51 @@ def _require_auth(request: Request) -> dict:
 
 
 def _require_admin(request: Request) -> dict:
-    user = _require_auth(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
+    return require_permission(request, "admin.access")
+
+
+def _require_users_view(request: Request) -> dict:
+    return require_permission(request, "users.view")
+
+
+def _require_users_manage(request: Request) -> dict:
+    return require_permission(request, "users.manage")
+
+
+def _require_users_create(request: Request) -> dict:
+    return require_permission(request, "users.create")
+
+
+def _require_users_status_manage(request: Request) -> dict:
+    return require_permission(request, "users.status.manage")
+
+
+def _require_users_password_manage(request: Request) -> dict:
+    return require_permission(request, "users.password.manage")
+
+
+def _require_users_sessions_manage(request: Request) -> dict:
+    return require_permission(request, "users.sessions.manage")
+
+
+def _require_users_delete(request: Request) -> dict:
+    return require_permission(request, "users.delete")
+
+
+def _require_roles_view(request: Request) -> dict:
+    return require_permission(request, "roles.view")
+
+
+def _require_roles_assign(request: Request) -> dict:
+    return require_permission(request, "roles.assign")
+
+
+def _require_roles_manage(request: Request) -> dict:
+    return require_permission(request, "roles.manage")
+
+
+def _require_auth_manage(request: Request) -> dict:
+    return require_permission(request, "auth.manage")
 
 
 # ── Routes ───────────────────────────────────────────────────────
@@ -1251,6 +1403,7 @@ async def login(request: Request, body: LoginRequest):
     if not user or not password_hash:
         _reject_invalid_login(body.email, request)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    _ensure_user_active(user)
     if not verify_password(body.password, str(password_hash)):
         _reject_invalid_login(body.email, request)
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -1358,6 +1511,7 @@ async def refresh_auth(request: Request, body: RefreshTokenRequest | None = None
     user = get_user_by_id(user_id_int)
     if not user:
         raise HTTPException(status_code=401, detail="Refresh user no longer exists")
+    _ensure_user_active(user)
 
     session_app_id = session.get("app_id")
     refreshed = (
@@ -1447,6 +1601,7 @@ async def auth_me(request: Request):
         payload["username"] = db_user.get("username")
         payload["bio"] = db_user.get("bio")
         payload["session_id"] = user.get("session_id")
+        payload["capabilities"] = sorted(get_user_capabilities(db_user))
         payload["connected_accounts"] = list_user_external_identities(user["id"])
         return payload
     return {
@@ -1455,6 +1610,7 @@ async def auth_me(request: Request):
         "name": None,
         "avatar": None,
         "role": user["role"],
+        "capabilities": sorted(get_user_capabilities(user)),
     }
 
 
@@ -2035,6 +2191,7 @@ async def oauth_callback(
 
     if not user:
         raise HTTPException(status_code=401, detail="OAuth user could not be loaded")
+    _ensure_user_active(user)
 
     update_user_last_login(user["id"])
     token, _session, refresh_token = _create_login_session(user, request, app_id=app_id)
@@ -2175,8 +2332,29 @@ async def apple_callback(request: Request, code: str = "", state: str = ""):
     summary="List users for administration",
 )
 async def admin_list_users(request: Request):
-    _require_admin(request)
-    return list_users()
+    _require_users_view(request)
+    return [_with_capabilities(user) for user in list_users()]
+
+
+@router.get(
+    "/roles",
+    responses=_AUTH_ADMIN_RESPONSES,
+    summary="List role presets and capabilities",
+)
+async def admin_list_roles(request: Request):
+    _require_roles_view(request)
+    return {
+        "capabilities": list(ALL_CAPABILITIES),
+        "roles": [
+            {
+                "slug": role,
+                "name": role.replace("_", " ").title(),
+                "capabilities": sorted(get_user_capabilities({"role": role})),
+                "system": True,
+            }
+            for role in ROLE_CAPABILITIES
+        ],
+    }
 
 
 @admin_router.get(
@@ -2186,7 +2364,7 @@ async def admin_list_users(request: Request):
     summary="List provider configuration for administrators",
 )
 async def admin_get_auth_providers(request: Request):
-    _require_admin(request)
+    _require_auth_manage(request)
     return _provider_status(request)
 
 
@@ -2197,7 +2375,7 @@ async def admin_get_auth_providers(request: Request):
     summary="Get admin-only authentication settings",
 )
 async def admin_get_auth_config(request: Request):
-    _require_admin(request)
+    _require_auth_manage(request)
     return {
         "invite_only": get_setting("auth_invite_only", "false") == "true",
     }
@@ -2210,7 +2388,7 @@ async def admin_get_auth_config(request: Request):
     summary="Update admin-only authentication settings",
 )
 async def admin_update_auth_config(request: Request, body: AuthConfigUpdateRequest):
-    _require_admin(request)
+    _require_auth_manage(request)
     set_setting("auth_invite_only", "true" if body.invite_only else "false")
     return {
         "invite_only": body.invite_only,
@@ -2226,7 +2404,7 @@ async def admin_update_auth_config(request: Request, body: AuthConfigUpdateReque
 async def admin_toggle_auth_provider(
     request: Request, provider: str, body: ProviderToggleRequest
 ):
-    _require_admin(request)
+    _require_auth_manage(request)
     if provider not in {"password", "google", "apple"}:
         raise HTTPException(status_code=404, detail="Unknown auth provider")
     set_setting(f"auth_{provider}_enabled", "true" if body.enabled else "false")
@@ -2240,7 +2418,7 @@ async def admin_toggle_auth_provider(
     summary="Create an authentication invite",
 )
 async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
-    user = _require_admin(request)
+    user = _require_users_create(request)
     invite = create_auth_invite(
         user.get("id"),
         email=body.email,
@@ -2257,7 +2435,7 @@ async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
     summary="List authentication invites",
 )
 async def admin_list_auth_invites(request: Request):
-    _require_admin(request)
+    _require_users_view(request)
     return list_auth_invites()
 
 
@@ -2268,7 +2446,10 @@ async def admin_list_auth_invites(request: Request):
     summary="Create a user as an administrator",
 )
 async def admin_create_user(request: Request, body: CreateUserRequest):
-    _require_admin(request)
+    admin_user = _require_users_create(request)
+    role = validate_role(body.role)
+    if role != "user":
+        _require_roles_assign(request)
     if len(body.password) < 8:
         raise HTTPException(
             status_code=400, detail="Password must be at least 8 characters"
@@ -2278,7 +2459,14 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
         raise HTTPException(status_code=409, detail="Email already registered")
     pw_hash = hash_password(body.password)
     user = create_user(
-        email=body.email, name=body.name, password_hash=pw_hash, role=body.role
+        email=body.email, name=body.name, password_hash=pw_hash, role=role
+    )
+    log_audit(
+        "create_user",
+        "user",
+        body.email,
+        details={"role": role, "source": "admin"},
+        user_id=admin_user.get("id"),
     )
     return _user_public(user)
 
@@ -2290,11 +2478,16 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
     summary="Get a user with sessions and linked accounts",
 )
 async def admin_get_user_detail(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     payload = _user_public(user)
+    payload["status"] = _user_status(user)
+    payload["status_reason"] = user.get("status_reason")
+    payload["suspended_at"] = _iso_datetime(user.get("suspended_at"))
+    payload["deleted_at"] = _iso_datetime(user.get("deleted_at"))
+    payload["capabilities"] = sorted(get_user_capabilities(user))
     payload["username"] = user.get("username")
     payload["bio"] = user.get("bio")
     payload["has_password"] = bool(user.get("password_hash"))
@@ -2306,6 +2499,94 @@ async def admin_get_user_detail(request: Request, user_id: int):
     return payload
 
 
+@router.patch(
+    "/users/{user_id}/role",
+    response_model=AdminUserDetailResponse,
+    responses=_AUTH_ADMIN_RESPONSES,
+    summary="Update a user's role",
+)
+async def admin_update_user_role(
+    request: Request, user_id: int, body: UpdateUserRoleRequest
+):
+    admin_user = _require_roles_assign(request)
+    next_role = validate_role(body.role)
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    previous_role = normalize_role(user.get("role"))
+    if previous_role == next_role:
+        return await admin_get_user_detail(request, user_id)
+
+    _ensure_role_change_is_safe(admin_user, user, next_role)
+    updated = update_user(user_id, role=next_role)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    _invalidate_auth_user(user_id)
+    log_audit(
+        "update_user_role",
+        "user",
+        updated["email"],
+        details={
+            "before": {"role": previous_role},
+            "after": {"role": next_role},
+            "changed_fields": ["role"],
+            "source": "admin",
+        },
+        user_id=admin_user.get("id"),
+    )
+    return await admin_get_user_detail(request, user_id)
+
+
+@router.patch(
+    "/users/{user_id}/status",
+    response_model=AdminUserDetailResponse,
+    responses=_AUTH_ADMIN_RESPONSES,
+    summary="Update a user's lifecycle status",
+)
+async def admin_update_user_status(
+    request: Request, user_id: int, body: UpdateUserStatusRequest
+):
+    admin_user = _require_users_status_manage(request)
+    next_status = body.status.strip().lower()
+    if next_status not in {"active", "suspended", "deleted"}:
+        raise HTTPException(status_code=422, detail="Unsupported user status")
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    previous_status = _user_status(user)
+    if previous_status == next_status:
+        return await admin_get_user_detail(request, user_id)
+
+    _ensure_status_change_is_safe(admin_user, user, next_status)
+    updated = update_user_status(
+        user_id,
+        next_status,
+        reason=body.reason,
+        actor_user_id=admin_user.get("id"),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    revoked = 0
+    if body.revoke_sessions and next_status != "active":
+        revoked = _revoke_user_sessions(user_id, None)
+    _invalidate_auth_user(user_id)
+    log_audit(
+        "update_user_status",
+        "user",
+        updated["email"],
+        details={
+            "before": {"status": previous_status},
+            "after": {"status": next_status},
+            "changed_fields": ["status"],
+            "reason": body.reason,
+            "revoked_sessions": revoked,
+            "source": "admin",
+        },
+        user_id=admin_user.get("id"),
+    )
+    return await admin_get_user_detail(request, user_id)
+
+
 @router.post(
     "/users/{user_id}/set-password",
     response_model=RevokeSessionsResponse,
@@ -2315,7 +2596,7 @@ async def admin_get_user_detail(request: Request, user_id: int):
 async def admin_set_user_password(
     request: Request, user_id: int, body: AdminSetPasswordRequest
 ):
-    admin_user = _require_admin(request)
+    admin_user = _require_users_password_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2325,13 +2606,25 @@ async def admin_set_user_password(
         )
 
     update_user(user_id, password_hash=hash_password(body.new_password))
+    _invalidate_auth_user(user_id)
 
     revoked = 0
     if body.revoke_all_sessions:
         current_session_id = (
             admin_user.get("session_id") if admin_user.get("id") == user_id else None
         )
-        revoked = revoke_other_sessions(user_id, current_session_id)
+        revoked = _revoke_user_sessions(user_id, current_session_id)
+    log_audit(
+        "set_user_password",
+        "user",
+        user["email"],
+        details={
+            "changed_fields": ["password_hash"],
+            "revoked_sessions": revoked,
+            "source": "admin",
+        },
+        user_id=admin_user.get("id"),
+    )
     return {"ok": True, "revoked": revoked}
 
 
@@ -2342,7 +2635,7 @@ async def admin_set_user_password(
     summary="List sessions for a user",
 )
 async def admin_get_user_sessions(request: Request, user_id: int):
-    _require_admin(request)
+    _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2356,7 +2649,7 @@ async def admin_get_user_sessions(request: Request, user_id: int):
     summary="Revoke a specific user session",
 )
 async def admin_revoke_user_session(request: Request, user_id: int, session_id: str):
-    _require_admin(request)
+    admin_user = _require_users_sessions_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -2366,6 +2659,14 @@ async def admin_revoke_user_session(request: Request, user_id: int, session_id: 
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
     revoke_session(session_id)
+    _invalidate_auth_session(session_id)
+    log_audit(
+        "revoke_user_session",
+        "user",
+        user["email"],
+        details={"session_id": session_id, "source": "admin"},
+        user_id=admin_user.get("id"),
+    )
     return {"ok": True}
 
 
@@ -2376,11 +2677,18 @@ async def admin_revoke_user_session(request: Request, user_id: int, session_id: 
     summary="Revoke all sessions for a user",
 )
 async def admin_revoke_all_user_sessions(request: Request, user_id: int):
-    _require_admin(request)
+    admin_user = _require_users_sessions_manage(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    revoked = revoke_other_sessions(user_id, None)
+    revoked = _revoke_user_sessions(user_id, None)
+    log_audit(
+        "revoke_all_user_sessions",
+        "user",
+        user["email"],
+        details={"revoked_sessions": revoked, "source": "admin"},
+        user_id=admin_user.get("id"),
+    )
     return {"ok": True, "revoked": revoked}
 
 
@@ -2391,9 +2699,39 @@ async def admin_revoke_all_user_sessions(request: Request, user_id: int):
     summary="Delete a user",
 )
 async def admin_delete_user(request: Request, user_id: int):
-    _require_admin(request)
+    admin_user = _require_users_delete(request)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    delete_user(user_id)
+    _ensure_status_change_is_safe(admin_user, user, "deleted")
+    contributions = list_user_album_contributions(user_id)
+    if contributions:
+        create_task(
+            "library_cleanup_user_contributions",
+            {"user_id": user_id, "contributions": contributions},
+        )
+    updated = update_user_status(
+        user_id,
+        "deleted",
+        reason="Deleted by administrator",
+        actor_user_id=admin_user.get("id"),
+    )
+    _revoke_user_sessions(user_id, None)
+    _invalidate_auth_user(user_id)
+    log_audit(
+        "delete_user",
+        "user",
+        user["email"],
+        details={
+            "before": {"status": _user_status(user)},
+            "after": {"status": "deleted"},
+            "changed_fields": ["status"],
+            "source": "admin",
+            "soft_delete": True,
+            "contributions": len(contributions),
+        },
+        user_id=admin_user.get("id"),
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
     return {"ok": True}

@@ -19,6 +19,8 @@ def get_recent_global_artist_rows(limit: int = 10) -> list[dict]:
                     la.track_count,
                     la.has_photo
                 FROM library_artists la
+                WHERE la.name NOT LIKE '.%'
+                  AND COALESCE(la.folder_name, '') NOT LIKE '.%'
                 ORDER BY COALESCE(la.dir_mtime, EXTRACT(EPOCH FROM la.updated_at)::bigint) DESC, la.name ASC
                 LIMIT :limit
                 """
@@ -58,6 +60,8 @@ def get_home_hero_rows(
                 LEFT JOIN genres g ON g.id = ag.genre_id
                 LEFT JOIN artist_similarities sim ON sim.artist_name = la.name AND sim.in_library = TRUE
                 WHERE la.has_photo = 1
+                  AND la.name NOT LIKE '.%'
+                  AND COALESCE(la.folder_name, '') NOT LIKE '.%'
                   AND COALESCE(la.bio, '') <> ''
                   AND NOT (LOWER(la.name) = ANY(:followed))
                 GROUP BY la.id, la.slug, la.name, la.listeners, la.lastfm_playcount, la.album_count, la.track_count, la.bio
@@ -96,6 +100,8 @@ def get_home_hero_rows(
                         COALESCE(bio, '') AS bio
                     FROM library_artists
                     WHERE has_photo = 1
+                      AND name NOT LIKE '.%'
+                      AND COALESCE(folder_name, '') NOT LIKE '.%'
                       AND COALESCE(bio, '') <> ''
                       AND NOT (LOWER(name) = ANY(:followed))
                     ORDER BY COALESCE(listeners, 0) DESC, COALESCE(lastfm_playcount, 0) DESC

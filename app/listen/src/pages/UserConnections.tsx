@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, UserPlus, Users } from "lucide-react";
 
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
+import { UserProfileLink } from "@/components/social/UserProfileLink";
 
 interface UserListItem {
   id: number;
@@ -90,9 +91,10 @@ export function UserConnections() {
               const label =
                 item.display_name || item.username || "Unknown user";
               return (
-                <Link
+                <UserProfileLink
                   key={`${mode}-${item.id}`}
-                  to={item.username ? `/users/${item.username}` : "/people"}
+                  username={item.username}
+                  hoverClassName="block"
                   className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
                 >
                   <UserAvatar
@@ -112,7 +114,7 @@ export function UserConnections() {
                     <UserPlus size={13} />
                     View profile
                   </div>
-                </Link>
+                </UserProfileLink>
               );
             })}
           </div>

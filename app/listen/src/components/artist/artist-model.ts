@@ -18,10 +18,17 @@ export interface ArtistAlbum {
   size_mb: number;
   year: string;
   has_cover: boolean;
+  cover_url?: string | null;
+  is_pre_release?: boolean;
+  release_date?: string | null;
+  release_status?: string | null;
+  release_type?: string | null;
+  source_url?: string | null;
 }
 
 export interface ArtistData {
   id?: number;
+  entity_uid?: string | null;
   slug?: string;
   name: string;
   updated_at?: string | null;

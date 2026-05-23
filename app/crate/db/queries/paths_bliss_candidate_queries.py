@@ -240,7 +240,131 @@ def find_candidate_rows(
     return normalized_rows
 
 
+def find_seeded_radio_candidate_rows(
+    target: list[float],
+    exclude_ids: set[int],
+    *,
+    seed_artists: list[str] | None = None,
+    similar_artist_keys: list[str] | None = None,
+    seed_genres: list[str] | None = None,
+    excluded_artist_keys: list[str] | None = None,
+    limit: int,
+    session=None,
+) -> list[dict]:
+    seed_artist_keys = [
+        artist.lower().strip() for artist in (seed_artists or []) if artist
+    ]
+    seed_artist_keys = list(dict.fromkeys(key for key in seed_artist_keys if key))
+    similar_keys = [
+        key.lower().strip()
+        for key in (similar_artist_keys or [])
+        if key and key.lower().strip() not in seed_artist_keys
+    ]
+    similar_keys = list(dict.fromkeys(key for key in similar_keys if key))
+    genre_terms = [term.lower().strip() for term in (seed_genres or []) if term]
+    excluded_keys = [key.lower().strip() for key in (excluded_artist_keys or []) if key]
+    excluded_keys = list(dict.fromkeys(key for key in excluded_keys if key))
+    if not seed_artist_keys and not similar_keys and not genre_terms:
+        return []
+
+    probe_vector = to_pgvector_literal(target)
+    exclude_clause = ""
+    params: dict = {
+        "probe_vector": probe_vector,
+        "seed_artist_keys": seed_artist_keys or ["__no_seed_artist__"],
+        "similar_artist_keys": similar_keys or ["__no_similar_artist__"],
+        "seed_genres": genre_terms or ["__no_seed_genre__"],
+        "excluded_artist_keys": excluded_keys or ["__no_excluded_artist__"],
+        "limit": int(limit),
+    }
+    if exclude_ids:
+        exclude_clause = "AND t.id != ALL(:exclude)"
+        params["exclude"] = list(exclude_ids)
+
+    with optional_scope(session) as s:
+        s.execute(text("SET LOCAL ivfflat.probes = 10"))
+        rows = (
+            s.execute(
+                text(
+                    f"""
+                WITH genre_artists AS (
+                    SELECT LOWER(ag.artist_name) AS artist_key
+                    FROM artist_genres ag
+                    JOIN genres g ON g.id = ag.genre_id
+                    WHERE LOWER(g.name) = ANY(:seed_genres)
+                       OR LOWER(g.slug) = ANY(:seed_genres)
+                    GROUP BY LOWER(ag.artist_name)
+                ),
+                ranked AS (
+                    SELECT
+                        t.id, t.entity_uid, t.title, a.artist,
+                        a.name AS album, t.album_id,
+                        a.entity_uid::text AS album_entity_uid,
+                        ar.entity_uid::text AS artist_entity_uid,
+                        t.duration, t.year,
+                        t.bpm, t.audio_key, t.audio_scale, t.energy,
+                        t.danceability, t.valence,
+                        t.bliss_vector,
+                        COALESCE(
+                            t.bliss_embedding <=> CAST(:probe_vector AS vector(20)),
+                            1.0
+                        ) AS distance,
+                        CASE
+                            WHEN LOWER(a.artist) = ANY(:seed_artist_keys) THEN 'seed'
+                            WHEN LOWER(a.artist) = ANY(:similar_artist_keys) THEN 'similar'
+                            ELSE 'genre'
+                        END AS radio_source,
+                        CASE
+                            WHEN LOWER(a.artist) = ANY(:seed_artist_keys) THEN 0
+                            WHEN LOWER(a.artist) = ANY(:similar_artist_keys) THEN 1
+                            ELSE 2
+                        END AS radio_source_rank,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY LOWER(a.artist)
+                            ORDER BY
+                                COALESCE(t.lastfm_playcount, 0) DESC,
+                                COALESCE(t.rating, 0) DESC,
+                                t.id
+                        ) AS artist_pick
+                    FROM library_tracks t
+                    JOIN library_albums a ON a.id = t.album_id
+                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    WHERE t.bliss_vector IS NOT NULL
+                      {exclude_clause}
+                      AND (
+                          LOWER(a.artist) = ANY(:seed_artist_keys)
+                          OR LOWER(a.artist) = ANY(:similar_artist_keys)
+                          OR LOWER(a.artist) IN (SELECT artist_key FROM genre_artists)
+                      )
+                      AND NOT (LOWER(a.artist) = ANY(:excluded_artist_keys))
+                )
+                SELECT *
+                FROM ranked
+                WHERE artist_pick <= CASE
+                    WHEN radio_source = 'seed' THEN 4
+                    WHEN radio_source = 'similar' THEN 6
+                    ELSE 2
+                END
+                ORDER BY radio_source_rank, artist_pick, distance
+                LIMIT :limit
+                """
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
+
+    normalized_rows: list[dict] = []
+    for row in rows:
+        normalized = _normalize_track_row(row)
+        if normalized is not None:
+            normalized_rows.append(normalized)
+    return normalized_rows
+
+
 __all__ = [
     "find_anchor_track_row",
+    "find_seeded_radio_candidate_rows",
     "find_candidate_rows",
 ]

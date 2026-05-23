@@ -3,7 +3,11 @@ from unittest.mock import patch
 from crate.api.browse_artist import _match_setlist_track
 from crate.db.home_personalized_collections import get_home_mix
 from crate.db.home_builder_track_selection import _select_diverse_tracks_with_backfill
-from crate.track_versions import canonical_track_title_key, track_variant_rank
+from crate.track_versions import (
+    canonical_track_title_key,
+    dedupe_track_variants,
+    track_variant_rank,
+)
 
 
 def test_canonical_track_title_key_strips_known_variant_suffixes():
@@ -110,6 +114,56 @@ def test_select_diverse_tracks_does_not_collapse_plain_studio_title_duplicates_w
     )
 
     assert [row["title"] for row in selected] == ["Intro", "Intro", "Outro"]
+
+
+def test_dedupe_track_variants_collapses_same_duration_special_edition_duplicate():
+    rows = [
+        {
+            "track_id": 1,
+            "track_path": "/music/gojira/special/born-in-winter.flac",
+            "title": "Born in Winter",
+            "artist": "Gojira",
+            "album": "L'Enfant Sauvage (Special Edition)",
+            "duration": 231,
+        },
+        {
+            "track_id": 2,
+            "track_path": "/music/gojira/original/born-in-winter.flac",
+            "title": "Born in Winter",
+            "artist": "Gojira",
+            "album": "L'Enfant Sauvage",
+            "duration": 231,
+        },
+    ]
+
+    selected = dedupe_track_variants(rows)
+
+    assert [row["track_id"] for row in selected] == [2]
+
+
+def test_dedupe_track_variants_keeps_same_title_when_duration_differs():
+    rows = [
+        {
+            "track_id": 1,
+            "track_path": "/music/artist/album-a/intro.flac",
+            "title": "Intro",
+            "artist": "Artist",
+            "album": "Album A",
+            "duration": 42,
+        },
+        {
+            "track_id": 2,
+            "track_path": "/music/artist/album-b/intro.flac",
+            "title": "Intro",
+            "artist": "Artist",
+            "album": "Album B",
+            "duration": 91,
+        },
+    ]
+
+    selected = dedupe_track_variants(rows)
+
+    assert [row["track_id"] for row in selected] == [1, 2]
 
 
 def test_match_setlist_track_prefers_studio_version_when_available():

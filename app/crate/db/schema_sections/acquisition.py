@@ -19,9 +19,23 @@ def create_acquisition_schema(cur) -> None:
             release_date DATE,
             release_type TEXT DEFAULT 'Album',
             mb_release_group_id TEXT,
+            source_name TEXT,
+            source_url TEXT,
+            cover_source TEXT,
+            tracklist_json JSONB DEFAULT '[]'::jsonb,
+            preview_tracks_json JSONB DEFAULT '[]'::jsonb,
             UNIQUE(artist_name, album_title)
         )
     """)
+    cur.execute("ALTER TABLE new_releases ADD COLUMN IF NOT EXISTS source_name TEXT")
+    cur.execute("ALTER TABLE new_releases ADD COLUMN IF NOT EXISTS source_url TEXT")
+    cur.execute("ALTER TABLE new_releases ADD COLUMN IF NOT EXISTS cover_source TEXT")
+    cur.execute(
+        "ALTER TABLE new_releases ADD COLUMN IF NOT EXISTS tracklist_json JSONB DEFAULT '[]'::jsonb"
+    )
+    cur.execute(
+        "ALTER TABLE new_releases ADD COLUMN IF NOT EXISTS preview_tracks_json JSONB DEFAULT '[]'::jsonb"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tidal_downloads (

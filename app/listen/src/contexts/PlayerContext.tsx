@@ -834,7 +834,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (eventName === "nearQueueEnd") {
-        continueInfinitePlayback();
+        // Native near-end is only a signal that the queue is getting short.
+        // The regular playback-intelligence effect handles prefetching without
+        // moving the cursor; advancing here skips the rest of the album/playlist.
         return;
       }
       if (eventName === "queueEnded") {
@@ -875,7 +877,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       clearNativeBufferingWatchdog,
       commitIsPlaying,
       commitIsBuffering,
-      continueInfinitePlayback,
       currentIndexRef,
       flushCurrentPlayEvent,
       queueRef,
@@ -1021,10 +1022,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       );
       removers.push(bufferingRemove);
 
-      const nearEndRemove = await androidNativeEngine.on("nearQueueEnd", () => {
-        if (disposed) return;
-        continueInfinitePlayback();
-      });
+      const nearEndRemove = await androidNativeEngine.on(
+        "nearQueueEnd",
+        (event) => {
+          if (disposed) return;
+          handleNativeEvent("nearQueueEnd", event);
+        },
+      );
       removers.push(nearEndRemove);
 
       const queueEndedRemove = await androidNativeEngine.on(
@@ -1088,7 +1092,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     applyNativeState,
     applyNativeTrackChange,
     commitIsBuffering,
-    continueInfinitePlayback,
     handleNativeEvent,
     reconcileNativePlayback,
   ]);

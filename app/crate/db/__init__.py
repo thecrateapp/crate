@@ -310,6 +310,9 @@ from crate.db.management import (
 from crate.db.releases import (
     upsert_new_release,
     get_new_releases,
+    get_upcoming_releases_for_artist,
+    find_upcoming_release_by_artist_album_slug,
+    get_artist_release_track_matches,
     mark_release_downloading,
     mark_release_downloaded,
     mark_release_dismissed,

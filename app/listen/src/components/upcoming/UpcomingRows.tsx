@@ -70,12 +70,8 @@ export function UpcomingMonthGroup({
             <UpcomingEventRow
               key={key}
               item={itemWithOverrides}
-              onAttendanceChange={(attending) => {
-                setAttendanceOverrides((current) => ({
-                  ...current,
-                  [key]: attending,
-                }));
-              }}
+              expanded={expandedId === key}
+              onToggle={() => onToggleExpand(expandedId === key ? null : key)}
             />
           );
         })}

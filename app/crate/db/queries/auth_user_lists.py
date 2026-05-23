@@ -19,6 +19,10 @@ def list_users() -> list[dict]:
                     u.name,
                     u.avatar,
                     u.role,
+                    u.status,
+                    u.status_reason,
+                    u.suspended_at,
+                    u.deleted_at,
                     u.google_id,
                     u.bio,
                     CASE WHEN u.password_hash IS NOT NULL AND u.password_hash <> '' THEN TRUE ELSE FALSE END AS has_password,
@@ -91,6 +95,7 @@ def list_users_map_rows() -> list[dict]:
                  AND s.revoked_at IS NULL
                  AND (s.expires_at IS NULL OR s.expires_at > NOW())
                 WHERE u.latitude IS NOT NULL AND u.longitude IS NOT NULL
+                  AND COALESCE(u.status, 'active') = 'active'
                 GROUP BY u.id
                 """
                 )

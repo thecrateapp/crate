@@ -30,6 +30,9 @@ const Library = React.lazy(() =>
 const Settings = React.lazy(() =>
   import("@/pages/Settings").then((m) => ({ default: m.Settings })),
 );
+const Bandcamp = React.lazy(() =>
+  import("@/pages/Bandcamp").then((m) => ({ default: m.Bandcamp })),
+);
 const Upload = React.lazy(() =>
   import("@/pages/Upload").then((m) => ({ default: m.Upload })),
 );
@@ -123,6 +126,7 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "stats/global", element: deferred(<Stats />) },
   { path: "upload", element: deferred(<Upload />) },
   { path: "settings", element: deferred(<Settings />) },
+  { path: "bandcamp", element: deferred(<Bandcamp />) },
   { path: "people", element: deferred(<People />) },
   { path: "users/:username", element: deferred(<UserProfile />) },
   { path: "users/:username/stats", element: deferred(<Stats />) },

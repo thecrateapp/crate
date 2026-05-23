@@ -2,9 +2,11 @@ from pathlib import Path
 
 from crate.worker_handlers.acquisition import (
     _finalize_upgrade_quarantine,
+    _find_cover_art_archive_release_group_cover,
     _handle_tidal_download,
     _handle_library_upload,
     _locate_soulseek_download_file,
+    _register_new_release,
     _select_soulseek_task_downloads,
 )
 
@@ -37,6 +39,129 @@ def test_select_soulseek_task_downloads_scopes_to_expected_full_paths():
     )
 
     assert selected == [downloads[0]]
+
+
+def test_find_cover_art_archive_release_group_cover_uses_front_endpoint(
+    monkeypatch,
+):
+    cached = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_cache", lambda _key: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.set_cache",
+        lambda key, value, ttl=None: cached.append((key, value, ttl)),
+    )
+
+    class Response:
+        status_code = 307
+
+    def fake_head(url, timeout, allow_redirects):
+        assert timeout == 6
+        assert allow_redirects is False
+        assert url.endswith("/release-group/rg-123/front-500")
+        return Response()
+
+    import requests
+
+    monkeypatch.setattr(requests, "head", fake_head)
+
+    url = _find_cover_art_archive_release_group_cover("rg-123")
+
+    assert url == "https://coverartarchive.org/release-group/rg-123/front-500"
+    assert cached == [
+        (
+            "caa:release-group-cover:rg-123",
+            "https://coverartarchive.org/release-group/rg-123/front-500",
+            86400 * 30,
+        )
+    ]
+
+
+def test_register_new_release_uses_tidal_tracklist_when_mb_is_empty(monkeypatch):
+    captured: dict = {}
+    preview_inputs: list[list[dict]] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_release_match",
+        lambda _artist, _title: {
+            "tidal_url": "https://tidal.com/album/515000",
+            "tidal_id": "515000",
+            "cover_url": "https://img.example/cover.jpg",
+            "tracks": 10,
+            "quality": ["HI_RES_LOSSLESS"],
+        },
+    )
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_release_group_tracklist", lambda _mbid: []
+    )
+
+    from crate import tidal as tidal_mod
+
+    monkeypatch.setattr(
+        tidal_mod,
+        "get_album_tracks",
+        lambda _album_id: [
+            {
+                "id": "7009",
+                "title": "Hum Of Hurt",
+                "display_title": "Hum Of Hurt",
+                "track_number": 9,
+                "volume_number": 1,
+                "duration": 180,
+                "url": "https://tidal.com/track/7009",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_preview_tracks",
+        lambda _artist, tracklist: (
+            preview_inputs.append(tracklist)
+            or {
+                "preview_tracks": [],
+                "cover_url": "",
+                "source_url": "",
+                "source_album": "",
+                "source_name": "",
+                "quality": "",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.upsert_new_release",
+        lambda **kwargs: captured.update(kwargs) or 91,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._broadcast_release_cache_invalidation",
+        lambda _artist: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+
+    release_id, processed = _register_new_release(
+        "task-release",
+        "Converge",
+        {
+            "title": "Hum Of Hurt",
+            "year": "2026",
+            "type": "Album",
+            "mbid": "rg-hum",
+            "first_release_date": "2026-06-05",
+        },
+        today="2026-05-17",
+        known_date="2026-01-01",
+        auto_download=False,
+    )
+
+    assert (release_id, processed) == (1, False)
+    assert preview_inputs[0][0]["title"] == "Hum Of Hurt"
+    assert preview_inputs[0][0]["position"] == 9
+    assert captured["tracklist"][0]["title"] == "Hum Of Hurt"
+    assert captured["tracklist"][0]["source"] == "tidal"
+    assert captured["tracks"] == 10
 
 
 def test_locate_soulseek_download_file_prefers_exact_path_suffix(tmp_path):
@@ -113,6 +238,7 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
 
         def sync_album(self, album_dir, artist_name):
             sync_calls.append((album_dir, artist_name))
+            return {}
 
     completed_events: list[dict] = []
 
@@ -127,8 +253,16 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
         lambda raw, grouped, ext: 0,
     )
     monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._uploaded_album_already_in_library",
+        lambda album_dir: None,
+    )
+    monkeypatch.setattr(
         "crate.worker_handlers.acquisition._seed_uploaded_library",
         lambda user_id, imported_albums: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._record_uploaded_library_contributions",
+        lambda **kwargs: [],
     )
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition.emit_task_event",
@@ -164,16 +298,200 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
                 {
                     "artist": "Terror",
                     "album": "One With The Underdogs",
+                    "album_id": None,
                     "path": str(album_a),
                     "moved": 1,
                 },
                 {
                     "artist": "Terror",
                     "album": "Lowest of the Low",
+                    "album_id": None,
                     "path": str(album_b),
                     "moved": 1,
                 },
             ],
+        }
+    ]
+
+
+def test_library_upload_skips_albums_that_already_exist(monkeypatch, tmp_path):
+    staging_dir = tmp_path / "staging"
+    raw_dir = staging_dir / "raw"
+    extracted_dir = staging_dir / "extracted"
+    grouped_dir = staging_dir / "grouped"
+    raw_dir.mkdir(parents=True)
+    extracted_dir.mkdir()
+    grouped_dir.mkdir()
+
+    source_album = extracted_dir / "existing-album"
+    source_album.mkdir()
+
+    class FakeQueue:
+        def __init__(self, config):
+            self.config = config
+
+        def import_item(self, source_path):
+            raise AssertionError("Existing uploads must not be merged into library")
+
+    class FakeSync:
+        def __init__(self, config):
+            self.config = config
+
+        def sync_album(self, album_dir, artist_name):
+            raise AssertionError("Skipped uploads must not be synced")
+
+    monkeypatch.setattr("crate.importer.ImportQueue", FakeQueue)
+    monkeypatch.setattr("crate.library_sync.LibrarySync", FakeSync)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_album_dirs_recursive",
+        lambda root, extensions: [source_album],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._group_loose_audio_files",
+        lambda raw, grouped, ext: 0,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._uploaded_album_already_in_library",
+        lambda album_dir: {
+            "artist": "Terror",
+            "album": "One With The Underdogs",
+            "album_id": 123,
+            "path": "/music/Terror/One With The Underdogs",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._seed_uploaded_library",
+        lambda user_id, imported_albums: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._record_uploaded_library_contributions",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_item_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
+
+    result = _handle_library_upload(
+        "task-upload-skip",
+        {"staging_dir": str(staging_dir), "uploader_user_id": 1},
+        {"library_path": str(tmp_path / "library"), "audio_extensions": [".flac"]},
+    )
+
+    assert result["success"] is True
+    assert result["albums_imported"] == 0
+    assert result["skipped_existing_uploads"] == [
+        {
+            "source_path": str(source_album),
+            "reason": "already_in_library",
+            "artist": "Terror",
+            "album": "One With The Underdogs",
+            "album_id": 123,
+            "path": "/music/Terror/One With The Underdogs",
+        }
+    ]
+
+
+def test_library_upload_skips_duplicate_albums_in_same_upload(monkeypatch, tmp_path):
+    staging_dir = tmp_path / "staging"
+    raw_dir = staging_dir / "raw"
+    extracted_dir = staging_dir / "extracted"
+    grouped_dir = staging_dir / "grouped"
+    raw_dir.mkdir(parents=True)
+    extracted_dir.mkdir()
+    grouped_dir.mkdir()
+
+    first_album = extracted_dir / "first"
+    second_album = extracted_dir / "second"
+    first_album.mkdir()
+    second_album.mkdir()
+
+    library_root = tmp_path / "library"
+    imported_album = library_root / "Terror" / "Duplicate"
+    imported_album.mkdir(parents=True)
+    (imported_album / "01 - Track.flac").write_bytes(b"a")
+    imported_paths: list[str] = []
+
+    class FakeQueue:
+        def __init__(self, config):
+            self.config = config
+
+        def import_item(self, source_path):
+            imported_paths.append(source_path)
+            return {"status": "imported", "dest": str(imported_album)}
+
+    class FakeSync:
+        def __init__(self, config):
+            self.config = config
+
+        def sync_album(self, album_dir, artist_name):
+            return {}
+
+    monkeypatch.setattr("crate.importer.ImportQueue", FakeQueue)
+    monkeypatch.setattr("crate.library_sync.LibrarySync", FakeSync)
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_album_dirs_recursive",
+        lambda root, extensions: [first_album, second_album],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._uploaded_album_identity",
+        lambda album_dir: ("Terror", "Duplicate"),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._uploaded_album_already_in_library",
+        lambda album_dir: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._group_loose_audio_files",
+        lambda raw, grouped, ext: 0,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._seed_uploaded_library",
+        lambda user_id, imported_albums: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._record_uploaded_library_contributions",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._emit_acquisition_completed_for_albums",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_progress", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_item_event",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
+
+    result = _handle_library_upload(
+        "task-upload-duplicates",
+        {"staging_dir": str(staging_dir), "uploader_user_id": 1},
+        {"library_path": str(library_root), "audio_extensions": [".flac"]},
+    )
+
+    assert imported_paths == [str(first_album)]
+    assert result["albums_imported"] == 1
+    assert result["skipped_existing_uploads"] == [
+        {
+            "source_path": str(second_album),
+            "artist": "Terror",
+            "album": "Duplicate",
+            "reason": "duplicate_in_upload",
         }
     ]
 

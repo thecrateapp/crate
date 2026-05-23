@@ -1,4 +1,67 @@
+from datetime import date
+
+from sqlalchemy import text
+
 from crate.db.home_builder_upcoming_feed import _build_home_upcoming
+
+
+def test_get_upcoming_releases_resolves_existing_album_without_artist_id(pg_db):
+    from crate.db.queries.user import get_upcoming_releases
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        artist_id = session.execute(
+            text(
+                """
+                INSERT INTO library_artists (name, slug)
+                VALUES ('Quicksand', 'quicksand')
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        album_id = session.execute(
+            text(
+                """
+                INSERT INTO library_albums (artist, name, path, slug)
+                VALUES ('Quicksand', 'Bring On The Psychics', '/music/q/botp', 'bring-on-the-psychics')
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO new_releases (
+                    artist_name,
+                    album_title,
+                    status,
+                    detected_at,
+                    release_date,
+                    release_type
+                )
+                VALUES (
+                    'Quicksand',
+                    'Bring On The Psychics',
+                    'detected',
+                    NOW(),
+                    '2026-07-17',
+                    'Album'
+                )
+                """
+            )
+        )
+
+    rows = get_upcoming_releases(
+        ["Quicksand"],
+        today=date(2026, 5, 18),
+        recent_cutoff="2026-04-01T00:00:00+00:00",
+        limit=10,
+    )
+
+    assert rows[0]["artist_id"] == artist_id
+    assert rows[0]["artist_slug"] == "quicksand"
+    assert rows[0]["album_id"] == album_id
+    assert rows[0]["album_slug"] == "bring-on-the-psychics"
 
 
 def test_home_upcoming_trims_preview_items_but_keeps_full_summary(monkeypatch):

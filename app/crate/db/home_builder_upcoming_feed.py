@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from crate.db.home_builder_shared import _coerce_date
 from crate.db.home_builder_upcoming_insights import _build_upcoming_insights_home
 from crate.db.queries.user_library import get_followed_artists
+from crate.slugs import build_public_album_slug
 
 
 def _build_release_items(releases: list[dict], *, today) -> list[dict]:
@@ -19,9 +20,14 @@ def _build_release_items(releases: list[dict], *, today) -> list[dict]:
                 "artist": release.get("artist_name", ""),
                 "artist_id": release.get("artist_id"),
                 "artist_slug": release.get("artist_slug"),
+                "album_id": release.get("album_id"),
+                "album_slug": release.get("album_slug")
+                or build_public_album_slug(release.get("album_title")),
                 "title": release.get("album_title", ""),
                 "subtitle": release.get("release_type") or "Album",
+                "cover_url": release.get("cover_url"),
                 "status": release.get("status", "detected"),
+                "tidal_url": release.get("tidal_url"),
                 "release_id": release.get("id"),
                 "is_upcoming": bool(scheduled_date and scheduled_date >= today),
             }
@@ -65,6 +71,11 @@ def _build_show_items(
                 "subtitle": ", ".join(
                     part for part in [show.get("city"), show.get("country")] if part
                 ),
+                "cover_url": show.get("image_url"),
+                "venue": show.get("venue"),
+                "city": show.get("city"),
+                "country": show.get("country"),
+                "url": show.get("url"),
                 "is_upcoming": True,
                 "user_attending": show.get("id") in attending_show_ids,
                 "probable_setlist": probable_setlists.get(artist_name),

@@ -12,6 +12,99 @@ class DeleteRequest(BaseModel):
     mode: str = "db_only"
 
 
+class TrackQuarantineRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class TrackRestoreRequest(BaseModel):
+    quarantine_path: str = Field(min_length=1, max_length=2000)
+    target_path: str | None = Field(default=None, max_length=2000)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class TrackQuarantineFileRequest(BaseModel):
+    quarantine_path: str = Field(min_length=1, max_length=2000)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class TrackQuarantineEntryResponse(BaseModel):
+    quarantine_path: str
+    filename: str
+    size_bytes: int
+    modified_at: datetime
+    suggested_target_path: str
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+    albumartist: str | None = None
+    track_number: str | None = None
+    disc_number: str | None = None
+    year: str | None = None
+    genre: str | None = None
+    duration: float | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+
+
+class TrackQuarantineListResponse(BaseModel):
+    items: list[TrackQuarantineEntryResponse] = Field(default_factory=list)
+    count: int
+
+
+class TrackMoveRequest(BaseModel):
+    target_album_id: int = Field(ge=1)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AlbumMoveToArtistRequest(BaseModel):
+    target_artist_id: int = Field(ge=1)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AlbumMergeRequest(BaseModel):
+    target_album_id: int = Field(ge=1)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AlbumSplitRequest(BaseModel):
+    target_album_name: str = Field(min_length=1, max_length=300)
+    track_ids: list[int] = Field(min_length=1, max_length=5000)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class ArtistMergeRequest(BaseModel):
+    target_artist_id: int = Field(ge=1)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class LibraryContributionResponse(BaseModel):
+    id: int
+    user_id: int
+    user_email: str | None = None
+    user_username: str | None = None
+    user_name: str | None = None
+    user_avatar: str | None = None
+    source: str
+    source_ref: str
+    album_id: int | None = None
+    album_entity_uid: str | None = None
+    album_slug: str | None = None
+    artist_name: str
+    album_name: str
+    status: str
+    imported_at: datetime | str | None = None
+    withdrawn_at: datetime | str | None = None
+    has_cover: bool | None = None
+    track_count: int | None = None
+    total_duration: int | None = None
+
+
+class LibraryContributionListResponse(BaseModel):
+    items: list[LibraryContributionResponse] = Field(default_factory=list)
+    count: int
+
+
 class RepairRequest(BaseModel):
     dry_run: bool = True
     auto_only: bool = True

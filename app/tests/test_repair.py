@@ -126,7 +126,7 @@ class TestRepairCatalog:
             repair,
             "_fix_duplicate_tracks",
             return_value={
-                "action": "delete_duplicate_tracks",
+                "action": "quarantine_duplicate_tracks",
                 "target": "Terror/Still Suffer/A Deeper Struggle",
                 "details": {
                     "keep_path": "/music/a.m4a",
@@ -137,7 +137,7 @@ class TestRepairCatalog:
                 },
                 "applied": False,
                 "fs_write": True,
-                "message": "Would delete 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle",
+                "message": "Would quarantine 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle",
             },
         ) as mock_fix:
             result = repair.preview(report, auto_only=False)
@@ -153,7 +153,7 @@ class TestRepairCatalog:
         assert result["items"][0]["scope"] == "hybrid"
         assert result["items"][0]["requires_confirmation"] is True
         assert result["items"][0]["message"] == (
-            "Would delete 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle"
+            "Would quarantine 1 duplicate track file(s) for Terror/Still Suffer/A Deeper Struggle"
         )
 
     def test_preview_returns_executable_artist_layout_fix_action(self):
@@ -357,7 +357,80 @@ class TestDuplicateTrackRepair:
             assert result["details"]["duplicate_count"] == 2
             assert result["details"]["enrich_artist"] == "Terror"
 
-    def test_duplicate_track_apply_deletes_redundant_file(self):
+    def test_duplicate_track_dry_run_prefers_flac_over_larger_m4a(self):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Little Simz" / "Lotus"
+            album_dir.mkdir(parents=True)
+            flac_file = album_dir / "01 - Thief.flac"
+            m4a_file = album_dir / "01 - Thief.m4a"
+            flac_file.write_bytes(b"\x00" * 1000)
+            m4a_file.write_bytes(b"\x00" * 5000)
+
+            tracks = [
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "Thief",
+                    "path": str(flac_file),
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 240.0,
+                    "size": 1000,
+                    "bitrate": 800000,
+                    "bit_depth": 16,
+                    "sample_rate": 44100,
+                    "audio_fingerprint": "fingerprint-1",
+                },
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "Thief",
+                    "path": str(m4a_file),
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "format": "m4a",
+                    "duration": 240.0,
+                    "size": 5000,
+                    "bitrate": 1200000,
+                    "bit_depth": 24,
+                    "sample_rate": 96000,
+                    "audio_fingerprint": "fingerprint-1",
+                },
+            ]
+            tags = {
+                "artist": "Little Simz",
+                "album": "Lotus",
+                "title": "Thief",
+                "tracknumber": "1",
+            }
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "Thief",
+                    "paths": [str(flac_file), str(m4a_file)],
+                },
+            }
+
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch("crate.repair.read_tags", return_value=tags),
+            ):
+                result = repair._fix_duplicate_tracks(issue, dry_run=True)
+
+            assert result is not None
+            assert result["details"]["keep_path"] == str(flac_file)
+            assert result["details"]["remove_paths"] == [str(m4a_file)]
+
+    def test_duplicate_track_apply_quarantines_redundant_file(self):
         from crate.repair import LibraryRepair
 
         with tempfile.TemporaryDirectory() as lib:
@@ -433,10 +506,19 @@ class TestDuplicateTrackRepair:
             assert result is not None
             assert result["applied"] is True
             assert dupe_file.exists() is False
+            assert (
+                Path(lib)
+                / ".crate-trash"
+                / "tracks"
+                / "Terror"
+                / "Still Suffer"
+                / "08 - A Deeper Struggle (1).m4a"
+            ).exists()
             assert keep_file.exists() is True
             mock_delete_track.assert_called_once_with(str(dupe_file))
             mock_log_audit.assert_called_once()
             assert result["details"]["removed_paths"] == [str(dupe_file)]
+            assert result["details"]["quarantined_paths"]
             assert result["details"]["enrich_artist"] == "Terror"
 
     def test_duplicate_track_stays_manual_when_fingerprints_conflict(self):
@@ -497,6 +579,149 @@ class TestDuplicateTrackRepair:
                 result = repair._fix_duplicate_tracks(issue, dry_run=True)
 
             assert result is None
+
+    def test_duplicate_track_stays_manual_when_metadata_is_broken(self):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Little Simz" / "Lotus"
+            album_dir.mkdir(parents=True)
+            first = album_dir / "01. Thief.m4a"
+            second = album_dir / "02. Flood.m4a"
+            first.write_bytes(b"\x00" * 1000)
+            second.write_bytes(b"\x00" * 1000)
+
+            tracks = [
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "",
+                    "path": str(first),
+                    "track_number": 0,
+                    "disc_number": 0,
+                    "format": "m4a",
+                    "duration": 0,
+                },
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "",
+                    "path": str(second),
+                    "track_number": 0,
+                    "disc_number": 0,
+                    "format": "m4a",
+                    "duration": 0,
+                },
+            ]
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "",
+                    "paths": [str(first), str(second)],
+                },
+            }
+
+            with patch("crate.repair.get_tracks_by_paths", return_value=tracks):
+                result = repair._fix_duplicate_tracks(issue, dry_run=True)
+
+            assert result is None
+
+    def test_shadow_quality_tracks_apply_removes_legacy_upgrade_residue(self):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            canonical_dir = Path(lib) / "artist-uid" / "album-uid"
+            legacy_dir = Path(lib) / "Little Simz" / "2025" / "Lotus"
+            canonical_dir.mkdir(parents=True)
+            legacy_dir.mkdir(parents=True)
+            legacy_first = legacy_dir / "01. Thief.m4a"
+            legacy_second = legacy_dir / "02. Flood.m4a"
+            legacy_first.write_bytes(b"\x00" * 2000)
+            legacy_second.write_bytes(b"\x00" * 2000)
+
+            tracks = [
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "",
+                    "path": str(legacy_first),
+                    "track_number": 0,
+                    "disc_number": 0,
+                    "format": "m4a",
+                    "duration": 0,
+                },
+                {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "title": "",
+                    "path": str(legacy_second),
+                    "track_number": 0,
+                    "disc_number": 0,
+                    "format": "m4a",
+                    "duration": 0,
+                },
+            ]
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "shadow_quality_tracks",
+                "details": {
+                    "album_id": 1353,
+                    "artist": "Little Simz",
+                    "album": "Lotus",
+                    "canonical_album_path": str(canonical_dir),
+                    "paths": [str(legacy_first), str(legacy_second)],
+                },
+            }
+
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch("crate.repair.count_valid_album_tracks", return_value=13),
+                patch("crate.repair.delete_track") as mock_delete_track,
+                patch("crate.repair.log_audit") as mock_log_audit,
+            ):
+                result = repair._fix_shadow_quality_tracks(
+                    issue, dry_run=False, task_id="task-1"
+                )
+
+            assert result is not None
+            assert result["applied"] is True
+            assert legacy_first.exists() is False
+            assert legacy_second.exists() is False
+            assert mock_delete_track.call_count == 2
+            mock_log_audit.assert_called_once()
+            assert result["details"]["removed_paths"] == [
+                str(legacy_first),
+                str(legacy_second),
+            ]
+
+    def test_shadow_quality_tracks_stays_manual_without_valid_replacement(self):
+        from crate.repair import LibraryRepair
+
+        repair = LibraryRepair({"library_path": "/tmp/fake_lib"})
+        issue = {
+            "check": "shadow_quality_tracks",
+            "details": {
+                "album_id": 1353,
+                "artist": "Little Simz",
+                "album": "Lotus",
+                "canonical_album_path": "/music/canonical",
+                "paths": ["/music/legacy/01. Thief.m4a"],
+            },
+        }
+
+        with patch("crate.repair.count_valid_album_tracks", return_value=0):
+            result = repair._fix_shadow_quality_tracks(issue, dry_run=True)
+
+        assert result is None
 
 
 class TestFolderNamingRepair:

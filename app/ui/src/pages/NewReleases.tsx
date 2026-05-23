@@ -27,6 +27,7 @@ import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Input } from "@crate/ui/shadcn/input";
 import { api, apiSseUrl } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import { useApi } from "@/hooks/use-api";
@@ -143,8 +144,8 @@ function ReleaseActions({
   onDismiss,
 }: {
   release: Release;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
 }) {
   if (release.status === "downloaded") {
     return (
@@ -163,7 +164,7 @@ function ReleaseActions({
 
   return (
     <div className="flex items-center gap-2">
-      {release.tidal_url ? (
+      {release.tidal_url && onDownload ? (
         <Button
           size="sm"
           className="gap-2"
@@ -173,14 +174,16 @@ function ReleaseActions({
           Download
         </Button>
       ) : null}
-      <ActionIconButton
-        variant="card"
-        tone="danger"
-        onClick={() => onDismiss(release.id)}
-        title="Dismiss release"
-      >
-        <X size={15} />
-      </ActionIconButton>
+      {onDismiss ? (
+        <ActionIconButton
+          variant="card"
+          tone="danger"
+          onClick={() => onDismiss(release.id)}
+          title="Dismiss release"
+        >
+          <X size={15} />
+        </ActionIconButton>
+      ) : null}
     </div>
   );
 }
@@ -191,8 +194,8 @@ function ReleaseTimelineRow({
   onDismiss,
 }: {
   release: Release;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
 }) {
   const artistHref = releaseArtistHref(release);
   const albumHref = releaseAlbumHref(release);
@@ -268,8 +271,8 @@ function ReleaseGridCard({
   onDismiss,
 }: {
   release: Release;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
 }) {
   const albumHref = releaseAlbumHref(release);
   const artistHref = releaseArtistHref(release);
@@ -335,7 +338,7 @@ function ReleaseGridCard({
         <ReleaseMeta release={release} />
 
         <div className="flex items-center gap-2">
-          {release.status === "detected" && release.tidal_url ? (
+          {release.status === "detected" && release.tidal_url && onDownload ? (
             <Button
               size="sm"
               className="flex-1 gap-2"
@@ -345,7 +348,7 @@ function ReleaseGridCard({
               Download
             </Button>
           ) : null}
-          {release.status === "detected" ? (
+          {release.status === "detected" && onDismiss ? (
             <ActionIconButton
               variant="card"
               tone="danger"
@@ -380,6 +383,12 @@ function EmptyState({
 }
 
 export function NewReleases() {
+  const { hasCapability, hasAnyCapability } = useAuth();
+  const canCurateReleases = hasCapability("curation.releases.write");
+  const canAcquireReleases = hasAnyCapability([
+    "curation.releases.write",
+    "library.tidal.manage",
+  ]);
   const {
     data: releaseSurface,
     loading,
@@ -519,6 +528,9 @@ export function NewReleases() {
     return <ErrorState message={error} onRetry={refetch} />;
   }
 
+  const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
+  const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
+
   return (
     <div className="space-y-6">
       <OpsPageHero
@@ -547,19 +559,21 @@ export function NewReleases() {
                 Grid
               </Button>
             </div>
-            <Button
-              size="sm"
-              onClick={checkNow}
-              disabled={checking}
-              className="gap-2"
-            >
-              {checking ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <RefreshCw size={14} />
-              )}
-              {checking ? "Checking…" : "Check now"}
-            </Button>
+            {canCurateReleases ? (
+              <Button
+                size="sm"
+                onClick={checkNow}
+                disabled={checking}
+                className="gap-2"
+              >
+                {checking ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                {checking ? "Checking…" : "Check now"}
+              </Button>
+            ) : null}
           </>
         }
       >
@@ -684,8 +698,8 @@ export function NewReleases() {
               <ReleaseTimelineRow
                 key={release.id}
                 release={release}
-                onDownload={downloadRelease}
-                onDismiss={dismissRelease}
+                onDownload={releaseDownload}
+                onDismiss={releaseDismiss}
               />
             ))}
           </div>
@@ -695,8 +709,8 @@ export function NewReleases() {
               <ReleaseGridCard
                 key={release.id}
                 release={release}
-                onDownload={downloadRelease}
-                onDismiss={dismissRelease}
+                onDownload={releaseDownload}
+                onDismiss={releaseDismiss}
               />
             ))}
           </div>

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
+from datetime import datetime
+from pathlib import Path
+from typing import Any, AsyncIterator, Mapping
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
-from crate.api.auth import _require_admin
 from crate.api._deps import (
     album_names_from_entity_uid,
     album_names_from_id,
@@ -19,11 +20,16 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
+from crate.api.permissions import require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.management import (
     AdminHealthSnapshotResponse,
     AnalysisStatusResponse,
+    AlbumMergeRequest,
+    AlbumMoveToArtistRequest,
+    AlbumSplitRequest,
+    ArtistMergeRequest,
     ArtistHealthIssuesResponse,
     ArtistRepairPlanResponse,
     ArtistRepairResponse,
@@ -35,6 +41,7 @@ from crate.api.schemas.management import (
     HealthIssuesResponse,
     HealthReportResponse,
     LyricsSyncRequest,
+    LibraryContributionListResponse,
     MoveRequest,
     PortableMetadataRequest,
     PortableRehydrateRequest,
@@ -45,9 +52,15 @@ from crate.api.schemas.management import (
     RepairRequest,
     RichMetadataExportRequest,
     StorageMigrationRequest,
+    TrackMoveRequest,
+    TrackQuarantineFileRequest,
+    TrackQuarantineListResponse,
+    TrackQuarantineRequest,
+    TrackRestoreRequest,
     StorageV2StatusResponse,
     WipeRequest,
 )
+from crate.audio import read_audio_quality, read_tags
 from crate.db.admin_health_surface import (
     HEALTH_SURFACE_STREAM_CHANNEL,
     get_cached_health_surface,
@@ -68,9 +81,21 @@ from crate.db.queries.management import (
     get_last_bliss_track,
     get_storage_v2_status,
 )
-from crate.db.repositories.library import get_library_artist
+from crate.db.repositories.library import (
+    get_library_album_by_entity_uid,
+    get_library_album_by_id,
+    get_library_artist,
+    get_library_artist_by_entity_uid,
+    get_library_artist_by_id,
+)
+from crate.db.repositories.library_contributions import list_library_contributions
+from crate.db.repositories.library_track_reads import (
+    get_library_track_by_entity_uid,
+    get_library_track_by_id,
+)
 from crate.db.repositories.tasks import create_task
 from crate.repair_catalog import REPAIR_CATALOG_BY_CHECK, repair_catalog_payload
+from crate.utils import AUDIO_EXTENSIONS
 
 
 def _build_repair_preview(issues: list[dict], *, auto_only: bool = False) -> dict:
@@ -158,6 +183,62 @@ _MANAGEMENT_RESPONSES = merge_responses(
 )
 
 
+def _require_repair_operator(request: Request) -> dict:
+    return require_permission(request, "library.repair.run")
+
+
+def _require_artist_removal(request: Request, mode: str) -> dict:
+    user = require_permission(request, "library.artist.remove")
+    if mode == "full":
+        require_permission(request, "library.files.delete")
+    return user
+
+
+def _require_artist_surgery(request: Request) -> dict:
+    return require_permission(request, "library.artist.remove")
+
+
+def _require_album_removal(request: Request, mode: str) -> dict:
+    user = require_permission(request, "library.album.remove")
+    if mode == "full":
+        require_permission(request, "library.files.delete")
+    return user
+
+
+def _require_album_surgery(request: Request) -> dict:
+    return require_permission(request, "library.album.remove")
+
+
+def _require_track_removal(request: Request) -> dict:
+    return require_permission(request, "library.track.remove")
+
+
+def _require_track_files_delete(request: Request) -> dict:
+    user = require_permission(request, "library.track.remove")
+    require_permission(request, "library.files.delete")
+    return user
+
+
+def _require_metadata_editor(request: Request) -> dict:
+    return require_permission(request, "library.metadata.write")
+
+
+def _require_analysis_manager(request: Request) -> dict:
+    return require_permission(request, "library.analysis.manage")
+
+
+def _require_library_maintenance(request: Request) -> dict:
+    return require_permission(request, "library.maintenance.manage")
+
+
+def _require_library_import_manager(request: Request) -> dict:
+    return require_permission(request, "library.import.manage")
+
+
+def _require_audit_viewer(request: Request) -> dict:
+    return require_permission(request, "audit.view")
+
+
 async def _health_stream(
     *, check_type: str | None = None, limit: int = 500
 ) -> AsyncIterator[str]:
@@ -196,7 +277,7 @@ async def _health_stream(
 def api_admin_health_snapshot(
     request: Request, check_type: str = "", fresh: bool = False, limit: int = 500
 ):
-    _require_admin(request)
+    _require_repair_operator(request)
     normalized = check_type or None
     return get_cached_health_surface(check_type=normalized, limit=limit, fresh=fresh)
 
@@ -209,7 +290,7 @@ def api_admin_health_snapshot(
 async def api_admin_health_stream(
     request: Request, check_type: str = "", limit: int = 500
 ):
-    _require_admin(request)
+    _require_repair_operator(request)
     normalized = check_type or None
     safe_limit = min(max(limit, 1), 1000)
     return StreamingResponse(
@@ -229,8 +310,8 @@ async def api_admin_health_stream(
     summary="Queue a library health check",
 )
 def run_health_check(request: Request):
-    _require_admin(request)
-    task_id = create_task("health_check", {"triggered_by": "admin"})
+    _require_repair_operator(request)
+    task_id = create_task("health_check", {"triggered_by": "console"})
     return {"task_id": task_id}
 
 
@@ -241,7 +322,7 @@ def run_health_check(request: Request):
     summary="Get the canonical library repair catalog",
 )
 def get_repair_catalog(request: Request):
-    _require_admin(request)
+    _require_repair_operator(request)
     return {"items": repair_catalog_payload()}
 
 
@@ -253,7 +334,7 @@ def get_repair_catalog(request: Request):
 )
 def get_health_report(request: Request):
     """Get persisted health issues from DB (survives restarts)."""
-    _require_admin(request)
+    _require_repair_operator(request)
     snapshot = get_cached_health_surface()
     return {
         "issues": snapshot.get("issues", []),
@@ -270,7 +351,7 @@ def get_health_report(request: Request):
 )
 def list_health_issues(request: Request, check_type: str = ""):
     """Get open health issues, optionally filtered by type."""
-    _require_admin(request)
+    _require_repair_operator(request)
     snapshot = get_cached_health_surface(check_type=check_type or None)
     return {
         "issues": snapshot.get("issues", []),
@@ -286,7 +367,7 @@ def list_health_issues(request: Request, check_type: str = ""):
     summary="Resolve a single health issue",
 )
 def api_resolve_issue(request: Request, issue_id: int):
-    _require_admin(request)
+    _require_repair_operator(request)
     resolve_issue(issue_id)
     publish_health_surface_signal()
     return {"ok": True}
@@ -299,7 +380,7 @@ def api_resolve_issue(request: Request, issue_id: int):
     summary="Dismiss a single health issue",
 )
 def api_dismiss_issue(request: Request, issue_id: int):
-    _require_admin(request)
+    _require_repair_operator(request)
     dismiss_issue(issue_id)
     publish_health_surface_signal()
     return {"ok": True}
@@ -312,7 +393,7 @@ def api_dismiss_issue(request: Request, issue_id: int):
     summary="Queue a repair run",
 )
 def run_repair(request: Request, body: RepairRequest):
-    _require_admin(request)
+    _require_repair_operator(request)
     task_id = create_task(
         "repair", {"dry_run": body.dry_run, "auto_only": body.auto_only}
     )
@@ -327,7 +408,7 @@ def run_repair(request: Request, body: RepairRequest):
 )
 def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     """Repair specific issues (individual or batch)."""
-    _require_admin(request)
+    _require_repair_operator(request)
     preview = _build_repair_preview(body.issues, auto_only=False)
     if body.plan_version and preview.get("plan_version") != body.plan_version:
         raise HTTPException(
@@ -383,7 +464,7 @@ def repair_specific_issues(request: Request, body: RepairIssuesRequest):
     summary="Preview repair actions for specific issues",
 )
 def preview_repair_issues(request: Request, body: RepairPreviewRequest):
-    _require_admin(request)
+    _require_repair_operator(request)
     return _build_repair_preview(body.issues, auto_only=body.auto_only)
 
 
@@ -395,7 +476,7 @@ def preview_repair_issues(request: Request, body: RepairPreviewRequest):
 )
 def api_resolve_type(request: Request, check_type: str):
     """Resolve all open issues of a given check type."""
-    _require_admin(request)
+    _require_repair_operator(request)
     resolve_issues_by_type(check_type)
     publish_health_surface_signal()
     return {"ok": True, "check_type": check_type}
@@ -409,7 +490,7 @@ def api_resolve_type(request: Request, check_type: str):
 )
 def api_fix_type(request: Request, check_type: str):
     """Auto-fix all fixable issues of a given check type via repair task."""
-    _require_admin(request)
+    _require_repair_operator(request)
     catalog_entry = REPAIR_CATALOG_BY_CHECK.get(check_type)
     if catalog_entry is None:
         return {
@@ -463,14 +544,14 @@ def api_fix_type(request: Request, check_type: str):
 
 def get_artist_health_issues(request: Request, name: str):
     """Get open health issues for a specific artist."""
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = get_artist_issues(name)
     return {"artist": name, "issues": issues, "count": len(issues)}
 
 
 def repair_artist(request: Request, name: str):
     """Repair all auto-fixable issues for a specific artist."""
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = get_artist_issues(name)
     fixable = [i for i in issues if i.get("auto_fixable")]
     if not fixable:
@@ -482,7 +563,7 @@ def repair_artist(request: Request, name: str):
 
 
 def preview_artist_repair_plan(request: Request, name: str):
-    _require_admin(request)
+    _require_repair_operator(request)
     issues = _augment_artist_layout_issues(get_artist_issues(name), name)
     preview = _build_repair_preview(issues, auto_only=False)
     return {"artist": name, **preview}
@@ -490,7 +571,7 @@ def preview_artist_repair_plan(request: Request, name: str):
 
 def fix_artist(request: Request, name: str):
     """Consolidate an artist into its canonical entity-UID layout and resync it."""
-    _require_admin(request)
+    _require_repair_operator(request)
     task_id = create_task("fix_artist", {"artist": name})
     return {"task_id": task_id}
 
@@ -590,9 +671,9 @@ def fix_artist_by_entity_uid(request: Request, artist_entity_uid: str):
 
 
 def delete_artist(request: Request, name: str, body: DeleteRequest):
-    _require_admin(request)
     if body.mode not in ("db_only", "full"):
         raise HTTPException(status_code=422, detail="mode must be 'db_only' or 'full'")
+    _require_artist_removal(request, body.mode)
     task_id = create_task("delete_artist", {"name": name, "mode": body.mode})
     return {"task_id": task_id}
 
@@ -626,7 +707,7 @@ def delete_artist_by_entity_uid(
 
 
 def reset_enrichment(request: Request, name: str):
-    _require_admin(request)
+    _require_metadata_editor(request)
     task_id = create_task("reset_enrichment", {"artist": name})
     return {"task_id": task_id}
 
@@ -658,7 +739,7 @@ def reset_enrichment_by_entity_uid(request: Request, artist_entity_uid: str):
 
 
 def move_artist(request: Request, name: str, body: MoveRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     if not body.new_name.strip():
         raise HTTPException(status_code=422, detail="new_name cannot be empty")
     task_id = create_task(
@@ -695,13 +776,76 @@ def move_artist_by_entity_uid(
     return move_artist(request, artist_name, body)
 
 
+def _queue_artist_merge(
+    request: Request,
+    source_artist: Mapping[str, Any] | None,
+    body: ArtistMergeRequest,
+) -> dict[str, str]:
+    user = _require_artist_surgery(request)
+    if not source_artist:
+        raise HTTPException(status_code=404, detail="Source artist not found")
+    target_artist = get_library_artist_by_id(body.target_artist_id)
+    if not target_artist:
+        raise HTTPException(status_code=404, detail="Target artist not found")
+    if int(source_artist.get("id") or 0) == int(target_artist.get("id") or 0):
+        raise HTTPException(
+            status_code=422, detail="Cannot merge an artist into itself"
+        )
+    task_id = create_task(
+        "library_artist_merge",
+        {
+            "source_artist_id": source_artist.get("id"),
+            "source_artist_entity_uid": source_artist.get("entity_uid"),
+            "source_artist": source_artist.get("name"),
+            "source_artist_folder": source_artist.get("folder_name"),
+            "target_artist_id": target_artist.get("id"),
+            "target_artist_entity_uid": target_artist.get("entity_uid"),
+            "target_artist": target_artist.get("name"),
+            "target_artist_folder": target_artist.get("folder_name"),
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/artists/{artist_id}/merge",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Merge an artist alias into another artist",
+)
+def merge_artist_by_id(request: Request, artist_id: int, body: ArtistMergeRequest):
+    return _queue_artist_merge(
+        request,
+        get_library_artist_by_id(artist_id),
+        body,
+    )
+
+
+@router.post(
+    "/artists/by-entity/{artist_entity_uid}/merge",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Merge an artist alias into another artist by entity UID",
+)
+def merge_artist_by_entity_uid(
+    request: Request, artist_entity_uid: str, body: ArtistMergeRequest
+):
+    return _queue_artist_merge(
+        request,
+        get_library_artist_by_entity_uid(artist_entity_uid),
+        body,
+    )
+
+
 # ── Album Management ────────────────────────────────────────────
 
 
 def delete_album(request: Request, artist: str, album: str, body: DeleteRequest):
-    _require_admin(request)
     if body.mode not in ("db_only", "full"):
         raise HTTPException(status_code=422, detail="mode must be 'db_only' or 'full'")
+    _require_album_removal(request, body.mode)
     task_id = create_task(
         "delete_album", {"artist": artist, "album": album, "mode": body.mode}
     )
@@ -738,7 +882,440 @@ def delete_album_by_entity_uid(
     return delete_album(request, artist, album, body)
 
 
+def _queue_album_move_to_artist(
+    request: Request,
+    album: Mapping[str, Any] | None,
+    body: AlbumMoveToArtistRequest,
+) -> dict[str, str]:
+    user = _require_album_surgery(request)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    target_artist = get_library_artist_by_id(body.target_artist_id)
+    if not target_artist:
+        raise HTTPException(status_code=404, detail="Target artist not found")
+    task_id = create_task(
+        "library_album_move_to_artist",
+        {
+            "album_id": album.get("id"),
+            "album_entity_uid": album.get("entity_uid"),
+            "album_path": album.get("path"),
+            "target_artist_id": target_artist.get("id"),
+            "target_artist": target_artist.get("name"),
+            "target_artist_folder": target_artist.get("folder_name"),
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+def _queue_album_merge(
+    request: Request,
+    source_album: Mapping[str, Any] | None,
+    body: AlbumMergeRequest,
+) -> dict[str, str]:
+    user = _require_album_surgery(request)
+    if not source_album:
+        raise HTTPException(status_code=404, detail="Source album not found")
+    target_album = get_library_album_by_id(body.target_album_id)
+    if not target_album:
+        raise HTTPException(status_code=404, detail="Target album not found")
+    if int(source_album.get("id") or 0) == int(target_album.get("id") or 0):
+        raise HTTPException(status_code=422, detail="Cannot merge an album into itself")
+    task_id = create_task(
+        "library_album_merge",
+        {
+            "source_album_id": source_album.get("id"),
+            "source_album_entity_uid": source_album.get("entity_uid"),
+            "source_album_path": source_album.get("path"),
+            "target_album_id": target_album.get("id"),
+            "target_album_entity_uid": target_album.get("entity_uid"),
+            "target_album_path": target_album.get("path"),
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+def _queue_album_split(
+    request: Request,
+    album: Mapping[str, Any] | None,
+    body: AlbumSplitRequest,
+) -> dict[str, str]:
+    user = _require_album_surgery(request)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    task_id = create_task(
+        "library_album_split",
+        {
+            "album_id": album.get("id"),
+            "album_entity_uid": album.get("entity_uid"),
+            "album_path": album.get("path"),
+            "target_album_name": body.target_album_name.strip(),
+            "track_ids": body.track_ids,
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/albums/{album_id}/move-to-artist",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Move an album directory to another artist",
+)
+def move_album_to_artist_by_id(
+    request: Request, album_id: int, body: AlbumMoveToArtistRequest
+):
+    return _queue_album_move_to_artist(
+        request,
+        get_library_album_by_id(album_id),
+        body,
+    )
+
+
+@router.post(
+    "/albums/by-entity/{album_entity_uid}/move-to-artist",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Move an album directory to another artist by entity UID",
+)
+def move_album_to_artist_by_entity_uid(
+    request: Request, album_entity_uid: str, body: AlbumMoveToArtistRequest
+):
+    return _queue_album_move_to_artist(
+        request,
+        get_library_album_by_entity_uid(album_entity_uid),
+        body,
+    )
+
+
+@router.post(
+    "/albums/{album_id}/merge",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Merge one album directory into another album",
+)
+def merge_album_by_id(request: Request, album_id: int, body: AlbumMergeRequest):
+    return _queue_album_merge(
+        request,
+        get_library_album_by_id(album_id),
+        body,
+    )
+
+
+@router.post(
+    "/albums/by-entity/{album_entity_uid}/merge",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Merge one album directory into another album by entity UID",
+)
+def merge_album_by_entity_uid(
+    request: Request, album_entity_uid: str, body: AlbumMergeRequest
+):
+    return _queue_album_merge(
+        request,
+        get_library_album_by_entity_uid(album_entity_uid),
+        body,
+    )
+
+
+@router.post(
+    "/albums/{album_id}/split",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Split selected tracks into a new album",
+)
+def split_album_by_id(request: Request, album_id: int, body: AlbumSplitRequest):
+    return _queue_album_split(
+        request,
+        get_library_album_by_id(album_id),
+        body,
+    )
+
+
+@router.post(
+    "/albums/by-entity/{album_entity_uid}/split",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Split selected tracks into a new album by entity UID",
+)
+def split_album_by_entity_uid(
+    request: Request, album_entity_uid: str, body: AlbumSplitRequest
+):
+    return _queue_album_split(
+        request,
+        get_library_album_by_entity_uid(album_entity_uid),
+        body,
+    )
+
+
+# ── Track Management ─────────────────────────────────────────────
+
+
+def _queue_track_quarantine(
+    request: Request,
+    track: Mapping[str, Any] | None,
+    body: TrackQuarantineRequest | None,
+) -> dict[str, str]:
+    user = _require_track_removal(request)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    task_id = create_task(
+        "library_track_quarantine",
+        {
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "track_path": track.get("path"),
+            "reason": (body.reason if body else None),
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/tracks/{track_id}/quarantine",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Move a track file to library quarantine",
+)
+def quarantine_track_by_id(
+    request: Request,
+    track_id: int,
+    body: TrackQuarantineRequest | None = None,
+):
+    return _queue_track_quarantine(request, get_library_track_by_id(track_id), body)
+
+
+@router.post(
+    "/tracks/by-entity/{track_entity_uid}/quarantine",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Move a track file to library quarantine by entity UID",
+)
+def quarantine_track_by_entity_uid(
+    request: Request,
+    track_entity_uid: str,
+    body: TrackQuarantineRequest | None = None,
+):
+    return _queue_track_quarantine(
+        request, get_library_track_by_entity_uid(track_entity_uid), body
+    )
+
+
+def _queue_track_hard_delete(
+    request: Request,
+    track: Mapping[str, Any] | None,
+    body: TrackQuarantineRequest | None,
+) -> dict[str, str]:
+    user = _require_track_files_delete(request)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    task_id = create_task(
+        "library_track_hard_delete",
+        {
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "track_path": track.get("path"),
+            "reason": (body.reason if body else None),
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/tracks/{track_id}/hard-delete",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Permanently delete a track file",
+)
+def hard_delete_track_by_id(
+    request: Request,
+    track_id: int,
+    body: TrackQuarantineRequest | None = None,
+):
+    return _queue_track_hard_delete(request, get_library_track_by_id(track_id), body)
+
+
+@router.post(
+    "/tracks/by-entity/{track_entity_uid}/hard-delete",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Permanently delete a track file by entity UID",
+)
+def hard_delete_track_by_entity_uid(
+    request: Request,
+    track_entity_uid: str,
+    body: TrackQuarantineRequest | None = None,
+):
+    return _queue_track_hard_delete(
+        request, get_library_track_by_entity_uid(track_entity_uid), body
+    )
+
+
+def _crate_trash_track_root() -> Path:
+    from crate.config import load_config
+
+    config = load_config()
+    return Path(str(config.get("library_path", "/music"))) / ".crate-trash" / "tracks"
+
+
+def _clean_tag(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _quarantined_track_metadata(path: Path) -> dict[str, Any]:
+    tags = read_tags(path)
+    quality = read_audio_quality(path)
+    return {
+        "title": _clean_tag(tags.get("title")),
+        "artist": _clean_tag(tags.get("artist")),
+        "album": _clean_tag(tags.get("album")),
+        "albumartist": _clean_tag(tags.get("albumartist")),
+        "track_number": _clean_tag(tags.get("tracknumber")),
+        "disc_number": _clean_tag(tags.get("discnumber")),
+        "year": _clean_tag(tags.get("date")),
+        "genre": _clean_tag(tags.get("genre")),
+        "duration": quality.get("duration"),
+        "bitrate": quality.get("bitrate"),
+        "sample_rate": quality.get("sample_rate"),
+        "bit_depth": quality.get("bit_depth"),
+    }
+
+
+@router.get(
+    "/tracks/quarantine",
+    response_model=TrackQuarantineListResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="List quarantined track files",
+)
+def list_quarantined_tracks(request: Request):
+    _require_track_removal(request)
+    root = _crate_trash_track_root()
+    if not root.exists():
+        return {"items": [], "count": 0}
+
+    items: list[dict[str, Any]] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in AUDIO_EXTENSIONS:
+            continue
+        try:
+            stat = path.stat()
+            quarantine_path = path.relative_to(root).as_posix()
+        except OSError:
+            continue
+        items.append(
+            {
+                "quarantine_path": quarantine_path,
+                "filename": path.name,
+                "size_bytes": stat.st_size,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime),
+                "suggested_target_path": quarantine_path,
+                **_quarantined_track_metadata(path),
+            }
+        )
+
+    return {"items": items, "count": len(items)}
+
+
+@router.post(
+    "/tracks/quarantine/hard-delete",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Permanently delete a quarantined track file",
+)
+def hard_delete_quarantined_track(request: Request, body: TrackQuarantineFileRequest):
+    user = _require_track_files_delete(request)
+    task_id = create_task(
+        "library_quarantined_track_hard_delete",
+        {
+            "quarantine_path": body.quarantine_path,
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/tracks/quarantine/restore",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Restore a track file from quarantine",
+)
+def restore_quarantined_track(request: Request, body: TrackRestoreRequest):
+    user = _require_track_removal(request)
+    task_id = create_task(
+        "library_track_restore",
+        {
+            "quarantine_path": body.quarantine_path,
+            "target_path": body.target_path,
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/tracks/{track_id}/move",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Move a track file into another album directory",
+)
+def move_track_by_id(request: Request, track_id: int, body: TrackMoveRequest):
+    user = _require_track_removal(request)
+    track = get_library_track_by_id(track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    target_album = get_library_album_by_id(body.target_album_id)
+    if not target_album:
+        raise HTTPException(status_code=404, detail="Target album not found")
+    task_id = create_task(
+        "library_track_move",
+        {
+            "track_id": track.get("id"),
+            "track_entity_uid": track.get("entity_uid"),
+            "track_path": track.get("path"),
+            "target_album_id": target_album.get("id"),
+            "target_album_path": target_album.get("path"),
+            "reason": body.reason,
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
 # ── Library Management ───────────────────────────────────────────
+
+
+@router.get(
+    "/contributions",
+    response_model=LibraryContributionListResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="List library contributions for curator review",
+)
+def list_contributions(
+    request: Request,
+    source: str = "",
+    status: str = "active",
+    limit: int = 100,
+):
+    _require_library_import_manager(request)
+    items = list_library_contributions(
+        source=source.strip(),
+        status=status.strip(),
+        limit=limit,
+    )
+    return {"items": items, "count": len(items)}
 
 
 @router.post(
@@ -748,7 +1325,7 @@ def delete_album_by_entity_uid(
     summary="Queue a full library wipe",
 )
 def wipe_library(request: Request, body: WipeRequest):
-    _require_admin(request)
+    _require_library_maintenance(request)
     task_id = create_task("wipe_library", {"rebuild": body.rebuild})
     return {"task_id": task_id}
 
@@ -760,7 +1337,7 @@ def wipe_library(request: Request, body: WipeRequest):
     summary="Queue a full library rebuild",
 )
 def rebuild_library(request: Request):
-    _require_admin(request)
+    _require_library_maintenance(request)
     task_id = create_task("rebuild_library")
     return {"task_id": task_id}
 
@@ -772,7 +1349,7 @@ def rebuild_library(request: Request):
     summary="Queue portable metadata sidecar and identity tag writes",
 )
 def write_portable_metadata(request: Request, body: PortableMetadataRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("write_portable_metadata", params)
     return {"task_id": task_id}
@@ -785,7 +1362,7 @@ def write_portable_metadata(request: Request, body: PortableMetadataRequest):
     summary="Queue lyrics synchronization for library tracks",
 )
 def sync_lyrics(request: Request, body: LyricsSyncRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("sync_lyrics", params)
     return {"task_id": task_id}
@@ -798,7 +1375,7 @@ def sync_lyrics(request: Request, body: LyricsSyncRequest):
     summary="Queue database rehydration from portable metadata sidecars",
 )
 def rehydrate_portable_metadata(request: Request, body: PortableRehydrateRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("rehydrate_portable_metadata", params)
     return {"task_id": task_id}
@@ -811,7 +1388,7 @@ def rehydrate_portable_metadata(request: Request, body: PortableRehydrateRequest
     summary="Queue rich metadata export packages",
 )
 def export_rich_metadata(request: Request, body: RichMetadataExportRequest):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = body.model_dump(exclude_none=True)
     task_id = create_task("export_rich_metadata", params)
     return {"task_id": task_id}
@@ -828,7 +1405,7 @@ def export_rich_metadata(request: Request, body: RichMetadataExportRequest):
 )
 def analysis_status(request: Request):
     """Return current background analysis progress for audio analysis and bliss daemons."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     snapshot = get_cached_ops_snapshot().get("analysis")
     if snapshot:
         return snapshot
@@ -857,14 +1434,14 @@ def analysis_status(request: Request):
 )
 def analyze_all_tracks(request: Request):
     """Reset all tracks to pending so background daemons re-analyze them."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     task_id = create_task("analyze_all", {"scope": "all", "what": "both"})
     return {"task_id": task_id}
 
 
 def reanalyze_artist(request: Request, name: str):
     """Reset analysis state for all tracks of an artist."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     task_id = create_task("analyze_tracks", {"artist": name, "what": "both"})
     return {"task_id": task_id}
 
@@ -903,7 +1480,7 @@ def reanalyze_artist_by_entity_uid(request: Request, artist_entity_uid: str):
 )
 def reanalyze_album(request: Request, album_id: int):
     """Reset analysis state for all tracks of an album."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     task_id = create_task("analyze_tracks", {"album_id": album_id, "what": "both"})
     return {"task_id": task_id}
 
@@ -937,7 +1514,7 @@ def reanalyze_album_by_entity_uid(request: Request, album_entity_uid: str):
 )
 def compute_bliss(request: Request):
     """Reset bliss state for all tracks so background daemon recomputes vectors."""
-    _require_admin(request)
+    _require_analysis_manager(request)
     task_id = create_task("compute_bliss", {"scope": "all", "what": "bliss"})
     return {"task_id": task_id}
 
@@ -952,7 +1529,7 @@ def compute_bliss(request: Request):
     summary="Queue popularity recomputation",
 )
 def compute_popularity(request: Request):
-    _require_admin(request)
+    _require_analysis_manager(request)
     task_id = create_task("compute_popularity")
     return {"task_id": task_id}
 
@@ -967,7 +1544,7 @@ def compute_popularity(request: Request):
     summary="Queue MusicBrainz ID enrichment",
 )
 def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
-    _require_admin(request)
+    _require_metadata_editor(request)
     params = {}
     if body:
         if body.artist:
@@ -990,7 +1567,7 @@ def enrich_mbids(request: Request, body: EnrichMbidsRequest | None = None):
 def read_audit_log(
     request: Request, limit: int = 100, offset: int = 0, action: str | None = None
 ):
-    _require_admin(request)
+    _require_audit_viewer(request)
     entries, total = get_audit_log(limit=limit, offset=offset, action=action)
     return {"entries": entries, "total": total, "limit": limit, "offset": offset}
 
@@ -1007,7 +1584,7 @@ def read_audit_log(
 )
 def migrate_storage_v2(request: Request, body: StorageMigrationRequest | None = None):
     """Legacy V2 storage migration. Entity-UID layout repair now uses fix_artist."""
-    _require_admin(request)
+    _require_library_maintenance(request)
     params = {}
     if body and body.artist:
         params["artist"] = body.artist
@@ -1024,7 +1601,7 @@ def migrate_storage_v2(request: Request, body: StorageMigrationRequest | None = 
 )
 def verify_storage_v2(request: Request):
     """Legacy V2 storage verification."""
-    _require_admin(request)
+    _require_library_maintenance(request)
     task_id = create_task("verify_storage_v2")
     return {"task_id": task_id}
 
@@ -1037,5 +1614,5 @@ def verify_storage_v2(request: Request):
 )
 def storage_v2_status(request: Request):
     """Get migration progress: how many artists/albums/tracks are on V2 layout."""
-    _require_admin(request)
+    _require_library_maintenance(request)
     return get_storage_v2_status()

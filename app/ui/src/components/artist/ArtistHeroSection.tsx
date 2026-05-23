@@ -18,12 +18,14 @@ import {
   Disc3,
   Archive,
   FileJson,
+  GitMerge,
   HardDrive,
   Headphones,
   ListMusic,
   MapPin,
   Music,
   AudioWaveform,
+  Pencil,
   RefreshCw,
   Tags,
   Trash2,
@@ -60,6 +62,15 @@ interface ArtistHeroSectionProps {
   tags: string[];
   enriching: boolean;
   isAdmin: boolean;
+  canEditArtwork?: boolean;
+  canEnrich?: boolean;
+  canAnalyze?: boolean;
+  canEditMetadata?: boolean;
+  canCreateCorePlaylist?: boolean;
+  canQueueMetadata?: boolean;
+  canRepair?: boolean;
+  canDelete?: boolean;
+  canMerge?: boolean;
   photoLoaded: boolean;
   photoError: boolean;
   photoCacheBust: string;
@@ -72,6 +83,7 @@ interface ArtistHeroSectionProps {
   onPhotoUploaded: () => void;
   onEnrich: () => void;
   onAnalyze: () => void;
+  onEditMetadata?: () => void;
   onRepair: () => void;
   metadataAction?: "lyrics" | "portable" | "export" | null;
   corePlaylistCreating?: boolean;
@@ -79,6 +91,7 @@ interface ArtistHeroSectionProps {
   onSyncLyrics?: () => void;
   onWritePortableMetadata?: () => void;
   onExportRichMetadata?: () => void;
+  onMerge?: () => void;
   onDelete: () => void;
 }
 
@@ -102,6 +115,15 @@ export function ArtistHeroSection({
   tags,
   enriching,
   isAdmin,
+  canEditArtwork = isAdmin,
+  canEnrich = isAdmin,
+  canAnalyze = isAdmin,
+  canEditMetadata = isAdmin,
+  canCreateCorePlaylist = isAdmin,
+  canQueueMetadata = isAdmin,
+  canRepair = isAdmin,
+  canDelete = isAdmin,
+  canMerge = isAdmin,
   photoLoaded,
   photoError,
   photoCacheBust,
@@ -114,6 +136,7 @@ export function ArtistHeroSection({
   onPhotoUploaded,
   onEnrich,
   onAnalyze,
+  onEditMetadata,
   onRepair,
   metadataAction = null,
   corePlaylistCreating = false,
@@ -121,6 +144,7 @@ export function ArtistHeroSection({
   onSyncLyrics,
   onWritePortableMetadata,
   onExportRichMetadata,
+  onMerge,
   onDelete,
 }: ArtistHeroSectionProps) {
   const backgroundUrl = artistBackgroundApiUrl(
@@ -159,7 +183,7 @@ export function ArtistHeroSection({
         }}
       />
 
-      {isAdmin ? (
+      {canEditArtwork ? (
         <ImageCropUpload
           endpoint={artistArtworkApiPath(
             { artistId, artistEntityUid },
@@ -198,7 +222,7 @@ export function ArtistHeroSection({
                 </span>
               </div>
             )}
-            {isAdmin ? (
+            {canEditArtwork ? (
               <ImageCropUpload
                 endpoint={artistArtworkApiPath(
                   { artistId, artistEntityUid },
@@ -330,22 +354,31 @@ export function ArtistHeroSection({
             ) : null}
 
             <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant="default"
-                disabled={enriching}
-                onClick={onEnrich}
-              >
-                <RefreshCw
-                  size={14}
-                  className={`mr-1 ${enriching ? "animate-spin" : ""}`}
-                />{" "}
-                {enriching ? "Enriching..." : "Enrich"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={onAnalyze}>
-                <AudioWaveform size={14} className="mr-1" /> Analyze
-              </Button>
-              {isAdmin && onCreateCorePlaylist ? (
+              {canEnrich ? (
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={enriching}
+                  onClick={onEnrich}
+                >
+                  <RefreshCw
+                    size={14}
+                    className={`mr-1 ${enriching ? "animate-spin" : ""}`}
+                  />{" "}
+                  {enriching ? "Enriching..." : "Enrich"}
+                </Button>
+              ) : null}
+              {canAnalyze ? (
+                <Button size="sm" variant="outline" onClick={onAnalyze}>
+                  <AudioWaveform size={14} className="mr-1" /> Analyze
+                </Button>
+              ) : null}
+              {canEditMetadata && onEditMetadata ? (
+                <Button size="sm" variant="outline" onClick={onEditMetadata}>
+                  <Pencil size={14} className="mr-1" /> Edit
+                </Button>
+              ) : null}
+              {canCreateCorePlaylist && onCreateCorePlaylist ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -360,7 +393,7 @@ export function ArtistHeroSection({
                   Core Tracks
                 </Button>
               ) : null}
-              {isAdmin && onSyncLyrics ? (
+              {canQueueMetadata && onSyncLyrics ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -375,7 +408,7 @@ export function ArtistHeroSection({
                   Lyrics
                 </Button>
               ) : null}
-              {isAdmin && onWritePortableMetadata ? (
+              {canQueueMetadata && onWritePortableMetadata ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -390,7 +423,7 @@ export function ArtistHeroSection({
                   Metadata
                 </Button>
               ) : null}
-              {isAdmin && onExportRichMetadata ? (
+              {canQueueMetadata && onExportRichMetadata ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -405,7 +438,7 @@ export function ArtistHeroSection({
                   Export
                 </Button>
               ) : null}
-              {showRepairAction && (
+              {canRepair && showRepairAction && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -416,7 +449,12 @@ export function ArtistHeroSection({
                   {(issueCount ?? 0) > 0 ? `Repair (${issueCount})` : "Repair"}
                 </Button>
               )}
-              {isAdmin && (
+              {canMerge && onMerge ? (
+                <Button size="sm" variant="outline" onClick={onMerge}>
+                  <GitMerge size={14} className="mr-1" /> Merge Alias
+                </Button>
+              ) : null}
+              {canDelete && (
                 <Button
                   size="sm"
                   variant="outline"

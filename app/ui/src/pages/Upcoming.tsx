@@ -12,8 +12,14 @@ import {
 } from "@crate/ui/shadcn/popover";
 import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
+import {
+  buildUpcomingCityOptions,
+  buildUpcomingGenreOptions,
+  filterUpcomingItems,
+} from "./upcoming-filters";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -114,6 +120,18 @@ function getArtistHref(artist: UpcomingArtistRef | null | undefined) {
   });
 }
 
+function getReleaseAlbumHref(item: UpcomingItem) {
+  if (item.type !== "release") return undefined;
+  if (item.album_id == null && !item.album_slug) return undefined;
+  return albumPagePath({
+    albumId: item.album_id,
+    albumSlug: item.album_slug,
+    albumName: item.title,
+    artistSlug: item.artist_slug,
+    artistName: item.artist,
+  });
+}
+
 function ArtistTextLink({
   artist,
   className,
@@ -136,6 +154,13 @@ function ArtistTextLink({
 }
 
 export function Upcoming() {
+  const { isAdmin, hasCapability, hasAnyCapability } = useAuth();
+  const canCurateShows = hasCapability("curation.shows.write");
+  const canCurateReleases = hasCapability("curation.releases.write");
+  const canAcquireReleases = hasAnyCapability([
+    "curation.releases.write",
+    "library.tidal.manage",
+  ]);
   const [items, setItems] = useState<UpcomingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TypeFilter>("all");
@@ -165,38 +190,13 @@ export function Upcoming() {
     fetchItems();
   }, []);
 
-  // Apply type + search filter first
-  const typeFiltered = useMemo(() => {
-    let list = items;
-    if (search)
-      list = list.filter((i) =>
-        i.artist.toLowerCase().includes(search.toLowerCase()),
-      );
-    if (filter === "releases") list = list.filter((i) => i.type === "release");
-    else if (filter === "shows") list = list.filter((i) => i.type === "show");
-    return list;
-  }, [items, search, filter]);
-
-  // Derived filter options from type-filtered list (so genres/cities adjust per view)
   const availableGenres = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const i of typeFiltered) {
-      for (const g of i.genres || []) counts[g] = (counts[g] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 30);
-  }, [typeFiltered]);
+    return buildUpcomingGenreOptions(items, { type: filter, search });
+  }, [items, filter, search]);
 
   const availableCities = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const i of typeFiltered) {
-      if (i.city) counts[i.city] = (counts[i.city] || 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 50);
-  }, [typeFiltered]);
+    return buildUpcomingCityOptions(items, { type: filter });
+  }, [items, filter]);
 
   // Reset genre/city filter if the selected value is no longer available
   useEffect(() => {
@@ -208,21 +208,14 @@ export function Upcoming() {
       setCityFilter("");
   }, [cityFilter, availableCities]);
 
-  // Apply genre + city filters
   const filtered = useMemo(() => {
-    let list = typeFiltered;
-    if (genreFilter)
-      list = list.filter((i) =>
-        (i.genres || []).some(
-          (g) => g.toLowerCase() === genreFilter.toLowerCase(),
-        ),
-      );
-    if (cityFilter)
-      list = list.filter(
-        (i) => i.city?.toLowerCase() === cityFilter.toLowerCase(),
-      );
-    return list;
-  }, [typeFiltered, genreFilter, cityFilter]);
+    return filterUpcomingItems(items, {
+      type: filter,
+      search,
+      genre: genreFilter,
+      city: cityFilter,
+    });
+  }, [items, filter, search, genreFilter, cityFilter]);
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = filtered.filter(
@@ -295,6 +288,8 @@ export function Upcoming() {
     (i) => i.type === "release" && i.is_upcoming,
   ).length;
   const showCount = items.filter((i) => i.type === "show").length;
+  const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
+  const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
 
   return (
     <div className="space-y-6">
@@ -342,16 +337,20 @@ export function Upcoming() {
                 Calendar
               </CratePill>
             </div>
-            <Button size="sm" onClick={syncShows} disabled={syncing}>
-              <RefreshCw
-                size={14}
-                className={cn("mr-1", syncing && "animate-spin")}
-              />
-              Sync shows
-            </Button>
-            <ActionIconButton onClick={clearCaches} title="Clear caches">
-              <Trash2 size={15} />
-            </ActionIconButton>
+            {canCurateShows ? (
+              <Button size="sm" onClick={syncShows} disabled={syncing}>
+                <RefreshCw
+                  size={14}
+                  className={cn("mr-1", syncing && "animate-spin")}
+                />
+                Sync shows
+              </Button>
+            ) : null}
+            {isAdmin ? (
+              <ActionIconButton onClick={clearCaches} title="Clear caches">
+                <Trash2 size={15} />
+              </ActionIconButton>
+            ) : null}
           </div>
         </div>
 
@@ -457,8 +456,8 @@ export function Upcoming() {
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={downloadRelease}
-                  onDismiss={dismissRelease}
+                  onDownload={releaseDownload}
+                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                 />
@@ -475,8 +474,8 @@ export function Upcoming() {
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={downloadRelease}
-                  onDismiss={dismissRelease}
+                  onDownload={releaseDownload}
+                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                 />
@@ -494,8 +493,8 @@ export function Upcoming() {
           onMonthChange={(dir) =>
             setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1))
           }
-          onDownload={downloadRelease}
-          onDismiss={dismissRelease}
+          onDownload={releaseDownload}
+          onDismiss={releaseDismiss}
           onShowClick={(item, idx) => {
             setView("list");
             setExpandedId(itemKey(item, idx));
@@ -518,8 +517,8 @@ function MonthGroup({
 }: {
   month: string;
   items: UpcomingItem[];
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
 }) {
@@ -585,6 +584,7 @@ function EventCard({
     ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
   const timeStr = item.time ? item.time.slice(0, 5) : "";
+  const albumHref = getReleaseAlbumHref(item);
 
   return (
     <div
@@ -628,9 +628,18 @@ function EventCard({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-medium text-white">
-              {item.title}
-            </span>
+            {albumHref ? (
+              <Link
+                to={albumHref}
+                className="truncate text-sm font-medium text-white transition-colors hover:text-primary"
+              >
+                {item.title}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-medium text-white">
+                {item.title}
+              </span>
+            )}
             {item.tidal_url && <CrateChip active>Lossless</CrateChip>}
           </div>
           <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-white/55">
@@ -664,6 +673,15 @@ function EventCard({
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {albumHref ? (
+            <Link
+              to={albumHref}
+              className="inline-flex h-9 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Open album
+            </Link>
+          ) : null}
           {item.status === "detected" &&
             item.tidal_url &&
             onDownload &&
@@ -712,8 +730,8 @@ function CalendarView({
   items: UpcomingItem[];
   month: Date;
   onMonthChange: (dir: number) => void;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   onShowClick: (item: UpcomingItem, index: number) => void;
 }) {
   const year = month.getFullYear();
@@ -839,8 +857,8 @@ function CalendarPill({
   onShowClick,
 }: {
   item: UpcomingItem;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
   onShowClick: () => void;
 }) {
   const isShow = item.type === "show";
@@ -894,8 +912,8 @@ function ReleasePopoverContent({
   onDismiss,
 }: {
   item: UpcomingItem;
-  onDownload: (id: number) => void;
-  onDismiss: (id: number) => void;
+  onDownload?: (id: number) => void;
+  onDismiss?: (id: number) => void;
 }) {
   const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
   const dateStr = dateObj
@@ -906,6 +924,7 @@ function ReleasePopoverContent({
         year: "numeric",
       })
     : "";
+  const albumHref = getReleaseAlbumHref(item);
 
   return (
     <div className="overflow-hidden rounded-md bg-transparent">
@@ -925,14 +944,9 @@ function ReleasePopoverContent({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          {item.album_id != null ? (
+          {albumHref ? (
             <Link
-              to={albumPagePath({
-                albumId: item.album_id,
-                albumSlug: item.album_slug,
-                artistName: item.artist,
-                albumName: item.title,
-              })}
+              to={albumHref}
               className="font-bold text-sm truncate block hover:text-foreground transition-colors"
             >
               {item.title}
@@ -958,24 +972,28 @@ function ReleasePopoverContent({
           <Calendar size={11} /> {dateStr}
         </div>
 
-        {item.status === "detected" && item.release_id && (
-          <div className="flex gap-2">
-            {item.tidal_url && (
-              <button
-                onClick={() => onDownload(item.release_id!)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
-              >
-                <Download size={12} /> Download
-              </button>
-            )}
-            <button
-              onClick={() => onDismiss(item.release_id!)}
-              className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        {item.status === "detected" &&
+          item.release_id &&
+          (onDownload || onDismiss) && (
+            <div className="flex gap-2">
+              {item.tidal_url && onDownload && (
+                <button
+                  onClick={() => onDownload(item.release_id!)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
+                >
+                  <Download size={12} /> Download
+                </button>
+              )}
+              {onDismiss ? (
+                <button
+                  onClick={() => onDismiss(item.release_id!)}
+                  className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
+                >
+                  Dismiss
+                </button>
+              ) : null}
+            </div>
+          )}
         {item.status === "downloaded" && (
           <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
             Downloaded

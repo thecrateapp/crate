@@ -34,6 +34,36 @@ interface ArtistSetlistSectionProps {
   onTrackTitlesLoaded: (tracks: LibraryTrackTitle[]) => void;
 }
 
+function normalizeSetlistSongs(value: unknown): SetlistSong[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((song) => {
+    if (!song || typeof song !== "object") return [];
+    const item = song as Partial<SetlistSong> & { name?: unknown };
+    const title =
+      typeof item.title === "string"
+        ? item.title.trim()
+        : typeof item.name === "string"
+          ? item.name.trim()
+          : "";
+    if (!title) return [];
+    const normalized: SetlistSong = {
+      title,
+      frequency:
+        typeof item.frequency === "number" && Number.isFinite(item.frequency)
+          ? item.frequency
+          : 1,
+      play_count:
+        typeof item.play_count === "number" && Number.isFinite(item.play_count)
+          ? item.play_count
+          : 1,
+    };
+    if (typeof item.last_played === "string") {
+      normalized.last_played = item.last_played;
+    }
+    return [normalized];
+  });
+}
+
 export function ArtistSetlistSection({
   artistName,
   artistId,
@@ -43,7 +73,7 @@ export function ArtistSetlistSection({
   onTrackTitlesLoaded,
 }: ArtistSetlistSectionProps) {
   const navigate = useNavigate();
-  const probableSetlist = setlistData?.probable_setlist ?? [];
+  const probableSetlist = normalizeSetlistSongs(setlistData?.probable_setlist);
   const lastShow = setlistData?.last_show;
   const totalShows = setlistData?.total_shows ?? 0;
 
