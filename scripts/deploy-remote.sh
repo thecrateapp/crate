@@ -166,12 +166,18 @@ wait_for_container_healthy() {
 
 check_public_url() {
   local url="$1"
-  curl -fsSIL --max-time 10 --retry 3 --retry-delay 2 "$url" >/dev/null
+  local host
+  host="${url#https://}"
+  host="${host%%/*}"
+  curl -fsSIL --max-time 10 --retry 3 --retry-delay 2 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null
 }
 
 check_public_get_url() {
   local url="$1"
-  curl -fsSL --max-time 10 --retry 3 --retry-delay 2 "$url" >/dev/null
+  local host
+  host="${url#https://}"
+  host="${host%%/*}"
+  curl -fsSL --max-time 10 --retry 3 --retry-delay 2 --resolve "${host}:443:127.0.0.1" "$url" >/dev/null
 }
 
 cmd_preflight() {
