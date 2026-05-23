@@ -9,6 +9,7 @@ DEPLOY_IMAGE_REGISTRY="${DEPLOY_IMAGE_REGISTRY:-ghcr.io}"
 DEPLOY_PUBLIC_CHECKS="${DEPLOY_PUBLIC_CHECKS:-1}"
 DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
+DEPLOY_HEALTH_WAIT_SECONDS="${DEPLOY_HEALTH_WAIT_SECONDS:-420}"
 BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
 BACKUP_DIR="${BACKUP_ROOT}/${DEPLOY_ID}"
 ROLLBACK_TAG="rollback-${DEPLOY_ID}"
@@ -139,8 +140,9 @@ wait_for_container_running() {
 
 wait_for_container_healthy() {
   local container="$1"
-  local deadline=$((SECONDS + 180))
+  local deadline=$((SECONDS + DEPLOY_HEALTH_WAIT_SECONDS))
   local status
+  local reported_unhealthy=0
 
   while true; do
     status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Running}}{{end}}' "$container" 2>/dev/null || true)"
@@ -148,9 +150,10 @@ wait_for_container_healthy() {
       return 0
     fi
     if [[ "$status" == "unhealthy" ]]; then
-      log "Container ${container} is unhealthy"
-      docker logs --tail=120 "$container" 2>/dev/null || true
-      return 1
+      if [[ "$reported_unhealthy" -eq 0 ]]; then
+        log "Container ${container} is temporarily unhealthy; waiting until deploy health deadline"
+        reported_unhealthy=1
+      fi
     fi
     if (( SECONDS >= deadline )); then
       log "Container ${container} did not become healthy; last status: ${status:-unknown}"

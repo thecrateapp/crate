@@ -16,6 +16,7 @@ DEPLOY_IMAGE_WAIT_SECONDS="${DEPLOY_IMAGE_WAIT_SECONDS:-900}"
 DEPLOY_IMAGE_WAIT_INTERVAL="${DEPLOY_IMAGE_WAIT_INTERVAL:-20}"
 REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
 TMP_DIR=""
+ROLLBACK_ENABLED=1
 REQUIRED_IMAGE_NAMES=(
   crate-api
   crate-readplane
@@ -56,7 +57,7 @@ ssh_remote() {
 
 remote_deploy() {
   ssh_remote \
-    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' '$REMOTE_SCRIPT_PATH' '$1'"
+    "SERVER_PATH='$SERVER_PATH' DEPLOY_ID='$DEPLOY_ID' DEPLOY_IMAGE_TAG='$DEPLOY_IMAGE_TAG' DEPLOY_IMAGE_OWNER='$DEPLOY_IMAGE_OWNER' DEPLOY_IMAGE_REGISTRY='$DEPLOY_IMAGE_REGISTRY' DEPLOY_PUBLIC_CHECKS='$DEPLOY_PUBLIC_CHECKS' DEPLOY_IMAGE_WAIT_SECONDS='$DEPLOY_IMAGE_WAIT_SECONDS' DEPLOY_IMAGE_WAIT_INTERVAL='$DEPLOY_IMAGE_WAIT_INTERVAL' DEPLOY_HEALTH_WAIT_SECONDS='${DEPLOY_HEALTH_WAIT_SECONDS:-420}' '$REMOTE_SCRIPT_PATH' '$1'"
 }
 
 env_file_value() {
@@ -222,6 +223,13 @@ rollback_on_error() {
     return
   fi
 
+  if [[ "$ROLLBACK_ENABLED" != "1" ]]; then
+    printf '\nDeploy verification failed after the updated stack was started. Automatic rollback is disabled at this stage because database migrations may already have advanced. Leaving the new stack running for forward-fix diagnostics.\n' >&2
+    remote_deploy diagnose || true
+    cleanup
+    exit "$exit_code"
+  fi
+
   printf '\nDeploy step failed. Attempting automatic rollback for %s...\n' "$DEPLOY_ID" >&2
   if remote_deploy rollback; then
     printf 'Rollback completed. Keeping deploy exit code %s so CI/operator sees the failure.\n' "$exit_code" >&2
@@ -251,6 +259,7 @@ main() {
   remote_deploy config
   remote_deploy pull
   remote_deploy up
+  ROLLBACK_ENABLED=0
   remote_deploy verify
   remote_deploy cleanup
 
