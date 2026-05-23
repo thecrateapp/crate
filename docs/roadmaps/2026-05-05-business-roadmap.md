@@ -256,19 +256,21 @@ Once the user has music, make them come back.
 
 ## Prioritized Summary
 
-| #   | Initiative              | Horizon | Effort   | Impact   | Blocker            |
-| --- | ----------------------- | ------- | -------- | -------- | ------------------ |
-| 1   | i18n                    | H0      | 2-3 wk   | Critical | None               |
-| 2   | Bandcamp integration    | H0      | 1-2 wk   | Critical | None               |
-| 3   | Discography timeline    | H0      | 3-5 days | High     | None               |
-| 4   | Music acquisition guide | H0      | 1-2 wk   | High     | None               |
-| 5   | Crate Wrapped           | H1      | 3-4 wk   | Critical | Play events (done) |
-| 6   | Social features depth   | H1      | 4-6 wk   | High     | None               |
-| 7   | Notifications           | H1      | 2-3 wk   | Medium   | None               |
-| 8   | External discovery      | H2      | 3-4 wk   | High     | Bandcamp (H0.2)    |
-| 9   | Cross-device playback   | H2      | 3-4 wk   | Medium   | None               |
-| 10  | Accessibility           | H2      | 2-3 wk   | Medium   | None               |
-| 11  | Mobile maturity (iOS)   | H2      | 4-6 wk   | Medium   | Capacitor base     |
-| 12  | Multi-instance          | H3      | 8-12 wk  | Medium   | None               |
-| 13  | Plugin ecosystem        | H3      | 8-16 wk  | Low      | Stabilized API     |
-| 14  | Editorial community     | H3      | 4-6 wk   | Low      | Social (H1.2)      |
+| #   | Initiative              | Horizon | Status | Effort   | Impact   | Blocker            |
+| --- | ----------------------- | ------- | ------ | -------- | -------- | ------------------ |
+| 1   | i18n                    | H0      | ⏳     | 2-3 wk   | Critical | None               |
+| 2   | Bandcamp integration    | H0      | ⏳     | 1-2 wk   | Critical | None               |
+| 3   | Discography timeline    | H0      | 🚧     | 3-5 days | High     | None               |
+| 4   | Music acquisition guide | H0      | ⏳     | 1-2 wk   | High     | None               |
+| 5   | Crate Wrapped           | H1      | ⏳     | 3-4 wk   | Critical | Play events (done) |
+| 6   | Social features depth   | H1      | 🚧     | 4-6 wk   | High     | None               |
+| 7   | Notifications           | H1      | 🚧     | 2-3 wk   | Medium   | None               |
+| 8   | External discovery      | H2      | ⏳     | 3-4 wk   | High     | Bandcamp (H0.2)    |
+| 9   | Cross-device playback   | H2      | ⏳     | 3-4 wk   | Medium   | None               |
+| 10  | Accessibility           | H2      | ⏳     | 2-3 wk   | Medium   | None               |
+| 11  | Mobile maturity (iOS)   | H2      | 🚧     | 4-6 wk   | Medium   | Capacitor base     |
+| 12  | Multi-instance          | H3      | ⏳     | 8-12 wk  | Medium   | None               |
+| 13  | Plugin ecosystem        | H3      | ⏳     | 8-16 wk  | Low      | Stabilized API     |
+| 14  | Editorial community     | H3      | ⏳     | 4-6 wk   | Low      | Social (H1.2)      |
+
+> **Status legend:** ✅ complete · 🚧 partial/in-progress · ⏳ not started

@@ -18,6 +18,7 @@ crate-media-worker       (Rust)                 → ZIP/download package generat
 @crate/ui                (React 19 + TW4)       → shared design system (npm workspace)
 crate-ui                 (React 19 + Vite)      → admin web app
 crate-listen             (React 19 + Vite)      → consumer listening app (PWA + Capacitor)
+crate-listen-desktop     (React 19 + Vite)      → desktop listening app (Tauri)
 crate-site               (React 19 + Vite)      → marketing landing page (cratemusic.app)
 crate-docs               (React 19 + Vite)      → technical documentation site
 crate-postgres           (PostgreSQL 15)        → data persistence
@@ -56,6 +57,7 @@ app/shared/web/             Shared frontend code (API client, hooks, utils)
 app/shared/fonts/           Shared font files (Poppins)
 app/ui/src/                 Admin frontend (27 pages)
 app/listen/src/             Consumer listening frontend (25 pages)
+app/listen-desktop/         Desktop listening app (Tauri)
 app/site/                   Marketing landing page
 app/tests/                  Python backend tests (35 files)
 tools/crate-cli/     Rust CLI for audio similarity (bliss-rs)
@@ -208,6 +210,7 @@ make dev                    # Docker backend + all frontend dev servers
 # Individual dev servers:
 npm run --workspace=app/ui dev          # Admin UI (port 5173)
 npm run --workspace=app/listen dev      # Listen app (port 5174)
+npm run --workspace=app/listen-desktop dev  # Listen desktop (Tauri)
 
 # Build @crate/ui:
 npm run --workspace=app/shared/ui build     # → dist/*.js + dist/*.d.ts
@@ -254,7 +257,7 @@ Login: admin@cratemusic.app / admin (dev seed user, also used in production).
 - `log = logging.getLogger(__name__)` per module
 - Imports: stdlib → third-party → local, separated by blank lines
 - DB functions in `db/` modules, not scattered across routers
-- `crate.db.__init__.py` is a frozen compatibility facade; **do not** add new exports to it. All code must import concrete submodules (`crate.db.queries.*`, `crate.db.repositories.*`, `crate.db.jobs.*`, `crate.db.surface.*`, `crate.db.tx.*`) directly. Internal imports using `from crate.db import ...` are considered technical debt and should be migrated when touched.
+- `crate.db.__init__.py` is a compatibility facade that re-exports from concrete modules. New code MUST import from concrete submodules (`crate.db.queries.*`, `crate.db.repositories.*`, `crate.db.jobs.*`, `crate.db.tx.*`) directly. Internal imports using `from crate.db import ...` are considered technical debt and should be migrated when touched.
 - Worker handlers in `worker_handlers/`, registered via Dramatiq actors
 - ORM models in `db/orm/` (SQLAlchemy 2.0 Mapped style), complex queries in `db/queries/` and `db/jobs/`
 - Pydantic v2 schemas in `api/schemas/`, data models in `db/models/`
@@ -284,36 +287,36 @@ Login: admin@cratemusic.app / admin (dev seed user, also used in production).
 
 ## Important Files
 
-| File                                         | Purpose                                                                                                      |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `app/crate/db/`                              | Database layer: `core.py` (pool + init), `tx.py` (session scopes), `orm/` (models), `queries/` (complex SQL) |
-| `app/crate/worker_handlers/`                 | 9 task handler modules                                                                                       |
-| `app/crate/actors.py`                        | Dramatiq actor wrappers + queue config                                                                       |
-| `app/crate/orchestrator.py`                  | Worker process manager + scheduler + watcher _(legacy — deprecated, use Dramatiq)_                           |
-| `app/crate/projector.py`                     | Domain events → snapshot warming                                                                             |
-| `app/crate/resource_governor.py`             | Background backpressure and maintenance-window decisions                                                     |
-| `app/crate/analysis_daemon.py`               | Audio analysis + bliss daemon loops                                                                          |
-| `app/crate/enrichment.py`                    | Unified artist enrichment (all sources)                                                                      |
-| `app/crate/audio_analysis.py`                | Essentia/librosa dual backend                                                                                |
-| `app/crate/bliss.py`                         | Python integration with crate-cli Rust CLI                                                                   |
-| `app/crate/tidal.py`                         | Tidal auth, search, download via tiddl                                                                       |
-| `app/crate/library_sync.py`                  | Filesystem → DB sync                                                                                         |
-| `app/crate/metrics.py`                       | Redis metrics buckets → PostgreSQL rollups                                                                   |
-| `app/crate/llm/`                             | LLM provider abstraction (Ollama/Gemini/litellm)                                                             |
-| `app/crate/api/__init__.py`                  | App factory + router registration order (important!)                                                         |
-| `app/readplane/`                             | Go read plane service                                                                                        |
-| `app/media-worker/`                          | Rust media worker service                                                                                    |
-| `app/shared/ui/`                             | @crate/ui design system (tokens, primitives, shadcn, domain)                                                 |
-| `app/shared/web/api.ts`                      | Shared API client factory                                                                                    |
-| `app/shared/web/use-api.ts`                  | Shared `useApi` hook factory                                                                                 |
-| `app/shared/web/utils.ts`                    | Shared utilities (formatDuration, encPath, etc.)                                                             |
-| `package.json`                               | Root workspace config                                                                                        |
-| `app/ui/src/components/layout/Shell.tsx`     | Admin layout (sidebar, main)                                                                                 |
-| `app/listen/src/contexts/PlayerContext.tsx`  | Public player provider/orchestrator; heavy internals now split across focused hooks                          |
-| `app/listen/src/components/layout/Shell.tsx` | Listen layout (desktop/mobile adaptive)                                                                      |
-| `Makefile`                                   | Dev, deploy, Capacitor, utilities                                                                            |
-| `docker-compose.yaml`                        | Production stack                                                                                             |
-| `docker-compose.dev.yaml`                    | Dev stack                                                                                                    |
+| File                                         | Purpose                                                                                                                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/crate/db/`                              | Database layer: `core_provisioning.py` (init + provisioning), `engine.py` (SQLAlchemy engine), `tx.py` (session scopes), `orm/` (models), `queries/` (complex SQL) |
+| `app/crate/worker_handlers/`                 | 9 task handler modules                                                                                                                                             |
+| `app/crate/actors.py`                        | Dramatiq actor wrappers + queue config                                                                                                                             |
+| `app/crate/orchestrator.py`                  | Worker process manager + scheduler + watcher _(legacy — deprecated, use Dramatiq)_                                                                                 |
+| `app/crate/projector.py`                     | Domain events → snapshot warming                                                                                                                                   |
+| `app/crate/resource_governor.py`             | Background backpressure and maintenance-window decisions                                                                                                           |
+| `app/crate/analysis_daemon.py`               | Audio analysis + bliss daemon loops                                                                                                                                |
+| `app/crate/enrichment.py`                    | Unified artist enrichment (all sources)                                                                                                                            |
+| `app/crate/audio_analysis.py`                | Essentia/librosa dual backend                                                                                                                                      |
+| `app/crate/bliss.py`                         | Python integration with crate-cli Rust CLI                                                                                                                         |
+| `app/crate/tidal.py`                         | Tidal auth, search, download via tiddl                                                                                                                             |
+| `app/crate/library_sync.py`                  | Filesystem → DB sync                                                                                                                                               |
+| `app/crate/metrics.py`                       | Redis metrics buckets → PostgreSQL rollups                                                                                                                         |
+| `app/crate/llm/`                             | LLM provider abstraction (Ollama/Gemini/litellm)                                                                                                                   |
+| `app/crate/api/__init__.py`                  | App factory + router registration order (important!)                                                                                                               |
+| `app/readplane/`                             | Go read plane service                                                                                                                                              |
+| `app/media-worker/`                          | Rust media worker service                                                                                                                                          |
+| `app/shared/ui/`                             | @crate/ui design system (tokens, primitives, shadcn, domain)                                                                                                       |
+| `app/shared/web/api.ts`                      | Shared API client factory                                                                                                                                          |
+| `app/shared/web/use-api.ts`                  | Shared `useApi` hook factory                                                                                                                                       |
+| `app/shared/web/utils.ts`                    | Shared utilities (formatDuration, encPath, etc.)                                                                                                                   |
+| `package.json`                               | Root workspace config                                                                                                                                              |
+| `app/ui/src/components/layout/Shell.tsx`     | Admin layout (sidebar, main)                                                                                                                                       |
+| `app/listen/src/contexts/PlayerContext.tsx`  | Public player provider/orchestrator; heavy internals now split across focused hooks                                                                                |
+| `app/listen/src/components/layout/Shell.tsx` | Listen layout (desktop/mobile adaptive)                                                                                                                            |
+| `Makefile`                                   | Dev, deploy, Capacitor, utilities                                                                                                                                  |
+| `docker-compose.yaml`                        | Production stack                                                                                                                                                   |
+| `docker-compose.dev.yaml`                    | Dev stack                                                                                                                                                          |
 
 ## Server
 
