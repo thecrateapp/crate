@@ -34,10 +34,19 @@ DB_HEAVY_LOCK_RETRY_SECONDS = 5
 DB_HEAVY_LOCK_TTL_SECONDS = 7200  # 2h max
 DOWNLOAD_SLOT_TIMEOUT_SECONDS = 120
 DOWNLOAD_SEM_TTL_SECONDS = 14400  # 4h — matches tidal_download timeout
-DOWNLOAD_SEM_MAX = 2
 TASK_REQUEUE_DELAY_MS = 30_000
 TASK_REQUEUE_DELAY_LONG_MS = 3600_000  # 1h cap for deferred downloads
 DOWNLOAD_WINDOW_RETRY_MS = 300_000  # 5 min
+
+
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    try:
+        return max(minimum, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+DOWNLOAD_SEM_MAX = _env_int("CRATE_DOWNLOAD_SEM_MAX", 2)
 
 # ── Pool configuration ────────────────────────────────────────────
 # task_type → TaskPoolConfig(queue, priority, time_limit_seconds, max_retries)
@@ -84,7 +93,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "fetch_cover": TaskPoolConfig("fast", 0, 120, 2),
     "apply_cover": TaskPoolConfig("fast", 0, 60, 0),
     "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
-    "upload_image": TaskPoolConfig("default", 0, 60, 0),
+    "upload_image": TaskPoolConfig("fast", 0, 60, 0),
     "library_upload": TaskPoolConfig("default", 0, 7200, 1),
     "library_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "library_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
@@ -96,7 +105,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
     "enrich_artist": TaskPoolConfig("fast", 1, 180, 2),
-    "sync_lyrics": TaskPoolConfig("fast", 2, 7200, 1),
+    "sync_lyrics": TaskPoolConfig("maintenance", 2, 7200, 1),
     "analyze_album_full": TaskPoolConfig(
         "fast", 1, 60, 0
     ),  # just resets state for background daemon
@@ -105,13 +114,13 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
-    "compute_analytics": TaskPoolConfig("fast", 2, 600, 0),
-    "check_new_releases": TaskPoolConfig("fast", 2, 600, 1),
+    "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
+    "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
     "fix_issues": TaskPoolConfig("maintenance", 2, 3600, 0),
-    "fetch_artist_covers": TaskPoolConfig("fast", 2, 300, 1),
+    "fetch_artist_covers": TaskPoolConfig("maintenance", 2, 300, 1),
     "batch_retag": TaskPoolConfig("maintenance", 2, 3600, 0),
-    "batch_covers": TaskPoolConfig("fast", 2, 3600, 0),
+    "batch_covers": TaskPoolConfig("maintenance", 2, 3600, 0),
     "wipe_library": TaskPoolConfig("default", 2, 300, 0),
     "rebuild_library": TaskPoolConfig("default", 2, 14400, 0),
     "resolve_duplicates": TaskPoolConfig("default", 2, 600, 0),
@@ -119,9 +128,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "rehydrate_portable_metadata": TaskPoolConfig("maintenance", 2, 14400, 0),
     "export_rich_metadata": TaskPoolConfig("maintenance", 2, 28800, 0),
     # Background batch (priority 3)
-    "enrich_artists": TaskPoolConfig("fast", 3, 86400, 0),
-    "enrich_mbids": TaskPoolConfig("fast", 3, 86400, 0),
-    "compute_popularity": TaskPoolConfig("fast", 3, 3600, 0),
+    "enrich_artists": TaskPoolConfig("maintenance", 3, 86400, 0),
+    "enrich_mbids": TaskPoolConfig("maintenance", 3, 86400, 0),
+    "compute_popularity": TaskPoolConfig("maintenance", 3, 3600, 0),
     "compute_bliss": TaskPoolConfig(
         "fast", 3, 60, 0
     ),  # just resets state for background daemon
@@ -132,20 +141,21 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
         "fast", 3, 60, 0
     ),  # just resets state for background daemon
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
-    "index_genres": TaskPoolConfig("fast", 3, 600, 0),
-    "infer_genre_taxonomy": TaskPoolConfig("fast", 3, 3600, 0),
-    "enrich_genre_descriptions": TaskPoolConfig("fast", 3, 3600, 0),
-    "sync_musicbrainz_genre_graph": TaskPoolConfig("fast", 3, 5400, 0),
-    "cleanup_invalid_genre_taxonomy": TaskPoolConfig("fast", 3, 900, 0),
-    "remux_m4a_dash": TaskPoolConfig("fast", 3, 7200, 0),
-    "scan_missing_covers": TaskPoolConfig("fast", 3, 3600, 0),
-    "fetch_artwork_all": TaskPoolConfig("fast", 3, 3600, 0),
-    "backfill_similarities": TaskPoolConfig("fast", 3, 3600, 0),
+    "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
+    "infer_genre_taxonomy": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "rebuild_genre_taxonomy_proposals": TaskPoolConfig("maintenance", 3, 7200, 0),
+    "enrich_genre_descriptions": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "sync_musicbrainz_genre_graph": TaskPoolConfig("maintenance", 3, 5400, 0),
+    "cleanup_invalid_genre_taxonomy": TaskPoolConfig("maintenance", 3, 900, 0),
+    "remux_m4a_dash": TaskPoolConfig("maintenance", 3, 7200, 0),
+    "scan_missing_covers": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "fetch_artwork_all": TaskPoolConfig("maintenance", 3, 3600, 0),
+    "backfill_similarities": TaskPoolConfig("maintenance", 3, 3600, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
     "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
     "bandcamp_import_purchase": TaskPoolConfig("default", 0, 14400, 0),
-    "bandcamp_radar_refresh": TaskPoolConfig("fast", 2, 600, 1),
+    "bandcamp_radar_refresh": TaskPoolConfig("maintenance", 2, 600, 1),
     "bandcamp_backfill_entity_urls": TaskPoolConfig("maintenance", 2, 7200, 0),
     "bandcamp_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "bandcamp_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
@@ -159,12 +169,12 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
         "maintenance", 2, 3600, 0
     ),  # deprecated legacy storage migration
     # Library completeness check
-    "compute_completeness": TaskPoolConfig("fast", 3, 3600, 0),
+    "compute_completeness": TaskPoolConfig("maintenance", 3, 3600, 0),
     # Playback delivery
     "prepare_stream_variant": TaskPoolConfig("playback", 0, 1200, 1),
     # Playlist generation
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
-    "refresh_system_smart_playlists": TaskPoolConfig("fast", 3, 1800, 0),
+    "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
 }
 

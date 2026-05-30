@@ -15,7 +15,7 @@ export interface AuthUser {
 export interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<AuthUser | null>;
   logout: () => Promise<void>;
 }
 

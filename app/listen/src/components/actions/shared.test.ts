@@ -55,7 +55,9 @@ describe("track action shared helpers", () => {
         entityUid: "entity-55",
         title: "Track Two",
         artist: "Artist",
+        artistEntityUid: "artist-entity-55",
         album: "Album",
+        albumEntityUid: "album-entity-55",
         isSuggested: true,
         suggestionSource: "playlist",
         format: "flac",
@@ -66,6 +68,8 @@ describe("track action shared helpers", () => {
     ).toEqual(
       expect.objectContaining({
         entity_uid: "entity-55",
+        artist_entity_uid: "artist-entity-55",
+        album_entity_uid: "album-entity-55",
         is_suggested: true,
         suggestion_source: "playlist",
         format: "flac",

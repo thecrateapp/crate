@@ -45,6 +45,7 @@ import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { toPlayableTrack } from "@/lib/playable-track";
+import { publicShareUrl } from "@/lib/share-url";
 import { toTrackReferencePayload } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
@@ -52,6 +53,7 @@ import {
   albumApiPath,
   albumCoverApiUrl,
   albumPagePath,
+  albumSharePath,
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
@@ -168,6 +170,7 @@ export function Album() {
   }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const sharedTrackUid = new URLSearchParams(location.search).get("track");
   const isDesktop = useIsDesktop();
   const { playAll, playNext } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -230,6 +233,18 @@ export function Album() {
     location.pathname,
     navigate,
   ]);
+
+  const hasTracks = Boolean(data?.tracks?.length);
+
+  useEffect(() => {
+    if (!sharedTrackUid || !hasTracks) return;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .getElementById(`track-${sharedTrackUid}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [data?.id, hasTracks, sharedTrackUid]);
 
   if (loading) {
     return (
@@ -410,13 +425,27 @@ export function Album() {
     setMenuOpen(false);
   };
 
-  const shareUrl = `${window.location.origin}${albumPagePath({
-    albumId,
-    albumSlug: data.slug,
-    artistSlug: data.artist_slug,
-    artistName,
-    albumName: data.name,
-  })}`;
+  const shareUrl = publicShareUrl(
+    albumSharePath({
+      albumId,
+      albumEntityUid: data.entity_uid,
+      albumSlug: data.slug,
+      artistEntityUid: data.artist_entity_uid,
+      artistSlug: data.artist_slug,
+      artistName,
+      albumName: data.name,
+    }),
+  );
+
+  function trackPreviewId(track: AlbumTrack) {
+    return track.entity_uid ? `track-${track.entity_uid}` : undefined;
+  }
+
+  function sharedTrackClass(track: AlbumTrack) {
+    return sharedTrackUid && track.entity_uid === sharedTrackUid
+      ? "rounded-xl ring-1 ring-primary/35 bg-primary/5"
+      : "";
+  }
 
   async function handleShare() {
     try {
@@ -962,89 +991,100 @@ export function Album() {
                     Disc {disc}
                   </div>
                   {tracks.map((t, idx) => (
-                    <TrackRow
+                    <div
                       key={t.id}
-                      track={toTrackRowData({
-                        id: t.id,
-                        entity_uid: t.entity_uid,
-                        title: t.tags.title || t.filename,
-                        artist: data.artist,
-                        artist_id: data.artist_id,
-                        artist_entity_uid: data.artist_entity_uid,
-                        artist_slug: data.artist_slug,
-                        album: displayName,
-                        album_id: data.id,
-                        album_entity_uid: data.entity_uid,
-                        album_slug: data.slug,
-                        duration: t.length_sec,
-                        path: t.path,
-                        track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                        format: t.format,
-                        bitrate: t.bitrate,
-                        sample_rate: t.sample_rate,
-                        bit_depth: t.bit_depth,
-                        bpm: t.bpm,
-                        audio_key: t.audio_key,
-                        audio_scale: t.audio_scale,
-                        energy: t.energy,
-                        danceability: t.danceability,
-                        valence: t.valence,
-                        bliss_vector: t.bliss_vector,
-                        library_track_id:
-                          t.is_available === false ? undefined : t.id,
-                        disabled: t.is_available === false,
-                      })}
-                      index={parseInt(t.tags.tracknumber) || idx + 1}
-                      albumCover={coverUrl}
-                      playlistOptions={playlists ?? undefined}
-                      onAddToPlaylist={handleAddTrackToPlaylist}
-                      onCreatePlaylist={handleCreatePlaylistFromTrack}
-                      onActionMenuOpen={ensurePlaylistOptionsLoaded}
-                      onPlayOverride={() => handlePlayTrack(t.id)}
-                    />
+                      id={trackPreviewId(t)}
+                      className={sharedTrackClass(t)}
+                    >
+                      <TrackRow
+                        track={toTrackRowData({
+                          id: t.id,
+                          entity_uid: t.entity_uid,
+                          title: t.tags.title || t.filename,
+                          artist: data.artist,
+                          artist_id: data.artist_id,
+                          artist_entity_uid: data.artist_entity_uid,
+                          artist_slug: data.artist_slug,
+                          album: displayName,
+                          album_id: data.id,
+                          album_entity_uid: data.entity_uid,
+                          album_slug: data.slug,
+                          duration: t.length_sec,
+                          path: t.path,
+                          track_number: parseInt(t.tags.tracknumber) || idx + 1,
+                          format: t.format,
+                          bitrate: t.bitrate,
+                          sample_rate: t.sample_rate,
+                          bit_depth: t.bit_depth,
+                          bpm: t.bpm,
+                          audio_key: t.audio_key,
+                          audio_scale: t.audio_scale,
+                          energy: t.energy,
+                          danceability: t.danceability,
+                          valence: t.valence,
+                          bliss_vector: t.bliss_vector,
+                          library_track_id:
+                            t.is_available === false ? undefined : t.id,
+                          disabled: t.is_available === false,
+                        })}
+                        index={parseInt(t.tags.tracknumber) || idx + 1}
+                        albumCover={coverUrl}
+                        playlistOptions={playlists ?? undefined}
+                        onAddToPlaylist={handleAddTrackToPlaylist}
+                        onCreatePlaylist={handleCreatePlaylistFromTrack}
+                        onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                        onPlayOverride={() => handlePlayTrack(t.id)}
+                      />
+                    </div>
                   ))}
                 </div>
               ))
           : data.tracks.map((t, idx) => (
-              <TrackRow
+              <div
                 key={t.id}
-                track={toTrackRowData({
-                  id: t.id,
-                  entity_uid: t.entity_uid,
-                  title: t.tags.title || t.filename,
-                  artist: data.artist,
-                  artist_id: data.artist_id,
-                  artist_entity_uid: data.artist_entity_uid,
-                  artist_slug: data.artist_slug,
-                  album: displayName,
-                  album_id: data.id,
-                  album_entity_uid: data.entity_uid,
-                  album_slug: data.slug,
-                  duration: t.length_sec,
-                  path: t.path,
-                  track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                  format: t.format,
-                  bitrate: t.bitrate,
-                  sample_rate: t.sample_rate,
-                  bit_depth: t.bit_depth,
-                  bpm: t.bpm,
-                  audio_key: t.audio_key,
-                  audio_scale: t.audio_scale,
-                  energy: t.energy,
-                  danceability: t.danceability,
-                  valence: t.valence,
-                  bliss_vector: t.bliss_vector,
-                  library_track_id: t.is_available === false ? undefined : t.id,
-                  disabled: t.is_available === false,
-                })}
-                index={parseInt(t.tags.tracknumber) || idx + 1}
-                albumCover={coverUrl}
-                playlistOptions={playlists ?? undefined}
-                onAddToPlaylist={handleAddTrackToPlaylist}
-                onCreatePlaylist={handleCreatePlaylistFromTrack}
-                onActionMenuOpen={ensurePlaylistOptionsLoaded}
-                onPlayOverride={() => handlePlayTrack(t.id)}
-              />
+                id={trackPreviewId(t)}
+                className={sharedTrackClass(t)}
+              >
+                <TrackRow
+                  track={toTrackRowData({
+                    id: t.id,
+                    entity_uid: t.entity_uid,
+                    title: t.tags.title || t.filename,
+                    artist: data.artist,
+                    artist_id: data.artist_id,
+                    artist_entity_uid: data.artist_entity_uid,
+                    artist_slug: data.artist_slug,
+                    album: displayName,
+                    album_id: data.id,
+                    album_entity_uid: data.entity_uid,
+                    album_slug: data.slug,
+                    duration: t.length_sec,
+                    path: t.path,
+                    track_number: parseInt(t.tags.tracknumber) || idx + 1,
+                    format: t.format,
+                    bitrate: t.bitrate,
+                    sample_rate: t.sample_rate,
+                    bit_depth: t.bit_depth,
+                    bpm: t.bpm,
+                    audio_key: t.audio_key,
+                    audio_scale: t.audio_scale,
+                    energy: t.energy,
+                    danceability: t.danceability,
+                    valence: t.valence,
+                    bliss_vector: t.bliss_vector,
+                    library_track_id:
+                      t.is_available === false ? undefined : t.id,
+                    disabled: t.is_available === false,
+                  })}
+                  index={parseInt(t.tags.tracknumber) || idx + 1}
+                  albumCover={coverUrl}
+                  playlistOptions={playlists ?? undefined}
+                  onAddToPlaylist={handleAddTrackToPlaylist}
+                  onCreatePlaylist={handleCreatePlaylistFromTrack}
+                  onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                  onPlayOverride={() => handlePlayTrack(t.id)}
+                />
+              </div>
             ))}
       </div>
     </div>

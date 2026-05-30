@@ -8,6 +8,7 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -31,6 +32,8 @@ import java.util.List;
     }
 )
 public class CrateNativePlaybackPlugin extends Plugin {
+    private static final String TAG = "CrateNativePlaybackPlugin";
+
     private CrateNativePlaybackService service;
     private boolean binding = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -270,8 +273,8 @@ public class CrateNativePlaybackPlugin extends Plugin {
         }
         try {
             getContext().unbindService(connection);
-        } catch (IllegalArgumentException ignored) {
-            // The service may not have been bound if the bridge is torn down early.
+        } catch (IllegalArgumentException error) {
+            Log.w(TAG, "Playback service was not bound during bridge teardown.", error);
         }
         service = null;
         binding = false;

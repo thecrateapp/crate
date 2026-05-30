@@ -100,6 +100,7 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.wasPlaying).toBe(false);
     expect(stored.shuffle).toBe(false);
     expect(stored.unshuffledQueue).toBeNull();
+    expect(stored.savedAt).toBeNull();
   });
 
   it("persists basic playback state", () => {
@@ -109,6 +110,7 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     expect(stored.currentIndex).toBe(1);
     expect(stored.currentTime).toBe(42);
     expect(stored.wasPlaying).toBe(true);
+    expect(stored.savedAt).toEqual(expect.any(String));
   });
 
   it("persists shuffle flag + unshuffledQueue snapshot", () => {
@@ -130,6 +132,7 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     const stored = getStoredQueue();
     expect(stored.shuffle).toBe(false);
     expect(stored.unshuffledQueue).toBeNull();
+    expect(stored.savedAt).toEqual(expect.any(String));
   });
 
   it("treats legacy payloads (pre-shuffle fields) as shuffle=false", () => {
@@ -146,6 +149,7 @@ describe("getStoredQueue / saveQueue round-trip", () => {
     const stored = getStoredQueue();
     expect(stored.shuffle).toBe(false);
     expect(stored.unshuffledQueue).toBeNull();
+    expect(stored.savedAt).toBeNull();
   });
 
   it("survives malformed JSON by returning defaults", () => {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockNavigate, mockRefetch, mockSetAuthTokens } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
-  mockRefetch: vi.fn<() => Promise<void>>(),
+  mockRefetch: vi.fn<() => Promise<{ id: number } | null>>(),
   mockSetAuthTokens: vi.fn(),
 }));
 
@@ -55,7 +55,7 @@ describe("AuthCallback", () => {
   });
 
   it("hydrates auth before navigating to the next route", async () => {
-    mockRefetch.mockResolvedValueOnce();
+    mockRefetch.mockResolvedValueOnce({ id: 1 });
 
     const { rerender } = render(<AuthCallback />);
 
@@ -64,7 +64,7 @@ describe("AuthCallback", () => {
       undefined,
       null,
     );
-    expect(localStorage.getItem("crate-oauth-next")).toBe("/stats");
+    expect(localStorage.getItem("crate-oauth-next")).toBeNull();
     expect(mockRefetch).toHaveBeenCalledTimes(1);
     expect(mockNavigate).not.toHaveBeenCalled();
 
@@ -78,7 +78,7 @@ describe("AuthCallback", () => {
   });
 
   it("returns to login when auth hydration finishes without a user", async () => {
-    mockRefetch.mockResolvedValueOnce();
+    mockRefetch.mockResolvedValueOnce(null);
 
     const { rerender } = render(<AuthCallback />);
 
@@ -93,7 +93,7 @@ describe("AuthCallback", () => {
 
   it("returns to login when the callback token is missing", async () => {
     window.history.replaceState({}, "", "/auth/callback?next=%2Fstats");
-    mockRefetch.mockResolvedValueOnce();
+    mockRefetch.mockResolvedValueOnce(null);
 
     render(<AuthCallback />);
 

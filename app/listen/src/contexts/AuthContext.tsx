@@ -25,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useAuthOAuthSync({ navigate, refetch });
   useAuthTokenRefresh(user);
   useAuthHeartbeat(user);
-  useAuthTokenRefresh(user);
   useListenWarmup(user);
 
   const logout = useCallback(async () => {

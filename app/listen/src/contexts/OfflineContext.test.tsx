@@ -101,7 +101,12 @@ function createAuthValue(
       role: "user",
     },
     loading: false,
-    refetch: vi.fn(async () => {}),
+    refetch: vi.fn(async () => ({
+      id: 7,
+      email: "listener@example.test",
+      name: "Listener",
+      role: "user",
+    })),
     logout: vi.fn(async () => {}),
     ...overrides,
   };

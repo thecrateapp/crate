@@ -11,6 +11,7 @@ from crate.db.queries.auth_user_lists import (
 )
 from crate.db.repositories.auth_shared import model_to_dict
 from crate.db.repositories.auth_user_accounts import get_user_by_id
+from crate.db.repositories.auth_user_roles import hydrate_users_roles
 from crate.db.orm.user import User
 from crate.db.tx import optional_scope
 
@@ -31,6 +32,7 @@ _USER_UPDATABLE_FIELDS = frozenset(
         "google_id",
         "avatar",
         "subsonic_token",
+        "crate_connect_enabled",
     }
 )
 
@@ -93,7 +95,7 @@ def update_user_last_login(user_id: int, *, session=None):
 
 
 def list_users() -> list[dict]:
-    return query_list_users()
+    return hydrate_users_roles(query_list_users())
 
 
 def list_users_map_rows() -> list[dict]:

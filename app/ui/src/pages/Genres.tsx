@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   OpsPageHero,
@@ -11,13 +11,15 @@ import { Input } from "@crate/ui/shadcn/input";
 import { Button } from "@crate/ui/shadcn/button";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { GridSkeleton } from "@/components/ui/grid-skeleton";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { AIButton } from "@/components/ui/AIButton";
 import { GenreNetworkGraph } from "@/components/genres/GenreNetworkGraph";
 import { GenreEqEditor } from "@/components/genres/GenreEqEditor";
 import { GenreTaxonomyTree } from "@/components/genres/GenreTaxonomyTree";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { createSystemPlaylistFromBlueprint } from "@/lib/system-playlist-blueprints";
 import { waitForTask } from "@/lib/tasks";
 import { formatNumber } from "@/lib/utils";
@@ -40,6 +42,9 @@ import {
   ListMusic,
   Network,
   RefreshCw,
+  Save,
+  Trash2,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
@@ -115,6 +120,323 @@ interface InvalidTaxonomyStatus {
   items: InvalidTaxonomyNode[];
 }
 
+interface SoundIntelligenceHealth {
+  eq: {
+    total_tracks: number;
+    sources: { source: string; count: number; percent: number }[];
+  };
+  taxonomy: {
+    node_count: number;
+    top_level_count: number;
+    orphan_count: number;
+    missing_description_count: number;
+    missing_direct_eq_count: number;
+    unmapped_raw_count: number;
+    edge_count: number;
+    locked_edge_count: number;
+    manual_edge_count: number;
+    ai_edge_count: number;
+  };
+}
+
+interface TaxonomyNode {
+  slug: string;
+  name: string;
+  description: string | null;
+  top_level: boolean;
+  parent_slugs: string[];
+  children_slugs: string[];
+  related_slugs: string[];
+  influenced_by_slugs: string[];
+  fusion_of_slugs: string[];
+  alias_names: string[];
+  artist_count: number;
+  album_count: number;
+}
+
+interface TaxonomyTree {
+  nodes: TaxonomyNode[];
+  top_level_slugs: string[];
+}
+
+interface TaxonomyNodeProposal {
+  source_kind?: "taxonomy_node" | "raw_genre";
+  recommended_action?:
+    | "create_node"
+    | "alias_existing"
+    | "delete_marginal"
+    | "needs_review";
+  recommended_target_slug?: string | null;
+  description: string;
+  aliases: string[];
+  relations: {
+    relation_type: string;
+    target_slugs: string[];
+    confidence: number;
+    reasoning: string;
+  }[];
+  reasoning: string;
+  evidence?: {
+    artist_count?: number | null;
+    album_count?: number | null;
+    seed_artists?: string[];
+    sample_albums?: string[];
+    cooccurring_genres?: string[];
+  };
+}
+
+interface TaxonomyNodeProposalApplyResponse {
+  ok: boolean;
+  slug: string;
+  action: string;
+  target_slug?: string | null;
+  applied_aliases: string[];
+  skipped_aliases: string[];
+}
+
+interface GenreDeleteResponse {
+  ok: boolean;
+  slug: string;
+  name?: string | null;
+  deleted_library_genres: number;
+  deleted_taxonomy_nodes: number;
+  removed_artist_assignments: number;
+  removed_album_assignments: number;
+  removed_raw_genres: string[];
+}
+
+const RELATION_EDITOR_CONFIG = [
+  {
+    key: "parent",
+    label: "Parents",
+    helper: "Subgenre relationship: this genre sits under these parent slugs.",
+    field: "parent_slugs",
+  },
+  {
+    key: "related",
+    label: "Related / siblings",
+    helper: "Adjacent genres that should help discovery and smart playlists.",
+    field: "related_slugs",
+  },
+  {
+    key: "influenced_by",
+    label: "Influenced by",
+    helper: "Lineage inputs that shaped this genre.",
+    field: "influenced_by_slugs",
+  },
+  {
+    key: "fusion_of",
+    label: "Fusion of",
+    helper: "Component genres blended into this genre.",
+    field: "fusion_of_slugs",
+  },
+] as const;
+
+function normalizeRelationSlug(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function TaxonomyRelationField({
+  config,
+  value,
+  options,
+  sourceSlug,
+  busy,
+  stagedProposal,
+  onChange,
+  onSave,
+}: {
+  config: (typeof RELATION_EDITOR_CONFIG)[number];
+  value: string[];
+  options: TaxonomyNode[];
+  sourceSlug: string;
+  busy: boolean;
+  stagedProposal:
+    | {
+        confidence: number;
+        reasoning: string;
+      }
+    | undefined;
+  onChange: (next: string[]) => void;
+  onSave: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const selected = useMemo(() => new Set(value), [value]);
+  const normalizedQuery = query.trim().toLowerCase();
+  const suggestions = useMemo(() => {
+    const candidates = options
+      .filter(
+        (option) => option.slug !== sourceSlug && !selected.has(option.slug),
+      )
+      .filter((option) => {
+        if (!normalizedQuery) return true;
+        return (
+          option.slug.includes(normalizedQuery) ||
+          option.name.toLowerCase().includes(normalizedQuery)
+        );
+      })
+      .sort((a, b) => {
+        const aExact = a.slug.startsWith(normalizedQuery) ? 0 : 1;
+        const bExact = b.slug.startsWith(normalizedQuery) ? 0 : 1;
+        return aExact - bExact || a.name.localeCompare(b.name);
+      });
+    return candidates.slice(0, 8);
+  }, [normalizedQuery, options, selected, sourceSlug]);
+
+  const addSlug = (slug: string) => {
+    const normalized = normalizeRelationSlug(slug);
+    if (!normalized || normalized === sourceSlug || selected.has(normalized))
+      return;
+    onChange([...value, normalized]);
+    setQuery("");
+    setFocused(false);
+  };
+
+  const removeSlug = (slug: string) => {
+    onChange(value.filter((item) => item !== slug));
+  };
+
+  return (
+    <div className="rounded-lg border border-white/8 bg-black/20 p-3">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold text-white/75">
+            {config.label}
+          </div>
+          <p className="mt-0.5 text-[11px] text-white/35">{config.helper}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs"
+          disabled={busy}
+          onClick={onSave}
+        >
+          {busy ? (
+            <Loader2 size={11} className="mr-1 animate-spin" />
+          ) : (
+            <Save size={11} className="mr-1" />
+          )}
+          Save
+        </Button>
+      </div>
+
+      <div className="rounded-md border border-white/10 bg-black/30 p-2 transition focus-within:border-cyan-400/40">
+        {value.length > 0 ? (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {value.map((slug) => {
+              const option = options.find((item) => item.slug === slug);
+              return (
+                <Badge
+                  key={`${config.key}-${slug}`}
+                  variant="outline"
+                  className="gap-1 border-cyan-400/20 bg-cyan-400/10 pr-1 text-[10px] text-cyan-100"
+                >
+                  <span>{option?.name ?? slug}</span>
+                  <span className="font-mono text-cyan-100/45">{slug}</span>
+                  <button
+                    type="button"
+                    className="rounded-full p-0.5 text-cyan-100/55 transition hover:bg-white/10 hover:text-white"
+                    aria-label={`Remove ${slug}`}
+                    onClick={() => removeSlug(slug)}
+                  >
+                    <X size={10} />
+                  </button>
+                </Badge>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className="relative">
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setFocused(true);
+            }}
+            onFocus={() => setFocused(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (suggestions[0]) addSlug(suggestions[0].slug);
+              }
+              if (event.key === "Escape") setFocused(false);
+            }}
+            className="w-full bg-transparent px-1 py-1 font-mono text-xs text-white/70 outline-none placeholder:text-white/25"
+            placeholder="Search taxonomy genres..."
+          />
+          {focused && suggestions.length > 0 ? (
+            <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-lg border border-white/10 bg-[#111118] shadow-2xl">
+              {suggestions.map((option) => (
+                <button
+                  key={option.slug}
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-cyan-400/10 hover:text-cyan-100"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => addSlug(option.slug)}
+                >
+                  <span className="font-semibold">{option.name}</span>
+                  <span className="font-mono text-[10px] text-white/35">
+                    {option.slug}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {stagedProposal ? (
+        <div className="mt-2 rounded-md border border-cyan-400/15 bg-cyan-400/[0.04] px-2.5 py-2 text-[11px] text-white/45">
+          <span className="font-semibold text-cyan-200">
+            AI {Math.round(stagedProposal.confidence * 100)}%
+          </span>
+          {stagedProposal.reasoning
+            ? ` · ${stagedProposal.reasoning}`
+            : " · staged from inference"}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function proposalActionLabel(
+  action: TaxonomyNodeProposal["recommended_action"],
+) {
+  if (action === "create_node") return "Create canonical node";
+  if (action === "alias_existing") return "Map as alias";
+  if (action === "delete_marginal") return "Remove marginal tag";
+  return "Needs curator review";
+}
+
+function proposalApplyLabel(
+  action: TaxonomyNodeProposal["recommended_action"],
+) {
+  if (action === "create_node") return "Create taxonomy node";
+  if (action === "delete_marginal") return "Consolidate marginal tag";
+  if (action === "alias_existing") return "Consolidate as alias";
+  return "Needs review";
+}
+
+const EQ_SOURCE_LABELS: Record<string, string> = {
+  user_track_preset: "User track",
+  instance_track_preset: "Curator track",
+  instance_album_preset: "Curator album",
+  genre_taxonomy_preset: "Genre taxonomy",
+  audio_analysis_preset: "Audio analysis",
+  flat: "Flat",
+};
+
+function genreDeleteSummary(result: GenreDeleteResponse) {
+  const assignmentCount =
+    result.removed_artist_assignments + result.removed_album_assignments;
+  if (assignmentCount === 0) return "Deleted genre metadata";
+  return `Removed ${assignmentCount} genre assignment${
+    assignmentCount === 1 ? "" : "s"
+  }`;
+}
+
 // ── Task action helper ─────────────────────────────────────────
 
 function useGenreTask(
@@ -171,13 +493,23 @@ function TaskButton({
   onClick,
   icon: Icon = Sparkles,
   variant = "outline",
+  ai = false,
 }: {
   label: string;
   busy: boolean;
   onClick: () => void;
   icon?: typeof Sparkles;
   variant?: "outline" | "default";
+  ai?: boolean;
 }) {
+  if (ai) {
+    return (
+      <AIButton onClick={onClick} loading={busy}>
+        {label}
+      </AIButton>
+    );
+  }
+
   return (
     <Button variant={variant} size="sm" onClick={onClick} disabled={busy}>
       {busy ? (
@@ -187,6 +519,522 @@ function TaskButton({
       )}
       {label}
     </Button>
+  );
+}
+
+function TaxonomyNodeEditorialEditor({
+  canonicalSlug,
+  rawSlug,
+  rawName,
+  canCurate,
+  onSaved,
+  onDeleted,
+}: {
+  canonicalSlug: string | null | undefined;
+  rawSlug: string;
+  rawName: string;
+  canCurate: boolean;
+  onSaved: () => void;
+  onDeleted?: () => void;
+}) {
+  const proposalSlug = canonicalSlug || rawSlug;
+  const { data, loading, refetch } = useApi<TaxonomyTree>(
+    canCurate && canonicalSlug ? "/api/genres/taxonomy/tree" : null,
+  );
+  const node = useMemo(
+    () =>
+      canonicalSlug
+        ? data?.nodes.find((item) => item.slug === canonicalSlug) ?? null
+        : null,
+    [canonicalSlug, data?.nodes],
+  );
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [topLevelDraft, setTopLevelDraft] = useState(false);
+  const [relationDrafts, setRelationDrafts] = useState<
+    Record<string, string[]>
+  >({});
+  const [proposal, setProposal] = useState<TaxonomyNodeProposal | null>(null);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [deleteNodeOpen, setDeleteNodeOpen] = useState(false);
+
+  useEffect(() => {
+    if (!node) return;
+    setDescriptionDraft(node.description ?? "");
+    setTopLevelDraft(node.top_level);
+    setRelationDrafts({
+      parent: node.parent_slugs ?? [],
+      related: node.related_slugs ?? [],
+      influenced_by: node.influenced_by_slugs ?? [],
+      fusion_of: node.fusion_of_slugs ?? [],
+    });
+    setProposal(null);
+  }, [node]);
+
+  if (!canCurate) return null;
+
+  const refresh = () => {
+    refetch();
+    onSaved();
+  };
+
+  const inferNodeProposal = async () => {
+    if (!proposalSlug) return;
+    setSavingKey("proposal");
+    try {
+      const result = await api<TaxonomyNodeProposal>(
+        `/api/genres/taxonomy/${proposalSlug}/proposal`,
+        "POST",
+      );
+      setProposal(result);
+      if (node && result.description) setDescriptionDraft(result.description);
+      if (node && result.relations.length > 0) {
+        setRelationDrafts((prev) => {
+          const next = { ...prev };
+          for (const relation of result.relations) {
+            next[relation.relation_type] = relation.target_slugs;
+          }
+          return next;
+        });
+      }
+      toast.success("AI proposal staged for review");
+    } catch {
+      toast.error("Failed to infer taxonomy node");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const saveMetadata = async () => {
+    if (!node) return;
+    setSavingKey("metadata");
+    try {
+      await api(`/api/genres/taxonomy/${node.slug}`, "PATCH", {
+        description: descriptionDraft,
+        top_level: topLevelDraft,
+      });
+      toast.success("Genre metadata saved");
+      refresh();
+    } catch {
+      toast.error("Failed to save genre metadata");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const saveRelation = async (relationType: string) => {
+    if (!node) return;
+    setSavingKey(`relation:${relationType}`);
+    try {
+      const result = await api<{ missing?: string[] }>(
+        `/api/genres/taxonomy/${node.slug}/relations`,
+        "PUT",
+        {
+          relation_type: relationType,
+          target_slugs: relationDrafts[relationType] ?? [],
+        },
+      );
+      if (result.missing?.length) {
+        toast.warning(`Saved, but missing: ${result.missing.join(", ")}`);
+      } else {
+        toast.success("Taxonomy relation saved");
+      }
+      refresh();
+    } catch {
+      toast.error("Failed to save taxonomy relation");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const applyProposalAliases = async () => {
+    if (!node || !proposal?.aliases.length) return;
+    setSavingKey("aliases");
+    try {
+      const result = await api<{ applied?: string[] }>(
+        `/api/genres/taxonomy/${node.slug}/aliases`,
+        "PUT",
+        { alias_names: proposal.aliases },
+      );
+      const appliedCount = result.applied?.length ?? 0;
+      if (appliedCount > 0) {
+        toast.success(`Applied ${appliedCount} aliases`);
+      } else {
+        toast.warning("No aliases applied");
+      }
+      refresh();
+    } catch {
+      toast.error("Failed to apply aliases");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const applyRawProposal = async () => {
+    if (!proposal) return;
+    setSavingKey("apply");
+    try {
+      const payload = {
+        source_kind: proposal.source_kind ?? "raw_genre",
+        recommended_action: proposal.recommended_action ?? "needs_review",
+        recommended_target_slug: proposal.recommended_target_slug ?? null,
+        name: rawName,
+        description: proposal.description ?? "",
+        aliases: (proposal.aliases ?? []).filter(Boolean),
+        relations: (proposal.relations ?? []).map((relation) => ({
+          relation_type: relation.relation_type,
+          target_slugs: relation.target_slugs ?? [],
+          confidence: relation.confidence ?? 0.5,
+          reasoning: relation.reasoning ?? "",
+        })),
+        reasoning: proposal.reasoning ?? "",
+      };
+      const result = await api<TaxonomyNodeProposalApplyResponse>(
+        `/api/genres/taxonomy/${encodeURIComponent(rawSlug)}/proposal/apply`,
+        "POST",
+        payload,
+      );
+      if (result.action === "create_node") {
+        toast.success("Taxonomy node created");
+      } else {
+        toast.success(
+          `Mapped ${result.applied_aliases.length} alias${
+            result.applied_aliases.length === 1 ? "" : "es"
+          } to ${result.target_slug}`,
+        );
+      }
+      setProposal(null);
+      onSaved();
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? `Failed to apply taxonomy proposal: ${error.message}`
+          : "Failed to apply taxonomy proposal",
+      );
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const deleteCanonicalNode = async () => {
+    if (!node) return;
+    setSavingKey("delete-node");
+    try {
+      const result = await api<GenreDeleteResponse>(
+        `/api/genres/taxonomy/${encodeURIComponent(node.slug)}`,
+        "DELETE",
+      );
+      toast.success(genreDeleteSummary(result));
+      setDeleteNodeOpen(false);
+      onDeleted?.();
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? `Failed to delete genre: ${error.message}`
+          : "Failed to delete genre",
+      );
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  return (
+    <>
+      <OpsPanel
+        icon={Network}
+        title={
+          canonicalSlug ? "Editorial Taxonomy Node" : "Unmapped Genre Proposal"
+        }
+        description={
+          canonicalSlug
+            ? "Curator-level editing for the canonical node behind this genre page."
+            : "Ask AI to decide whether this raw tag deserves a node, should become an alias, or should be removed as marginal."
+        }
+      >
+        {!canonicalSlug ? (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-foreground">
+                  {rawName}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-mono">{rawSlug}</span>
+                  <span>raw library tag</span>
+                </div>
+              </div>
+              <AIButton
+                onClick={inferNodeProposal}
+                loading={savingKey === "proposal"}
+                disabled={savingKey !== null && savingKey !== "proposal"}
+              >
+                Infer node with AI
+              </AIButton>
+            </div>
+
+            {proposal ? (
+              <div className="space-y-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-4 text-xs text-white/55">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                      {proposalActionLabel(proposal.recommended_action)}
+                    </Badge>
+                    {proposal.recommended_target_slug ? (
+                      <Badge variant="outline">
+                        target: {proposal.recommended_target_slug}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-cyan-400 text-black hover:bg-cyan-300"
+                    disabled={
+                      savingKey === "apply" ||
+                      proposal.recommended_action === "needs_review" ||
+                      (proposal.recommended_action !== "create_node" &&
+                        !proposal.recommended_target_slug)
+                    }
+                    onClick={applyRawProposal}
+                  >
+                    {savingKey === "apply" ? (
+                      <Loader2 size={13} className="mr-1.5 animate-spin" />
+                    ) : (
+                      <Save size={13} className="mr-1.5" />
+                    )}
+                    {proposalApplyLabel(proposal.recommended_action)}
+                  </Button>
+                </div>
+                {proposal.description ? (
+                  <p className="text-sm leading-6 text-white/70">
+                    {proposal.description}
+                  </p>
+                ) : null}
+                {proposal.reasoning ? (
+                  <p className="text-white/45">{proposal.reasoning}</p>
+                ) : null}
+                {proposal.evidence ? (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-md border border-white/8 bg-black/20 p-3">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                        Artists
+                      </div>
+                      <div className="mt-1 text-white/65">
+                        {(proposal.evidence.seed_artists ?? [])
+                          .slice(0, 6)
+                          .join(", ") || "No local artists"}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-white/8 bg-black/20 p-3">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                        Albums
+                      </div>
+                      <div className="mt-1 text-white/65">
+                        {(proposal.evidence.sample_albums ?? [])
+                          .slice(0, 4)
+                          .join(", ") || "No local albums"}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-white/8 bg-black/20 p-3">
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-white/35">
+                        Co-occurs with
+                      </div>
+                      <div className="mt-1 text-white/65">
+                        {(proposal.evidence.cooccurring_genres ?? [])
+                          .slice(0, 6)
+                          .join(", ") || "No mapped context"}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                {proposal.aliases.length > 0 ||
+                proposal.relations.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {proposal.aliases.slice(0, 8).map((alias) => (
+                      <Badge key={`alias-${alias}`} variant="outline">
+                        alias: {alias}
+                      </Badge>
+                    ))}
+                    {proposal.relations.map((relation) => (
+                      <Badge
+                        key={`${
+                          relation.relation_type
+                        }-${relation.target_slugs.join("-")}`}
+                        variant="outline"
+                      >
+                        {relation.relation_type}:{" "}
+                        {relation.target_slugs.join(", ")}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                This genre is unmapped. Run inference to get a reviewable
+                proposal with local artists, albums, and alias/delete guidance.
+              </div>
+            )}
+          </div>
+        ) : loading && !node ? (
+          <div className="py-8 text-sm text-muted-foreground">
+            Loading taxonomy node...
+          </div>
+        ) : !node ? (
+          <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Canonical node not found in the taxonomy tree.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-foreground">
+                  {node.name}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-mono">{node.slug}</span>
+                  <span>{node.artist_count} artists</span>
+                  <span>{node.album_count} albums</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <AIButton
+                  onClick={inferNodeProposal}
+                  loading={savingKey === "proposal"}
+                  disabled={savingKey !== null && savingKey !== "proposal"}
+                >
+                  Infer node with AI
+                </AIButton>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  disabled={savingKey === "metadata"}
+                  onClick={saveMetadata}
+                >
+                  {savingKey === "metadata" ? (
+                    <Loader2 size={13} className="mr-1 animate-spin" />
+                  ) : (
+                    <Save size={13} className="mr-1" />
+                  )}
+                  Save node
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs"
+                  disabled={savingKey === "delete-node"}
+                  onClick={() => setDeleteNodeOpen(true)}
+                >
+                  {savingKey === "delete-node" ? (
+                    <Loader2 size={13} className="mr-1 animate-spin" />
+                  ) : (
+                    <Trash2 size={13} className="mr-1" />
+                  )}
+                  Delete
+                </Button>
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wider text-white/35">
+                Description
+              </span>
+              <textarea
+                value={descriptionDraft}
+                onChange={(event) => setDescriptionDraft(event.target.value)}
+                rows={4}
+                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
+                placeholder="Short editorial description for this genre."
+              />
+            </label>
+
+            <label className="inline-flex items-center gap-2 text-xs text-white/60">
+              <input
+                type="checkbox"
+                checked={topLevelDraft}
+                onChange={(event) => setTopLevelDraft(event.target.checked)}
+                className="h-3.5 w-3.5 accent-cyan-400"
+              />
+              Top-level genre
+            </label>
+
+            {proposal ? (
+              <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs text-white/55">
+                <div className="font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                  AI proposal staged
+                </div>
+                {proposal.reasoning ? (
+                  <p className="mt-2 text-white/45">{proposal.reasoning}</p>
+                ) : null}
+                {proposal.aliases.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {proposal.aliases.map((alias) => (
+                      <Badge
+                        key={alias}
+                        variant="outline"
+                        className="text-[10px]"
+                      >
+                        alias: {alias}
+                      </Badge>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      disabled={savingKey === "aliases"}
+                      onClick={applyProposalAliases}
+                    >
+                      {savingKey === "aliases" ? (
+                        <Loader2 size={11} className="mr-1 animate-spin" />
+                      ) : (
+                        <Tag size={11} className="mr-1" />
+                      )}
+                      Apply aliases
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="grid gap-3 xl:grid-cols-2">
+              {RELATION_EDITOR_CONFIG.map((config) => {
+                const value = relationDrafts[config.key] ?? [];
+                const busy = savingKey === `relation:${config.key}`;
+                const stagedProposal = proposal?.relations.find(
+                  (relation) => relation.relation_type === config.key,
+                );
+                return (
+                  <TaxonomyRelationField
+                    key={config.key}
+                    config={config}
+                    value={value}
+                    options={data?.nodes ?? []}
+                    sourceSlug={node.slug}
+                    busy={busy}
+                    stagedProposal={stagedProposal}
+                    onChange={(next) =>
+                      setRelationDrafts((prev) => ({
+                        ...prev,
+                        [config.key]: next,
+                      }))
+                    }
+                    onSave={() => saveRelation(config.key)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </OpsPanel>
+      <ConfirmDialog
+        open={deleteNodeOpen}
+        onOpenChange={setDeleteNodeOpen}
+        title={`Delete ${node?.name ?? "genre"}?`}
+        description={`This removes the taxonomy node, aliases, relations, and all mapped raw genre assignments from artists and albums. This cannot be undone.`}
+        confirmLabel="Delete Genre"
+        variant="destructive"
+        onConfirm={deleteCanonicalNode}
+      />
+    </>
   );
 }
 
@@ -216,18 +1064,30 @@ function GenreList() {
     useApi<InvalidTaxonomyStatus>(
       canCurateGenres ? "/api/genres/taxonomy/invalid?limit=8" : null,
     );
+  const { data: soundHealth, refetch: refetchSoundHealth } =
+    useApi<SoundIntelligenceHealth>(
+      canCurateGenres ? "/api/genres/sound-intelligence/health" : null,
+    );
   const { pollTask } = useTaskPoll();
   const [filter, setFilter] = useState("");
   const [indexing, setIndexing] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "tree">("grid");
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Genre | null>(null);
   const navigate = useNavigate();
 
   const afterSuccess = useCallback(() => {
     refetch();
     refetchUnmapped();
     if (canCurateGenres) refetchInvalidTaxonomy();
-  }, [canCurateGenres, refetch, refetchUnmapped, refetchInvalidTaxonomy]);
+    if (canCurateGenres) refetchSoundHealth();
+  }, [
+    canCurateGenres,
+    refetch,
+    refetchUnmapped,
+    refetchInvalidTaxonomy,
+    refetchSoundHealth,
+  ]);
   const { run, isBusy } = useGenreTask(pollTask, afterSuccess);
 
   const filtered = useMemo(() => {
@@ -261,6 +1121,25 @@ function GenreList() {
       toast.error("Failed to start indexing");
     } finally {
       setIndexing(false);
+    }
+  }
+
+  async function deleteRawGenre() {
+    if (!deleteTarget) return;
+    try {
+      const result = await api<GenreDeleteResponse>(
+        `/api/genres/${encodeURIComponent(deleteTarget.slug)}`,
+        "DELETE",
+      );
+      toast.success(genreDeleteSummary(result));
+      setDeleteTarget(null);
+      afterSuccess();
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? `Failed to delete genre: ${error.message}`
+          : "Failed to delete genre",
+      );
     }
   }
 
@@ -345,6 +1224,36 @@ function GenreList() {
                     },
                   )
                 }
+              />
+              <TaskButton
+                label="Build proposal with AI"
+                busy={isBusy("rebuild-proposal")}
+                ai
+                onClick={() =>
+                  run(
+                    "rebuild-proposal",
+                    "/api/genres/taxonomy/rebuild-proposal",
+                    {
+                      alias_limit: 120,
+                      node_limit: 16,
+                      aggressive: true,
+                      include_external: true,
+                    },
+                    {
+                      successMessage: (r) => {
+                        const summary =
+                          (r.summary as Record<string, unknown> | undefined) ||
+                          {};
+                        return `Proposal: ${
+                          summary.alias_proposals ?? 0
+                        } aliases, ${summary.node_proposals ?? 0} nodes`;
+                      },
+                      errorMessage: "Taxonomy rebuild proposal failed",
+                      pollTimeout: 60 * 60 * 1000,
+                    },
+                  )
+                }
+                icon={Network}
               />
               <TaskButton
                 label="Clean invalid nodes"
@@ -442,6 +1351,102 @@ function GenreList() {
           tone="default"
         />
       </div>
+
+      {canCurateGenres && soundHealth ? (
+        <OpsPanel
+          icon={Sparkles}
+          title="Sound Intelligence"
+          description="Effective EQ coverage and taxonomy health, so Smart EQ and discovery do not silently fall back to weak data."
+        >
+          <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-xl border border-white/8 bg-black/20 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    Effective EQ sources
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatNumber(soundHealth.eq.total_tracks)} tracks resolved
+                    through the Smart EQ hierarchy.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2.5">
+                {soundHealth.eq.sources.map((source) => (
+                  <div key={source.source} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-white/65">
+                        {EQ_SOURCE_LABELS[source.source] ?? source.source}
+                      </span>
+                      <span className="font-mono text-white/45">
+                        {formatNumber(source.count)} · {source.percent}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+                      <div
+                        className={`h-full rounded-full ${
+                          source.source === "flat"
+                            ? "bg-amber-400/70"
+                            : "bg-cyan-400/80"
+                        }`}
+                        style={{ width: `${Math.min(source.percent, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <OpsStatTile
+                icon={Network}
+                label="Taxonomy nodes"
+                value={formatNumber(soundHealth.taxonomy.node_count)}
+                caption={`${formatNumber(
+                  soundHealth.taxonomy.edge_count,
+                )} graph edges · ${formatNumber(
+                  soundHealth.taxonomy.locked_edge_count,
+                )} locked`}
+                tone="default"
+              />
+              <OpsStatTile
+                icon={AlertTriangle}
+                label="Needs mapping"
+                value={formatNumber(soundHealth.taxonomy.unmapped_raw_count)}
+                caption="Raw genre tags not linked to curated taxonomy"
+                tone={
+                  soundHealth.taxonomy.unmapped_raw_count > 0
+                    ? "warning"
+                    : "default"
+                }
+              />
+              <OpsStatTile
+                icon={Tag}
+                label="Orphans"
+                value={formatNumber(soundHealth.taxonomy.orphan_count)}
+                caption="Non top-level nodes without a parent relation"
+                tone={
+                  soundHealth.taxonomy.orphan_count > 0 ? "warning" : "default"
+                }
+              />
+              <OpsStatTile
+                icon={Sparkles}
+                label="Missing copy"
+                value={formatNumber(
+                  soundHealth.taxonomy.missing_description_count,
+                )}
+                caption={`${formatNumber(
+                  soundHealth.taxonomy.missing_direct_eq_count,
+                )} nodes without direct EQ`}
+                tone={
+                  soundHealth.taxonomy.missing_description_count > 0
+                    ? "warning"
+                    : "default"
+                }
+              />
+            </div>
+          </div>
+        </OpsPanel>
+      ) : null}
 
       <OpsPanel
         icon={Search}
@@ -551,6 +1556,7 @@ function GenreList() {
               hideEmpty={hideEmpty}
               canCurate={canCurateGenres}
               canCreatePlaylists={canCuratePlaylists}
+              onChanged={afterSuccess}
             />
           ) : (
             <>
@@ -574,9 +1580,17 @@ function GenreList() {
                   </p>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {unmappedGenres!.slice(0, 12).map((genre) => (
-                      <button
+                      <div
                         key={`unmapped-${genre.slug}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => navigate(`/genres/${genre.slug}`)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            navigate(`/genres/${genre.slug}`);
+                          }
+                        }}
                         className="flex items-center justify-between rounded-md border border-amber-500/20 bg-black/10 px-3 py-2 text-left transition-colors hover:bg-black/20"
                       >
                         <div className="min-w-0">
@@ -588,13 +1602,28 @@ function GenreList() {
                             albums
                           </div>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="border-amber-500/30 text-amber-100"
-                        >
-                          unmapped
-                        </Badge>
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/30 text-amber-100"
+                          >
+                            unmapped
+                          </Badge>
+                          {canCurateGenres ? (
+                            <button
+                              type="button"
+                              className="rounded-md p-1 text-white/30 transition hover:bg-red-500/10 hover:text-red-200"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(genre);
+                              }}
+                              aria-label={`Delete ${genre.name}`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -618,10 +1647,18 @@ function GenreList() {
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                   {filtered.map((g) => (
-                    <button
+                    <div
                       key={g.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => navigate(`/genres/${g.slug}`)}
-                      className={`overflow-hidden rounded-md border bg-black/20 p-4 text-left shadow-[0_16px_36px_rgba(0,0,0,0.16)] transition-colors hover:bg-white/[0.04] ${
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          navigate(`/genres/${g.slug}`);
+                        }
+                      }}
+                      className={`group overflow-hidden rounded-md border bg-black/20 p-4 text-left shadow-[0_16px_36px_rgba(0,0,0,0.16)] transition-colors hover:bg-white/[0.04] ${
                         g.mapped
                           ? "border-white/8 hover:border-primary/30"
                           : "border-amber-500/30"
@@ -631,16 +1668,31 @@ function GenreList() {
                         <div className="font-semibold text-foreground text-sm truncate">
                           {g.name}
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            g.mapped
-                              ? "border-primary/30 bg-primary/10 text-primary"
-                              : "border-amber-500/30 bg-amber-500/10 text-amber-100"
-                          }
-                        >
-                          {g.mapped ? "mapped" : "unmapped"}
-                        </Badge>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={
+                              g.mapped
+                                ? "border-primary/30 bg-primary/10 text-primary"
+                                : "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                            }
+                          >
+                            {g.mapped ? "mapped" : "unmapped"}
+                          </Badge>
+                          {canCurateGenres ? (
+                            <button
+                              type="button"
+                              className="rounded-md p-1 text-white/25 opacity-0 transition hover:bg-red-500/10 hover:text-red-200 group-hover:opacity-100 focus:opacity-100"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(g);
+                              }}
+                              aria-label={`Delete ${g.name}`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       {g.canonical_name && g.canonical_name !== g.name && (
                         <div className="mb-1 truncate text-[11px] text-white/70">
@@ -662,7 +1714,7 @@ function GenreList() {
                           {g.album_count}
                         </span>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -670,6 +1722,17 @@ function GenreList() {
           )}
         </div>
       </OpsPanel>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={`Delete ${deleteTarget?.name ?? "genre"}?`}
+        description="This removes this raw genre from every artist and album that currently uses it. This cannot be undone."
+        confirmLabel="Delete Genre"
+        variant="destructive"
+        onConfirm={deleteRawGenre}
+      />
     </div>
   );
 }
@@ -689,6 +1752,7 @@ function GenreView({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [graphVersion, setGraphVersion] = useState(0);
+  const [deleteGenreOpen, setDeleteGenreOpen] = useState(false);
 
   const afterSuccess = useCallback(() => {
     refetch();
@@ -711,6 +1775,25 @@ function GenreView({ slug }: { slug: string }) {
       toast.error("Failed to create editorial playlist");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function deleteCurrentGenre() {
+    if (!genre) return;
+    try {
+      const result = await api<GenreDeleteResponse>(
+        `/api/genres/${encodeURIComponent(genre.slug)}`,
+        "DELETE",
+      );
+      toast.success(genreDeleteSummary(result));
+      setDeleteGenreOpen(false);
+      navigate("/genres");
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError
+          ? `Failed to delete genre: ${error.message}`
+          : "Failed to delete genre",
+      );
     }
   }
 
@@ -866,6 +1949,14 @@ function GenreView({ slug }: { slug: string }) {
                     }
                     icon={AlertTriangle}
                   />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteGenreOpen(true)}
+                  >
+                    <Trash2 size={14} className="mr-1" />
+                    Delete
+                  </Button>
                 </>
               ) : null}
               {canCuratePlaylists &&
@@ -962,6 +2053,15 @@ function GenreView({ slug }: { slug: string }) {
           </div>
         </div>
       </OpsPanel>
+
+      <TaxonomyNodeEditorialEditor
+        canonicalSlug={genre.canonical_slug}
+        rawSlug={genre.slug}
+        rawName={genre.name}
+        canCurate={canCurateGenres}
+        onSaved={afterSuccess}
+        onDeleted={() => navigate("/genres")}
+      />
 
       <div>
         <GenreNetworkGraph
@@ -1101,6 +2201,15 @@ function GenreView({ slug }: { slug: string }) {
           </div>
         </OpsPanel>
       )}
+      <ConfirmDialog
+        open={deleteGenreOpen}
+        onOpenChange={setDeleteGenreOpen}
+        title={`Delete ${genre.name}?`}
+        description="This removes this raw genre from every artist and album that currently uses it. If this genre is an alias, the canonical taxonomy node is kept."
+        confirmLabel="Delete Genre"
+        variant="destructive"
+        onConfirm={deleteCurrentGenre}
+      />
     </div>
   );
 }

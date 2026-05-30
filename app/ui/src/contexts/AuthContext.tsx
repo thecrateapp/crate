@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from "react";
@@ -15,11 +16,19 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  roles?: string[];
   avatar?: string;
   username?: string | null;
   bio?: string | null;
   capabilities?: string[];
   connected_accounts?: Array<{ provider: string; status: string }>;
+}
+
+export interface RolePreset {
+  slug: string;
+  name: string;
+  capabilities: string[];
+  system?: boolean;
 }
 
 export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
@@ -49,7 +58,12 @@ export const ADMIN_CONSOLE_ENTRY_CAPABILITIES = [
 ] as const;
 
 function hasLegacyAdminRole(user: AuthUser | null): boolean {
-  return user?.role === "admin" || user?.role === "owner";
+  const roles = user?.roles?.length
+    ? user.roles
+    : user?.role
+      ? [user.role]
+      : [];
+  return roles.includes("admin") || roles.includes("owner");
 }
 
 export function userHasCapability(
@@ -77,6 +91,7 @@ export function userCanAccessAdminConsole(user: AuthUser | null): boolean {
 
 export interface AuthContextValue {
   user: AuthUser | null;
+  actualUser?: AuthUser | null;
   loading: boolean;
   logout: () => void;
   isAdmin: boolean;
@@ -84,6 +99,10 @@ export interface AuthContextValue {
   hasCapability: (capability: string) => boolean;
   hasAnyCapability: (capabilities: readonly string[]) => boolean;
   refetch: () => void;
+  rolePresets?: RolePreset[];
+  previewRole?: string | null;
+  setPreviewRole?: (role: string | null) => void;
+  clearRolePreview?: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,7 +114,15 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [actualUser, setActualUser] = useState<AuthUser | null>(null);
+  const [rolePresets, setRolePresets] = useState<RolePreset[]>([]);
+  const [previewRole, setPreviewRoleState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem("crate-admin-role-preview") || null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const lastHeartbeatAtRef = useRef(0);
@@ -103,10 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchUser = useCallback(async () => {
     try {
       const data = await api<AuthUser>("/api/auth/me");
-      if (data && data.id) setUser(data);
-      else setUser(null);
+      if (data && data.id) setActualUser(data);
+      else setActualUser(null);
     } catch {
-      setUser(null);
+      setActualUser(null);
     } finally {
       setLoading(false);
     }
@@ -117,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUser]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!actualUser) return;
     async function sendHeartbeat(force = false) {
       if (!force && document.visibilityState !== "visible") return;
       const now = Date.now();
@@ -149,7 +176,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnline);
     };
-  }, [user]);
+  }, [actualUser]);
+
+  useEffect(() => {
+    if (!actualUser || !userHasCapability(actualUser, "roles.view")) {
+      setRolePresets([]);
+      return;
+    }
+    let cancelled = false;
+    api<{ roles: RolePreset[] }>("/api/auth/roles")
+      .then((data) => {
+        if (!cancelled) setRolePresets(data.roles ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRolePresets([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [actualUser]);
+
+  const setPreviewRole = useCallback((role: string | null) => {
+    const nextRole = role || null;
+    setPreviewRoleState(nextRole);
+    try {
+      if (nextRole) {
+        localStorage.setItem("crate-admin-role-preview", nextRole);
+      } else {
+        localStorage.removeItem("crate-admin-role-preview");
+      }
+    } catch {
+      // ignore persistence failures
+    }
+  }, []);
+
+  const clearRolePreview = useCallback(() => {
+    setPreviewRole(null);
+  }, [setPreviewRole]);
+
+  const user = useMemo(() => {
+    if (!actualUser || !previewRole) return actualUser;
+    const preset = rolePresets.find((role) => role.slug === previewRole);
+    if (!preset) return actualUser;
+    return {
+      ...actualUser,
+      role: preset.slug,
+      roles: [preset.slug],
+      capabilities: preset.capabilities,
+    };
+  }, [actualUser, previewRole, rolePresets]);
 
   const logout = useCallback(async () => {
     try {
@@ -157,25 +232,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    setUser(null);
+    setActualUser(null);
+    clearRolePreview();
     navigate("/login");
-  }, [navigate]);
+  }, [clearRolePreview, navigate]);
+
+  const isAdmin = useMemo(
+    () => userHasCapability(user, "admin.access"),
+    [user],
+  );
+  const canAccessAdmin = useMemo(() => userCanAccessAdminConsole(user), [user]);
+  const hasCapability = useCallback(
+    (capability: string) => userHasCapability(user, capability),
+    [user],
+  );
+  const hasAnyCapability = useCallback(
+    (capabilities: readonly string[]) =>
+      userHasAnyCapability(user, capabilities),
+    [user],
+  );
+  const contextValue = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      actualUser,
+      loading,
+      logout,
+      isAdmin,
+      canAccessAdmin,
+      hasCapability,
+      hasAnyCapability,
+      refetch: fetchUser,
+      rolePresets,
+      previewRole,
+      setPreviewRole,
+      clearRolePreview,
+    }),
+    [
+      actualUser,
+      canAccessAdmin,
+      clearRolePreview,
+      fetchUser,
+      hasAnyCapability,
+      hasCapability,
+      isAdmin,
+      loading,
+      logout,
+      previewRole,
+      rolePresets,
+      setPreviewRole,
+      user,
+    ],
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        logout,
-        isAdmin: userHasCapability(user, "admin.access"),
-        canAccessAdmin: userCanAccessAdminConsole(user),
-        hasCapability: (capability) => userHasCapability(user, capability),
-        hasAnyCapability: (capabilities) =>
-          userHasAnyCapability(user, capabilities),
-        refetch: fetchUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }

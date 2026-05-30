@@ -106,7 +106,7 @@ def get_random_library_seed_rows(limit: int = 30, *, session=None) -> list[dict]
             s.execute(
                 text(
                     """
-                SELECT t.id AS track_id, t.artist, t.bliss_vector
+                SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM library_tracks t
                 WHERE t.bliss_vector IS NOT NULL
                   AND t.id >= :start_id
@@ -124,7 +124,7 @@ def get_random_library_seed_rows(limit: int = 30, *, session=None) -> list[dict]
                 s.execute(
                     text(
                         """
-                    SELECT t.id AS track_id, t.artist, t.bliss_vector
+                    SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                     FROM library_tracks t
                     WHERE t.bliss_vector IS NOT NULL
                       AND t.id < :start_id

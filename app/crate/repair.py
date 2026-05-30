@@ -1570,6 +1570,12 @@ class LibraryRepair:
             "fs_write": True,
         }
 
+        if dry_run:
+            result["message"] = (
+                f"Would reorganize album folder for {artist}/{details.get('current_folder', '')}"
+            )
+            return result
+
         if not dry_run:
             if not current_dir.is_dir():
                 result["applied"] = False
@@ -1634,6 +1640,9 @@ class LibraryRepair:
                 result["details"]["merged"] = True
                 result["details"]["files_copied"] = len(copied)
                 result["details"]["files_upgraded"] = upgraded
+                result["message"] = (
+                    f"Merged album folder into {artist}/{year}/{clean_name}"
+                )
                 log_audit(
                     "merge_duplicate_album_folder",
                     "album",
@@ -1660,6 +1669,9 @@ class LibraryRepair:
                     f"{artist}/{year}/{clean_name}",
                     details=result["details"],
                     task_id=task_id,
+                )
+                result["message"] = (
+                    f"Reorganized album folder for {artist}/{clean_name}"
                 )
             except Exception as e:
                 log.error(

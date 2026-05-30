@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		C0DEF0010000000000000001 /* BridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000002 /* BridgeViewController.swift */; };
 		C0DEF0010000000000000003 /* CrateMediaSessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */; };
+		C0DEF0010000000000000006 /* CrateCastPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000007 /* CrateCastPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		C0DEF0010000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		C0DEF0010000000000000002 /* BridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeViewController.swift; sourceTree = "<group>"; };
 		C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateMediaSessionPlugin.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000007 /* CrateCastPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrateCastPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				C0DEF0010000000000000002 /* BridgeViewController.swift */,
 				C0DEF0010000000000000004 /* CrateMediaSessionPlugin.swift */,
+				C0DEF0010000000000000007 /* CrateCastPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -166,6 +169,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				C0DEF0010000000000000001 /* BridgeViewController.swift in Sources */,
 				C0DEF0010000000000000003 /* CrateMediaSessionPlugin.swift in Sources */,
+				C0DEF0010000000000000006 /* CrateCastPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

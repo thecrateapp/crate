@@ -81,6 +81,7 @@ interface UserRecord {
   name: string;
   avatar?: string | null;
   role: string;
+  roles?: string[];
   status?: "active" | "suspended" | "deleted" | string;
   status_reason?: string | null;
   suspended_at?: string | null;
@@ -168,10 +169,74 @@ const STATUS_OPTIONS = [
   { value: "deleted", label: "Deleted" },
 ];
 
-const MODAL_SELECT_MENU_CLASS = "z-[1600]";
-
 const SESSION_ACTIVE_WINDOW_MS = 3 * 60 * 1000;
 const SESSION_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function roleLabel(role: string) {
+  return ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
+}
+
+function rolesForUser(user: Pick<UserRecord, "role" | "roles"> | null) {
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  const normalized = roles
+    .map((role) => role.trim().toLowerCase())
+    .filter(Boolean);
+  if (normalized.length > 0) return Array.from(new Set(normalized));
+  return [user?.role || "user"];
+}
+
+function sameRoleSet(left: string[], right: string[]) {
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return (
+    sortedLeft.length === sortedRight.length &&
+    sortedLeft.every((role, index) => role === sortedRight[index])
+  );
+}
+
+function toggleRole(current: string[], role: string) {
+  if (current.includes(role)) {
+    if (current.length === 1) return current;
+    return current.filter((candidate) => candidate !== role);
+  }
+  const next = [...current, role];
+  return ROLE_OPTIONS.map((option) => option.value).filter((candidate) =>
+    next.includes(candidate),
+  );
+}
+
+function RolePicker({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string[];
+  onChange: (roles: string[]) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {ROLE_OPTIONS.map((option) => {
+        const active = value.includes(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(toggleRole(value, option.value))}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+              active
+                ? "border-cyan-400/35 bg-cyan-400/12 text-cyan-200"
+                : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/80"
+            } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 interface SessionSourceSummary {
   key: string;
@@ -671,7 +736,10 @@ export function Users() {
           filter === "all" ||
           (filter === "online" && user.online_now) ||
           (filter === "listening" && user.listening_now) ||
-          (filter === "admins" && user.role === "admin") ||
+          (filter === "admins" &&
+            rolesForUser(user).some(
+              (role) => role === "admin" || role === "owner",
+            )) ||
           (filter === "suspended" && userStatus(user) === "suspended") ||
           (filter === "deleted" && userStatus(user) === "deleted");
 
@@ -801,7 +869,11 @@ export function Users() {
                 {
                   key: "admins",
                   label: "Admins",
-                  count: users.filter((user) => user.role === "admin").length,
+                  count: users.filter((user) =>
+                    rolesForUser(user).some(
+                      (role) => role === "admin" || role === "owner",
+                    ),
+                  ).length,
                 },
                 {
                   key: "suspended",
@@ -847,13 +919,18 @@ export function Users() {
                           <h2 className="text-lg font-semibold tracking-tight text-white">
                             {user.name || user.email}
                           </h2>
-                          <Badge
-                            variant={
-                              user.role === "admin" ? "default" : "secondary"
-                            }
-                          >
-                            {user.role}
-                          </Badge>
+                          {rolesForUser(user).map((role) => (
+                            <Badge
+                              key={role}
+                              variant={
+                                role === "admin" || role === "owner"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {roleLabel(role)}
+                            </Badge>
+                          ))}
                           <Badge
                             variant="outline"
                             className={statusBadgeClass(userStatus(user))}
@@ -1064,7 +1141,7 @@ function UserDetailDialog({
   const [revokingAll, setRevokingAll] = useState(false);
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("active");
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [roleDraft, setRoleDraft] = useState("user");
+  const [roleDraft, setRoleDraft] = useState<string[]>(["user"]);
   const [statusDraft, setStatusDraft] = useState("active");
   const [statusReason, setStatusReason] = useState("");
   const [roleSaving, setRoleSaving] = useState(false);
@@ -1096,10 +1173,10 @@ function UserDetailDialog({
   }, [open, user]);
 
   useEffect(() => {
-    if (detail?.role) {
-      setRoleDraft(detail.role);
+    if (detail) {
+      setRoleDraft(rolesForUser(detail));
     }
-  }, [detail?.role]);
+  }, [detail]);
 
   useEffect(() => {
     if (detail?.status) {
@@ -1109,13 +1186,18 @@ function UserDetailDialog({
   }, [detail]);
 
   async function handleRoleSave() {
-    if (!detail || !canAssignRoles || roleDraft === detail.role) return;
+    if (
+      !detail ||
+      !canAssignRoles ||
+      sameRoleSet(roleDraft, rolesForUser(detail))
+    )
+      return;
     setRoleSaving(true);
     try {
       const updated = await api<UserDetail>(
         `/api/auth/users/${detail.id}/role`,
         "PATCH",
-        { role: roleDraft },
+        { roles: roleDraft },
       );
       setDetail(updated);
       toast.success("Role updated");
@@ -1268,13 +1350,18 @@ function UserDetailDialog({
                           <h3 className="text-xl font-semibold tracking-tight text-white">
                             {detail.name || detail.email}
                           </h3>
-                          <Badge
-                            variant={
-                              detail.role === "admin" ? "default" : "secondary"
-                            }
-                          >
-                            {detail.role}
-                          </Badge>
+                          {rolesForUser(detail).map((role) => (
+                            <Badge
+                              key={role}
+                              variant={
+                                role === "admin" || role === "owner"
+                                  ? "default"
+                                  : "secondary"
+                              }
+                            >
+                              {roleLabel(role)}
+                            </Badge>
+                          ))}
                           <Badge
                             variant="outline"
                             className={statusBadgeClass(userStatus(detail))}
@@ -1297,35 +1384,36 @@ function UserDetailDialog({
                     ) : null}
                     <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
                       <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
-                        Role
+                        Roles
                       </div>
                       {canAssignRoles ? (
-                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <AdminSelect
+                        <div className="mt-3 space-y-3">
+                          <RolePicker
                             value={roleDraft}
                             onChange={setRoleDraft}
-                            options={ROLE_OPTIONS}
-                            placeholder="Select role"
-                            allowClear={false}
-                            triggerClassName="max-w-full sm:w-48"
-                            menuClassName={MODAL_SELECT_MENU_CLASS}
+                            disabled={roleSaving}
                           />
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={roleSaving || roleDraft === detail.role}
+                            disabled={
+                              roleSaving ||
+                              sameRoleSet(roleDraft, rolesForUser(detail))
+                            }
                             onClick={handleRoleSave}
                           >
                             {roleSaving ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              "Save role"
+                              "Save roles"
                             )}
                           </Button>
                         </div>
                       ) : (
-                        <div className="mt-2 text-sm text-white/70">
-                          {detail.role}
+                        <div className="mt-2 flex flex-wrap gap-2 text-sm text-white/70">
+                          {rolesForUser(detail).map((role) => (
+                            <CrateChip key={role}>{roleLabel(role)}</CrateChip>
+                          ))}
                         </div>
                       )}
                       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1358,10 +1446,11 @@ function UserDetailDialog({
                               value={statusDraft}
                               onChange={setStatusDraft}
                               options={STATUS_OPTIONS}
-                              placeholder="Select status"
+                              placeholder="Account status"
                               allowClear={false}
-                              triggerClassName="max-w-full sm:w-48"
-                              menuClassName={MODAL_SELECT_MENU_CLASS}
+                              disabled={statusSaving}
+                              triggerClassName="h-11 w-full max-w-none sm:w-48"
+                              menuClassName="w-[220px]"
                             />
                             <Button
                               size="sm"
@@ -1933,14 +2022,14 @@ function AddUserDialog({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user");
+  const [roles, setRoles] = useState<string[]>(["user"]);
   const [submitting, setSubmitting] = useState(false);
 
   function reset() {
     setEmail("");
     setName("");
     setPassword("");
-    setRole("user");
+    setRoles(["user"]);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -1951,7 +2040,7 @@ function AddUserDialog({
         email,
         name: name || undefined,
         password,
-        role: canAssignRoles ? role : "user",
+        roles: canAssignRoles ? roles : ["user"],
       });
       toast.success("User created");
       onOpenChange(false);
@@ -1972,7 +2061,7 @@ function AddUserDialog({
         <DialogHeader>
           <DialogTitle>Add User</DialogTitle>
           <DialogDescription>
-            Create a new account with an initial role and password.
+            Create a new account with initial roles and password.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -1998,15 +2087,12 @@ function AddUserDialog({
             minLength={8}
           />
           {canAssignRoles ? (
-            <AdminSelect
-              value={role}
-              onChange={setRole}
-              options={ROLE_OPTIONS}
-              placeholder="Select role"
-              allowClear={false}
-              triggerClassName="max-w-full"
-              menuClassName={MODAL_SELECT_MENU_CLASS}
-            />
+            <div className="rounded-md border border-white/8 bg-black/15 p-3">
+              <div className="mb-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
+                Roles
+              </div>
+              <RolePicker value={roles} onChange={setRoles} />
+            </div>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
             <Button

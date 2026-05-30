@@ -186,7 +186,7 @@ export function GenreEqEditor({
               loading={generating}
               disabled={saving || clearing}
             >
-              Generate with AI
+              Generate EQ preset with AI
             </AIButton>
           )}
           <Button

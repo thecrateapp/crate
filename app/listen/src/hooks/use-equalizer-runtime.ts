@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Track } from "@/contexts/player-types";
 import { useEqFeatures } from "@/hooks/use-eq-features";
+import { useEffectiveEq } from "@/hooks/use-effective-eq";
 import { useTrackGenre } from "@/hooks/use-track-genre";
 import { computeAdaptiveGains } from "@/lib/adaptive-eq";
 import { EQ_BAND_COUNT, type EqGains } from "@/lib/equalizer";
@@ -39,18 +40,27 @@ export function useResolvedEqualizer(
   snapshot: EqualizerSnapshot,
   currentTrack: Track | undefined,
 ) {
+  const effectiveEqState = useEffectiveEq(currentTrack, snapshot.smart);
+  const effectiveEq =
+    effectiveEqState.status === "ready" ? effectiveEqState.eq : null;
+
   const featuresState = useEqFeatures(
-    snapshot.adaptive ? currentTrack : undefined,
+    !snapshot.smart && snapshot.adaptive ? currentTrack : undefined,
   );
   const features =
     featuresState.status === "ready" ? featuresState.features : null;
 
   const genreState = useTrackGenre(
-    snapshot.genreAdaptive ? currentTrack : undefined,
+    !snapshot.smart && snapshot.genreAdaptive ? currentTrack : undefined,
   );
   const trackGenre = genreState.status === "ready" ? genreState.genre : null;
 
   const effectiveGains: EqGains = useMemo(() => {
+    if (snapshot.smart) {
+      if (!effectiveEq || effectiveEq.gains.length !== EQ_BAND_COUNT)
+        return FLAT_GAINS;
+      return effectiveEq.gains;
+    }
     if (snapshot.adaptive) return computeAdaptiveGains(features);
     if (snapshot.genreAdaptive) {
       const preset = trackGenre?.preset;
@@ -60,14 +70,18 @@ export function useResolvedEqualizer(
     return snapshot.gains;
   }, [
     features,
+    effectiveEq,
     snapshot.adaptive,
     snapshot.gains,
     snapshot.genreAdaptive,
+    snapshot.smart,
     trackGenre,
   ]);
 
   return {
     effectiveGains,
+    effectiveEqState,
+    effectiveEq,
     featuresState,
     features,
     genreState,

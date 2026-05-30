@@ -50,6 +50,7 @@ from crate.db.repositories.playlists import (
 )
 from crate.db.repositories.tasks import create_task
 from crate.task_progress import TaskProgress, emit_progress
+from crate.utils import PHOTO_NAMES
 from crate.worker_handlers import (
     DEFAULT_AUDIO_EXTENSIONS,
     TaskHandler,
@@ -769,6 +770,13 @@ def _unique_quarantine_path(
     trash_root: Path, relative_path: Path, task_id: str
 ) -> Path:
     destination = trash_root / "tracks" / relative_path
+    return _unique_file_path(destination, task_id)
+
+
+def _unique_artist_sidecar_trash_path(
+    trash_root: Path, relative_path: Path, task_id: str
+) -> Path:
+    destination = trash_root / "artist-sidecars" / relative_path
     return _unique_file_path(destination, task_id)
 
 
@@ -1502,11 +1510,26 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
         return {"error": f"Source artist directory not found: {source_relative}"}
     if source_dir == target_dir or _path_inside(target_dir, source_dir):
         return {"error": "Invalid artist merge target"}
-    for child in source_dir.iterdir():
-        if (target_dir / child.name).exists():
-            return {
-                "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
-            }
+    moved_sidecars_to_trash: list[str] = []
+    for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
+        target_child = target_dir / child.name
+        if not target_child.exists():
+            continue
+        if child.is_file() and child.name.lower() in PHOTO_NAMES:
+            destination = _unique_artist_sidecar_trash_path(
+                _crate_trash_root(lib),
+                child.relative_to(lib),
+                task_id,
+            )
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(child), str(destination))
+            moved_sidecars_to_trash.append(str(destination))
+            continue
+        if child.is_file() and target_child.is_file():
+            return {"error": f"Target artist directory already has file {child.name}"}
+        return {
+            "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
+        }
 
     target_dir.mkdir(parents=True, exist_ok=True)
     moved_items = 0
@@ -1533,6 +1556,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
             "source_path": str(source_dir),
             "target_path": str(target_dir),
             "moved_items": moved_items,
+            "artist_sidecars_preserved": len(moved_sidecars_to_trash),
         },
     )
     log_audit(
@@ -1549,6 +1573,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
             "source_path": str(source_dir),
             "target_path": str(target_dir),
             "moved_items": moved_items,
+            "artist_sidecars_preserved": len(moved_sidecars_to_trash),
             "source_albums": len(source_albums),
             "source_tracks": source_track_count,
             "reason": params.get("reason"),
@@ -1567,6 +1592,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
         "source_path": str(source_dir),
         "target_path": str(target_dir),
         "moved_items": moved_items,
+        "artist_sidecars_preserved": len(moved_sidecars_to_trash),
         "source_albums": len(source_albums),
         "source_tracks": source_track_count,
     }

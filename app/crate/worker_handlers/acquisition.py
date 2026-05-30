@@ -4,8 +4,9 @@ import shutil
 import time
 import zipfile
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Mapping
 from urllib.parse import urlparse
 
 from crate.acquisition_tasks import (
@@ -17,7 +18,10 @@ from crate.db.cache_settings import get_setting
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.domain_events import append_domain_event
 from crate.db.events import emit_task_event
-from crate.db.jobs.acquisition import update_artist_latest_release_date
+from crate.db.jobs.acquisition import (
+    mark_artist_new_releases_checked,
+    update_artist_latest_release_date,
+)
 from crate.db.repositories.library import (
     delete_quarantined_album,
     get_library_album,
@@ -31,8 +35,10 @@ from crate.db.repositories.library import (
 from crate.db.queries.browse import find_album_row
 from crate.db.repositories.library_contributions import record_album_contribution
 from crate.db.releases import (
+    clear_new_release_preview_source_url,
     mark_release_downloaded,
     mark_release_downloading,
+    merge_new_release_preview_tracks,
     upsert_new_release,
 )
 from crate.db.repositories.tasks import (
@@ -55,6 +61,8 @@ from crate.storage_import import (
 from crate.worker_handlers import TaskHandler, is_cancelled, start_scan
 
 log = logging.getLogger(__name__)
+
+NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 
 
 def _emit_acquisition_domain_event(
@@ -1089,6 +1097,27 @@ def _quality_label(value) -> str:
     return str(value or "")
 
 
+def _coerce_datetime(value) -> datetime | None:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str) and value.strip():
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    return None
+
+
+def _recently_checked_for_new_releases(
+    artist: Mapping[str, object], *, now: datetime
+) -> bool:
+    checked_at = _coerce_datetime(artist.get("new_releases_checked_at"))
+    if not checked_at:
+        return False
+    return now - checked_at < NEW_RELEASE_SCAN_TTL
+
+
 def _quality_values(value) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value if item]
@@ -1107,7 +1136,7 @@ def _find_tidal_preview_tracks(artist_name: str, tracklist: list[dict]) -> dict:
     best_quality: list[str] = []
     seen_track_ids: set[str] = set()
 
-    for track in tracklist[:8]:
+    for track in tracklist:
         title = str(track.get("title") or "").strip()
         if not title:
             continue
@@ -1148,10 +1177,12 @@ def _find_tidal_preview_tracks(artist_name: str, tracklist: list[dict]) -> dict:
             seen_track_ids.add(track_id)
 
         album = album_by_title.get(_norm_release_match(match.get("album", ""))) or {}
-        cover_url = str(album.get("cover") or "")
-        source_url = _normalize_tidal_url(
-            str(album.get("url") or match.get("url") or "")
-        )
+        cover_url = str(album.get("cover") or match.get("album_cover") or "")
+        album_url = str(album.get("url") or match.get("album_url") or "")
+        album_id = str(match.get("album_id") or "")
+        if not album_url and album_id:
+            album_url = f"https://tidal.com/album/{album_id}"
+        source_url = _normalize_tidal_url(album_url)
         track_url = _normalize_tidal_url(str(match.get("url") or source_url))
         quality = _quality_values(match.get("quality") or album.get("quality"))
         if cover_url and not best_cover:
@@ -1280,9 +1311,10 @@ def _register_new_release(
     if not release_date:
         return 0, False
 
-    is_future = release_date >= today
+    is_future = release_date > today
+    is_release_day = release_date == today
     is_new = release_date > known_date
-    if not is_future and not is_new:
+    if not is_future and not is_release_day and not is_new:
         return 0, True
 
     title = release.get("title", "")
@@ -1317,7 +1349,7 @@ def _register_new_release(
     if not cover_url:
         cover_url = _find_cover_art_archive_release_group_cover(release_group_id)
         cover_source = "cover_art_archive" if cover_url else ""
-    source_url = tidal_data["tidal_url"] or preview_data["source_url"]
+    source_url = tidal_data["tidal_url"]
     source_name = "tidal" if source_url else ""
     release_id = upsert_new_release(
         artist_name=artist_name,
@@ -1337,28 +1369,60 @@ def _register_new_release(
         tracklist=tracklist,
         preview_tracks=preview_data["preview_tracks"],
     )
+    merge_new_release_preview_tracks(
+        release_id,
+        preview_data["preview_tracks"],
+        source_url=source_url,
+        cover_url=cover_url,
+        quality=_quality_label(tidal_data["quality"] or preview_data["quality"]),
+    )
+    if not source_url and preview_data["preview_tracks"]:
+        preview_source_urls = [
+            _normalize_tidal_url(str(track.get("source_url") or track.get("url") or ""))
+            for track in preview_data["preview_tracks"]
+        ]
+        clear_new_release_preview_source_url(release_id, preview_source_urls)
     _broadcast_release_cache_invalidation(artist_name)
-    if preview_data["preview_tracks"] and source_url:
+    if preview_data["preview_tracks"]:
         try:
-            preview_task_id = _queue_release_preview_download(
-                release_id,
-                artist_name=artist_name,
-                source_album=preview_data["source_album"] or title,
-                source_url=source_url,
-                cover_url=cover_url,
-            )
-            if preview_task_id:
+            queued_preview_tasks: list[str] = []
+            seen_sources: set[str] = set()
+            for preview_track in preview_data["preview_tracks"]:
+                preview_source_url = _normalize_tidal_url(
+                    str(
+                        preview_track.get("source_url")
+                        or preview_track.get("url")
+                        or ""
+                    )
+                )
+                if not preview_source_url or preview_source_url in seen_sources:
+                    continue
+                seen_sources.add(preview_source_url)
+                preview_task_id = _queue_release_preview_download(
+                    release_id,
+                    artist_name=artist_name,
+                    source_album=str(
+                        preview_track.get("album")
+                        or preview_data["source_album"]
+                        or title
+                    ),
+                    source_url=preview_source_url,
+                    cover_url=cover_url,
+                )
+                if preview_task_id:
+                    queued_preview_tasks.append(preview_task_id)
+            if queued_preview_tasks:
                 emit_task_event(
                     task_id,
                     "new_release_preview_download_queued",
                     {
                         "message": (
-                            f"Queued {len(preview_data['preview_tracks'])} Tidal preview "
-                            f"track(s) for {artist_name} - {title}"
+                            f"Queued {len(queued_preview_tasks)} Tidal preview source(s) "
+                            f"for {artist_name} - {title}"
                         ),
                         "artist": artist_name,
                         "album": title,
-                        "preview_task_id": preview_task_id,
+                        "preview_task_ids": queued_preview_tasks,
                     },
                 )
         except Exception:
@@ -1406,13 +1470,16 @@ def _handle_check_new_releases(task_id: str, params: dict, config: dict) -> dict
     from crate.musicbrainz_ext import get_artist_releases as mb_get_releases
 
     auto_download = get_setting("auto_download_new_releases", "false").lower() == "true"
+    force = bool(params.get("force"))
+    now = datetime.now(timezone.utc)
 
     all_artists, total = get_library_artists(per_page=10000)
     if not all_artists:
-        return {"checked": 0, "new_releases": 0}
+        return {"checked": 0, "skipped_recent": 0, "new_releases": 0}
 
     new_count = 0
     checked = 0
+    skipped_recent = 0
 
     p = TaskProgress(phase="checking", phase_count=1, total=total)
 
@@ -1428,17 +1495,22 @@ def _handle_check_new_releases(task_id: str, params: dict, config: dict) -> dict
 
         if not mbid:
             continue
+        if not force and _recently_checked_for_new_releases(artist, now=now):
+            skipped_recent += 1
+            continue
 
         try:
             mb_releases = mb_get_releases(mbid)
             if not mb_releases:
                 checked += 1
+                mark_artist_new_releases_checked(name, now)
                 continue
 
             latest_mb = mb_releases[0]
             latest_mb_date = latest_mb.get("first_release_date", "")
             if not latest_mb_date:
                 checked += 1
+                mark_artist_new_releases_checked(name, now)
                 continue
 
             known_date = artist.get("latest_release_date") or ""
@@ -1468,11 +1540,17 @@ def _handle_check_new_releases(task_id: str, params: dict, config: dict) -> dict
                 update_artist_latest_release_date(name, latest_mb_date)
 
             checked += 1
+            mark_artist_new_releases_checked(name, now)
             time.sleep(1)
         except Exception:
             log.debug("New release check failed for %s", name, exc_info=True)
+            mark_artist_new_releases_checked(name, now)
 
-    return {"checked": checked, "new_releases": new_count}
+    return {
+        "checked": checked,
+        "skipped_recent": skipped_recent,
+        "new_releases": new_count,
+    }
 
 
 def _search_alternate_peers(
@@ -2222,8 +2300,8 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
             continue
 
         dest = Path(result["dest"])
-        artist = dest.parent.name
-        album = dest.name
+        artist = str(result.get("artist") or dest.parent.name)
+        album = str(result.get("album") or dest.name)
         imported_albums.append(
             {
                 "source_path": str(album_dir),
@@ -2294,13 +2372,17 @@ def _handle_library_upload(task_id: str, params: dict, config: dict) -> dict:
         imported_albums=imported_albums,
     )
 
+    upload_source = str(params.get("source") or "upload")
+
     if completed_albums:
         _emit_acquisition_completed_for_albums(
             task_id=task_id,
-            source="upload",
+            source=upload_source,
             entity_type="album",
             moved_albums=completed_albums,
         )
+        for artist_name in modified_artists:
+            _broadcast_release_cache_invalidation(artist_name)
 
     try:
         start_scan()

@@ -39,12 +39,16 @@ def create_library_catalog_schema(cur) -> None:
             discogs_profile TEXT,
             discogs_members_json JSONB,
             latest_release_date TEXT,
+            new_releases_checked_at TIMESTAMPTZ,
             content_hash TEXT,
             bandcamp_url TEXT,
             bandcamp_url_source TEXT,
             bandcamp_url_updated_at TIMESTAMPTZ
         )
     """)
+    cur.execute(
+        "ALTER TABLE library_artists ADD COLUMN IF NOT EXISTS new_releases_checked_at TIMESTAMPTZ"
+    )
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_id ON library_artists(id)"
     )
@@ -325,6 +329,48 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)"
     )
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS equalizer_presets (
+            id BIGSERIAL PRIMARY KEY,
+            scope TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_entity_uid UUID NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            gains DOUBLE PRECISION[] NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            reasoning TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'manual',
+            created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CHECK (scope IN ('user', 'instance')),
+            CHECK (target_type IN ('track', 'album')),
+            CHECK (
+                (scope = 'user' AND user_id IS NOT NULL)
+                OR (scope = 'instance' AND user_id IS NULL)
+            )
+        )
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_equalizer_presets_user_target
+        ON equalizer_presets(scope, target_type, target_entity_uid, user_id)
+        WHERE scope = 'user'
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_equalizer_presets_instance_target
+        ON equalizer_presets(scope, target_type, target_entity_uid)
+        WHERE scope = 'instance'
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equalizer_presets_target
+        ON equalizer_presets(target_type, target_entity_uid)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equalizer_presets_user
+        ON equalizer_presets(user_id, updated_at DESC)
+        WHERE user_id IS NOT NULL
+    """)
 
 
 __all__ = ["create_library_catalog_schema"]

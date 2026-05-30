@@ -7,6 +7,8 @@ from pathlib import Path
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
 from crate.db.repositories.library import get_library_album, get_library_artist
+from crate.db.releases import update_new_release_cover
+from crate.release_covers import release_cover_abspath, release_cover_public_url
 from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.db.jobs.artwork import (
     set_album_has_cover,
@@ -484,6 +486,7 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
     img_type = params.get("type")
     artist = params.get("artist", "")
     album = params.get("album", "")
+    release_id = params.get("release_id")
     data_b64 = params.get("data_b64", "")
 
     if not data_b64:
@@ -511,6 +514,18 @@ def _handle_upload_image(task_id: str, params: dict, config: dict) -> dict:
             set_album_has_cover(int(album_data["id"]))
             invalidation_scopes.append(f"album:{album_data['id']}")
         invalidation_scopes.extend(["library", "home"])
+    elif img_type == "release_cover":
+        if not release_id:
+            return {"error": "Release not found"}
+        dest = release_cover_abspath(int(release_id))
+        img.save(str(dest), "JPEG", quality=92)
+        if not update_new_release_cover(
+            int(release_id),
+            cover_url=release_cover_public_url(int(release_id)),
+            cover_source="manual",
+        ):
+            return {"error": "Release not found"}
+        invalidation_scopes.extend(["library", "home", "upcoming"])
     elif img_type == "artist_photo":
         artist_row = get_library_artist(artist)
         found_dir = resolve_artist_dir(

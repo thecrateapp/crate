@@ -40,6 +40,7 @@ dependencies {
     implementation "androidx.media3:media3-datasource:$androidxMedia3Version"
     implementation "androidx.media3:media3-exoplayer:$androidxMedia3Version"
     implementation "androidx.media3:media3-session:$androidxMedia3Version"
+    implementation "com.google.android.gms:play-services-cast-framework:$googleCastFrameworkVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

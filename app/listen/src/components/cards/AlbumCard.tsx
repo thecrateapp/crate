@@ -105,6 +105,7 @@ export const AlbumCard = memo(function AlbumCard({
     album,
     albumId,
     albumEntityUid,
+    artistEntityUid,
     albumSlug,
     cover: coverUrl,
   });

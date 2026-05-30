@@ -18,7 +18,7 @@ import {
 } from "@/components/actions/shared";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { artistPagePath } from "@/lib/library-routes";
+import { artistPagePath, artistSharePath } from "@/lib/library-routes";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 
@@ -32,6 +32,13 @@ export function useArtistActionEntries(
   return useMemo<ItemActionMenuEntry[]>(() => {
     const artistPath = artistPagePath({
       artistId: input.artistId,
+      artistEntityUid: input.artistEntityUid,
+      artistSlug: input.artistSlug,
+      artistName: input.name,
+    });
+    const artistShare = artistSharePath({
+      artistId: input.artistId,
+      artistEntityUid: input.artistEntityUid,
       artistSlug: input.artistSlug,
       artistName: input.name,
     });
@@ -118,7 +125,7 @@ export function useArtistActionEntries(
         key: "share",
         label: "Share artist",
         icon: Share2,
-        onSelect: sharePath(artistPath, input.name),
+        onSelect: sharePath(artistShare || artistPath, input.name),
       }),
     ];
   }, [following, input, playAll, toggleArtistFollow]);

@@ -372,6 +372,48 @@ class TestHandleUploadImage:
         assert result["height"] == 50
         assert (album_dir / "cover.jpg").exists()
 
+    def test_release_cover_upload_updates_virtual_release(self, monkeypatch, tmp_path):
+        from PIL import Image
+
+        img = Image.new("RGB", (120, 120), color="purple")
+        buf = io.BytesIO()
+        img.save(buf, "PNG")
+        data_b64 = base64.b64encode(buf.getvalue()).decode()
+        updates: list[dict] = []
+
+        monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+        monkeypatch.setattr(
+            "crate.worker_handlers.artwork.update_new_release_cover",
+            lambda release_id, **kwargs: (
+                updates.append({"release_id": release_id, **kwargs}) or True
+            ),
+        )
+        import requests as _requests
+
+        monkeypatch.setattr(_requests, "post", lambda *args, **kwargs: MagicMock())
+
+        result = _handle_upload_image(
+            "task-1",
+            {
+                "type": "release_cover",
+                "release_id": 42,
+                "artist": "Quicksand",
+                "album": "Bring On The Psychics",
+                "data_b64": data_b64,
+            },
+            {"library_path": str(tmp_path / "music")},
+        )
+
+        assert result["type"] == "release_cover"
+        assert (tmp_path / "data" / "release-covers" / "release-42.jpg").exists()
+        assert updates == [
+            {
+                "release_id": 42,
+                "cover_url": "/api/albums/-42/cover",
+                "cover_source": "manual",
+            }
+        ]
+
     def test_album_not_found_returns_error(self, monkeypatch, tmp_path):
         from PIL import Image
 

@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { persistOAuthCallbackPayload } from "@/lib/capacitor";
+import {
+  clearPendingOAuthNext,
+  persistOAuthCallbackPayload,
+} from "@/lib/capacitor";
 
 function buildDesktopDeepLink(search: string): string | null {
   const params = new URLSearchParams(search);
@@ -46,6 +49,7 @@ export function AuthCallback() {
       return;
     }
 
+    clearPendingOAuthNext();
     nextRef.current = next;
     awaitingAuthRef.current = true;
     void refetch();

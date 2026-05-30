@@ -1495,6 +1495,63 @@ class TestAuthMiddleware:
         assert response.status_code == 200
         assert response.json()["user"] == "admin@cratemusic.app"
 
+    @patch(
+        "crate.auth._get_jwt_secret", return_value="test-secret-key-1234-12345678901234"
+    )
+    def test_auth_middleware_falls_back_when_preferred_cookie_is_stale(
+        self, _mock_secret
+    ):
+        from crate.api.auth import AuthMiddleware
+        from crate.auth import create_jwt
+
+        stale_token = create_jwt(
+            1,
+            "admin@cratemusic.app",
+            "admin",
+            session_id="stale-session",
+        )
+        valid_token = create_jwt(
+            1,
+            "admin@cratemusic.app",
+            "admin",
+            session_id="valid-session",
+        )
+
+        app = FastAPI()
+        app.add_middleware(AuthMiddleware)
+
+        @app.get("/asset")
+        def asset(request: Request):
+            return {"user": request.state.user["email"]}
+
+        def get_session(session_id):
+            if session_id == "valid-session":
+                return {
+                    "id": "valid-session",
+                    "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+                    "revoked_at": None,
+                }
+            return None
+
+        with (
+            patch("crate.api.auth_cache.get_cached_session", side_effect=get_session),
+            patch(
+                "crate.api.auth_cache.get_cached_user",
+                return_value={
+                    "id": 1,
+                    "email": "admin@cratemusic.app",
+                    "role": "admin",
+                },
+            ),
+        ):
+            with TestClient(app) as client:
+                client.cookies.set("crate_session_listen", stale_token)
+                client.cookies.set("crate_session", valid_token)
+                response = client.get("/asset", headers={"X-Crate-App": "listen-web"})
+
+        assert response.status_code == 200
+        assert response.json()["user"] == "admin@cratemusic.app"
+
     @staticmethod
     def _remote_user_request(headers: dict[str, str]) -> Request:
         return Request(

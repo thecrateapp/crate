@@ -28,6 +28,7 @@ import { type ArtistShowEvent } from "@/components/upcoming/UpcomingRows";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { publicShareUrl } from "@/lib/share-url";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
@@ -35,6 +36,7 @@ import {
   artistBackgroundApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
+  artistSharePath,
 } from "@/lib/library-routes";
 
 export function Artist() {
@@ -98,10 +100,14 @@ export function Artist() {
 
   async function handleShare() {
     if (!data?.id) return;
-    const shareUrl = `${window.location.origin}${artistPagePath({
-      artistId: data.id,
-      artistSlug: data.slug,
-    })}`;
+    const shareUrl = publicShareUrl(
+      artistSharePath({
+        artistId: data.id,
+        artistEntityUid: data.entity_uid,
+        artistSlug: data.slug,
+        artistName: data.name,
+      }),
+    );
     try {
       if (navigator.share) {
         await navigator.share({

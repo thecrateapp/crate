@@ -658,6 +658,10 @@ cap-android-list: ## List available Android Emulator targets
 # ===========================================================================
 
 TAURI_DIR := app/listen-desktop
+TAURI_RELEASE_VERSION ?= $(shell git describe --tags --exact-match 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || gh release view --json tagName --jq .tagName 2>/dev/null || node -p "require('./$(TAURI_DIR)/src-tauri/tauri.conf.json').version")
+TAURI_MACOS_OUTPUT_DIR ?= desktop-artifacts/$(TAURI_RELEASE_VERSION)-macos-testers
+TAURI_MACOS_ARM_APP := $(TAURI_DIR)/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Crate.app
+TAURI_MACOS_INTEL_APP := $(TAURI_DIR)/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Crate.app
 
 .PHONY: tauri-dev
 tauri-dev: ## Build and run Crate desktop with Tauri dev mode
@@ -674,6 +678,35 @@ tauri-build: ## Build Crate desktop local app bundle
 .PHONY: tauri-build-all
 tauri-build-all: ## Build Crate desktop all release bundles
 	@cd $(TAURI_DIR) && npm run tauri:build:all
+
+.PHONY: tauri-build-macos-testers
+tauri-build-macos-testers: ## Build ARM + Intel macOS .app ZIPs for manual tester distribution
+	@if [ "$$(uname -s)" != "Darwin" ]; then \
+		echo "$(RED)macOS tester builds must run on macOS.$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Building Crate macOS ARM bundle ($(TAURI_RELEASE_VERSION))$(NC)"
+	@npm run --workspace=$(TAURI_DIR) tauri -- build --target aarch64-apple-darwin --bundles app
+	@echo "$(YELLOW)Building Crate macOS Intel bundle ($(TAURI_RELEASE_VERSION))$(NC)"
+	@npm run --workspace=$(TAURI_DIR) tauri -- build --target x86_64-apple-darwin --bundles app
+	@mkdir -p "$(TAURI_MACOS_OUTPUT_DIR)"
+	@arm_binary="$(TAURI_MACOS_ARM_APP)/Contents/MacOS/crate-desktop"; \
+	intel_binary="$(TAURI_MACOS_INTEL_APP)/Contents/MacOS/crate-desktop"; \
+	file "$$arm_binary" | grep -q "arm64" || { echo "$(RED)ARM bundle is not arm64$(NC)"; exit 1; }; \
+	file "$$intel_binary" | grep -q "x86_64" || { echo "$(RED)Intel bundle is not x86_64$(NC)"; exit 1; }
+	@echo "$(YELLOW)Applying minimal ad-hoc macOS signatures$(NC)"
+	@xattr -cr "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_INTEL_APP)" 2>/dev/null || true
+	@codesign --force --deep --sign - "$(TAURI_MACOS_ARM_APP)"
+	@codesign --force --deep --sign - "$(TAURI_MACOS_INTEL_APP)"
+	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_ARM_APP)"
+	@codesign --verify --deep --strict --verbose=2 "$(TAURI_MACOS_INTEL_APP)"
+	@ditto -c -k --keepParent "$(TAURI_MACOS_ARM_APP)" "$(TAURI_MACOS_OUTPUT_DIR)/Crate-macos-arm64-$(TAURI_RELEASE_VERSION).app.zip"
+	@ditto -c -k --keepParent "$(TAURI_MACOS_INTEL_APP)" "$(TAURI_MACOS_OUTPUT_DIR)/Crate-macos-intel-$(TAURI_RELEASE_VERSION).app.zip"
+	@echo "$(GREEN)macOS tester ZIPs ready:$(NC)"
+	@ls -lh "$(TAURI_MACOS_OUTPUT_DIR)"
+
+.PHONY: tauri-macos-testers
+tauri-macos-testers: tauri-build-macos-testers ## Alias for tauri-build-macos-testers
 
 .PHONY: tauri-collect-artifacts
 tauri-collect-artifacts: ## Collect Crate desktop release artifacts into desktop-artifacts/

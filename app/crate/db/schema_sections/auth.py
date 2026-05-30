@@ -28,7 +28,8 @@ def create_auth_schema(cur) -> None:
             latitude DOUBLE PRECISION,
             longitude DOUBLE PRECISION,
             show_location_mode TEXT DEFAULT 'fixed',
-            show_radius_km INTEGER DEFAULT 60
+            show_radius_km INTEGER DEFAULT 60,
+            crate_connect_enabled BOOLEAN NOT NULL DEFAULT FALSE
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
@@ -46,6 +47,28 @@ def create_auth_schema(cur) -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL"
     )
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_status ON users(status)")
+    cur.execute(
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS crate_connect_enabled BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_roles (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL,
+            assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (user_id, role)
+        )
+    """)
+    cur.execute("""
+        INSERT INTO user_roles (user_id, role, assigned_at)
+        SELECT id, COALESCE(NULLIF(TRIM(role), ''), 'user'), NOW()
+        FROM users
+        ON CONFLICT (user_id, role) DO NOTHING
+    """)
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role, user_id)"
+    )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (

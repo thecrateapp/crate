@@ -507,22 +507,29 @@ def search(
         # Parse tracks
         tracks_raw = _items("tracks")
         if tracks_raw:
-            result["tracks"] = [
-                {
-                    "id": str(t.get("id", "")),
-                    "title": t.get("title", ""),
-                    "artist": t.get("artists", [{}])[0].get("name", "")
-                    if t.get("artists")
-                    else "",
-                    "album": t.get("album", {}).get("title", "")
-                    if isinstance(t.get("album"), dict)
-                    else "",
-                    "duration": t.get("duration", 0),
-                    "url": t.get("url") or f"https://tidal.com/track/{t.get('id', '')}",
-                    "quality": t.get("mediaMetadata", {}).get("tags", []),
-                }
-                for t in tracks_raw
-            ]
+            tracks = []
+            for t in tracks_raw:
+                album = t.get("album") if isinstance(t.get("album"), dict) else {}
+                album_id = str(album.get("id") or "")
+                tracks.append(
+                    {
+                        "id": str(t.get("id", "")),
+                        "title": t.get("title", ""),
+                        "artist": t.get("artists", [{}])[0].get("name", "")
+                        if t.get("artists")
+                        else "",
+                        "album": album.get("title", ""),
+                        "album_id": album_id,
+                        "album_cover": _tidal_cover(album.get("cover")),
+                        "album_url": album.get("url")
+                        or (f"https://tidal.com/album/{album_id}" if album_id else ""),
+                        "duration": t.get("duration", 0),
+                        "url": t.get("url")
+                        or f"https://tidal.com/track/{t.get('id', '')}",
+                        "quality": t.get("mediaMetadata", {}).get("tags", []),
+                    }
+                )
+            result["tracks"] = tracks
 
         return result
 

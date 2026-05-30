@@ -1,9 +1,23 @@
 import { screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { ArtistCard } from "./ArtistCard";
+
+const { resolveMaybeApiAssetUrlMock } = vi.hoisted(() => ({
+  resolveMaybeApiAssetUrlMock: vi.fn(
+    (url: string | null | undefined) => url ?? null,
+  ),
+}));
+
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    resolveMaybeApiAssetUrl: resolveMaybeApiAssetUrlMock,
+  };
+});
 
 vi.mock("@/contexts/ArtistFollowsContext", () => ({
   useArtistFollows: () => ({
@@ -24,6 +38,12 @@ beforeAll(() => {
       dispatchEvent: vi.fn(),
     })),
   });
+});
+
+beforeEach(() => {
+  resolveMaybeApiAssetUrlMock.mockImplementation(
+    (url: string | null | undefined) => url ?? null,
+  );
 });
 
 describe("ArtistCard", () => {
@@ -49,5 +69,28 @@ describe("ArtistCard", () => {
       "https://www.last.fm/music/Chelsea+Wolfe",
     );
     expect(screen.queryByText("Last.fm")).not.toBeInTheDocument();
+  });
+
+  it("normalizes API-relative external photos before rendering", () => {
+    resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
+      url?.startsWith("/api/")
+        ? `https://api.example.test${url}&token=desktop-token`
+        : url ?? null,
+    );
+
+    renderWithListenProviders(
+      <ArtistCard
+        name="Poison The Well"
+        photo="/api/network/external-artist/photo?name=Poison%20The%20Well"
+        href="https://www.last.fm/music/Poison+The+Well"
+        external
+        imageTone="muted"
+      />,
+    );
+
+    expect(screen.getByAltText("Poison The Well")).toHaveAttribute(
+      "src",
+      "https://api.example.test/api/network/external-artist/photo?name=Poison%20The%20Well&token=desktop-token",
+    );
   });
 });

@@ -27,9 +27,10 @@ def _build_release_items(releases: list[dict], *, today) -> list[dict]:
                 "subtitle": release.get("release_type") or "Album",
                 "cover_url": release.get("cover_url"),
                 "status": release.get("status", "detected"),
-                "tidal_url": release.get("tidal_url"),
+                "tidal_url": release.get("tidal_url") or release.get("source_url"),
+                "source_url": release.get("source_url"),
                 "release_id": release.get("id"),
-                "is_upcoming": bool(scheduled_date and scheduled_date >= today),
+                "is_upcoming": bool(scheduled_date and scheduled_date > today),
             }
         )
     return items

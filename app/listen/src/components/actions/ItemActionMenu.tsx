@@ -252,7 +252,10 @@ export function ItemActionMenu({
             key={entry.key}
             danger={entry.danger}
             disabled={entry.disabled}
-            onClick={() => handleSelect(entry)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleSelect(entry);
+            }}
             className={cn(
               entry.active ? "text-primary" : undefined,
               entry.disabled ? "opacity-50" : undefined,

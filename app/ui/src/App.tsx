@@ -182,7 +182,6 @@ const UPCOMING_CURATION = [
   "library.tidal.manage",
 ] as const;
 const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
-
 export default function App() {
   return (
     <BrowserRouter>

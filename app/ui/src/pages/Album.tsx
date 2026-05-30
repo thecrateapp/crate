@@ -102,6 +102,10 @@ interface AlbumData {
   };
   genres?: string[];
   genre_profile?: GenreProfileItem[];
+  is_pre_release?: boolean;
+  release_date?: string | null;
+  release_status?: string | null;
+  release_type?: string | null;
 }
 
 type AlbumMetadataAction = "lyrics" | "portable" | "export";
@@ -1024,7 +1028,8 @@ export function Album() {
     hasCapability("library.album.remove") &&
     hasCapability("library.files.delete");
   const canMoveAlbum = hasCapability("library.album.remove");
-  const canDownloadAlbum = hasCapability("library.view");
+  const canDownloadAlbum =
+    hasCapability("library.view") && !data.is_pre_release;
 
   return (
     <div className="-mt-16 md:-mt-[6.5rem]">
@@ -1055,8 +1060,8 @@ export function Album() {
         isAdmin={isAdmin}
         canDownload={canDownloadAlbum}
         canEditArtwork={canEditMetadata}
-        canEnrich={canEditMetadata}
-        canQueueMetadata={canEditMetadata}
+        canEnrich={canEditMetadata && !data.is_pre_release}
+        canQueueMetadata={canEditMetadata && !data.is_pre_release}
         onAnalysisComplete={() => {
           const endpoint = artistActionApiPath(
             {

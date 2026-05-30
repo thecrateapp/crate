@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
@@ -10,11 +12,23 @@ from crate.api.openapi_responses import (
 from crate.api.permissions import require_permission
 from crate.api.schemas.genres import (
     EqPresetUpdateResponse,
+    GenreDeleteResponse,
     GenreDetailResponse,
     GenreGraphResponse,
     GenreSummaryResponse,
+    GenreTaxonomyAliasesUpdateRequest,
+    GenreTaxonomyAliasesUpdateResponse,
+    GenreTaxonomyNodeProposalApplyRequest,
+    GenreTaxonomyNodeProposalApplyResponse,
+    GenreTaxonomyNodeProposalResponse,
+    GenreTaxonomyNodeUpdateRequest,
+    GenreTaxonomyNodeUpdateResponse,
+    GenreTaxonomyRebuildProposalRequest,
+    GenreTaxonomyRelationsUpdateRequest,
+    GenreTaxonomyRelationsUpdateResponse,
     GenreTaxonomyInvalidStatusResponse,
     GenreTaxonomyTreeResponse,
+    SoundIntelligenceHealthResponse,
 )
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.db.genres import (
@@ -28,10 +42,25 @@ from crate.db.genres import (
 )
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.tasks import create_task
+from crate.db.queries.sound_intelligence import get_sound_intelligence_health
+from crate.db.repositories.genres_taxonomy_edges import (
+    VALID_RELATION_TYPES,
+    replace_genre_taxonomy_edges,
+)
+from crate.db.repositories.genres_taxonomy_metadata import (
+    update_genre_taxonomy_node_metadata,
+)
+from crate.db.repositories.genres_taxonomy_nodes import upsert_genre_taxonomy_node
+from crate.db.repositories.genres_delete import (
+    delete_library_genre,
+    delete_taxonomy_genre,
+)
+from crate.db.jobs.genre_taxonomy import assign_genre_alias_value
 from crate.genre_taxonomy import (
     invalidate_runtime_taxonomy_cache,
     resolve_genre_eq_preset,
 )
+from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
 
@@ -54,6 +83,40 @@ _GENRE_ADMIN_RESPONSES = merge_responses(
 
 def _require_genre_curator(request: Request) -> dict:
     return require_permission(request, "curation.genres.write")
+
+
+def _broadcast_genre_taxonomy_changed(*scopes: str) -> None:
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        broadcast_invalidation("library", "home", "curation", *scopes)
+    except Exception:
+        pass
+
+
+def _normalize_taxonomy_slug(value: str | None) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
+
+
+def _proposal_alias_candidates(
+    raw_slug: str,
+    body: GenreTaxonomyNodeProposalApplyRequest,
+) -> list[str]:
+    aliases = [
+        raw_slug,
+        raw_slug.replace("-", " "),
+        body.name or "",
+        *(body.aliases or []),
+    ]
+    result: list[str] = []
+    seen: set[str] = set()
+    for alias in aliases:
+        value = (alias or "").strip()
+        key = value.lower()
+        if value and key not in seen:
+            seen.add(key)
+            result.append(value)
+    return result
 
 
 def _get_or_create_task(task_type: str, params: dict, max_limit: int = 500) -> dict:
@@ -141,6 +204,40 @@ def get_invalid_taxonomy_nodes(request: Request, limit: int = Query(8, ge=1, le=
 
 
 @router.get(
+    "/sound-intelligence/health",
+    response_model=SoundIntelligenceHealthResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Inspect EQ coverage and genre taxonomy health",
+)
+def get_sound_intelligence_health_snapshot(request: Request):
+    _require_genre_curator(request)
+    return get_sound_intelligence_health()
+
+
+@router.post(
+    "/taxonomy/rebuild-proposal",
+    response_model=TaskEnqueueResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Queue a review-only full genre taxonomy rebuild proposal",
+)
+def rebuild_taxonomy_proposal(
+    request: Request,
+    body: GenreTaxonomyRebuildProposalRequest | None = None,
+):
+    _require_genre_curator(request)
+    body = body or GenreTaxonomyRebuildProposalRequest.model_validate({})
+    return _get_or_create_task(
+        "rebuild_genre_taxonomy_proposals",
+        {
+            "alias_limit": body.alias_limit,
+            "node_limit": body.node_limit,
+            "include_external": body.include_external,
+            "aggressive": body.aggressive,
+        },
+    )
+
+
+@router.get(
     "/taxonomy/tree",
     response_model=GenreTaxonomyTreeResponse,
     responses=AUTH_ERROR_RESPONSES,
@@ -174,6 +271,12 @@ def taxonomy_tree(request: Request):
         preset = resolve_genre_eq_preset(slug)
         c = counts.get(slug, {"artist_count": 0, "album_count": 0})
         children = sorted(s for s, m in catalog.items() if slug in m.get("parents", []))
+        influences = sorted(
+            s for s, m in catalog.items() if slug in m.get("influenced_by", [])
+        )
+        fusion_genres = sorted(
+            s for s, m in catalog.items() if slug in m.get("fusion_of", [])
+        )
         node = {
             "slug": slug,
             "name": meta["name"],
@@ -183,6 +286,11 @@ def taxonomy_tree(request: Request):
             "top_level": meta.get("top_level", False),
             "parent_slugs": meta.get("parents", []),
             "children_slugs": children,
+            "related_slugs": meta.get("related", []),
+            "influenced_by_slugs": meta.get("influenced_by", []),
+            "influences_slugs": influences,
+            "fusion_of_slugs": meta.get("fusion_of", []),
+            "fusion_genre_slugs": fusion_genres,
             "alias_names": meta.get("aliases", []),
             "artist_count": c["artist_count"],
             "album_count": c["album_count"],
@@ -197,6 +305,275 @@ def taxonomy_tree(request: Request):
             top_level_slugs.append(slug)
 
     return {"nodes": nodes, "top_level_slugs": sorted(top_level_slugs)}
+
+
+@router.patch(
+    "/taxonomy/{slug}",
+    response_model=GenreTaxonomyNodeUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Update editable taxonomy node metadata",
+)
+def update_taxonomy_node(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyNodeUpdateRequest,
+):
+    _require_genre_curator(request)
+    canonical_slug = (slug or "").strip().lower()
+    if not canonical_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    if not get_genre_taxonomy_node_id(canonical_slug):
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+    updated = update_genre_taxonomy_node_metadata(
+        canonical_slug,
+        name=body.name,
+        description=body.description,
+        top_level=body.top_level,
+    )
+    if not updated:
+        raise HTTPException(status_code=400, detail="No taxonomy metadata changed")
+    invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {"ok": True, "slug": canonical_slug}
+
+
+@router.delete(
+    "/taxonomy/{slug}",
+    response_model=GenreDeleteResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Delete a canonical taxonomy node and its mapped raw genre assignments",
+)
+def delete_taxonomy_node(request: Request, slug: str):
+    _require_genre_curator(request)
+    canonical_slug = _normalize_taxonomy_slug(slug)
+    if not canonical_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    result = delete_taxonomy_genre(canonical_slug)
+    if not result:
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {"ok": True, **result}
+
+
+@router.post(
+    "/taxonomy/{slug}/proposal",
+    response_model=GenreTaxonomyNodeProposalResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Generate a reviewable AI proposal for one taxonomy node",
+)
+def infer_taxonomy_node_proposal(
+    request: Request,
+    slug: str,
+):
+    _require_genre_curator(request)
+    canonical_slug = (slug or "").strip().lower()
+    if not canonical_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    proposal = build_genre_taxonomy_node_proposal(canonical_slug)
+    if not proposal.get("ok"):
+        raise HTTPException(status_code=404, detail="Genre not found")
+    return proposal
+
+
+@router.post(
+    "/taxonomy/{slug}/proposal/apply",
+    response_model=GenreTaxonomyNodeProposalApplyResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Apply a reviewed AI taxonomy proposal",
+)
+def apply_taxonomy_node_proposal(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyNodeProposalApplyRequest,
+):
+    user = _require_genre_curator(request)
+    raw_slug = _normalize_taxonomy_slug(slug)
+    if not raw_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+
+    action = (body.recommended_action or "").strip().lower()
+    if action not in {
+        "create_node",
+        "alias_existing",
+        "delete_marginal",
+        "needs_review",
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported proposal action")
+    if action == "needs_review":
+        raise HTTPException(
+            status_code=400,
+            detail="This proposal still needs curator review before applying",
+        )
+
+    applied_aliases: list[str] = []
+    skipped_aliases: list[str] = []
+    relation_results: list[dict] = []
+
+    if action in {"alias_existing", "delete_marginal"}:
+        target_slug = _normalize_taxonomy_slug(body.recommended_target_slug)
+        if not target_slug:
+            raise HTTPException(status_code=400, detail="Target slug is required")
+        if not get_genre_taxonomy_node_id(target_slug):
+            raise HTTPException(status_code=404, detail="Target genre not found")
+
+        for alias in _proposal_alias_candidates(raw_slug, body):
+            if assign_genre_alias_value(alias, target_slug):
+                applied_aliases.append(alias)
+            else:
+                skipped_aliases.append(alias)
+
+        invalidate_runtime_taxonomy_cache(broadcast=True)
+        _broadcast_genre_taxonomy_changed(f"genre:{raw_slug}", f"genre:{target_slug}")
+        return {
+            "ok": True,
+            "slug": raw_slug,
+            "action": action,
+            "target_slug": target_slug,
+            "applied_aliases": applied_aliases,
+            "skipped_aliases": skipped_aliases,
+            "relation_results": [],
+        }
+
+    node = upsert_genre_taxonomy_node(
+        raw_slug,
+        name=body.name or raw_slug.replace("-", " ").title(),
+        description=body.description,
+        is_top_level=False,
+    )
+    if not node:
+        raise HTTPException(status_code=400, detail="Could not create taxonomy node")
+    node_slug = str(node["slug"])
+
+    for alias in _proposal_alias_candidates(node_slug, body):
+        if assign_genre_alias_value(alias, node_slug):
+            applied_aliases.append(alias)
+        else:
+            skipped_aliases.append(alias)
+
+    for relation in body.relations:
+        relation_type = (relation.relation_type or "").strip().lower()
+        if relation_type not in VALID_RELATION_TYPES:
+            continue
+        result = replace_genre_taxonomy_edges(
+            node_slug,
+            relation_type=relation_type,
+            target_slugs=relation.target_slugs,
+            created_by=int(user["id"]),
+            source="ai_proposal",
+        )
+        relation_results.append(
+            {
+                "ok": bool(result.get("updated")),
+                "slug": node_slug,
+                "relation_type": relation_type,
+                "added": result.get("added") or [],
+                "missing": result.get("missing") or [],
+            }
+        )
+
+    invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{raw_slug}", f"genre:{node_slug}")
+    return {
+        "ok": True,
+        "slug": raw_slug,
+        "action": action,
+        "target_slug": node_slug,
+        "applied_aliases": applied_aliases,
+        "skipped_aliases": skipped_aliases,
+        "relation_results": relation_results,
+    }
+
+
+@router.put(
+    "/taxonomy/{slug}/relations",
+    response_model=GenreTaxonomyRelationsUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Replace one editable relation set for a taxonomy node",
+)
+def update_taxonomy_relations(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyRelationsUpdateRequest,
+):
+    user = _require_genre_curator(request)
+    canonical_slug = (slug or "").strip().lower()
+    relation_type = (body.relation_type or "").strip().lower()
+    if relation_type not in VALID_RELATION_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported relation_type")
+    if not get_genre_taxonomy_node_id(canonical_slug):
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+    result = replace_genre_taxonomy_edges(
+        canonical_slug,
+        relation_type=relation_type,
+        target_slugs=body.target_slugs,
+        created_by=int(user["id"]),
+        source="manual",
+    )
+    invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {
+        "ok": bool(result.get("updated")),
+        "slug": canonical_slug,
+        "relation_type": relation_type,
+        "added": result.get("added") or [],
+        "missing": result.get("missing") or [],
+    }
+
+
+@router.put(
+    "/taxonomy/{slug}/aliases",
+    response_model=GenreTaxonomyAliasesUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Assign proposed raw aliases to a taxonomy node",
+)
+def update_taxonomy_aliases(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyAliasesUpdateRequest,
+):
+    _require_genre_curator(request)
+    canonical_slug = (slug or "").strip().lower()
+    if not get_genre_taxonomy_node_id(canonical_slug):
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+
+    applied: list[str] = []
+    skipped: list[str] = []
+    for alias in body.alias_names:
+        alias_name = (alias or "").strip()
+        if not alias_name:
+            continue
+        if assign_genre_alias_value(alias_name, canonical_slug):
+            applied.append(alias_name)
+        else:
+            skipped.append(alias_name)
+
+    if applied:
+        invalidate_runtime_taxonomy_cache(broadcast=True)
+        _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {
+        "ok": True,
+        "slug": canonical_slug,
+        "applied": applied,
+        "skipped": skipped,
+    }
+
+
+@router.delete(
+    "/{slug}",
+    response_model=GenreDeleteResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Delete a raw library genre and remove it from artists/albums",
+)
+def delete_genre(request: Request, slug: str):
+    _require_genre_curator(request)
+    genre_slug = _normalize_taxonomy_slug(slug)
+    if not genre_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    result = delete_library_genre(genre_slug)
+    if not result:
+        raise HTTPException(status_code=404, detail="Genre not found")
+    _broadcast_genre_taxonomy_changed(f"genre:{genre_slug}")
+    return {"ok": True, **result}
 
 
 @router.get(
@@ -361,6 +738,7 @@ def update_genre_eq_preset(request: Request, slug: str, body: EqPresetBody):
     # Drop the cached graph so the next resolver call picks up the new
     # gains (or NULL → inheritance).
     invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
 
     resolved = resolve_genre_eq_preset(canonical_slug)
     return {
@@ -412,6 +790,7 @@ def generate_genre_eq(
     if apply:
         set_genre_eq_gains(canonical_slug, gains, reasoning=result.reasoning)
         invalidate_runtime_taxonomy_cache(broadcast=True)
+        _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
 
     return {
         "slug": canonical_slug,

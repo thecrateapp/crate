@@ -27,6 +27,15 @@ interface ModalSectionProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
 export function AppModal({
   open,
   onClose,
@@ -39,6 +48,9 @@ export function AppModal({
   lockBodyScroll = true,
   mobileSafeArea = false,
 }: AppModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return undefined;
 
@@ -51,6 +63,34 @@ export function AppModal({
       if (event.key === "Escape" && closeOnEscape) {
         onClose();
       }
+      if (event.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter(
+        (element) =>
+          !element.hasAttribute("disabled") &&
+          element.getAttribute("aria-hidden") !== "true",
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || active === panel)) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -61,6 +101,29 @@ export function AppModal({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [closeOnEscape, lockBodyScroll, onClose, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const firstFocusable =
+        panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      (firstFocusable ?? panel).focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      const previous = previouslyFocusedElementRef.current;
+      if (previous && document.contains(previous)) {
+        previous.focus();
+      }
+      previouslyFocusedElementRef.current = null;
+    };
+  }, [open]);
 
   // Swipe-to-dismiss (mobile bottom sheet — drag handle only)
   const [swipeY, setSwipeY] = useState(0);
@@ -99,6 +162,8 @@ export function AppModal({
       }}
     >
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
           "bg-modal-surface w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl animate-sheet-up sm:rounded-3xl sm:animate-pop-in",
           mobileSafeArea

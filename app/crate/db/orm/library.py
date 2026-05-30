@@ -53,6 +53,9 @@ class LibraryArtist(Base):
     discogs_profile: Mapped[str | None] = mapped_column(Text)
     discogs_members_json: Mapped[Any | None] = mapped_column(JSON)
     latest_release_date: Mapped[str | None] = mapped_column(Text)
+    new_releases_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     content_hash: Mapped[str | None] = mapped_column(Text)
     bandcamp_url: Mapped[str | None] = mapped_column(Text)
     bandcamp_url_source: Mapped[str | None] = mapped_column(Text)

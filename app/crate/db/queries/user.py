@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from math import cos, radians
 
@@ -6,6 +7,110 @@ from crate.db.serialize import serialize_rows
 from crate.db.tx import read_scope
 from crate.show_filters import show_has_tribute_signal
 from sqlalchemy import text
+
+_RELEASE_TITLE_SUFFIX_RE = re.compile(r"\s+(?:ep|single)\s*$", re.IGNORECASE)
+_RELEASE_TITLE_TOKEN_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _release_title_without_redundant_type(title: str, release_type: str = "") -> str:
+    cleaned = (title or "").strip()
+    normalized_type = (release_type or "").strip().lower()
+    if normalized_type in {"ep", "single"}:
+        suffix = f" {normalized_type}"
+        if cleaned.lower().endswith(suffix) and len(cleaned) > len(suffix):
+            return cleaned[: -len(suffix)].strip()
+    return cleaned
+
+
+def _release_dedupe_title(title: str, release_type: str = "") -> str:
+    base = _release_title_without_redundant_type(title, release_type).lower()
+    base = _RELEASE_TITLE_SUFFIX_RE.sub("", base).strip()
+    return _RELEASE_TITLE_TOKEN_RE.sub(" ", base).strip()
+
+
+def _release_dedupe_key(row: dict) -> tuple[str, str, str]:
+    return (
+        str(row.get("artist_name") or "").strip().lower(),
+        str(row.get("release_date") or "").strip(),
+        _release_dedupe_title(
+            str(row.get("album_title") or ""),
+            str(row.get("release_type") or ""),
+        ),
+    )
+
+
+def _release_row_score(row: dict) -> tuple[int, int]:
+    score = 0
+    if row.get("album_id"):
+        score += 64
+    if row.get("tidal_url") or row.get("source_url"):
+        score += 32
+    if row.get("cover_url"):
+        score += 16
+    if row.get("release_type"):
+        score += 4
+    if row.get("status") == "downloaded":
+        score += 2
+    title = str(row.get("album_title") or "")
+    display_title = _release_title_without_redundant_type(
+        title,
+        str(row.get("release_type") or ""),
+    )
+    if title == display_title:
+        score += 1
+    return score, int(row.get("id") or 0)
+
+
+def _merge_release_rows(primary: dict, fallback: dict) -> dict:
+    merged = dict(primary)
+    for key in (
+        "artist_id",
+        "artist_slug",
+        "album_id",
+        "album_slug",
+        "cover_url",
+        "tidal_url",
+        "source_url",
+        "release_type",
+        "release_date",
+        "detected_at",
+    ):
+        if not merged.get(key) and fallback.get(key):
+            merged[key] = fallback[key]
+    return merged
+
+
+def _dedupe_release_rows(rows: list[dict]) -> list[dict]:
+    deduped: dict[tuple[str, str, str], dict] = {}
+    order: list[tuple[str, str, str]] = []
+    for row in rows:
+        key = _release_dedupe_key(row)
+        if not all(key):
+            key = (
+                key[0] or f"artist:{row.get('id')}",
+                key[1] or f"date:{row.get('id')}",
+                key[2] or f"title:{row.get('id')}",
+            )
+            order.append(key)
+            deduped[key] = dict(row)
+            continue
+        existing = deduped.get(key)
+        if existing is None:
+            order.append(key)
+            deduped[key] = dict(row)
+            continue
+        if _release_row_score(row) > _release_row_score(existing):
+            deduped[key] = _merge_release_rows(dict(row), existing)
+        else:
+            deduped[key] = _merge_release_rows(existing, row)
+
+    releases = [deduped[key] for key in order if key in deduped]
+    for release in releases:
+        release["album_title"] = _release_title_without_redundant_type(
+            str(release.get("album_title") or ""),
+            str(release.get("release_type") or ""),
+        )
+    return releases
 
 
 def get_feed_new_albums(
@@ -105,6 +210,7 @@ def get_upcoming_releases(
                 nr.cover_url,
                 nr.status,
                 nr.tidal_url,
+                nr.source_url,
                 nr.release_type,
                 nr.release_date,
                 nr.detected_at
@@ -116,7 +222,7 @@ def get_upcoming_releases(
             WHERE nr.artist_name = ANY(:followed_names)
               AND nr.status != 'dismissed'
               AND (
-                (nr.release_date IS NOT NULL AND nr.release_date >= :today)
+                (nr.release_date IS NOT NULL AND nr.release_date > :today)
                 OR nr.detected_at >= :recent_cutoff
               )
             ORDER BY COALESCE(nr.release_date, (nr.detected_at AT TIME ZONE 'UTC')::date) ASC
@@ -126,13 +232,13 @@ def get_upcoming_releases(
                     "followed_names": followed_names,
                     "today": today,
                     "recent_cutoff": recent_cutoff,
-                    "limit": limit,
+                    "limit": limit * 3,
                 },
             )
             .mappings()
             .all()
         )
-        return serialize_rows(rows)
+        return _dedupe_release_rows(serialize_rows(rows))[:limit]
 
 
 def get_upcoming_shows(

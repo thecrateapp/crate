@@ -1,14 +1,21 @@
 import {
   Activity,
+  Brain,
+  RotateCcw,
+  Save,
   SlidersHorizontal,
   Sparkles,
   Sun,
   Tag,
+  Trash2,
   Volume2,
   X,
   Zap,
 } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
+import type { EffectiveEq } from "@/hooks/use-effective-eq";
 import type { EqFeatures } from "@/hooks/use-eq-features";
 import { useEqualizer } from "@/hooks/use-equalizer";
 import type { TrackGenre } from "@/hooks/use-track-genre";
@@ -41,6 +48,64 @@ const PRESET_LABELS: Record<EqPresetName, string> = {
   post_rock: "Post-Rock",
   lo_fi: "Indie / Lo-Fi",
 };
+
+const SMART_EQ_SOURCE_LABELS: Record<EffectiveEq["source"], string> = {
+  user_track_preset: "User track preset",
+  instance_track_preset: "Curator track preset",
+  instance_album_preset: "Curator album preset",
+  genre_taxonomy_preset: "Genre taxonomy",
+  audio_analysis_preset: "Audio analysis",
+  flat: "Flat",
+};
+
+function SmartEqReadout({
+  eq,
+  status,
+}: {
+  eq: EffectiveEq | null;
+  status: "idle" | "loading" | "ready" | "unavailable";
+}) {
+  if (status === "loading") {
+    return (
+      <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.07] px-3 py-2 text-[11px] text-cyan-100/80">
+        Resolving Smart EQ…
+      </div>
+    );
+  }
+
+  if (status === "unavailable" || !eq) {
+    return (
+      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
+        Smart EQ is waiting for a resolvable library track.
+      </div>
+    );
+  }
+
+  const label = SMART_EQ_SOURCE_LABELS[eq.source] ?? eq.label;
+  const detail =
+    eq.source === "genre_taxonomy_preset" && eq.genre
+      ? eq.inheritedFrom
+        ? `Inherited from ${eq.inheritedFrom.name}`
+        : eq.genre.name
+      : eq.reasoning || eq.label;
+
+  return (
+    <div className="rounded-lg border border-cyan-400/25 bg-gradient-to-r from-cyan-400/[0.14] via-cyan-400/[0.06] to-transparent px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+          <Brain size={10} />
+          Smart
+        </span>
+        <span className="text-xs font-semibold text-foreground">{label}</span>
+      </div>
+      {detail ? (
+        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+          {detail}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Labeled chip showing a single adaptive feature with its value and a
@@ -270,28 +335,63 @@ interface EqualizerPanelProps {
  * component is pure presentation.
  */
 export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
+  const [saving, setSaving] = useState(false);
   const {
     enabled,
     preset,
     gains,
+    smart,
     adaptive,
     genreAdaptive,
+    smartStatus,
+    effectiveEq,
     adaptiveStatus,
     adaptiveFeatures,
     genreAdaptiveStatus,
     trackGenre,
     toggleEnabled,
+    toggleSmart,
     toggleAdaptive,
     toggleGenreAdaptive,
     applyPreset,
     updateBand,
     resetToFlat,
+    saveForCurrentTrack,
+    clearCurrentTrackPreset,
   } = useEqualizer();
 
-  // Either adaptive mode takes over the band gains, so manual controls
-  // (presets, sliders, reset) become read-only to avoid fighting the
-  // automatic curve.
-  const manualControlsEnabled = enabled && !adaptive && !genreAdaptive;
+  // Smart/adaptive modes own the curve, so manual controls become
+  // read-only until the user explicitly switches back to manual.
+  const manualControlsEnabled =
+    enabled && !smart && !adaptive && !genreAdaptive;
+  const hasUserTrackPreset = effectiveEq?.source === "user_track_preset";
+
+  const handleSaveTrack = async () => {
+    setSaving(true);
+    try {
+      const result = await saveForCurrentTrack();
+      if (result) toast.success("EQ preset saved for this track");
+      else toast.error("This track cannot store an EQ preset yet");
+    } catch (error) {
+      console.error("[eq] failed to save track preset", error);
+      toast.error("Could not save the EQ preset");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearTrack = async () => {
+    setSaving(true);
+    try {
+      await clearCurrentTrackPreset();
+      toast.success("Track EQ preset cleared");
+    } catch (error) {
+      console.error("[eq] failed to clear track preset", error);
+      toast.error("Could not clear the track EQ preset");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -302,28 +402,14 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
           <h2 className="text-sm font-semibold text-foreground">Equalizer</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Genre toggle — picks a preset from the track's primary
-              genre. Mutually exclusive with Adaptive (the hook enforces
-              this). Disabled when the EQ itself is off. */}
           <CratePill
-            active={genreAdaptive}
+            active={smart}
             disabled={!enabled}
-            onClick={() => toggleGenreAdaptive(!genreAdaptive)}
-            icon={Tag}
+            onClick={() => toggleSmart(!smart)}
+            icon={Brain}
           >
-            Genre
-            {genreAdaptive && genreAdaptiveStatus === "loading" ? (
-              <span className="ml-1 text-[9px] opacity-60">…</span>
-            ) : null}
-          </CratePill>
-          <CratePill
-            active={adaptive}
-            disabled={!enabled}
-            onClick={() => toggleAdaptive(!adaptive)}
-            icon={Sparkles}
-          >
-            Adaptive
-            {adaptive && adaptiveStatus === "loading" ? (
+            Smart
+            {smart && smartStatus === "loading" ? (
               <span className="ml-1 text-[9px] opacity-60">…</span>
             ) : null}
           </CratePill>
@@ -349,12 +435,44 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
         </div>
       </div>
 
+      {smart ? (
+        <SmartEqReadout eq={effectiveEq} status={smartStatus} />
+      ) : (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.025] px-2.5 py-2">
+          <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-white/35">
+            Manual helpers
+          </span>
+          <CratePill
+            active={genreAdaptive}
+            disabled={!enabled}
+            onClick={() => toggleGenreAdaptive(!genreAdaptive)}
+            icon={Tag}
+          >
+            Genre
+            {genreAdaptive && genreAdaptiveStatus === "loading" ? (
+              <span className="ml-1 text-[9px] opacity-60">…</span>
+            ) : null}
+          </CratePill>
+          <CratePill
+            active={adaptive}
+            disabled={!enabled}
+            onClick={() => toggleAdaptive(!adaptive)}
+            icon={Sparkles}
+          >
+            Adaptive
+            {adaptive && adaptiveStatus === "loading" ? (
+              <span className="ml-1 text-[9px] opacity-60">…</span>
+            ) : null}
+          </CratePill>
+        </div>
+      )}
+
       {/* Preset picker — compact pill scroller */}
       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
         {(Object.keys(PRESET_LABELS) as EqPresetName[]).map((name) => (
           <CratePill
             key={name}
-            active={preset === name && !adaptive && !genreAdaptive}
+            active={preset === name && !smart && !adaptive && !genreAdaptive}
             disabled={!manualControlsEnabled}
             onClick={() => applyPreset(name)}
           >
@@ -364,7 +482,12 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       </div>
 
       <div className="flex items-center justify-between">
-        {adaptive ? (
+        {smart ? (
+          <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
+            <Brain size={9} />
+            Smart curve
+          </span>
+        ) : adaptive ? (
           <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
             <Sparkles size={9} />
             Adaptive active
@@ -381,16 +504,40 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          disabled={!manualControlsEnabled}
-          onClick={resetToFlat}
-          className={`rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-[10px] text-white/70 hover:border-white/20 hover:text-foreground ${
-            !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
-          }`}
-        >
-          Reset
-        </button>
+        <div className="flex items-center gap-1.5">
+          {hasUserTrackPreset ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={handleClearTrack}
+              className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-400/[0.06] px-2.5 py-0.5 text-[10px] text-red-100/80 hover:border-red-400/35 hover:text-red-100 disabled:cursor-wait disabled:opacity-50"
+            >
+              <Trash2 size={9} />
+              Clear track preset
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!enabled || saving}
+              onClick={handleSaveTrack}
+              className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-2.5 py-0.5 text-[10px] text-cyan-100/80 hover:border-cyan-400/35 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Save size={9} />
+              Save for track
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!manualControlsEnabled}
+            onClick={resetToFlat}
+            className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-[10px] text-white/70 hover:border-white/20 hover:text-foreground ${
+              !manualControlsEnabled ? "cursor-not-allowed opacity-40" : ""
+            }`}
+          >
+            <RotateCcw size={9} />
+            Reset
+          </button>
+        </div>
       </div>
 
       {/* Adaptive feature readout — shows the analysis values that drive

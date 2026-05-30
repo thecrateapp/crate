@@ -1,17 +1,17 @@
 import logging
-from pathlib import Path
 import re
 import shutil
+from pathlib import Path
 from typing import Any, Mapping
 
 import mutagen
+import requests
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 from starlette.background import BackgroundTask
 
 from crate.api._deps import COVER_NAMES, extensions, library_path
 from crate.api.auth import _require_auth
-from crate.api.image_variants import build_image_response
 from crate.api.browse_shared import (
     build_genre_profile,
     display_name,
@@ -19,7 +19,7 @@ from crate.api.browse_shared import (
     fs_album_detail,
     has_library_data,
 )
-from crate.db.queries.browse import find_album_row
+from crate.api.image_variants import build_image_response
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -30,33 +30,39 @@ from crate.api.schemas.browse import AlbumDetailResponse, RelatedAlbumResponse
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
 from crate.db.cache_store import get_cache, set_cache
+from crate.db.queries.browse import (
+    find_album_row,
+    get_album_genre_ids,
+    get_album_genre_profile,
+    get_related_albums,
+)
+from crate.db.queries.lyrics import get_album_track_lyrics_status
+from crate.db.queries.streaming_admin import get_track_variant_summaries
+from crate.db.releases import (
+    find_upcoming_release_by_artist_album_slug,
+    get_artist_release_track_matches,
+    get_release_by_virtual_album_id,
+)
 from crate.db.repositories.library import (
-    get_library_album_by_id,
     get_library_album_by_entity_uid,
+    get_library_album_by_id,
     get_library_albums,
     get_library_artist,
     get_library_artist_by_slug,
     get_library_tracks,
 )
 from crate.db.repositories.library_contributions import list_album_contributors
-from crate.db.releases import (
-    find_upcoming_release_by_artist_album_slug,
-    get_artist_release_track_matches,
-)
-from crate.db.queries.browse import (
-    get_album_genre_ids,
-    get_related_albums,
-    get_album_genre_profile,
-)
-from crate.db.queries.lyrics import get_album_track_lyrics_status
 from crate.db.repositories.tasks import create_task
+from crate.release_covers import release_cover_abspath
 from crate.slugs import build_public_album_slug
-from crate.db.queries.streaming_admin import get_track_variant_summaries
 from crate.storage_layout import resolve_album_dir
 from crate.track_versions import canonical_track_title_key
 
 router = APIRouter(tags=["browse"])
 log = logging.getLogger(__name__)
+_REMOTE_COVER_SESSION = requests.Session()
+_REMOTE_COVER_TIMEOUT_SECONDS = 10
+_REMOTE_COVER_MIN_BYTES = 1000
 
 _BROWSE_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -82,6 +88,21 @@ _IMAGE_RESPONSES = merge_responses(
         404: error_response("The requested image was not found."),
     },
 )
+
+
+def _fetch_remote_cover(cover_url: str) -> tuple[bytes, str] | None:
+    response = _REMOTE_COVER_SESSION.get(
+        cover_url,
+        headers={"Accept": "image/*"},
+        timeout=_REMOTE_COVER_TIMEOUT_SECONDS,
+    )
+    if response.status_code != 200 or len(response.content) <= _REMOTE_COVER_MIN_BYTES:
+        return None
+    media_type = response.headers.get("content-type") or "image/jpeg"
+    if not media_type.startswith("image/"):
+        return None
+    return response.content, media_type
+
 
 _ZIP_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -914,6 +935,44 @@ def api_cover_by_id(
     size: int | None = Query(None, ge=32, le=1024),
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
+    if album_id < 0:
+        release = get_release_by_virtual_album_id(album_id)
+        if not release:
+            return _placeholder_cover("?")
+        cached_cover = release_cover_abspath(album_id)
+        if cached_cover.exists():
+            return build_image_response(
+                cached_cover.read_bytes(),
+                "image/jpeg",
+                size=size,
+                output_format=image_format,
+                headers={
+                    "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+                },
+            )
+        cover_url = str(release.get("cover_url") or "")
+        if cover_url:
+            try:
+                remote_cover = _fetch_remote_cover(cover_url)
+                if remote_cover:
+                    content, media_type = remote_cover
+                    return build_image_response(
+                        content,
+                        media_type,
+                        size=size,
+                        output_format=image_format,
+                        headers={
+                            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+                        },
+                    )
+            except Exception:
+                log.debug(
+                    "Failed to proxy pre-release cover for %s",
+                    release.get("album_title"),
+                    exc_info=True,
+                )
+        return _placeholder_cover(str(release.get("album_title") or "?"))
+
     album = get_library_album_by_id(album_id)
     if not album:
         return _placeholder_cover("?")
@@ -975,17 +1034,17 @@ def api_download_album(request: Request, artist: str, album: str):
     cache_key: str | None = None
     if album_row:
         try:
+            from crate.db.queries.portable_metadata import get_portable_album_payload
             from crate.download_cache import (
                 album_cache_ttl_seconds,
                 album_download_cache_key,
                 cached_download_artifact_path,
-                download_cache_lock,
                 download_cache_enabled,
+                download_cache_lock,
                 get_cached_download,
                 safe_download_filename,
                 store_cached_download,
             )
-            from crate.db.queries.portable_metadata import get_portable_album_payload
             from crate.media_worker import build_album_download_package
             from crate.portable_metadata import (
                 export_album_rich_metadata,

@@ -34,6 +34,17 @@ def test_roles_are_checked_through_casbin_policy():
     assert not has_capability({"role": "user"}, "admin.access")
 
 
+def test_multi_roles_union_capabilities():
+    from crate.api.permissions import get_user_capabilities, has_capability
+
+    user = {"roles": ["librarian", "curator"]}
+
+    assert has_capability(user, "library.analysis.manage")
+    assert has_capability(user, "curation.playlists.write")
+    assert "library.analysis.manage" in get_user_capabilities(user)
+    assert "curation.playlists.write" in get_user_capabilities(user)
+
+
 def test_require_permission_returns_user_for_allowed_role():
     from crate.api.permissions import require_permission
 
@@ -106,16 +117,21 @@ def test_admin_update_user_role_validates_persists_and_audits(monkeypatch):
         "name": "Editor",
         "avatar": None,
         "role": "user",
+        "roles": ["user"],
     }
-    updated = {**target, "role": "editor"}
-    lookups = [target, updated]
+    updated = {**target, "role": "editor", "roles": ["editor"]}
+    lookups = [target, updated, updated]
     audit = MagicMock()
+    role_updates: list[tuple[int, list[str]]] = []
 
     monkeypatch.setattr(
         "crate.api.auth.get_user_by_id", lambda _user_id: lookups.pop(0)
     )
     monkeypatch.setattr(
-        "crate.api.auth.update_user", lambda _user_id, **fields: {**target, **fields}
+        "crate.api.auth.set_user_roles",
+        lambda user_id, roles, **_kwargs: (
+            role_updates.append((user_id, list(roles))) or list(roles)
+        ),
     )
     monkeypatch.setattr("crate.api.auth.list_user_external_identities", lambda _id: [])
     monkeypatch.setattr("crate.api.auth.list_sessions", lambda *_args, **_kwargs: [])
@@ -131,12 +147,14 @@ def test_admin_update_user_role_validates_persists_and_audits(monkeypatch):
     )
 
     assert result["role"] == "editor"
+    assert result["roles"] == ["editor"]
     assert "library.metadata.write" in result["capabilities"]
+    assert role_updates == [(2, ["editor"])]
     audit.assert_called_once()
     assert audit.call_args.args[:3] == ("update_user_role", "user", "editor@test.com")
     assert audit.call_args.kwargs["user_id"] == 1
-    assert audit.call_args.kwargs["details"]["before"] == {"role": "user"}
-    assert audit.call_args.kwargs["details"]["after"] == {"role": "editor"}
+    assert audit.call_args.kwargs["details"]["before"] == {"roles": ["user"]}
+    assert audit.call_args.kwargs["details"]["after"] == {"roles": ["editor"]}
 
 
 def test_admin_update_user_role_prevents_self_lockout(monkeypatch):
@@ -816,7 +834,10 @@ def test_quarantined_track_hard_delete_api_requires_file_delete(monkeypatch):
 
 
 def test_list_contributions_requires_import_manager(monkeypatch):
+    from uuid import UUID
+
     from crate.api.management import list_contributions
+    from crate.api.schemas.management import LibraryContributionListResponse
 
     monkeypatch.setattr(
         "crate.api.management.list_library_contributions",
@@ -828,12 +849,17 @@ def test_list_contributions_requires_import_manager(monkeypatch):
                 "source": "bandcamp",
                 "source_ref": "bandcamp:123",
                 "album_id": 44,
-                "album_entity_uid": None,
+                "album_entity_uid": UUID("f05d1701-b2d0-5160-85f8-449053929f12"),
                 "artist_name": "Artist",
                 "album_name": "Album",
                 "status": "active",
+                "total_duration": 2423.0490000000004,
             }
         ],
+    )
+    monkeypatch.setattr(
+        "crate.api.management._require_library_import_manager",
+        lambda request: request.state.user,
     )
 
     response = list_contributions(_request_for("librarian"))  # type: ignore[arg-type]
@@ -841,6 +867,9 @@ def test_list_contributions_requires_import_manager(monkeypatch):
     assert response["count"] == 1
     assert response["items"][0]["source"] == "bandcamp"
     assert response["items"][0]["user_email"] == "user@example.test"
+    validated = LibraryContributionListResponse.model_validate(response)
+    assert validated.items[0].album_entity_uid == "f05d1701-b2d0-5160-85f8-449053929f12"
+    assert validated.items[0].total_duration == 2423
 
 
 def test_update_track_tags_writes_audit_entry(tmp_path, monkeypatch):
@@ -1552,6 +1581,7 @@ def test_merge_artist_moves_albums_reassigns_db_and_rescans(tmp_path, monkeypatc
         "source_path": str(source_dir),
         "target_path": str(target_dir),
         "moved_items": 1,
+        "artist_sidecars_preserved": 0,
         "source_albums": 1,
         "source_tracks": 1,
     }
@@ -1566,6 +1596,80 @@ def test_merge_artist_moves_albums_reassigns_db_and_rescans(tmp_path, monkeypatc
         "artist",
         "Source Artist",
     )
+
+
+def test_merge_artist_preserves_duplicate_artist_photo_sidecar(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import _handle_merge_artist
+
+    source_dir = tmp_path / "source-artist-uid"
+    target_dir = tmp_path / "target-artist-uid"
+    source_album_dir = source_dir / "Alias Album"
+    source_album_dir.mkdir(parents=True)
+    target_dir.mkdir(parents=True)
+    (source_album_dir / "01.flac").write_bytes(b"fake")
+    (source_dir / "artist.jpg").write_bytes(b"source art")
+    (target_dir / "artist.jpg").write_bytes(b"target art")
+
+    def fake_get_artist(artist_id: int):
+        if artist_id == 4:
+            return {
+                "id": 4,
+                "entity_uid": "source-artist-uid",
+                "name": "Source Artist",
+                "folder_name": "source-artist-uid",
+            }
+        if artist_id == 22:
+            return {
+                "id": 22,
+                "entity_uid": "target-artist-uid",
+                "name": "Target Artist",
+                "folder_name": "target-artist-uid",
+            }
+        return None
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist_by_id",
+        fake_get_artist,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_albums",
+        lambda artist_name: (
+            [{"id": 7, "name": "Alias Album", "track_count": 1}]
+            if artist_name == "Source Artist"
+            else []
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_album",
+        lambda _artist, _album: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.merge_artist_into_artist",
+        MagicMock(),
+    )
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.start_scan", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *_scopes: None,
+    )
+
+    result = _handle_merge_artist(
+        "task-sidecar",
+        {"source_artist_id": 4, "target_artist_id": 22},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result["status"] == "ok"
+    assert result["moved_items"] == 1
+    assert result["artist_sidecars_preserved"] == 1
+    assert (target_dir / "artist.jpg").read_bytes() == b"target art"
+    assert (target_dir / "Alias Album" / "01.flac").read_bytes() == b"fake"
+    trashed = list((tmp_path / ".crate-trash" / "artist-sidecars").rglob("artist.jpg"))
+    assert len(trashed) == 1
+    assert trashed[0].read_bytes() == b"source art"
+    assert not source_dir.exists()
 
 
 def test_system_playlists_allow_playlist_curator(monkeypatch):

@@ -1,15 +1,17 @@
 import { useEffect } from "react";
 import type { NavigateFunction } from "react-router";
 
+import type { AuthUser } from "@/contexts/auth-context";
 import { consumePendingOAuthNext } from "@/lib/capacitor";
 
 async function completePendingOAuthFlow(
   next: string | null,
-  refetch: () => Promise<void>,
+  refetch: () => Promise<AuthUser | null>,
   navigate: NavigateFunction,
 ) {
   if (!next) return;
-  await refetch();
+  const user = await refetch();
+  if (!user) return;
   navigate(next, { replace: true });
 }
 
@@ -18,7 +20,7 @@ export function useAuthOAuthSync({
   refetch,
 }: {
   navigate: NavigateFunction;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<AuthUser | null>;
 }) {
   useEffect(() => {
     function handleTokenReceived() {

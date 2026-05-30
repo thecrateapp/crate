@@ -7,6 +7,11 @@ from pathlib import Path
 from threading import Lock
 
 from crate.audio import get_audio_files, read_tags
+from crate.storage_import import (
+    DEFAULT_AUDIO_EXTENSIONS,
+    resolve_import_album_target,
+    resolve_managed_track_destination,
+)
 
 log = logging.getLogger(__name__)
 
@@ -117,35 +122,55 @@ class ImportQueue:
             or "Unknown Artist"
         )
         album = str(dest_album or tags.get("album") or src.name)
+        _artist_row, dest, managed_track_names = resolve_import_album_target(
+            self.library_path,
+            artist,
+            album,
+        )
 
-        dest = self.library_path / _sanitize(artist) / _sanitize(album)
+        copied = 0
+        skipped = 0
+        dest.mkdir(parents=True, exist_ok=True)
+        audio_extensions = {ext.lower() for ext in self.extensions}
+        audio_extensions.update(DEFAULT_AUDIO_EXTENSIONS)
+        for f in sorted(src.rglob("*")):
+            if not f.is_file():
+                continue
+            relative = f.relative_to(src)
+            if managed_track_names and f.suffix.lower() in audio_extensions:
+                target = resolve_managed_track_destination(
+                    f,
+                    dest,
+                    artist_name=artist,
+                    album_name=album,
+                    album_entity_uid=dest.name,
+                    replace_existing_audio=True,
+                )
+            else:
+                target = dest / relative
+            if target.exists():
+                skipped += 1
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(f), str(target))
+            copied += 1
 
-        if dest.exists():
-            # Merge: only copy files that don't exist
-            copied = 0
-            skipped = 0
-            for f in src.iterdir():
-                if f.is_file():
-                    target = dest / f.name
-                    if target.exists():
-                        skipped += 1
-                    else:
-                        shutil.copy2(str(f), str(target))
-                        copied += 1
+        if skipped:
             return {
                 "status": "merged",
                 "dest": str(dest),
                 "copied": copied,
                 "skipped": skipped,
+                "artist": artist,
+                "album": album,
             }
-        else:
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(str(src), str(dest))
-            return {
-                "status": "imported",
-                "dest": str(dest),
-                "tracks": len(tracks),
-            }
+        return {
+            "status": "imported",
+            "dest": str(dest),
+            "tracks": len(tracks),
+            "artist": artist,
+            "album": album,
+        }
 
     def import_all(self, items: list[dict] | None = None) -> list[dict]:
         """Import multiple items."""

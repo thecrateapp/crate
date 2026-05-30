@@ -11,8 +11,13 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from starlette.responses import StreamingResponse
 
-from crate import soulseek
-from crate import tidal
+from crate import soulseek, tidal
+from crate.acquisition_tasks import (
+    build_soulseek_download_params,
+    build_tidal_download_params,
+    soulseek_download_dedup_key,
+    tidal_download_dedup_key,
+)
 from crate.api._deps import json_dumps
 from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
@@ -25,9 +30,12 @@ from crate.api.schemas.acquisition import (
     AcquisitionDownloadRequest,
     AcquisitionDownloadResponse,
     AcquisitionQueueResponse,
-    AcquisitionSurfaceResponse,
     AcquisitionStatusResponse,
+    AcquisitionSurfaceResponse,
     AcquisitionUploadResponse,
+    ArtistSuggestionResponse,
+    ArtistSuggestionsResponse,
+    ArtistSuggestionStatusRequest,
     NewReleasesResponse,
     NewReleasesSurfaceResponse,
     QueueClearResponse,
@@ -36,19 +44,17 @@ from crate.api.schemas.acquisition import (
     SoulseekSearchStartResponse,
 )
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
-from crate.acquisition_tasks import (
-    build_soulseek_download_params,
-    build_tidal_download_params,
-    soulseek_download_dedup_key,
-    tidal_download_dedup_key,
-)
 from crate.db.cache_settings import get_setting
-from crate.db.repositories.library import get_release_by_id
 from crate.db.releases import (
     get_new_releases,
     mark_release_dismissed,
     mark_release_downloading,
 )
+from crate.db.repositories.artist_suggestions import (
+    list_artist_suggestions,
+    update_artist_suggestion_status,
+)
+from crate.db.repositories.library import get_release_by_id
 from crate.db.repositories.tasks import (
     create_task,
     create_task_dedup,
@@ -225,6 +231,50 @@ def acquisition_status(request: Request):
 def acquisition_snapshot(request: Request):
     _require_auth(request)
     return _build_acquisition_surface()
+
+
+@router.get(
+    "/artist-suggestions",
+    response_model=ArtistSuggestionsResponse,
+    responses=_ACQUISITION_RESPONSES,
+    summary="List listener artist suggestions for acquisition triage",
+)
+def acquisition_artist_suggestions(
+    request: Request,
+    status: str = "open",
+    limit: int = 50,
+):
+    _require_acquisition_manager(request)
+    return {
+        "suggestions": list_artist_suggestions(status=status, limit=limit),
+    }
+
+
+@router.patch(
+    "/artist-suggestions/{suggestion_id}",
+    response_model=ArtistSuggestionResponse,
+    responses=_ACQUISITION_RESPONSES,
+    summary="Update a listener artist suggestion",
+)
+def update_acquisition_artist_suggestion(
+    request: Request,
+    suggestion_id: int,
+    body: ArtistSuggestionStatusRequest,
+):
+    user = _require_acquisition_manager(request)
+    try:
+        suggestion = update_artist_suggestion_status(
+            suggestion_id,
+            status=body.status,
+            actor_user_id=int(user["id"]),
+            linked_artist_id=body.linked_artist_id,
+            linked_task_id=body.linked_task_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Artist suggestion not found")
+    return suggestion
 
 
 @router.get(
@@ -630,10 +680,11 @@ def api_dismiss_release(request: Request, release_id: int):
     responses=AUTH_ERROR_RESPONSES,
     summary="Queue a new-release check",
 )
-def api_check_new_releases(request: Request):
+def api_check_new_releases(request: Request, force: bool = False):
     """Trigger a new release check for all library artists."""
     require_permission(request, "curation.releases.write")
-    task_id = create_task("check_new_releases", {})
+    params = {"force": True} if force else {}
+    task_id = create_task("check_new_releases", params)
     return {"task_id": task_id}
 
 

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -58,5 +58,29 @@ describe("AppModal", () => {
     );
     const panel = screen.getByText("Content").parentElement;
     expect(panel?.className).not.toContain("pb-[var(--listen-safe-bottom)]");
+  });
+
+  it("keeps keyboard focus inside the modal", async () => {
+    render(
+      <>
+        <button type="button">Outside</button>
+        <AppModal open onClose={vi.fn()}>
+          <ModalBody>
+            <button type="button">First</button>
+            <button type="button">Last</button>
+          </ModalBody>
+        </AppModal>
+      </>,
+    );
+
+    const first = screen.getByRole("button", { name: "First" });
+    const last = screen.getByRole("button", { name: "Last" });
+    await waitFor(() => expect(first).toHaveFocus());
+
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(first).toHaveFocus();
   });
 });

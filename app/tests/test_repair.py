@@ -887,6 +887,44 @@ class TestFolderNamingRepair:
             # Source should still exist
             assert current.is_dir()
             assert not expected.exists()
+            assert (
+                result["message"]
+                == "Would reorganize album folder for Artist/2020 - Album"
+            )
+
+    def test_direct_album_folder_preview_is_executable_not_skipped(self):
+        """'Artist/Album' preview should describe the move instead of looking skipped."""
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            current = Path(lib) / "Audioslave" / "Like A Stone"
+            expected = Path(lib) / "Audioslave" / "2002" / "Like A Stone"
+            current.mkdir(parents=True)
+            (current / "01 - Like A Stone.flac").write_bytes(b"\x00")
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "folder_naming",
+                "auto_fixable": True,
+                "details": {
+                    "artist": "Audioslave",
+                    "current_folder": "Like A Stone",
+                    "clean_name": "Like A Stone",
+                    "year": "2002",
+                    "current_path": str(current),
+                    "expected_path": str(expected),
+                    "reason": "Album directly under artist — should be under 2002/ subdirectory",
+                    "path": str(current),
+                },
+            }
+
+            plan = repair.preview({"issues": [issue]}, auto_only=False)
+
+        assert plan["total"] == 1
+        assert plan["executable"] == 1
+        assert plan["items"][0]["message"] == (
+            "Would reorganize album folder for Audioslave/Like A Stone"
+        )
 
 
 class TestUnindexedFilesRepair:

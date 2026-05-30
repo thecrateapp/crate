@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from crate.db.orm.user import User, UserExternalIdentity
 from crate.db.repositories.auth_shared import model_to_dict
+from crate.db.repositories.auth_user_roles import hydrate_user_roles, set_user_roles
 from crate.db.tx import optional_scope, read_scope, transaction_scope
 
 log = logging.getLogger(__name__)
@@ -113,7 +114,8 @@ def create_user(
         )
         s.add(user)
         s.flush()
-        return model_to_dict(user)
+        set_user_roles(user.id, [role], session=s)
+        return hydrate_user_roles(model_to_dict(user), session=s) or {}
 
     with optional_scope(session) as s:
         return _impl(s)
@@ -124,7 +126,9 @@ def get_user_by_email(email: str) -> dict | None:
         user = session.execute(
             select(User).where(User.email == email).limit(1)
         ).scalar_one_or_none()
-        return model_to_dict(user) if user is not None else None
+        return (
+            hydrate_user_roles(model_to_dict(user), session=session) if user else None
+        )
 
 
 def get_user_by_google_id(google_id: str) -> dict | None:
@@ -132,7 +136,9 @@ def get_user_by_google_id(google_id: str) -> dict | None:
         user = session.execute(
             select(User).where(User.google_id == google_id).limit(1)
         ).scalar_one_or_none()
-        return model_to_dict(user) if user is not None else None
+        return (
+            hydrate_user_roles(model_to_dict(user), session=session) if user else None
+        )
 
 
 def get_user_by_external_identity(provider: str, external_user_id: str) -> dict | None:
@@ -146,13 +152,15 @@ def get_user_by_external_identity(provider: str, external_user_id: str) -> dict 
             )
             .limit(1)
         ).scalar_one_or_none()
-        return model_to_dict(user) if user is not None else None
+        return (
+            hydrate_user_roles(model_to_dict(user), session=session) if user else None
+        )
 
 
 def get_user_by_id(user_id: int, *, session=None) -> dict | None:
     def _impl(s) -> dict | None:
         user = s.get(User, user_id)
-        return model_to_dict(user) if user is not None else None
+        return hydrate_user_roles(model_to_dict(user), session=s) if user else None
 
     if session is not None:
         return _impl(session)

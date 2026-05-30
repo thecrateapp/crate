@@ -1,6 +1,22 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const {
+  castPauseMock,
+  castPlayMock,
+  castSeekMock,
+  castSetVolumeMock,
+  isCastSessionActiveMock,
+  startCastSessionMock,
+} = vi.hoisted(() => ({
+  castPauseMock: vi.fn(),
+  castPlayMock: vi.fn(),
+  castSeekMock: vi.fn(),
+  castSetVolumeMock: vi.fn(),
+  isCastSessionActiveMock: vi.fn(),
+  startCastSessionMock: vi.fn(),
+}));
+
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import type { Track } from "@/contexts/player-types";
 import * as gaplessPlayer from "@/lib/gapless-player";
@@ -24,6 +40,16 @@ vi.mock("@/lib/gapless-player", () => ({
   setSingleMode: vi.fn(),
   setVolume: vi.fn(),
   stop: vi.fn(),
+}));
+
+vi.mock("@/lib/cast-sender", () => ({
+  castPause: castPauseMock,
+  castPlay: castPlayMock,
+  castSeek: castSeekMock,
+  castSetVolume: castSetVolumeMock,
+  castStop: vi.fn(),
+  isCastSessionActive: isCastSessionActiveMock,
+  startCastSession: startCastSessionMock,
 }));
 
 const TRACK: Track = {
@@ -79,6 +105,7 @@ function createParams() {
     pullFromEngine: vi.fn(() => ({ resolvedTrack: TRACK })),
     pushToEngine: vi.fn(),
     advanceCursorTo: vi.fn(),
+    publishConnectState: vi.fn(async () => undefined),
     playbackDeliveryPolicy: "original" as const,
   };
 }
@@ -86,6 +113,12 @@ function createParams() {
 describe("usePlayerQueueActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    castPauseMock.mockResolvedValue({ ok: true });
+    castPlayMock.mockResolvedValue({ ok: true });
+    castSeekMock.mockResolvedValue({ ok: true });
+    castSetVolumeMock.mockResolvedValue({ ok: true });
+    isCastSessionActiveMock.mockReturnValue(false);
+    startCastSessionMock.mockResolvedValue({ ok: true });
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
       value: "visible",
@@ -107,6 +140,24 @@ describe("usePlayerQueueActions", () => {
     );
     expect(params.commitIsBuffering).toHaveBeenCalledWith(false);
     expect(gaplessPlayer.play).toHaveBeenCalledTimes(1);
+    expect(params.publishConnectState).toHaveBeenCalledWith({
+      claimActive: true,
+    });
+  });
+
+  it("does not claim Crate Connect ownership for queue mutation actions", () => {
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    const queuedTrack = { ...TRACK, id: "track-queued", title: "Queued" };
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.playNext(queuedTrack);
+    result.current.addToQueue(queuedTrack);
+
+    expect(params.publishConnectState).not.toHaveBeenCalled();
+    expect(gaplessPlayer.insertTrack).toHaveBeenCalledTimes(1);
+    expect(gaplessPlayer.addTrack).toHaveBeenCalledTimes(1);
+    expect(gaplessPlayer.play).not.toHaveBeenCalled();
   });
 
   it("pauses immediately when the app is hidden", () => {
@@ -138,5 +189,35 @@ describe("usePlayerQueueActions", () => {
     expect(gaplessPlayer.restoreVolume).toHaveBeenCalledTimes(1);
     expect(gaplessPlayer.play).toHaveBeenCalledTimes(1);
     expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+  });
+
+  it("routes transport and volume actions to an active Cast receiver", () => {
+    isCastSessionActiveMock.mockReturnValue(true);
+    const params = createParams();
+    params.queueRef.current = [
+      TRACK,
+      { ...TRACK, id: "track-2", title: "Track Two" },
+    ];
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+
+    result.current.pause();
+    result.current.resume();
+    result.current.seek(42);
+    result.current.setVolume(0.6);
+    result.current.next();
+
+    expect(castPauseMock).toHaveBeenCalledTimes(1);
+    expect(castPlayMock).toHaveBeenCalledTimes(1);
+    expect(castSeekMock).toHaveBeenCalledWith(42);
+    expect(castSetVolumeMock).toHaveBeenCalledWith(0.6);
+    expect(startCastSessionMock).toHaveBeenCalledWith({
+      track: expect.objectContaining({ id: "track-2" }),
+      currentTime: 0,
+    });
+    expect(gaplessPlayer.play).not.toHaveBeenCalled();
+    expect(gaplessPlayer.pause).not.toHaveBeenCalled();
+    expect(gaplessPlayer.seekTo).not.toHaveBeenCalled();
+    expect(params.commitIsPlaying).toHaveBeenCalledWith(false);
+    expect(params.commitIsPlaying).toHaveBeenCalledWith(true);
   });
 });

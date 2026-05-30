@@ -20,6 +20,14 @@ export function consumePendingOAuthNext(): string | null {
   }
 }
 
+export function clearPendingOAuthNext(): void {
+  try {
+    localStorage.removeItem(OAUTH_NEXT_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 export function getOAuthCallbackPayload(search: string | URLSearchParams): {
   token: string | null;
   refreshToken: string | null;

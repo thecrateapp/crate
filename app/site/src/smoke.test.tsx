@@ -60,15 +60,17 @@ describe("site routes", () => {
     ).toBeTruthy();
   });
 
-  it("renders manifesto separators with key phrases", () => {
+  it("renders the streamlined manifesto copy", () => {
     window.history.pushState(null, "", "/why");
 
     render(<App />);
 
-    expect(screen.getByText(/the system is not broken/i)).toBeTruthy();
-    const biggerThanMusic = screen.getAllByText(/this is bigger than music/i);
-    expect(biggerThanMusic.length).toBe(2);
-    expect(screen.getByText(/the manifesto is the start/i)).toBeTruthy();
+    expect(screen.getByText(/the system isn't broken/i)).toBeTruthy();
+    expect(screen.getByText(/this is bigger than music/i)).toBeTruthy();
+    expect(screen.getAllByText(/refuse the middleman/i).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText(/the manifesto is the start/i)).toBeNull();
   });
 
   it("does not restore removed content routes", () => {

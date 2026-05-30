@@ -7,7 +7,11 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 
-import type { UpcomingItem } from "./upcoming-model";
+import {
+  canOpenUpcomingRelease,
+  upcomingReleaseBadgeLabel,
+  type UpcomingItem,
+} from "./upcoming-model";
 
 export function UpcomingEventRow({
   item,
@@ -34,7 +38,7 @@ export function UpcomingEventRow({
     ) ||
     undefined;
   const albumPath =
-    item.album_id || item.album_slug
+    canOpenUpcomingRelease(item) && (item.album_id || item.album_slug)
       ? albumPagePath({
           albumId: item.album_id,
           albumSlug: item.album_slug,
@@ -43,6 +47,7 @@ export function UpcomingEventRow({
           artistName: item.artist,
         })
       : null;
+  const badgeLabel = upcomingReleaseBadgeLabel(item);
   const artistPath = artistPagePath({
     artistId: item.artist_id,
     artistSlug: item.artist_slug,
@@ -100,7 +105,7 @@ export function UpcomingEventRow({
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
               <Disc3 size={11} />
-              Pre-release
+              {badgeLabel}
             </div>
             <h3 className="truncate text-lg font-extrabold text-foreground">
               {item.title}
@@ -140,7 +145,7 @@ export function UpcomingEventRow({
               className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Play size={14} className="fill-current" />
-              Open pre-release
+              Open
             </Link>
           ) : null}
           {item.tidal_url ? (
@@ -185,9 +190,9 @@ export function UpcomingEventRow({
                 Discography radar
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/68">
-                This release is tracked as a pre-release album. Open it to see
-                the full planned tracklist; tracks become playable as soon as
-                Crate has downloaded or matched them locally.
+                {item.is_upcoming
+                  ? "This release is tracked as a pre-release album. Open it to see the full planned tracklist; tracks become playable as soon as Crate has downloaded or matched them locally."
+                  : "This release has landed recently. Open it if Crate has matched it to the local library, or jump to the source to inspect the original release."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

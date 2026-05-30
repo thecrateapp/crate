@@ -117,7 +117,8 @@ class TestBootstrap:
                             'latitude',
                             'longitude',
                             'show_location_mode',
-                            'show_radius_km'
+                            'show_radius_km',
+                            'crate_connect_enabled'
                         ))
                         OR
                         (table_name = 'shows' AND column_name IN (
@@ -145,6 +146,7 @@ class TestBootstrap:
             ("users", "longitude"),
             ("users", "show_location_mode"),
             ("users", "show_radius_km"),
+            ("users", "crate_connect_enabled"),
             ("shows", "lastfm_event_id"),
             ("shows", "lastfm_url"),
             ("shows", "lastfm_attendance"),
@@ -156,6 +158,107 @@ class TestBootstrap:
 
 
 class TestPlaylistTrackEntityRefs:
+    def test_duplicate_track_query_reports_only_safe_candidates(self, pg_db):
+        from crate.db.queries.health import get_duplicate_tracks
+
+        pg_db.upsert_artist({"name": "Duplicate Query Artist"})
+        safe_album_id = pg_db.upsert_album(
+            {
+                "artist": "Duplicate Query Artist",
+                "name": "Safe Duplicate Album",
+                "path": "/music/duplicate-query-artist/safe-duplicate-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename in ("01-safe-a.flac", "01-safe-b.flac"):
+            pg_db.upsert_track(
+                {
+                    "album_id": safe_album_id,
+                    "artist": "Duplicate Query Artist",
+                    "album": "Safe Duplicate Album",
+                    "filename": filename,
+                    "title": "Safe Duplicate",
+                    "path": f"/music/duplicate-query-artist/safe-duplicate-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": 120.0,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": "same-fingerprint",
+                }
+            )
+
+        featured_album_id = pg_db.upsert_album(
+            {
+                "artist": "Duplicate Query Artist",
+                "name": "Featured Duplicate Album",
+                "path": "/music/duplicate-query-artist/featured-duplicate-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename in ("01-featured-a.flac", "01-featured-b.flac"):
+            pg_db.upsert_track(
+                {
+                    "album_id": featured_album_id,
+                    "artist": "Featured Track Artist",
+                    "album": "Featured Duplicate Album",
+                    "filename": filename,
+                    "title": "Featured Duplicate",
+                    "path": f"/music/duplicate-query-artist/featured-duplicate-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": 120.0,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": "same-featured-fingerprint",
+                }
+            )
+
+        unsafe_album_id = pg_db.upsert_album(
+            {
+                "artist": "Duplicate Query Artist",
+                "name": "Unsafe Duplicate Album",
+                "path": "/music/duplicate-query-artist/unsafe-duplicate-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 245.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename, duration, fingerprint in (
+            ("01-unsafe-a.flac", 120.0, "fingerprint-a"),
+            ("01-unsafe-b.flac", 125.0, "fingerprint-b"),
+        ):
+            pg_db.upsert_track(
+                {
+                    "album_id": unsafe_album_id,
+                    "artist": "Duplicate Query Artist",
+                    "album": "Unsafe Duplicate Album",
+                    "filename": filename,
+                    "title": "Unsafe Duplicate",
+                    "path": f"/music/duplicate-query-artist/unsafe-duplicate-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": duration,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": fingerprint,
+                }
+            )
+
+        rows = get_duplicate_tracks()
+        by_title = {row["title"]: row for row in rows}
+
+        assert by_title["Safe Duplicate"]["artist"] == "Duplicate Query Artist"
+        assert "Featured Duplicate" not in by_title
+        assert "Unsafe Duplicate" not in by_title
+
     def test_add_playlist_tracks_persists_entity_and_storage_refs(self, pg_db):
         from crate.db.repositories.playlists_create import create_playlist
         from crate.db.repositories.playlists_tracks import add_playlist_tracks
@@ -1946,6 +2049,14 @@ class TestHomeCaching:
         task = pg_db.get_task(task_id)
         assert task["status"] == "failed"
         assert task["error"] == "Something broke"
+
+    def test_update_task_completed_clears_stale_error(self, pg_db):
+        task_id = pg_db.create_task("scan")
+        pg_db.update_task(task_id, status="failed", error="Orphaned: worker restarted")
+        pg_db.update_task(task_id, status="completed", result={"ok": True})
+        task = pg_db.get_task(task_id)
+        assert task["status"] == "completed"
+        assert task["error"] is None
 
     def test_list_tasks(self, pg_db):
         pg_db.create_task("scan")

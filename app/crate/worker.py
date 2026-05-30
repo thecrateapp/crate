@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from collections.abc import Iterator, MutableMapping
 from importlib import import_module
@@ -7,7 +8,6 @@ from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
 from crate.db.queries.tasks import get_task, get_task_activity_snapshot
 from crate.db.repositories.tasks import (
-    cleanup_orphaned_tasks,
     cleanup_zombie_tasks,
     redispatch_stale_pending_tasks,
 )
@@ -25,6 +25,28 @@ def _normalise_queues(value) -> list[str]:
         parts = []
     queues = [str(part).strip() for part in parts if str(part).strip()]
     return queues or ["fast", "heavy", "default", "maintenance"]
+
+
+def _env_int(name: str, default: int = 0) -> int:
+    try:
+        return int(os.environ.get(name, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _configured_worker_slots(config: dict) -> int:
+    """Return real Dramatiq process capacity across split worker containers."""
+    primary = int(config.get("worker_processes") or 0)
+    split_workers = sum(
+        _env_int(name)
+        for name in (
+            "FAST_WORKER_PROCESSES",
+            "MAINTENANCE_WORKER_PROCESSES",
+            "ANALYSIS_WORKER_PROCESSES",
+            "PLAYBACK_WORKER_PROCESSES",
+        )
+    )
+    return max(1, primary + split_workers)
 
 
 def _is_cancelled(task_id: str) -> bool:
@@ -63,8 +85,6 @@ def run_worker(config: dict):
         _load_radio_graphs()
     except Exception:
         log.warning("Radio graph pre-warm failed", exc_info=True)
-
-    cleanup_orphaned_tasks(pools=queues)
 
     # Runtime semaphores use TTLs and owner checks.  Do not clear them on
     # startup: another worker instance may still be doing real work.
@@ -250,7 +270,6 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
         if now - last_status_update > 15:
             last_status_update = now
             try:
-                from crate.db.cache_settings import get_setting
                 from crate.db.ops_runtime import set_ops_runtime_state
 
                 activity = get_task_activity_snapshot(
@@ -259,11 +278,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                 running = activity["running_tasks"]
                 pending = activity["pending_tasks"]
                 recent = activity["recent_tasks"]
-                max_workers = int(
-                    get_setting("max_workers", str(config.get("worker_processes", 6)))
-                    or config.get("worker_processes", 6)
-                    or 6
-                )
+                max_workers = _configured_worker_slots(config)
                 scan_running = next(
                     (task for task in running if task.get("type") == "scan"), None
                 )

@@ -54,6 +54,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -64,6 +66,10 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS Rust targets
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Cache Rust builds
         uses: Swatinem/rust-cache@v2
@@ -89,10 +95,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build macOS tester bundles
+        if: runner.os == 'macOS'
+        run: |
+          version="$(node -p "require('./app/listen-desktop/src-tauri/tauri.conf.json').version")"
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && -n "${GITHUB_REF_NAME:-}" ]]; then
+            version="${GITHUB_REF_NAME}"
+          fi
+          make tauri-build-macos-testers \
+            TAURI_RELEASE_VERSION="$version" \
+            TAURI_MACOS_OUTPUT_DIR=desktop-artifacts
+
       - name: Build desktop bundles
+        if: runner.os != 'macOS'
         run: npm run --workspace=app/listen-desktop ${{ matrix.build_script }}
 
       - name: Collect artifacts
+        if: runner.os != 'macOS'
         run: app/listen-desktop/scripts/collect-artifacts.sh ${{ matrix.artifact_suffix }}
 
       - name: Upload desktop artifacts

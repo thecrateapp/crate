@@ -57,6 +57,7 @@ interface TestOptions {
   queue?: Track[];
   isPlaying?: boolean;
   repeat?: RepeatMode;
+  allowAutoplayRestore?: boolean;
 }
 
 function createOptions(opts: TestOptions = {}) {
@@ -77,6 +78,7 @@ function createOptions(opts: TestOptions = {}) {
     commitIsBuffering: vi.fn(),
     commitCurrentTime: vi.fn(),
     markSeekPosition: vi.fn(),
+    allowAutoplayRestore: opts.allowAutoplayRestore,
   };
 }
 
@@ -159,6 +161,16 @@ describe("useRestoreOnMount", () => {
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
     expect(result.current.resumeAfterReloadRef.current).toBe(true);
+  });
+
+  it("can restore the queue without restoring autoplay", () => {
+    setStored([TRACK_A], 0, 0, true);
+    const opts = createOptions({ allowAutoplayRestore: false });
+
+    const { result } = renderHook(() => useRestoreOnMount(opts));
+
+    expect(opts.pullFromEngine).toHaveBeenCalledWith([TRACK_A]);
+    expect(result.current.resumeAfterReloadRef.current).toBe(false);
   });
 
   it("tryRestoreAutoplay is a no-op when wasPlaying=false", () => {

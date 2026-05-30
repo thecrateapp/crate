@@ -68,6 +68,8 @@ def update_task(
         elif status in TERMINAL_STATUSES:
             fields.append("heartbeat_at = NULL")
             fields.append("worker_id = NULL")
+            if status == "completed":
+                fields.append("error = NULL")
     if progress is not None:
         fields.append("progress = :set_progress")
         params["set_progress"] = progress

@@ -11,6 +11,7 @@ import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
@@ -50,8 +51,9 @@ export function ArtistCard({
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
+  const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
   const photoUrl =
-    photo ||
+    resolvedPhotoUrl ||
     artistPhotoApiUrl(
       { artistId, artistEntityUid, artistSlug, artistName: name },
       { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
@@ -62,6 +64,7 @@ export function ArtistCard({
   const following = isFollowing(artistId);
   const actions = useArtistActionEntries({
     artistId,
+    artistEntityUid,
     artistSlug,
     name,
   });

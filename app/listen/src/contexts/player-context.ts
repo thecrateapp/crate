@@ -48,6 +48,7 @@ export interface PlayerActionsValue {
   addToQueue: (track: Track) => void;
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
+  publishConnectState: (options?: { claimActive?: boolean }) => Promise<void>;
 }
 
 export type PlayerContextValue = PlayerStateValue &

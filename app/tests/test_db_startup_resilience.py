@@ -5,9 +5,19 @@ import importlib
 from sqlalchemy.exc import OperationalError
 
 
+class _FakeResult:
+    def __init__(self, value):
+        self.value = value
+
+    def scalar(self):
+        return self.value
+
+
 class _FakeConnection:
     def __init__(self):
         self.statements: list[object] = []
+        self.lock_results = [True]
+        self.commits = 0
 
     def __enter__(self):
         return self
@@ -17,8 +27,12 @@ class _FakeConnection:
 
     def execute(self, statement, params=None):
         self.statements.append((statement, params))
+        if "pg_try_advisory_lock" in str(statement):
+            return _FakeResult(self.lock_results.pop(0))
+        return _FakeResult(None)
 
     def commit(self):
+        self.commits += 1
         return None
 
 
@@ -51,6 +65,36 @@ def test_init_db_retries_until_database_accepts_connections(monkeypatch):
 
     assert engine.attempts == 2
     assert calls == ["ensure", "ensure", "inner"]
+    assert any(
+        "pg_try_advisory_lock" in str(stmt) for stmt, _ in engine.connection.statements
+    )
+
+
+def test_init_db_polls_migration_lock_without_blocking_transactions(monkeypatch):
+    db_init = importlib.import_module("crate.db.init_db")
+
+    engine = _FakeEngine()
+    engine.attempts = 1
+    engine.connection.lock_results = [False, False, True]
+    calls: list[str] = []
+
+    monkeypatch.setenv("CRATE_DB_INIT_LOCK_TIMEOUT_SECONDS", "5")
+    monkeypatch.setenv("CRATE_DB_INIT_LOCK_INTERVAL_SECONDS", "0.01")
+    monkeypatch.setattr(db_init, "ensure_database", lambda: calls.append("ensure"))
+    monkeypatch.setattr(db_init, "get_engine", lambda: engine)
+    monkeypatch.setattr(db_init, "_init_db_inner", lambda: calls.append("inner"))
+    monkeypatch.setattr(db_init.time, "sleep", lambda _: calls.append("sleep"))
+
+    db_init._init_db_once()
+
+    lock_statements = [
+        stmt
+        for stmt, _params in engine.connection.statements
+        if "pg_try_advisory_lock" in str(stmt)
+    ]
+    assert len(lock_statements) == 3
+    assert calls == ["ensure", "sleep", "sleep", "inner"]
+    assert engine.connection.commits >= 4
 
 
 def test_ensure_database_retries_after_failed_provisioning(monkeypatch):

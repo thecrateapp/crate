@@ -35,6 +35,10 @@ CHUNK_SIZE = 10
 # Default / max limits for task parameters
 _DEFAULT_INFER_GENRE_TAXONOMY_LIMIT = 200
 _MAX_INFER_GENRE_TAXONOMY_LIMIT = 500
+_DEFAULT_REBUILD_GENRE_TAXONOMY_ALIAS_LIMIT = 80
+_MAX_REBUILD_GENRE_TAXONOMY_ALIAS_LIMIT = 300
+_DEFAULT_REBUILD_GENRE_TAXONOMY_NODE_LIMIT = 12
+_MAX_REBUILD_GENRE_TAXONOMY_NODE_LIMIT = 50
 _DEFAULT_ENRICH_GENRE_DESCRIPTIONS_LIMIT = 120
 _MAX_ENRICH_GENRE_DESCRIPTIONS_LIMIT = 500
 _DEFAULT_SYNC_MB_GENRE_GRAPH_LIMIT = 80
@@ -661,6 +665,78 @@ def _handle_infer_genre_taxonomy(task_id: str, params: dict, config: dict) -> di
     return result
 
 
+def _handle_rebuild_genre_taxonomy_proposals(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    from crate.genre_taxonomy_proposals import build_genre_taxonomy_rebuild_proposal
+
+    alias_limit = max(
+        1,
+        min(
+            int(
+                params.get("alias_limit") or _DEFAULT_REBUILD_GENRE_TAXONOMY_ALIAS_LIMIT
+            ),
+            _MAX_REBUILD_GENRE_TAXONOMY_ALIAS_LIMIT,
+        ),
+    )
+    node_limit = max(
+        0,
+        min(
+            int(params.get("node_limit") or _DEFAULT_REBUILD_GENRE_TAXONOMY_NODE_LIMIT),
+            _MAX_REBUILD_GENRE_TAXONOMY_NODE_LIMIT,
+        ),
+    )
+    include_external = bool(params.get("include_external", True))
+    aggressive = bool(params.get("aggressive", True))
+
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": "Building review-only genre taxonomy rebuild proposal...",
+            "alias_limit": alias_limit,
+            "node_limit": node_limit,
+            "include_external": include_external,
+            "aggressive": aggressive,
+        },
+    )
+    p_rebuild = TaskProgress(
+        phase="taxonomy_proposal",
+        phase_count=2,
+        total=alias_limit + node_limit,
+    )
+
+    def _proposal_progress(data):
+        p_rebuild.phase = data.get("phase", p_rebuild.phase)
+        p_rebuild.done = data.get("done", p_rebuild.done)
+        p_rebuild.total = data.get("total", p_rebuild.total)
+        p_rebuild.item = data.get("item", p_rebuild.item)
+        emit_progress(task_id, p_rebuild)
+
+    result = build_genre_taxonomy_rebuild_proposal(
+        alias_limit=alias_limit,
+        node_limit=node_limit,
+        include_external=include_external,
+        aggressive=aggressive,
+        progress_callback=_proposal_progress,
+        event_callback=lambda data: emit_task_event(task_id, "info", data),
+    )
+    summary = result.get("summary") or {}
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": (
+                f"Taxonomy rebuild proposal ready: "
+                f"{summary.get('alias_proposals', 0)} alias proposals, "
+                f"{summary.get('node_proposals', 0)} node proposals"
+            ),
+            "summary": summary,
+        },
+    )
+    return result
+
+
 def _handle_enrich_genre_descriptions(task_id: str, params: dict, config: dict) -> dict:
     from crate.genre_descriptions import enrich_genre_descriptions_batch
 
@@ -944,6 +1020,7 @@ ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
     "index_genres": _handle_index_genres,
     "infer_genre_taxonomy": _handle_infer_genre_taxonomy,
+    "rebuild_genre_taxonomy_proposals": _handle_rebuild_genre_taxonomy_proposals,
     "enrich_genre_descriptions": _handle_enrich_genre_descriptions,
     "sync_musicbrainz_genre_graph": _handle_sync_musicbrainz_genre_graph,
     "cleanup_invalid_genre_taxonomy": _handle_cleanup_invalid_genre_taxonomy,

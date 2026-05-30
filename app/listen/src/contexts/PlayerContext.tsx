@@ -18,7 +18,7 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
-import {} from "@/contexts/player-queue-helpers";
+import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
@@ -39,6 +39,10 @@ import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
+import { useRemotePlaybackState } from "@/contexts/use-remote-playback-state";
+import { useCrateConnectCommands } from "@/contexts/use-crate-connect-commands";
+import { ContinuePlaybackPrompt } from "@/components/player/ContinuePlaybackPrompt";
+import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
 import { usePlayerAuthSync } from "@/contexts/use-player-auth-sync";
@@ -75,6 +79,11 @@ import {
   type PlaybackDeliveryPolicy,
 } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
+import {
+  remotePlaybackQueue,
+  remoteTrackToPlayerTrack,
+  type RemotePlaybackState,
+} from "@/lib/remote-playback-state";
 import { toast } from "sonner";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
@@ -286,10 +295,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   });
 
   const { user: authUser } = useAuth();
+  const connectEnabled = useCrateConnectEnabled();
   usePlayerAuthSync({
     authUser,
     currentTrack,
     isPlaying,
+  });
+  const suppressNextConnectClaimRef = useRef(false);
+  const { publishStructuralNow: publishConnectState } = useRemotePlaybackState({
+    authUser,
+    enabled: connectEnabled,
+    queue,
+    currentIndex,
+    isPlaying,
+    shuffle,
+    repeat,
+    playSource,
+    queueRef,
+    currentIndexRef,
+    currentTimeRef,
+    durationRef,
+    isPlayingRef,
+    shuffleRef,
+    repeatRef,
+    playSourceRef,
+    unshuffledQueueRef,
+    suppressNextActiveClaimRef: suppressNextConnectClaimRef,
   });
   useEqualizerRuntime(currentTrack);
 
@@ -1116,6 +1147,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     commitIsBuffering,
     commitCurrentTime,
     markSeekPosition,
+    allowAutoplayRestore: !connectEnabled,
   });
   usePlayerEngineCallbacks({
     callbacksRef,
@@ -1230,6 +1262,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     pullFromEngine,
     pushToEngine,
     advanceCursorTo,
+    publishConnectState,
     playbackDeliveryPolicy,
   });
 
@@ -1237,6 +1270,83 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     clearQueueRef.current = clearQueue;
   }, [clearQueue]);
+
+  const applyConnectStateToLocalQueue = useCallback(
+    (state: RemotePlaybackState, startPlaying: boolean) => {
+      const tracks = remotePlaybackQueue(state);
+      if (!tracks.length) return false;
+      const nextIndex = clampIndex(state.current_index, tracks.length);
+      const nextRepeat =
+        state.repeat_mode === "one" || state.repeat_mode === "all"
+          ? state.repeat_mode
+          : "off";
+      const nextShuffle = Boolean(state.shuffle);
+      const nextSource =
+        state.play_source ||
+        (tracks.length > 1
+          ? { type: "queue" as const, name: "Queue" }
+          : {
+              type: "track" as const,
+              name: tracks[nextIndex]?.title || "Track",
+            });
+
+      if (startPlaying) {
+        suppressNextConnectClaimRef.current = true;
+      }
+      repeatRef.current = nextRepeat;
+      shuffleRef.current = nextShuffle;
+      playSourceRef.current = nextSource;
+      unshuffledQueueRef.current = state.unshuffled_queue
+        ? state.unshuffled_queue.map(remoteTrackToPlayerTrack)
+        : null;
+      setRepeatState(nextRepeat);
+      setShuffleState(nextShuffle);
+      setPlaySource(nextSource);
+      const positionSeconds = Math.max(0, (state.position_ms || 0) / 1000);
+      pendingRestoreTimeRef.current = positionSeconds;
+      pushToEngine(tracks, nextIndex, {
+        autoplay: startPlaying,
+        positionMs: Math.max(0, state.position_ms || 0),
+      });
+      commitCurrentTime(positionSeconds);
+      commitDuration(Math.max(0, (state.duration_ms || 0) / 1000));
+      return true;
+    },
+    [
+      commitCurrentTime,
+      commitDuration,
+      pendingRestoreTimeRef,
+      playSourceRef,
+      pushToEngine,
+      repeatRef,
+      setPlaySource,
+      setRepeatState,
+      setShuffleState,
+      shuffleRef,
+      unshuffledQueueRef,
+    ],
+  );
+
+  const handleConnectTransferIn = useCallback(
+    (state: RemotePlaybackState, startPlaying: boolean) => {
+      applyConnectStateToLocalQueue(state, startPlaying);
+    },
+    [applyConnectStateToLocalQueue],
+  );
+
+  useCrateConnectCommands({
+    authUser,
+    enabled: connectEnabled,
+    isBuffering,
+    isPlaying,
+    pause,
+    resume,
+    next,
+    prev,
+    seek,
+    setVolume,
+    onTransferIn: handleConnectTransferIn,
+  });
 
   useEffect(() => {
     const handleAuthRuntimeReset = () => {
@@ -1353,6 +1463,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      publishConnectState,
     }),
     [
       queue,
@@ -1380,6 +1491,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      publishConnectState,
     ],
   );
 
@@ -1388,6 +1500,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       <PlayerStateContext.Provider value={stateValue}>
         <PlayerProgressContext.Provider value={progressValue}>
           {children}
+          <ContinuePlaybackPrompt />
           {playbackNeedsUserGesture && currentTrack ? (
             <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-[1600] flex justify-center sm:bottom-28">
               <button

@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Radio,
+  Share2,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import {
   action,
   buildTrackMenuPlayerTrack,
+  sharePath,
   type TrackMenuData,
 } from "@/components/actions/shared";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
@@ -29,6 +31,7 @@ import {
   artistPagePath,
   downloadApiUrl,
   trackDownloadApiPath,
+  trackSharePath,
 } from "@/lib/library-routes";
 import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
 import { hasPlayableTrackReference } from "@/lib/playable-track";
@@ -138,6 +141,22 @@ export function useTrackActionEntries(
             toast.error("Failed to start track radio");
           }
         },
+      }),
+      action({
+        key: "share",
+        label: "Share track",
+        icon: Share2,
+        disabled: !trackEntityUid && libraryTrackId == null,
+        onSelect: sharePath(
+          trackSharePath({
+            entityUid: trackEntityUid,
+            libraryTrackId,
+            trackSlug: input.track.slug,
+            title: input.track.title,
+            artistName: input.track.artist,
+          }),
+          `${input.track.artist} - ${input.track.title}`,
+        ),
       }),
       action({
         key: "offline",

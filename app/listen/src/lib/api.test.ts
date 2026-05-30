@@ -410,10 +410,10 @@ describe("auth tokens", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("getApiAuthHeaders", () => {
-  it("includes bearer token when present", () => {
+  it("omits bearer token on web even when a token is present", () => {
     localStorage.setItem("listen-auth-token", "tok");
     const headers = getApiAuthHeaders();
-    expect(headers["Authorization"]).toBe("Bearer tok");
+    expect(headers).not.toHaveProperty("Authorization");
   });
 
   it("omits Authorization header when token absent", () => {
@@ -744,7 +744,7 @@ describe("apiFetch", () => {
       string
     >;
     expect(headers["X-Custom"]).toBe("value");
-    expect(headers["Authorization"]).toBe("Bearer tok");
+    expect(headers).not.toHaveProperty("Authorization");
     expect(headers["X-Crate-App"]).toBe("listen-web");
   });
 
@@ -918,6 +918,16 @@ describe("native (configurable server) mode", () => {
       );
       expect(result).toBe(
         "https://api.example.com/api/cover.jpg?token=native-tok",
+      );
+    });
+
+    it("resolves relative API artist photos against the configured server", () => {
+      setupServer();
+      const result = apiMod.resolveMaybeApiAssetUrl(
+        "/api/network/external-artist/photo?name=Slowthai",
+      );
+      expect(result).toBe(
+        "https://api.example.com/api/network/external-artist/photo?name=Slowthai&token=native-tok",
       );
     });
   });

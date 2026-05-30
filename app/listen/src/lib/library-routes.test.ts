@@ -16,18 +16,23 @@ import {
   albumApiPath,
   albumCoverApiUrl,
   albumPagePath,
+  albumSharePath,
   artistApiPath,
   artistBackgroundApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
+  artistSharePath,
   artistTopTracksPath,
   isReservedArtistChildSlug,
   recordAssetInvalidationScope,
   trackDownloadApiPath,
+  trackEffectiveEqApiPath,
   trackEqFeaturesApiPath,
+  trackEqPresetApiPath,
   trackGenreApiPath,
   trackInfoApiPath,
   trackPlaybackApiPath,
+  trackSharePath,
   trackOfflineManifestApiPath,
   trackStreamApiPath,
 } from "@/lib/library-routes";
@@ -144,6 +149,17 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/quicksand/top-tracks");
   });
 
+  it("builds public artist share paths from stable identity", () => {
+    expect(
+      artistSharePath({
+        artistId: 7,
+        artistEntityUid: "artist-entity-7",
+        artistSlug: "quicksand",
+        artistName: "Quicksand",
+      }),
+    ).toBe("/share/artist/artist-entity-7/quicksand");
+  });
+
   it("builds nested album paths under the artist when the slug is not reserved", () => {
     const path = albumPagePath({
       albumId: 9,
@@ -224,6 +240,17 @@ describe("library route asset helpers", () => {
     expect(path).toBe("/api/artist-slugs/quicksand/albums/slip");
   });
 
+  it("builds public album share paths from stable identity", () => {
+    expect(
+      albumSharePath({
+        albumId: 9,
+        albumEntityUid: "album-entity-9",
+        albumSlug: "quicksand-slip",
+        albumName: "Slip",
+      }),
+    ).toBe("/share/album/album-entity-9/slip");
+  });
+
   it("falls back to entity UID album APIs and artwork when slugs and numeric ids are unavailable", () => {
     const path = albumApiPath({ albumEntityUid: "album-entity-42" });
     const cover = albumCoverApiUrl(
@@ -247,6 +274,15 @@ describe("library route asset helpers", () => {
     expect(trackEqFeaturesApiPath({ entityUid: "track-entity-1" })).toBe(
       "/api/tracks/by-entity/track-entity-1/eq-features",
     );
+    expect(trackEffectiveEqApiPath({ entityUid: "track-entity-1" })).toBe(
+      "/api/tracks/by-entity/track-entity-1/eq",
+    );
+    expect(
+      trackEqPresetApiPath({
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/tracks/12/eq-preset");
     expect(trackGenreApiPath({ entityUid: "track-entity-1" })).toBe(
       "/api/tracks/by-entity/track-entity-1/genre",
     );
@@ -261,12 +297,28 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds public track share paths from entity_uid", () => {
+    expect(
+      trackSharePath({
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+        title: "Head to Wall",
+      }),
+    ).toBe("/share/track/track-entity-1/head-to-wall");
+  });
+
   it("falls back to id/path routes only when canonical identity is missing", () => {
     expect(trackInfoApiPath({ libraryTrackId: 12 })).toBe(
       "/api/tracks/12/info",
     );
     expect(trackPlaybackApiPath({ libraryTrackId: 12 })).toBe(
       "/api/tracks/12/playback",
+    );
+    expect(trackEffectiveEqApiPath({ libraryTrackId: 12 })).toBe(
+      "/api/tracks/12/eq",
+    );
+    expect(trackEqPresetApiPath({ libraryTrackId: 12 })).toBe(
+      "/api/tracks/12/eq-preset",
     );
     expect(trackStreamApiPath({ libraryTrackId: 12 })).toBe(
       "/api/tracks/12/stream",

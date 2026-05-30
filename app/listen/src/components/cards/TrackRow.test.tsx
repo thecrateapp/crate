@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,25 +16,6 @@ vi.mock("react-router", async () => {
     useNavigate: () => navigateMock,
   };
 });
-
-vi.mock("@/components/actions/ItemActionMenu", () => ({
-  ItemActionMenu: () => null,
-  ItemActionMenuButton: () => null,
-  useItemActionMenu: () => ({
-    triggerRef: { current: null },
-    hasActions: false,
-    openFromTrigger: vi.fn(),
-    handleContextMenu: vi.fn(),
-    open: false,
-    position: null,
-    menuRef: { current: null },
-    close: vi.fn(),
-  }),
-}));
-
-vi.mock("@/components/actions/track-actions", () => ({
-  useTrackActionEntries: () => [],
-}));
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
@@ -112,5 +93,57 @@ describe("TrackRow playback behavior", () => {
       ],
       0,
     );
+  });
+
+  it("does not activate the row when selecting queue actions from the menu", async () => {
+    const playAll = vi.fn();
+    const playNext = vi.fn();
+    const addToQueue = vi.fn();
+    const tracks: TrackRowData[] = [
+      {
+        id: 1,
+        entity_uid: "entity-1",
+        title: "Track One",
+        artist: "Artist",
+        album: "Album",
+        album_id: 12,
+      },
+      {
+        id: 2,
+        entity_uid: "entity-2",
+        title: "Track Two",
+        artist: "Artist",
+        album: "Album",
+        album_id: 12,
+      },
+    ];
+
+    renderWithListenProviders(
+      <TrackRow track={tracks[0]!} queueTracks={tracks} />,
+      {
+        playerActions: {
+          playAll,
+          playNext,
+          addToQueue,
+        },
+      },
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play next" }));
+
+    expect(playNext).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Track One" }),
+    );
+    expect(playAll).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add to queue" }));
+
+    expect(addToQueue).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Track One" }),
+    );
+    expect(playAll).not.toHaveBeenCalled();
   });
 });

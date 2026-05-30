@@ -20,6 +20,15 @@ export type ListenAppPlatform =
 
 const DEVICE_FINGERPRINT_KEY = "listen-device-fingerprint";
 
+export interface ListenDeviceCapabilities {
+  can_play: boolean;
+  can_receive_commands: boolean;
+  can_background_play: boolean;
+  can_set_volume: boolean;
+  supports_native_audio: boolean;
+  supports_cast_sender: boolean;
+}
+
 export function isIpadRuntime(): boolean {
   if (platform !== "ios") return false;
   if (typeof navigator === "undefined") return false;
@@ -80,4 +89,20 @@ export function getListenDeviceFingerprint(): string {
   } catch {
     return `${getListenAppPlatform()}:${getListenDeviceLabel()}`;
   }
+}
+
+export function getListenDeviceId(): string {
+  return getListenDeviceFingerprint();
+}
+
+export function getListenDeviceCapabilities(): ListenDeviceCapabilities {
+  const native = isNative || isTauriRuntime;
+  return {
+    can_play: true,
+    can_receive_commands: true,
+    can_background_play: native,
+    can_set_volume: true,
+    supports_native_audio: isAndroidNative,
+    supports_cast_sender: false,
+  };
 }

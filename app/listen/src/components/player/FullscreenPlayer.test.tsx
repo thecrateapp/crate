@@ -30,6 +30,12 @@ vi.mock("@/lib/api", () => ({
   AUTH_TOKEN_EVENT: "crate:auth-token-updated",
 }));
 
+const androidNativeEngineMock = vi.hoisted(() => ({
+  shouldUseAndroidNativePlayer: vi.fn(() => false),
+}));
+
+vi.mock("@/lib/android-native-engine", () => androidNativeEngineMock);
+
 vi.mock("@/components/player/SpinningDisc", () => ({
   SpinningDisc: (props: Record<string, unknown>) => (
     <div data-testid="spinning-disc" data-props={JSON.stringify(props)} />
@@ -231,6 +237,7 @@ describe("FullscreenPlayer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigateMock.mockReset();
+    androidNativeEngineMock.shouldUseAndroidNativePlayer.mockReturnValue(false);
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -412,6 +419,46 @@ describe("FullscreenPlayer", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("spinning-disc")).toBeInTheDocument();
+      });
+    });
+
+    it("keeps live disc jog seeks for web playback", async () => {
+      const track = makeTrack();
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        const props = JSON.parse(
+          screen.getByTestId("spinning-disc").dataset.props ?? "{}",
+        );
+        expect(props.jogSeekMode).toBe("live");
+      });
+    });
+
+    it("uses commit-only disc jog seeks for Android native playback", async () => {
+      androidNativeEngineMock.shouldUseAndroidNativePlayer.mockReturnValue(
+        true,
+      );
+      const track = makeTrack();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await waitFor(() => {
+        const props = JSON.parse(
+          screen.getByTestId("spinning-disc").dataset.props ?? "{}",
+        );
+        expect(props.jogSeekMode).toBe("commit");
       });
     });
   });

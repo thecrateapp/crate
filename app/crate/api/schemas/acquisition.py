@@ -1,5 +1,6 @@
 """Schema models for unified acquisition endpoints."""
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
@@ -155,3 +156,55 @@ class AcquisitionSurfaceResponse(BaseModel):
 
 class QueueClearResponse(BaseModel):
     cleared: bool
+
+
+class ArtistSuggestionCreateRequest(BaseModel):
+    artist_name: str = Field(min_length=2, max_length=200)
+    artist_url: str | None = Field(default=None, max_length=500)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class ArtistSuggestionStatusRequest(BaseModel):
+    status: str
+    linked_artist_id: int | None = None
+    linked_task_id: str | None = None
+
+
+class ArtistSuggestionSupporterResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    user_id: int | None = None
+    name: str | None = None
+    email: str | None = None
+    avatar: str | None = None
+    note: str | None = None
+    artist_url: str | None = None
+    created_at: datetime | None = None
+
+
+class ArtistSuggestionResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: int
+    artist_name: str
+    normalized_artist_name: str | None = None
+    artist_url: str | None = None
+    note: str | None = None
+    status: str
+    created_by_user_id: int | None = None
+    created_by_name: str | None = None
+    created_by_email: str | None = None
+    created_by_avatar: str | None = None
+    triaged_by_user_id: int | None = None
+    triaged_by_name: str | None = None
+    linked_artist_id: int | None = None
+    linked_task_id: str | None = None
+    supporter_count: int = 0
+    supporters: list[ArtistSuggestionSupporterResponse] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    resolved_at: datetime | None = None
+
+
+class ArtistSuggestionsResponse(BaseModel):
+    suggestions: list[ArtistSuggestionResponse] = Field(default_factory=list)

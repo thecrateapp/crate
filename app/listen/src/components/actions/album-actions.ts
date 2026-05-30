@@ -24,6 +24,7 @@ import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import {
   albumDownloadApiPath,
   albumPagePath,
+  albumSharePath,
   downloadApiUrl,
 } from "@/lib/library-routes";
 import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
@@ -57,6 +58,16 @@ export function useAlbumActionEntries(
   return useMemo<ItemActionMenuEntry[]>(() => {
     const albumPath = albumPagePath({
       albumId: input.albumId,
+      albumEntityUid: input.albumEntityUid,
+      albumSlug: input.albumSlug,
+      artistEntityUid: input.artistEntityUid,
+      artistSlug: input.artistSlug,
+      artistName: input.artist,
+      albumName: input.album,
+    });
+    const albumShare = albumSharePath({
+      albumId: input.albumId,
+      albumEntityUid: input.albumEntityUid,
       albumSlug: input.albumSlug,
       artistSlug: input.artistSlug,
       artistName: input.artist,
@@ -180,7 +191,10 @@ export function useAlbumActionEntries(
         key: "share",
         label: "Share album",
         icon: Share2,
-        onSelect: sharePath(albumPath, `${input.artist} - ${input.album}`),
+        onSelect: sharePath(
+          albumShare || albumPath,
+          `${input.artist} - ${input.album}`,
+        ),
       }),
     ];
   }, [

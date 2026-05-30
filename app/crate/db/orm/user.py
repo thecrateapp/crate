@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crate.db.engine import Base
@@ -40,10 +40,38 @@ class User(Base):
     longitude: Mapped[float | None] = mapped_column()
     show_location_mode: Mapped[str | None] = mapped_column(Text, server_default="fixed")
     show_radius_km: Mapped[int | None] = mapped_column(Integer, server_default="60")
+    crate_connect_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")
     external_identities: Mapped[list["UserExternalIdentity"]] = relationship(
         back_populates="user"
+    )
+    role_assignments: Mapped[list["UserRole"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="UserRole.user_id",
+    )
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(Text, primary_key=True)
+    assigned_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(
+        back_populates="role_assignments",
+        foreign_keys=[user_id],
     )
 
 

@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 from crate.worker_handlers.acquisition import (
     _finalize_upgrade_quarantine,
     _find_cover_art_archive_release_group_cover,
+    _find_tidal_preview_tracks,
+    _handle_check_new_releases,
     _handle_tidal_download,
     _handle_library_upload,
     _locate_soulseek_download_file,
@@ -133,6 +136,10 @@ def test_register_new_release_uses_tidal_tracklist_when_mb_is_empty(monkeypatch)
         lambda **kwargs: captured.update(kwargs) or 91,
     )
     monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.merge_new_release_preview_tracks",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
         "crate.worker_handlers.acquisition._broadcast_release_cache_invalidation",
         lambda _artist: None,
     )
@@ -162,6 +169,446 @@ def test_register_new_release_uses_tidal_tracklist_when_mb_is_empty(monkeypatch)
     assert captured["tracklist"][0]["title"] == "Hum Of Hurt"
     assert captured["tracklist"][0]["source"] == "tidal"
     assert captured["tracks"] == 10
+
+
+def test_register_new_release_downloads_on_release_day(monkeypatch):
+    queued: list[dict] = []
+    downloading: list[int] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_release_match",
+        lambda _artist, _title: {
+            "tidal_url": "https://tidal.com/album/777",
+            "tidal_id": "777",
+            "cover_url": "https://img.example/release.jpg",
+            "tracks": 8,
+            "quality": "LOSSLESS",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_release_group_tracklist",
+        lambda _mbid: [{"title": "Released Today", "position": 1}],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._get_tidal_release_tracklist",
+        lambda _tidal_id: [],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_preview_tracks",
+        lambda _artist, _tracklist: {
+            "preview_tracks": [],
+            "cover_url": "",
+            "source_url": "",
+            "source_album": "",
+            "source_name": "",
+            "quality": "",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.upsert_new_release",
+        lambda **_kwargs: 77,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.merge_new_release_preview_tracks",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._broadcast_release_cache_invalidation",
+        lambda _artist: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.mark_release_downloading",
+        lambda release_id: downloading.append(release_id),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_setting",
+        lambda key, default="": "max" if key == "tidal_quality" else default,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.create_task_dedup",
+        lambda task_type, params, dedup_key=None: (
+            queued.append(
+                {"task_type": task_type, "params": params, "dedup_key": dedup_key}
+            )
+            or "task-download"
+        ),
+    )
+
+    added_count, should_stop = _register_new_release(
+        "task-release",
+        "Sparta",
+        {
+            "title": "Released Today",
+            "year": "2026",
+            "type": "Album",
+            "mbid": "rg-today",
+            "first_release_date": "2026-05-29",
+        },
+        today="2026-05-29",
+        known_date="2026-05-29",
+        auto_download=True,
+    )
+
+    assert (added_count, should_stop) == (1, False)
+    assert downloading == [77]
+    assert queued[0]["task_type"] == "tidal_download"
+    assert queued[0]["params"]["url"] == "https://tidal.com/album/777"
+    assert queued[0]["params"]["new_release_id"] == 77
+
+
+def test_register_new_release_queues_each_preview_source(monkeypatch):
+    queued: list[dict] = []
+    captured: dict = {}
+    cleared_preview_urls: list[tuple[int, list[str]]] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_release_match",
+        lambda _artist, _title: {
+            "tidal_url": "",
+            "tidal_id": "",
+            "cover_url": "",
+            "tracks": 0,
+            "quality": "",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_release_group_tracklist",
+        lambda _mbid: [
+            {"title": "Cryogen", "position": 1},
+            {"title": "The Wow! Signal", "position": 2},
+        ],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._find_tidal_preview_tracks",
+        lambda _artist, _tracklist: {
+            "preview_tracks": [
+                {
+                    "title": "Cryogen",
+                    "album": "Cryogen",
+                    "source_url": "https://tidal.com/album/1",
+                },
+                {
+                    "title": "The Wow! Signal",
+                    "album": "The Wow! Signal",
+                    "source_url": "https://tidal.com/album/2",
+                },
+            ],
+            "cover_url": "https://img.example/cover.jpg",
+            "source_url": "https://tidal.com/album/1",
+            "source_album": "Cryogen",
+            "source_name": "tidal",
+            "quality": "HI_RES_LOSSLESS",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.upsert_new_release",
+        lambda **kwargs: captured.update(kwargs) or 91,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.merge_new_release_preview_tracks",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._queue_release_preview_download",
+        lambda release_id, **kwargs: (
+            queued.append({"release_id": release_id, **kwargs}) or f"task-{len(queued)}"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.clear_new_release_preview_source_url",
+        lambda release_id, urls: (
+            cleared_preview_urls.append((release_id, urls)) or True
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._broadcast_release_cache_invalidation",
+        lambda _artist: None,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_task_event",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _register_new_release(
+        "task-release",
+        "Muse",
+        {
+            "title": "The Wow! Signal",
+            "year": "2026",
+            "type": "Album",
+            "mbid": "rg-wow",
+            "first_release_date": "2026-06-05",
+        },
+        today="2026-05-17",
+        known_date="2026-01-01",
+        auto_download=False,
+    )
+
+    assert [item["source_url"] for item in queued] == [
+        "https://tidal.com/album/1",
+        "https://tidal.com/album/2",
+    ]
+    assert [item["source_album"] for item in queued] == [
+        "Cryogen",
+        "The Wow! Signal",
+    ]
+    assert captured["source_url"] == ""
+    assert captured["source_name"] == ""
+    assert cleared_preview_urls == [
+        (91, ["https://tidal.com/album/1", "https://tidal.com/album/2"])
+    ]
+
+
+def test_find_tidal_preview_tracks_uses_album_url_from_track_search(monkeypatch):
+    from crate import tidal as tidal_mod
+
+    monkeypatch.setattr(
+        tidal_mod,
+        "search",
+        lambda *_args, **_kwargs: {
+            "tracks": [
+                {
+                    "id": "9001",
+                    "title": "The Wow! Signal",
+                    "artist": "Muse",
+                    "album": "The Wow! Signal",
+                    "album_id": "515052476",
+                    "album_cover": "https://img.example/wow.jpg",
+                    "album_url": "http://www.tidal.com/album/515052476",
+                    "url": "https://tidal.com/track/9001",
+                    "quality": ["HI_RES_LOSSLESS"],
+                    "duration": 210,
+                }
+            ]
+        },
+    )
+
+    result = _find_tidal_preview_tracks(
+        "Muse",
+        [{"title": "The Wow! Signal", "position": 2, "duration": 210}],
+    )
+
+    assert result["source_url"] == "https://tidal.com/album/515052476"
+    assert result["cover_url"] == "https://img.example/wow.jpg"
+    assert result["quality"] == "HI_RES_LOSSLESS"
+    assert result["preview_tracks"] == [
+        {
+            "source": "tidal",
+            "id": "9001",
+            "title": "The Wow! Signal",
+            "duration": 210,
+            "position": 2,
+            "url": "https://tidal.com/track/9001",
+            "source_url": "https://tidal.com/album/515052476",
+            "album": "The Wow! Signal",
+            "quality": ["HI_RES_LOSSLESS"],
+        }
+    ]
+
+
+def test_new_release_upsert_preserves_manual_cover_and_existing_previews(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.releases import (
+        clear_new_release_preview_source_url,
+        merge_new_release_preview_tracks,
+        update_new_release_cover,
+        upsert_new_release,
+    )
+    from crate.db.tx import read_scope, transaction_scope
+
+    release_id = upsert_new_release(
+        artist_name="Quicksand",
+        album_title="Bring On The Psychics",
+        cover_url="https://img.example/original.jpg",
+        cover_source="tidal",
+        release_date="2026-07-17",
+        tracklist=[{"title": "Get To It"}],
+        preview_tracks=[{"id": "old", "title": "Get To It"}],
+    )
+    update_new_release_cover(
+        release_id,
+        cover_url=f"/api/albums/-{release_id}/cover",
+        cover_source="manual",
+    )
+
+    same_release_id = upsert_new_release(
+        artist_name="Quicksand",
+        album_title="Bring On The Psychics",
+        cover_url="",
+        cover_source="",
+        release_date="2026-07-17",
+        tracklist=[],
+        preview_tracks=[{"id": "new", "title": "Regenerate"}],
+    )
+    merge_new_release_preview_tracks(
+        same_release_id,
+        [{"id": "new", "title": "Regenerate"}],
+        cover_url="https://img.example/tidal.jpg",
+    )
+
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT cover_url, cover_source, tracklist_json, preview_tracks_json
+                    FROM new_releases
+                    WHERE id = :id
+                    """
+                ),
+                {"id": release_id},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert same_release_id == release_id
+    assert row["cover_url"] == f"/api/albums/-{release_id}/cover"
+    assert row["cover_source"] == "manual"
+    assert row["tracklist_json"] == [{"title": "Get To It"}]
+    assert row["preview_tracks_json"] == [
+        {"id": "old", "title": "Get To It"},
+        {"id": "new", "title": "Regenerate"},
+    ]
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "UPDATE new_releases SET source_url = :url, source_name = 'tidal' WHERE id = :id"
+            ),
+            {"id": release_id, "url": "https://tidal.com/album/preview"},
+        )
+
+    assert clear_new_release_preview_source_url(
+        release_id,
+        ["https://tidal.com/album/preview"],
+    )
+
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text("SELECT source_url, source_name FROM new_releases WHERE id = :id"),
+                {"id": release_id},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert row["source_url"] is None
+    assert row["source_name"] is None
+
+
+def test_upcoming_pre_release_queries_use_strict_future_filter(monkeypatch):
+    from crate.db.releases import get_new_releases, get_upcoming_releases_for_artist
+
+    captured_sql: list[str] = []
+
+    class FakeRows:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return []
+
+    class FakeSession:
+        def execute(self, statement, _params):
+            captured_sql.append(str(statement))
+            return FakeRows()
+
+    class FakeScope:
+        def __enter__(self):
+            return FakeSession()
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr("crate.db.releases.read_scope", lambda: FakeScope())
+
+    get_new_releases(upcoming=True)
+    get_upcoming_releases_for_artist("Sparta")
+
+    assert all("nr.release_date > :today" in sql for sql in captured_sql)
+    assert all("nr.release_date >= :today" not in sql for sql in captured_sql)
+
+
+def test_check_new_releases_skips_recently_checked_artists(monkeypatch):
+    checked_at = datetime.now(timezone.utc)
+    mb_calls: list[str] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_library_artists",
+        lambda per_page=10000: (
+            [
+                {
+                    "name": "Quicksand",
+                    "mbid": "mbid-quicksand",
+                    "latest_release_date": "2026-01-01",
+                    "new_releases_checked_at": checked_at,
+                }
+            ],
+            1,
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.musicbrainz_ext.get_artist_releases",
+        lambda mbid: mb_calls.append(mbid) or [],
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_setting",
+        lambda *_args, **_kwargs: "false",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_progress",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = _handle_check_new_releases("task-releases", {}, {})
+
+    assert result == {"checked": 0, "skipped_recent": 1, "new_releases": 0}
+    assert mb_calls == []
+
+
+def test_check_new_releases_force_ignores_recent_cursor(monkeypatch):
+    checked_at = datetime.now(timezone.utc)
+    marked: list[str] = []
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_library_artists",
+        lambda per_page=10000: (
+            [
+                {
+                    "name": "Quicksand",
+                    "mbid": "mbid-quicksand",
+                    "latest_release_date": "2026-01-01",
+                    "new_releases_checked_at": checked_at,
+                }
+            ],
+            1,
+        ),
+    )
+    monkeypatch.setattr("crate.musicbrainz_ext.get_artist_releases", lambda _mbid: [])
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_setting",
+        lambda *_args, **_kwargs: "false",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.mark_artist_new_releases_checked",
+        lambda name, checked_at=None: marked.append(name),
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.emit_progress",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = _handle_check_new_releases("task-releases", {"force": True}, {})
+
+    assert result == {"checked": 1, "skipped_recent": 0, "new_releases": 0}
+    assert marked == ["Quicksand"]
 
 
 def test_locate_soulseek_download_file_prefers_exact_path_suffix(tmp_path):
@@ -241,6 +688,7 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
             return {}
 
     completed_events: list[dict] = []
+    invalidated_artists: list[str] = []
 
     monkeypatch.setattr("crate.importer.ImportQueue", FakeQueue)
     monkeypatch.setattr("crate.library_sync.LibrarySync", FakeSync)
@@ -279,6 +727,10 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
         "crate.worker_handlers.acquisition._emit_acquisition_completed_for_albums",
         lambda **kwargs: completed_events.append(kwargs),
     )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition._broadcast_release_cache_invalidation",
+        lambda artist_name: invalidated_artists.append(artist_name),
+    )
     monkeypatch.setattr("crate.worker_handlers.acquisition.start_scan", lambda: None)
 
     result = _handle_library_upload(
@@ -312,6 +764,7 @@ def test_library_upload_syncs_each_album_and_emits_grouped_completion(
             ],
         }
     ]
+    assert invalidated_artists == ["Terror"]
 
 
 def test_library_upload_skips_albums_that_already_exist(monkeypatch, tmp_path):

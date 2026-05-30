@@ -25,10 +25,12 @@ class CreateUserRequest(BaseModel):
     password: str
     name: str | None = None
     role: str = "user"
+    roles: list[str] | None = None
 
 
 class UpdateUserRoleRequest(BaseModel):
-    role: str
+    role: str | None = None
+    roles: list[str] | None = None
 
 
 class UpdateUserStatusRequest(BaseModel):
@@ -87,6 +89,7 @@ class AuthUserPublicResponse(BaseModel):
     name: str | None = None
     avatar: str | None = None
     role: str
+    roles: list[str] = Field(default_factory=list)
 
 
 class AuthExternalIdentityResponse(BaseModel):

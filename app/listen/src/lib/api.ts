@@ -285,8 +285,10 @@ export function setAuthTokens(
 
 export function getApiAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (usesConfigurableServer) {
+    const token = getAuthToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
   headers["X-Crate-App"] = getListenAppId();
   headers["X-Device-Label"] = getListenDeviceLabel();
   headers["X-Device-Fingerprint"] = getListenDeviceFingerprint();

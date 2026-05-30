@@ -52,7 +52,7 @@ export function createMockAuthValue(
   return {
     user: createMockAuthUser(),
     loading: false,
-    refetch: vi.fn(async () => {}),
+    refetch: vi.fn(async () => createMockAuthUser()),
     logout: vi.fn(async () => {}),
     ...overrides,
   };
@@ -110,6 +110,7 @@ export function createMockPlayerActions(
     addToQueue: vi.fn(),
     removeFromQueue: vi.fn(),
     reorderQueue: vi.fn(),
+    publishConnectState: vi.fn(async () => undefined),
     ...overrides,
   };
 }

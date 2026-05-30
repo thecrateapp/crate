@@ -22,6 +22,7 @@ export function createMockAuthUser(
     email: "admin@cratemusic.app",
     name: "Admin",
     role: "admin",
+    roles: ["admin"],
     ...overrides,
   };
 }
@@ -29,8 +30,10 @@ export function createMockAuthUser(
 export function createMockAuthValue(
   overrides: Partial<AuthContextValue> = {},
 ): AuthContextValue {
+  const user = overrides.user ?? createMockAuthUser();
   return {
-    user: createMockAuthUser(),
+    user,
+    actualUser: user,
     loading: false,
     logout: vi.fn(),
     isAdmin: true,
@@ -38,6 +41,10 @@ export function createMockAuthValue(
     hasCapability: vi.fn(() => true),
     hasAnyCapability: vi.fn(() => true),
     refetch: vi.fn(),
+    rolePresets: [],
+    previewRole: null,
+    setPreviewRole: vi.fn(),
+    clearRolePreview: vi.fn(),
     ...overrides,
   };
 }

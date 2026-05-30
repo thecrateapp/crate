@@ -68,6 +68,7 @@ export interface StoredQueue {
    * active at persistence time. `null` when shuffle was off.
    */
   unshuffledQueue: Track[] | null;
+  savedAt: string | null;
 }
 
 export function getStoredQueue(): StoredQueue {
@@ -87,6 +88,7 @@ export function getStoredQueue(): StoredQueue {
           wasPlaying: parsed.wasPlaying === true,
           shuffle: parsed.shuffle === true,
           unshuffledQueue,
+          savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
         };
       }
     }
@@ -100,6 +102,7 @@ export function getStoredQueue(): StoredQueue {
     wasPlaying: false,
     shuffle: false,
     unshuffledQueue: null,
+    savedAt: null,
   };
 }
 
@@ -132,6 +135,7 @@ export function saveQueue(
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
         unshuffledQueue: options.unshuffledQueue ?? null,
+        savedAt: new Date().toISOString(),
       }),
     );
   } catch {
