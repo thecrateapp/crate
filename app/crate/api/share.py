@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -39,7 +40,7 @@ _PREVIEW_HEADERS = {
 _IMAGE_HEADERS = {
     "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
 }
-LibraryRow = dict[str, Any]
+LibraryRow = Mapping[str, Any]
 
 
 def _is_uuid(value: str) -> bool:

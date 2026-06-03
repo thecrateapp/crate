@@ -1706,7 +1706,7 @@ def connect_lastfm(request: Request, body: LastfmCallbackRequest):
         )
 
     username = (lastfm_session.username or "").strip() or None
-    metadata = {"session_key": lastfm_session.key}
+    metadata: dict[str, object] = {"session_key": lastfm_session.key}
     if username:
         metadata["username"] = username
     if lastfm_session.subscriber is not None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Request
 
 from crate.api.auth import _require_auth
@@ -45,7 +47,7 @@ _CAST_TICKET_RESPONSES = merge_responses(
     },
 )
 
-_CAST_PUBLIC_RESPONSES = {
+_CAST_PUBLIC_RESPONSES: dict[int | str, dict[str, Any]] = {
     404: error_response("The cast ticket is invalid, expired, revoked, or missing."),
     425: error_response("The receiver-safe playback variant is still preparing."),
 }
