@@ -7,7 +7,7 @@ import { PlayerActionsContext } from "@/contexts/player-context";
 import { getStoredQueue } from "@/contexts/player-utils";
 import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import { transferPlaybackToDevice } from "@/lib/crate-connect";
-import { getListenDeviceId } from "@/lib/listen-device";
+import { formatCrateDeviceName, getListenDeviceId } from "@/lib/listen-device";
 import {
   fetchResumeCandidate,
   isRecentlyPlayingRemote,
@@ -30,11 +30,25 @@ export function ContinuePlaybackPrompt() {
     throw new Error(
       "ContinuePlaybackPrompt must be used within PlayerProvider",
     );
-  const { playAll, seek } = playerActions;
+  const { connect, playAll, seek } = playerActions;
   const connectEnabled = useCrateConnectEnabled();
   const [candidate, setCandidate] = useState<RemotePlaybackState | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const activeInstance =
+    connect.transport === "ws"
+      ? connect.connectedInstances.find(
+          (instance) => instance.instance_id === connect.activeInstanceId,
+        )
+      : null;
+  const isV2RemoteActive =
+    connect.transport === "ws" &&
+    Boolean(connect.activeInstanceId) &&
+    Boolean(connect.playbackInstanceId) &&
+    Boolean(activeInstance) &&
+    connect.activeInstanceId !== connect.playbackInstanceId;
+  const v2Candidate =
+    isV2RemoteActive && connect.isRemoteActive ? connect.remoteState : null;
 
   useEffect(() => {
     setCandidate(null);
@@ -42,7 +56,7 @@ export function ContinuePlaybackPrompt() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user || !connectEnabled || dismissed) {
+    if (!user || !connectEnabled || dismissed || connect.transport === "ws") {
       setCandidate(null);
       return;
     }
@@ -59,29 +73,57 @@ export function ContinuePlaybackPrompt() {
     return () => {
       cancelled = true;
     };
-  }, [connectEnabled, dismissed, user?.id]);
+  }, [connect.transport, connectEnabled, dismissed, user?.id]);
 
   const queue = useMemo(
-    () => (candidate ? remotePlaybackQueue(candidate) : []),
-    [candidate],
+    () =>
+      v2Candidate
+        ? remotePlaybackQueue(v2Candidate)
+        : candidate
+          ? remotePlaybackQueue(candidate)
+          : [],
+    [candidate, v2Candidate],
   );
 
-  if (!connectEnabled || !candidate || dismissed || queue.length === 0)
+  const promptState = v2Candidate ?? candidate;
+  if (!connectEnabled || !promptState || dismissed || queue.length === 0)
     return null;
 
-  const label = candidate.device_label || candidate.device_id;
-  const activeRemote = isRecentlyPlayingRemote(candidate);
+  const activeRemote =
+    connect.transport === "ws"
+      ? isV2RemoteActive
+      : isRecentlyPlayingRemote(promptState);
+  const label = formatCrateDeviceName({
+    app_platform: activeInstance?.app_platform ?? promptState.app_platform,
+    device_label: activeInstance?.device_label ?? promptState.device_label,
+    device_type: activeInstance?.device_type ?? promptState.device_type,
+  });
 
   const continueHere = async () => {
     const startIndex = Math.max(
       0,
-      Math.min(candidate.current_index || 0, queue.length - 1),
+      Math.min(promptState.current_index || 0, queue.length - 1),
     );
+    if (connect.transport === "ws") {
+      if (!connect.playbackInstanceId) {
+        toast.error("Crate Connect is still connecting");
+        return;
+      }
+      setTransferring(true);
+      const sent = connect.requestTransfer(connect.playbackInstanceId);
+      setTransferring(false);
+      if (!sent) {
+        toast.error("Could not transfer playback to this device");
+        return;
+      }
+      setDismissed(true);
+      return;
+    }
     if (activeRemote) {
       setTransferring(true);
       try {
         await transferPlaybackToDevice(getListenDeviceId(), {
-          sourceDeviceId: candidate.device_id,
+          sourceDeviceId: promptState.device_id,
           startPlaying: true,
         });
         setDismissed(true);
@@ -93,10 +135,10 @@ export function ContinuePlaybackPrompt() {
       return;
     }
 
-    playAll(queue, startIndex, candidate.play_source || undefined);
+    playAll(queue, startIndex, promptState.play_source || undefined);
     window.setTimeout(() => {
-      if (candidate.position_ms > 0) {
-        seek(candidate.position_ms / 1000);
+      if (promptState.position_ms > 0) {
+        seek(promptState.position_ms / 1000);
       }
     }, 250);
     setDismissed(true);
@@ -113,9 +155,9 @@ export function ContinuePlaybackPrompt() {
             {activeRemote ? `Playing on ${label}` : `Continue from ${label}`}
           </div>
           <div className="mt-1 truncate text-xs text-muted-foreground">
-            {candidate.artist ? `${candidate.artist} - ` : ""}
-            {candidate.title || "Unknown track"} -{" "}
-            {formatPosition(candidate.position_ms)}
+            {promptState.artist ? `${promptState.artist} - ` : ""}
+            {promptState.title || "Unknown track"} -{" "}
+            {formatPosition(promptState.position_ms)}
           </div>
           <div className="mt-3 flex items-center gap-2">
             <button

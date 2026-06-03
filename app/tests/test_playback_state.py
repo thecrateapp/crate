@@ -137,6 +137,41 @@ def test_playback_state_resume_candidate_ignores_other_users_and_revoked_devices
     assert get_resume_candidate(owner["id"], device_id="new-device") is None
 
 
+def test_playback_state_revoke_device_revokes_matching_auth_sessions(pg_db):
+    from crate.db.repositories.auth_sessions import create_session, get_session
+    from crate.db.repositories.playback_state import revoke_device, upsert_device
+
+    user = pg_db.create_user("connect-device-revoke@test.com")
+    user_id = user["id"]
+    expires_at = datetime.now(timezone.utc) + timedelta(days=1)
+
+    create_session(
+        "session-phone",
+        user_id,
+        expires_at,
+        app_id="listen-web",
+        device_fingerprint="listen:phone",
+    )
+    create_session(
+        "session-other",
+        user_id,
+        expires_at,
+        app_id="listen-web",
+        device_fingerprint="listen:other",
+    )
+    upsert_device(
+        user_id,
+        device_id="listen:phone",
+        device_label="Phone",
+        session_id="session-phone",
+    )
+
+    assert revoke_device(user_id, "listen:phone") is True
+
+    assert get_session("session-phone")["revoked_at"] is not None
+    assert get_session("session-other")["revoked_at"] is None
+
+
 def test_playback_state_presence_marks_only_recent_devices_active(pg_db, monkeypatch):
     presence_cache: dict[str, object] = {}
 

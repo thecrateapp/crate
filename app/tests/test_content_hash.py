@@ -192,6 +192,19 @@ class TestShouldProcessArtist:
 
 
 class TestQueueProcessNewContent:
+    def test_hidden_artist_is_never_queued(self, pg_db, monkeypatch):
+        from crate.content import queue_process_new_content_if_needed
+
+        monkeypatch.setattr(
+            "crate.content.should_process_artist",
+            lambda artist_name, library_path=None: True,
+        )
+
+        created = queue_process_new_content_if_needed(".crate-trash", force=True)
+
+        assert created is None
+        assert pg_db.list_tasks(task_type="process_new_content") == []
+
     def test_force_and_non_force_share_same_artist_dedup_key(self, pg_db, monkeypatch):
         from crate.content import queue_process_new_content_if_needed
 

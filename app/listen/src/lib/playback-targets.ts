@@ -1,6 +1,7 @@
 import type { Track } from "@/contexts/player-types";
 import { getCastSenderCapabilities, startCastSession } from "@/lib/cast-sender";
 import {
+  CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   fetchActiveConnectSession,
   fetchConnectDevices,
   isCrateConnectEnabled,
@@ -9,6 +10,7 @@ import {
   type ConnectDevice,
 } from "@/lib/crate-connect";
 import {
+  formatCrateDeviceName,
   getListenDeviceCapabilities,
   getListenDeviceId,
   getListenDeviceLabel,
@@ -59,8 +61,27 @@ export interface PlaybackTargetContext {
   volume?: number;
   activeConnectDeviceId?: string | null;
   activeConnectSession?: ActiveConnectSession | null;
+  connect?: PlaybackTargetConnectContext | null;
   pause?: () => void | Promise<void>;
   publishConnectState?: (options?: { claimActive?: boolean }) => Promise<void>;
+}
+
+export interface PlaybackTargetConnectInstance {
+  instance_id: string;
+  device_id?: string | null;
+  device_label?: string | null;
+  device_type?: string | null;
+  app_platform?: string | null;
+  connected_at?: string | null;
+  capabilities?: Record<string, unknown> | null;
+}
+
+export interface PlaybackTargetConnectContext {
+  activeInstanceId: string | null;
+  connectedInstances: PlaybackTargetConnectInstance[];
+  playbackInstanceId: string | null;
+  requestTransfer: (targetInstanceId: string) => boolean;
+  transport: "legacy" | "ws" | null;
 }
 
 export interface PlaybackTargetProvider {
@@ -83,7 +104,7 @@ export interface PlaybackTargetGroup {
 }
 
 function connectDeviceName(device: ConnectDevice): string {
-  return device.device_label || device.app_platform || "Crate device";
+  return formatCrateDeviceName(device);
 }
 
 function connectDeviceUnavailableReason(device: ConnectDevice): string {
@@ -96,14 +117,61 @@ function connectDeviceUnavailableReason(device: ConnectDevice): string {
   return "Crate Connect transfer is unavailable.";
 }
 
+function isLegacyCrateConnectEnabled(): boolean {
+  return isCrateConnectEnabled() && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
+}
+
+function isWsCrateConnectContext(
+  context?: PlaybackTargetContext,
+): context is PlaybackTargetContext & {
+  connect: PlaybackTargetConnectContext;
+} {
+  return context?.connect?.transport === "ws";
+}
+
+function capabilityFlag(
+  capabilities: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const value = capabilities?.[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function connectInstanceName(instance: PlaybackTargetConnectInstance): string {
+  return formatCrateDeviceName(instance);
+}
+
+function visibleInstanceNames(
+  instances: PlaybackTargetConnectInstance[],
+): Map<string, string> {
+  const totals = new Map<string, number>();
+  const seen = new Map<string, number>();
+  for (const instance of instances) {
+    const name = connectInstanceName(instance);
+    totals.set(name, (totals.get(name) ?? 0) + 1);
+  }
+  const names = new Map<string, string>();
+  for (const instance of instances) {
+    const name = connectInstanceName(instance);
+    const total = totals.get(name) ?? 1;
+    const index = (seen.get(name) ?? 0) + 1;
+    seen.set(name, index);
+    names.set(instance.instance_id, total > 1 ? `${name} (${index})` : name);
+  }
+  return names;
+}
+
 export const localTargetProvider: PlaybackTargetProvider = {
   id: "local",
   label: "This device",
   getTargets: (context) => {
     const capabilities = getListenDeviceCapabilities();
     const activeConnectDeviceId = context?.activeConnectDeviceId;
-    const localActive =
-      !activeConnectDeviceId || activeConnectDeviceId === getListenDeviceId();
+    const localActive = isWsCrateConnectContext(context)
+      ? !context.connect.activeInstanceId ||
+        context.connect.activeInstanceId === context.connect.playbackInstanceId
+      : !activeConnectDeviceId || activeConnectDeviceId === getListenDeviceId();
     return [
       {
         id: "local:current",
@@ -125,7 +193,25 @@ export const localTargetProvider: PlaybackTargetProvider = {
     ];
   },
   selectTarget: async (_target, context) => {
-    if (!isCrateConnectEnabled()) {
+    if (isWsCrateConnectContext(context)) {
+      const { activeInstanceId, playbackInstanceId, requestTransfer } =
+        context.connect;
+      if (
+        playbackInstanceId &&
+        activeInstanceId &&
+        activeInstanceId !== playbackInstanceId
+      ) {
+        const sent = requestTransfer(playbackInstanceId);
+        return sent
+          ? { ok: true, message: "Playing here." }
+          : { ok: false, message: "Crate Connect is still connecting." };
+      }
+      return {
+        ok: true,
+        message: "Already playing on this device.",
+      };
+    }
+    if (!isLegacyCrateConnectEnabled()) {
       return {
         ok: true,
         message: "Already playing on this device.",
@@ -153,7 +239,43 @@ export const crateConnectTargetProvider: PlaybackTargetProvider = {
   id: "crate-connect",
   label: "Crate devices",
   getTargets: async (context) => {
-    if (!isCrateConnectEnabled()) return [];
+    if (isWsCrateConnectContext(context)) {
+      const { activeInstanceId, connectedInstances, playbackInstanceId } =
+        context.connect;
+      const instances = connectedInstances.filter(
+        (instance) => instance.instance_id !== playbackInstanceId,
+      );
+      const names = visibleInstanceNames(instances);
+      return instances.map((instance) => {
+        const canPlay = capabilityFlag(instance.capabilities, "can_play", true);
+        const active = activeInstanceId === instance.instance_id;
+        return {
+          id: `crate-instance:${instance.instance_id}`,
+          providerId: "crate-connect",
+          kind: "crate-device" as const,
+          name:
+            names.get(instance.instance_id) ?? connectInstanceName(instance),
+          subtitle: active
+            ? "Playing through Crate Connect"
+            : "Connected Crate instance",
+          active,
+          available: canPlay,
+          unavailableReason: canPlay
+            ? undefined
+            : "Playback is not available on this instance.",
+          capabilities: {
+            canPlay,
+            canSeek: canPlay,
+            canSetVolume: capabilityFlag(
+              instance.capabilities,
+              "can_set_volume",
+              true,
+            ),
+          },
+        };
+      });
+    }
+    if (!isLegacyCrateConnectEnabled()) return [];
     const currentDeviceId = getListenDeviceId();
     const activeConnectDeviceId = context?.activeConnectDeviceId;
     const response = await fetchConnectDevices();
@@ -188,7 +310,25 @@ export const crateConnectTargetProvider: PlaybackTargetProvider = {
       });
   },
   selectTarget: async (target, context) => {
-    if (!isCrateConnectEnabled()) {
+    if (isWsCrateConnectContext(context)) {
+      if (!target.available) {
+        return {
+          ok: false,
+          message:
+            target.unavailableReason ||
+            "Crate Connect transfer is unavailable.",
+        };
+      }
+      const targetInstanceId = target.id.replace(/^crate-instance:/, "");
+      if (targetInstanceId === context.connect.activeInstanceId) {
+        return { ok: true, message: `Already playing on ${target.name}.` };
+      }
+      const sent = context.connect.requestTransfer(targetInstanceId);
+      return sent
+        ? { ok: true, message: `Playing on ${target.name}.` }
+        : { ok: false, message: "Crate Connect is still connecting." };
+    }
+    if (!isLegacyCrateConnectEnabled()) {
       return {
         ok: false,
         message: "Crate Connect is disabled in Settings.",
@@ -366,6 +506,7 @@ function targetArgs(
 async function enrichTargetContext(
   context: PlaybackTargetContext | undefined,
 ): Promise<PlaybackTargetContext | undefined> {
+  if (isWsCrateConnectContext(context)) return context;
   if (context?.activeConnectDeviceId !== undefined) return context;
   const session = await fetchActiveConnectSession().catch(() => null);
   return {

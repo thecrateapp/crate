@@ -48,7 +48,7 @@ describe("PlaybackTargetMenu", () => {
             id: "local:current",
             providerId: "local",
             kind: "local",
-            name: "Web (Listen)",
+            name: "Crate on Chrome",
             subtitle: "System-selected output",
             active: true,
             available: true,
@@ -94,7 +94,7 @@ describe("PlaybackTargetMenu", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
 
-    expect(await screen.findByText("Web (Listen)")).toBeVisible();
+    expect(await screen.findByText("Crate on Chrome")).toBeVisible();
     expect(screen.getByText("System-selected output")).toBeVisible();
     expect(screen.getByText("Desktop")).toBeVisible();
     expect(screen.getByText("Unavailable")).toBeVisible();
@@ -110,7 +110,7 @@ describe("PlaybackTargetMenu", () => {
             id: "local:current",
             providerId: "local",
             kind: "local",
-            name: "Web (Listen)",
+            name: "Crate on Chrome",
             subtitle: "Available on this device",
             active: false,
             available: true,
@@ -167,7 +167,7 @@ describe("PlaybackTargetMenu", () => {
     render(<PlaybackTargetMenu targetContext={targetContext} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
-    const localRow = (await screen.findByText("Web (Listen)")).closest(
+    const localRow = (await screen.findByText("Crate on Chrome")).closest(
       "button",
     );
     expect(localRow).not.toBeNull();

@@ -91,6 +91,9 @@ def should_process_artist(
     - the artist directory cannot be located,
     - the hash already matches (no new content to process).
     """
+    if str(artist_name or "").strip().startswith("."):
+        return False
+
     if library_path is None:
         from crate.config import load_config
 
@@ -129,7 +132,8 @@ def queue_process_new_content_if_needed(
     call was suppressed because content is unchanged or the dedup window
     already contains a pending task for the same artist.
     """
-    if not artist_name:
+    artist_name = str(artist_name or "").strip()
+    if not artist_name or artist_name.startswith("."):
         return None
 
     if not force and not should_process_artist(artist_name, library_path=library_path):

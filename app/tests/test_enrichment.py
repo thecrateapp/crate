@@ -786,3 +786,43 @@ class TestArtistEnrichment:
             ("refresh", "VVV [Trippin'you]"),
             ("unmark", "VVV [Trippin'you]"),
         ]
+
+    def test_process_new_content_skips_hidden_artist_without_refresh(self, monkeypatch):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        calls: list[tuple[str, str]] = []
+
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_mark_processing",
+            lambda artist: calls.append(("mark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_unmark_processing",
+            lambda artist: calls.append(("unmark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_refresh_artist_summary",
+            lambda artist, config: calls.append(("refresh", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_inner",
+            lambda *args, **kwargs: calls.append(("inner", "")),
+        )
+
+        result = worker_enrichment._handle_process_new_content(
+            "task-1",
+            {"artist": ".crate-trash"},
+            {"library_path": "/tmp/music"},
+        )
+
+        assert result == {
+            "artist": ".crate-trash",
+            "album": "",
+            "skipped": True,
+            "reason": "hidden_library_path",
+        }
+        assert calls == []

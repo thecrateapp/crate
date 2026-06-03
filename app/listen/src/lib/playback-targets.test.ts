@@ -26,6 +26,21 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/listen-device", () => ({
+  formatCrateDeviceName: vi.fn(
+    (device: {
+      app_platform?: string | null;
+      device_label?: string | null;
+      device_type?: string | null;
+    }) => {
+      if (device.device_label === "Web (Listen)") return "Crate on Browser";
+      if (device.device_label) return device.device_label;
+      if (device.app_platform === "listen-tauri") return "Crate Desktop";
+      if (device.app_platform === "listen-web") return "Crate on Browser";
+      return device.device_type
+        ? `Crate on ${device.device_type}`
+        : "Crate device";
+    },
+  ),
   getListenDeviceCapabilities: vi.fn(() => ({
     can_play: true,
     can_receive_commands: true,
@@ -35,7 +50,7 @@ vi.mock("@/lib/listen-device", () => ({
     supports_cast_sender: false,
   })),
   getListenDeviceId: vi.fn(() => "phone"),
-  getListenDeviceLabel: vi.fn(() => "Web (Listen)"),
+  getListenDeviceLabel: vi.fn(() => "Crate on Chrome"),
 }));
 
 vi.mock("@/lib/native-output-router", () => ({
@@ -56,6 +71,7 @@ vi.mock("@/lib/crate-connect", async () => {
   );
   return {
     ...actual,
+    CRATE_CONNECT_V2_TRANSPORT_ENABLED: false,
     isCrateConnectEnabled: isCrateConnectEnabledMock,
   };
 });
@@ -224,7 +240,7 @@ describe("playback targets", () => {
         {
           id: "local:current",
           kind: "local",
-          name: "Web (Listen)",
+          name: "Crate on Chrome",
           active: true,
           available: true,
         },
@@ -249,6 +265,179 @@ describe("playback targets", () => {
         unavailableReason: "Playback is not available on this device.",
       }),
     ]);
+  });
+
+  it("loads Crate Connect v2 targets from connected playback instances", async () => {
+    const requestTransfer = vi.fn(() => true);
+    const groups = await loadPlaybackTargetGroups({
+      connect: {
+        activeInstanceId: "desktop-tab",
+        connectedInstances: [
+          {
+            instance_id: "phone-tab",
+            device_label: "Web (Listen)",
+            capabilities: { can_play: true, can_set_volume: true },
+          },
+          {
+            instance_id: "desktop-tab",
+            device_label: "Desktop",
+            capabilities: { can_play: true, can_set_volume: true },
+          },
+          {
+            instance_id: "tablet-tab",
+            device_label: "Tablet",
+            capabilities: { can_play: false },
+          },
+        ],
+        playbackInstanceId: "phone-tab",
+        requestTransfer,
+        transport: "ws",
+      },
+    });
+
+    const crateGroup = groups.find(
+      (group) => group.providerId === "crate-connect",
+    );
+    const local = groups
+      .find((group) => group.providerId === "local")
+      ?.targets.find((target) => target.id === "local:current");
+
+    expect(local).toMatchObject({ active: false });
+    expect(crateGroup?.targets).toEqual([
+      expect.objectContaining({
+        id: "crate-instance:desktop-tab",
+        name: "Desktop",
+        subtitle: "Playing through Crate Connect",
+        active: true,
+        available: true,
+      }),
+      expect.objectContaining({
+        id: "crate-instance:tablet-tab",
+        name: "Tablet",
+        active: false,
+        available: false,
+        unavailableReason: "Playback is not available on this instance.",
+      }),
+    ]);
+    expect(apiMock.mock.calls.map((call) => call[0])).not.toContain(
+      "/api/me/devices",
+    );
+    expect(apiMock.mock.calls.map((call) => call[0])).not.toContain(
+      "/api/me/connect/session",
+    );
+  });
+
+  it("normalizes legacy Crate Connect v2 instance names", async () => {
+    const groups = await loadPlaybackTargetGroups({
+      connect: {
+        activeInstanceId: null,
+        connectedInstances: [
+          { instance_id: "local-tab", device_label: "Crate on Chrome" },
+          { instance_id: "remote-tab", device_label: "Web (Listen)" },
+        ],
+        playbackInstanceId: "local-tab",
+        requestTransfer: vi.fn(() => true),
+        transport: "ws",
+      },
+    });
+
+    const crateGroup = groups.find(
+      (group) => group.providerId === "crate-connect",
+    );
+
+    expect(crateGroup?.targets[0]?.name).toBe("Crate on Browser");
+  });
+
+  it("disambiguates duplicate Crate Connect v2 instance names", async () => {
+    const groups = await loadPlaybackTargetGroups({
+      connect: {
+        activeInstanceId: null,
+        connectedInstances: [
+          { instance_id: "local-tab", device_label: "Crate on Chrome" },
+          { instance_id: "remote-tab-1", device_label: "Crate on Chrome" },
+          { instance_id: "remote-tab-2", device_label: "Crate on Chrome" },
+        ],
+        playbackInstanceId: "local-tab",
+        requestTransfer: vi.fn(() => true),
+        transport: "ws",
+      },
+    });
+
+    const crateGroup = groups.find(
+      (group) => group.providerId === "crate-connect",
+    );
+
+    expect(crateGroup?.targets.map((target) => target.name)).toEqual([
+      "Crate on Chrome (1)",
+      "Crate on Chrome (2)",
+    ]);
+  });
+
+  it("selects a Crate Connect v2 instance by requesting transfer", async () => {
+    const requestTransfer = vi.fn(() => true);
+    const result = await selectPlaybackTarget(
+      {
+        id: "crate-instance:desktop-tab",
+        providerId: "crate-connect",
+        kind: "crate-device",
+        name: "Desktop",
+        active: false,
+        available: true,
+        capabilities: {
+          canPlay: true,
+          canSeek: true,
+          canSetVolume: true,
+        },
+      },
+      {
+        connect: {
+          activeInstanceId: "phone-tab",
+          connectedInstances: [],
+          playbackInstanceId: "phone-tab",
+          requestTransfer,
+          transport: "ws",
+        },
+      },
+    );
+
+    expect(result).toEqual({ ok: true, message: "Playing on Desktop." });
+    expect(requestTransfer).toHaveBeenCalledWith("desktop-tab");
+    expect(apiMock).not.toHaveBeenCalledWith(
+      "/api/me/connect/transfer",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("claims local Crate Connect v2 ownership from the local target", async () => {
+    const requestTransfer = vi.fn(() => true);
+    const result = await localTargetProvider.selectTarget(
+      {
+        id: "local:current",
+        providerId: "local",
+        kind: "local",
+        name: "Crate on Chrome",
+        active: false,
+        available: true,
+        capabilities: {
+          canPlay: true,
+          canSeek: true,
+          canSetVolume: true,
+        },
+      },
+      {
+        connect: {
+          activeInstanceId: "desktop-tab",
+          connectedInstances: [],
+          playbackInstanceId: "phone-tab",
+          requestTransfer,
+          transport: "ws",
+        },
+      },
+    );
+
+    expect(result).toEqual({ ok: true, message: "Playing here." });
+    expect(requestTransfer).toHaveBeenCalledWith("phone-tab");
   });
 
   it("does not expose or claim Crate Connect targets when the feature is disabled", async () => {
@@ -316,7 +505,7 @@ describe("playback targets", () => {
         id: "local:current",
         providerId: "local",
         kind: "local",
-        name: "Web (Listen)",
+        name: "Crate on Chrome",
         active: false,
         available: true,
         capabilities: {
@@ -355,7 +544,7 @@ describe("playback targets", () => {
       id: "local:current",
       providerId: "local",
       kind: "local",
-      name: "Web (Listen)",
+      name: "Crate on Chrome",
       active: false,
       available: true,
       capabilities: {
@@ -384,7 +573,7 @@ describe("playback targets", () => {
         id: "local:current",
         providerId: "local",
         kind: "local",
-        name: "Web (Listen)",
+        name: "Crate on Chrome",
         active: true,
         available: true,
         capabilities: {

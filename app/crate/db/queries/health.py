@@ -212,8 +212,10 @@ def get_duplicate_tracks() -> list[dict]:
     handled by shadow-quality repair instead of being reported as duplicates.
     Ambiguous candidates are deliberately excluded because the duplicate-track
     fixer is destructive and only safe when every copy belongs to the same
-    physical album directory, has matching duration, does not carry conflicting
-    audio fingerprints, and matches the canonical album identity.
+    physical album directory, has matching duration, and matches the canonical
+    album identity. Conflicting audio fingerprints are only reported when the
+    durations are near-identical; the fixer then requires readable tags before
+    it quarantines anything.
     """
     with read_scope() as session:
         rows = (
@@ -255,7 +257,10 @@ def get_duplicate_tracks() -> list[dict]:
             FROM candidates
             WHERE parent_count = 1
               AND duration_delta <= 1.0
-              AND fingerprint_count <= 1
+              AND (
+                fingerprint_count <= 1
+                OR duration_delta <= 0.25
+              )
               AND db_identity_mismatches = 0
             ORDER BY artist, album, disc_number, track_number, title
         """)

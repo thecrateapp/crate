@@ -111,6 +111,18 @@ export function createMockPlayerActions(
     removeFromQueue: vi.fn(),
     reorderQueue: vi.fn(),
     publishConnectState: vi.fn(async () => undefined),
+    connect: {
+      activeInstanceId: null,
+      connectedInstances: [],
+      enabled: false,
+      isRemoteActive: false,
+      playbackInstanceId: null,
+      remoteState: null,
+      requestTransfer: vi.fn(() => false),
+      sendRemoteCommand: vi.fn(() => false),
+      serverClockOffsetMs: 0,
+      transport: null,
+    },
     ...overrides,
   };
 }

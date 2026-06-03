@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from crate.api.auth import _require_auth
+from crate.api.cache_events import broadcast_invalidation
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -39,6 +41,7 @@ from crate.db.repositories.connect import (
     send_connect_command,
     transfer_playback,
 )
+from crate.db.repositories.connect_ws_hub import connect_hub
 
 router = APIRouter(prefix="/api/me/connect", tags=["me"])
 
@@ -124,12 +127,24 @@ def get_connect_preferences(request: Request):
     responses=_CONNECT_RESPONSES,
     summary="Update current user's Crate Connect preferences",
 )
-def put_connect_preferences(request: Request, body: ConnectPreferencesUpdateRequest):
+async def put_connect_preferences(
+    request: Request, body: ConnectPreferencesUpdateRequest
+):
     user_id = _require_persisted_user_id(request)
     user = update_user(user_id, crate_connect_enabled=body.enabled)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"enabled": bool(user.get("crate_connect_enabled"))}
+    enabled = bool(user.get("crate_connect_enabled"))
+    await connect_hub.broadcast_to_user(
+        user_id,
+        {
+            "type": "connect_preferences",
+            "payload": {"enabled": enabled},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    broadcast_invalidation("connect:preferences")
+    return {"enabled": enabled}
 
 
 @router.post(

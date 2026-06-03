@@ -136,7 +136,7 @@ def get_devices(request: Request):
     "/devices/{device_id}",
     response_model=OkResponse,
     responses=_PLAYBACK_STATE_RESPONSES,
-    summary="Forget a Crate Connect device",
+    summary="Revoke a Crate Connect device",
 )
 def delete_device(request: Request, device_id: str):
     user_id = _require_persisted_user_id(request)

@@ -1,6 +1,8 @@
 import { createContext } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type { ConnectedPlaybackInstance } from "@/hooks/use-crate-connect-ws";
+import type { RemotePlaybackState } from "@/lib/remote-playback-state";
 
 export interface CrossfadeTransition {
   outgoing: Track;
@@ -49,6 +51,29 @@ export interface PlayerActionsValue {
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
   publishConnectState: (options?: { claimActive?: boolean }) => Promise<void>;
+  connect: PlayerConnectValue;
+}
+
+export interface PlayerConnectValue {
+  activeInstanceId: string | null;
+  connectedInstances: ConnectedPlaybackInstance[];
+  enabled: boolean;
+  isRemoteActive: boolean;
+  playbackInstanceId: string | null;
+  remoteState: RemotePlaybackState | null;
+  requestTransfer: (targetInstanceId: string) => boolean;
+  sendRemoteCommand: (
+    type:
+      | "pause"
+      | "resume"
+      | "seek"
+      | "next_track"
+      | "previous_track"
+      | "volume",
+    payload?: Record<string, unknown>,
+  ) => boolean;
+  serverClockOffsetMs: number;
+  transport: "legacy" | "ws" | null;
 }
 
 export type PlayerContextValue = PlayerStateValue &

@@ -71,12 +71,13 @@ import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
 import {
   CONNECT_SESSION_EVENT,
+  CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   fetchActiveConnectSnapshot,
   fetchConnectDevices,
   sendConnectCommand,
   type ActiveConnectSession,
 } from "@/lib/crate-connect";
-import { getListenDeviceId } from "@/lib/listen-device";
+import { formatCrateDeviceName, getListenDeviceId } from "@/lib/listen-device";
 import {
   remotePlaybackQueue,
   type RemotePlaybackState,
@@ -207,11 +208,14 @@ export function PlayerBar() {
     seek,
     setVolume,
     publishConnectState,
+    connect,
     toggleShuffle,
     cycleRepeat,
   } = usePlayerActions();
   const isDesktop = useIsDesktop();
   const connectEnabled = useCrateConnectEnabled();
+  const legacyConnectEnabled =
+    connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
   const allowEqualizer = canUseWebAudioEffects;
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && allowEqualizer;
@@ -244,45 +248,84 @@ export function PlayerBar() {
     number | null
   >(null);
   const activeConnectDeviceId = activeConnectSession?.active_device_id ?? null;
-  const isRemoteConnectActive = Boolean(
-    connectEnabled &&
+  const legacyRemoteConnectActive = Boolean(
+    legacyConnectEnabled &&
       activeConnectDeviceId &&
       activeConnectDeviceId !== currentConnectDeviceId,
   );
+  const v2RemoteConnectActive = Boolean(
+    connect.transport === "ws" && connect.isRemoteActive && connect.remoteState,
+  );
+  const isRemoteConnectActive =
+    legacyRemoteConnectActive || v2RemoteConnectActive;
+  const remoteConnectState = v2RemoteConnectActive
+    ? connect.remoteState
+    : activeConnectState;
   const { frequenciesDb, sampleRate } = useAudioVisualizer(
     showPlayerBarAnalyzer && isPlaying && !isRemoteConnectActive,
     `${currentTrack?.id ?? "none"}:${analyserVersion}`,
   );
-  const remoteConnectDeviceLabel =
-    isRemoteConnectActive && activeConnectDeviceLabel
-      ? activeConnectDeviceLabel
+  const activeConnectInstance =
+    connect.transport === "ws"
+      ? connect.connectedInstances.find(
+          (instance) => instance.instance_id === connect.activeInstanceId,
+        )
       : null;
+  const remoteConnectDeviceLabel =
+    isRemoteConnectActive && v2RemoteConnectActive
+      ? formatCrateDeviceName({
+          app_platform:
+            activeConnectInstance?.app_platform ??
+            connect.remoteState?.app_platform,
+          device_label:
+            activeConnectInstance?.device_label ??
+            connect.remoteState?.device_label,
+          device_type:
+            activeConnectInstance?.device_type ??
+            connect.remoteState?.device_type,
+        })
+      : isRemoteConnectActive
+        ? activeConnectDeviceLabel
+        : null;
   const effectiveIsPlaying = isRemoteConnectActive
-    ? activeConnectSession?.status === "playing"
+    ? remoteConnectState?.status === "playing"
     : isPlaying;
   const remoteDuration =
-    typeof activeConnectState?.duration_ms === "number"
-      ? activeConnectState.duration_ms / 1000
+    typeof remoteConnectState?.duration_ms === "number"
+      ? remoteConnectState.duration_ms / 1000
       : 0;
   const remoteDisplayedTime = useMemo(() => {
-    if (!isRemoteConnectActive || !activeConnectState) return 0;
+    if (!isRemoteConnectActive || !remoteConnectState) return 0;
     if (optimisticRemoteTime !== null) return optimisticRemoteTime;
-    const baseMs = Math.max(0, activeConnectState.position_ms || 0);
-    if (activeConnectSession?.status !== "playing") return baseMs / 1000;
+    const baseMs = Math.max(0, remoteConnectState.position_ms || 0);
+    if (remoteConnectState.status !== "playing") return baseMs / 1000;
+    if (v2RemoteConnectActive && remoteConnectState.position_updated_at) {
+      const serverAnchor = Date.parse(remoteConnectState.position_updated_at);
+      if (Number.isFinite(serverAnchor)) {
+        const projected =
+          baseMs +
+          Math.max(0, Date.now() + connect.serverClockOffsetMs - serverAnchor);
+        const durationMs = remoteConnectState.duration_ms || 0;
+        return (
+          (durationMs > 0 ? Math.min(projected, durationMs) : projected) / 1000
+        );
+      }
+    }
     if (activeConnectStateFetchedAt === null) return baseMs / 1000;
     const elapsedMs = Math.max(0, Date.now() - activeConnectStateFetchedAt);
     const projected = baseMs + elapsedMs;
-    const durationMs = activeConnectState.duration_ms || 0;
+    const durationMs = remoteConnectState.duration_ms || 0;
     return (
       (durationMs > 0 ? Math.min(projected, durationMs) : projected) / 1000
     );
   }, [
-    activeConnectSession?.status,
-    activeConnectState,
     activeConnectStateFetchedAt,
+    connect.serverClockOffsetMs,
     isRemoteConnectActive,
     optimisticRemoteTime,
+    remoteConnectState,
     remoteClockTick,
+    v2RemoteConnectActive,
   ]);
   const effectiveDisplayedTime = isRemoteConnectActive
     ? remoteDisplayedTime
@@ -298,7 +341,7 @@ export function PlayerBar() {
 
   const refreshConnectSession = useCallback(() => {
     let cancelled = false;
-    if (!connectEnabled) {
+    if (!legacyConnectEnabled) {
       setActiveConnectSession(null);
       setActiveConnectState(null);
       setActiveConnectStateFetchedAt(null);
@@ -324,16 +367,17 @@ export function PlayerBar() {
         (device) => device.device_id === activeDeviceId,
       );
       setActiveConnectDeviceLabel(
-        activeDevice?.device_label ||
-          activeDevice?.app_platform ||
-          activeDeviceId ||
-          null,
+        activeDevice
+          ? formatCrateDeviceName(activeDevice)
+          : activeDeviceId
+            ? "Crate device"
+            : null,
       );
     });
     return () => {
       cancelled = true;
     };
-  }, [connectEnabled]);
+  }, [legacyConnectEnabled]);
   const refreshConnectSessionCleanupRef = useRef<(() => void) | null>(null);
   const runRefreshConnectSession = useCallback(() => {
     refreshConnectSessionCleanupRef.current?.();
@@ -368,13 +412,13 @@ export function PlayerBar() {
   }, [isRemoteConnectActive]);
 
   useEffect(() => {
-    if (!isRemoteConnectActive || activeConnectSession?.status !== "playing")
+    if (!isRemoteConnectActive || remoteConnectState?.status !== "playing")
       return;
     const intervalId = window.setInterval(() => {
       setRemoteClockTick((value) => value + 1);
-    }, 1000);
+    }, 250);
     return () => window.clearInterval(intervalId);
-  }, [activeConnectSession?.status, isRemoteConnectActive]);
+  }, [isRemoteConnectActive, remoteConnectState?.status]);
 
   useEffect(() => {
     if (!isRemoteConnectActive) return;
@@ -395,6 +439,25 @@ export function PlayerBar() {
       type: "pause" | "resume" | "seek" | "next" | "previous" | "set_volume",
       payload?: Record<string, unknown>,
     ) => {
+      if (v2RemoteConnectActive) {
+        const wsType =
+          type === "next"
+            ? "next_track"
+            : type === "previous"
+              ? "previous_track"
+              : type === "set_volume"
+                ? "volume"
+                : type;
+        const ok = connect.sendRemoteCommand(wsType, payload);
+        if (!ok) {
+          toast.error(
+            remoteConnectDeviceLabel
+              ? `Could not control ${remoteConnectDeviceLabel}`
+              : "Could not control remote device",
+          );
+        }
+        return ok;
+      }
       if (!isRemoteConnectActive || !activeConnectDeviceId) return false;
       try {
         await sendConnectCommand({
@@ -427,9 +490,11 @@ export function PlayerBar() {
     [
       activeConnectDeviceId,
       activeConnectSession?.playback_session_id,
+      connect,
       isRemoteConnectActive,
       remoteConnectDeviceLabel,
       runRefreshConnectSession,
+      v2RemoteConnectActive,
     ],
   );
 
@@ -678,22 +743,22 @@ export function PlayerBar() {
   }
 
   const remoteDisplayQueue = useMemo(
-    () => (activeConnectState ? remotePlaybackQueue(activeConnectState) : []),
-    [activeConnectState],
+    () => (remoteConnectState ? remotePlaybackQueue(remoteConnectState) : []),
+    [remoteConnectState],
   );
   const remoteDisplayIndex =
     remoteDisplayQueue.length > 0
       ? Math.max(
           0,
           Math.min(
-            activeConnectState?.current_index ?? 0,
+            remoteConnectState?.current_index ?? 0,
             remoteDisplayQueue.length - 1,
           ),
         )
       : 0;
   const shouldDisplayConnectSnapshot =
     remoteDisplayQueue.length > 0 &&
-    (isRemoteConnectActive || (connectEnabled && !currentTrack));
+    (isRemoteConnectActive || (legacyConnectEnabled && !currentTrack));
   const displayTrack = shouldDisplayConnectSnapshot
     ? remoteDisplayQueue[remoteDisplayIndex]
     : currentTrack;
@@ -704,8 +769,8 @@ export function PlayerBar() {
     ? remoteDisplayIndex
     : currentIndex;
   const displayPlaySource = (
-    shouldDisplayConnectSnapshot && activeConnectState?.play_source
-      ? activeConnectState.play_source
+    shouldDisplayConnectSnapshot && remoteConnectState?.play_source
+      ? remoteConnectState.play_source
       : playSource
   ) as PlaySource | null;
   const displayCrossfadeTransition = isRemoteConnectActive
@@ -782,20 +847,24 @@ export function PlayerBar() {
       currentIndex: displayCurrentIndex,
       queue: displayQueue,
       volume: effectiveVolume,
-      activeConnectDeviceId: connectEnabled ? activeConnectDeviceId : null,
-      activeConnectSession: connectEnabled ? activeConnectSession : null,
+      activeConnectDeviceId: legacyConnectEnabled
+        ? activeConnectDeviceId
+        : null,
+      activeConnectSession: legacyConnectEnabled ? activeConnectSession : null,
+      connect,
       pause,
       publishConnectState,
     }),
     [
       activeConnectDeviceId,
       activeConnectSession,
-      connectEnabled,
+      connect,
       displayCurrentIndex,
       displayQueue,
       displayTrack,
       effectiveDisplayedTime,
       effectiveVolume,
+      legacyConnectEnabled,
       pause,
       publishConnectState,
     ],

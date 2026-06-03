@@ -55,6 +55,7 @@ export interface RemotePlaybackState {
   album: string;
   album_cover?: string | null;
   position_ms: number;
+  position_updated_at?: string | null;
   duration_ms?: number | null;
   current_index: number;
   queue_revision?: string | null;

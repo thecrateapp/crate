@@ -1,6 +1,7 @@
 """User personal library: follows, saved albums, likes, play history, feed."""
 
 import asyncio
+import logging
 import time
 from datetime import date, datetime, timedelta, timezone
 
@@ -153,6 +154,7 @@ from crate.db.tx import read_scope
 from crate.slugs import build_public_album_slug
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+log = logging.getLogger(__name__)
 
 _ME_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -1696,21 +1698,42 @@ def connect_lastfm(request: Request, body: LastfmCallbackRequest):
 
     from crate.scrobble import lastfm_get_session
 
-    session_key = lastfm_get_session(api_key, api_secret, body.token)
-    if not session_key:
+    lastfm_session = lastfm_get_session(api_key, api_secret, body.token)
+    if not lastfm_session:
         raise HTTPException(
             status_code=400,
             detail="Failed to get Last.fm session — token may have expired",
         )
 
-    upsert_user_external_identity(
-        user_id=user["id"],
-        provider="lastfm",
-        external_user_id=session_key[:8],
-        external_username="",
-        status="linked",
-        metadata={"session_key": session_key},
-    )
+    username = (lastfm_session.username or "").strip() or None
+    metadata = {"session_key": lastfm_session.key}
+    if username:
+        metadata["username"] = username
+    if lastfm_session.subscriber is not None:
+        metadata["subscriber"] = lastfm_session.subscriber
+
+    try:
+        upsert_user_external_identity(
+            user_id=user["id"],
+            provider="lastfm",
+            external_user_id=username,
+            external_username=username,
+            status="linked",
+            metadata=metadata,
+        )
+    except Exception as exc:
+        from sqlalchemy.exc import IntegrityError
+
+        if isinstance(exc, IntegrityError):
+            raise HTTPException(
+                status_code=409,
+                detail="This Last.fm account is already linked to another Crate user",
+            ) from None
+        log.warning("Failed to store Last.fm identity for user %s", user["id"])
+        raise HTTPException(
+            status_code=500,
+            detail="Could not store Last.fm connection",
+        ) from None
     return {"ok": True}
 
 

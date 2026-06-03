@@ -191,6 +191,38 @@ class TestPlaylistTrackEntityRefs:
                 }
             )
 
+        strong_album_id = pg_db.upsert_album(
+            {
+                "artist": "Duplicate Query Artist",
+                "name": "Strong Identity Album",
+                "path": "/music/duplicate-query-artist/strong-identity-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename, fingerprint in (
+            ("01-strong-a.flac", "fingerprint-a"),
+            ("01-strong-b.flac", "fingerprint-b"),
+        ):
+            pg_db.upsert_track(
+                {
+                    "album_id": strong_album_id,
+                    "artist": "Duplicate Query Artist",
+                    "album": "Strong Identity Album",
+                    "filename": filename,
+                    "title": "Strong Duplicate",
+                    "path": f"/music/duplicate-query-artist/strong-identity-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": 120.0,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": fingerprint,
+                }
+            )
+
         featured_album_id = pg_db.upsert_album(
             {
                 "artist": "Duplicate Query Artist",
@@ -256,6 +288,7 @@ class TestPlaylistTrackEntityRefs:
         by_title = {row["title"]: row for row in rows}
 
         assert by_title["Safe Duplicate"]["artist"] == "Duplicate Query Artist"
+        assert by_title["Strong Duplicate"]["artist"] == "Duplicate Query Artist"
         assert "Featured Duplicate" not in by_title
         assert "Unsafe Duplicate" not in by_title
 

@@ -63,6 +63,9 @@ export function PlaybackTargetMenu({
   const targetContextRef = useRef(targetContext);
   targetContextRef.current = targetContext;
   const targetTrackId = targetContext?.currentTrack?.id;
+  const activeConnectInstanceId = targetContext?.connect?.activeInstanceId;
+  const connectedInstanceCount =
+    targetContext?.connect?.connectedInstances.length ?? 0;
   const activeTarget = useMemo(
     () =>
       groups.flatMap((group) => group.targets).find((target) => target.active),
@@ -131,7 +134,12 @@ export function PlaybackTargetMenu({
       refreshTargetsCleanupRef.current?.();
       refreshTargetsCleanupRef.current = null;
     };
-  }, [runRefreshTargets, targetTrackId]);
+  }, [
+    activeConnectInstanceId,
+    connectedInstanceCount,
+    runRefreshTargets,
+    targetTrackId,
+  ]);
 
   useEffect(() => {
     window.addEventListener(CONNECT_SESSION_EVENT, runRefreshTargets);

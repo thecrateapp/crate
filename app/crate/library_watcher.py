@@ -79,6 +79,9 @@ class LibraryWatcher:
         parts = rel.parts
         if len(parts) < 2:
             return
+        if any(part.startswith(".") for part in parts):
+            log.debug("Watcher: ignoring hidden library path %s", rel)
+            return
 
         # Ignore non-audio files (covers, photos written by enrichment)
         if p.name.lower() in IGNORE_PATTERNS:

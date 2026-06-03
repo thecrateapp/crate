@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MonitorSpeaker, Trash2 } from "lucide-react";
+import { Loader2, LogOut, MonitorSpeaker } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import {
   CRATE_CONNECT_FEATURE_ENABLED,
+  CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   setCrateConnectEnabled,
 } from "@/lib/crate-connect";
 import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
-import { getListenDeviceId } from "@/lib/listen-device";
+import {
+  formatCrateAppPlatform,
+  formatCrateDeviceName,
+  formatCrateDeviceType,
+  getListenDeviceId,
+} from "@/lib/listen-device";
 import { registerCurrentConnectDevice } from "@/lib/remote-playback-state";
 
 interface ConnectDevice {
@@ -27,6 +33,8 @@ interface ConnectDeviceListResponse {
   devices: ConnectDevice[];
 }
 
+const RECENT_DEVICE_WINDOW_MS = 5 * 60 * 1000;
+
 function formatSeenAt(value?: string | null): string {
   if (!value) return "recently";
   const timestamp = Date.parse(value);
@@ -35,7 +43,33 @@ function formatSeenAt(value?: string | null): string {
 }
 
 function deviceLabel(device: ConnectDevice): string {
-  return device.device_label || device.app_platform || device.device_id;
+  return formatCrateDeviceName(device);
+}
+
+function deviceMeta(device: ConnectDevice): string | null {
+  const parts = [
+    formatCrateAppPlatform(device.app_platform),
+    formatCrateDeviceType(device.device_type),
+  ].filter((part): part is string => Boolean(part));
+  const uniqueParts = [...new Set(parts)];
+  return uniqueParts.length > 0 ? uniqueParts.join(" · ") : null;
+}
+
+function deviceSeenTimestamp(device: ConnectDevice): number | null {
+  const value = device.last_seen_at || device.updated_at || device.created_at;
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function isVisibleDevice(
+  device: ConnectDevice,
+  currentDeviceId: string,
+): boolean {
+  if (device.device_id === currentDeviceId) return true;
+  if (device.active) return true;
+  const seenAt = deviceSeenTimestamp(device);
+  return seenAt !== null && Date.now() - seenAt <= RECENT_DEVICE_WINDOW_MS;
 }
 
 export function ConnectDevicesSection() {
@@ -63,7 +97,11 @@ function ConnectDevicesSectionContent() {
     })
       .then((response) => {
         if (requestId === devicesRequestIdRef.current) {
-          setDevices(response.devices);
+          setDevices(
+            response.devices.filter((device) =>
+              isVisibleDevice(device, currentDeviceId),
+            ),
+          );
         }
       })
       .catch((error) => {
@@ -83,9 +121,9 @@ function ConnectDevicesSectionContent() {
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [currentDeviceId]);
 
-  async function forgetDevice(device: ConnectDevice) {
+  async function revokeDevice(device: ConnectDevice) {
     setForgettingDeviceId(device.device_id);
     try {
       await api(
@@ -95,9 +133,9 @@ function ConnectDevicesSectionContent() {
       setDevices((current) =>
         current.filter((item) => item.device_id !== device.device_id),
       );
-      toast.success("Device forgotten");
+      toast.success("Device revoked");
     } catch {
-      toast.error("Failed to forget device");
+      toast.error("Failed to revoke device");
     } finally {
       setForgettingDeviceId(null);
     }
@@ -108,7 +146,9 @@ function ConnectDevicesSectionContent() {
     setUpdatingPreference(true);
     try {
       await setCrateConnectEnabled(nextEnabled);
-      if (nextEnabled) void registerCurrentConnectDevice().catch(() => {});
+      if (nextEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED) {
+        void registerCurrentConnectDevice().catch(() => {});
+      }
       toast.success(
         nextEnabled ? "Crate Connect enabled" : "Crate Connect disabled",
       );
@@ -167,6 +207,7 @@ function ConnectDevicesSectionContent() {
             const lastSeen =
               device.last_seen_at || device.updated_at || device.created_at;
             const label = deviceLabel(device);
+            const meta = deviceMeta(device);
             const busy = forgettingDeviceId === device.device_id;
             return (
               <div
@@ -200,34 +241,30 @@ function ConnectDevicesSectionContent() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     Last seen {formatSeenAt(lastSeen)}
                   </div>
-                  {device.app_platform || device.device_type ? (
-                    <div className="mt-1 text-[11px] text-white/40">
-                      {[device.app_platform, device.device_type]
-                        .filter(Boolean)
-                        .join(" - ")}
-                    </div>
+                  {meta ? (
+                    <div className="mt-1 text-[11px] text-white/40">{meta}</div>
                   ) : null}
                 </div>
                 <button
                   type="button"
-                  aria-label={`Forget ${label}`}
+                  aria-label={`Revoke ${label}`}
                   disabled={busy || isCurrent}
-                  onClick={() => void forgetDevice(device)}
+                  onClick={() => void revokeDevice(device)}
                   className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? (
                     <Loader2 size={13} className="animate-spin" />
                   ) : (
-                    <Trash2 size={13} />
+                    <LogOut size={13} />
                   )}
-                  Forget
+                  Revoke device
                 </button>
               </div>
             );
           })}
           {devices.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              No Crate Connect devices yet.
+              No active Crate Connect devices right now.
             </div>
           ) : null}
         </div>

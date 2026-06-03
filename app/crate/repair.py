@@ -31,6 +31,9 @@ from crate.worker_handlers.migration import _fix_artist, preview_fix_artist
 
 log = logging.getLogger(__name__)
 
+DUPLICATE_TRACK_MAX_DURATION_DELTA_SEC = 1.0
+DUPLICATE_TRACK_CONFLICTING_FINGERPRINT_MAX_DURATION_DELTA_SEC = 0.25
+
 
 class LibraryRepair:
     FIXER_METHODS: dict[str, str] = {
@@ -934,6 +937,16 @@ class LibraryRepair:
         )
 
     @staticmethod
+    def _duplicate_track_tag_number(value: str) -> int | None:
+        raw = str(value or "").split("/", 1)[0].strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    @staticmethod
     def _duplicate_track_format_rank(track: dict) -> int:
         format_value = str(track.get("format") or "").strip().casefold()
         if not format_value:
@@ -974,7 +987,7 @@ class LibraryRepair:
 
     def _safe_duplicate_track_resolution(
         self, issue: dict
-    ) -> tuple[dict, list[dict]] | None:
+    ) -> tuple[dict, list[dict], str] | None:
         details = issue.get("details", {})
         artist = str(details.get("artist") or "").strip()
         album = str(details.get("album") or "").strip()
@@ -1004,7 +1017,8 @@ class LibraryRepair:
             for track in tracks
             if track.get("duration") is not None
         ]
-        if durations and max(durations) - min(durations) > 1.0:
+        duration_delta = max(durations) - min(durations) if durations else 0.0
+        if durations and duration_delta > DUPLICATE_TRACK_MAX_DURATION_DELTA_SEC:
             return None
         if any(
             not str(track.get("title") or "").strip()
@@ -1030,14 +1044,6 @@ class LibraryRepair:
         if len(disc_numbers) > 1:
             return None
 
-        fingerprints = {
-            str(track["audio_fingerprint"])
-            for track in tracks
-            if track.get("audio_fingerprint")
-        }
-        if len(fingerprints) > 1:
-            return None
-
         expected_artist = artist.casefold()
         expected_album = album.casefold()
         expected_title = title.casefold()
@@ -1058,11 +1064,58 @@ class LibraryRepair:
         if mismatched_tags:
             return None
 
+        expected_track_number = next(iter(track_numbers)) if track_numbers else None
+        tag_track_numbers = [
+            self._duplicate_track_tag_number(tag_tracknumber)
+            for _tag_artist, _tag_album, _tag_title, tag_tracknumber in tag_identities
+        ]
+        if expected_track_number is not None and any(
+            tag_track_number is not None and tag_track_number != expected_track_number
+            for tag_track_number in tag_track_numbers
+        ):
+            return None
+
+        fingerprints = {
+            str(track["audio_fingerprint"])
+            for track in tracks
+            if track.get("audio_fingerprint")
+        }
+        reason = "same album/title/track number and matching duration"
+        if len(fingerprints) > 1:
+            if (
+                duration_delta
+                > DUPLICATE_TRACK_CONFLICTING_FINGERPRINT_MAX_DURATION_DELTA_SEC
+            ):
+                return None
+            strong_tag_matches = all(
+                tag_artist == expected_artist
+                and tag_album == expected_album
+                and tag_title == expected_title
+                and (
+                    expected_track_number is None
+                    or tag_track_number == expected_track_number
+                )
+                for (
+                    tag_artist,
+                    tag_album,
+                    tag_title,
+                    _tag_tracknumber,
+                ), tag_track_number in zip(
+                    tag_identities, tag_track_numbers, strict=False
+                )
+            )
+            if not strong_tag_matches:
+                return None
+            reason = (
+                "same album/title/track number, near-identical duration, "
+                "and matching readable tags"
+            )
+
         keep = max(tracks, key=self._duplicate_track_keep_key)
         remove = [track for track in tracks if track is not keep]
         if not remove:
             return None
-        return keep, remove
+        return keep, remove, reason
 
     def _fix_duplicate_tracks(
         self, issue: dict, dry_run: bool, task_id: str | None = None
@@ -1076,7 +1129,7 @@ class LibraryRepair:
         if resolution is None:
             return None
 
-        keep, remove = resolution
+        keep, remove, reason = resolution
         keep_path = str(keep.get("path") or "")
         remove_paths = [
             str(track.get("path") or "") for track in remove if track.get("path")
@@ -1093,7 +1146,7 @@ class LibraryRepair:
                 "keep_path": keep_path,
                 "remove_paths": remove_paths,
                 "duplicate_count": 1 + len(remove_paths),
-                "reason": "same album/title/track number and matching duration",
+                "reason": reason,
                 "enrich_artist": artist,
             },
             "applied": False,

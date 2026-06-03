@@ -5,12 +5,14 @@ const {
   apiMock,
   fetchCrateConnectPreferencesMock,
   registerCurrentConnectDeviceMock,
+  refreshCrateConnectPreferencesMock,
   setCrateConnectEnabledMock,
   toastSuccessMock,
 } = vi.hoisted(() => ({
   apiMock: vi.fn(),
   fetchCrateConnectPreferencesMock: vi.fn(),
   registerCurrentConnectDeviceMock: vi.fn(),
+  refreshCrateConnectPreferencesMock: vi.fn(),
   setCrateConnectEnabledMock: vi.fn(),
   toastSuccessMock: vi.fn(),
 }));
@@ -20,6 +22,23 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/listen-device", () => ({
+  formatCrateAppPlatform: vi.fn((appPlatform?: string | null) => {
+    if (appPlatform === "listen-tauri") return "Desktop app";
+    if (appPlatform === "listen-web") return "Web app";
+    return appPlatform || null;
+  }),
+  formatCrateDeviceName: vi.fn(
+    (device: { app_platform?: string | null; device_label?: string | null }) =>
+      device.device_label ||
+      (device.app_platform === "listen-tauri"
+        ? "Crate Desktop"
+        : "Crate device"),
+  ),
+  formatCrateDeviceType: vi.fn((deviceType?: string | null) => {
+    if (deviceType === "desktop") return "Desktop";
+    if (deviceType === "web") return "Browser";
+    return deviceType || null;
+  }),
   getListenDeviceId: vi.fn(() => "phone"),
 }));
 
@@ -28,6 +47,7 @@ vi.mock("@/lib/crate-connect", () => ({
   CONNECT_ENABLED_EVENT: "crate:connect-enabled-changed",
   fetchCrateConnectPreferences: fetchCrateConnectPreferencesMock,
   isCrateConnectEnabled: vi.fn(() => true),
+  refreshCrateConnectPreferences: refreshCrateConnectPreferencesMock,
   resetCrateConnectPreferences: vi.fn(),
   setCrateConnectEnabled: setCrateConnectEnabledMock,
 }));
@@ -47,6 +67,9 @@ import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSecti
 
 describe("ConnectDevicesSection", () => {
   beforeEach(() => {
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-05-25T10:01:00.000Z").getTime(),
+    );
     fetchCrateConnectPreferencesMock.mockResolvedValue({ enabled: true });
     registerCurrentConnectDeviceMock.mockResolvedValue(undefined);
     setCrateConnectEnabledMock.mockResolvedValue({ enabled: false });
@@ -54,7 +77,7 @@ describe("ConnectDevicesSection", () => {
       devices: [
         {
           device_id: "phone",
-          device_label: "Phone",
+          device_label: "Crate on Mobile Chrome (Android)",
           device_type: "web",
           app_platform: "listen-web",
           active: true,
@@ -62,9 +85,17 @@ describe("ConnectDevicesSection", () => {
         },
         {
           device_id: "desktop",
-          device_label: "Desktop",
+          device_label: "Crate Desktop",
           device_type: "desktop",
           app_platform: "listen-tauri",
+          active: false,
+          last_seen_at: "2026-05-25T10:00:30.000Z",
+        },
+        {
+          device_id: "old-tablet",
+          device_label: "Crate on iPad",
+          device_type: "web",
+          app_platform: "listen-web",
           active: false,
           last_seen_at: "2026-05-25T09:00:00.000Z",
         },
@@ -74,37 +105,48 @@ describe("ConnectDevicesSection", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("lists current, active, and recent Connect devices", async () => {
     render(<ConnectDevicesSection />);
 
-    expect(await screen.findByText("Phone")).toBeVisible();
-    expect(screen.getByText("Desktop")).toBeVisible();
+    expect(
+      await screen.findByText("Crate on Mobile Chrome (Android)"),
+    ).toBeVisible();
+    expect(screen.getByText("Crate Desktop")).toBeVisible();
     expect(screen.getByText("Current")).toBeVisible();
     expect(screen.getByText("Active")).toBeVisible();
     expect(screen.getByText("Recent")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Forget Phone" })).toBeDisabled();
+    expect(screen.queryByText("Crate on iPad")).not.toBeInTheDocument();
+    expect(screen.queryByText("listen-web")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Revoke Crate on Mobile Chrome (Android)",
+      }),
+    ).toBeDisabled();
   });
 
-  it("forgets a non-current device", async () => {
+  it("revokes a non-current device", async () => {
     apiMock.mockResolvedValueOnce({ ok: true });
     render(<ConnectDevicesSection />);
 
-    await screen.findByText("Desktop");
-    fireEvent.click(screen.getByRole("button", { name: "Forget Desktop" }));
+    await screen.findByText("Crate Desktop");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Revoke Crate Desktop" }),
+    );
 
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith("/api/me/devices/desktop", "DELETE"),
     );
-    expect(toastSuccessMock).toHaveBeenCalledWith("Device forgotten");
-    expect(screen.queryByText("Desktop")).not.toBeInTheDocument();
+    expect(toastSuccessMock).toHaveBeenCalledWith("Device revoked");
+    expect(screen.queryByText("Crate Desktop")).not.toBeInTheDocument();
   });
 
   it("lets the user disable Crate Connect globally", async () => {
     render(<ConnectDevicesSection />);
 
-    await screen.findByText("Phone");
+    await screen.findByText("Crate on Mobile Chrome (Android)");
     fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));
 
     await waitFor(() =>

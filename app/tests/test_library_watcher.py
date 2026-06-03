@@ -32,3 +32,17 @@ def test_library_watcher_queues_scoped_sync_instead_of_syncing_inline(
         "is_new_file": True,
     }
     assert captured["dedup_key"] == f"library-sync:album:{str(album_dir).lower()}"
+
+
+def test_library_watcher_ignores_crate_trash_paths(tmp_path):
+    from crate.library_watcher import LibraryWatcher
+
+    library_path = tmp_path / "music"
+    trash_file = library_path / ".crate-trash" / "tracks" / "Artist" / "01.flac"
+    trash_file.parent.mkdir(parents=True)
+    trash_file.write_bytes(b"audio")
+
+    watcher = LibraryWatcher({"library_path": str(library_path)}, sync=object())
+    watcher._on_change(str(trash_file), is_new_file=True)
+
+    assert watcher.debounce_timers == {}

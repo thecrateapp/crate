@@ -8,16 +8,24 @@ import hashlib
 import json
 import logging
 import time
+from dataclasses import dataclass
 
 import requests
 
 log = logging.getLogger(__name__)
 
-LASTFM_API_URL = "http://ws.audioscrobbler.com/2.0/"
+LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 LISTENBRAINZ_API_URL = "https://api.listenbrainz.org/1/submit-listens"
 
 
 # ── Last.fm ─────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class LastfmSession:
+    key: str
+    username: str | None = None
+    subscriber: bool | None = None
 
 
 def lastfm_scrobble(
@@ -102,7 +110,9 @@ def lastfm_now_playing(
         return False
 
 
-def lastfm_get_session(api_key: str, api_secret: str, auth_token: str) -> str | None:
+def lastfm_get_session(
+    api_key: str, api_secret: str, auth_token: str
+) -> LastfmSession | None:
     """Exchange a Last.fm auth token for a session key."""
     params = {
         "method": "auth.getSession",
@@ -115,9 +125,22 @@ def lastfm_get_session(api_key: str, api_secret: str, auth_token: str) -> str | 
 
     try:
         resp = requests.get(LASTFM_API_URL, params=params, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            return data.get("session", {}).get("key")
+        data = resp.json() if resp.content else {}
+        if resp.status_code == 200 and data.get("session", {}).get("key"):
+            session = data["session"]
+            return LastfmSession(
+                key=session["key"],
+                username=session.get("name") or None,
+                subscriber=bool(int(session["subscriber"]))
+                if str(session.get("subscriber", "")).isdigit()
+                else None,
+            )
+        log.warning(
+            "Last.fm auth.getSession failed: status=%s error=%s message=%s",
+            resp.status_code,
+            data.get("error"),
+            data.get("message"),
+        )
     except Exception:
         log.warning("Last.fm auth.getSession failed", exc_info=True)
     return None

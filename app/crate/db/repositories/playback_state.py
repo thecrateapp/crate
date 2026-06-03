@@ -297,6 +297,27 @@ def revoke_device(user_id: int, device_id: str, *, session=None) -> bool:
         s.execute(
             text(
                 """
+                WITH target_device AS (
+                    SELECT last_session_id
+                    FROM user_devices
+                    WHERE user_id = :user_id
+                      AND device_id = :device_id
+                )
+                UPDATE sessions
+                SET revoked_at = :now
+                WHERE user_id = :user_id
+                  AND revoked_at IS NULL
+                  AND (
+                    id = (SELECT last_session_id FROM target_device)
+                    OR device_fingerprint = :device_id
+                  )
+                """
+            ),
+            {"user_id": user_id, "device_id": device_id, "now": now},
+        )
+        s.execute(
+            text(
+                """
                 DELETE FROM user_playback_device_states
                 WHERE user_id = :user_id AND device_id = :device_id
                 """

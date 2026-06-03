@@ -521,7 +521,86 @@ class TestDuplicateTrackRepair:
             assert result["details"]["quarantined_paths"]
             assert result["details"]["enrich_artist"] == "Terror"
 
-    def test_duplicate_track_stays_manual_when_fingerprints_conflict(self):
+    def test_duplicate_track_dry_run_allows_conflicting_fingerprints_with_strong_tags(
+        self,
+    ):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Hatebreed" / "Hatebreed"
+            album_dir.mkdir(parents=True)
+            first = album_dir / "13 - Merciless Tide.flac"
+            second = album_dir / "13 - Merciless Tide (1).flac"
+            first.write_bytes(b"\x00" * 1000)
+            second.write_bytes(b"\x00" * 1200)
+
+            tracks = [
+                {
+                    "album_id": 113609,
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "path": str(first),
+                    "track_number": 13,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 160.973,
+                    "size": 1000,
+                    "bitrate": 1030000,
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "audio_fingerprint": "fp-1",
+                },
+                {
+                    "album_id": 113609,
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "path": str(second),
+                    "track_number": 13,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 160.973,
+                    "size": 1200,
+                    "bitrate": 1030000,
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "audio_fingerprint": "fp-2",
+                },
+            ]
+            tags = {
+                "artist": "Hatebreed",
+                "album": "Hatebreed",
+                "title": "Merciless Tide",
+                "tracknumber": "13",
+            }
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "paths": [str(first), str(second)],
+                },
+            }
+
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch("crate.repair.read_tags", return_value=tags),
+            ):
+                result = repair._fix_duplicate_tracks(issue, dry_run=True)
+
+            assert result is not None
+            assert result["details"]["keep_path"] == str(second)
+            assert result["details"]["remove_paths"] == [str(first)]
+            assert result["details"]["reason"] == (
+                "same album/title/track number, near-identical duration, "
+                "and matching readable tags"
+            )
+
+    def test_duplicate_track_stays_manual_when_fingerprints_conflict_without_tags(self):
         from crate.repair import LibraryRepair
 
         with tempfile.TemporaryDirectory() as lib:

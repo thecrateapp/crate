@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   getListenDeviceType,
   getListenAppPlatform,
@@ -6,7 +6,21 @@ import {
   getListenDeviceFingerprint,
   getListenDeviceId,
   getListenDeviceCapabilities,
+  formatCrateDeviceName,
 } from "./listen-device";
+
+const originalUserAgent = navigator.userAgent;
+
+function setUserAgent(userAgent: string) {
+  Object.defineProperty(navigator, "userAgent", {
+    configurable: true,
+    value: userAgent,
+  });
+}
+
+afterEach(() => {
+  setUserAgent(originalUserAgent);
+});
 
 describe("getListenDeviceType", () => {
   it("returns web by default", () => {
@@ -21,8 +35,38 @@ describe("getListenAppPlatform", () => {
 });
 
 describe("getListenDeviceLabel", () => {
-  it("returns Web (Listen) for web", () => {
-    expect(getListenDeviceLabel()).toBe("Web (Listen)");
+  it("returns a Crate browser label for web", () => {
+    expect(getListenDeviceLabel()).toBe("Crate on Browser");
+  });
+
+  it("includes the browser name on desktop web", () => {
+    setUserAgent(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+    );
+
+    expect(getListenDeviceLabel()).toBe("Crate on Chrome");
+  });
+
+  it("includes browser and OS for mobile web", () => {
+    setUserAgent(
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36",
+    );
+
+    expect(getListenDeviceLabel()).toBe("Crate on Mobile Chrome (Android)");
+  });
+});
+
+describe("formatCrateDeviceName", () => {
+  it("normalizes persisted legacy Listen labels", () => {
+    expect(formatCrateDeviceName({ device_label: "Web (Listen)" })).toBe(
+      "Crate on Browser",
+    );
+  });
+
+  it("falls back to product-facing platform names", () => {
+    expect(formatCrateDeviceName({ app_platform: "listen-tauri" })).toBe(
+      "Crate Desktop",
+    );
   });
 });
 
