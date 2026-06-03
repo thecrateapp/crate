@@ -102,6 +102,13 @@ from crate.db.library import (
     enrich_track_refs,
 )
 
+from crate.db.releases import (
+    clear_new_release_preview_source_url,
+    get_release_by_virtual_album_id,
+    merge_new_release_preview_tracks,
+    update_new_release_cover,
+)
+
 # Auth
 from crate.db.auth import (
     count_users,

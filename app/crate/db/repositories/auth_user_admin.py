@@ -11,7 +11,7 @@ from crate.db.queries.auth_user_lists import (
 )
 from crate.db.repositories.auth_shared import model_to_dict
 from crate.db.repositories.auth_user_accounts import get_user_by_id
-from crate.db.repositories.auth_user_roles import hydrate_users_roles
+from crate.db.repositories.auth_user_roles import hydrate_users_roles, set_user_roles
 from crate.db.orm.user import User
 from crate.db.tx import optional_scope
 
@@ -115,6 +115,8 @@ def update_user(user_id: int, *, session=None, **fields) -> dict | None:
             return None
         for key, value in fields.items():
             setattr(user, key, value)
+        if "role" in fields:
+            set_user_roles(user_id, [str(fields["role"])], session=s)
         s.flush()
         return model_to_dict(user)
 

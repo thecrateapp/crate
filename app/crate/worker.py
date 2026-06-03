@@ -497,6 +497,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "refresh_user_listening_stats",
             "index_genres",
             "infer_genre_taxonomy",
+            "rebuild_genre_taxonomy_proposals",
             "enrich_genre_descriptions",
             "sync_musicbrainz_genre_graph",
             "cleanup_invalid_genre_taxonomy",

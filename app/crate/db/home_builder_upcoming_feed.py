@@ -13,26 +13,26 @@ def _build_release_items(releases: list[dict], *, today) -> list[dict]:
     for release in releases:
         scheduled_date = _coerce_date(release.get("release_date"))
         fallback_date = scheduled_date or _coerce_date(release.get("detected_at"))
-        items.append(
-            {
-                "type": "release",
-                "date": fallback_date.isoformat() if fallback_date else "",
-                "artist": release.get("artist_name", ""),
-                "artist_id": release.get("artist_id"),
-                "artist_slug": release.get("artist_slug"),
-                "album_id": release.get("album_id"),
-                "album_slug": release.get("album_slug")
-                or build_public_album_slug(release.get("album_title")),
-                "title": release.get("album_title", ""),
-                "subtitle": release.get("release_type") or "Album",
-                "cover_url": release.get("cover_url"),
-                "status": release.get("status", "detected"),
-                "tidal_url": release.get("tidal_url") or release.get("source_url"),
-                "source_url": release.get("source_url"),
-                "release_id": release.get("id"),
-                "is_upcoming": bool(scheduled_date and scheduled_date > today),
-            }
-        )
+        item = {
+            "type": "release",
+            "date": fallback_date.isoformat() if fallback_date else "",
+            "artist": release.get("artist_name", ""),
+            "artist_id": release.get("artist_id"),
+            "artist_slug": release.get("artist_slug"),
+            "album_id": release.get("album_id"),
+            "album_slug": release.get("album_slug")
+            or build_public_album_slug(release.get("album_title")),
+            "title": release.get("album_title", ""),
+            "subtitle": release.get("release_type") or "Album",
+            "cover_url": release.get("cover_url"),
+            "status": release.get("status", "detected"),
+            "tidal_url": release.get("tidal_url") or release.get("source_url"),
+            "release_id": release.get("id"),
+            "is_upcoming": bool(scheduled_date and scheduled_date > today),
+        }
+        if release.get("source_url"):
+            item["source_url"] = release.get("source_url")
+        items.append(item)
     return items
 
 
