@@ -9,8 +9,13 @@ import { recordTauriAuthDiagnostic } from "@/lib/tauri-auth-diagnostic";
 import { initLinuxScrollBehavior } from "./linux-scroll";
 import { initLinuxDesktopTheme } from "./linux-theme";
 
+let tauriRuntimeInitialized = false;
+
 export function initTauriRuntime(): void {
   if (typeof document === "undefined") return;
+  if (tauriRuntimeInitialized) return;
+  tauriRuntimeInitialized = true;
+
   document.documentElement.dataset.listenRuntime = "tauri";
   recordTauriAuthDiagnostic("OAuth bridge initializing");
   recordDevLog("tauri", "runtime init");

@@ -46,6 +46,7 @@ import {
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
 import { isNative } from "@/lib/capacitor-runtime";
+import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import {
   getCrossfadeDurationPreference,
   type PlaybackDeliveryPolicy,
@@ -252,8 +253,9 @@ export function usePlayerQueueActions({
           startTrackerSession(activeTrack, nextSource);
         }
         commitIsPlaying(true);
-        void nativeEngine
-          .loadQueue({
+        void (async () => {
+          await primeOfflineRuntimeProfile();
+          return nativeEngine.loadQueue({
             revision: createQueueRevision(),
             tracks: toEngineTracks(tracks),
             currentIndex: normalizedIndex,
@@ -262,12 +264,12 @@ export function usePlayerQueueActions({
             repeat: toEngineRepeatMode(repeatRef.current),
             crossfadeMs: nativeCrossfadeMs(),
             volume: lastNonZeroVolumeRef.current,
-          })
-          .catch((error) => {
-            console.error("[native-player] failed to load queue:", error);
-            commitIsPlaying(false);
-            commitIsBuffering(false);
           });
+        })().catch((error) => {
+          console.error("[native-player] failed to load queue:", error);
+          commitIsPlaying(false);
+          commitIsBuffering(false);
+        });
         void publishConnectState?.({ claimActive: true }).catch(() => {});
         return;
       }

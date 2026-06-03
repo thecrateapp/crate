@@ -11,7 +11,17 @@ export interface DevLogEntry {
 
 export const DEV_LOG_EVENT = "crate:dev-log";
 const DEV_LOG_STORAGE_KEY = "crate-dev-logs";
+const DEV_LOG_FORCE_KEY = "crate-dev-logs-enabled";
 const MAX_LOGS = 200;
+
+function devLogsEnabled(): boolean {
+  if (import.meta.env.DEV) return true;
+  try {
+    return window.localStorage.getItem(DEV_LOG_FORCE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
 
 function readLogs(): DevLogEntry[] {
   if (typeof window === "undefined") return [];
@@ -54,6 +64,7 @@ export function recordDevLog(
   level: DevLogLevel = "info",
 ): void {
   if (typeof window === "undefined") return;
+  if (!devLogsEnabled()) return;
   const logs = readLogs();
   const entry: DevLogEntry = {
     id: Date.now() + Math.random(),
@@ -61,14 +72,28 @@ export function recordDevLog(
     level,
     scope,
     message,
-    detail: typeof detail === "string" ? detail : detail == null ? undefined : JSON.stringify(detail),
+    detail:
+      typeof detail === "string"
+        ? detail
+        : detail == null
+          ? undefined
+          : JSON.stringify(detail),
   };
   const next = [...logs, entry].slice(-MAX_LOGS);
   window.__crateDevLogs = next;
   persistLogs(next);
-  window.dispatchEvent(new CustomEvent<DevLogEntry>(DEV_LOG_EVENT, { detail: entry }));
+  window.dispatchEvent(
+    new CustomEvent<DevLogEntry>(DEV_LOG_EVENT, { detail: entry }),
+  );
 
-  const consoleMethod = level === "debug" ? "debug" : level === "warn" ? "warn" : level === "error" ? "error" : "info";
+  const consoleMethod =
+    level === "debug"
+      ? "debug"
+      : level === "warn"
+        ? "warn"
+        : level === "error"
+          ? "error"
+          : "info";
   console[consoleMethod](`[${scope}] ${message}`, entry.detail ?? "");
 }
 

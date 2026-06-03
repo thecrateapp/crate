@@ -1196,5 +1196,8 @@ export async function primeOfflineRuntimeProfile(
 ): Promise<void> {
   const profileKey = deriveOfflineProfileKeyFromStoredUser(serverOrigin);
   setActiveOfflineProfileKey(profileKey);
+  if (isNative && profileKey) {
+    await hydrateOfflineProfileState(profileKey);
+  }
   await syncOfflineProfileToServiceWorker(profileKey);
 }

@@ -36,6 +36,7 @@ import {
   isAndroidNativePlayerAvailable,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { getCrossfadeDurationPreference } from "@/lib/player-playback-prefs";
 import { createQueueRevision } from "@/lib/playback-engine";
 
@@ -265,8 +266,9 @@ export function usePlayerEngineSync({
         commitIsBuffering(autoplay);
         commitIsPlaying(autoplay);
 
-        void androidNativeEngine
-          .loadQueue({
+        void (async () => {
+          await primeOfflineRuntimeProfile();
+          return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),
             tracks: toEngineTracks(nextQueue),
             currentIndex: nextIndex,
@@ -275,12 +277,12 @@ export function usePlayerEngineSync({
             repeat: repeatRef.current,
             crossfadeMs: effectiveCrossfadeMsRef.current,
             volume: 1,
-          })
-          .catch((error) => {
-            console.error("[native-player] failed to sync queue:", error);
-            commitIsBuffering(false);
-            commitIsPlaying(false);
           });
+        })().catch((error) => {
+          console.error("[native-player] failed to sync queue:", error);
+          commitIsBuffering(false);
+          commitIsPlaying(false);
+        });
         return;
       }
 
