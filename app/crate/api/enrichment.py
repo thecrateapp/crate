@@ -79,6 +79,37 @@ def _enrich_enrichment_artist_refs(result: dict) -> dict:
     return enriched
 
 
+def _has_probable_setlist(result: dict) -> bool:
+    setlist_payload = result.get("setlist")
+    if not isinstance(setlist_payload, dict):
+        return False
+    songs = setlist_payload.get("probable_setlist")
+    return isinstance(songs, list) and len(songs) > 0
+
+
+def _with_probable_setlist(name: str, result: dict, *, allow_live: bool) -> dict:
+    """Fill stale enrichment payloads that were cached before setlists existed."""
+    if _has_probable_setlist(result):
+        return result
+
+    songs = setlistfm.get_cached_probable_setlist(name)
+    if not songs and allow_live:
+        try:
+            songs = setlistfm.get_probable_setlist(name)
+        except Exception:
+            log.debug("Setlist.fm enrichment failed for %s", name, exc_info=True)
+            songs = None
+    if not songs:
+        return result
+
+    enriched = dict(result or {})
+    enriched["setlist"] = {
+        "probable_setlist": songs,
+        "total_shows": len(songs),
+    }
+    return enriched
+
+
 def get_artist_enrichment(request: Request, name: str):
     """Get consolidated enrichment data. Returns cached if available, otherwise fetches inline.
     For background enrichment, use POST /api/artists/{artist_id}/enrich which queues a worker task."""
@@ -89,6 +120,7 @@ def get_artist_enrichment(request: Request, name: str):
     cached = get_cache(cache_key, max_age_seconds=86400)
     if cached:
         enriched_cached = _enrich_enrichment_artist_refs(cached)
+        enriched_cached = _with_probable_setlist(name, enriched_cached, allow_live=True)
         set_cache(cache_key, enriched_cached)
         return enriched_cached
 
@@ -97,6 +129,7 @@ def get_artist_enrichment(request: Request, name: str):
     if db_artist and db_artist.get("enriched_at"):
         result = _enrich_enrichment_artist_refs(_build_from_db(db_artist))
         if result:
+            result = _with_probable_setlist(name, result, allow_live=True)
             set_cache(cache_key, result)
             return result
 
@@ -115,7 +148,7 @@ def get_artist_page_enrichment(name: str) -> dict:
     cached = get_cache(cache_key, max_age_seconds=86400)
     if cached and isinstance(cached, dict):
         setlist_payload = cached.get("setlist")
-        if isinstance(setlist_payload, dict):
+        if isinstance(setlist_payload, dict) and _has_probable_setlist(cached):
             return {"setlist": setlist_payload}
 
     setlist = setlistfm.get_cached_probable_setlist(name)

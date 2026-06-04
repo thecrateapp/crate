@@ -927,6 +927,97 @@ class TestSearch:
         assert results[0]["bliss_vector"] == [0.1] * 20
 
 
+class TestHybridSearch:
+    def test_build_fts_query_uses_prefix_on_last_term(self):
+        from crate.db.queries.browse_media_search import build_fts_query
+
+        assert build_fts_query("high v") == "high & v:*"
+        assert build_fts_query("!!!") is None
+        assert build_fts_query("VVV [Trippin'you]") == "vvv & trippin & you:*"
+
+    def test_search_all_hybrid_matches_prefix_queries(self, pg_db):
+        from crate.db.queries.browse_media_search import search_all_hybrid
+
+        pg_db.upsert_artist({"name": "High Vis", "album_count": 3})
+
+        results = search_all_hybrid("high v", 10)
+
+        assert [artist["name"] for artist in results["artists"]] == ["High Vis"]
+
+    def test_search_all_hybrid_symbol_query_does_not_return_everything(self, pg_db):
+        from crate.db.queries.browse_media_search import search_all_hybrid
+
+        pg_db.upsert_artist({"name": "Hatebreed", "album_count": 5})
+
+        results = search_all_hybrid("!!!", 10)
+
+        assert results == {"artists": [], "albums": [], "tracks": []}
+
+    def test_search_all_hybrid_refreshes_track_vectors_on_album_rename(self, pg_db):
+        from crate.db.queries.browse_media_search import search_all_hybrid
+        from crate.db.tx import transaction_scope
+
+        artist = "Cascade Search Artist"
+        pg_db.upsert_artist({"name": artist})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": artist,
+                "name": "Old Album Name",
+                "path": f"/music/{artist}/Old Album Name",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": artist,
+                "album": "Old Album Name",
+                "filename": "01-cascade.flac",
+                "title": "Plain Track",
+                "path": f"/music/{artist}/Old Album Name/01-cascade.flac",
+            }
+        )
+
+        with transaction_scope() as session:
+            session.execute(
+                text("UPDATE library_albums SET name = :name WHERE id = :id"),
+                {"name": "Renamed Album Signal", "id": album_id},
+            )
+
+        results = search_all_hybrid("renamed signal", 10)
+
+        assert [track["title"] for track in results["tracks"]] == ["Plain Track"]
+
+    def test_search_all_hybrid_payload_excludes_heavy_track_columns(self, pg_db):
+        from crate.db.queries.browse_media_search import search_all_hybrid
+
+        artist = "Lean Search Artist"
+        album = "Lean Search Album"
+        pg_db.upsert_artist({"name": artist})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": artist,
+                "name": album,
+                "path": f"/music/{artist}/{album}",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": artist,
+                "album": album,
+                "filename": "01-lean.flac",
+                "title": "Lean Result",
+                "path": f"/music/{artist}/{album}/01-lean.flac",
+            }
+        )
+
+        results = search_all_hybrid("lean result", 10)
+
+        assert len(results["tracks"]) == 1
+        assert "bliss_vector" not in results["tracks"][0]
+        assert results["tracks"][0]["title"] == "Lean Result"
+
+
 # ══════════════════════════════════════════════════════════════════════
 # browse_media_mood
 # ══════════════════════════════════════════════════════════════════════

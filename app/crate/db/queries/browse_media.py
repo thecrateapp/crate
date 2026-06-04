@@ -9,6 +9,7 @@ from crate.db.queries.browse_media_mood import (
     get_mood_tracks,
 )
 from crate.db.queries.browse_media_search import (
+    search_all_hybrid,
     search_albums,
     search_artists,
     search_tracks,
@@ -48,6 +49,7 @@ __all__ = [
     "get_track_path_by_entity_uid",
     "list_favorites",
     "remove_favorite",
+    "search_all_hybrid",
     "search_albums",
     "search_artists",
     "search_tracks",

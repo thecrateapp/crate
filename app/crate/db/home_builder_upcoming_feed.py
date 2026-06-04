@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from crate.db.home_builder_shared import _coerce_date
 from crate.db.home_builder_upcoming_insights import _build_upcoming_insights_home
 from crate.db.queries.user_library import get_followed_artists
 from crate.slugs import build_public_album_slug
+
+log = logging.getLogger(__name__)
 
 
 def _build_release_items(releases: list[dict], *, today) -> list[dict]:
@@ -36,15 +39,30 @@ def _build_release_items(releases: list[dict], *, today) -> list[dict]:
     return items
 
 
-def _load_probable_setlists(artist_names: list[str]) -> dict[str, list[dict]]:
-    from crate.db.cache_store import get_cache
+def _load_probable_setlists(
+    artist_names: list[str], *, live_fetch_limit: int = 8
+) -> dict[str, list[dict]]:
+    from crate.setlistfm import get_cached_probable_setlist, get_probable_setlist
 
     probable_setlists: dict[str, list[dict]] = {}
+    missing: list[str] = []
     for artist_name in artist_names:
-        cached = get_cache(
-            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
-        )
-        songs = cached.get("songs") if isinstance(cached, dict) else None
+        songs = get_cached_probable_setlist(artist_name)
+        if songs:
+            probable_setlists[artist_name] = songs
+        else:
+            missing.append(artist_name)
+
+    for artist_name in missing[:live_fetch_limit]:
+        try:
+            songs = get_probable_setlist(artist_name)
+        except Exception:
+            log.debug(
+                "Failed to load probable setlist for upcoming feed artist=%s",
+                artist_name,
+                exc_info=True,
+            )
+            continue
         if songs:
             probable_setlists[artist_name] = songs
     return probable_setlists

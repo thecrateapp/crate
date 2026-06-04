@@ -72,10 +72,9 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
     list_favorites,
     remove_favorite,
-    search_albums,
-    search_artists,
-    search_tracks,
+    search_all_hybrid,
 )
+from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.tasks import create_task_dedup
 from crate.audio import read_audio_quality
@@ -155,7 +154,7 @@ def api_search(request: Request, q: str = "", limit: int = 20):
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
 
-    cache_key = f"listen:search:v1:{q_stripped.lower()}:{capped_limit}"
+    cache_key = f"listen:search:v2:{q_stripped.lower()}:{capped_limit}"
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
@@ -166,60 +165,10 @@ def api_search(request: Request, q: str = "", limit: int = 20):
         set_cache(cache_key, result, ttl=45)
         return result
 
-    like = f"%{q_stripped}%"
-    artist_rows = search_artists(like, capped_limit)
-    album_rows = search_albums(like, capped_limit)
-    track_rows = search_tracks(like, capped_limit)
-
-    artists = [
-        {
-            "id": row["id"],
-            "entity_uid": row.get("entity_uid"),
-            "slug": row.get("slug"),
-            "name": row["name"],
-            "album_count": row.get("album_count", 0),
-            "has_photo": bool(row.get("has_photo")),
-        }
-        for row in artist_rows
-    ]
-    albums = [
-        {
-            "id": row["id"],
-            "entity_uid": row.get("entity_uid"),
-            "slug": row.get("slug"),
-            "artist": row["artist"],
-            "artist_id": row.get("artist_id"),
-            "artist_entity_uid": row.get("artist_entity_uid"),
-            "artist_slug": row.get("artist_slug"),
-            "name": row["name"],
-            "year": row.get("year") or "",
-            "has_cover": bool(row.get("has_cover")),
-        }
-        for row in album_rows
-    ]
-    tracks = [
-        {
-            "id": row["id"],
-            "entity_uid": entity_uid,
-            "slug": row.get("slug"),
-            "title": row["title"],
-            "artist": row["artist"],
-            "artist_id": row.get("artist_id"),
-            "artist_entity_uid": row.get("artist_entity_uid"),
-            "artist_slug": row.get("artist_slug"),
-            "album_id": row.get("album_id"),
-            "album_entity_uid": row.get("album_entity_uid"),
-            "album_slug": row.get("album_slug"),
-            "album": row["album"],
-            "path": row["path"],
-            "duration": row["duration"],
-        }
-        for row in track_rows
-        for entity_uid in [
-            str(row["entity_uid"]) if row.get("entity_uid") is not None else None
-        ]
-    ]
-    payload = {"artists": artists, "albums": albums, "tracks": tracks}
+    payload = search_all_hybrid(q_stripped, capped_limit)
+    record_later("search.hybrid.results.artists", len(payload["artists"]))
+    record_later("search.hybrid.results.albums", len(payload["albums"]))
+    record_later("search.hybrid.results.tracks", len(payload["tracks"]))
     set_cache(cache_key, payload, ttl=45)
     return payload
 
