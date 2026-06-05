@@ -266,8 +266,13 @@ export function usePlayerEngineSync({
         commitIsBuffering(autoplay);
         commitIsPlaying(autoplay);
 
+        void primeOfflineRuntimeProfile().catch((error) => {
+          console.warn(
+            "[offline] failed to prime profile before native sync:",
+            error,
+          );
+        });
         void (async () => {
-          await primeOfflineRuntimeProfile();
           const engineTracks = await toFreshEngineTracks(nextQueue);
           return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),

@@ -86,6 +86,7 @@ import {
   CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   connectPlayerStateToRemotePlaybackState,
 } from "@/lib/crate-connect";
+import { recordDevLog } from "@/lib/dev-logs";
 import {
   buildPlaybackStatePayload,
   remotePlaybackQueue,
@@ -278,6 +279,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const nativeBufferingWatchdogRef = useRef<number | null>(null);
   const nativeBufferingProbeIdRef = useRef(0);
   const nativeAuthRetryKeyRef = useRef<string | null>(null);
+  const nativeBufferingRecoveryKeyRef = useRef<string | null>(null);
 
   // queue, currentIndex, currentTrack, currentTime, duration, isPlaying are
   // kept in sync with their refs by their respective commit* helpers.
@@ -653,6 +655,51 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     nativeBufferingWatchdogRef.current = null;
   }, []);
 
+  const recoverNativeBuffering = useCallback(
+    async (options: { forceRefresh: boolean; probeStatus: string }) => {
+      if (!shouldUseAndroidNativePlayer()) return false;
+
+      const queueSnapshot = queueRef.current;
+      if (queueSnapshot.length === 0) return false;
+
+      const index = clampIndex(currentIndexRef.current, queueSnapshot.length);
+      const targetTrack = queueSnapshot[index];
+      const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+      const retryKey = [
+        targetTrack?.id || index,
+        Math.floor(positionMs / 10_000),
+        options.probeStatus,
+      ].join(":");
+      if (nativeBufferingRecoveryKeyRef.current === retryKey) return false;
+      nativeBufferingRecoveryKeyRef.current = retryKey;
+
+      if (options.forceRefresh && !(await refreshAuthToken())) {
+        return false;
+      }
+
+      const engineTracks = await toFreshEngineTracks(queueSnapshot);
+      await androidNativeEngine.loadQueue({
+        revision: createQueueRevision(),
+        tracks: engineTracks,
+        currentIndex: index,
+        positionMs,
+        autoplay: true,
+        repeat: repeatRef.current,
+        crossfadeMs: effectiveCrossfadeMsRef.current,
+        volume: lastNonZeroVolumeRef.current,
+      });
+      return true;
+    },
+    [
+      currentIndexRef,
+      currentTimeRef,
+      effectiveCrossfadeMsRef,
+      lastNonZeroVolumeRef,
+      queueRef,
+      repeatRef,
+    ],
+  );
+
   const probeNativeBuffering = useCallback(async () => {
     const track = currentTrackRef.current;
     const probeId = nativeBufferingProbeIdRef.current + 1;
@@ -664,7 +711,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       ? "network-error"
       : "no-track";
     let detail = "";
-    if (track && streamUrl) {
+    const isNativeLocalUrl =
+      streamUrl.startsWith("file:") ||
+      streamUrl.startsWith("capacitor:") ||
+      streamUrl.startsWith("content:");
+
+    if (track && streamUrl && isNativeLocalUrl) {
+      status = 206;
+      detail = "Native local media URL; skipping WebView range probe";
+    } else if (track && streamUrl) {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 5000);
       try {
@@ -702,11 +757,46 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       probeStatus: status,
       detail,
     });
+    const canRecover =
+      status === 200 || status === 206 || status === 401 || isNativeLocalUrl;
+    if (canRecover) {
+      try {
+        const recovered = await recoverNativeBuffering({
+          forceRefresh: status === 401,
+          probeStatus: String(status),
+        });
+        if (recovered) {
+          recordDevLog(
+            "native-player",
+            "recovered stuck native buffering",
+            {
+              track: track?.title,
+              artist: track?.artist,
+              probeStatus: status,
+              url: redactedUrl,
+            },
+            "warn",
+          );
+          return;
+        }
+      } catch (error) {
+        persistNativePlaybackDiagnostic({
+          type: "buffering-recovery-failed",
+          track: track
+            ? { id: track.id, title: track.title, artist: track.artist }
+            : null,
+          streamUrl: redactedUrl,
+          probeStatus: status,
+          detail,
+          recoveryError: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     toast.error("Native playback is stuck buffering", {
       description: `Stream probe: ${status}${detail ? ` · ${detail}` : ""}`,
       duration: 9000,
     });
-  }, [currentTrackRef]);
+  }, [currentTrackRef, recoverNativeBuffering]);
 
   const scheduleNativeBufferingWatchdog = useCallback(() => {
     clearNativeBufferingWatchdog();
@@ -893,6 +983,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (state.playbackState === "buffering" && !isPassiveLifecycleBuffering) {
         scheduleNativeBufferingWatchdog();
       } else {
+        if (state.playbackState !== "buffering") {
+          nativeBufferingRecoveryKeyRef.current = null;
+        }
         clearNativeBufferingWatchdog();
       }
       if (state.isPlaying) {
@@ -1205,7 +1298,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         "bufferingChanged",
         (event) => {
           if (disposed) return;
-          commitIsBuffering(event.isBuffering);
+          handleNativeEvent("bufferingChanged", event);
         },
       );
       removers.push(bufferingRemove);

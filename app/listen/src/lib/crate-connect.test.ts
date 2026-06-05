@@ -20,9 +20,17 @@ import {
   fetchConnectWsTicket,
   generatePlaybackInstanceId,
   isCrateConnectEnabled,
+  isCrateConnectFeatureFlagEnabled,
 } from "@/lib/crate-connect";
 
 describe("Crate Connect v2 client primitives", () => {
+  it("keeps the feature compiled in unless explicitly disabled", () => {
+    expect(isCrateConnectFeatureFlagEnabled(undefined)).toBe(true);
+    expect(isCrateConnectFeatureFlagEnabled("")).toBe(true);
+    expect(isCrateConnectFeatureFlagEnabled("true")).toBe(true);
+    expect(isCrateConnectFeatureFlagEnabled("false")).toBe(false);
+  });
+
   it("starts disabled until the user preference enables it", () => {
     expect(isCrateConnectEnabled()).toBe(false);
   });
