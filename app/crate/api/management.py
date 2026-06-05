@@ -1246,6 +1246,26 @@ def hard_delete_quarantined_track(request: Request, body: TrackQuarantineFileReq
 
 
 @router.post(
+    "/tracks/quarantine/hard-delete-all",
+    response_model=TaskEnqueueResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Permanently delete all quarantined track files",
+)
+def hard_delete_all_quarantined_tracks(
+    request: Request, body: TrackQuarantineRequest | None = None
+):
+    user = _require_track_files_delete(request)
+    task_id = create_task(
+        "library_quarantined_tracks_hard_delete_all",
+        {
+            "reason": (body.reason if body else None),
+            "actor_user_id": user.get("id"),
+        },
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
     "/tracks/quarantine/restore",
     response_model=TaskEnqueueResponse,
     responses=_MANAGEMENT_RESPONSES,

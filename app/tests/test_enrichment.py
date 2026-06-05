@@ -1,6 +1,7 @@
 """Tests for enrichment modules: Spotify, Setlist.fm, MusicBrainz, Last.fm."""
 
 import threading
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 
@@ -219,6 +220,37 @@ class TestArtistPageEnrichment:
             }
         }
         mock_live.assert_called_once_with("Radiohead")
+
+    def test_artist_enrichment_completes_stale_cache_without_setlist(self):
+        cached = {"lastfm": {"bio": "Bio"}}
+        request = SimpleNamespace(state=SimpleNamespace(user={"role": "user"}))
+
+        with (
+            patch("crate.api.enrichment.require_permission"),
+            patch("crate.api.enrichment.get_cache", return_value=cached),
+            patch(
+                "crate.api.enrichment.setlistfm.get_cached_probable_setlist",
+                return_value=None,
+            ),
+            patch(
+                "crate.api.enrichment.setlistfm.get_probable_setlist",
+                return_value=[{"title": "Pure Morning"}],
+            ) as mock_live,
+            patch("crate.api.enrichment.set_cache") as mock_set_cache,
+        ):
+            from crate.api.enrichment import get_artist_enrichment
+
+            result = get_artist_enrichment(request, "Placebo")
+
+        assert result == {
+            "lastfm": {"bio": "Bio"},
+            "setlist": {
+                "probable_setlist": [{"title": "Pure Morning"}],
+                "total_shows": 1,
+            },
+        }
+        mock_live.assert_called_once_with("Placebo")
+        mock_set_cache.assert_called_once()
 
 
 class TestGenreMetadataTasks:
@@ -786,3 +818,43 @@ class TestArtistEnrichment:
             ("refresh", "VVV [Trippin'you]"),
             ("unmark", "VVV [Trippin'you]"),
         ]
+
+    def test_process_new_content_skips_hidden_artist_without_refresh(self, monkeypatch):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        calls: list[tuple[str, str]] = []
+
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_mark_processing",
+            lambda artist: calls.append(("mark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_unmark_processing",
+            lambda artist: calls.append(("unmark", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_refresh_artist_summary",
+            lambda artist, config: calls.append(("refresh", artist)),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_inner",
+            lambda *args, **kwargs: calls.append(("inner", "")),
+        )
+
+        result = worker_enrichment._handle_process_new_content(
+            "task-1",
+            {"artist": ".crate-trash"},
+            {"library_path": "/tmp/music"},
+        )
+
+        assert result == {
+            "artist": ".crate-trash",
+            "album": "",
+            "skipped": True,
+            "reason": "hidden_library_path",
+        }
+        assert calls == []

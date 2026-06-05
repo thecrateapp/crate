@@ -1,21 +1,42 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { authState, ensureFreshAuthTokenMock } = vi.hoisted(() => ({
+  authState: { token: "listen-token" },
+  ensureFreshAuthTokenMock: vi.fn(),
+}));
 
 vi.mock("@/lib/api", () => ({
   getApiBase: () => "https://listen.example",
-  getAuthToken: () => "listen-token",
+  getAuthToken: () => authState.token,
+  ensureFreshAuthToken: ensureFreshAuthTokenMock,
   resolveMaybeApiAssetUrl: (url: string | null | undefined) =>
     url?.startsWith("/api/")
-      ? `https://listen.example${url}?token=listen-token`
+      ? `https://listen.example${url}?token=${authState.token}`
       : url ?? null,
+}));
+
+vi.mock("@/lib/capacitor-runtime", () => ({
+  isNative: true,
+  isAndroidRuntime: true,
+  isIosRuntime: false,
 }));
 
 vi.mock("@/lib/offline", () => ({
   getOfflineNativePlaybackUrl: () => null,
 }));
 
-import { toEngineTrack } from "@/contexts/player-engine-adapter";
+import {
+  toEngineTrack,
+  toFreshEngineTrack,
+} from "@/contexts/player-engine-adapter";
 
 describe("player engine adapter", () => {
+  beforeEach(() => {
+    authState.token = "listen-token";
+    ensureFreshAuthTokenMock.mockReset();
+    ensureFreshAuthTokenMock.mockResolvedValue(true);
+  });
+
   it("sends absolute authenticated artwork URLs to the native player", () => {
     const track = toEngineTrack({
       id: "track-1",
@@ -42,5 +63,22 @@ describe("player engine adapter", () => {
 
     expect(toEngineTrack(baseTrack).eqGains).toBeUndefined();
     expect(toEngineTrack(baseTrack, [0, 1, 2]).eqGains).toEqual([0, 1, 2]);
+  });
+
+  it("refreshes auth before resolving native stream URLs", async () => {
+    ensureFreshAuthTokenMock.mockImplementationOnce(async () => {
+      authState.token = "fresh-token";
+      return true;
+    });
+
+    const track = await toFreshEngineTrack({
+      id: "track-1",
+      entityUid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+    });
+
+    expect(ensureFreshAuthTokenMock).toHaveBeenCalledTimes(1);
+    expect(track.url).toContain("token=fresh-token");
   });
 });

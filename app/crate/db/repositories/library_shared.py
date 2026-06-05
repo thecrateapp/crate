@@ -64,6 +64,7 @@ class LibraryArtistRow(TypedDict):
     discogs_profile: str | None
     discogs_members_json: Any | None
     latest_release_date: str | None
+    new_releases_checked_at: Any | None
     content_hash: str | None
     bandcamp_url: str | None
     bandcamp_url_source: str | None
@@ -204,6 +205,7 @@ def artist_to_dict(artist) -> LibraryArtistRow | None:
         "discogs_profile": artist.discogs_profile,
         "discogs_members_json": artist.discogs_members_json,
         "latest_release_date": artist.latest_release_date,
+        "new_releases_checked_at": artist.new_releases_checked_at,
         "content_hash": artist.content_hash,
         "bandcamp_url": artist.bandcamp_url,
         "bandcamp_url_source": artist.bandcamp_url_source,

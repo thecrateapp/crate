@@ -68,6 +68,11 @@ export default defineConfig({
         secure: false,
         ws: true,
       },
+      "/share": {
+        target: process.env.API_URL || "http://localhost:8585",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 });

@@ -39,6 +39,7 @@ interface UseRestoreOnMountOptions {
   commitIsBuffering: (buffering: boolean) => void;
   commitCurrentTime: (time: number) => void;
   markSeekPosition: (time: number) => void;
+  allowAutoplayRestore?: boolean;
 }
 
 export interface RestoreController {
@@ -96,12 +97,15 @@ export function useRestoreOnMount({
   commitIsBuffering,
   commitCurrentTime,
   markSeekPosition,
+  allowAutoplayRestore = true,
 }: UseRestoreOnMountOptions): RestoreController {
   const storedRef = useRef(getStoredQueue());
   const pendingRestoreTimeRef = useRef(
     storedRef.current.currentTime > 0 ? storedRef.current.currentTime : 0,
   );
-  const resumeAfterReloadRef = useRef(storedRef.current.wasPlaying);
+  const resumeAfterReloadRef = useRef(
+    allowAutoplayRestore && storedRef.current.wasPlaying,
+  );
   const restoreAutoplayAttemptedRef = useRef(false);
   const restoreAutoplayTimerRef = useRef<number | null>(null);
   const playerReadyRef = useRef(false);
@@ -164,7 +168,7 @@ export function useRestoreOnMount({
       gpLoadQueue([], 0);
       resumeAfterReloadRef.current = false;
       pushToEngine(restoredQueue, restoredIndex, {
-        autoplay: storedRef.current.wasPlaying,
+        autoplay: allowAutoplayRestore && storedRef.current.wasPlaying,
         positionMs: Math.max(0, pendingRestoreTimeRef.current * 1000),
       });
       return;

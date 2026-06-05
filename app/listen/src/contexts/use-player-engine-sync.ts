@@ -6,7 +6,7 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { toEngineTracks } from "@/contexts/player-engine-adapter";
+import { toFreshEngineTracks } from "@/contexts/player-engine-adapter";
 import {
   clampIndex,
   resolveQueueFromUrls,
@@ -36,6 +36,7 @@ import {
   isAndroidNativePlayerAvailable,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { getCrossfadeDurationPreference } from "@/lib/player-playback-prefs";
 import { createQueueRevision } from "@/lib/playback-engine";
 
@@ -265,22 +266,24 @@ export function usePlayerEngineSync({
         commitIsBuffering(autoplay);
         commitIsPlaying(autoplay);
 
-        void androidNativeEngine
-          .loadQueue({
+        void (async () => {
+          await primeOfflineRuntimeProfile();
+          const engineTracks = await toFreshEngineTracks(nextQueue);
+          return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),
-            tracks: toEngineTracks(nextQueue),
+            tracks: engineTracks,
             currentIndex: nextIndex,
             positionMs,
             autoplay,
             repeat: repeatRef.current,
             crossfadeMs: effectiveCrossfadeMsRef.current,
             volume: 1,
-          })
-          .catch((error) => {
-            console.error("[native-player] failed to sync queue:", error);
-            commitIsBuffering(false);
-            commitIsPlaying(false);
           });
+        })().catch((error) => {
+          console.error("[native-player] failed to sync queue:", error);
+          commitIsBuffering(false);
+          commitIsPlaying(false);
+        });
         return;
       }
 

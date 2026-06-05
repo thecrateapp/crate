@@ -521,7 +521,86 @@ class TestDuplicateTrackRepair:
             assert result["details"]["quarantined_paths"]
             assert result["details"]["enrich_artist"] == "Terror"
 
-    def test_duplicate_track_stays_manual_when_fingerprints_conflict(self):
+    def test_duplicate_track_dry_run_allows_conflicting_fingerprints_with_strong_tags(
+        self,
+    ):
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            album_dir = Path(lib) / "Hatebreed" / "Hatebreed"
+            album_dir.mkdir(parents=True)
+            first = album_dir / "13 - Merciless Tide.flac"
+            second = album_dir / "13 - Merciless Tide (1).flac"
+            first.write_bytes(b"\x00" * 1000)
+            second.write_bytes(b"\x00" * 1200)
+
+            tracks = [
+                {
+                    "album_id": 113609,
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "path": str(first),
+                    "track_number": 13,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 160.973,
+                    "size": 1000,
+                    "bitrate": 1030000,
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "audio_fingerprint": "fp-1",
+                },
+                {
+                    "album_id": 113609,
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "path": str(second),
+                    "track_number": 13,
+                    "disc_number": 1,
+                    "format": "flac",
+                    "duration": 160.973,
+                    "size": 1200,
+                    "bitrate": 1030000,
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "audio_fingerprint": "fp-2",
+                },
+            ]
+            tags = {
+                "artist": "Hatebreed",
+                "album": "Hatebreed",
+                "title": "Merciless Tide",
+                "tracknumber": "13",
+            }
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "duplicate_tracks",
+                "details": {
+                    "artist": "Hatebreed",
+                    "album": "Hatebreed",
+                    "title": "Merciless Tide",
+                    "paths": [str(first), str(second)],
+                },
+            }
+
+            with (
+                patch("crate.repair.get_tracks_by_paths", return_value=tracks),
+                patch("crate.repair.read_tags", return_value=tags),
+            ):
+                result = repair._fix_duplicate_tracks(issue, dry_run=True)
+
+            assert result is not None
+            assert result["details"]["keep_path"] == str(second)
+            assert result["details"]["remove_paths"] == [str(first)]
+            assert result["details"]["reason"] == (
+                "same album/title/track number, near-identical duration, "
+                "and matching readable tags"
+            )
+
+    def test_duplicate_track_stays_manual_when_fingerprints_conflict_without_tags(self):
         from crate.repair import LibraryRepair
 
         with tempfile.TemporaryDirectory() as lib:
@@ -887,6 +966,44 @@ class TestFolderNamingRepair:
             # Source should still exist
             assert current.is_dir()
             assert not expected.exists()
+            assert (
+                result["message"]
+                == "Would reorganize album folder for Artist/2020 - Album"
+            )
+
+    def test_direct_album_folder_preview_is_executable_not_skipped(self):
+        """'Artist/Album' preview should describe the move instead of looking skipped."""
+        from crate.repair import LibraryRepair
+
+        with tempfile.TemporaryDirectory() as lib:
+            current = Path(lib) / "Audioslave" / "Like A Stone"
+            expected = Path(lib) / "Audioslave" / "2002" / "Like A Stone"
+            current.mkdir(parents=True)
+            (current / "01 - Like A Stone.flac").write_bytes(b"\x00")
+
+            repair = LibraryRepair({"library_path": lib})
+            issue = {
+                "check": "folder_naming",
+                "auto_fixable": True,
+                "details": {
+                    "artist": "Audioslave",
+                    "current_folder": "Like A Stone",
+                    "clean_name": "Like A Stone",
+                    "year": "2002",
+                    "current_path": str(current),
+                    "expected_path": str(expected),
+                    "reason": "Album directly under artist — should be under 2002/ subdirectory",
+                    "path": str(current),
+                },
+            }
+
+            plan = repair.preview({"issues": [issue]}, auto_only=False)
+
+        assert plan["total"] == 1
+        assert plan["executable"] == 1
+        assert plan["items"][0]["message"] == (
+            "Would reorganize album folder for Audioslave/Like A Stone"
+        )
 
 
 class TestUnindexedFilesRepair:

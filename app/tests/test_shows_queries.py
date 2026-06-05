@@ -1,6 +1,6 @@
 """Tests for shows query modules."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -174,6 +174,10 @@ class TestShowsLocationQueries:
 
 
 class TestShowsUpcomingQueries:
+    @staticmethod
+    def _future_date(days: int = 30) -> date:
+        return date.today() + timedelta(days=days)
+
     def _insert_show(self, session, overrides=None):
         from sqlalchemy import text
 
@@ -185,7 +189,7 @@ class TestShowsUpcomingQueries:
             "country_code": "DE",
             "latitude": 52.52,
             "longitude": 13.405,
-            "date": date(2026, 6, 1),
+            "date": self._future_date(),
             "status": "upcoming",
             "source": "lastfm",
         }
@@ -300,9 +304,11 @@ class TestShowsUpcomingQueries:
         from crate.db.tx import transaction_scope
 
         with transaction_scope() as session:
-            self._insert_show(session, {"date": date(2026, 6, 1), "source": "lastfm"})
             self._insert_show(
-                session, {"date": date(2026, 7, 1), "source": "ticketmaster"}
+                session, {"date": self._future_date(30), "source": "lastfm"}
+            )
+            self._insert_show(
+                session, {"date": self._future_date(60), "source": "ticketmaster"}
             )
 
         counts = get_upcoming_show_counts()

@@ -100,6 +100,17 @@ export function itemKey(item: UpcomingItem, index: number): string {
   );
 }
 
+export function canOpenUpcomingRelease(item: UpcomingItem) {
+  if (item.type !== "release") return false;
+  if (item.album_id != null) return true;
+  return Boolean(item.is_upcoming && item.release_id && item.artist_slug);
+}
+
+export function upcomingReleaseBadgeLabel(item: UpcomingItem) {
+  if (item.type !== "release") return "";
+  return item.is_upcoming ? "Pre-release" : "Released";
+}
+
 export function groupByMonth(
   items: UpcomingItem[],
 ): [string, UpcomingItem[]][] {

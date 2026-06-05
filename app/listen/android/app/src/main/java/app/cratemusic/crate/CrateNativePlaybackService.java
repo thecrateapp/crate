@@ -215,6 +215,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 payload.put("code", error.errorCode);
                 payload.put("message", error.getMessage());
                 payload.put("trackId", currentTrack == null ? "" : currentTrack.id);
+                payload.put("index", player.getCurrentMediaItemIndex());
                 payload.put("url", currentTrack == null ? "" : redactUrl(currentTrack.url));
                 payload.put("cause", rootCause == null ? "" : rootCause.getClass().getName());
                 payload.put("causeMessage", rootCause == null ? "" : valueOrDefault(rootCause.getMessage(), ""));
@@ -292,8 +293,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private void stopLegacyPlaybackService() {
         try {
             stopService(new Intent(this, CratePlaybackService.class));
-        } catch (RuntimeException ignored) {
-            // The legacy service is only a fallback; never block native playback startup.
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not stop legacy playback service.", error);
         }
     }
 
@@ -783,8 +784,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
         try {
             systemEqualizer.setEnabled(false);
             systemEqualizer.release();
-        } catch (RuntimeException ignored) {
-            // Some vendors throw if the audio session disappeared first.
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not release system equalizer.", error);
         } finally {
             systemEqualizer = null;
             systemEqAudioSessionId = C.AUDIO_SESSION_ID_UNSET;

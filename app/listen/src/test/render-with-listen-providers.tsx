@@ -11,6 +11,7 @@ import {
 import {
   OfflineContext,
   type OfflineContextValue,
+  type OfflineTrackInput,
 } from "@/contexts/offline-context";
 import {
   PlayerActionsContext,
@@ -52,7 +53,7 @@ export function createMockAuthValue(
   return {
     user: createMockAuthUser(),
     loading: false,
-    refetch: vi.fn(async () => {}),
+    refetch: vi.fn(async () => createMockAuthUser()),
     logout: vi.fn(async () => {}),
     ...overrides,
   };
@@ -110,6 +111,19 @@ export function createMockPlayerActions(
     addToQueue: vi.fn(),
     removeFromQueue: vi.fn(),
     reorderQueue: vi.fn(),
+    publishConnectState: vi.fn(async () => undefined),
+    connect: {
+      activeInstanceId: null,
+      connectedInstances: [],
+      enabled: false,
+      isRemoteActive: false,
+      playbackInstanceId: null,
+      remoteState: null,
+      requestTransfer: vi.fn(() => false),
+      sendRemoteCommand: vi.fn(() => false),
+      serverClockOffsetMs: 0,
+      transport: null,
+    },
     ...overrides,
   };
 }
@@ -118,7 +132,10 @@ export function createMockOfflineValue(
   overrides: Partial<OfflineContextValue> = {},
 ): OfflineContextValue {
   const getIdleState = vi.fn<
-    (value?: string | number | null) => OfflineItemState
+    (value?: string | OfflineTrackInput | null) => OfflineItemState
+  >(() => "idle");
+  const getNumericIdleState = vi.fn<
+    (value?: number | null) => OfflineItemState
   >(() => "idle");
   const toggleOffline = vi.fn<() => Promise<"enabled" | "removed">>(
     async () => "enabled",
@@ -135,8 +152,8 @@ export function createMockOfflineValue(
       totalBytes: 0,
     },
     getTrackState: getIdleState,
-    getAlbumState: getIdleState,
-    getPlaylistState: getIdleState,
+    getAlbumState: getNumericIdleState,
+    getPlaylistState: getNumericIdleState,
     getAlbumRecord: vi.fn(() => null),
     getPlaylistRecord: vi.fn(() => null),
     isTrackOffline: vi.fn(() => false),

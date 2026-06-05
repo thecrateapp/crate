@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from crate.api.schemas.common import OkResponse, SnapshotMetadataResponse
 
@@ -98,6 +98,18 @@ class LibraryContributionResponse(BaseModel):
     has_cover: bool | None = None
     track_count: int | None = None
     total_duration: int | None = None
+
+    @field_validator("album_entity_uid", mode="before")
+    @classmethod
+    def coerce_album_entity_uid(cls, value: Any) -> str | None:
+        return str(value) if value is not None else None
+
+    @field_validator("total_duration", mode="before")
+    @classmethod
+    def coerce_total_duration(cls, value: Any) -> int | None:
+        if value is None or value == "":
+            return None
+        return int(float(value))
 
 
 class LibraryContributionListResponse(BaseModel):

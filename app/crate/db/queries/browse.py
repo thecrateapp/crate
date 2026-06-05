@@ -44,15 +44,18 @@ def get_related_albums(
             rows = (
                 session.execute(
                     text("""
-                SELECT DISTINCT a.id, a.slug, a.name, a.artist, ar.id AS artist_id, ar.slug AS artist_slug,
-                    a.year, a.track_count, a.has_cover
-                FROM library_albums a
-                LEFT JOIN library_artists ar ON ar.name = a.artist
-                JOIN album_genres ag ON a.id = ag.album_id
-                WHERE ag.genre_id = ANY(:genre_ids)
-                AND a.artist != :artist
-                AND a.year IS NOT NULL AND length(a.year) >= 4
-                AND CAST(substring(a.year, 1, 4) AS INTEGER) BETWEEN :year_min AND :year_max
+                SELECT *
+                FROM (
+                    SELECT DISTINCT a.id, a.slug, a.name, a.artist, ar.id AS artist_id, ar.slug AS artist_slug,
+                        a.year, a.track_count, a.has_cover
+                    FROM library_albums a
+                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    JOIN album_genres ag ON a.id = ag.album_id
+                    WHERE ag.genre_id = ANY(:genre_ids)
+                    AND a.artist != :artist
+                    AND a.year IS NOT NULL AND length(a.year) >= 4
+                    AND CAST(substring(a.year, 1, 4) AS INTEGER) BETWEEN :year_min AND :year_max
+                ) related
                 ORDER BY RANDOM() LIMIT 10
                 """),
                     {

@@ -137,6 +137,11 @@ class GenreTaxonomyTreeNodeResponse(IdentityFieldsMixin):
     top_level: bool = False
     parent_slugs: list[str] = Field(default_factory=list)
     children_slugs: list[str] = Field(default_factory=list)
+    related_slugs: list[str] = Field(default_factory=list)
+    influenced_by_slugs: list[str] = Field(default_factory=list)
+    influences_slugs: list[str] = Field(default_factory=list)
+    fusion_of_slugs: list[str] = Field(default_factory=list)
+    fusion_genre_slugs: list[str] = Field(default_factory=list)
     alias_names: list[str] = Field(default_factory=list)
     artist_count: int = 0
     album_count: int = 0
@@ -148,3 +153,130 @@ class GenreTaxonomyTreeNodeResponse(IdentityFieldsMixin):
 class GenreTaxonomyTreeResponse(BaseModel):
     nodes: list[GenreTaxonomyTreeNodeResponse]
     top_level_slugs: list[str] = Field(default_factory=list)
+
+
+class GenreTaxonomyNodeUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    top_level: bool | None = None
+
+
+class GenreTaxonomyNodeUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+
+
+class GenreDeleteResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    name: str | None = None
+    deleted_library_genres: int = 0
+    deleted_taxonomy_nodes: int = 0
+    removed_artist_assignments: int = 0
+    removed_album_assignments: int = 0
+    removed_raw_genres: list[str] = Field(default_factory=list)
+
+
+class GenreTaxonomyRelationsUpdateRequest(BaseModel):
+    relation_type: str
+    target_slugs: list[str] = Field(default_factory=list)
+
+
+class GenreTaxonomyRelationsUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    relation_type: str
+    added: list[str] = Field(default_factory=list)
+    missing: list[str] = Field(default_factory=list)
+
+
+class GenreTaxonomyAliasesUpdateRequest(BaseModel):
+    alias_names: list[str] = Field(default_factory=list, max_length=24)
+
+
+class GenreTaxonomyAliasesUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    applied: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+
+
+class GenreTaxonomyRelationProposalResponse(BaseModel):
+    relation_type: str
+    target_slugs: list[str] = Field(default_factory=list)
+    confidence: float = 0.5
+    reasoning: str = ""
+
+
+class GenreTaxonomyNodeProposalResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    name: str | None = None
+    source_kind: str = "taxonomy_node"
+    recommended_action: str = "needs_review"
+    recommended_target_slug: str | None = None
+    description: str = ""
+    aliases: list[str] = Field(default_factory=list)
+    relations: list[GenreTaxonomyRelationProposalResponse] = Field(default_factory=list)
+    reasoning: str = ""
+    current_relations: dict[str, list[str]] = Field(default_factory=dict)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class GenreTaxonomyNodeProposalApplyRequest(BaseModel):
+    source_kind: str = "raw_genre"
+    recommended_action: str
+    recommended_target_slug: str | None = None
+    name: str | None = None
+    description: str = ""
+    aliases: list[str] = Field(default_factory=list, max_length=24)
+    relations: list[GenreTaxonomyRelationProposalResponse] = Field(default_factory=list)
+    reasoning: str = ""
+
+
+class GenreTaxonomyNodeProposalApplyResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    action: str
+    target_slug: str | None = None
+    applied_aliases: list[str] = Field(default_factory=list)
+    skipped_aliases: list[str] = Field(default_factory=list)
+    relation_results: list[GenreTaxonomyRelationsUpdateResponse] = Field(
+        default_factory=list
+    )
+
+
+class EqCoverageSourceResponse(BaseModel):
+    source: str
+    count: int = 0
+    percent: float = 0.0
+
+
+class EqCoverageResponse(BaseModel):
+    total_tracks: int = 0
+    sources: list[EqCoverageSourceResponse] = Field(default_factory=list)
+
+
+class TaxonomyHealthResponse(BaseModel):
+    node_count: int = 0
+    top_level_count: int = 0
+    orphan_count: int = 0
+    missing_description_count: int = 0
+    missing_direct_eq_count: int = 0
+    unmapped_raw_count: int = 0
+    edge_count: int = 0
+    locked_edge_count: int = 0
+    manual_edge_count: int = 0
+    ai_edge_count: int = 0
+
+
+class SoundIntelligenceHealthResponse(BaseModel):
+    eq: EqCoverageResponse
+    taxonomy: TaxonomyHealthResponse
+
+
+class GenreTaxonomyRebuildProposalRequest(BaseModel):
+    alias_limit: int = Field(80, ge=1, le=300)
+    node_limit: int = Field(12, ge=0, le=50)
+    include_external: bool = True
+    aggressive: bool = True

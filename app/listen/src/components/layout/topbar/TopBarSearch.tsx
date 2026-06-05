@@ -434,13 +434,14 @@ export function TopBarSearch() {
           ) : null}
           {!loading && query && searchOpen ? (
             <button
+              type="button"
               onClick={() => {
                 setQuery("");
                 setResults([]);
                 setShowDropdown(true);
                 focusInputSoon();
               }}
-              className="absolute right-4 text-white/30 hover:text-white/60"
+              className="absolute right-4 z-20 touch-manipulation text-white/30 hover:text-white/60"
               aria-label="Clear search"
             >
               <X size={15} />

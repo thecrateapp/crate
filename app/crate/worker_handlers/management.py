@@ -50,6 +50,7 @@ from crate.db.repositories.playlists import (
 )
 from crate.db.repositories.tasks import create_task
 from crate.task_progress import TaskProgress, emit_progress
+from crate.utils import PHOTO_NAMES
 from crate.worker_handlers import (
     DEFAULT_AUDIO_EXTENSIONS,
     TaskHandler,
@@ -772,6 +773,13 @@ def _unique_quarantine_path(
     return _unique_file_path(destination, task_id)
 
 
+def _unique_artist_sidecar_trash_path(
+    trash_root: Path, relative_path: Path, task_id: str
+) -> Path:
+    destination = trash_root / "artist-sidecars" / relative_path
+    return _unique_file_path(destination, task_id)
+
+
 def _broadcast_track_library_invalidation(
     track: Mapping[str, Any] | None = None,
 ) -> None:
@@ -1001,6 +1009,136 @@ def _handle_hard_delete_quarantined_track(
         "status": "ok",
         "quarantine_path": str(source),
         "deleted": True,
+    }
+
+
+def _handle_hard_delete_all_quarantined_tracks(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    lib = Path(config["library_path"])
+    trash_tracks = (_crate_trash_root(lib) / "tracks").resolve(strict=False)
+    if not trash_tracks.exists():
+        log_audit(
+            "hard_delete_all_quarantined_tracks",
+            "track",
+            ".crate-trash/tracks",
+            details={
+                "deleted": 0,
+                "skipped": 0,
+                "errors": [],
+                "bytes_deleted": 0,
+                "reason": params.get("reason"),
+            },
+            user_id=params.get("actor_user_id"),
+            task_id=task_id,
+        )
+        return {
+            "status": "ok",
+            "deleted": 0,
+            "skipped": 0,
+            "errors": [],
+            "bytes_deleted": 0,
+        }
+
+    candidates = [
+        path
+        for path in sorted(trash_tracks.rglob("*"))
+        if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+    ]
+    progress = TaskProgress(
+        phase="hard_delete_quarantined_tracks",
+        phase_count=1,
+        total=len(candidates),
+    )
+    emit_progress(task_id, progress, force=True)
+
+    deleted = 0
+    skipped = 0
+    bytes_deleted = 0
+    errors: list[dict[str, str]] = []
+
+    for index, path in enumerate(candidates, start=1):
+        if is_cancelled(task_id):
+            return {
+                "error": "cancelled",
+                "deleted": deleted,
+                "skipped": skipped,
+                "errors": errors[-20:],
+                "bytes_deleted": bytes_deleted,
+            }
+
+        progress.done = index - 1
+        progress.item = path.name
+        try:
+            relative_path = path.relative_to(trash_tracks).as_posix()
+        except ValueError:
+            skipped += 1
+            continue
+
+        try:
+            if path.is_symlink() or not path.is_file():
+                skipped += 1
+                continue
+            resolved = path.resolve(strict=False)
+            try:
+                resolved.relative_to(trash_tracks)
+            except ValueError:
+                skipped += 1
+                continue
+            size = path.stat().st_size
+            path.unlink()
+            deleted += 1
+            bytes_deleted += size
+            if deleted % 25 == 0:
+                emit_task_event(
+                    task_id,
+                    "info",
+                    {
+                        "message": f"Deleted {deleted} quarantined tracks",
+                        "deleted": deleted,
+                        "total": len(candidates),
+                    },
+                )
+        except OSError as exc:
+            errors.append({"path": relative_path, "error": str(exc)})
+
+        progress.done = index
+        if index % 25 == 0 or index == len(candidates):
+            emit_progress(task_id, progress, force=True)
+
+    emit_progress(task_id, progress, force=True)
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Empty trash complete: {deleted} deleted, {skipped} skipped",
+            "deleted": deleted,
+            "skipped": skipped,
+            "errors": len(errors),
+            "bytes_deleted": bytes_deleted,
+        },
+    )
+    log_audit(
+        "hard_delete_all_quarantined_tracks",
+        "track",
+        ".crate-trash/tracks",
+        details={
+            "deleted": deleted,
+            "skipped": skipped,
+            "errors": errors[-20:],
+            "bytes_deleted": bytes_deleted,
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation()
+    return {
+        "status": "ok",
+        "deleted": deleted,
+        "skipped": skipped,
+        "errors": errors[-20:],
+        "bytes_deleted": bytes_deleted,
     }
 
 
@@ -1502,11 +1640,26 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
         return {"error": f"Source artist directory not found: {source_relative}"}
     if source_dir == target_dir or _path_inside(target_dir, source_dir):
         return {"error": "Invalid artist merge target"}
-    for child in source_dir.iterdir():
-        if (target_dir / child.name).exists():
-            return {
-                "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
-            }
+    moved_sidecars_to_trash: list[str] = []
+    for child in sorted(source_dir.iterdir(), key=lambda item: item.name.lower()):
+        target_child = target_dir / child.name
+        if not target_child.exists():
+            continue
+        if child.is_file() and child.name.lower() in PHOTO_NAMES:
+            destination = _unique_artist_sidecar_trash_path(
+                _crate_trash_root(lib),
+                child.relative_to(lib),
+                task_id,
+            )
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(child), str(destination))
+            moved_sidecars_to_trash.append(str(destination))
+            continue
+        if child.is_file() and target_child.is_file():
+            return {"error": f"Target artist directory already has file {child.name}"}
+        return {
+            "error": f"Target artist directory already has {child.name}; merge duplicate albums first"
+        }
 
     target_dir.mkdir(parents=True, exist_ok=True)
     moved_items = 0
@@ -1533,6 +1686,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
             "source_path": str(source_dir),
             "target_path": str(target_dir),
             "moved_items": moved_items,
+            "artist_sidecars_preserved": len(moved_sidecars_to_trash),
         },
     )
     log_audit(
@@ -1549,6 +1703,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
             "source_path": str(source_dir),
             "target_path": str(target_dir),
             "moved_items": moved_items,
+            "artist_sidecars_preserved": len(moved_sidecars_to_trash),
             "source_albums": len(source_albums),
             "source_tracks": source_track_count,
             "reason": params.get("reason"),
@@ -1567,6 +1722,7 @@ def _handle_merge_artist(task_id: str, params: dict, config: dict) -> dict:
         "source_path": str(source_dir),
         "target_path": str(target_dir),
         "moved_items": moved_items,
+        "artist_sidecars_preserved": len(moved_sidecars_to_trash),
         "source_albums": len(source_albums),
         "source_tracks": source_track_count,
     }
@@ -2364,6 +2520,9 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "library_track_restore": _handle_restore_track,
     "library_track_hard_delete": _handle_hard_delete_track,
     "library_quarantined_track_hard_delete": _handle_hard_delete_quarantined_track,
+    "library_quarantined_tracks_hard_delete_all": (
+        _handle_hard_delete_all_quarantined_tracks
+    ),
     "library_track_move": _handle_move_track,
     "library_album_move_to_artist": _handle_move_album_to_artist,
     "library_album_merge": _handle_merge_album,

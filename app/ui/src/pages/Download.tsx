@@ -34,6 +34,7 @@ import {
   Users,
   Loader2,
   CheckCircle2,
+  ExternalLink,
   Heart,
   Clock,
   XCircle,
@@ -127,6 +128,35 @@ interface AcquisitionSurface {
   tidal_authenticated: boolean;
   tidal_queue: QueueItem[];
   soulseek_queue: SoulseekQueueItem[];
+}
+
+interface ArtistSuggestionSupporter {
+  user_id?: number | null;
+  name?: string | null;
+  email?: string | null;
+  avatar?: string | null;
+  note?: string | null;
+  artist_url?: string | null;
+  created_at?: string | null;
+}
+
+interface ArtistSuggestion {
+  id: number;
+  artist_name: string;
+  artist_url?: string | null;
+  note?: string | null;
+  status: string;
+  created_by_name?: string | null;
+  created_by_email?: string | null;
+  created_by_avatar?: string | null;
+  supporter_count: number;
+  supporters?: ArtistSuggestionSupporter[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+interface ArtistSuggestionsPayload {
+  suggestions: ArtistSuggestion[];
 }
 
 // Cover lookup cache — fetches from Last.fm public API (no auth needed)
@@ -299,6 +329,8 @@ export function DownloadPage() {
   } | null>(null);
   const { data: acquisitionSurface, refetch: refetchAcquisitionSurface } =
     useApi<AcquisitionSurface>("/api/acquisition/snapshot");
+  const { data: artistSuggestions, refetch: refetchArtistSuggestions } =
+    useApi<ArtistSuggestionsPayload>("/api/acquisition/artist-suggestions");
   const [liveAcquisitionSurface, setLiveAcquisitionSurface] =
     useState<AcquisitionSurface | null>(null);
 
@@ -315,6 +347,7 @@ export function DownloadPage() {
   function refetchQueue() {
     refetchAcquisitionSurface();
   }
+  const suggestions = artistSuggestions?.suggestions ?? [];
 
   // Persist search state across navigation
   useEffect(() => {
@@ -410,6 +443,49 @@ export function DownloadPage() {
     },
     [query],
   );
+
+  async function searchArtistSuggestion(suggestion: ArtistSuggestion) {
+    const term = suggestion.artist_name.trim();
+    if (!term) return;
+    setQuery(term);
+    setResultTab("tidal");
+    void doSearch(term);
+    try {
+      await api(
+        `/api/acquisition/artist-suggestions/${suggestion.id}`,
+        "PATCH",
+        {
+          status: "searching",
+        },
+      );
+      refetchArtistSuggestions();
+    } catch {
+      // Searching should not be blocked if triage state cannot be updated.
+    }
+  }
+
+  async function updateArtistSuggestionStatus(
+    suggestion: ArtistSuggestion,
+    status: string,
+  ) {
+    try {
+      await api(
+        `/api/acquisition/artist-suggestions/${suggestion.id}`,
+        "PATCH",
+        {
+          status,
+        },
+      );
+      toast.success(
+        status === "dismissed" ? "Suggestion dismissed" : "Suggestion updated",
+      );
+      refetchArtistSuggestions();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update suggestion",
+      );
+    }
+  }
 
   // Auto-search on mount if URL has ?q=
   useEffect(() => {
@@ -606,6 +682,99 @@ export function DownloadPage() {
           </div>
         </div>
       </section>
+
+      {suggestions.length > 0 ? (
+        <section className="rounded-md border border-white/10 bg-panel-surface/85 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-white">
+                Listener suggestions
+              </h2>
+              <p className="text-xs text-white/45">
+                Artist requests from Listen, ready to search and triage.
+              </p>
+            </div>
+            <CrateChip>{suggestions.length} open</CrateChip>
+          </div>
+          <div className="grid gap-3 xl:grid-cols-2">
+            {suggestions.slice(0, 6).map((suggestion) => {
+              const requester =
+                suggestion.created_by_name ||
+                suggestion.created_by_email ||
+                "Listener";
+              return (
+                <div
+                  key={suggestion.id}
+                  className="rounded-md border border-white/8 bg-black/20 p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold text-white">
+                          {suggestion.artist_name}
+                        </h3>
+                        <CrateChip className="text-[10px]">
+                          {suggestion.supporter_count || 1} request
+                          {(suggestion.supporter_count || 1) === 1 ? "" : "s"}
+                        </CrateChip>
+                      </div>
+                      <p className="mt-1 text-xs text-white/45">
+                        Suggested by {requester}
+                      </p>
+                      {suggestion.note ? (
+                        <p className="mt-2 line-clamp-2 text-xs text-white/55">
+                          {suggestion.note}
+                        </p>
+                      ) : null}
+                    </div>
+                    {suggestion.created_by_avatar ? (
+                      <img
+                        src={suggestion.created_by_avatar}
+                        alt=""
+                        className="h-9 w-9 shrink-0 rounded-md object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void searchArtistSuggestion(suggestion)}
+                    >
+                      <Search size={14} />
+                      Search
+                    </Button>
+                    {suggestion.artist_url ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <a
+                          href={suggestion.artist_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink size={14} />
+                          Open link
+                        </a>
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        void updateArtistSuggestionStatus(
+                          suggestion,
+                          "dismissed",
+                        )
+                      }
+                    >
+                      <XCircle size={14} />
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {browsingArtist && (
         <TidalArtistBrowser

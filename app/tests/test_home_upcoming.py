@@ -64,6 +64,145 @@ def test_get_upcoming_releases_resolves_existing_album_without_artist_id(pg_db):
     assert rows[0]["album_slug"] == "bring-on-the-psychics"
 
 
+def test_get_upcoming_releases_deduplicates_release_title_variants(pg_db):
+    from crate.db.queries.user import get_upcoming_releases
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO library_artists (name, slug)
+                VALUES ('HEALTH', 'health')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO library_albums (artist, name, path, slug)
+                VALUES ('HEALTH', 'ADDENDUM', '/music/health/addendum', 'addendum')
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO new_releases (
+                    artist_name,
+                    album_title,
+                    status,
+                    detected_at,
+                    release_date,
+                    release_type,
+                    cover_url
+                )
+                VALUES (
+                    'HEALTH',
+                    'ADDENDUM EP',
+                    'detected',
+                    NOW(),
+                    '2026-04-30',
+                    'EP',
+                    'https://img.example/addendum-ep.jpg'
+                )
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO new_releases (
+                    artist_name,
+                    album_title,
+                    status,
+                    detected_at,
+                    release_date,
+                    release_type,
+                    source_url
+                )
+                VALUES (
+                    'HEALTH',
+                    'ADDENDUM',
+                    'detected',
+                    NOW(),
+                    '2026-04-30',
+                    'EP',
+                    'https://tidal.com/album/123'
+                )
+                """
+            )
+        )
+
+    rows = get_upcoming_releases(
+        ["HEALTH"],
+        today=date(2026, 4, 1),
+        recent_cutoff="2026-03-01T00:00:00+00:00",
+        limit=10,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["album_title"] == "ADDENDUM"
+    assert rows[0]["album_slug"] == "addendum"
+    assert rows[0]["cover_url"] == "https://img.example/addendum-ep.jpg"
+    assert rows[0]["source_url"] == "https://tidal.com/album/123"
+
+
+def test_get_upcoming_releases_excludes_release_day_rows(pg_db):
+    from crate.db.queries.user import get_upcoming_releases
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO library_artists (name, slug)
+                VALUES ('Converge', 'converge')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO library_albums (artist, name, path, slug)
+                VALUES ('Converge', 'Hum of Hurt', '/music/converge/hum-of-hurt', 'converge-hum-of-hurt')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO new_releases (
+                    artist_name,
+                    album_title,
+                    status,
+                    detected_at,
+                    release_date,
+                    release_type
+                )
+                VALUES (
+                    'Converge',
+                    'Hum of Hurt',
+                    'detected',
+                    '2026-06-05T09:00:00+00:00',
+                    '2026-06-05',
+                    'Album'
+                )
+                """
+            )
+        )
+
+    rows = get_upcoming_releases(
+        ["Converge"],
+        today=date(2026, 6, 5),
+        recent_cutoff="2026-05-01T00:00:00+00:00",
+        limit=10,
+    )
+
+    assert rows == []
+
+
 def test_home_upcoming_trims_preview_items_but_keeps_full_summary(monkeypatch):
     releases = [
         {

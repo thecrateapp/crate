@@ -14,11 +14,14 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
 }
 
 html,
 body {
-  overscroll-behavior: none;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
   background: linear-gradient(rgba(103, 232, 249, 0.018) 1px, transparent 1px),
     linear-gradient(90deg, rgba(103, 232, 249, 0.014) 1px, transparent 1px),
     radial-gradient(

@@ -3,17 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type AuthUser } from "@/contexts/auth-context";
 import { applyAuthenticatedUser } from "@/contexts/auth-runtime";
 import { api } from "@/lib/api";
-import {
-  setActiveOfflineProfileKey,
-  syncOfflineProfileToServiceWorker,
-} from "@/lib/offline";
 
 export function useAuthSession() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const authRequestRef = useRef<AbortController | null>(null);
 
-  const refetch = useCallback(async () => {
+  const refetch = useCallback(async (): Promise<AuthUser | null> => {
     authRequestRef.current?.abort();
     const controller = new AbortController();
     authRequestRef.current = controller;
@@ -26,13 +22,14 @@ export function useAuthSession() {
       const nextUser = data && data.id ? data : null;
       setUser(nextUser);
       applyAuthenticatedUser(nextUser);
+      return nextUser;
     } catch (error) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
-        return;
+        return null;
       }
-      setActiveOfflineProfileKey(null);
-      void syncOfflineProfileToServiceWorker(null);
       setUser(null);
+      applyAuthenticatedUser(null);
+      return null;
     } finally {
       if (authRequestRef.current === controller) {
         authRequestRef.current = null;

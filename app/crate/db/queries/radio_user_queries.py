@@ -21,7 +21,7 @@ def get_recent_liked_seed_rows(
             s.execute(
                 text(
                     """
-                SELECT t.id AS track_id, t.artist, t.bliss_vector
+                SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_liked_tracks lt
                 JOIN library_tracks t ON t.id = lt.track_id
                 WHERE lt.user_id = :user_id
@@ -54,7 +54,8 @@ def get_followed_artist_seed_rows(
             s.execute(
                 text(
                     """
-                SELECT DISTINCT ON (t.id) t.id AS track_id, t.artist, t.bliss_vector
+                SELECT DISTINCT ON (t.id)
+                    t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_follows af
                 JOIN library_albums a ON LOWER(a.artist) = LOWER(af.artist_name)
                 JOIN library_tracks t ON t.album_id = a.id
@@ -88,7 +89,7 @@ def get_saved_album_seed_rows(
             s.execute(
                 text(
                     """
-                SELECT t.id AS track_id, t.artist, t.bliss_vector
+                SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_saved_albums sa
                 JOIN library_tracks t ON t.album_id = sa.album_id
                 WHERE sa.user_id = :user_id
@@ -120,7 +121,7 @@ def get_recent_play_seed_rows(
             s.execute(
                 text(
                     """
-                SELECT t.id AS track_id, t.artist, t.bliss_vector
+                SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_play_events pe
                 LEFT JOIN library_tracks t
                   ON t.id = pe.track_id
@@ -188,6 +189,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     SELECT
                         t.id AS track_id,
                         t.artist,
+                        t.title,
                         t.bliss_vector,
                         ROW_NUMBER() OVER (ORDER BY lt.created_at DESC, t.id) AS source_rank
                     FROM user_liked_tracks lt
@@ -201,6 +203,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     SELECT
                         t.id AS track_id,
                         t.artist,
+                        t.title,
                         t.bliss_vector,
                         ROW_NUMBER() OVER (ORDER BY t.id) AS source_rank
                     FROM user_follows af
@@ -215,6 +218,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     SELECT
                         t.id AS track_id,
                         t.artist,
+                        t.title,
                         t.bliss_vector,
                         ROW_NUMBER() OVER (ORDER BY sa.created_at DESC, t.id) AS source_rank
                     FROM user_saved_albums sa
@@ -228,6 +232,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     SELECT
                         t.id AS track_id,
                         t.artist,
+                        t.title,
                         t.bliss_vector,
                         ROW_NUMBER() OVER (ORDER BY pe.ended_at DESC, t.id) AS source_rank
                     FROM user_play_events pe
@@ -240,15 +245,15 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     ORDER BY pe.ended_at DESC, t.id
                     LIMIT 20
                 )
-                SELECT priority, track_id, artist, bliss_vector
+                SELECT priority, track_id, artist, title, bliss_vector
                 FROM (
-                    SELECT 1 AS priority, track_id, artist, bliss_vector, source_rank FROM liked
+                    SELECT 1 AS priority, track_id, artist, title, bliss_vector, source_rank FROM liked
                     UNION ALL
-                    SELECT 2 AS priority, track_id, artist, bliss_vector, source_rank FROM followed
+                    SELECT 2 AS priority, track_id, artist, title, bliss_vector, source_rank FROM followed
                     UNION ALL
-                    SELECT 3 AS priority, track_id, artist, bliss_vector, source_rank FROM saved
+                    SELECT 3 AS priority, track_id, artist, title, bliss_vector, source_rank FROM saved
                     UNION ALL
-                    SELECT 4 AS priority, track_id, artist, bliss_vector, source_rank FROM plays
+                    SELECT 4 AS priority, track_id, artist, title, bliss_vector, source_rank FROM plays
                 ) sources
                 ORDER BY priority, source_rank
                 """

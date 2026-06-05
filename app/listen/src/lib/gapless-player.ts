@@ -36,6 +36,10 @@ type GaplessOutputInternal = Gapless5 & {
   _outputChainOutput?: AudioNode | null;
 };
 
+type WindowWithGaplessContext = Window & {
+  gapless5AudioContext?: AudioContext;
+};
+
 // The package's TS declarations don't expose these enums as named imports,
 // but the runtime constants are stable in gapless5.js:
 // LogLevel.Warning = 3, CrossfadeShape.EqualPower = 3.
@@ -89,6 +93,7 @@ let lastEqGains: EqGains = [];
 let lastPlaybackRate = 1.0;
 let lifecycleRecoveryInstalled = false;
 let contextWakeInFlight: Promise<void> | null = null;
+let tauriAudioOutputMayBeStale = false;
 
 const DEFAULT_FADE_MS = 220;
 
@@ -445,6 +450,7 @@ function installAudioLifecycleRecovery(): void {
 
   const wake = (reason: string) => {
     if (!isTauriDesktopRuntime()) return;
+    tauriAudioOutputMayBeStale = true;
     void prepareAudioForPlayback(reason);
   };
 
@@ -489,9 +495,21 @@ function kickAudioOutput(ctx: AudioContext, reason: string): void {
   }
 }
 
+function clearSharedGaplessAudioContext(
+  previousContext: AudioContext | null,
+): void {
+  if (typeof window === "undefined") return;
+  const w = window as WindowWithGaplessContext;
+  if (!w.gapless5AudioContext) return;
+  if (!previousContext || w.gapless5AudioContext === previousContext) {
+    w.gapless5AudioContext = undefined;
+  }
+}
+
 function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   if (!instance) return;
   const previous = instance;
+  const previousContext = getAudioContext();
   const tracks = previous.getTracks();
   const index = Math.max(0, Math.min(previous.getIndex(), tracks.length - 1));
   const position = previous.getPosition();
@@ -523,6 +541,8 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   instance = null;
   currentAnalyser = null;
   currentTrackFullyBuffered = false;
+  clearSharedGaplessAudioContext(previousContext);
+  tauriAudioOutputMayBeStale = false;
 
   const nextPlayer = initPlayer(currentCallbacks);
   if (tracks.length > 0) {
@@ -539,16 +559,35 @@ function rebuildPlayerAfterAudioContextLoss(reason: string): void {
   setEqualizer(preservedEqEnabled, preservedEqGains);
 }
 
-async function prepareAudioForPlayback(reason: string): Promise<void> {
+async function prepareAudioForPlayback(
+  reason: string,
+  options: { rebuildIfTauriOutputMayBeStale?: boolean } = {},
+): Promise<void> {
   if (contextWakeInFlight) return contextWakeInFlight;
-  contextWakeInFlight = prepareAudioForPlaybackInner(reason).finally(() => {
-    contextWakeInFlight = null;
-  });
+  contextWakeInFlight = prepareAudioForPlaybackInner(reason, options).finally(
+    () => {
+      contextWakeInFlight = null;
+    },
+  );
   return contextWakeInFlight;
 }
 
-async function prepareAudioForPlaybackInner(reason: string): Promise<void> {
+async function prepareAudioForPlaybackInner(
+  reason: string,
+  options: { rebuildIfTauriOutputMayBeStale?: boolean } = {},
+): Promise<void> {
   let ctx = getAudioContext();
+  if (!ctx) return;
+
+  if (
+    options.rebuildIfTauriOutputMayBeStale &&
+    isTauriDesktopRuntime() &&
+    tauriAudioOutputMayBeStale
+  ) {
+    rebuildPlayerAfterAudioContextLoss(`${reason}:tauri-output-stale`);
+    ctx = getAudioContext();
+  }
+
   if (!ctx) return;
 
   if (ctx.state === "closed") {
@@ -582,7 +621,9 @@ async function prepareAudioForPlaybackInner(reason: string): Promise<void> {
 
 export async function play(): Promise<void> {
   stopFade();
-  await prepareAudioForPlayback("play");
+  await prepareAudioForPlayback("play", {
+    rebuildIfTauriOutputMayBeStale: true,
+  });
   instance?.play();
 }
 
@@ -601,7 +642,9 @@ export function stop(): void {
  * next track (auto-advance uses the same internal path).
  */
 export function next(): void {
-  void prepareAudioForPlayback("next").then(() => {
+  void prepareAudioForPlayback("next", {
+    rebuildIfTauriOutputMayBeStale: true,
+  }).then(() => {
     instance?.next(undefined, true, true);
   });
 }
@@ -626,7 +669,9 @@ export function gotoTrack(
     instance?.gotoTrack(indexOrUrl, forcePlay);
     return;
   }
-  void prepareAudioForPlayback("gotoTrack").then(() => {
+  void prepareAudioForPlayback("gotoTrack", {
+    rebuildIfTauriOutputMayBeStale: true,
+  }).then(() => {
     instance?.gotoTrack(indexOrUrl, forcePlay);
   });
 }
@@ -706,7 +751,9 @@ export async function fadeInAndPlay(
 ): Promise<void> {
   if (!instance) return Promise.resolve();
   stopFade();
-  await prepareAudioForPlayback("fadeInAndPlay");
+  await prepareAudioForPlayback("fadeInAndPlay", {
+    rebuildIfTauriOutputMayBeStale: true,
+  });
   applyVolume(0);
   instance?.play();
   return new Promise((resolve) => {

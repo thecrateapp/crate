@@ -19,7 +19,7 @@ import {
   AppPopoverDivider,
 } from "@crate/ui/primitives/AppPopover";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
 import { cn } from "@/lib/utils";
 
 export type ItemActionMenuEntry =
@@ -252,7 +252,10 @@ export function ItemActionMenu({
             key={entry.key}
             danger={entry.danger}
             disabled={entry.disabled}
-            onClick={() => handleSelect(entry)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleSelect(entry);
+            }}
             className={cn(
               entry.active ? "text-primary" : undefined,
               entry.disabled ? "opacity-50" : undefined,
@@ -278,13 +281,10 @@ export function ItemActionMenu({
   if (!open) return null;
 
   if (!isDesktop) {
-    return createPortal(
-      <AppModal open={open} onClose={onClose} maxWidthClassName="sm:max-w-sm">
-        <ModalBody className="px-3 pb-4 pt-2">
-          <div className="space-y-1">{content}</div>
-        </ModalBody>
-      </AppModal>,
-      document.body,
+    return (
+      <MobileActionSheet panelRef={menuRef} onClose={onClose}>
+        <div className="space-y-1 px-3 pb-3 pt-1">{content}</div>
+      </MobileActionSheet>
     );
   }
 

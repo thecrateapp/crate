@@ -120,6 +120,35 @@ def test_library_sync_album_refreshes_artist_with_canonical_name(monkeypatch, tm
     assert result["artist_tracks"] == 37
 
 
+def test_library_sync_album_skips_hidden_library_paths(monkeypatch, tmp_path):
+    from crate.worker_handlers.library import _handle_library_sync
+
+    library_root = tmp_path / "music"
+    album_dir = library_root / ".crate-trash" / "tracks"
+    album_dir.mkdir(parents=True)
+
+    class FakeSync:
+        def __init__(self, config):
+            self.library_path = library_root
+            self.extensions = {".flac"}
+
+        def sync_album(self, *args, **kwargs):
+            raise AssertionError("hidden paths must not be synced")
+
+        def sync_artist_dirs(self, *args, **kwargs):
+            raise AssertionError("hidden paths must not refresh artists")
+
+    monkeypatch.setattr("crate.worker_handlers.library.LibrarySync", FakeSync)
+
+    result = _handle_library_sync(
+        "task-1",
+        {"album_dir": str(album_dir), "artist": ".crate-trash"},
+        {"library_path": str(library_root), "audio_extensions": [".flac"]},
+    )
+
+    assert result["skipped"] == "hidden_library_path"
+
+
 def test_library_sync_full_can_skip_when_native_diff_is_unchanged(
     monkeypatch, tmp_path
 ):

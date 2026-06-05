@@ -482,6 +482,7 @@ class LibraryHealthCheck:
                 "check": "duplicate_tracks",
                 "severity": "medium",
                 "details": {
+                    "album_id": r["album_id"],
                     "artist": r["artist"],
                     "album": r["album"],
                     "title": r["title"],
@@ -489,6 +490,10 @@ class LibraryHealthCheck:
                     "disc_number": r.get("disc_number"),
                     "count": r["cnt"],
                     "paths": r.get("paths", []),
+                    "track_ids": r.get("track_ids", []),
+                    "tracks": r.get("tracks", []),
+                    "fingerprinted_count": r.get("fingerprinted_count", 0),
+                    "missing_fingerprint_count": r.get("missing_fingerprint_count", 0),
                 },
             }
             for r in rows

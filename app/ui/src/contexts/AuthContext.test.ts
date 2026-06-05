@@ -13,6 +13,7 @@ function user(role: string, capabilities: string[] = []): AuthUser {
     email: `${role}@example.test`,
     name: role,
     role,
+    roles: [role],
     capabilities,
   };
 }
@@ -32,6 +33,15 @@ describe("AuthContext permission helpers", () => {
     expect(userHasAnyCapability(editor, ["admin.access", "library.view"])).toBe(
       true,
     );
+  });
+
+  it("treats multirole admin users as legacy wildcard users", () => {
+    expect(
+      userHasCapability(
+        { ...user("curator"), roles: ["curator", "admin"] },
+        "users.delete",
+      ),
+    ).toBe(true);
   });
 
   it("does not allow plain library viewers into the admin console", () => {

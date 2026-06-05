@@ -9,6 +9,7 @@ ext {
     androidxFragmentVersion = '1.8.9'
     androidxMediaVersion = '1.7.0'
     androidxMedia3Version = '1.5.1'
+    googleCastFrameworkVersion = '22.3.1'
     coreSplashScreenVersion = '1.2.0'
     androidxWebkitVersion = '1.14.0'
     junitVersion = '4.13.2'

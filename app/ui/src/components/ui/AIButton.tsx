@@ -20,7 +20,7 @@ export function AIButton({
       {/* Glow pulse behind the button */}
       <div
         className={cn(
-          "absolute -inset-[2px] rounded-md bg-gradient-to-r from-primary/40 via-violet-500/40 to-primary/40 opacity-60 blur-sm",
+          "absolute -inset-[3px] rounded-md bg-gradient-to-r from-primary/45 via-cyan-200/25 to-primary/45 opacity-65 blur-md",
           loading
             ? "animate-pulse"
             : "animate-[aiGlow_3s_ease-in-out_infinite]",
@@ -32,7 +32,7 @@ export function AIButton({
         variant="outline"
         disabled={disabled || loading}
         className={cn(
-          "relative h-full border-primary/40 bg-black/80 text-primary hover:bg-primary/15 hover:text-primary text-xs",
+          "relative h-full border-primary/45 bg-black/85 text-primary shadow-[0_0_18px_rgba(34,211,238,0.12)] hover:border-primary/70 hover:bg-primary/15 hover:text-primary text-xs",
           className,
         )}
         {...props}

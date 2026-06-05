@@ -32,6 +32,7 @@ from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
 from crate.artwork import extract_embedded_cover, save_cover
 from crate.db.repositories.library import get_albums_missing_covers
+from crate.db.releases import get_release_by_virtual_album_id
 from crate.db.repositories.tasks import create_task
 
 log = logging.getLogger(__name__)
@@ -224,6 +225,26 @@ async def api_upload_cover(
 async def api_upload_cover_by_id(
     request: Request, album_id: int, file: UploadFile = File(...)
 ):
+    if album_id < 0:
+        _require_artwork_editor(request)
+        import base64
+
+        release = get_release_by_virtual_album_id(album_id)
+        if not release:
+            return JSONResponse({"error": "Release not found"}, status_code=404)
+        data = await file.read()
+        task_id = create_task(
+            "upload_image",
+            {
+                "type": "release_cover",
+                "release_id": abs(album_id),
+                "artist": release.get("artist_name", ""),
+                "album": release.get("album_title", ""),
+                "data_b64": base64.b64encode(data).decode(),
+            },
+        )
+        return {"status": "queued", "task_id": task_id}
+
     album_names = album_names_from_id(album_id)
     if not album_names:
         return JSONResponse({"error": "Album not found"}, status_code=404)

@@ -32,8 +32,9 @@ import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import { Badge } from "@crate/ui/shadcn/badge";
 import { useOpsSnapshot } from "@/contexts/OpsSnapshotContext";
+import { AdminSelect } from "@/components/ui/AdminSelect";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, userCanAccessAdminConsole } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -239,7 +240,28 @@ function emitSidebarExpanded(expanded: boolean) {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const [expanded, setExpanded] = useState(getStoredSidebarExpanded);
-  const { user, hasAnyCapability, logout } = useAuth();
+  const auth = useAuth();
+  const {
+    user,
+    actualUser,
+    hasAnyCapability,
+    logout,
+    previewRole,
+    clearRolePreview,
+  } = auth;
+  const rolePresets = auth.rolePresets ?? [];
+  const previewableRolePresets = rolePresets.filter((role) =>
+    userCanAccessAdminConsole({
+      id: 0,
+      email: "",
+      name: role.name,
+      role: role.slug,
+      roles: [role.slug],
+      capabilities: role.capabilities,
+    }),
+  );
+  const setPreviewRole = auth.setPreviewRole ?? (() => {});
+  const clearPreview = clearRolePreview ?? (() => {});
   const { data: opsSnapshot } = useOpsSnapshot();
   const profileHref =
     user && hasAnyCapability(["users.view"])
@@ -389,45 +411,87 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       {user ? (
         <div className="mt-auto border-t border-white/6 p-3">
           {expanded ? (
-            <div className="flex items-center gap-3 rounded-md border border-white/8 bg-white/[0.03] px-3 py-3">
-              <Link
-                to={profileHref}
-                className="flex min-w-0 flex-1 items-center gap-3"
-                onClick={onNavigate}
-              >
-                {user.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt=""
-                    className="h-10 w-10 rounded-md object-cover"
+            <div className="space-y-2 rounded-md border border-white/8 bg-white/[0.03] px-3 py-3">
+              {actualUser && previewableRolePresets.length > 0 ? (
+                <div
+                  className={cn(
+                    "rounded-md border px-2 py-2",
+                    previewRole
+                      ? "border-cyan-400/25 bg-cyan-400/10"
+                      : "border-white/8 bg-black/15",
+                  )}
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/32">
+                      Preview as
+                    </span>
+                    {previewRole ? (
+                      <button
+                        type="button"
+                        onClick={clearPreview}
+                        className="text-[10px] font-medium text-cyan-200/75 hover:text-cyan-100"
+                      >
+                        Clear
+                      </button>
+                    ) : null}
+                  </div>
+                  <AdminSelect
+                    value={previewRole ?? ""}
+                    onChange={(value) => setPreviewRole(value || null)}
+                    options={[
+                      { value: "", label: "Actual permissions" },
+                      ...previewableRolePresets.map((role) => ({
+                        value: role.slug,
+                        label: role.name,
+                      })),
+                    ]}
+                    placeholder="Actual permissions"
+                    allowClear={false}
+                    triggerClassName="h-8 w-full min-w-0 max-w-none rounded-md px-2 text-xs"
+                    menuClassName="w-[200px]"
                   />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/60">
-                    <User size={16} />
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-white">
-                    {user.name}
-                  </div>
-                  <div className="mt-1">
-                    <Badge
-                      variant="secondary"
-                      className="px-1.5 py-0 text-[10px]"
-                    >
-                      {user.role}
-                    </Badge>
-                  </div>
                 </div>
-              </Link>
-              <button
-                type="button"
-                onClick={logout}
-                title="Logout"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/5 hover:text-white"
-              >
-                <LogOut size={16} />
-              </button>
+              ) : null}
+              <div className="flex items-center gap-3">
+                <Link
+                  to={profileHref}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                  onClick={onNavigate}
+                >
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt=""
+                      className="h-10 w-10 rounded-md object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/60">
+                      <User size={16} />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-white">
+                      {user.name}
+                    </div>
+                    <div className="mt-1">
+                      <Badge
+                        variant="secondary"
+                        className="px-1.5 py-0 text-[10px]"
+                      >
+                        {user.role}
+                      </Badge>
+                    </div>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={logout}
+                  title="Logout"
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-white/35 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">

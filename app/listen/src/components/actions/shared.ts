@@ -8,7 +8,9 @@ import {
 import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import type { Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
-import { toPlayableTrack } from "@/lib/playable-track";
+import { isUuidLikeTrackId, toPlayableTrack } from "@/lib/playable-track";
+import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet, type SharePayload } from "@/lib/social-share";
 import {
   albumApiPath,
   albumCoverApiUrl,
@@ -28,12 +30,15 @@ export interface MenuActionConfig {
 export interface TrackMenuData {
   id?: string | number;
   entity_uid?: string;
+  slug?: string;
   title: string;
   artist: string;
   artist_id?: number;
+  artist_entity_uid?: string;
   artist_slug?: string;
   album?: string;
   album_id?: number;
+  album_entity_uid?: string;
   album_slug?: string;
   duration?: number;
   path?: string;
@@ -56,6 +61,7 @@ export interface TrackMenuData {
 export interface AlbumMenuData {
   artist: string;
   artistSlug?: string;
+  artistEntityUid?: string;
   album: string;
   albumId?: number;
   albumEntityUid?: string;
@@ -65,7 +71,9 @@ export interface AlbumMenuData {
 
 export interface ArtistMenuData {
   artistId?: number;
+  artistEntityUid?: string;
   artistSlug?: string;
+  imageUrl?: string | null;
   name: string;
 }
 
@@ -84,15 +92,20 @@ export interface PlaylistMenuData {
 
 /** Normalize any full `Track` (camelCase) into the menu-friendly shape preserving suggestion metadata. */
 export function trackToMenuData(track: Track): TrackMenuData {
+  const entityUid =
+    track.entityUid || (isUuidLikeTrackId(track.id) ? track.id : undefined);
+
   return {
     id: track.id,
-    entity_uid: track.entityUid,
+    entity_uid: entityUid,
     title: track.title,
     artist: track.artist,
     artist_id: track.artistId,
+    artist_entity_uid: track.artistEntityUid,
     artist_slug: track.artistSlug,
     album: track.album,
     album_id: track.albumId,
+    album_entity_uid: track.albumEntityUid,
     album_slug: track.albumSlug,
     duration: track.duration,
     path: track.path,
@@ -147,18 +160,23 @@ export function action(config: MenuActionConfig): ItemActionMenuEntry {
   };
 }
 
-export function sharePath(path: string, label: string) {
+export function sharePath(
+  path: string,
+  label: string,
+  options: Partial<Omit<SharePayload, "title" | "url">> = {},
+) {
   return async () => {
-    const url = `${window.location.origin}${path}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: label, text: label, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        toast.success("Link copied");
-      }
-    } catch {
-      toast.error("Failed to share");
+    const url = publicShareUrl(path);
+    const opened = openShareSheet({
+      kind: options.kind ?? "playlist",
+      title: label,
+      subtitle: options.subtitle,
+      imageUrl: options.imageUrl,
+      url,
+    });
+    if (!opened) {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
     }
   };
 }

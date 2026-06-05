@@ -1,4 +1,5 @@
 export {
+  clearPendingOAuthNext,
   consumeOAuthCallbackUrl,
   consumePendingOAuthNext,
   getOAuthCallbackPayload,

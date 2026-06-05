@@ -62,6 +62,48 @@ def create_acquisition_schema(cur) -> None:
     )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS artist_suggestions (
+            id BIGSERIAL PRIMARY KEY,
+            artist_name TEXT NOT NULL,
+            normalized_artist_name TEXT NOT NULL,
+            artist_url TEXT,
+            note TEXT,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            triaged_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            linked_artist_id INTEGER REFERENCES library_artists(id) ON DELETE SET NULL,
+            linked_task_id TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            resolved_at TIMESTAMPTZ,
+            CHECK (status IN ('new', 'triaged', 'searching', 'accepted', 'dismissed', 'downloaded'))
+        )
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_artist_suggestions_open_key
+        ON artist_suggestions(normalized_artist_name)
+        WHERE status IN ('new', 'triaged', 'searching')
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_artist_suggestions_status_created
+        ON artist_suggestions(status, created_at DESC)
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS artist_suggestion_supporters (
+            suggestion_id BIGINT NOT NULL REFERENCES artist_suggestions(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            artist_url TEXT,
+            note TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (suggestion_id, user_id)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_artist_suggestion_supporters_user
+        ON artist_suggestion_supporters(user_id, created_at DESC)
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS tidal_monitored_artists (
             artist_name TEXT PRIMARY KEY,
             tidal_id TEXT,

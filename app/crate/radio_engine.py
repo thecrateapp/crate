@@ -59,6 +59,12 @@ from crate.db.repositories.radio import (
     persist_radio_feedback,
 )
 from crate.db.tx import read_scope
+from crate.track_versions import (
+    canonical_track_title_key,
+    dedupe_track_variants,
+    track_song_identity,
+    track_variant_rank,
+)
 
 log = logging.getLogger(__name__)
 
@@ -98,6 +104,17 @@ _TRACK_RADIO_SOURCE_PENALTY = {
     "bliss": 0.20,
 }
 _DISCOVERY_FRESH_RATIO = 0.80
+_RADIO_ARTIST_BATCH_LIMITS = {
+    "discovery": 1,
+    "contextual": 2,
+    "track": 1,
+}
+_RADIO_ARTIST_SESSION_LIMITS = {
+    "discovery": 2,
+    "contextual": 4,
+    "track": 3,
+}
+_RADIO_VARIANT_SCORE_PENALTY = 0.06
 _DISCOVERY_RADIO_SOURCE_PENALTY = {
     "similar": -0.06,
     "genre": -0.03,
@@ -164,8 +181,10 @@ def _delete_session(session_id: str) -> bool:
 def _seed_context_from_rows(rows: list[dict]) -> dict:
     artists: list[str] = []
     track_ids: list[int] = []
+    song_keys: list[str] = []
     seen_artists: set[str] = set()
     seen_tracks: set[int] = set()
+    seen_song_keys: set[str] = set()
 
     for row in rows:
         artist = (row.get("artist") or "").strip()
@@ -184,10 +203,16 @@ def _seed_context_from_rows(rows: list[dict]) -> dict:
             seen_tracks.add(track_id)
             track_ids.append(track_id)
 
+        song_key = _song_key(row)
+        if song_key and song_key not in seen_song_keys:
+            seen_song_keys.add(song_key)
+            song_keys.append(song_key)
+
     return {
         "seed_artists": artists[:24],
         "seed_genres": [],
         "seed_track_ids": track_ids[:80],
+        "seed_song_keys": song_keys[:80],
     }
 
 
@@ -414,6 +439,8 @@ def start_radio(
             "disliked_vectors": hist_disliked[:10],
             "used_track_ids": [],
             "used_titles": [],
+            "used_song_keys": seed_context.get("seed_song_keys") or [],
+            "used_artist_counts": {},
             "recent_artists": [],
             "recent_tracks": [],
             "track_count": 0,
@@ -531,7 +558,56 @@ def _db_exclude_ids(used_track_ids: list[int]) -> set[int]:
 
 
 def _title_key(candidate: dict) -> str:
+    artist_key = _artist_key(candidate)
+    title_key = canonical_track_title_key(str(candidate.get("title") or ""))
+    if artist_key and title_key:
+        return f"{artist_key}::{title_key}"
     return f"{candidate.get('artist') or ''}::{candidate.get('title') or ''}".lower()
+
+
+def _artist_key(candidate: dict) -> str:
+    return (
+        str(candidate.get("artist") or candidate.get("artist_name") or "")
+        .strip()
+        .casefold()
+    )
+
+
+def _song_key(candidate: dict) -> str | None:
+    identity = track_song_identity(candidate)
+    if identity is not None and identity[0] and identity[1]:
+        return f"{identity[0]}::{identity[1]}"
+    title_key = _title_key(candidate)
+    return title_key or None
+
+
+def _normalize_artist_counts(value: Any) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for raw_key, raw_count in value.items():
+        key = str(raw_key or "").strip().casefold()
+        if not key:
+            continue
+        try:
+            count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if count > 0:
+            counts[key] = count
+    return counts
+
+
+def _radio_artist_batch_limit(radio_profile: str) -> int | None:
+    return _RADIO_ARTIST_BATCH_LIMITS.get(radio_profile)
+
+
+def _radio_artist_session_limit(radio_profile: str) -> int | None:
+    return _RADIO_ARTIST_SESSION_LIMITS.get(radio_profile)
+
+
+def _dedupe_radio_candidate_variants(rows: list[dict]) -> list[dict]:
+    return dedupe_track_variants([dict(row) for row in rows])
 
 
 def _radio_profile(seed_type: str | None) -> str:
@@ -750,6 +826,9 @@ def _select_radio_candidate_from_rows(
     target: list[float],
     used_ids: set[int],
     used_titles: set[str],
+    used_song_keys: set[str] | None,
+    batch_artist_counts: dict[str, int] | None,
+    session_artist_counts: dict[str, int] | None,
     recent_artists: list[str],
     sim_graph: dict[str, dict[str, float]],
     genre_map: dict[str, dict[str, float]],
@@ -761,13 +840,33 @@ def _select_radio_candidate_from_rows(
     genre_overlap,
     recent_tracks: list[dict] | None = None,
     radio_profile: str = "discovery",
+    artist_batch_limit: int | None = None,
+    artist_session_limit: int | None = None,
 ) -> dict | None:
     track_context = _latest_track_context(recent_tracks)
     target_norm = sum(v * v for v in target) ** 0.5
     scored_rows: list[tuple[dict, float]] = []
     for row in rows:
         candidate = dict(row)
-        if candidate.get("id") in used_ids or _title_key(candidate) in used_titles:
+        song_key = _song_key(candidate)
+        artist_key = _artist_key(candidate)
+        if (
+            candidate.get("id") in used_ids
+            or _title_key(candidate) in used_titles
+            or (song_key and song_key in (used_song_keys or set()))
+        ):
+            continue
+        if (
+            artist_batch_limit is not None
+            and artist_key
+            and (batch_artist_counts or {}).get(artist_key, 0) >= artist_batch_limit
+        ):
+            continue
+        if (
+            artist_session_limit is not None
+            and artist_key
+            and (session_artist_counts or {}).get(artist_key, 0) >= artist_session_limit
+        ):
             continue
         scored_rows.append(
             (candidate, _vector_distance(candidate, target, target_norm=target_norm))
@@ -783,16 +882,16 @@ def _select_radio_candidate_from_rows(
 
     for candidate, distance in scored_rows:
         artist = candidate["artist"]
+        artist_key = _artist_key(candidate)
         if recent_artists:
             consecutive = sum(
                 1
                 for recent_artist in reversed(recent_artists)
-                if recent_artist == artist
+                if recent_artist.strip().casefold() == artist_key
             )
             if consecutive >= _MAX_CONSECUTIVE_SAME_ARTIST:
                 continue
 
-        artist_key = artist.lower()
         affinity_key = (artist_key, context_artists)
         affinity = artist_affinity_cache.get(affinity_key)
         if affinity is None:
@@ -821,9 +920,14 @@ def _select_radio_candidate_from_rows(
             + _W_ERA * _era_penalty(candidate, track_context)
             + _curation_penalty(candidate)
             + source_penalty
+            + _RADIO_VARIANT_SCORE_PENALTY
+            * track_variant_rank(str(candidate.get("title") or ""))
         )
 
-        if artist in recent_artists[-2:]:
+        recent_artist_keys = {
+            recent.strip().casefold() for recent in recent_artists[-2:]
+        }
+        if artist_key in recent_artist_keys:
             score *= _ARTIST_REPEAT_PENALTY
 
         if score < best_score:
@@ -850,6 +954,15 @@ def _generate_batch(
     seed_track_ids = [int(track_id) for track_id in session.get("seed_track_ids") or []]
     used_ids = set(used_track_ids) | set(seed_track_ids)
     used_titles = set(session["used_titles"])
+    used_song_keys = {
+        str(song_key)
+        for song_key in (session.get("used_song_keys") or [])
+        if str(song_key or "").strip()
+    }
+    session_artist_counts = _normalize_artist_counts(
+        session.get("used_artist_counts") or {}
+    )
+    batch_artist_counts: dict[str, int] = {}
     recent_artists = list(session["recent_artists"])
     recent_tracks = list(session.get("recent_tracks") or [])
     disliked_vecs = session["disliked_vectors"]
@@ -896,6 +1009,7 @@ def _generate_batch(
             count=count,
             db_session=db_session,
         )
+    candidate_rows = _dedupe_radio_candidate_variants(candidate_rows)
     max_attempts = min(
         len(candidate_rows),
         max(count + 5, count * _MAX_GENERATION_ATTEMPT_MULTIPLIER),
@@ -905,6 +1019,8 @@ def _generate_batch(
     genre_overlap_cache: dict[str, float] = {}
     discovery_fresh_target = int(round(count * _DISCOVERY_FRESH_RATIO))
     discovery_fresh_count = 0
+    artist_batch_limit = _radio_artist_batch_limit(radio_profile)
+    artist_session_limit = _radio_artist_session_limit(radio_profile)
 
     while len(tracks) < count and attempts < max_attempts:
         attempts += 1
@@ -937,6 +1053,9 @@ def _generate_batch(
             drift,
             used_ids,
             used_titles,
+            used_song_keys,
+            batch_artist_counts,
+            session_artist_counts,
             recent_artists,
             sim_graph,
             genre_map,
@@ -947,7 +1066,53 @@ def _generate_batch(
             genre_overlap=genre_overlap,
             recent_tracks=recent_tracks,
             radio_profile=radio_profile,
+            artist_batch_limit=artist_batch_limit,
+            artist_session_limit=artist_session_limit,
         )
+        if candidate is None and artist_batch_limit is not None:
+            candidate = _select_radio_candidate_from_rows(
+                rows_for_selection,
+                drift,
+                used_ids,
+                used_titles,
+                used_song_keys,
+                batch_artist_counts,
+                session_artist_counts,
+                recent_artists,
+                sim_graph,
+                genre_map,
+                member_graph,
+                target_artists,
+                artist_affinity_cache=artist_affinity_cache,
+                genre_overlap_cache=genre_overlap_cache,
+                genre_overlap=genre_overlap,
+                recent_tracks=recent_tracks,
+                radio_profile=radio_profile,
+                artist_batch_limit=None,
+                artist_session_limit=artist_session_limit,
+            )
+        if candidate is None and artist_session_limit is not None:
+            candidate = _select_radio_candidate_from_rows(
+                rows_for_selection,
+                drift,
+                used_ids,
+                used_titles,
+                used_song_keys,
+                batch_artist_counts,
+                session_artist_counts,
+                recent_artists,
+                sim_graph,
+                genre_map,
+                member_graph,
+                target_artists,
+                artist_affinity_cache=artist_affinity_cache,
+                genre_overlap_cache=genre_overlap_cache,
+                genre_overlap=genre_overlap,
+                recent_tracks=recent_tracks,
+                radio_profile=radio_profile,
+                artist_batch_limit=None,
+                artist_session_limit=None,
+            )
 
         if not candidate:
             break
@@ -962,12 +1127,21 @@ def _generate_batch(
         track_id = candidate["id"]
         artist = candidate["artist"]
         title = candidate["title"]
-        title_key = f"{artist}::{title}".lower()
+        title_key = _title_key(candidate)
+        song_key = _song_key(candidate)
+        artist_key = _artist_key(candidate)
 
         if track_id not in used_ids:
             used_ids.add(track_id)
             used_track_ids.append(track_id)
         used_titles.add(title_key)
+        if song_key:
+            used_song_keys.add(song_key)
+        if artist_key:
+            batch_artist_counts[artist_key] = batch_artist_counts.get(artist_key, 0) + 1
+            session_artist_counts[artist_key] = (
+                session_artist_counts.get(artist_key, 0) + 1
+            )
         recent_artists.append(artist)
         if len(recent_artists) > 3:
             recent_artists.pop(0)
@@ -1026,6 +1200,8 @@ def _generate_batch(
     # Update session state
     session["used_track_ids"] = used_track_ids
     session["used_titles"] = list(used_titles)
+    session["used_song_keys"] = sorted(used_song_keys)
+    session["used_artist_counts"] = session_artist_counts
     session["recent_artists"] = recent_artists
     session["recent_tracks"] = recent_tracks[-5:]
     session["current_target"] = target

@@ -8,6 +8,10 @@ import type {
 
 export interface OfflineTrackInput {
   entityUid?: string | null;
+  trackId?: number | null;
+  libraryTrackId?: number | null;
+  storageId?: string | null;
+  path?: string | null;
   title?: string | null;
 }
 
@@ -26,12 +30,12 @@ export interface OfflineContextValue {
   supported: boolean;
   syncing: boolean;
   summary: OfflineSummary;
-  getTrackState: (entityUid?: string | null) => OfflineItemState;
+  getTrackState: (ref?: string | OfflineTrackInput | null) => OfflineItemState;
   getAlbumState: (albumId?: number | null) => OfflineItemState;
   getPlaylistState: (playlistId?: number | null) => OfflineItemState;
   getAlbumRecord: (albumId?: number | null) => OfflineItemRecord | null;
   getPlaylistRecord: (playlistId?: number | null) => OfflineItemRecord | null;
-  isTrackOffline: (entityUid?: string | null) => boolean;
+  isTrackOffline: (ref?: string | OfflineTrackInput | null) => boolean;
   isAlbumOffline: (albumId?: number | null) => boolean;
   isPlaylistOffline: (playlistId?: number | null) => boolean;
   toggleTrackOffline: (

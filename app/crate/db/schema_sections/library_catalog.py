@@ -39,12 +39,20 @@ def create_library_catalog_schema(cur) -> None:
             discogs_profile TEXT,
             discogs_members_json JSONB,
             latest_release_date TEXT,
+            new_releases_checked_at TIMESTAMPTZ,
             content_hash TEXT,
             bandcamp_url TEXT,
             bandcamp_url_source TEXT,
-            bandcamp_url_updated_at TIMESTAMPTZ
+            bandcamp_url_updated_at TIMESTAMPTZ,
+            search_vector tsvector
         )
     """)
+    cur.execute(
+        "ALTER TABLE library_artists ADD COLUMN IF NOT EXISTS new_releases_checked_at TIMESTAMPTZ"
+    )
+    cur.execute(
+        "ALTER TABLE library_artists ADD COLUMN IF NOT EXISTS search_vector tsvector"
+    )
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_lib_artists_id ON library_artists(id)"
     )
@@ -67,6 +75,9 @@ def create_library_catalog_schema(cur) -> None:
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_artists_name_trgm ON library_artists USING gin(name gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_artists_search_fts ON library_artists USING gin(search_vector)"
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_library_artists_bandcamp_url ON library_artists(bandcamp_url) WHERE bandcamp_url IS NOT NULL"
@@ -100,9 +111,13 @@ def create_library_catalog_schema(cur) -> None:
             bandcamp_url TEXT,
             bandcamp_url_source TEXT,
             bandcamp_url_updated_at TIMESTAMPTZ,
+            search_vector tsvector,
             UNIQUE(artist, name)
         )
     """)
+    cur.execute(
+        "ALTER TABLE library_albums ADD COLUMN IF NOT EXISTS search_vector tsvector"
+    )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_lib_albums_artist ON library_albums(artist)"
     )
@@ -125,6 +140,12 @@ def create_library_catalog_schema(cur) -> None:
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_albums_name_trgm ON library_albums USING gin(name gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_albums_artist_trgm ON library_albums USING gin(artist gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_albums_search_fts ON library_albums USING gin(search_vector)"
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_albums_artist_name ON library_albums(artist, name)"
@@ -199,9 +220,13 @@ def create_library_catalog_schema(cur) -> None:
             lastfm_listeners INTEGER,
             lastfm_playcount BIGINT,
             popularity INTEGER,
-            rating INTEGER DEFAULT 0
+            rating INTEGER DEFAULT 0,
+            search_vector tsvector
         )
     """)
+    cur.execute(
+        "ALTER TABLE library_tracks ADD COLUMN IF NOT EXISTS search_vector tsvector"
+    )
     cur.execute("""
         DO $$ BEGIN
             IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='library_tracks' AND column_name='storage_id') THEN
@@ -241,6 +266,12 @@ def create_library_catalog_schema(cur) -> None:
         "CREATE INDEX IF NOT EXISTS idx_tracks_title_trgm ON library_tracks USING gin(title gin_trgm_ops)"
     )
     cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_artist_trgm ON library_tracks USING gin(artist gin_trgm_ops)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_search_fts ON library_tracks USING gin(search_vector)"
+    )
+    cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON library_tracks(album_id)"
     )
     cur.execute(
@@ -252,6 +283,106 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_lib_tracks_lastfm_playcount ON library_tracks(lastfm_playcount DESC NULLS LAST)"
     )
+
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION library_artists_search_update()
+        RETURNS trigger AS $$
+        BEGIN
+            NEW.search_vector :=
+                setweight(to_tsvector('simple', coalesce(NEW.name, '')), 'A');
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+    """)
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION library_albums_search_update()
+        RETURNS trigger AS $$
+        BEGIN
+            NEW.search_vector :=
+                setweight(to_tsvector('simple', coalesce(NEW.name, '')), 'A') ||
+                setweight(to_tsvector('simple', coalesce(NEW.artist, '')), 'B');
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+    """)
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION library_tracks_search_update()
+        RETURNS trigger AS $$
+        DECLARE
+            album_name_text TEXT;
+        BEGIN
+            SELECT name INTO album_name_text
+            FROM library_albums
+            WHERE id = NEW.album_id;
+
+            NEW.search_vector :=
+                setweight(to_tsvector('simple', coalesce(NEW.title, '')), 'A') ||
+                setweight(to_tsvector('simple', coalesce(NEW.artist, '')), 'B') ||
+                setweight(to_tsvector('simple', coalesce(album_name_text, NEW.album, '')), 'C');
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+    """)
+    cur.execute("""
+        CREATE OR REPLACE FUNCTION library_albums_search_cascade()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NEW.name IS DISTINCT FROM OLD.name THEN
+                UPDATE library_tracks
+                SET search_vector = DEFAULT
+                WHERE album_id = NEW.id;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trg_artists_search_vector'
+            ) THEN
+                CREATE TRIGGER trg_artists_search_vector
+                    BEFORE INSERT OR UPDATE ON library_artists
+                    FOR EACH ROW EXECUTE FUNCTION library_artists_search_update();
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trg_albums_search_vector'
+            ) THEN
+                CREATE TRIGGER trg_albums_search_vector
+                    BEFORE INSERT OR UPDATE ON library_albums
+                    FOR EACH ROW EXECUTE FUNCTION library_albums_search_update();
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trg_tracks_search_vector'
+            ) THEN
+                CREATE TRIGGER trg_tracks_search_vector
+                    BEFORE INSERT OR UPDATE ON library_tracks
+                    FOR EACH ROW EXECUTE FUNCTION library_tracks_search_update();
+            END IF;
+        END $$
+    """)
+    cur.execute("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_trigger WHERE tgname = 'trg_albums_search_cascade'
+            ) THEN
+                CREATE TRIGGER trg_albums_search_cascade
+                    AFTER UPDATE ON library_albums
+                    FOR EACH ROW EXECUTE FUNCTION library_albums_search_cascade();
+            END IF;
+        END $$
+    """)
+    cur.execute("UPDATE library_artists SET search_vector = DEFAULT")
+    cur.execute("UPDATE library_albums SET search_vector = DEFAULT")
+    cur.execute("UPDATE library_tracks SET search_vector = DEFAULT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS artist_bliss_centroids (
@@ -325,6 +456,48 @@ def create_library_catalog_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_album_portable_metadata_export ON album_portable_metadata(exported_at DESC)"
     )
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS equalizer_presets (
+            id BIGSERIAL PRIMARY KEY,
+            scope TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            target_entity_uid UUID NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            gains DOUBLE PRECISION[] NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            reasoning TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'manual',
+            created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CHECK (scope IN ('user', 'instance')),
+            CHECK (target_type IN ('track', 'album')),
+            CHECK (
+                (scope = 'user' AND user_id IS NOT NULL)
+                OR (scope = 'instance' AND user_id IS NULL)
+            )
+        )
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_equalizer_presets_user_target
+        ON equalizer_presets(scope, target_type, target_entity_uid, user_id)
+        WHERE scope = 'user'
+    """)
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_equalizer_presets_instance_target
+        ON equalizer_presets(scope, target_type, target_entity_uid)
+        WHERE scope = 'instance'
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equalizer_presets_target
+        ON equalizer_presets(target_type, target_entity_uid)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_equalizer_presets_user
+        ON equalizer_presets(user_id, updated_at DESC)
+        WHERE user_id IS NOT NULL
+    """)
 
 
 __all__ = ["create_library_catalog_schema"]

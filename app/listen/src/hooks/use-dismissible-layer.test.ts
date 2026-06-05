@@ -16,7 +16,10 @@ describe("useDismissibleLayer", () => {
       }),
     );
 
-    const event = new MouseEvent("mousedown", { bubbles: true });
+    const event = new Event("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+    });
     document.body.dispatchEvent(event);
     expect(onDismiss).toHaveBeenCalledTimes(1);
 
@@ -36,7 +39,10 @@ describe("useDismissibleLayer", () => {
       }),
     );
 
-    const event = new MouseEvent("mousedown", { bubbles: true });
+    const event = new Event("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+    });
     ref.current.dispatchEvent(event);
     expect(onDismiss).not.toHaveBeenCalled();
 
@@ -71,5 +77,36 @@ describe("useDismissibleLayer", () => {
     const event = new KeyboardEvent("keydown", { key: "Escape" });
     window.dispatchEvent(event);
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("suppresses the synthetic click after an outside pointer dismiss", () => {
+    const onDismiss = vi.fn();
+    const onUnderlyingClick = vi.fn();
+    const ref = { current: document.createElement("div") };
+    const target = document.createElement("button");
+    target.addEventListener("click", onUnderlyingClick);
+    document.body.appendChild(ref.current);
+    document.body.appendChild(target);
+
+    renderHook(() =>
+      useDismissibleLayer({
+        active: true,
+        refs: [ref],
+        onDismiss,
+      }),
+    );
+
+    target.dispatchEvent(
+      new Event("pointerdown", { bubbles: true, cancelable: true }),
+    );
+    target.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onUnderlyingClick).not.toHaveBeenCalled();
+
+    document.body.removeChild(ref.current);
+    document.body.removeChild(target);
   });
 });

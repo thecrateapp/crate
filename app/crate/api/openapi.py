@@ -81,6 +81,11 @@ _TAG_METADATA = [
         "description": "User playlists and sharing flows.",
     },
     {
+        "name": "cast",
+        "x-displayName": "Cast Receivers",
+        "description": "Short-lived receiver tickets and cast media delivery.",
+    },
+    {
         "name": "radio",
         "x-displayName": "Radio & Similar",
         "description": "Radio and recommendation building endpoints.",
@@ -211,6 +216,7 @@ _TAG_GROUPS = [
         "tags": [
             "browse",
             "playlists",
+            "cast",
             "radio",
             "genres",
             "curation",

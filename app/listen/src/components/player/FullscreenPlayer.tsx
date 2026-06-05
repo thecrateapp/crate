@@ -15,6 +15,7 @@ import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { InfoTab } from "@/components/player/extended/InfoTab";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { api } from "@/lib/api";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import {
   canUseWebAudioEffects,
   isMobileAudioRuntime,
@@ -202,6 +203,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   );
   const navigate = useNavigate();
   const allowMobileEqualizer = canUseWebAudioEffects;
+  const spinningDiscJogSeekMode = shouldUseAndroidNativePlayer()
+    ? "commit"
+    : "live";
 
   const [activeTab, setActiveTab] = useState<FSTab>("player");
   const [surfaceMode, setSurfaceMode] = useState<PlayerSurfaceMode>(
@@ -643,6 +647,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   isBuffering={isBuffering}
                   isPlaying={isPlaying}
                   jogEnabled
+                  jogSeekMode={spinningDiscJogSeekMode}
                   onJoggingChange={(jogging) => {
                     draggingRef.current = jogging;
                   }}

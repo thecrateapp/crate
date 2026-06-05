@@ -18,7 +18,7 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
-import {} from "@/contexts/player-queue-helpers";
+import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
@@ -30,8 +30,8 @@ import {
   setVolume as gpSetVolume,
 } from "@/lib/gapless-player";
 import {
-  toEngineTrack,
-  toEngineTracks,
+  toFreshEngineTrack,
+  toFreshEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
@@ -39,6 +39,11 @@ import { usePlayerEngineSync } from "@/contexts/use-player-engine-sync";
 import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
+import { useRemotePlaybackState } from "@/contexts/use-remote-playback-state";
+import { useCrateConnectCommands } from "@/contexts/use-crate-connect-commands";
+import { ContinuePlaybackPrompt } from "@/components/player/ContinuePlaybackPrompt";
+import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
+import { useCrateConnectWs } from "@/hooks/use-crate-connect-ws";
 import { useEqualizerRuntime } from "@/hooks/use-equalizer-runtime";
 import { useRestoreOnMount } from "@/contexts/use-restore-on-mount";
 import { usePlayerAuthSync } from "@/contexts/use-player-auth-sync";
@@ -55,6 +60,7 @@ import {
 } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
+import { refreshAuthToken } from "@/lib/api";
 import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
@@ -65,6 +71,7 @@ import type {
   EnginePositionEvent,
   EngineState,
 } from "@/lib/playback-engine";
+import { createQueueRevision } from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
   getPlaybackDeliveryPolicyPreference,
@@ -75,6 +82,16 @@ import {
   type PlaybackDeliveryPolicy,
 } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
+import {
+  CRATE_CONNECT_V2_TRANSPORT_ENABLED,
+  connectPlayerStateToRemotePlaybackState,
+} from "@/lib/crate-connect";
+import {
+  buildPlaybackStatePayload,
+  remotePlaybackQueue,
+  remoteTrackToPlayerTrack,
+  type RemotePlaybackState,
+} from "@/lib/remote-playback-state";
 import { toast } from "sonner";
 
 const NATIVE_BUFFERING_WATCHDOG_MS = 12000;
@@ -260,6 +277,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   } = usePlayerRuntimeState();
   const nativeBufferingWatchdogRef = useRef<number | null>(null);
   const nativeBufferingProbeIdRef = useRef(0);
+  const nativeAuthRetryKeyRef = useRef<string | null>(null);
 
   // queue, currentIndex, currentTrack, currentTime, duration, isPlaying are
   // kept in sync with their refs by their respective commit* helpers.
@@ -286,11 +304,80 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   });
 
   const { user: authUser } = useAuth();
+  const connectEnabled = useCrateConnectEnabled();
+  const connectV2Enabled = connectEnabled && CRATE_CONNECT_V2_TRANSPORT_ENABLED;
+  const connectV1Enabled =
+    connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
   usePlayerAuthSync({
     authUser,
     currentTrack,
     isPlaying,
   });
+  const suppressNextConnectClaimRef = useRef(false);
+  const connectV2PublishRef = useRef<
+    ((options?: { claimActive?: boolean }) => Promise<void>) | null
+  >(null);
+  const buildConnectSnapshotPayload = useCallback(
+    (
+      snapshotKind: "light" | "structural",
+      options?: { claimActive?: boolean },
+    ) =>
+      buildPlaybackStatePayload({
+        currentIndex: currentIndexRef.current,
+        currentTime: currentTimeRef.current,
+        duration: durationRef.current,
+        isPlaying: isPlayingRef.current,
+        playSource: playSourceRef.current,
+        queue: queueRef.current,
+        repeat: repeatRef.current,
+        shuffle: shuffleRef.current,
+        snapshotKind,
+        unshuffledQueue: unshuffledQueueRef.current,
+        claimActive: options?.claimActive,
+      }),
+    [
+      currentIndexRef,
+      currentTimeRef,
+      durationRef,
+      isPlayingRef,
+      playSourceRef,
+      queueRef,
+      repeatRef,
+      shuffleRef,
+      unshuffledQueueRef,
+    ],
+  );
+  const { publishStructuralNow: publishConnectStateV1 } =
+    useRemotePlaybackState({
+      authUser,
+      enabled: connectV1Enabled,
+      queue,
+      currentIndex,
+      isPlaying,
+      shuffle,
+      repeat,
+      playSource,
+      queueRef,
+      currentIndexRef,
+      currentTimeRef,
+      durationRef,
+      isPlayingRef,
+      shuffleRef,
+      repeatRef,
+      playSourceRef,
+      unshuffledQueueRef,
+      suppressNextActiveClaimRef: suppressNextConnectClaimRef,
+    });
+  const publishConnectState = useCallback(
+    async (options?: { claimActive?: boolean }) => {
+      if (connectV2Enabled) {
+        await connectV2PublishRef.current?.(options);
+        return;
+      }
+      await publishConnectStateV1(options);
+    },
+    [connectV2Enabled, publishConnectStateV1],
+  );
   useEqualizerRuntime(currentTrack);
 
   const getPlaybackSnapshot = useCallback(
@@ -325,6 +412,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     commitIsPlaying,
     commitIsBuffering,
   });
+  const connectTransferPlaybackGuardRef = useRef<number | null>(null);
+  const clearConnectTransferPlaybackGuard = useCallback(() => {
+    if (connectTransferPlaybackGuardRef.current === null) return;
+    window.clearTimeout(connectTransferPlaybackGuardRef.current);
+    connectTransferPlaybackGuardRef.current = null;
+  }, []);
+  const scheduleConnectTransferPlaybackGuard = useCallback(() => {
+    clearConnectTransferPlaybackGuard();
+    const startedAtSeconds = currentTimeRef.current;
+    connectTransferPlaybackGuardRef.current = window.setTimeout(() => {
+      connectTransferPlaybackGuardRef.current = null;
+      const advancedEnough = currentTimeRef.current > startedAtSeconds + 0.25;
+      if (isPlayingRef.current && advancedEnough) return;
+      requireUserGestureToResume();
+    }, 2500);
+  }, [
+    clearConnectTransferPlaybackGuard,
+    currentTimeRef,
+    isPlayingRef,
+    requireUserGestureToResume,
+  ]);
   const {
     syncEffectiveCrossfade,
     rememberActiveTrack,
@@ -378,14 +486,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue, ...unique];
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
-        void androidNativeEngine
-          .appendTracks(toEngineTracks(unique))
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to append intelligence tracks:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTracks = await toFreshEngineTracks(unique);
+          return androidNativeEngine.appendTracks(engineTracks);
+        })().catch((error) => {
+          console.error(
+            "[native-player] failed to append intelligence tracks:",
+            error,
+          );
+        });
       } else {
         for (const track of unique) {
           gpAddTrack(registerEngineTrack(track));
@@ -428,14 +537,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue];
       nextQueue.splice(insertionIndex, 0, marked);
       if (shouldUseAndroidNativePlayer()) {
-        void androidNativeEngine
-          .insertTrack(insertionIndex, toEngineTrack(marked))
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to insert suggested track:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(marked);
+          return androidNativeEngine.insertTrack(insertionIndex, engineTrack);
+        })().catch((error) => {
+          console.error(
+            "[native-player] failed to insert suggested track:",
+            error,
+          );
+        });
       } else {
         gpInsertTrack(insertionIndex, registerEngineTrack(marked));
       }
@@ -472,17 +582,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue, ...unique];
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
-        void androidNativeEngine
-          .appendTracks(toEngineTracks(unique))
-          .then(() => {
-            void androidNativeEngine.jumpTo(queue.length, true);
-          })
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to append and advance:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTracks = await toFreshEngineTracks(unique);
+          await androidNativeEngine.appendTracks(engineTracks);
+          return androidNativeEngine.jumpTo(queue.length, true);
+        })().catch((error) => {
+          console.error("[native-player] failed to append and advance:", error);
+        });
       } else {
         for (const track of unique) {
           gpAddTrack(registerEngineTrack(track));
@@ -609,6 +715,84 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       void probeNativeBuffering();
     }, NATIVE_BUFFERING_WATCHDOG_MS);
   }, [clearNativeBufferingWatchdog, probeNativeBuffering]);
+
+  const retryNativePlaybackAfterAuthError = useCallback(
+    (nativeError: EngineEventMap["error"]): boolean => {
+      if (nativeError.httpStatus !== 401) return false;
+      if (!shouldUseAndroidNativePlayer()) return false;
+
+      const queueSnapshot = queueRef.current;
+      if (queueSnapshot.length === 0) return false;
+
+      const nativeIndex =
+        typeof nativeError.index === "number" &&
+        Number.isFinite(nativeError.index)
+          ? nativeError.index
+          : currentIndexRef.current;
+      const index = clampIndex(nativeIndex, queueSnapshot.length);
+      const targetTrack = queueSnapshot[index];
+      const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+      const retryKey = [
+        nativeError.revision,
+        nativeError.trackId || targetTrack?.id || index,
+        Math.floor(positionMs / 10_000),
+      ].join(":");
+      if (nativeAuthRetryKeyRef.current === retryKey) return false;
+      nativeAuthRetryKeyRef.current = retryKey;
+
+      bufferingIntentRef.current = true;
+      commitIsBuffering(true);
+      commitIsPlaying(true);
+
+      void (async () => {
+        if (!(await refreshAuthToken())) {
+          throw new Error("Could not refresh the native playback token");
+        }
+        const engineTracks = await toFreshEngineTracks(queueSnapshot);
+        await androidNativeEngine.loadQueue({
+          revision: createQueueRevision(),
+          tracks: engineTracks,
+          currentIndex: index,
+          positionMs,
+          autoplay: true,
+          repeat: repeatRef.current,
+          crossfadeMs: effectiveCrossfadeMsRef.current,
+          volume: lastNonZeroVolumeRef.current,
+        });
+      })().catch((error) => {
+        const summary = nativePlaybackErrorMessage(nativeError);
+        console.error("[native-player] failed to recover auth error:", error);
+        persistNativePlaybackDiagnostic({
+          type: "auth-retry-failed",
+          ...nativeError,
+          url: redactDiagnosticUrl(nativeError.url),
+          retryError: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Native playback failed", {
+          description: summary,
+          duration: 9000,
+        });
+        bufferingIntentRef.current = false;
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+        beginSoftInterruption("stream");
+      });
+
+      return true;
+    },
+    [
+      beginSoftInterruption,
+      bufferingIntentRef,
+      commitIsBuffering,
+      commitIsPlaying,
+      currentIndexRef,
+      currentTimeRef,
+      effectiveCrossfadeMsRef,
+      lastNonZeroVolumeRef,
+      queueRef,
+      repeatRef,
+    ],
+  );
 
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
@@ -858,6 +1042,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
         clearNativeBufferingWatchdog();
         console.error("[native-player] playback error:", payload);
+        if (retryNativePlaybackAfterAuthError(nativeError)) {
+          return;
+        }
         toast.error("Native playback failed", {
           description: summary,
           duration: 9000,
@@ -880,6 +1067,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentIndexRef,
       flushCurrentPlayEvent,
       queueRef,
+      retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
     ],
   );
@@ -1116,6 +1304,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     commitIsBuffering,
     commitCurrentTime,
     markSeekPosition,
+    allowAutoplayRestore: !connectEnabled,
   });
   usePlayerEngineCallbacks({
     callbacksRef,
@@ -1230,6 +1419,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     pullFromEngine,
     pushToEngine,
     advanceCursorTo,
+    publishConnectState,
     playbackDeliveryPolicy,
   });
 
@@ -1237,6 +1427,334 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     clearQueueRef.current = clearQueue;
   }, [clearQueue]);
+
+  const applyConnectStateToLocalQueue = useCallback(
+    (state: RemotePlaybackState, startPlaying: boolean) => {
+      const tracks = remotePlaybackQueue(state);
+      if (!tracks.length) return false;
+      const nextIndex = clampIndex(state.current_index, tracks.length);
+      const nextRepeat =
+        state.repeat_mode === "one" || state.repeat_mode === "all"
+          ? state.repeat_mode
+          : "off";
+      const nextShuffle = Boolean(state.shuffle);
+      const nextSource =
+        state.play_source ||
+        (tracks.length > 1
+          ? { type: "queue" as const, name: "Queue" }
+          : {
+              type: "track" as const,
+              name: tracks[nextIndex]?.title || "Track",
+            });
+
+      if (startPlaying) {
+        suppressNextConnectClaimRef.current = true;
+      }
+      repeatRef.current = nextRepeat;
+      shuffleRef.current = nextShuffle;
+      playSourceRef.current = nextSource;
+      unshuffledQueueRef.current = state.unshuffled_queue
+        ? state.unshuffled_queue.map(remoteTrackToPlayerTrack)
+        : null;
+      setRepeatState(nextRepeat);
+      setShuffleState(nextShuffle);
+      setPlaySource(nextSource);
+      const positionSeconds = Math.max(0, (state.position_ms || 0) / 1000);
+      pendingRestoreTimeRef.current = positionSeconds;
+      pushToEngine(tracks, nextIndex, {
+        autoplay: startPlaying,
+        positionMs: Math.max(0, state.position_ms || 0),
+      });
+      commitCurrentTime(positionSeconds);
+      commitDuration(Math.max(0, (state.duration_ms || 0) / 1000));
+      return true;
+    },
+    [
+      commitCurrentTime,
+      commitDuration,
+      pendingRestoreTimeRef,
+      playSourceRef,
+      pushToEngine,
+      repeatRef,
+      setPlaySource,
+      setRepeatState,
+      setShuffleState,
+      shuffleRef,
+      unshuffledQueueRef,
+    ],
+  );
+
+  const handleConnectTransferIn = useCallback(
+    (state: RemotePlaybackState, startPlaying: boolean) => {
+      applyConnectStateToLocalQueue(state, startPlaying);
+    },
+    [applyConnectStateToLocalQueue],
+  );
+
+  const handleConnectV2TransferIncoming = useCallback(
+    (payload: { state?: unknown }) => {
+      const remoteState = connectPlayerStateToRemotePlaybackState(
+        payload.state as Parameters<
+          typeof connectPlayerStateToRemotePlaybackState
+        >[0],
+      );
+      if (!remoteState) return false;
+      return applyConnectStateToLocalQueue(remoteState, false);
+    },
+    [applyConnectStateToLocalQueue],
+  );
+
+  const handleConnectV2RemoteCommand = useCallback(
+    (
+      type:
+        | "seek"
+        | "next_track"
+        | "previous_track"
+        | "pause"
+        | "resume"
+        | "volume",
+      payload: { payload?: Record<string, unknown> | null },
+    ) => {
+      if (type === "pause") {
+        pause();
+        return;
+      }
+      if (type === "resume") {
+        resume();
+        return;
+      }
+      if (type === "next_track") {
+        next();
+        return;
+      }
+      if (type === "previous_track") {
+        prev();
+        return;
+      }
+      if (type === "volume") {
+        const rawVolume = payload.payload?.volume;
+        if (typeof rawVolume === "number" && Number.isFinite(rawVolume)) {
+          setVolume(Math.max(0, Math.min(1, rawVolume)));
+        }
+        return;
+      }
+      const rawPosition =
+        payload.payload?.position_ms ?? payload.payload?.positionMs;
+      if (typeof rawPosition === "number" && Number.isFinite(rawPosition)) {
+        seek(Math.max(0, rawPosition / 1000));
+        void publishConnectState();
+      }
+    },
+    [next, pause, prev, publishConnectState, resume, seek, setVolume],
+  );
+
+  const {
+    activeInstanceId: connectV2ActiveInstanceId,
+    connectedInstances: connectV2ConnectedInstances,
+    playbackInstanceId: connectV2PlaybackInstanceId,
+    playerState: connectV2PlayerState,
+    requestTransfer: requestConnectV2Transfer,
+    serverClockOffsetMs: connectV2ServerClockOffsetMs,
+    sendMessage: sendConnectV2Message,
+    sendSnapshot: sendConnectV2Snapshot,
+    sendVolume: sendConnectV2Volume,
+  } = useCrateConnectWs({
+    authUserId: authUser?.id,
+    callbacks: {
+      onBecameInactive: pause,
+      onRemoteCommand: handleConnectV2RemoteCommand,
+      onTransferCommitted: () => {
+        resume();
+        void publishConnectState({ claimActive: true });
+        scheduleConnectTransferPlaybackGuard();
+      },
+      onTransferIncoming: handleConnectV2TransferIncoming,
+    },
+    enabled: connectV2Enabled,
+  });
+  const connectV2IsActive =
+    connectV2ActiveInstanceId === connectV2PlaybackInstanceId;
+  const connectV2ActiveInstanceConnected =
+    Boolean(connectV2ActiveInstanceId) &&
+    connectV2ConnectedInstances.some(
+      (instance) => instance.instance_id === connectV2ActiveInstanceId,
+    );
+  const connectV2HasRemoteOwner =
+    connectV2Enabled &&
+    connectV2ActiveInstanceConnected &&
+    Boolean(connectV2PlaybackInstanceId) &&
+    connectV2ActiveInstanceId !== connectV2PlaybackInstanceId;
+  const connectV2RemoteState = useMemo(
+    () => connectPlayerStateToRemotePlaybackState(connectV2PlayerState),
+    [connectV2PlayerState],
+  );
+  const sendConnectV2RemoteCommand = useCallback(
+    (
+      type:
+        | "pause"
+        | "resume"
+        | "seek"
+        | "next_track"
+        | "previous_track"
+        | "volume",
+      payload?: Record<string, unknown>,
+    ) =>
+      sendConnectV2Message({
+        payload: payload ?? {},
+        type,
+        version: null,
+      }),
+    [sendConnectV2Message],
+  );
+  const publishConnectV2State = useCallback(
+    async (options?: { claimActive?: boolean }) => {
+      if (!authUser?.id || !connectV2Enabled || !queueRef.current.length)
+        return;
+      const payload = buildConnectSnapshotPayload(
+        options?.claimActive ? "structural" : "light",
+        options,
+      );
+      if (options?.claimActive) {
+        sendConnectV2Message({
+          payload: { position_ms: payload.position_ms },
+          type: "claim_active",
+          version: null,
+        });
+        sendConnectV2Message({
+          payload: payload as unknown as Record<string, unknown>,
+          type: "update_snapshot",
+          version: null,
+        });
+        return;
+      }
+      if (!connectV2IsActive) return;
+      sendConnectV2Snapshot(payload);
+    },
+    [
+      authUser?.id,
+      buildConnectSnapshotPayload,
+      connectV2Enabled,
+      connectV2IsActive,
+      queueRef,
+      sendConnectV2Message,
+      sendConnectV2Snapshot,
+    ],
+  );
+  useEffect(() => {
+    connectV2PublishRef.current = connectV2Enabled
+      ? publishConnectV2State
+      : null;
+  }, [connectV2Enabled, publishConnectV2State]);
+
+  const connectV2StructuralRevisionRef = useRef<string | null>(null);
+  const connectV2ClaimedPlaybackRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authUser?.id || !connectV2Enabled || !isPlaying || !queue.length)
+      return;
+    if (
+      connectV2ActiveInstanceId &&
+      connectV2ActiveInstanceId !== connectV2PlaybackInstanceId
+    ) {
+      return;
+    }
+    const payload = buildConnectSnapshotPayload("structural", {
+      claimActive: true,
+    });
+    const claimKey = [
+      payload.queue_revision,
+      payload.current_index,
+      payload.track_id ?? payload.track_entity_uid ?? payload.track_path ?? "",
+      payload.status,
+    ].join(":");
+    if (claimKey === connectV2ClaimedPlaybackRef.current) return;
+    connectV2ClaimedPlaybackRef.current = claimKey;
+    sendConnectV2Message({
+      payload: { position_ms: payload.position_ms },
+      type: "claim_active",
+      version: null,
+    });
+    sendConnectV2Message({
+      payload: payload as unknown as Record<string, unknown>,
+      type: "update_snapshot",
+      version: null,
+    });
+  }, [
+    authUser?.id,
+    buildConnectSnapshotPayload,
+    connectV2ActiveInstanceId,
+    connectV2Enabled,
+    connectV2PlaybackInstanceId,
+    currentIndex,
+    isPlaying,
+    queue,
+    sendConnectV2Message,
+  ]);
+
+  useEffect(() => {
+    if (!connectV2Enabled || !connectV2IsActive || !queue.length) return;
+    const payload = buildConnectSnapshotPayload("structural");
+    if (payload.queue_revision === connectV2StructuralRevisionRef.current)
+      return;
+    connectV2StructuralRevisionRef.current = payload.queue_revision;
+    sendConnectV2Snapshot(payload);
+  }, [
+    buildConnectSnapshotPayload,
+    connectV2Enabled,
+    connectV2IsActive,
+    currentIndex,
+    playSource,
+    queue,
+    repeat,
+    sendConnectV2Snapshot,
+    shuffle,
+  ]);
+
+  useEffect(() => {
+    if (!connectV2Enabled || !connectV2IsActive || !queueRef.current.length)
+      return;
+    sendConnectV2Snapshot(buildConnectSnapshotPayload("light"));
+  }, [
+    buildConnectSnapshotPayload,
+    connectV2Enabled,
+    connectV2IsActive,
+    isPlaying,
+    queueRef,
+    sendConnectV2Snapshot,
+  ]);
+
+  useEffect(() => {
+    if (!connectV2Enabled || !connectV2IsActive) return;
+    sendConnectV2Volume(volume);
+  }, [connectV2Enabled, connectV2IsActive, sendConnectV2Volume, volume]);
+
+  useEffect(() => {
+    if (!connectV2Enabled || !connectV2IsActive) return;
+    const intervalId = window.setInterval(() => {
+      if (!queueRef.current.length) return;
+      sendConnectV2Snapshot(buildConnectSnapshotPayload("light"));
+    }, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [
+    buildConnectSnapshotPayload,
+    connectV2Enabled,
+    connectV2IsActive,
+    queueRef,
+    sendConnectV2Snapshot,
+  ]);
+
+  useCrateConnectCommands({
+    authUser,
+    enabled: connectV1Enabled,
+    isBuffering,
+    isPlaying,
+    pause,
+    resume,
+    next,
+    prev,
+    seek,
+    setVolume,
+    onTransferIn: handleConnectTransferIn,
+  });
 
   useEffect(() => {
     const handleAuthRuntimeReset = () => {
@@ -1275,10 +1793,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     return () => {
+      clearConnectTransferPlaybackGuard();
       clearNativeBufferingWatchdog();
       gpDestroyPlayer();
     };
-  }, [clearNativeBufferingWatchdog]);
+  }, [clearConnectTransferPlaybackGuard, clearNativeBufferingWatchdog]);
 
   usePlayerShortcuts({
     hasCurrentTrack: !!currentTrack,
@@ -1326,6 +1845,41 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [currentTime, duration],
   );
 
+  const connectValue = useMemo(
+    () => ({
+      activeInstanceId: connectV2Enabled ? connectV2ActiveInstanceId : null,
+      connectedInstances: connectV2Enabled ? connectV2ConnectedInstances : [],
+      enabled: connectEnabled,
+      isRemoteActive: connectV2HasRemoteOwner,
+      playbackInstanceId: connectV2Enabled ? connectV2PlaybackInstanceId : null,
+      remoteState: connectV2Enabled ? connectV2RemoteState : null,
+      requestTransfer: connectV2Enabled
+        ? requestConnectV2Transfer
+        : () => false,
+      sendRemoteCommand: connectV2Enabled
+        ? sendConnectV2RemoteCommand
+        : () => false,
+      serverClockOffsetMs: connectV2Enabled ? connectV2ServerClockOffsetMs : 0,
+      transport: connectEnabled
+        ? connectV2Enabled
+          ? ("ws" as const)
+          : ("legacy" as const)
+        : null,
+    }),
+    [
+      connectEnabled,
+      connectV2ActiveInstanceId,
+      connectV2HasRemoteOwner,
+      connectV2ConnectedInstances,
+      connectV2Enabled,
+      connectV2PlaybackInstanceId,
+      connectV2RemoteState,
+      connectV2ServerClockOffsetMs,
+      requestConnectV2Transfer,
+      sendConnectV2RemoteCommand,
+    ],
+  );
+
   const actionsValue = useMemo<PlayerActionsValue>(
     () => ({
       queue,
@@ -1353,6 +1907,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      publishConnectState,
+      connect: connectValue,
     }),
     [
       queue,
@@ -1380,6 +1936,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       addToQueue,
       removeFromQueue,
       reorderQueue,
+      publishConnectState,
+      connectValue,
     ],
   );
 
@@ -1388,6 +1946,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       <PlayerStateContext.Provider value={stateValue}>
         <PlayerProgressContext.Provider value={progressValue}>
           {children}
+          <ContinuePlaybackPrompt />
           {playbackNeedsUserGesture && currentTrack ? (
             <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-[1600] flex justify-center sm:bottom-28">
               <button

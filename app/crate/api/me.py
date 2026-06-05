@@ -1,13 +1,18 @@
 """User personal library: follows, saved albums, likes, play history, feed."""
 
 import asyncio
+import logging
 import time
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
-from crate.api._deps import artist_name_from_id, coerce_date as _coerce_date, json_dumps
+from crate.api._deps import (
+    artist_name_from_id,
+    coerce_date as _coerce_date,
+    json_dumps,
+)
 from crate.api.auth import _require_auth
 from crate.api.cache_events import (
     get_invalidation_events_since,
@@ -19,44 +24,49 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.redis_sse import close_pubsub, open_pubsub
+from crate.api.schemas.acquisition import (
+    ArtistSuggestionCreateRequest,
+    ArtistSuggestionResponse,
+)
 from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.me import (
     ChangePasswordRequest,
     CitySearchResultResponse,
-    FollowMutationResponse,
-    FollowRequest,
     FeedItemResponse,
     FollowedArtistResponse,
     FollowedPlaylistResponse,
     FollowingStateResponse,
+    FollowMutationResponse,
+    FollowRequest,
     GeolocationResponse,
     HomeCardResponse,
     HomeDiscoveryResponse,
     HomeSectionResponse,
-    LastfmCallbackRequest,
     LastfmAuthUrlResponse,
+    LastfmCallbackRequest,
+    LibraryPlaylistsPageResponse,
+    LikedTrackResponse,
     LikeMutationResponse,
     LikeTrackRequest,
-    LikedTrackResponse,
-    LibraryPlaylistsPageResponse,
-    ListenBrainzConnectResponse,
     ListenBrainzConnectRequest,
+    ListenBrainzConnectResponse,
     LocationPreferencesResponse,
+    MeUpcomingResponse,
+    NowPlayingRequest,
     PlayEventRecordedResponse,
     PlayHistoryEntryResponse,
     PlayStatsResponse,
-    NowPlayingRequest,
     RecordPlayEventRequest,
     RecordPlayRequest,
     ReplayMixResponse,
     SaveAlbumRequest,
     SaveAlbumResponse,
     SavedAlbumResponse,
-    ShowReminderRequest,
+    ScrobbleStatusResponse,
     ShowAttendanceAddResponse,
     ShowAttendanceRemoveResponse,
     ShowReminderCreateResponse,
-    ScrobbleStatusResponse,
+    ShowReminderRequest,
     StatsDashboardResponse,
     StatsOverviewResponse,
     StatsTrendsResponse,
@@ -66,28 +76,14 @@ from crate.api.schemas.me import (
     TopGenresResponse,
     TopTracksResponse,
     UnlikeMutationResponse,
-    MeUpcomingResponse,
+    UpdateLocationBody,
     UpdateProfileRequest,
     UpdateProfileResponse,
-    UpdateLocationBody,
     UserLibraryCountsResponse,
-)
-from crate.db.repositories.auth import (
-    get_user_by_id,
-    unlink_user_external_identity,
-    update_user,
-    update_user_location,
-    upsert_user_external_identity,
 )
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.home import get_cached_home_discovery, get_home_playlist, get_home_section
-from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
-from crate.db.repositories.library_contributions import (
-    get_user_album_contribution,
-    list_user_album_contributions,
-)
-from crate.db.repositories.tasks import create_task
-from crate.db.snapshot_events import snapshot_channel
+from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
     get_feed_new_albums,
@@ -96,17 +92,6 @@ from crate.db.queries.user import (
     get_scrobble_identities,
     get_upcoming_releases,
     get_upcoming_shows,
-)
-from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
-from crate.db.queries.user_library_stats_month import (
-    get_month_replay_mix,
-    get_month_stats_overview,
-    get_month_stats_trends,
-    get_month_top_albums,
-    get_month_top_artists,
-    get_month_top_genres,
-    get_month_top_tracks,
-    month_period_key,
 )
 from crate.db.queries.user_library import (
     get_followed_artists,
@@ -125,8 +110,34 @@ from crate.db.queries.user_library import (
     get_user_library_counts,
     is_following,
 )
-from crate.slugs import build_public_album_slug
+from crate.db.queries.user_library_stats_month import (
+    get_month_replay_mix,
+    get_month_stats_overview,
+    get_month_stats_trends,
+    get_month_top_albums,
+    get_month_top_artists,
+    get_month_top_genres,
+    get_month_top_tracks,
+    month_period_key,
+)
+from crate.db.repositories.artist_suggestions import (
+    create_artist_suggestion,
+    list_user_artist_suggestions,
+)
+from crate.db.repositories.auth import (
+    get_user_by_id,
+    unlink_user_external_identity,
+    update_user,
+    update_user_location,
+    upsert_user_external_identity,
+)
+from crate.db.repositories.library_contributions import (
+    get_user_album_contribution,
+    list_user_album_contributions,
+)
+from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
 from crate.db.repositories.shows import attend_show, create_show_reminder, unattend_show
+from crate.db.repositories.tasks import create_task
 from crate.db.repositories.user_library import (
     follow_artist,
     like_track,
@@ -138,9 +149,12 @@ from crate.db.repositories.user_library import (
     unsave_album,
 )
 from crate.db.repositories.user_library_shared import resolve_track_reference
+from crate.db.snapshot_events import snapshot_channel
 from crate.db.tx import read_scope
+from crate.slugs import build_public_album_slug
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+log = logging.getLogger(__name__)
 
 _ME_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -152,6 +166,36 @@ _ME_RESPONSES = merge_responses(
 )
 
 _STATS_DASHBOARD_CACHE_TTL_SECONDS = 90
+
+
+@router.post(
+    "/artist-suggestions",
+    response_model=ArtistSuggestionResponse,
+    responses=_ME_RESPONSES,
+    summary="Suggest an artist for the shared Crate library",
+)
+def suggest_artist(request: Request, body: ArtistSuggestionCreateRequest):
+    user = _require_auth(request)
+    try:
+        return create_artist_suggestion(
+            user_id=int(user["id"]),
+            artist_name=body.artist_name,
+            artist_url=body.artist_url,
+            note=body.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/artist-suggestions",
+    response_model=list[ArtistSuggestionResponse],
+    responses=_ME_RESPONSES,
+    summary="List artist suggestions submitted by the current user",
+)
+def my_artist_suggestions(request: Request):
+    user = _require_auth(request)
+    return list_user_artist_suggestions(int(user["id"]))
 
 
 def _record_home_endpoint_metric(name: str, value: float = 1.0) -> None:
@@ -1367,9 +1411,10 @@ def upcoming(request: Request, limit: int = 120):
                 "subtitle": release.get("release_type") or "Album",
                 "cover_url": release.get("cover_url"),
                 "status": release.get("status", "detected"),
-                "tidal_url": release.get("tidal_url"),
+                "tidal_url": release.get("tidal_url") or release.get("source_url"),
+                "source_url": release.get("source_url"),
                 "release_id": release.get("id"),
-                "is_upcoming": bool(scheduled_date and scheduled_date >= today),
+                "is_upcoming": bool(scheduled_date and scheduled_date > today),
             }
         )
 
@@ -1653,21 +1698,42 @@ def connect_lastfm(request: Request, body: LastfmCallbackRequest):
 
     from crate.scrobble import lastfm_get_session
 
-    session_key = lastfm_get_session(api_key, api_secret, body.token)
-    if not session_key:
+    lastfm_session = lastfm_get_session(api_key, api_secret, body.token)
+    if not lastfm_session:
         raise HTTPException(
             status_code=400,
             detail="Failed to get Last.fm session — token may have expired",
         )
 
-    upsert_user_external_identity(
-        user_id=user["id"],
-        provider="lastfm",
-        external_user_id=session_key[:8],
-        external_username="",
-        status="linked",
-        metadata={"session_key": session_key},
-    )
+    username = (lastfm_session.username or "").strip() or None
+    metadata: dict[str, object] = {"session_key": lastfm_session.key}
+    if username:
+        metadata["username"] = username
+    if lastfm_session.subscriber is not None:
+        metadata["subscriber"] = lastfm_session.subscriber
+
+    try:
+        upsert_user_external_identity(
+            user_id=user["id"],
+            provider="lastfm",
+            external_user_id=username,
+            external_username=username,
+            status="linked",
+            metadata=metadata,
+        )
+    except Exception as exc:
+        from sqlalchemy.exc import IntegrityError
+
+        if isinstance(exc, IntegrityError):
+            raise HTTPException(
+                status_code=409,
+                detail="This Last.fm account is already linked to another Crate user",
+            ) from None
+        log.warning("Failed to store Last.fm identity for user %s", user["id"])
+        raise HTTPException(
+            status_code=500,
+            detail="Could not store Last.fm connection",
+        ) from None
     return {"ok": True}
 
 

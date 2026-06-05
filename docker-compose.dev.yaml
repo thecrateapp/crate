@@ -175,6 +175,11 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_WORKER_PROCESSES=${CRATE_WORKER_PROCESSES:-2}
+      - FAST_WORKER_PROCESSES=${FAST_WORKER_PROCESSES:-1}
+      - MAINTENANCE_WORKER_PROCESSES=${MAINTENANCE_WORKER_PROCESSES:-1}
+      - ANALYSIS_WORKER_PROCESSES=${ANALYSIS_WORKER_PROCESSES:-1}
+      - PLAYBACK_WORKER_PROCESSES=${PLAYBACK_WORKER_PROCESSES:-1}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
       - CRATE_BANDCAMP_DOWNLOAD_BACKEND=${CRATE_BANDCAMP_DOWNLOAD_BACKEND:-web}
@@ -225,11 +230,31 @@ services:
       [
         "worker",
         "--queues",
-        "fast,default",
+        "default,fast",
         "--processes",
-        "${CRATE_WORKER_PROCESSES:-1}",
+        "${CRATE_WORKER_PROCESSES:-2}",
         "--no-daemons",
         "--no-projector",
+      ]
+
+  fast-worker:
+    extends:
+      service: worker
+    container_name: crate-dev-fast-worker
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "0.35"
+    command:
+      [
+        "worker",
+        "--queues",
+        "fast",
+        "--processes",
+        "${FAST_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
       ]
 
   projector:

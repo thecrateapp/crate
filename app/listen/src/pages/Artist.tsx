@@ -28,6 +28,8 @@ import { type ArtistShowEvent } from "@/components/upcoming/UpcomingRows";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
@@ -35,6 +37,7 @@ import {
   artistBackgroundApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
+  artistSharePath,
 } from "@/lib/library-routes";
 
 export function Artist() {
@@ -98,24 +101,23 @@ export function Artist() {
 
   async function handleShare() {
     if (!data?.id) return;
-    const shareUrl = `${window.location.origin}${artistPagePath({
-      artistId: data.id,
-      artistSlug: data.slug,
-    })}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: data.name,
-          text: data.name,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("Artist link copied");
-      }
-    } catch {
-      toast.error("Failed to share artist");
-    }
+    const shareUrl = publicShareUrl(
+      artistSharePath({
+        artistId: data.id,
+        artistEntityUid: data.entity_uid,
+        artistSlug: data.slug,
+        artistName: data.name,
+      }),
+    );
+    openShareSheet({
+      kind: "artist",
+      title: data.name,
+      imageUrl: artistPhotoApiUrl(
+        { artistId: data.id, artistSlug: data.slug, artistName: data.name },
+        { size: 512, version: data.updated_at ?? undefined },
+      ),
+      url: shareUrl,
+    });
   }
   const info: ArtistInfo | undefined = pageData?.info;
   const topTracks: ArtistTopTrack[] = canonicalTopTracks ?? [];

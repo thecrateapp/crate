@@ -7,8 +7,8 @@ import {
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import {
-  toEngineTracks,
-  toEngineTrack,
+  toFreshEngineTrack,
+  toFreshEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import {
   addTrack as gpAddTrack,
@@ -46,6 +46,7 @@ import {
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
 import { isNative } from "@/lib/capacitor-runtime";
+import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import {
   getCrossfadeDurationPreference,
   type PlaybackDeliveryPolicy,
@@ -55,6 +56,15 @@ import {
   createQueueRevision,
   type EngineRepeatMode,
 } from "@/lib/playback-engine";
+import {
+  castPause,
+  castPlay,
+  castSeek,
+  castSetVolume,
+  castStop,
+  isCastSessionActive,
+  startCastSession,
+} from "@/lib/cast-sender";
 
 const SOFT_PAUSE_FADE_MS = 220;
 const PREV_DOUBLE_TAP_WINDOW_MS = 1500;
@@ -151,6 +161,7 @@ interface UsePlayerQueueActionsParams {
     options?: { autoplay?: boolean; positionMs?: number },
   ) => void;
   advanceCursorTo: (index: number) => void;
+  publishConnectState?: (options?: { claimActive?: boolean }) => Promise<void>;
   playbackDeliveryPolicy: PlaybackDeliveryPolicy;
 }
 
@@ -196,6 +207,7 @@ export function usePlayerQueueActions({
   pullFromEngine,
   pushToEngine,
   advanceCursorTo,
+  publishConnectState,
   playbackDeliveryPolicy,
 }: UsePlayerQueueActionsParams) {
   const startQueuePlayback = useCallback(
@@ -241,22 +253,25 @@ export function usePlayerQueueActions({
           startTrackerSession(activeTrack, nextSource);
         }
         commitIsPlaying(true);
-        void nativeEngine
-          .loadQueue({
+        void (async () => {
+          await primeOfflineRuntimeProfile();
+          const engineTracks = await toFreshEngineTracks(tracks);
+          return nativeEngine.loadQueue({
             revision: createQueueRevision(),
-            tracks: toEngineTracks(tracks),
+            tracks: engineTracks,
             currentIndex: normalizedIndex,
             positionMs: 0,
             autoplay: true,
             repeat: toEngineRepeatMode(repeatRef.current),
             crossfadeMs: nativeCrossfadeMs(),
             volume: lastNonZeroVolumeRef.current,
-          })
-          .catch((error) => {
-            console.error("[native-player] failed to load queue:", error);
-            commitIsPlaying(false);
-            commitIsBuffering(false);
           });
+        })().catch((error) => {
+          console.error("[native-player] failed to load queue:", error);
+          commitIsPlaying(false);
+          commitIsBuffering(false);
+        });
+        void publishConnectState?.({ claimActive: true }).catch(() => {});
         return;
       }
 
@@ -274,6 +289,7 @@ export function usePlayerQueueActions({
       }
 
       gpPlay();
+      void publishConnectState?.({ claimActive: true }).catch(() => {});
     },
     [
       buildEngineUrls,
@@ -291,6 +307,7 @@ export function usePlayerQueueActions({
       resetPlaybackIntelligence,
       pullFromEngine,
       playbackDeliveryPolicy,
+      publishConnectState,
       queueRef,
       startTrackerSession,
     ],
@@ -325,6 +342,13 @@ export function usePlayerQueueActions({
   );
 
   const pause = useCallback(() => {
+    if (isCastSessionActive()) {
+      void castPause().catch((error) => {
+        console.error("[cast] failed to pause:", error);
+      });
+      commitIsPlaying(false);
+      return;
+    }
     cancelSoftInterruption();
     bufferingIntentRef.current = false;
     commitIsBuffering(false);
@@ -352,6 +376,13 @@ export function usePlayerQueueActions({
 
   const resume = useCallback(() => {
     if (!queueRef.current.length) return;
+    if (isCastSessionActive()) {
+      void castPlay().catch((error) => {
+        console.error("[cast] failed to resume:", error);
+      });
+      commitIsPlaying(true);
+      return;
+    }
     cancelSoftInterruption();
     bufferingIntentRef.current = true;
     commitIsBuffering(true);
@@ -372,7 +403,7 @@ export function usePlayerQueueActions({
       gpRestoreVolume();
       gpPlay();
     });
-  }, [cancelSoftInterruption, commitIsBuffering, queueRef]);
+  }, [cancelSoftInterruption, commitIsBuffering, commitIsPlaying, queueRef]);
 
   const advanceToTrack = useCallback(
     (targetIndex: number) => {
@@ -404,6 +435,21 @@ export function usePlayerQueueActions({
 
     const nextIndex = currentIndexRef.current + 1;
     if (nextIndex < queueRef.current.length) {
+      if (isCastSessionActive()) {
+        const nextTrack = queueRef.current[nextIndex];
+        if (nextTrack) {
+          void startCastSession({
+            track: nextTrack,
+            currentTime: 0,
+          }).catch((error) => {
+            console.error("[cast] failed to load next track:", error);
+          });
+        }
+        advanceToTrack(nextIndex);
+        commitCurrentTime(0);
+        commitIsPlaying(true);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.next().catch((error) => {
           console.error("[native-player] failed to skip next:", error);
@@ -416,6 +462,21 @@ export function usePlayerQueueActions({
     }
 
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
+      if (isCastSessionActive()) {
+        const nextTrack = queueRef.current[0];
+        if (nextTrack) {
+          void startCastSession({
+            track: nextTrack,
+            currentTime: 0,
+          }).catch((error) => {
+            console.error("[cast] failed to wrap queue:", error);
+          });
+        }
+        advanceToTrack(0);
+        commitCurrentTime(0);
+        commitIsPlaying(true);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.jumpTo(0, true).catch((error) => {
           console.error("[native-player] failed to wrap queue:", error);
@@ -435,6 +496,8 @@ export function usePlayerQueueActions({
     }
   }, [
     advanceToTrack,
+    commitCurrentTime,
+    commitIsPlaying,
     continueInfinitePlayback,
     currentIndexRef,
     flushCurrentPlayEvent,
@@ -462,6 +525,18 @@ export function usePlayerQueueActions({
         justRestartedCurrentTrack,
       })
     ) {
+      if (isCastSessionActive()) {
+        void castSeek(0).catch((error) => {
+          console.error("[cast] failed to restart track:", error);
+        });
+        commitCurrentTime(0);
+        markSeekPosition(0);
+        prevRestartTrackKeyRef.current = activeTrackKey;
+        prevRestartedAtRef.current = now;
+        bufferingIntentRef.current = false;
+        commitIsBuffering(false);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.seekTo(0).catch((error) => {
           console.error("[native-player] failed to restart track:", error);
@@ -481,6 +556,21 @@ export function usePlayerQueueActions({
     if (currentIndexRef.current > 0) {
       const targetIndex = currentIndexRef.current - 1;
       clearPrevRestartLatch();
+      if (isCastSessionActive()) {
+        const previousTrack = queueRef.current[targetIndex];
+        if (previousTrack) {
+          void startCastSession({
+            track: previousTrack,
+            currentTime: 0,
+          }).catch((error) => {
+            console.error("[cast] failed to load previous track:", error);
+          });
+        }
+        advanceToTrack(targetIndex);
+        commitCurrentTime(0);
+        commitIsPlaying(true);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.previous().catch((error) => {
           console.error("[native-player] failed to skip previous:", error);
@@ -495,6 +585,21 @@ export function usePlayerQueueActions({
     if (repeatRef.current === "all" && queueRef.current.length > 0) {
       const wrappedIndex = queueRef.current.length - 1;
       clearPrevRestartLatch();
+      if (isCastSessionActive()) {
+        const previousTrack = queueRef.current[wrappedIndex];
+        if (previousTrack) {
+          void startCastSession({
+            track: previousTrack,
+            currentTime: 0,
+          }).catch((error) => {
+            console.error("[cast] failed to wrap previous:", error);
+          });
+        }
+        advanceToTrack(wrappedIndex);
+        commitCurrentTime(0);
+        commitIsPlaying(true);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.jumpTo(wrappedIndex, true).catch((error) => {
           console.error("[native-player] failed to wrap previous:", error);
@@ -510,6 +615,7 @@ export function usePlayerQueueActions({
     clearPrevRestartLatch,
     commitCurrentTime,
     commitIsBuffering,
+    commitIsPlaying,
     currentIndexRef,
     currentTimeRef,
     markSeekPosition,
@@ -521,6 +627,14 @@ export function usePlayerQueueActions({
 
   const seek = useCallback(
     (time: number) => {
+      if (isCastSessionActive()) {
+        void castSeek(time).catch((error) => {
+          console.error("[cast] failed to seek:", error);
+        });
+        commitCurrentTime(time);
+        markSeekPosition(time);
+        return;
+      }
       const shouldResumeBufferingFlow = isPlayingRef.current;
       bufferingIntentRef.current = shouldResumeBufferingFlow;
       if (shouldUseAndroidNativePlayer()) {
@@ -545,6 +659,21 @@ export function usePlayerQueueActions({
 
   const setVolume = useCallback(
     (volume: number) => {
+      if (isCastSessionActive()) {
+        void castSetVolume(volume).catch((error) => {
+          console.error("[cast] failed to set volume:", error);
+        });
+        setVolumeState(volume);
+        if (volume > 0) {
+          lastNonZeroVolumeRef.current = volume;
+        }
+        try {
+          localStorage.setItem("listen-player-volume", String(volume));
+        } catch {
+          // ignore persistence failures
+        }
+        return;
+      }
       const effectiveVolume = isNative ? 1 : volume;
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.setVolume(effectiveVolume).catch((error) => {
@@ -578,6 +707,11 @@ export function usePlayerQueueActions({
   }, []);
 
   const clearQueue = useCallback(() => {
+    if (isCastSessionActive()) {
+      void castStop().catch((error) => {
+        console.error("[cast] failed to stop:", error);
+      });
+    }
     cancelSoftInterruption();
     pendingRestoreTimeRef.current = 0;
     resumeAfterReloadRef.current = false;
@@ -693,6 +827,21 @@ export function usePlayerQueueActions({
     (index: number) => {
       if (index < 0 || index >= queueRef.current.length) return;
       pendingRestoreTimeRef.current = 0;
+      if (isCastSessionActive()) {
+        const nextTrack = queueRef.current[index];
+        if (nextTrack) {
+          void startCastSession({
+            track: nextTrack,
+            currentTime: 0,
+          }).catch((error) => {
+            console.error("[cast] failed to jump:", error);
+          });
+        }
+        advanceToTrack(index);
+        commitCurrentTime(0);
+        commitIsPlaying(true);
+        return;
+      }
       if (shouldUseAndroidNativePlayer()) {
         void nativeEngine.jumpTo(index, true).catch((error) => {
           console.error("[native-player] failed to jump:", error);
@@ -703,7 +852,13 @@ export function usePlayerQueueActions({
       advanceToTrack(index);
       commitIsPlaying(true);
     },
-    [advanceToTrack, commitIsPlaying, pendingRestoreTimeRef, queueRef],
+    [
+      advanceToTrack,
+      commitCurrentTime,
+      commitIsPlaying,
+      pendingRestoreTimeRef,
+      queueRef,
+    ],
   );
 
   const playNext = useCallback(
@@ -713,11 +868,12 @@ export function usePlayerQueueActions({
       nextQueue.splice(insertAt, 0, track);
 
       if (shouldUseAndroidNativePlayer()) {
-        void nativeEngine
-          .insertTrack(insertAt, toEngineTrack(track))
-          .catch((error) => {
-            console.error("[native-player] failed to insert track:", error);
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(track);
+          return nativeEngine.insertTrack(insertAt, engineTrack);
+        })().catch((error) => {
+          console.error("[native-player] failed to insert track:", error);
+        });
       } else {
         gpInsertTrack(insertAt, registerEngineTrack(track));
       }
@@ -740,11 +896,12 @@ export function usePlayerQueueActions({
     (track: Track) => {
       const nextQueue = [...queueRef.current, track];
       if (shouldUseAndroidNativePlayer()) {
-        void nativeEngine
-          .appendTracks([toEngineTrack(track)])
-          .catch((error) => {
-            console.error("[native-player] failed to append track:", error);
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(track);
+          return nativeEngine.appendTracks([engineTrack]);
+        })().catch((error) => {
+          console.error("[native-player] failed to append track:", error);
+        });
       } else {
         gpAddTrack(registerEngineTrack(track));
       }

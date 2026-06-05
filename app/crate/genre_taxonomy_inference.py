@@ -14,6 +14,7 @@ from crate.db.genres import (
     list_unmapped_genres_for_inference,
 )
 from crate.db.jobs.genre_taxonomy import assign_genre_alias_value
+from crate.db.repositories.genres_taxonomy_metadata import update_genre_node_description
 from crate.genre_taxonomy import (
     get_genre_alias_terms,
     get_genre_catalog,
@@ -32,6 +33,10 @@ class InferenceEvidence:
     external: dict[str, float]
     family_hints: dict[str, float]
     artists: list[str]
+
+
+def _display_genre(value: str) -> str:
+    return (value or "").replace("-", " ").strip().title()
 
 
 def _normalize_text(value: str) -> str:
@@ -342,6 +347,87 @@ def _collect_external_evidence(artists: list[str]) -> dict[str, float]:
     return dict(evidence)
 
 
+def _description_needs_inference(value: str | None) -> bool:
+    return not _normalize_text(value or "")
+
+
+def _infer_and_store_node_description(
+    canonical_slug: str,
+    *,
+    seed_artists: list[str] | None = None,
+) -> dict:
+    """Generate and persist a missing description for one taxonomy node.
+
+    The LLM call is intentionally best-effort. Taxonomy alias inference should
+    not fail just because the configured LLM provider is offline.
+    """
+    canonical_slug = (canonical_slug or "").strip().lower()
+    if not canonical_slug:
+        return {"slug": canonical_slug, "updated": False, "reason": "empty_slug"}
+
+    catalog = get_genre_catalog()
+    node = catalog.get(canonical_slug)
+    if not node:
+        return {"slug": canonical_slug, "updated": False, "reason": "unknown_node"}
+    if not _description_needs_inference(node.get("description")):
+        return {
+            "slug": canonical_slug,
+            "updated": False,
+            "reason": "description_already_present",
+            "description": node.get("description") or "",
+        }
+
+    parent_names = [_display_genre(slug) for slug in node.get("parents", [])]
+    related_slugs = [
+        *(node.get("related", []) or []),
+        *(node.get("influenced_by", []) or []),
+        *(node.get("fusion_of", []) or []),
+    ]
+    related_names = [_display_genre(slug) for slug in dict.fromkeys(related_slugs)]
+
+    try:
+        from crate.llm.prompts.genre_node_description import (
+            generate_genre_node_description,
+        )
+
+        response = generate_genre_node_description(
+            genre_name=node.get("name") or _display_genre(canonical_slug),
+            slug=canonical_slug,
+            parent_genres=parent_names,
+            related_genres=related_names,
+            aliases=list(node.get("aliases") or []),
+            seed_artists=seed_artists or [],
+        )
+    except Exception as exc:
+        log.warning(
+            "Genre node description inference failed for %s",
+            canonical_slug,
+            exc_info=True,
+        )
+        return {
+            "slug": canonical_slug,
+            "updated": False,
+            "reason": "llm_failed",
+            "error": str(exc),
+        }
+
+    description = re.sub(r"\s+", " ", (response.description or "").strip())
+    if not description:
+        return {"slug": canonical_slug, "updated": False, "reason": "empty_response"}
+
+    updated = update_genre_node_description(
+        canonical_slug,
+        description,
+        only_if_empty=True,
+    )
+    return {
+        "slug": canonical_slug,
+        "updated": updated,
+        "reason": "updated" if updated else "description_already_present",
+        "description": description,
+    }
+
+
 def infer_genre_taxonomy_batch(
     *,
     limit: int = 200,
@@ -355,8 +441,12 @@ def infer_genre_taxonomy_batch(
     total = len(unmapped)
     mapped = 0
     skipped = 0
+    descriptions_updated = 0
+    description_errors = 0
     examples_mapped: list[dict] = []
     examples_skipped: list[dict] = []
+    examples_descriptions: list[dict] = []
+    described_slugs: set[str] = set()
 
     if progress_callback:
         progress_callback(
@@ -368,6 +458,28 @@ def infer_genre_taxonomy_batch(
                 "skipped": 0,
             }
         )
+
+    if total == 0 and focus_slug and focus_slug in get_genre_catalog():
+        description_result = _infer_and_store_node_description(focus_slug)
+        described_slugs.add(focus_slug)
+        if description_result.get("updated"):
+            descriptions_updated += 1
+        if description_result.get("reason") == "llm_failed":
+            description_errors += 1
+        examples_descriptions.append(description_result)
+        if event_callback:
+            event_callback(
+                {
+                    "message": (
+                        f"description updated for {focus_slug}"
+                        if description_result.get("updated")
+                        else f"description unchanged for {focus_slug}: {description_result.get('reason')}"
+                    ),
+                    "genre": focus_slug,
+                    "description_updated": bool(description_result.get("updated")),
+                    "reason": description_result.get("reason"),
+                }
+            )
 
     for index, item in enumerate(unmapped, start=1):
         genre_slug = item["slug"]
@@ -416,6 +528,20 @@ def infer_genre_taxonomy_batch(
 
         if applied:
             mapped += 1
+            description_updated = False
+            if canonical_slug and canonical_slug not in described_slugs:
+                description_result = _infer_and_store_node_description(
+                    canonical_slug,
+                    seed_artists=evidence.artists,
+                )
+                described_slugs.add(canonical_slug)
+                if description_result.get("updated"):
+                    descriptions_updated += 1
+                    description_updated = True
+                if description_result.get("reason") == "llm_failed":
+                    description_errors += 1
+                if len(examples_descriptions) < 20:
+                    examples_descriptions.append(description_result)
             if len(examples_mapped) < 20:
                 examples_mapped.append(
                     {
@@ -434,6 +560,7 @@ def infer_genre_taxonomy_batch(
                         "genre": genre_name,
                         "canonical_slug": canonical_slug,
                         "confidence": confidence,
+                        "description_updated": description_updated,
                     }
                 )
         else:
@@ -469,6 +596,9 @@ def infer_genre_taxonomy_batch(
         "remaining_unmapped": remaining_unmapped,
         "include_external": include_external,
         "aggressive": aggressive,
+        "descriptions_updated": descriptions_updated,
+        "description_errors": description_errors,
         "examples_mapped": examples_mapped,
         "examples_skipped": examples_skipped,
+        "examples_descriptions": examples_descriptions,
     }

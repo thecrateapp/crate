@@ -10,6 +10,8 @@ const JOG_RATE_UPDATE_INTERVAL_MS = 70;
 const PLAYING_FORWARD_SYNC_TOLERANCE_SECONDS = 0.65;
 const PLAYING_BACKWARD_SYNC_TOLERANCE_SECONDS = 1.6;
 
+type JogSeekMode = "live" | "commit";
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -43,6 +45,7 @@ interface SpinningDiscProps {
   isBuffering?: boolean;
   isPlaying: boolean;
   jogEnabled?: boolean;
+  jogSeekMode?: JogSeekMode;
   onJoggingChange?: (jogging: boolean) => void;
   onPlaybackRateChange?: (rate: number) => void;
   onSeek?: (time: number) => void;
@@ -60,6 +63,7 @@ export function SpinningDisc({
   isBuffering = false,
   isPlaying,
   jogEnabled = false,
+  jogSeekMode = "live",
   onJoggingChange,
   onPlaybackRateChange,
   onSeek,
@@ -276,6 +280,7 @@ export function SpinningDisc({
         previousMoveAt: now,
         startTime: currentTime,
       };
+      pendingSeekRef.current = currentTime;
       setJogPlaybackRate(1, true);
       setDragRotation(baseRotation);
       setIsJogging(true);
@@ -312,14 +317,18 @@ export function SpinningDisc({
       if (degreesPerSecond > 8) {
         setJogPlaybackRate(degreesPerSecond / DISC_DEGREES_PER_SECOND);
       } else if (degreesPerSecond < -8) {
-        setJogPlaybackRate(0.35);
+        setJogPlaybackRate(jogSeekMode === "live" ? 0.35 : 1);
       } else {
         setJogPlaybackRate(1);
       }
-      scheduleSeek(nextTime);
+      if (jogSeekMode === "commit") {
+        pendingSeekRef.current = nextTime;
+      } else {
+        scheduleSeek(nextTime);
+      }
       event.preventDefault();
     },
-    [duration, scheduleSeek, setJogPlaybackRate],
+    [duration, jogSeekMode, scheduleSeek, setJogPlaybackRate],
   );
 
   const finishJog = useCallback(
@@ -374,6 +383,7 @@ export function SpinningDisc({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        data-testid="spinning-disc-jog-surface"
         style={{ touchAction: jogEnabled && onSeek ? "none" : undefined }}
       >
         <div

@@ -286,6 +286,11 @@ services:
           *worker-native-env,
         ]
       CRATE_RUNTIME: worker
+      CRATE_WORKER_PROCESSES: ${CRATE_WORKER_PROCESSES:-3}
+      FAST_WORKER_PROCESSES: ${FAST_WORKER_PROCESSES:-2}
+      MAINTENANCE_WORKER_PROCESSES: ${MAINTENANCE_WORKER_PROCESSES:-1}
+      ANALYSIS_WORKER_PROCESSES: ${ANALYSIS_WORKER_PROCESSES:-1}
+      PLAYBACK_WORKER_PROCESSES: ${PLAYBACK_WORKER_PROCESSES:-1}
       CRATE_LEGACY_POOL_MAXCONN: ${CRATE_WORKER_LEGACY_POOL_MAXCONN:-4}
       CRATE_SQLALCHEMY_POOL_SIZE: ${CRATE_WORKER_SQLALCHEMY_POOL_SIZE:-2}
       CRATE_SQLALCHEMY_MAX_OVERFLOW: ${CRATE_WORKER_SQLALCHEMY_MAX_OVERFLOW:-1}
@@ -308,11 +313,31 @@ services:
       [
         "worker",
         "--queues",
-        "fast,default",
+        "default",
         "--processes",
-        "${CRATE_WORKER_PROCESSES:-1}",
+        "${CRATE_WORKER_PROCESSES:-3}",
         "--no-daemons",
         "--no-projector",
+      ]
+
+  crate-fast-worker:
+    extends:
+      service: crate-worker
+    container_name: crate-fast-worker
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "0.35"
+    command:
+      [
+        "worker",
+        "--queues",
+        "fast",
+        "--processes",
+        "${FAST_WORKER_PROCESSES:-2}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
       ]
 
   crate-projector:

@@ -138,6 +138,7 @@ def create_app() -> FastAPI:
                 "bandcamp",
                 "browse",
                 "playlists",
+                "cast",
                 "radio",
                 "genres",
                 "curation",
@@ -296,6 +297,11 @@ def create_app() -> FastAPI:
     from crate.api.bandcamp import router as bandcamp_router
     from crate.api.acquisition import router as acquisition_router
     from crate.api.me import router as me_router
+    from crate.api.playback_state import router as playback_state_router
+    from crate.api.connect import router as connect_router
+    from crate.api.connect_ws import router as connect_ws_router
+    from crate.api.cast import router as cast_router
+    from crate.api.share import router as share_router
     from crate.api.radio import router as radio_router
     from crate.api.lyrics import router as lyrics_router
     from crate.api.cache_events import router as cache_events_router
@@ -311,6 +317,11 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(admin_auth_router)
     app.include_router(me_router)
+    app.include_router(playback_state_router)
+    app.include_router(connect_router)
+    app.include_router(connect_ws_router)
+    app.include_router(cast_router)
+    app.include_router(share_router)
     app.include_router(offline_router)
     app.include_router(social_router)
     app.include_router(jam_router)

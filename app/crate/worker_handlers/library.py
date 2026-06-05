@@ -221,10 +221,16 @@ def _handle_library_sync(task_id: str, params: dict, config: dict) -> dict:
     if album_dir_param:
         album_dir = Path(str(album_dir_param))
         try:
-            album_dir.resolve().relative_to(sync.library_path.resolve())
+            rel_album_dir = album_dir.resolve().relative_to(sync.library_path.resolve())
         except ValueError:
             return {
                 "error": f"Album path is outside the configured library: {album_dir}"
+            }
+        if any(part.startswith(".") for part in rel_album_dir.parts):
+            return {
+                "mode": "album",
+                "album_dir": str(album_dir),
+                "skipped": "hidden_library_path",
             }
         if not album_dir.exists():
             return {"mode": "album", "album_dir": str(album_dir), "skipped": "missing"}

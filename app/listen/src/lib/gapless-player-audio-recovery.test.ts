@@ -15,6 +15,9 @@ const gaplessMock = vi.hoisted(() => {
       state,
       currentTime: 0,
       destination: createNode(),
+      close: vi.fn(async () => {
+        ctx.state = "closed";
+      }),
       resume: vi.fn(async () => {
         ctx.state = "running";
       }),
@@ -50,7 +53,14 @@ const gaplessMock = vi.hoisted(() => {
     stopCalls = 0;
 
     constructor(options: { crossfade?: number; volume?: number } = {}) {
-      this.context = contextQueue.shift() ?? createContext("running");
+      const w = window as Window & {
+        gapless5AudioContext?: ReturnType<typeof createContext>;
+      };
+      if (w.gapless5AudioContext === undefined) {
+        w.gapless5AudioContext =
+          contextQueue.shift() ?? createContext("running");
+      }
+      this.context = w.gapless5AudioContext;
       this.masterOut = this.context.createGain();
       this.crossfade = options.crossfade ?? 0;
       this.volume = options.volume ?? 1;
@@ -173,6 +183,8 @@ describe("gapless player audio recovery", () => {
   afterEach(() => {
     destroyPlayer();
     delete document.documentElement.dataset.listenRuntime;
+    delete (window as Window & { gapless5AudioContext?: unknown })
+      .gapless5AudioContext;
     vi.clearAllMocks();
   });
 
@@ -218,6 +230,35 @@ describe("gapless player audio recovery", () => {
     expect(recovered.loop).toBe(true);
     expect(recovered.singleMode).toBe(true);
     expect(recovered.playbackRate).toBe(1.25);
+    expect(recovered.playCalls).toBe(1);
+  });
+
+  it("rebuilds stale Tauri audio output before the next play", async () => {
+    const staleContext = gaplessMock.createContext("running");
+    const freshContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(staleContext, freshContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 0);
+    seekTo(12_000);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await Promise.resolve();
+
+    await play();
+
+    expect(gaplessMock.instances).toHaveLength(2);
+    expect(gaplessMock.instances[0]!.stopCalls).toBe(1);
+
+    const recovered = gaplessMock.instances[1]!;
+    expect(recovered.context).toBe(freshContext);
+    expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
+    expect(recovered.index).toBe(0);
+    expect(recovered.position).toBe(12_000);
     expect(recovered.playCalls).toBe(1);
   });
 });

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from crate.db.home_builder_shared import _coerce_date
@@ -7,43 +8,61 @@ from crate.db.home_builder_upcoming_insights import _build_upcoming_insights_hom
 from crate.db.queries.user_library import get_followed_artists
 from crate.slugs import build_public_album_slug
 
+log = logging.getLogger(__name__)
+
 
 def _build_release_items(releases: list[dict], *, today) -> list[dict]:
     items: list[dict] = []
     for release in releases:
         scheduled_date = _coerce_date(release.get("release_date"))
         fallback_date = scheduled_date or _coerce_date(release.get("detected_at"))
-        items.append(
-            {
-                "type": "release",
-                "date": fallback_date.isoformat() if fallback_date else "",
-                "artist": release.get("artist_name", ""),
-                "artist_id": release.get("artist_id"),
-                "artist_slug": release.get("artist_slug"),
-                "album_id": release.get("album_id"),
-                "album_slug": release.get("album_slug")
-                or build_public_album_slug(release.get("album_title")),
-                "title": release.get("album_title", ""),
-                "subtitle": release.get("release_type") or "Album",
-                "cover_url": release.get("cover_url"),
-                "status": release.get("status", "detected"),
-                "tidal_url": release.get("tidal_url"),
-                "release_id": release.get("id"),
-                "is_upcoming": bool(scheduled_date and scheduled_date >= today),
-            }
-        )
+        item = {
+            "type": "release",
+            "date": fallback_date.isoformat() if fallback_date else "",
+            "artist": release.get("artist_name", ""),
+            "artist_id": release.get("artist_id"),
+            "artist_slug": release.get("artist_slug"),
+            "album_id": release.get("album_id"),
+            "album_slug": release.get("album_slug")
+            or build_public_album_slug(release.get("album_title")),
+            "title": release.get("album_title", ""),
+            "subtitle": release.get("release_type") or "Album",
+            "cover_url": release.get("cover_url"),
+            "status": release.get("status", "detected"),
+            "tidal_url": release.get("tidal_url") or release.get("source_url"),
+            "release_id": release.get("id"),
+            "is_upcoming": bool(scheduled_date and scheduled_date > today),
+        }
+        if release.get("source_url"):
+            item["source_url"] = release.get("source_url")
+        items.append(item)
     return items
 
 
-def _load_probable_setlists(artist_names: list[str]) -> dict[str, list[dict]]:
-    from crate.db.cache_store import get_cache
+def _load_probable_setlists(
+    artist_names: list[str], *, live_fetch_limit: int = 8
+) -> dict[str, list[dict]]:
+    from crate.setlistfm import get_cached_probable_setlist, get_probable_setlist
 
     probable_setlists: dict[str, list[dict]] = {}
+    missing: list[str] = []
     for artist_name in artist_names:
-        cached = get_cache(
-            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
-        )
-        songs = cached.get("songs") if isinstance(cached, dict) else None
+        songs = get_cached_probable_setlist(artist_name)
+        if songs:
+            probable_setlists[artist_name] = songs
+        else:
+            missing.append(artist_name)
+
+    for artist_name in missing[:live_fetch_limit]:
+        try:
+            songs = get_probable_setlist(artist_name)
+        except Exception:
+            log.debug(
+                "Failed to load probable setlist for upcoming feed artist=%s",
+                artist_name,
+                exc_info=True,
+            )
+            continue
         if songs:
             probable_setlists[artist_name] = songs
     return probable_setlists

@@ -139,6 +139,14 @@ export function scopesForUrl(url: string): string[] {
     scopes.push("library");
   } else if (url.match(/^\/api\/artist-slugs\/[^/]+\/albums\//))
     scopes.push("library");
+  // Track detail/EQ surfaces
+  else if (url.match(/^\/api\/tracks\/\d+\/eq/)) {
+    const m = url.match(/^\/api\/tracks\/(\d+)\/eq/);
+    if (m) scopes.push(`track:${m[1]}`, `track:eq:${m[1]}`);
+    scopes.push("library");
+  } else if (url.match(/^\/api\/tracks\/by-entity\/[^/]+\/eq/)) {
+    scopes.push("library");
+  }
   // Artist/album listings
   else if (url.startsWith("/api/artists")) scopes.push("library");
   else if (url.startsWith("/api/albums")) scopes.push("library");

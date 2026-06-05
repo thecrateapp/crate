@@ -34,6 +34,9 @@ export interface TrackRouteInput {
   libraryTrackId?: number | null;
   entityUid?: string | null;
   trackEntityUid?: string | null;
+  trackSlug?: string | null;
+  title?: string | null;
+  artistName?: string | null;
   path?: string | null;
   trackPath?: string | null;
 }
@@ -71,8 +74,23 @@ function encodeEntityUid(value: string | null | undefined) {
   return value ? encodeURIComponent(value) : "";
 }
 
+function isUuidLike(value: string | null | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
 function resolveTrackEntityUid(input: TrackRouteInput) {
-  return input.entityUid || input.trackEntityUid || null;
+  if (input.entityUid || input.trackEntityUid) {
+    return input.entityUid || input.trackEntityUid || null;
+  }
+  if (isUuidLike(typeof input.id === "string" ? input.id : null)) {
+    return input.id as string;
+  }
+  return null;
 }
 
 function resolveTrackLibraryId(input: TrackRouteInput) {
@@ -227,6 +245,13 @@ export function artistTopTracksPath(input: ArtistRouteInput) {
   return "/artists";
 }
 
+export function artistSharePath(input: ArtistRouteInput) {
+  const ref =
+    input.artistEntityUid || input.artistId || publicArtistSlug(input);
+  const slug = safeSlug(input.artistSlug, input.artistName || "artist");
+  return ref ? `/share/artist/${encodeURIComponent(ref)}/${slug}` : "/share";
+}
+
 export function artistApiPath(input: ArtistRouteInput) {
   const slug = publicArtistSlug(input);
   if (slug) {
@@ -355,6 +380,15 @@ export function albumApiPath(input: AlbumRouteInput) {
   return "";
 }
 
+export function albumSharePath(input: AlbumRouteInput) {
+  const ref = input.albumEntityUid || input.albumId;
+  const publicSlug = publicAlbumSlug(input);
+  const slug = publicSlug
+    ? encPath(publicSlug)
+    : safeSlug(input.albumSlug, input.albumName || "album");
+  return ref ? `/share/album/${encodeURIComponent(ref)}/${slug}` : "/share";
+}
+
 export function albumRelatedApiPath(input: AlbumRouteInput) {
   if (input.albumEntityUid) {
     return `/api/albums/by-entity/${encodeEntityUid(
@@ -403,6 +437,23 @@ export function trackEqFeaturesApiPath(input: TrackRouteInput) {
   return "";
 }
 
+export function trackEffectiveEqApiPath(input: TrackRouteInput) {
+  const entityUid = resolveTrackEntityUid(input);
+  if (entityUid)
+    return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/eq`;
+
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/tracks/${trackId}/eq`;
+
+  return "";
+}
+
+export function trackEqPresetApiPath(input: TrackRouteInput) {
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/tracks/${trackId}/eq-preset`;
+  return "";
+}
+
 export function trackGenreApiPath(input: TrackRouteInput) {
   const entityUid = resolveTrackEntityUid(input);
   if (entityUid)
@@ -433,6 +484,9 @@ export function trackDownloadApiPath(input: TrackRouteInput) {
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/download`;
 
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/tracks/${trackId}/download`;
+
   const path = resolveTrackPath(input);
   if (path) return `/api/download/track/${encodeTrackPath(path)}`;
 
@@ -457,7 +511,25 @@ export function trackOfflineManifestApiPath(input: TrackRouteInput) {
       entityUid,
     )}/manifest`;
 
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/offline/tracks/${trackId}/manifest`;
+
+  const path = resolveTrackPath(input);
+  if (path)
+    return `/api/offline/tracks/by-path/${encodeTrackPath(path)}/manifest`;
+
   return "";
+}
+
+export function trackSharePath(input: TrackRouteInput) {
+  const entityUid = resolveTrackEntityUid(input);
+  const libraryId = resolveTrackLibraryId(input);
+  const ref = entityUid || libraryId;
+  const slug = safeSlug(
+    input.trackSlug,
+    input.title || input.artistName || "track",
+  );
+  return ref ? `/share/track/${encodeURIComponent(ref)}/${slug}` : "/share";
 }
 
 export function albumCoverApiUrl(

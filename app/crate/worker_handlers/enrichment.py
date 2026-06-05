@@ -1180,8 +1180,15 @@ def _process_new_content_refresh_artist_summary(artist_name: str, config: dict) 
 
 def _handle_process_new_content(task_id: str, params: dict, config: dict) -> dict:
     """Full pipeline for new content: enrich artist + index genres + analyze audio + bliss."""
-    artist_name = params.get("artist", "")
+    artist_name = str(params.get("artist", "") or "").strip()
     album_folder = params.get("album", "")
+    if not artist_name or artist_name.startswith("."):
+        return {
+            "artist": artist_name,
+            "album": album_folder,
+            "skipped": True,
+            "reason": "hidden_library_path",
+        }
 
     _mark_processing(artist_name)
     try:

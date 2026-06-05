@@ -1,11 +1,45 @@
 """Tests for the FastAPI API endpoints with mocked DB layer."""
 
+import io
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 from uuid import UUID
 
 from crate.api import _extra_cors_origins
+
+
+def test_virtual_pre_release_cover_proxies_release_cover_url(monkeypatch, tmp_path):
+    from crate.api.browse_album import api_cover_by_id
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (256, 256), color="black").save(buf, format="JPEG")
+    cover_bytes = buf.getvalue()
+
+    class Response:
+        status_code = 200
+        content = cover_bytes
+        headers = {"content-type": "image/jpeg"}
+
+    monkeypatch.setattr(
+        "crate.api.browse_album.get_release_by_virtual_album_id",
+        lambda album_id: {
+            "id": abs(album_id),
+            "album_title": "Bring On The Psychics",
+            "cover_url": "https://img.example/cover.jpg",
+        },
+    )
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setattr(
+        "crate.api.browse_album._REMOTE_COVER_SESSION.get",
+        lambda *args, **kwargs: Response(),
+    )
+
+    response = api_cover_by_id(-42, size=None, image_format=None)
+
+    assert response.body == cover_bytes
+    assert response.media_type == "image/jpeg"
 
 
 def test_extra_cors_origins_parse_operator_env(monkeypatch):

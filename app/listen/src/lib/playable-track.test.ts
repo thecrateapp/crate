@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePlayableTrackId, toPlayableTrack } from "@/lib/playable-track";
+import {
+  hasPlayableTrackReference,
+  resolvePlayableTrackId,
+  toPlayableTrack,
+} from "@/lib/playable-track";
 
 describe("playable track mapper", () => {
   it("normalizes snake_case API payloads into player tracks", () => {
@@ -117,5 +121,17 @@ describe("playable track mapper", () => {
         artist: "Artist",
       }),
     ).toBe("entity-42");
+  });
+
+  it("treats UUID string ids as canonical entity ids when snapshots are partial", () => {
+    const uuid = "123e4567-e89b-12d3-a456-426614174000";
+    const track = toPlayableTrack({
+      id: uuid,
+      title: "Partial Track",
+      artist: "Artist",
+    });
+
+    expect(track.entityUid).toBe(uuid);
+    expect(hasPlayableTrackReference({ id: uuid })).toBe(true);
   });
 });

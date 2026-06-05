@@ -230,8 +230,21 @@ type OfflineTrackIdentityInput =
   | string
   | null
   | undefined
-  | { entity_uid?: string | null; storage_id?: string | null }
-  | { entityUid?: string | null; storageId?: string | null };
+  | {
+      entity_uid?: string | null;
+      storage_id?: string | null;
+      track_id?: number | null;
+      path?: string | null;
+      track_path?: string | null;
+    }
+  | {
+      entityUid?: string | null;
+      storageId?: string | null;
+      trackId?: number | null;
+      libraryTrackId?: number | null;
+      path?: string | null;
+      trackPath?: string | null;
+    };
 
 type OfflineTrackIdentityObject = Exclude<
   OfflineTrackIdentityInput,
@@ -240,16 +253,28 @@ type OfflineTrackIdentityObject = Exclude<
 type OfflineTrackSnakeIdentity = {
   entity_uid?: string | null;
   storage_id?: string | null;
+  track_id?: number | null;
+  path?: string | null;
+  track_path?: string | null;
 };
 type OfflineTrackCamelIdentity = {
   entityUid?: string | null;
   storageId?: string | null;
+  trackId?: number | null;
+  libraryTrackId?: number | null;
+  path?: string | null;
+  trackPath?: string | null;
 };
 
 function hasSnakeCaseOfflineIdentity(
   track: OfflineTrackIdentityObject,
 ): track is OfflineTrackSnakeIdentity {
-  return "entity_uid" in track || "storage_id" in track;
+  return (
+    "entity_uid" in track ||
+    "storage_id" in track ||
+    "track_id" in track ||
+    "track_path" in track
+  );
 }
 
 function readOfflineTrackEntityUid(
@@ -268,6 +293,35 @@ function readOfflineTrackStorageId(
     return normalizeIdentityValue(track.storage_id);
   }
   return normalizeIdentityValue((track as OfflineTrackCamelIdentity).storageId);
+}
+
+function readOfflineTrackLibraryId(
+  track: OfflineTrackIdentityObject,
+): number | null {
+  if (hasSnakeCaseOfflineIdentity(track)) {
+    return typeof track.track_id === "number" && Number.isFinite(track.track_id)
+      ? track.track_id
+      : null;
+  }
+  const camelTrack = track as OfflineTrackCamelIdentity;
+  const id = camelTrack.libraryTrackId ?? camelTrack.trackId;
+  return typeof id === "number" && Number.isFinite(id) ? id : null;
+}
+
+function readOfflineTrackPath(
+  track: OfflineTrackIdentityObject,
+): string | null {
+  if (hasSnakeCaseOfflineIdentity(track)) {
+    return (
+      normalizeIdentityValue(track.track_path) ||
+      normalizeIdentityValue(track.path)
+    );
+  }
+  const camelTrack = track as OfflineTrackCamelIdentity;
+  return (
+    normalizeIdentityValue(camelTrack.trackPath) ||
+    normalizeIdentityValue(camelTrack.path)
+  );
 }
 
 export function getOfflineTrackAssetKey(
@@ -324,12 +378,17 @@ function getOfflineTrackCacheUrls(
     (track && typeof track === "object"
       ? readOfflineTrackStorageId(track)
       : null);
+  const path =
+    track && typeof track === "object" ? readOfflineTrackPath(track) : null;
 
   if (entityUid) {
     urls.add(apiUrl(trackStreamApiPath({ entityUid })));
   }
   if (resolvedStorageId) {
     urls.add(apiUrl(legacyTrackStreamApiPath(resolvedStorageId)));
+  }
+  if (!entityUid && !resolvedStorageId && path) {
+    urls.add(apiUrl(trackStreamApiPath({ path })));
   }
   if (!entityUid && !resolvedStorageId && typeof track === "string") {
     const generic = normalizeIdentityValue(track);
@@ -355,11 +414,21 @@ export function getOfflineTrackManifestPaths(
     (track && typeof track === "object"
       ? readOfflineTrackStorageId(track)
       : null);
+  const trackId =
+    track && typeof track === "object"
+      ? readOfflineTrackLibraryId(track)
+      : null;
+  const path =
+    track && typeof track === "object" ? readOfflineTrackPath(track) : null;
 
   if (entityUid) {
     urls.add(trackOfflineManifestApiPath({ entityUid }));
   } else if (resolvedStorageId) {
     urls.add(legacyTrackOfflineManifestApiPath(resolvedStorageId));
+  } else if (trackId != null) {
+    urls.add(trackOfflineManifestApiPath({ trackId }));
+  } else if (path) {
+    urls.add(trackOfflineManifestApiPath({ path }));
   }
   if (!entityUid && !resolvedStorageId && typeof track === "string") {
     const generic = normalizeIdentityValue(track);
@@ -1196,5 +1265,8 @@ export async function primeOfflineRuntimeProfile(
 ): Promise<void> {
   const profileKey = deriveOfflineProfileKeyFromStoredUser(serverOrigin);
   setActiveOfflineProfileKey(profileKey);
+  if (isNative && profileKey) {
+    await hydrateOfflineProfileState(profileKey);
+  }
   await syncOfflineProfileToServiceWorker(profileKey);
 }

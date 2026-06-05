@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { AIButton } from "@/components/ui/AIButton";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
@@ -824,21 +825,15 @@ export function PlaylistEditor() {
                   placeholder="Editorial description shown in listen"
                 />
                 <div className="mt-2 flex justify-end">
-                  <Button
+                  <AIButton
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={handleGenerateDescription}
+                    loading={describing}
                     disabled={describing || !name.trim() || !llmAvailable}
                     title={!llmAvailable ? llmUnavailableReason : undefined}
                   >
-                    {describing ? (
-                      <Loader2 size={14} className="mr-2 animate-spin" />
-                    ) : (
-                      <Sparkles size={14} className="mr-2" />
-                    )}
-                    Generate with AI
-                  </Button>
+                    Generate description with AI
+                  </AIButton>
                 </div>
               </Field>
 

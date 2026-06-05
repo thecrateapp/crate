@@ -15,6 +15,7 @@ from crate.api._deps import (
     safe_path,
 )
 from crate.api.auth import _require_auth
+from crate.api.permissions import require_permission
 from crate.api.browse_shared import fs_search, has_library_data
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
@@ -23,9 +24,13 @@ from crate.api.openapi_responses import (
 )
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.media import (
+    AlbumEqualizerPresetMutationResponse,
     DiscoverCompletenessRefreshResponse,
     DiscoverCompletenessResponse,
+    EffectiveEqResponse,
     EqFeaturesResponse,
+    EqualizerPresetMutationRequest,
+    EqualizerPresetMutationResponse,
     FavoriteMutationRequest,
     FavoritesResponse,
     MoodPresetsResponse,
@@ -39,6 +44,15 @@ from crate.api.schemas.media import (
     TrackInfoResponse,
     TrackRatingRequest,
     TrackRatingResponse,
+)
+from crate.equalizer import (
+    clear_instance_album_eq_preset,
+    clear_instance_track_eq_preset,
+    clear_user_track_eq_preset,
+    resolve_effective_track_eq,
+    save_instance_album_eq_preset,
+    save_instance_track_eq_preset,
+    save_user_track_eq_preset,
 )
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.repositories.library import set_track_rating
@@ -58,10 +72,9 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
     list_favorites,
     remove_favorite,
-    search_albums,
-    search_artists,
-    search_tracks,
+    search_all_hybrid,
 )
+from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.tasks import create_task_dedup
 from crate.audio import read_audio_quality
@@ -141,7 +154,7 @@ def api_search(request: Request, q: str = "", limit: int = 20):
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
 
-    cache_key = f"listen:search:v1:{q_stripped.lower()}:{capped_limit}"
+    cache_key = f"listen:search:v2:{q_stripped.lower()}:{capped_limit}"
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
@@ -152,60 +165,10 @@ def api_search(request: Request, q: str = "", limit: int = 20):
         set_cache(cache_key, result, ttl=45)
         return result
 
-    like = f"%{q_stripped}%"
-    artist_rows = search_artists(like, capped_limit)
-    album_rows = search_albums(like, capped_limit)
-    track_rows = search_tracks(like, capped_limit)
-
-    artists = [
-        {
-            "id": row["id"],
-            "entity_uid": row.get("entity_uid"),
-            "slug": row.get("slug"),
-            "name": row["name"],
-            "album_count": row.get("album_count", 0),
-            "has_photo": bool(row.get("has_photo")),
-        }
-        for row in artist_rows
-    ]
-    albums = [
-        {
-            "id": row["id"],
-            "entity_uid": row.get("entity_uid"),
-            "slug": row.get("slug"),
-            "artist": row["artist"],
-            "artist_id": row.get("artist_id"),
-            "artist_entity_uid": row.get("artist_entity_uid"),
-            "artist_slug": row.get("artist_slug"),
-            "name": row["name"],
-            "year": row.get("year") or "",
-            "has_cover": bool(row.get("has_cover")),
-        }
-        for row in album_rows
-    ]
-    tracks = [
-        {
-            "id": row["id"],
-            "entity_uid": entity_uid,
-            "slug": row.get("slug"),
-            "title": row["title"],
-            "artist": row["artist"],
-            "artist_id": row.get("artist_id"),
-            "artist_entity_uid": row.get("artist_entity_uid"),
-            "artist_slug": row.get("artist_slug"),
-            "album_id": row.get("album_id"),
-            "album_entity_uid": row.get("album_entity_uid"),
-            "album_slug": row.get("album_slug"),
-            "album": row["album"],
-            "path": row["path"],
-            "duration": row["duration"],
-        }
-        for row in track_rows
-        for entity_uid in [
-            str(row["entity_uid"]) if row.get("entity_uid") is not None else None
-        ]
-    ]
-    payload = {"artists": artists, "albums": albums, "tracks": tracks}
+    payload = search_all_hybrid(q_stripped, capped_limit)
+    record_later("search.hybrid.results.artists", len(payload["artists"]))
+    record_later("search.hybrid.results.albums", len(payload["albums"]))
+    record_later("search.hybrid.results.tracks", len(payload["tracks"]))
     set_cache(cache_key, payload, ttl=45)
     return payload
 
@@ -555,6 +518,198 @@ def api_eq_features_by_storage_id(request: Request, storage_id: str):
     return _serialize_eq_features(row)
 
 
+# ── Effective EQ presets ────────────────────────────────────────────
+
+
+def _eq_response(result) -> dict:
+    if result is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    return result.to_payload()
+
+
+def _require_curation_eq_permission(request: Request) -> dict:
+    return require_permission(request, "curation.genres.write")
+
+
+def _broadcast_eq_preset_changed(
+    *,
+    track_id: int | None = None,
+    album_id: int | None = None,
+) -> None:
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        scopes: list[str] = ["library"]
+        if track_id is not None:
+            scopes.extend([f"track:{track_id}", f"track:eq:{track_id}"])
+        if album_id is not None:
+            scopes.append(f"album:{album_id}")
+        broadcast_invalidation(*dict.fromkeys(scopes))
+    except Exception:
+        log.debug("Failed to broadcast EQ preset invalidation", exc_info=True)
+
+
+@router.get(
+    "/api/tracks/{track_id}/eq",
+    response_model=EffectiveEqResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Resolve the effective EQ preset for a track by ID",
+)
+def api_track_effective_eq_by_id(request: Request, track_id: int):
+    user = _require_auth(request)
+    return _eq_response(resolve_effective_track_eq(track_id, user_id=int(user["id"])))
+
+
+@router.get(
+    "/api/tracks/by-entity/{entity_uid}/eq",
+    response_model=EffectiveEqResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Resolve the effective EQ preset for a track by entity UID",
+)
+def api_track_effective_eq_by_entity_uid(request: Request, entity_uid: str):
+    _require_auth(request)
+    tid = get_track_id_by_entity_uid(entity_uid)
+    if tid is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    user = getattr(request.state, "user", None) or {}
+    return _eq_response(resolve_effective_track_eq(tid, user_id=int(user["id"])))
+
+
+@router.put(
+    "/api/tracks/{track_id}/eq-preset",
+    response_model=EqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Save the current user's EQ preset for a track",
+)
+def api_save_user_track_eq_preset(
+    request: Request,
+    track_id: int,
+    body: EqualizerPresetMutationRequest,
+):
+    user = _require_auth(request)
+    try:
+        result = save_user_track_eq_preset(
+            track_id,
+            user_id=int(user["id"]),
+            gains=body.gains,
+            label=body.label,
+            reasoning=body.reasoning,
+            created_by=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    _broadcast_eq_preset_changed(track_id=track_id, album_id=result.album_id)
+    return {"ok": True, "preset": result.to_payload()}
+
+
+@router.delete(
+    "/api/tracks/{track_id}/eq-preset",
+    response_model=EqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Clear the current user's EQ preset for a track",
+)
+def api_clear_user_track_eq_preset(request: Request, track_id: int):
+    user = _require_auth(request)
+    result = clear_user_track_eq_preset(track_id, user_id=int(user["id"]))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    _broadcast_eq_preset_changed(track_id=track_id)
+    return {
+        "ok": True,
+        "preset": _eq_response(
+            resolve_effective_track_eq(track_id, user_id=int(user["id"]))
+        ),
+    }
+
+
+@router.put(
+    "/api/tracks/{track_id}/eq-preset/instance",
+    response_model=EqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Save an instance-wide EQ preset for a track",
+)
+def api_save_instance_track_eq_preset(
+    request: Request,
+    track_id: int,
+    body: EqualizerPresetMutationRequest,
+):
+    user = _require_curation_eq_permission(request)
+    try:
+        result = save_instance_track_eq_preset(
+            track_id,
+            gains=body.gains,
+            label=body.label,
+            reasoning=body.reasoning,
+            created_by=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    _broadcast_eq_preset_changed(track_id=track_id, album_id=result.album_id)
+    return {"ok": True, "preset": result.to_payload()}
+
+
+@router.delete(
+    "/api/tracks/{track_id}/eq-preset/instance",
+    response_model=EqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Clear an instance-wide EQ preset for a track",
+)
+def api_clear_instance_track_eq_preset(request: Request, track_id: int):
+    _require_curation_eq_permission(request)
+    result = clear_instance_track_eq_preset(track_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    _broadcast_eq_preset_changed(track_id=track_id)
+    return {"ok": True, "preset": None}
+
+
+@router.put(
+    "/api/albums/{album_id}/eq-preset/instance",
+    response_model=AlbumEqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Save an instance-wide EQ preset for an album",
+)
+def api_save_instance_album_eq_preset(
+    request: Request,
+    album_id: int,
+    body: EqualizerPresetMutationRequest,
+):
+    user = _require_curation_eq_permission(request)
+    try:
+        result = save_instance_album_eq_preset(
+            album_id,
+            gains=body.gains,
+            label=body.label,
+            reasoning=body.reasoning,
+            created_by=int(user["id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="Album not found")
+    _broadcast_eq_preset_changed(album_id=album_id)
+    return {"ok": True, **result}
+
+
+@router.delete(
+    "/api/albums/{album_id}/eq-preset/instance",
+    response_model=AlbumEqualizerPresetMutationResponse,
+    responses=_BROWSE_MEDIA_RESPONSES,
+    summary="Clear an instance-wide EQ preset for an album",
+)
+def api_clear_instance_album_eq_preset(request: Request, album_id: int):
+    _require_curation_eq_permission(request)
+    result = clear_instance_album_eq_preset(album_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Album not found")
+    _broadcast_eq_preset_changed(album_id=album_id)
+    return {"ok": True, "albumId": album_id, "albumEntityUid": None, "preset": None}
+
+
 # ── Track primary genre ─────────────────────────────────────────────
 
 
@@ -768,13 +923,17 @@ def _stream_file(request: Request, filepath: str):
 
 
 def _stream_resolved_file(
-    request: Request,
+    request: Request | None,
     file_path,
     *,
     media_type: str | None = None,
     extra_headers: dict[str, str] | None = None,
+    require_auth: bool = True,
 ):
-    _require_auth(request)
+    if require_auth:
+        if request is None:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        _require_auth(request)
     from fastapi.responses import FileResponse
     from crate.metrics import record, record_counter
 

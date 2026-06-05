@@ -81,6 +81,7 @@ export interface EngineErrorEvent {
   code?: number;
   message: string;
   trackId?: string;
+  index?: number;
   url?: string;
   cause?: string;
   causeMessage?: string;

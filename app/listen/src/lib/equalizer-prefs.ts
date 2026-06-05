@@ -10,6 +10,7 @@ export const EQ_PREFS_EVENT = "listen-equalizer-prefs";
 const ENABLED_KEY = "listen-eq-enabled";
 const PRESET_KEY = "listen-eq-preset"; // "custom" or one of EQ_PRESETS keys
 const GAINS_KEY = "listen-eq-gains"; // JSON array of numbers
+const SMART_KEY = "listen-eq-smart";
 const ADAPTIVE_KEY = "listen-eq-adaptive";
 const GENRE_ADAPTIVE_KEY = "listen-eq-genre-adaptive";
 
@@ -17,6 +18,7 @@ export interface EqualizerSnapshot {
   enabled: boolean;
   preset: EqPresetName | "custom";
   gains: number[];
+  smart: boolean;
   /**
    * When true, the EQ ignores `gains`/`preset` and derives bands from
    * per-track analysis features. Incompatible with manual preset/custom
@@ -92,6 +94,7 @@ export function applyEqualizerPreset(preset: EqPresetName): EqGains {
   try {
     localStorage.setItem(PRESET_KEY, preset);
     localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
+    localStorage.setItem(SMART_KEY, "false");
     dispatchPrefsEvent();
   } catch {
     /* ignore */
@@ -107,6 +110,34 @@ export function setCustomEqualizerGains(gains: EqGains): void {
   try {
     localStorage.setItem(PRESET_KEY, "custom");
     localStorage.setItem(GAINS_KEY, JSON.stringify(gains));
+    localStorage.setItem(SMART_KEY, "false");
+    dispatchPrefsEvent();
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getEqualizerSmart(): boolean {
+  try {
+    const raw = localStorage.getItem(SMART_KEY);
+    if (raw != null) return raw === "true";
+    return (
+      getEqualizerPreset() === "flat" &&
+      !getEqualizerAdaptive() &&
+      !getEqualizerGenreAdaptive()
+    );
+  } catch {
+    return true;
+  }
+}
+
+export function setEqualizerSmart(value: boolean): void {
+  try {
+    localStorage.setItem(SMART_KEY, value ? "true" : "false");
+    if (value) {
+      localStorage.setItem(ADAPTIVE_KEY, "false");
+      localStorage.setItem(GENRE_ADAPTIVE_KEY, "false");
+    }
     dispatchPrefsEvent();
   } catch {
     /* ignore */
@@ -128,6 +159,7 @@ export function setEqualizerAdaptive(value: boolean): void {
     // must turn the other off. We do it here rather than leaving it to
     // callers so the persisted state can never end up with both flags.
     if (value) {
+      localStorage.setItem(SMART_KEY, "false");
       localStorage.setItem(GENRE_ADAPTIVE_KEY, "false");
     }
     dispatchPrefsEvent();
@@ -148,6 +180,7 @@ export function setEqualizerGenreAdaptive(value: boolean): void {
   try {
     localStorage.setItem(GENRE_ADAPTIVE_KEY, value ? "true" : "false");
     if (value) {
+      localStorage.setItem(SMART_KEY, "false");
       localStorage.setItem(ADAPTIVE_KEY, "false");
     }
     dispatchPrefsEvent();
@@ -161,6 +194,7 @@ export function getEqualizerSnapshot(): EqualizerSnapshot {
     enabled: getEqualizerEnabled(),
     preset: getEqualizerPreset(),
     gains: getEqualizerGains(),
+    smart: getEqualizerSmart(),
     adaptive: getEqualizerAdaptive(),
     genreAdaptive: getEqualizerGenreAdaptive(),
   };

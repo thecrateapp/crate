@@ -90,7 +90,94 @@ def update_genre_external_metadata(
     return changed
 
 
+def update_genre_node_description(
+    slug: str,
+    description: str,
+    *,
+    only_if_empty: bool = True,
+    session=None,
+) -> bool:
+    slug = (slug or "").strip().lower()
+    description = (description or "").strip()
+    if not slug or not description:
+        return False
+
+    if session is None:
+        with transaction_scope() as s:
+            return update_genre_node_description(
+                slug,
+                description,
+                only_if_empty=only_if_empty,
+                session=s,
+            )
+
+    where = "slug = :slug"
+    if only_if_empty:
+        where += " AND (description IS NULL OR trim(description) = '')"
+
+    result = session.execute(
+        text(
+            f"UPDATE genre_taxonomy_nodes SET description = :description WHERE {where}"
+        ),
+        {"slug": slug, "description": description},
+    )
+    changed = result.rowcount > 0
+    if changed:
+        invalidate_runtime_taxonomy_cache_after_commit(session)
+    return changed
+
+
+def update_genre_taxonomy_node_metadata(
+    slug: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    top_level: bool | None = None,
+    session=None,
+) -> bool:
+    slug = (slug or "").strip().lower()
+    if not slug:
+        return False
+
+    fields: list[str] = []
+    params: dict = {"slug": slug}
+    if name is not None:
+        value = (name or "").strip()
+        if value:
+            fields.append("name = :name")
+            params["name"] = value
+    if description is not None:
+        fields.append("description = :description")
+        params["description"] = (description or "").strip()
+    if top_level is not None:
+        fields.append("is_top_level = :top_level")
+        params["top_level"] = bool(top_level)
+    if not fields:
+        return False
+
+    if session is None:
+        with transaction_scope() as s:
+            return update_genre_taxonomy_node_metadata(
+                slug,
+                name=name,
+                description=description,
+                top_level=top_level,
+                session=s,
+            )
+
+    result = session.execute(
+        text(f"UPDATE genre_taxonomy_nodes SET {', '.join(fields)} WHERE slug = :slug"),
+        params,
+    )
+    changed = int(getattr(result, "rowcount", 0) or 0) > 0
+    if changed:
+        invalidate_runtime_taxonomy_cache_after_commit(session)
+    return changed
+
+
 __all__ = [
     "set_genre_eq_gains",
     "update_genre_external_metadata",
+    "update_genre_node_description",
+    "update_genre_taxonomy_node_metadata",
 ]

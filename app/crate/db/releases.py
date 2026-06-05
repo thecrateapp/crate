@@ -64,17 +64,40 @@ def upsert_new_release(
                 cover_source, tracklist_json, preview_tracks_json)
             VALUES (:artist_name, :album_title, :tidal_id, :tidal_url, :cover_url, :year, :tracks, :quality, 'detected', :detected_at, :release_date, :release_type, :mb_release_group_id, :source_name, :source_url, :cover_source, CAST(:tracklist_json AS jsonb), CAST(:preview_tracks_json AS jsonb))
             ON CONFLICT (artist_name, album_title) DO UPDATE SET
-                tidal_id = EXCLUDED.tidal_id, tidal_url = EXCLUDED.tidal_url,
-                cover_url = EXCLUDED.cover_url, year = EXCLUDED.year,
-                tracks = EXCLUDED.tracks, quality = EXCLUDED.quality,
-                release_date = EXCLUDED.release_date,
-                release_type = EXCLUDED.release_type,
-                mb_release_group_id = EXCLUDED.mb_release_group_id,
-                source_name = EXCLUDED.source_name,
-                source_url = EXCLUDED.source_url,
-                cover_source = EXCLUDED.cover_source,
-                tracklist_json = EXCLUDED.tracklist_json,
-                preview_tracks_json = EXCLUDED.preview_tracks_json
+                tidal_id = COALESCE(NULLIF(EXCLUDED.tidal_id, ''), new_releases.tidal_id),
+                tidal_url = COALESCE(NULLIF(EXCLUDED.tidal_url, ''), new_releases.tidal_url),
+                cover_url = CASE
+                    WHEN new_releases.cover_source = 'manual'
+                     AND NULLIF(new_releases.cover_url, '') IS NOT NULL
+                    THEN new_releases.cover_url
+                    ELSE COALESCE(NULLIF(EXCLUDED.cover_url, ''), new_releases.cover_url)
+                END,
+                year = COALESCE(NULLIF(EXCLUDED.year, ''), new_releases.year),
+                tracks = GREATEST(COALESCE(EXCLUDED.tracks, 0), COALESCE(new_releases.tracks, 0)),
+                quality = COALESCE(NULLIF(EXCLUDED.quality, ''), new_releases.quality),
+                release_date = COALESCE(EXCLUDED.release_date, new_releases.release_date),
+                release_type = COALESCE(NULLIF(EXCLUDED.release_type, ''), new_releases.release_type),
+                mb_release_group_id = COALESCE(NULLIF(EXCLUDED.mb_release_group_id, ''), new_releases.mb_release_group_id),
+                source_name = COALESCE(NULLIF(EXCLUDED.source_name, ''), new_releases.source_name),
+                source_url = COALESCE(NULLIF(EXCLUDED.source_url, ''), new_releases.source_url),
+                cover_source = CASE
+                    WHEN new_releases.cover_source = 'manual'
+                     AND NULLIF(new_releases.cover_url, '') IS NOT NULL
+                    THEN new_releases.cover_source
+                    WHEN NULLIF(EXCLUDED.cover_url, '') IS NOT NULL
+                    THEN EXCLUDED.cover_source
+                    ELSE new_releases.cover_source
+                END,
+                tracklist_json = CASE
+                    WHEN EXCLUDED.tracklist_json = '[]'::jsonb
+                    THEN new_releases.tracklist_json
+                    ELSE EXCLUDED.tracklist_json
+                END,
+                preview_tracks_json = CASE
+                    WHEN COALESCE(new_releases.preview_tracks_json, '[]'::jsonb) = '[]'::jsonb
+                    THEN EXCLUDED.preview_tracks_json
+                    ELSE new_releases.preview_tracks_json
+                END
             RETURNING id
         """),
             {
@@ -103,6 +126,170 @@ def upsert_new_release(
     return row["id"]
 
 
+def update_new_release_cover(
+    release_id: int,
+    *,
+    cover_url: str,
+    cover_source: str = "manual",
+    session=None,
+) -> bool:
+    """Update cover metadata for a virtual pre-release album."""
+    if session is None:
+        with transaction_scope() as s:
+            return update_new_release_cover(
+                release_id,
+                cover_url=cover_url,
+                cover_source=cover_source,
+                session=s,
+            )
+
+    result = session.execute(
+        text("""
+        UPDATE new_releases
+        SET cover_url = :cover_url,
+            cover_source = :cover_source
+        WHERE id = :id
+          AND status NOT IN ('dismissed')
+        """),
+        {
+            "id": abs(int(release_id)),
+            "cover_url": cover_url,
+            "cover_source": cover_source,
+        },
+    )
+    return bool(result.rowcount)
+
+
+def merge_new_release_preview_tracks(
+    release_id: int,
+    preview_tracks: list[dict[str, Any]],
+    *,
+    source_url: str = "",
+    cover_url: str = "",
+    quality: str = "",
+    session=None,
+) -> None:
+    """Merge newly discovered preview singles into an existing release."""
+    if not preview_tracks and not source_url and not cover_url and not quality:
+        return
+    if session is None:
+        with transaction_scope() as s:
+            return merge_new_release_preview_tracks(
+                release_id,
+                preview_tracks,
+                source_url=source_url,
+                cover_url=cover_url,
+                quality=quality,
+                session=s,
+            )
+
+    current = (
+        session.execute(
+            text("""
+            SELECT preview_tracks_json, source_url, cover_url, cover_source, quality
+            FROM new_releases
+            WHERE id = :id
+            """),
+            {"id": abs(int(release_id))},
+        )
+        .mappings()
+        .first()
+    )
+    if not current:
+        return
+
+    existing = current.get("preview_tracks_json") or []
+    if isinstance(existing, str):
+        try:
+            existing = json.loads(existing)
+        except Exception:
+            existing = []
+    merged: dict[str, dict] = {}
+    for item in [*existing, *preview_tracks]:
+        if not isinstance(item, dict):
+            continue
+        key = str(item.get("id") or item.get("url") or item.get("title") or "")
+        if not key:
+            continue
+        merged[key] = item
+
+    session.execute(
+        text("""
+        UPDATE new_releases
+        SET preview_tracks_json = CAST(:preview_tracks_json AS jsonb),
+            source_url = COALESCE(NULLIF(:source_url, ''), source_url),
+            cover_url = CASE
+                WHEN cover_source = 'manual' AND NULLIF(cover_url, '') IS NOT NULL
+                THEN cover_url
+                ELSE COALESCE(NULLIF(:cover_url, ''), cover_url)
+            END,
+            quality = COALESCE(NULLIF(:quality, ''), quality),
+            cover_source = CASE
+                WHEN cover_source = 'manual' AND NULLIF(cover_url, '') IS NOT NULL THEN cover_source
+                WHEN NULLIF(:cover_url, '') IS NOT NULL THEN COALESCE(cover_source, 'tidal')
+                ELSE cover_source
+            END
+        WHERE id = :id
+        """),
+        {
+            "id": abs(int(release_id)),
+            "preview_tracks_json": json.dumps(list(merged.values())),
+            "source_url": source_url,
+            "cover_url": cover_url,
+            "quality": quality,
+        },
+    )
+
+
+def clear_new_release_preview_source_url(
+    release_id: int,
+    preview_source_urls: list[str],
+    *,
+    session=None,
+) -> bool:
+    """Clear a release-level source URL when it actually points to a preview single."""
+    urls = {
+        str(url or "").strip() for url in preview_source_urls if str(url or "").strip()
+    }
+    if not urls:
+        return False
+    if session is None:
+        with transaction_scope() as s:
+            return clear_new_release_preview_source_url(
+                release_id,
+                preview_source_urls,
+                session=s,
+            )
+
+    current = (
+        session.execute(
+            text("""
+            SELECT source_url
+            FROM new_releases
+            WHERE id = :id
+            """),
+            {"id": abs(int(release_id))},
+        )
+        .mappings()
+        .first()
+    )
+    current_source = str((current or {}).get("source_url") or "").strip()
+    if not current_source or current_source not in urls:
+        return False
+
+    result = session.execute(
+        text("""
+        UPDATE new_releases
+        SET source_url = NULL,
+            source_name = NULL
+        WHERE id = :id
+          AND source_url = :source_url
+        """),
+        {"id": abs(int(release_id)), "source_url": current_source},
+    )
+    return bool(result.rowcount)
+
+
 def get_new_releases(
     status: str = "", upcoming: bool = False, limit: int = 200
 ) -> list[dict]:
@@ -126,7 +313,7 @@ def get_new_releases(
                 session.execute(
                     text(
                         select_sql + "WHERE nr.status NOT IN ('dismissed') "
-                        "AND nr.release_date IS NOT NULL AND nr.release_date >= :today "
+                        "AND nr.release_date IS NOT NULL AND nr.release_date > :today "
                         "ORDER BY nr.release_date ASC LIMIT :lim"
                     ),
                     {"today": datetime.now(timezone.utc).date(), "lim": limit},
@@ -183,7 +370,7 @@ def get_upcoming_releases_for_artist(
                 WHERE LOWER(nr.artist_name) = LOWER(:artist_name)
                   AND nr.status NOT IN ('dismissed')
                   AND nr.release_date IS NOT NULL
-                  AND nr.release_date >= :today
+                  AND nr.release_date > :today
                 ORDER BY nr.release_date ASC, nr.album_title ASC
                 LIMIT :limit
                 """),
@@ -197,6 +384,39 @@ def get_upcoming_releases_for_artist(
             .all()
         )
         return [serialize_row(r) for r in rows]
+
+
+def get_release_by_virtual_album_id(album_id: int, *, session=None) -> dict | None:
+    """Return a new_releases row for the negative virtual album id."""
+    release_id = abs(int(album_id or 0))
+    if release_id <= 0:
+        return None
+
+    def impl(s) -> dict | None:
+        row = (
+            s.execute(
+                text("""
+                SELECT
+                    nr.*,
+                    la.id AS artist_id,
+                    la.slug AS artist_slug
+                FROM new_releases nr
+                LEFT JOIN library_artists la ON LOWER(la.name) = LOWER(nr.artist_name)
+                WHERE nr.id = :id
+                  AND nr.status NOT IN ('dismissed')
+                LIMIT 1
+                """),
+                {"id": release_id},
+            )
+            .mappings()
+            .first()
+        )
+        return serialize_row(row) if row else None
+
+    if session is not None:
+        return impl(session)
+    with read_scope() as s:
+        return impl(s)
 
 
 def find_upcoming_release_by_artist_album_slug(

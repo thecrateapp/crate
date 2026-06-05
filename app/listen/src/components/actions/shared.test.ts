@@ -55,7 +55,9 @@ describe("track action shared helpers", () => {
         entityUid: "entity-55",
         title: "Track Two",
         artist: "Artist",
+        artistEntityUid: "artist-entity-55",
         album: "Album",
+        albumEntityUid: "album-entity-55",
         isSuggested: true,
         suggestionSource: "playlist",
         format: "flac",
@@ -66,12 +68,31 @@ describe("track action shared helpers", () => {
     ).toEqual(
       expect.objectContaining({
         entity_uid: "entity-55",
+        artist_entity_uid: "artist-entity-55",
+        album_entity_uid: "album-entity-55",
         is_suggested: true,
         suggestion_source: "playlist",
         format: "flac",
         bitrate: 1411,
         sample_rate: 96000,
         bit_depth: 24,
+      }),
+    );
+  });
+
+  it("infers track entity uid from UUID player ids", () => {
+    const uuid = "123e4567-e89b-12d3-a456-426614174000";
+
+    expect(
+      trackToMenuData({
+        id: uuid,
+        title: "Track Two",
+        artist: "Artist",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: uuid,
+        entity_uid: uuid,
       }),
     );
   });

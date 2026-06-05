@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
 import { Play, Pause, Heart } from "lucide-react";
 import {
@@ -81,6 +81,17 @@ interface TrackRowProps {
   onCreatePlaylist?: (track: TrackRowData) => void | Promise<void>;
   onActionMenuOpen?: () => void;
   onPlayOverride?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (track: TrackRowData, event: MouseEvent<HTMLDivElement>) => void;
+  onSelectionContextMenu?: (
+    track: TrackRowData,
+    event: MouseEvent<HTMLDivElement>,
+  ) => boolean | void;
+  onSelectionActionMenuOpen?: (
+    track: TrackRowData,
+    event: MouseEvent<HTMLButtonElement>,
+  ) => boolean | void;
   /** Pass the full sibling track list so clicking plays all from this track's position. */
   queueTracks?: TrackRowData[];
 }
@@ -97,6 +108,11 @@ export const TrackRow = memo(function TrackRow({
   onCreatePlaylist,
   onActionMenuOpen,
   onPlayOverride,
+  selectable = false,
+  selected = false,
+  onSelect,
+  onSelectionContextMenu,
+  onSelectionActionMenuOpen,
   queueTracks,
 }: TrackRowProps) {
   const navigate = useNavigate();
@@ -177,16 +193,35 @@ export const TrackRow = memo(function TrackRow({
         "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer",
         disabled
           ? "cursor-not-allowed opacity-55"
-          : isActive
-            ? "bg-primary/10"
-            : "hover:bg-white/5",
+          : selected
+            ? "bg-primary/12 ring-1 ring-primary/30"
+            : isActive
+              ? "bg-primary/10"
+              : "hover:bg-white/5",
       )}
+      aria-selected={selectable ? selected : undefined}
       onContextMenu={(event) => {
         if (disabled) return;
+        if (selectable && onSelectionContextMenu?.(track, event)) return;
         onActionMenuOpen?.();
         actionMenu.handleContextMenu(event);
       }}
-      onClick={handleActivate}
+      onClick={(event) => {
+        if (disabled) return;
+        if (selectable && onSelect) {
+          onSelect(track, event);
+          return;
+        }
+        handleActivate();
+      }}
+      onDoubleClick={
+        selectable
+          ? (event) => {
+              event.preventDefault();
+              handleActivate();
+            }
+          : undefined
+      }
     >
       {showCoverThumb ? (
         <div className="relative h-11 w-11 flex-shrink-0">
@@ -370,6 +405,12 @@ export const TrackRow = memo(function TrackRow({
             buttonRef={actionMenu.triggerRef}
             hasActions={actionMenu.hasActions}
             onClick={(event) => {
+              if (
+                selectable &&
+                selected &&
+                onSelectionActionMenuOpen?.(track, event)
+              )
+                return;
               onActionMenuOpen?.();
               actionMenu.openFromTrigger(event);
             }}

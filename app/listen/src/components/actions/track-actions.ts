@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Radio,
+  Share2,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import {
   action,
   buildTrackMenuPlayerTrack,
+  sharePath,
   type TrackMenuData,
 } from "@/components/actions/shared";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
@@ -29,9 +31,13 @@ import {
   artistPagePath,
   downloadApiUrl,
   trackDownloadApiPath,
+  trackSharePath,
 } from "@/lib/library-routes";
 import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
-import { hasPlayableTrackReference } from "@/lib/playable-track";
+import {
+  hasPlayableTrackReference,
+  isUuidLikeTrackId,
+} from "@/lib/playable-track";
 import { fetchTrackRadio } from "@/lib/radio";
 
 interface UseTrackActionEntriesInput {
@@ -66,16 +72,33 @@ export function useTrackActionEntries(
   const libraryTrackId =
     input.track.library_track_id ??
     (typeof input.track.id === "number" ? input.track.id : null);
-  const trackEntityUid = input.track.entity_uid ?? null;
+  const trackEntityUid =
+    input.track.entity_uid ??
+    (typeof input.track.id === "string" && isUuidLikeTrackId(input.track.id)
+      ? input.track.id
+      : null);
   const hasTrackRef = hasPlayableTrackReference(input.track);
   const liked = isLiked(libraryTrackId, trackEntityUid, input.track.path);
-  const offlineState = getTrackState(trackEntityUid);
+  const offlineRef = {
+    entityUid: trackEntityUid,
+    libraryTrackId,
+    path: input.track.path ?? null,
+  };
+  const offlineState = getTrackState(offlineRef);
 
   return useMemo<ItemActionMenuEntry[]>(() => {
     const playerTrack = buildTrackMenuPlayerTrack(
       input.track,
       input.albumCover,
     );
+    const trackShare = trackSharePath({
+      id: input.track.id,
+      entityUid: trackEntityUid,
+      libraryTrackId,
+      trackSlug: input.track.slug,
+      title: input.track.title,
+      artistName: input.track.artist,
+    });
     const entries: ItemActionMenuEntry[] = [
       action({
         key: "play",
@@ -140,16 +163,29 @@ export function useTrackActionEntries(
         },
       }),
       action({
+        key: "share",
+        label: "Share track",
+        icon: Share2,
+        disabled: trackShare === "/share",
+        onSelect: sharePath(trackShare, input.track.title, {
+          kind: "track",
+          subtitle: input.track.artist,
+          imageUrl: input.albumCover,
+        }),
+      }),
+      action({
         key: "offline",
         label: getOfflineActionLabel(offlineState),
         icon: isOfflineBusy(offlineState) ? Loader2 : ArrowDownToLine,
         active: offlineState === "ready",
         disabled:
-          !offlineSupported || !trackEntityUid || isOfflineBusy(offlineState),
+          !offlineSupported || !hasTrackRef || isOfflineBusy(offlineState),
         onSelect: async () => {
           try {
             const result = await toggleTrackOffline({
               entityUid: trackEntityUid,
+              libraryTrackId,
+              path: input.track.path ?? null,
               title: input.track.title,
             });
             toast.success(

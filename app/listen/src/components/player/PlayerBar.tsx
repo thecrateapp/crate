@@ -1,4 +1,11 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router";
 import {
   Play,
@@ -9,7 +16,6 @@ import {
   Repeat,
   Repeat1,
   Heart,
-  Airplay,
   ListMusic,
   Mic2,
   Maximize2,
@@ -45,6 +51,7 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { toast } from "sonner";
 import { RadioFeedback } from "@/components/player/RadioFeedback";
+import { useCrateConnectEnabled } from "@/hooks/use-crate-connect-enabled";
 import {
   LazyEqualizerPopover,
   LazyExtendedPlayer,
@@ -60,6 +67,21 @@ import {
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl";
 import { WaveformCanvas } from "@/components/player/bar/WaveformCanvas";
+import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
+import type { PlaybackTargetContext } from "@/lib/playback-targets";
+import {
+  CONNECT_SESSION_EVENT,
+  CRATE_CONNECT_V2_TRANSPORT_ENABLED,
+  fetchActiveConnectSnapshot,
+  fetchConnectDevices,
+  sendConnectCommand,
+  type ActiveConnectSession,
+} from "@/lib/crate-connect";
+import { formatCrateDeviceName, getListenDeviceId } from "@/lib/listen-device";
+import {
+  remotePlaybackQueue,
+  type RemotePlaybackState,
+} from "@/lib/remote-playback-state";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import {
   formatPlayerTime,
@@ -185,10 +207,15 @@ export function PlayerBar() {
     prev,
     seek,
     setVolume,
+    publishConnectState,
+    connect,
     toggleShuffle,
     cycleRepeat,
   } = usePlayerActions();
   const isDesktop = useIsDesktop();
+  const connectEnabled = useCrateConnectEnabled();
+  const legacyConnectEnabled =
+    connectEnabled && !CRATE_CONNECT_V2_TRANSPORT_ENABLED;
   const allowEqualizer = canUseWebAudioEffects;
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && allowEqualizer;
@@ -203,9 +230,349 @@ export function PlayerBar() {
     duration,
   );
 
+  const currentConnectDeviceId = useMemo(() => getListenDeviceId(), []);
+  const [activeConnectSession, setActiveConnectSession] =
+    useState<ActiveConnectSession | null>(null);
+  const [activeConnectState, setActiveConnectState] =
+    useState<RemotePlaybackState | null>(null);
+  const [activeConnectStateFetchedAt, setActiveConnectStateFetchedAt] =
+    useState<number | null>(null);
+  const [activeConnectDeviceLabel, setActiveConnectDeviceLabel] = useState<
+    string | null
+  >(null);
+  const [remoteClockTick, setRemoteClockTick] = useState(0);
+  const [optimisticRemoteTime, setOptimisticRemoteTime] = useState<
+    number | null
+  >(null);
+  const [optimisticRemoteVolume, setOptimisticRemoteVolume] = useState<
+    number | null
+  >(null);
+  const activeConnectDeviceId = activeConnectSession?.active_device_id ?? null;
+  const legacyRemoteConnectActive = Boolean(
+    legacyConnectEnabled &&
+      activeConnectDeviceId &&
+      activeConnectDeviceId !== currentConnectDeviceId,
+  );
+  const v2RemoteConnectActive = Boolean(
+    connect.transport === "ws" && connect.isRemoteActive && connect.remoteState,
+  );
+  const isRemoteConnectActive =
+    legacyRemoteConnectActive || v2RemoteConnectActive;
+  const remoteConnectState = v2RemoteConnectActive
+    ? connect.remoteState
+    : activeConnectState;
   const { frequenciesDb, sampleRate } = useAudioVisualizer(
-    showPlayerBarAnalyzer && isPlaying,
+    showPlayerBarAnalyzer && isPlaying && !isRemoteConnectActive,
     `${currentTrack?.id ?? "none"}:${analyserVersion}`,
+  );
+  const activeConnectInstance =
+    connect.transport === "ws"
+      ? connect.connectedInstances.find(
+          (instance) => instance.instance_id === connect.activeInstanceId,
+        )
+      : null;
+  const remoteConnectDeviceLabel =
+    isRemoteConnectActive && v2RemoteConnectActive
+      ? formatCrateDeviceName({
+          app_platform:
+            activeConnectInstance?.app_platform ??
+            connect.remoteState?.app_platform,
+          device_label:
+            activeConnectInstance?.device_label ??
+            connect.remoteState?.device_label,
+          device_type:
+            activeConnectInstance?.device_type ??
+            connect.remoteState?.device_type,
+        })
+      : isRemoteConnectActive
+        ? activeConnectDeviceLabel
+        : null;
+  const effectiveIsPlaying = isRemoteConnectActive
+    ? remoteConnectState?.status === "playing"
+    : isPlaying;
+  const remoteDuration =
+    typeof remoteConnectState?.duration_ms === "number"
+      ? remoteConnectState.duration_ms / 1000
+      : 0;
+  const remoteDisplayedTime = useMemo(() => {
+    if (!isRemoteConnectActive || !remoteConnectState) return 0;
+    if (optimisticRemoteTime !== null) return optimisticRemoteTime;
+    const baseMs = Math.max(0, remoteConnectState.position_ms || 0);
+    if (remoteConnectState.status !== "playing") return baseMs / 1000;
+    if (v2RemoteConnectActive && remoteConnectState.position_updated_at) {
+      const serverAnchor = Date.parse(remoteConnectState.position_updated_at);
+      if (Number.isFinite(serverAnchor)) {
+        const projected =
+          baseMs +
+          Math.max(0, Date.now() + connect.serverClockOffsetMs - serverAnchor);
+        const durationMs = remoteConnectState.duration_ms || 0;
+        return (
+          (durationMs > 0 ? Math.min(projected, durationMs) : projected) / 1000
+        );
+      }
+    }
+    if (activeConnectStateFetchedAt === null) return baseMs / 1000;
+    const elapsedMs = Math.max(0, Date.now() - activeConnectStateFetchedAt);
+    const projected = baseMs + elapsedMs;
+    const durationMs = remoteConnectState.duration_ms || 0;
+    return (
+      (durationMs > 0 ? Math.min(projected, durationMs) : projected) / 1000
+    );
+  }, [
+    activeConnectStateFetchedAt,
+    connect.serverClockOffsetMs,
+    isRemoteConnectActive,
+    optimisticRemoteTime,
+    remoteConnectState,
+    remoteClockTick,
+    v2RemoteConnectActive,
+  ]);
+  const effectiveDisplayedTime = isRemoteConnectActive
+    ? remoteDisplayedTime
+    : displayedTime;
+  const effectiveDisplayedDuration =
+    isRemoteConnectActive && remoteDuration > 0
+      ? remoteDuration
+      : displayedDuration;
+  const effectiveVolume =
+    isRemoteConnectActive && optimisticRemoteVolume !== null
+      ? optimisticRemoteVolume
+      : volume;
+
+  const refreshConnectSession = useCallback(() => {
+    let cancelled = false;
+    if (!legacyConnectEnabled) {
+      setActiveConnectSession(null);
+      setActiveConnectState(null);
+      setActiveConnectStateFetchedAt(null);
+      setActiveConnectDeviceLabel(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    void Promise.all([
+      fetchActiveConnectSnapshot().catch(() => ({
+        session: null,
+        state: null,
+      })),
+      fetchConnectDevices().catch(() => ({ devices: [] })),
+    ]).then(([snapshot, devices]) => {
+      if (cancelled) return;
+      const session = snapshot.session;
+      setActiveConnectSession(session);
+      setActiveConnectState(snapshot.state ?? null);
+      setActiveConnectStateFetchedAt(snapshot.state ? Date.now() : null);
+      const activeDeviceId = session?.active_device_id;
+      const activeDevice = devices.devices.find(
+        (device) => device.device_id === activeDeviceId,
+      );
+      setActiveConnectDeviceLabel(
+        activeDevice
+          ? formatCrateDeviceName(activeDevice)
+          : activeDeviceId
+            ? "Crate device"
+            : null,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [legacyConnectEnabled]);
+  const refreshConnectSessionCleanupRef = useRef<(() => void) | null>(null);
+  const runRefreshConnectSession = useCallback(() => {
+    refreshConnectSessionCleanupRef.current?.();
+    refreshConnectSessionCleanupRef.current = refreshConnectSession();
+  }, [refreshConnectSession]);
+
+  useEffect(() => {
+    runRefreshConnectSession();
+    return () => {
+      refreshConnectSessionCleanupRef.current?.();
+      refreshConnectSessionCleanupRef.current = null;
+    };
+  }, [runRefreshConnectSession]);
+
+  useEffect(() => {
+    window.addEventListener(CONNECT_SESSION_EVENT, runRefreshConnectSession);
+    window.addEventListener("focus", runRefreshConnectSession);
+    return () => {
+      window.removeEventListener(
+        CONNECT_SESSION_EVENT,
+        runRefreshConnectSession,
+      );
+      window.removeEventListener("focus", runRefreshConnectSession);
+    };
+  }, [runRefreshConnectSession]);
+
+  useEffect(() => {
+    if (!isRemoteConnectActive) {
+      setOptimisticRemoteTime(null);
+      setOptimisticRemoteVolume(null);
+    }
+  }, [isRemoteConnectActive]);
+
+  useEffect(() => {
+    if (!isRemoteConnectActive || remoteConnectState?.status !== "playing")
+      return;
+    const intervalId = window.setInterval(() => {
+      setRemoteClockTick((value) => value + 1);
+    }, 250);
+    return () => window.clearInterval(intervalId);
+  }, [isRemoteConnectActive, remoteConnectState?.status]);
+
+  useEffect(() => {
+    if (!isRemoteConnectActive) return;
+    const intervalId = window.setInterval(runRefreshConnectSession, 2500);
+    return () => window.clearInterval(intervalId);
+  }, [isRemoteConnectActive, runRefreshConnectSession]);
+
+  useEffect(() => {
+    setOptimisticRemoteTime(null);
+    setOptimisticRemoteVolume(null);
+  }, [
+    activeConnectSession?.playback_session_id,
+    activeConnectSession?.state_revision,
+  ]);
+
+  const sendRemoteTransportCommand = useCallback(
+    async (
+      type: "pause" | "resume" | "seek" | "next" | "previous" | "set_volume",
+      payload?: Record<string, unknown>,
+    ) => {
+      if (v2RemoteConnectActive) {
+        const wsType =
+          type === "next"
+            ? "next_track"
+            : type === "previous"
+              ? "previous_track"
+              : type === "set_volume"
+                ? "volume"
+                : type;
+        const ok = connect.sendRemoteCommand(wsType, payload);
+        if (!ok) {
+          toast.error(
+            remoteConnectDeviceLabel
+              ? `Could not control ${remoteConnectDeviceLabel}`
+              : "Could not control remote device",
+          );
+        }
+        return ok;
+      }
+      if (!isRemoteConnectActive || !activeConnectDeviceId) return false;
+      try {
+        await sendConnectCommand({
+          type,
+          targetDeviceId: activeConnectDeviceId,
+          playbackSessionId: activeConnectSession?.playback_session_id,
+          payload,
+        });
+        if (type === "pause" || type === "resume") {
+          setActiveConnectSession((previous) =>
+            previous
+              ? {
+                  ...previous,
+                  status: type === "pause" ? "paused" : "playing",
+                }
+              : previous,
+          );
+        }
+        window.setTimeout(runRefreshConnectSession, 600);
+      } catch {
+        toast.error(
+          remoteConnectDeviceLabel
+            ? `Could not control ${remoteConnectDeviceLabel}`
+            : "Could not control remote device",
+        );
+        return false;
+      }
+      return true;
+    },
+    [
+      activeConnectDeviceId,
+      activeConnectSession?.playback_session_id,
+      connect,
+      isRemoteConnectActive,
+      remoteConnectDeviceLabel,
+      runRefreshConnectSession,
+      v2RemoteConnectActive,
+    ],
+  );
+
+  const handlePlayPause = useCallback(() => {
+    triggerHaptic("light");
+    if (isRemoteConnectActive) {
+      void sendRemoteTransportCommand(effectiveIsPlaying ? "pause" : "resume");
+      return;
+    }
+    if (isPlaying) pause();
+    else resume();
+  }, [
+    effectiveIsPlaying,
+    isPlaying,
+    isRemoteConnectActive,
+    pause,
+    resume,
+    sendRemoteTransportCommand,
+  ]);
+
+  const handlePreviousTrack = useCallback(() => {
+    triggerHaptic("selection");
+    if (isRemoteConnectActive) {
+      void sendRemoteTransportCommand("previous");
+      return;
+    }
+    prev();
+  }, [isRemoteConnectActive, prev, sendRemoteTransportCommand]);
+
+  const handleNextTrack = useCallback(() => {
+    triggerHaptic("selection");
+    if (isRemoteConnectActive) {
+      void sendRemoteTransportCommand("next");
+      return;
+    }
+    next();
+  }, [isRemoteConnectActive, next, sendRemoteTransportCommand]);
+
+  const handleSeek = useCallback(
+    (time: number) => {
+      if (isRemoteConnectActive) {
+        const nextTime =
+          effectiveDisplayedDuration > 0
+            ? Math.max(0, Math.min(time, effectiveDisplayedDuration))
+            : Math.max(0, time);
+        setOptimisticRemoteTime(nextTime);
+        void sendRemoteTransportCommand("seek", {
+          position_ms: Math.round(nextTime * 1000),
+        }).then((ok) => {
+          if (!ok) setOptimisticRemoteTime(null);
+        });
+        return;
+      }
+      seek(time);
+    },
+    [
+      effectiveDisplayedDuration,
+      isRemoteConnectActive,
+      seek,
+      sendRemoteTransportCommand,
+    ],
+  );
+
+  const handleVolumeChange = useCallback(
+    (nextVolume: number) => {
+      if (isRemoteConnectActive) {
+        const normalizedVolume = Math.max(0, Math.min(1, nextVolume));
+        setOptimisticRemoteVolume(normalizedVolume);
+        void sendRemoteTransportCommand("set_volume", {
+          volume: normalizedVolume,
+        }).then((ok) => {
+          if (!ok) setOptimisticRemoteVolume(null);
+        });
+        return;
+      }
+      setVolume(nextVolume);
+    },
+    [isRemoteConnectActive, sendRemoteTransportCommand, setVolume],
   );
 
   const [seekHover, setSeekHover] = useState<{
@@ -316,6 +683,15 @@ export function PlayerBar() {
     };
   }, [isDesktop, setFsOpen]);
 
+  useEffect(() => {
+    if (!isRemoteConnectActive) return;
+    setFsOpen(false);
+    setExtendedOpen(false);
+    setShowLyrics(false);
+    setShowEqualizer(false);
+    setHasFloatingOverlayOpen(false);
+  }, [isRemoteConnectActive, setFsOpen]);
+
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
 
@@ -360,28 +736,65 @@ export function PlayerBar() {
       viewportWidth: window.innerWidth,
     });
     if (action === "next") {
-      triggerHaptic("selection");
-      next();
+      handleNextTrack();
     } else if (action === "previous") {
-      triggerHaptic("selection");
-      prev();
+      handlePreviousTrack();
     }
   }
 
-  const shouldResolveTrackInfo = shouldFetchTrackQualityInfo(currentTrack);
-  const { info: currentTrackInfo } = useTrackInfo(currentTrack, {
+  const remoteDisplayQueue = useMemo(
+    () => (remoteConnectState ? remotePlaybackQueue(remoteConnectState) : []),
+    [remoteConnectState],
+  );
+  const remoteDisplayIndex =
+    remoteDisplayQueue.length > 0
+      ? Math.max(
+          0,
+          Math.min(
+            remoteConnectState?.current_index ?? 0,
+            remoteDisplayQueue.length - 1,
+          ),
+        )
+      : 0;
+  const shouldDisplayConnectSnapshot =
+    remoteDisplayQueue.length > 0 &&
+    (isRemoteConnectActive || (legacyConnectEnabled && !currentTrack));
+  const displayTrack = shouldDisplayConnectSnapshot
+    ? remoteDisplayQueue[remoteDisplayIndex]
+    : currentTrack;
+  const displayQueue = shouldDisplayConnectSnapshot
+    ? remoteDisplayQueue
+    : queue;
+  const displayCurrentIndex = shouldDisplayConnectSnapshot
+    ? remoteDisplayIndex
+    : currentIndex;
+  const displayPlaySource = (
+    shouldDisplayConnectSnapshot && remoteConnectState?.play_source
+      ? remoteConnectState.play_source
+      : playSource
+  ) as PlaySource | null;
+  const displayCrossfadeTransition = isRemoteConnectActive
+    ? null
+    : crossfadeTransition;
+  const effectiveIsBuffering = isRemoteConnectActive ? false : isBuffering;
+
+  const displayTrackForQueries = displayTrack ?? undefined;
+  const shouldResolveTrackInfo = shouldFetchTrackQualityInfo(
+    displayTrackForQueries,
+  );
+  const { info: currentTrackInfo } = useTrackInfo(displayTrackForQueries, {
     enabled: shouldResolveTrackInfo,
   });
   const { resolution: currentTrackPlayback } = useTrackPlayback(
-    currentTrack,
+    displayTrackForQueries,
     playbackDeliveryPolicy,
     {
-      enabled: !!currentTrack,
+      enabled: !!displayTrack,
     },
   );
-  const sourceTrackQuality = currentTrack
+  const sourceTrackQuality = displayTrack
     ? mergeTrackQualityParts(
-        getTrackQualityFallback(currentTrack),
+        getTrackQualityFallback(displayTrack),
         getTrackQualityFromInfo(currentTrackInfo),
         getTrackQualityFromPlaybackQuality(currentTrackPlayback?.source),
       )
@@ -395,31 +808,67 @@ export function PlayerBar() {
           }),
         )
       : sourceTrackQuality;
-  const qualityBadge = currentTrack
+  const qualityBadge = displayTrack
     ? getQualityBadge({
-        id: currentTrack.id,
-        path: currentTrack.path,
+        id: displayTrack.id,
+        path: displayTrack.path,
         ...(activeTrackQuality ?? {}),
       })
     : null;
   const progressPct =
-    displayedDuration > 0
-      ? Math.max(0, Math.min(100, (displayedTime / displayedDuration) * 100))
+    effectiveDisplayedDuration > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            (effectiveDisplayedTime / effectiveDisplayedDuration) * 100,
+          ),
+        )
       : 0;
   const showsDeliveryQuality = Boolean(
     currentTrackPlayback &&
       currentTrackPlayback.effective_policy !== "original",
   );
   const transportButtonClass = getTransportButtonToneClass(
-    playSource,
-    isPlaying || isBuffering,
+    displayPlaySource,
+    effectiveIsPlaying || effectiveIsBuffering,
   );
-  const shapedRadioSessionId = playSource?.radio?.shapedSessionId;
+  const shapedRadioSessionId = displayPlaySource?.radio?.shapedSessionId;
   const isShapedRadioTrack = !!(
-    shapedRadioSessionId && currentTrack?.libraryTrackId
+    shapedRadioSessionId && displayTrack?.libraryTrackId
   );
-  const sourceLabel = getPlaySourceLabel(playSource);
+  const sourceLabel = getPlaySourceLabel(displayPlaySource);
   const hidePlayerBarForMobileFullscreen = !isDesktop && fsOpen;
+
+  const playbackTargetContext = useMemo<PlaybackTargetContext>(
+    () => ({
+      currentTrack: displayTrack,
+      currentTime: effectiveDisplayedTime,
+      currentIndex: displayCurrentIndex,
+      queue: displayQueue,
+      volume: effectiveVolume,
+      activeConnectDeviceId: legacyConnectEnabled
+        ? activeConnectDeviceId
+        : null,
+      activeConnectSession: legacyConnectEnabled ? activeConnectSession : null,
+      connect,
+      pause,
+      publishConnectState,
+    }),
+    [
+      activeConnectDeviceId,
+      activeConnectSession,
+      connect,
+      displayCurrentIndex,
+      displayQueue,
+      displayTrack,
+      effectiveDisplayedTime,
+      effectiveVolume,
+      legacyConnectEnabled,
+      pause,
+      publishConnectState,
+    ],
+  );
 
   useEffect(() => {
     if (!isDesktop && fsOpen) {
@@ -447,12 +896,12 @@ export function PlayerBar() {
     };
   }, [currentTrack, isDesktop, setFsOpen]);
 
-  if (!currentTrack) return null;
+  if (!displayTrack) return null;
 
   const liked = isLiked(
-    currentTrack.libraryTrackId ?? null,
-    currentTrack.entityUid ?? null,
-    currentTrack.path || currentTrack.id,
+    displayTrack.libraryTrackId ?? null,
+    displayTrack.entityUid ?? null,
+    displayTrack.path || displayTrack.id,
   );
 
   function prepareQueuePanel() {
@@ -461,45 +910,34 @@ export function PlayerBar() {
   }
 
   function prepareLyricsPanel() {
+    if (isRemoteConnectActive) return;
     setShouldRenderLyricsPanel(true);
     void preloadLyricsPanel();
   }
 
   function prepareEqualizerPopover() {
+    if (isRemoteConnectActive) return;
     setShouldRenderEqualizerPopover(true);
     void preloadEqualizerPopover();
   }
 
   function prepareExtendedPlayer() {
+    if (isRemoteConnectActive) return;
     setShouldRenderExtendedPlayer(true);
     void preloadExtendedPlayer();
   }
 
   function prepareFullscreenPlayer() {
+    if (isRemoteConnectActive) return;
     void preloadFullscreenPlayer();
   }
 
   function openFullscreenPlayer() {
+    if (isRemoteConnectActive) return;
     triggerHaptic("medium");
     setShouldRenderFullscreenPlayer(true);
     void preloadFullscreenPlayer();
     setFsOpen(true);
-  }
-
-  function handlePlayPause() {
-    triggerHaptic("light");
-    if (isPlaying) pause();
-    else resume();
-  }
-
-  function handlePreviousTrack() {
-    triggerHaptic("selection");
-    prev();
-  }
-
-  function handleNextTrack() {
-    triggerHaptic("selection");
-    next();
   }
 
   function handleToggleShuffle() {
@@ -520,6 +958,7 @@ export function PlayerBar() {
   }
 
   function handleToggleLyrics() {
+    if (isRemoteConnectActive) return;
     triggerHaptic("selection");
     prepareLyricsPanel();
     setShowLyrics(!showLyrics);
@@ -527,6 +966,7 @@ export function PlayerBar() {
   }
 
   function handleToggleExtendedPlayer() {
+    if (isRemoteConnectActive) return;
     triggerHaptic("medium");
     prepareExtendedPlayer();
     setExtendedOpen(!extendedOpen);
@@ -537,10 +977,10 @@ export function PlayerBar() {
   }
 
   async function toggleLike() {
-    if (!currentTrack) return;
-    const trackId = currentTrack.libraryTrackId ?? null;
-    const trackEntityUid = currentTrack.entityUid ?? null;
-    const trackPath = currentTrack.path || currentTrack.id;
+    if (!displayTrack) return;
+    const trackId = displayTrack.libraryTrackId ?? null;
+    const trackEntityUid = displayTrack.entityUid ?? null;
+    const trackPath = displayTrack.path || displayTrack.id;
     try {
       if (liked) {
         await unlikeTrack(trackId, trackEntityUid, trackPath);
@@ -553,12 +993,12 @@ export function PlayerBar() {
   }
 
   async function handleAddToCollection() {
-    if (!currentTrack) return;
+    if (!displayTrack) return;
     try {
       await likeTrack(
-        currentTrack.libraryTrackId ?? null,
-        currentTrack.entityUid ?? null,
-        currentTrack.path || currentTrack.id,
+        displayTrack.libraryTrackId ?? null,
+        displayTrack.entityUid ?? null,
+        displayTrack.path || displayTrack.id,
       );
       toast.success("Added to collection");
     } catch {
@@ -570,9 +1010,9 @@ export function PlayerBar() {
     <>
       {/* Screen reader announcement for track changes */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
-        {isPlaying
-          ? `Now playing ${currentTrack.title} by ${currentTrack.artist}`
-          : `Paused: ${currentTrack.title} by ${currentTrack.artist}`}
+        {effectiveIsPlaying
+          ? `Now playing ${displayTrack.title} by ${displayTrack.artist}`
+          : `Paused: ${displayTrack.title} by ${displayTrack.artist}`}
       </div>
 
       {!hidePlayerBarForMobileFullscreen ? (
@@ -620,44 +1060,44 @@ export function PlayerBar() {
                 On desktop, clicking navigates to the album page. */}
               <div
                 className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white/5 md:h-12 md:w-12 ${
-                  isDesktop && currentTrack.albumId ? "cursor-pointer" : ""
+                  isDesktop && displayTrack.albumId ? "cursor-pointer" : ""
                 }`}
                 onClick={(e) => {
-                  if (isDesktop && currentTrack.albumId) {
+                  if (isDesktop && displayTrack.albumId) {
                     e.stopPropagation();
                     navigate(
                       albumPagePath({
-                        albumId: currentTrack.albumId,
-                        albumSlug: currentTrack.albumSlug,
-                        albumName: currentTrack.album,
-                        artistName: currentTrack.artist,
+                        albumId: displayTrack.albumId,
+                        albumSlug: displayTrack.albumSlug,
+                        albumName: displayTrack.album,
+                        artistName: displayTrack.artist,
                       }),
                     );
                   }
                 }}
               >
-                {crossfadeTransition ? (
+                {displayCrossfadeTransition ? (
                   <>
-                    {crossfadeTransition.outgoing.albumCover ? (
+                    {displayCrossfadeTransition.outgoing.albumCover ? (
                       <img
-                        src={crossfadeTransition.outgoing.albumCover}
+                        src={displayCrossfadeTransition.outgoing.albumCover}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover"
                         style={{ opacity: 1 - crossfadeProgress }}
                       />
                     ) : null}
-                    {crossfadeTransition.incoming.albumCover ? (
+                    {displayCrossfadeTransition.incoming.albumCover ? (
                       <img
-                        src={crossfadeTransition.incoming.albumCover}
+                        src={displayCrossfadeTransition.incoming.albumCover}
                         alt=""
                         className="absolute inset-0 w-full h-full object-cover"
                         style={{ opacity: crossfadeProgress }}
                       />
                     ) : null}
                   </>
-                ) : currentTrack.albumCover ? (
+                ) : displayTrack.albumCover ? (
                   <img
-                    src={currentTrack.albumCover}
+                    src={displayTrack.albumCover}
                     alt=""
                     className="w-full h-full object-cover"
                   />
@@ -674,71 +1114,71 @@ export function PlayerBar() {
                   outgoing copy doesn't escape into the persistent rows
                   below ("Playing from", "Buffering"). */}
                 <div className="relative">
-                  {crossfadeTransition ? (
+                  {displayCrossfadeTransition ? (
                     <>
                       <div
                         className="absolute inset-0"
                         style={{ opacity: 1 - crossfadeProgress }}
                       >
                         <p className="text-[13px] font-semibold text-white truncate leading-tight">
-                          {crossfadeTransition.outgoing.title}
+                          {displayCrossfadeTransition.outgoing.title}
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
-                          {crossfadeTransition.outgoing.artist}
+                          {displayCrossfadeTransition.outgoing.artist}
                         </p>
                       </div>
                       <div style={{ opacity: crossfadeProgress }}>
                         <p className="text-[13px] font-semibold text-white truncate leading-tight">
-                          {crossfadeTransition.incoming.title}
+                          {displayCrossfadeTransition.incoming.title}
                         </p>
                         <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
-                          {crossfadeTransition.incoming.artist}
+                          {displayCrossfadeTransition.incoming.artist}
                         </p>
                       </div>
                     </>
                   ) : (
-                    <div key={currentTrack.id} className="animate-track-in">
-                      {isDesktop && currentTrack.albumId ? (
+                    <div key={displayTrack.id} className="animate-track-in">
+                      {isDesktop && displayTrack.albumId ? (
                         <p
                           className="text-[13px] font-semibold text-white truncate leading-tight hover:underline cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
                               albumPagePath({
-                                albumId: currentTrack.albumId,
-                                albumSlug: currentTrack.albumSlug,
-                                albumName: currentTrack.album,
-                                artistName: currentTrack.artist,
+                                albumId: displayTrack.albumId,
+                                albumSlug: displayTrack.albumSlug,
+                                albumName: displayTrack.album,
+                                artistName: displayTrack.artist,
                               }),
                             );
                           }}
                         >
-                          {currentTrack.title}
+                          {displayTrack.title}
                         </p>
                       ) : (
                         <p className="text-[13px] font-semibold text-white truncate leading-tight">
-                          {currentTrack.title}
+                          {displayTrack.title}
                         </p>
                       )}
-                      {isDesktop && currentTrack.artistId ? (
+                      {isDesktop && displayTrack.artistId ? (
                         <p
                           className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 hover:text-foreground hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
                               artistPagePath({
-                                artistId: currentTrack.artistId,
-                                artistSlug: currentTrack.artistSlug,
-                                artistName: currentTrack.artist,
+                                artistId: displayTrack.artistId,
+                                artistSlug: displayTrack.artistSlug,
+                                artistName: displayTrack.artist,
                               }),
                             );
                           }}
                         >
-                          {currentTrack.artist}
+                          {displayTrack.artist}
                         </p>
                       ) : (
                         <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
-                          {currentTrack.artist}
+                          {displayTrack.artist}
                         </p>
                       )}
                     </div>
@@ -755,12 +1195,13 @@ export function PlayerBar() {
                       className="text-[10px] text-white/40 truncate leading-tight animate-fade-in"
                     >
                       Playing from:{" "}
-                      {playSource?.href && sourceLabel !== "Discovery Radio" ? (
+                      {displayPlaySource?.href &&
+                      sourceLabel !== "Discovery Radio" ? (
                         <span
                           className="hover:text-foreground hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(playSource.href!);
+                            navigate(displayPlaySource.href!);
                           }}
                         >
                           {sourceLabel}
@@ -771,7 +1212,7 @@ export function PlayerBar() {
                     </p>
                   </div>
                 )}
-                {isBuffering && (
+                {effectiveIsBuffering && (
                   <p className="text-[10px] text-primary/80 truncate leading-tight mt-0.5">
                     Buffering...
                   </p>
@@ -800,15 +1241,15 @@ export function PlayerBar() {
                 {isDesktop && isShapedRadioTrack && (
                   <RadioFeedback
                     sessionId={shapedRadioSessionId!}
-                    trackId={currentTrack.libraryTrackId}
-                    onDislike={() => next()}
+                    trackId={displayTrack.libraryTrackId}
+                    onDislike={handleNextTrack}
                   />
                 )}
 
                 <div onClick={(e) => e.stopPropagation()}>
                   <PlayerTrackMenu
-                    currentTrack={currentTrack}
-                    duration={duration}
+                    currentTrack={displayTrack}
+                    duration={effectiveDisplayedDuration || duration}
                     onOverlayChange={setHasFloatingOverlayOpen}
                     onAddToCollection={handleAddToCollection}
                   />
@@ -850,15 +1291,15 @@ export function PlayerBar() {
                   </button>
                   <button
                     onClick={handlePlayPause}
-                    aria-label={isPlaying ? "Pause" : "Play"}
+                    aria-label={effectiveIsPlaying ? "Pause" : "Play"}
                     className={cn(
                       "flex h-9 w-9 items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 hover:scale-105",
                       transportButtonClass,
                     )}
                   >
-                    {isBuffering ? (
+                    {effectiveIsBuffering ? (
                       <Loader2 size={15} className="animate-spin text-black" />
-                    ) : isPlaying ? (
+                    ) : effectiveIsPlaying ? (
                       <Pause size={16} className="text-black" />
                     ) : (
                       <Play
@@ -894,7 +1335,7 @@ export function PlayerBar() {
 
                 <div className="relative mt-2 flex items-center gap-2 w-full">
                   <span className="text-[10px] text-white/40 w-9 text-right tabular-nums font-mono">
-                    {formatPlayerTime(displayedTime)}
+                    {formatPlayerTime(effectiveDisplayedTime)}
                   </span>
                   <div
                     className="group relative flex-1 cursor-pointer py-2"
@@ -904,7 +1345,7 @@ export function PlayerBar() {
                         0,
                         Math.min(1, (e.clientX - rect.left) / rect.width),
                       );
-                      seek(pct * duration);
+                      handleSeek(pct * effectiveDisplayedDuration);
                     }}
                     onPointerMove={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -914,12 +1355,14 @@ export function PlayerBar() {
                       );
                       setSeekHover({
                         pct,
-                        time: formatPlayerTime(pct * displayedDuration),
+                        time: formatPlayerTime(
+                          pct * effectiveDisplayedDuration,
+                        ),
                       });
                     }}
                     onPointerLeave={() => setSeekHover(null)}
                   >
-                    {seekHover && displayedDuration > 0 && (
+                    {seekHover && effectiveDisplayedDuration > 0 && (
                       <div
                         className="pointer-events-none absolute -top-6 -translate-x-1/2 rounded bg-black/85 px-1.5 py-0.5 text-[10px] tabular-nums text-white/90 border border-white/10"
                         style={{ left: `${seekHover.pct * 100}%` }}
@@ -952,7 +1395,7 @@ export function PlayerBar() {
                     />
                   </div>
                   <span className="text-[10px] text-white/40 w-9 tabular-nums font-mono">
-                    {formatPlayerTime(displayedDuration)}
+                    {formatPlayerTime(effectiveDisplayedDuration)}
                   </span>
                 </div>
               </div>
@@ -963,7 +1406,7 @@ export function PlayerBar() {
               {isShapedRadioTrack ? (
                 <RadioFeedback
                   sessionId={shapedRadioSessionId!}
-                  trackId={currentTrack.libraryTrackId}
+                  trackId={displayTrack.libraryTrackId}
                   onDislike={handleNextTrack}
                   size="sm"
                 />
@@ -978,21 +1421,21 @@ export function PlayerBar() {
               )}
               <button
                 onClick={handlePlayPause}
-                aria-label={isPlaying ? "Pause" : "Play"}
+                aria-label={effectiveIsPlaying ? "Pause" : "Play"}
                 className={cn(
                   "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 active:scale-95",
                   transportButtonClass,
                 )}
               >
-                {isBuffering ? (
+                {effectiveIsBuffering ? (
                   <Loader2 size={15} className="animate-spin text-black" />
-                ) : isPlaying ? (
+                ) : effectiveIsPlaying ? (
                   <Pause size={16} className="text-black" />
                 ) : (
                   <Play size={16} className="text-black ml-0.5" fill="black" />
                 )}
               </button>
-              {isShapedRadioTrack ? (
+              {isShapedRadioTrack && !isRemoteConnectActive ? (
                 <button
                   onTouchStart={prepareFullscreenPlayer}
                   onClick={openFullscreenPlayer}
@@ -1027,21 +1470,18 @@ export function PlayerBar() {
 
                 {/* Volume */}
                 <PlayerVolumeControl
-                  volume={volume}
-                  onVolumeChange={setVolume}
+                  volume={effectiveVolume}
+                  onVolumeChange={handleVolumeChange}
                   onOverlayChange={setHasFloatingOverlayOpen}
                 />
 
-                {/* Device (placeholder) */}
-                <button
-                  className="hidden rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60 xl:block"
-                  aria-label="Connect device"
-                >
-                  <Airplay size={16} />
-                </button>
+                <PlaybackTargetMenu
+                  onOverlayChange={setHasFloatingOverlayOpen}
+                  targetContext={playbackTargetContext}
+                />
 
                 {/* Equalizer (hidden when extended player is open) */}
-                {!extendedOpen && allowEqualizer && (
+                {!isRemoteConnectActive && !extendedOpen && allowEqualizer && (
                   <button
                     onClick={() => {
                       triggerHaptic("selection");
@@ -1077,16 +1517,16 @@ export function PlayerBar() {
                     aria-label="Queue"
                   >
                     <ListMusic size={16} />
-                    {queue.length > 1 && (
+                    {displayQueue.length > 1 && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
-                        {queue.length - currentIndex - 1}
+                        {displayQueue.length - displayCurrentIndex - 1}
                       </span>
                     )}
                   </button>
                 )}
 
                 {/* Lyrics (hidden when extended player is open) */}
-                {!extendedOpen && (
+                {!isRemoteConnectActive && !extendedOpen && (
                   <button
                     onClick={handleToggleLyrics}
                     onMouseEnter={prepareLyricsPanel}
@@ -1103,19 +1543,21 @@ export function PlayerBar() {
                 )}
 
                 {/* Extended / Full player */}
-                <button
-                  onClick={handleToggleExtendedPlayer}
-                  onMouseEnter={prepareExtendedPlayer}
-                  onFocus={prepareExtendedPlayer}
-                  className={`rounded-md p-1.5 transition-colors hover:bg-white/5 ${
-                    extendedOpen
-                      ? "text-primary"
-                      : "text-white/30 hover:text-white/60"
-                  }`}
-                  aria-label="Expand player"
-                >
-                  <Maximize2 size={16} />
-                </button>
+                {!isRemoteConnectActive && (
+                  <button
+                    onClick={handleToggleExtendedPlayer}
+                    onMouseEnter={prepareExtendedPlayer}
+                    onFocus={prepareExtendedPlayer}
+                    className={`rounded-md p-1.5 transition-colors hover:bg-white/5 ${
+                      extendedOpen
+                        ? "text-primary"
+                        : "text-white/30 hover:text-white/60"
+                    }`}
+                    aria-label="Expand player"
+                  >
+                    <Maximize2 size={16} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1136,19 +1578,21 @@ export function PlayerBar() {
                   <ListMusic size={16} />
                 </button>
               )}
-              <button
-                onClick={handleToggleExtendedPlayer}
-                onMouseEnter={prepareExtendedPlayer}
-                onFocus={prepareExtendedPlayer}
-                aria-label="Expand player"
-                className={`p-1.5 hover:bg-white/5 rounded-md transition-colors ${
-                  extendedOpen
-                    ? "text-primary"
-                    : "text-white/30 hover:text-white/60"
-                }`}
-              >
-                <Maximize2 size={16} />
-              </button>
+              {!isRemoteConnectActive && (
+                <button
+                  onClick={handleToggleExtendedPlayer}
+                  onMouseEnter={prepareExtendedPlayer}
+                  onFocus={prepareExtendedPlayer}
+                  aria-label="Expand player"
+                  className={`p-1.5 hover:bg-white/5 rounded-md transition-colors ${
+                    extendedOpen
+                      ? "text-primary"
+                      : "text-white/30 hover:text-white/60"
+                  }`}
+                >
+                  <Maximize2 size={16} />
+                </button>
+              )}
             </div>
           </div>
         </div>

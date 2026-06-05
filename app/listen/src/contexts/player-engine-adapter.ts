@@ -1,6 +1,6 @@
 import type { Track } from "@/contexts/player-types";
 import { getStreamUrl } from "@/contexts/player-utils";
-import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
 import type { EngineTrack } from "@/lib/playback-engine";
 
 export function toEngineTrack(track: Track, eqGains?: number[]): EngineTrack {
@@ -31,4 +31,20 @@ export function toEngineTracks(
   return tracks.map((track) =>
     toEngineTrack(track, eqGainsByTrackId?.get(track.id)),
   );
+}
+
+export async function toFreshEngineTrack(
+  track: Track,
+  eqGains?: number[],
+): Promise<EngineTrack> {
+  await ensureFreshAuthToken();
+  return toEngineTrack(track, eqGains);
+}
+
+export async function toFreshEngineTracks(
+  tracks: Track[],
+  eqGainsByTrackId?: Map<string, number[]>,
+): Promise<EngineTrack[]> {
+  await ensureFreshAuthToken();
+  return toEngineTracks(tracks, eqGainsByTrackId);
 }

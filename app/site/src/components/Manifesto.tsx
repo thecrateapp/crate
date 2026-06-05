@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 
 export function Manifesto() {
   return (
-    <article className="relative px-5 py-14 sm:px-8 sm:py-20">
+    <article className="relative px-4 py-12 sm:px-8 sm:py-20">
       <div className="mx-auto max-w-[1500px]">
         <a
           href="/"
@@ -15,12 +15,12 @@ export function Manifesto() {
           <div className="mb-5 font-mono text-[12px] uppercase text-cyan-200">
             manifesto / full text
           </div>
-          <h1 className="max-w-4xl text-[48px] font-extrabold uppercase leading-[0.92] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[76px] lg:text-[104px]">
+          <h1 className="max-w-4xl text-[clamp(38px,11.8vw,48px)] font-extrabold uppercase leading-[0.94] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[76px] sm:leading-[0.92] lg:text-[104px]">
             The Crate Manifesto
           </h1>
         </header>
 
-        <div className="mx-auto mt-14 max-w-[820px] border-l border-cyan-200/20 pl-5 text-[16px] leading-[1.85] text-white/65 sm:pl-8">
+        <div className="mx-auto mt-12 max-w-[820px] border-l border-cyan-200/20 pl-4 text-[15px] leading-[1.85] text-white/65 sm:mt-14 sm:pl-8 sm:text-[16px]">
           <p>
             A while ago, I stopped feeling comfortable using the major streaming
             platforms. At first it was just a vague discomfort, the feeling that
@@ -44,14 +44,7 @@ export function Manifesto() {
             platforms that turn music into a supply chain optimized for
             attention capture and corporate profit.
           </p>
-
-          <div className="my-12 flex items-center gap-5">
-            <hr className="flex-1 border-cyan-200/18" />
-            <span className="font-mono text-[12px] uppercase text-cyan-200/45">
-              The system is not broken — it works exactly as designed.
-            </span>
-            <hr className="flex-1 border-cyan-200/18" />
-          </div>
+          <br />
           <p>
             The system isn't broken — it's working exactly as designed. Designed
             to extract value from artists and redistribute it upward. An
@@ -115,14 +108,7 @@ export function Manifesto() {
             audience, thirty times the income. The platforms know this math.
             They're counting on you not doing it.
           </p>
-
-          <div className="my-12 flex items-center gap-5">
-            <hr className="flex-1 border-cyan-200/18" />
-            <span className="font-mono text-[12px] uppercase text-cyan-200/45">
-              This is bigger than music.
-            </span>
-            <hr className="flex-1 border-cyan-200/18" />
-          </div>
+          <br />
           <p>
             This is bigger than music. It's the same logic that turns housing
             into investment vehicles, food delivery into gig exploitation, and
@@ -170,43 +156,6 @@ export function Manifesto() {
           <p className="text-[18px] font-medium leading-[1.7] text-white/85">
             Own your music. Support your artists. Refuse the middleman. Resist.
           </p>
-
-          <div className="my-12 flex items-center gap-5">
-            <hr className="flex-1 border-cyan-200/18" />
-            <span className="font-mono text-[12px] uppercase text-cyan-200/45">
-              The manifesto is the start.
-            </span>
-            <hr className="flex-1 border-cyan-200/18" />
-          </div>
-
-          <div className="hud-frame signal-card border border-cyan-400/20 bg-[#061014]/46 p-8 text-center sm:p-10">
-            <div className="mb-3 flex items-center justify-center gap-3">
-              <span className="signal-dot inline-block h-2 w-2 rounded-full bg-cyan-300 text-cyan-300" />
-              <p className="font-mono text-[13px] uppercase text-cyan-200">
-                Ready to act?
-              </p>
-              <span className="signal-dot inline-block h-2 w-2 rounded-full bg-cyan-300 text-cyan-300" />
-            </div>
-            <p className="mt-2 text-[15px] leading-relaxed text-white/55">
-              Crate is the next step. Run it on your own hardware, invite your
-              friends, and turn your library into a platform your community
-              actually owns.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href="https://docs.cratemusic.app"
-                className="inline-flex items-center gap-2 border border-cyan-300/45 bg-cyan-300/12 px-5 py-2.5 font-mono text-[12px] uppercase text-cyan-100 transition hover:bg-cyan-300/18"
-              >
-                Self-host Crate
-              </a>
-              <a
-                href="https://github.com/thecrateapp/crate"
-                className="inline-flex items-center gap-2 border border-white/12 bg-white/[0.04] px-5 py-2.5 font-mono text-[12px] uppercase text-white/80 transition hover:border-white/20 hover:text-white"
-              >
-                Browse the source
-              </a>
-            </div>
-          </div>
         </div>
       </div>
     </article>

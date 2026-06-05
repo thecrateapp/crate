@@ -23,6 +23,11 @@ from crate.db.repositories.auth_user_admin import (
     update_user_status,
     validate_user_status,
 )
+from crate.db.repositories.auth_user_roles import (
+    get_user_roles,
+    normalize_role_values,
+    set_user_roles,
+)
 
 
 __all__ = [
@@ -36,10 +41,13 @@ __all__ = [
     "get_user_by_id",
     "get_user_presence",
     "get_users_presence",
+    "get_user_roles",
     "list_users",
     "list_users_map_rows",
     "normalize_user_status",
+    "normalize_role_values",
     "suggest_username",
+    "set_user_roles",
     "update_user",
     "update_user_last_login",
     "update_user_location",

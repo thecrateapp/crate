@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { api } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 
 interface BandcampLinkState {
   entity_type?: string;
@@ -20,44 +21,94 @@ interface BandcampLinkState {
 interface BandcampSupportButtonProps {
   entityType: "artist" | "album";
   entityUid?: string | null;
+  fallbackArtistEntityUid?: string | null;
   className?: string;
+}
+
+interface ResolvedBandcampLink {
+  entityType: "artist" | "album";
+  link: BandcampLinkState;
+}
+
+function linkUrlForType(
+  entityType: "artist" | "album",
+  link: BandcampLinkState,
+) {
+  return entityType === "artist"
+    ? link.artist_url || link.item_url || ""
+    : link.album_url || link.item_url || "";
+}
+
+async function fetchBandcampLink(
+  entityType: "artist" | "album",
+  entityUid: string,
+) {
+  const payload = await api<BandcampLinkState>(
+    `/api/bandcamp/links/${entityType}/by-entity/${entityUid}`,
+  );
+  return linkUrlForType(entityType, payload) ? payload : null;
 }
 
 export function BandcampSupportButton({
   entityType,
   entityUid,
+  fallbackArtistEntityUid,
   className = "",
 }: BandcampSupportButtonProps) {
-  const [link, setLink] = useState<BandcampLinkState | null>(null);
+  const [resolved, setResolved] = useState<ResolvedBandcampLink | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!entityUid) {
-      setLink(null);
+    if (!entityUid && !(entityType === "album" && fallbackArtistEntityUid)) {
+      setResolved(null);
       return;
     }
-    api<BandcampLinkState>(
-      `/api/bandcamp/links/${entityType}/by-entity/${entityUid}`,
-    )
-      .then((payload) => {
-        const url = payload.item_url || payload.album_url || payload.artist_url;
-        setLink(url ? payload : null);
-      })
-      .catch(() => setLink(null));
-  }, [entityType, entityUid]);
+    let cancelled = false;
+    async function load() {
+      try {
+        const primary = entityUid
+          ? await fetchBandcampLink(entityType, entityUid)
+          : null;
+        if (cancelled) return;
+        if (primary) {
+          setResolved({ entityType, link: primary });
+          return;
+        }
 
+        if (entityType === "album" && fallbackArtistEntityUid) {
+          const fallback = await fetchBandcampLink(
+            "artist",
+            fallbackArtistEntityUid,
+          );
+          if (!cancelled)
+            setResolved(
+              fallback ? { entityType: "artist", link: fallback } : null,
+            );
+          return;
+        }
+
+        setResolved(null);
+      } catch {
+        if (!cancelled) setResolved(null);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [entityType, entityUid, fallbackArtistEntityUid]);
+
+  const link = resolved?.link;
   if (!link) return null;
 
-  const url =
-    entityType === "artist"
-      ? link.artist_url || ""
-      : link.album_url || link.item_url || "";
+  const resolvedEntityType = resolved.entityType;
+  const url = linkUrlForType(resolvedEntityType, link);
   if (!url) return null;
   const latestImportStatus = link.latest_import_status || "";
   const importInProgress = ["queued", "downloading", "importing"].includes(
     latestImportStatus,
   );
-  const ownedAlbum = entityType === "album" && Boolean(link.user_owned);
+  const ownedAlbum = resolvedEntityType === "album" && Boolean(link.user_owned);
   const canImport =
     ownedAlbum &&
     link.bandcamp_item_id &&
@@ -68,7 +119,7 @@ export function BandcampSupportButton({
     ? "Importing from Bandcamp"
     : "Owned on Bandcamp";
   const label =
-    entityType === "artist"
+    resolvedEntityType === "artist"
       ? "Support on Bandcamp"
       : canImport
         ? "Import from Bandcamp"
@@ -105,7 +156,7 @@ export function BandcampSupportButton({
       }
       return;
     }
-    window.open(url, "_blank", "noopener,noreferrer");
+    await openExternalUrl(url);
   };
 
   return (

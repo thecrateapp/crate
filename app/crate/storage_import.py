@@ -147,12 +147,9 @@ def resolve_import_album_target(
     artist = ensure_import_artist(artist_name)
 
     folder_name = str(artist.get("folder_name") or "")
-    artist_uid = str(
-        entity_uid_for(artist, "entity_uid") or artist_entity_uid(name=artist["name"])
-    )
-    is_managed_artist = bool(artist_uid) and (
-        folder_name == artist_uid or looks_like_entity_uid(folder_name)
-    )
+    stored_artist_uid = entity_uid_for(artist, "entity_uid")
+    artist_uid = str(stored_artist_uid or artist_entity_uid(name=artist["name"]))
+    is_managed_artist = bool(stored_artist_uid) or looks_like_entity_uid(folder_name)
 
     # For managed artists, always use V2 layout
     if is_managed_artist and artist_uid:

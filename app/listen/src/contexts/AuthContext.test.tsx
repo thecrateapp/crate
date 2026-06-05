@@ -254,4 +254,28 @@ describe("AuthProvider", () => {
       true,
     );
   });
+
+  it("does not navigate pending OAuth when rehydration remains unauthenticated", async () => {
+    apiMock.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AuthProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("anon")).toBeTruthy();
+
+    consumePendingOAuthNextMock.mockReturnValueOnce("/stats");
+    window.dispatchEvent(new CustomEvent("crate:auth-token-received"));
+
+    await waitFor(() => {
+      expect(apiMock).toHaveBeenCalledTimes(2);
+    });
+    expect(navigateMock).not.toHaveBeenCalledWith("/stats", {
+      replace: true,
+    });
+  });
 });

@@ -30,9 +30,9 @@ function InstallerBlock() {
   }
 
   return (
-    <div className="mt-6 max-w-3xl">
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 py-2">
-        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[14px] leading-7 text-cyan-100 sm:text-[15px]">
+    <div className="mt-6 max-w-3xl overflow-hidden">
+      <div className="mt-2 flex flex-col items-start gap-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-2">
+        <code className="w-full min-w-0 overflow-x-auto whitespace-nowrap rounded-sm border border-cyan-200/12 bg-black/20 px-3 py-2 font-mono text-[12px] leading-6 text-cyan-100 sm:flex-1 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-[15px] sm:leading-7">
           <span className="select-none text-cyan-200/45" aria-hidden="true">
             $
           </span>{" "}
@@ -75,9 +75,9 @@ function InstallerBlock() {
 
 export function Hero() {
   return (
-    <section className="relative border-b border-white/10 px-5 py-10 sm:px-8 sm:py-14">
+    <section className="relative border-b border-white/10 px-4 py-10 sm:px-8 sm:py-14">
       <div className="hud-frame mx-auto flex max-w-[1500px] px-0 py-2 lg:min-h-[calc(100svh-7rem)] lg:items-start lg:pt-8">
-        <div className="relative isolate max-w-[1120px]">
+        <div className="relative isolate w-full max-w-[1120px]">
           <img
             src="/icons/logo.svg"
             alt=""
@@ -89,11 +89,11 @@ export function Hero() {
             <p className="mb-5 font-mono text-[12px] uppercase text-cyan-200">
               FREE MUSIC PLATFORM / OPEN SOURCE / SELF HOSTED
             </p>
-            <h1 className="max-w-[12ch] text-[58px] font-extrabold uppercase leading-[0.86] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[92px] lg:text-[82px] xl:text-[90px] 2xl:text-[108px]">
+            <h1 className="max-w-full text-[clamp(42px,13.5vw,58px)] font-extrabold uppercase leading-[0.88] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:max-w-[12ch] sm:text-[92px] sm:leading-[0.86] lg:text-[82px] xl:text-[90px] 2xl:text-[108px]">
               Crate is not a streaming service.
             </h1>
 
-            <p className="mt-5 text-[28px] font-extrabold uppercase leading-none tracking-normal text-cyan-200 [text-shadow:0_0_24px_rgba(103,232,249,0.22)] sm:text-[42px] lg:text-[48px]">
+            <p className="mt-5 text-[clamp(23px,7vw,28px)] font-extrabold uppercase leading-none tracking-normal text-cyan-200 [text-shadow:0_0_24px_rgba(103,232,249,0.22)] sm:text-[42px] lg:text-[48px]">
               Is a tool for revolution
             </p>
 

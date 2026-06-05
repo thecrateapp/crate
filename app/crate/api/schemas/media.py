@@ -142,6 +142,39 @@ class EqFeaturesResponse(BaseModel):
     instrumentalness: float | None = None
 
 
+class EffectiveEqResponse(BaseModel):
+    trackId: int
+    trackEntityUid: str | None = None
+    albumId: int | None = None
+    albumEntityUid: str | None = None
+    gains: list[float] = Field(default_factory=list)
+    source: str
+    label: str
+    reasoning: str = ""
+    scope: str | None = None
+    targetType: str | None = None
+    targetEntityUid: str | None = None
+    userId: int | None = None
+    genre: dict[str, Any] | None = None
+    inheritedFrom: dict[str, str] | None = None
+
+
+class EqualizerPresetMutationRequest(BaseModel):
+    gains: list[float] = Field(min_length=10, max_length=10)
+    label: str = ""
+    reasoning: str = ""
+
+
+class EqualizerPresetMutationResponse(OkResponse):
+    preset: EffectiveEqResponse | None = None
+
+
+class AlbumEqualizerPresetMutationResponse(OkResponse):
+    albumId: int
+    albumEntityUid: str | None = None
+    preset: dict[str, Any] | None = None
+
+
 class GenreRefResponse(BaseModel):
     slug: str
     name: str

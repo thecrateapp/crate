@@ -5,13 +5,16 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.tx import optional_scope
+from crate.track_versions import track_song_identity
 
 
 def _seed_context_from_rows(rows) -> dict:
     artists: list[str] = []
     track_ids: list[int] = []
+    song_keys: list[str] = []
     seen_artists: set[str] = set()
     seen_track_ids: set[int] = set()
+    seen_song_keys: set[str] = set()
     for row in rows:
         artist = (row.get("artist") or "").strip()
         artist_key = artist.lower()
@@ -26,10 +29,17 @@ def _seed_context_from_rows(rows) -> dict:
             if track_id not in seen_track_ids:
                 seen_track_ids.add(track_id)
                 track_ids.append(track_id)
+        song_identity = track_song_identity(row)
+        if song_identity:
+            song_key = f"{song_identity[0]}::{song_identity[1]}"
+            if song_key not in seen_song_keys:
+                seen_song_keys.add(song_key)
+                song_keys.append(song_key)
     return {
         "seed_artists": artists[:24],
         "seed_genres": [],
         "seed_track_ids": track_ids[:80],
+        "seed_song_keys": song_keys[:80],
     }
 
 
@@ -98,6 +108,7 @@ def get_album_seed_context(
                 SELECT
                     t.id AS track_id,
                     t.artist,
+                    t.title,
                     t.bliss_vector,
                     a.name AS album,
                     a.artist AS album_artist
@@ -151,7 +162,7 @@ def get_playlist_seed_context(
             s.execute(
                 text(
                     """
-                SELECT lt.id AS track_id, lt.artist, lt.bliss_vector
+                SELECT lt.id AS track_id, lt.artist, lt.title, lt.bliss_vector
                 FROM (
                     SELECT
                         pt.*,
@@ -302,6 +313,7 @@ def get_home_playlist_seed_context(
             {
                 "track_id": row["track_id"],
                 "artist": (row.get("artist") or "").strip(),
+                "title": (row.get("title") or "").strip(),
             }
         )
 

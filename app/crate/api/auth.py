@@ -1,7 +1,7 @@
+import base64
+import hashlib
 import logging
 import os
-import hashlib
-import base64
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
@@ -10,30 +10,23 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
 import requests
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
+from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
-from starlette.responses import Response, RedirectResponse, JSONResponse
 
-from crate.auth import (
-    create_jwt,
-    create_refresh_jwt,
-    hash_password,
-    verify_jwt,
-    verify_password,
-    verify_refresh_jwt,
-    JWT_EXPIRY_HOURS,
-    LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
-    LISTEN_REFRESH_TOKEN_EXPIRY_DAYS,
-)
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
     merge_responses,
 )
-from crate.api.permissions import ALL_CAPABILITIES, ROLE_CAPABILITIES
-from crate.api.permissions import get_user_capabilities, normalize_role
-from crate.api.permissions import require_permission, validate_role
+from crate.api.permissions import (
+    ALL_CAPABILITIES,
+    ROLE_CAPABILITIES,
+    get_user_capabilities,
+    require_permission,
+    validate_roles,
+)
 from crate.api.schemas.auth import (
     AdminAuthConfigResponse,
     AdminSetPasswordRequest,
@@ -46,8 +39,8 @@ from crate.api.schemas.auth import (
     AuthLoginResponse,
     AuthMeResponse,
     AuthProviderResponse,
-    AuthRefreshResponse,
     AuthProvidersResponse,
+    AuthRefreshResponse,
     AuthSessionResponse,
     AuthUserPublicResponse,
     ChangePasswordRequest,
@@ -66,7 +59,19 @@ from crate.api.schemas.auth import (
     UpdateUserStatusRequest,
 )
 from crate.api.schemas.common import OkResponse
+from crate.auth import (
+    JWT_EXPIRY_HOURS,
+    LISTEN_ACCESS_TOKEN_EXPIRY_HOURS,
+    LISTEN_REFRESH_TOKEN_EXPIRY_DAYS,
+    create_jwt,
+    create_refresh_jwt,
+    hash_password,
+    verify_jwt,
+    verify_password,
+    verify_refresh_jwt,
+)
 from crate.db.audit import log_audit
+from crate.db.cache_settings import get_setting, set_setting
 from crate.db.repositories.auth import (
     consume_auth_invite,
     count_users,
@@ -86,6 +91,7 @@ from crate.db.repositories.auth import (
     list_users,
     revoke_other_sessions,
     revoke_session,
+    set_user_roles,
     touch_session,
     unlink_user_external_identity,
     update_user,
@@ -95,7 +101,6 @@ from crate.db.repositories.auth import (
 )
 from crate.db.repositories.library_contributions import list_user_album_contributions
 from crate.db.repositories.tasks import create_task
-from crate.db.cache_settings import get_setting, set_setting
 
 log = logging.getLogger(__name__)
 
@@ -550,12 +555,14 @@ def _request_device_fingerprint(
 
 
 def _user_public(user: dict) -> dict:
+    roles = validate_roles(user.get("roles") or [user.get("role")])
     return {
         "id": user["id"],
         "email": user["email"],
         "name": user["name"],
         "avatar": user["avatar"],
-        "role": user["role"],
+        "role": roles[0],
+        "roles": roles,
     }
 
 
@@ -575,6 +582,9 @@ def _ensure_user_active(user: dict | None) -> dict:
 def _with_capabilities(user: dict) -> dict:
     payload = dict(user)
     payload["status"] = _user_status(payload)
+    roles = validate_roles(payload.get("roles") or [payload.get("role")])
+    payload["role"] = roles[0]
+    payload["roles"] = roles
     payload["capabilities"] = sorted(get_user_capabilities(payload))
     return payload
 
@@ -588,23 +598,21 @@ def _admin_capable_roles() -> set[str]:
 
 
 def _is_active_admin_capable(user: dict) -> bool:
-    return (
-        _user_status(user) == "active"
-        and normalize_role(user.get("role")) in _admin_capable_roles()
+    return _user_status(user) == "active" and "admin.access" in get_user_capabilities(
+        user
     )
 
 
-def _ensure_role_change_is_safe(actor: dict, target: dict, next_role: str) -> None:
-    next_role = validate_role(next_role)
-    current_role = normalize_role(target.get("role"))
-    if actor.get("id") == target.get("id") and next_role not in _admin_capable_roles():
+def _ensure_role_change_is_safe(
+    actor: dict, target: dict, next_roles: list[str]
+) -> None:
+    next_roles = validate_roles(next_roles)
+    next_capabilities = get_user_capabilities({"roles": next_roles})
+    if actor.get("id") == target.get("id") and "admin.access" not in next_capabilities:
         raise HTTPException(
             status_code=400, detail="Cannot remove your own admin access"
         )
-    if (
-        current_role not in _admin_capable_roles()
-        or next_role in _admin_capable_roles()
-    ):
+    if not _is_active_admin_capable(target) or "admin.access" in next_capabilities:
         return
 
     remaining_admins = [
@@ -1242,6 +1250,38 @@ class AuthMiddleware:
     def __init__(self, app: ASGIApp):
         self.app = app
 
+    def _resolve_token_user(self, token: str) -> dict | None:
+        payload = verify_jwt(token)
+        if not payload:
+            return None
+
+        from crate.api.auth_cache import get_cached_session, get_cached_user
+
+        session_id = payload.get("sid")
+        session = get_cached_session(session_id) if session_id else None
+        if session_id and (
+            not session
+            or session.get("revoked_at") is not None
+            or (
+                session.get("expires_at")
+                and session["expires_at"] <= datetime.now(timezone.utc)
+            )
+        ):
+            return None
+
+        current_user = get_cached_user(payload["user_id"])
+        if not current_user or _user_status(current_user) != "active":
+            return None
+
+        return {
+            "id": current_user["id"],
+            "email": current_user["email"],
+            "role": current_user.get("role", "user"),
+            "username": current_user.get("username"),
+            "name": current_user.get("name"),
+            "session_id": payload.get("sid"),
+        }
+
     async def resolve_user(self, request: Request) -> dict | None:
         user = None
 
@@ -1254,41 +1294,16 @@ class AuthMiddleware:
         if not token:
             token = request.query_params.get("token")
         # 3. Cookie auth — try app-specific cookie first, then default
-        if not token:
-            for cookie_name in _auth_cookie_candidates(request):
-                token = request.cookies.get(cookie_name)
-                if token:
-                    break
-
         if token:
-            payload = verify_jwt(token)
-            if payload:
-                from crate.api.auth_cache import get_cached_session, get_cached_user
-
-                session_id = payload.get("sid")
-                session = get_cached_session(session_id) if session_id else None
-                if session_id and (
-                    not session
-                    or session.get("revoked_at") is not None
-                    or (
-                        session.get("expires_at")
-                        and session["expires_at"] <= datetime.now(timezone.utc)
-                    )
-                ):
-                    payload = None
-            if payload:
-                current_user = get_cached_user(payload["user_id"])
-                if current_user and _user_status(current_user) == "active":
-                    user = {
-                        "id": current_user["id"],
-                        "email": current_user["email"],
-                        "role": current_user.get("role", "user"),
-                        "username": current_user.get("username"),
-                        "name": current_user.get("name"),
-                        "session_id": payload.get("sid"),
-                    }
-                else:
-                    user = None
+            user = self._resolve_token_user(token)
+        else:
+            for cookie_name in _auth_cookie_candidates(request):
+                cookie_token = request.cookies.get(cookie_name)
+                if not cookie_token:
+                    continue
+                user = self._resolve_token_user(cookie_token)
+                if user:
+                    break
 
         if not user:
             # Only trust Remote-User from a trusted reverse proxy that knows
@@ -1609,7 +1624,8 @@ async def auth_me(request: Request):
         "email": user["email"],
         "name": None,
         "avatar": None,
-        "role": user["role"],
+        "role": validate_roles(user.get("roles") or [user.get("role")])[0],
+        "roles": validate_roles(user.get("roles") or [user.get("role")]),
         "capabilities": sorted(get_user_capabilities(user)),
     }
 
@@ -2447,8 +2463,8 @@ async def admin_list_auth_invites(request: Request):
 )
 async def admin_create_user(request: Request, body: CreateUserRequest):
     admin_user = _require_users_create(request)
-    role = validate_role(body.role)
-    if role != "user":
+    roles = validate_roles(body.roles or [body.role])
+    if roles != ["user"]:
         _require_roles_assign(request)
     if len(body.password) < 8:
         raise HTTPException(
@@ -2459,13 +2475,15 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
         raise HTTPException(status_code=409, detail="Email already registered")
     pw_hash = hash_password(body.password)
     user = create_user(
-        email=body.email, name=body.name, password_hash=pw_hash, role=role
+        email=body.email, name=body.name, password_hash=pw_hash, role=roles[0]
     )
+    set_user_roles(user["id"], roles, assigned_by=admin_user.get("id"))
+    user = get_user_by_id(user["id"]) or user
     log_audit(
         "create_user",
         "user",
         body.email,
-        details={"role": role, "source": "admin"},
+        details={"role": roles[0], "roles": roles, "source": "admin"},
         user_id=admin_user.get("id"),
     )
     return _user_public(user)
@@ -2509,16 +2527,17 @@ async def admin_update_user_role(
     request: Request, user_id: int, body: UpdateUserRoleRequest
 ):
     admin_user = _require_roles_assign(request)
-    next_role = validate_role(body.role)
+    next_roles = validate_roles(body.roles or [body.role])
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    previous_role = normalize_role(user.get("role"))
-    if previous_role == next_role:
+    previous_roles = validate_roles(user.get("roles") or [user.get("role")])
+    if previous_roles == next_roles:
         return await admin_get_user_detail(request, user_id)
 
-    _ensure_role_change_is_safe(admin_user, user, next_role)
-    updated = update_user(user_id, role=next_role)
+    _ensure_role_change_is_safe(admin_user, user, next_roles)
+    set_user_roles(user_id, next_roles, assigned_by=admin_user.get("id"))
+    updated = get_user_by_id(user_id)
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
     _invalidate_auth_user(user_id)
@@ -2527,9 +2546,9 @@ async def admin_update_user_role(
         "user",
         updated["email"],
         details={
-            "before": {"role": previous_role},
-            "after": {"role": next_role},
-            "changed_fields": ["role"],
+            "before": {"roles": previous_roles},
+            "after": {"roles": next_roles},
+            "changed_fields": ["role", "roles"],
             "source": "admin",
         },
         user_id=admin_user.get("id"),

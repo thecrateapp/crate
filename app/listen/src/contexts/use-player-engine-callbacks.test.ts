@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutableRefObject } from "react";
 
 import type { GaplessPlayerCallbacks } from "@/lib/gapless-player";
+import { seekTo as gaplessSeekTo } from "@/lib/gapless-player";
 import type { PlaySource, Track } from "@/contexts/player-types";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
 
@@ -104,5 +105,18 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.bufferingIntentRef.current).toBe(false);
     expect(options.commitIsBuffering).toHaveBeenCalledWith(false);
     expect(options.commitCurrentTime).toHaveBeenCalledWith(12);
+  });
+
+  it("applies a deferred seek when the active track finishes loading", () => {
+    const options = createOptions();
+    options.pendingRestoreTimeRef.current = 42;
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onLoad?.("/stream/a", true, 120_000);
+
+    expect(gaplessSeekTo).toHaveBeenCalledWith(42_000);
+    expect(options.commitCurrentTime).toHaveBeenCalledWith(42);
+    expect(options.markSeekPosition).toHaveBeenCalledWith(42);
+    expect(options.pendingRestoreTimeRef.current).toBe(0);
   });
 });

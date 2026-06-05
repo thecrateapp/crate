@@ -3,6 +3,7 @@ import logging
 from collections import Counter
 
 import requests
+from requests import RequestException
 
 from crate.db.cache_store import get_cache, set_cache
 
@@ -48,12 +49,22 @@ def _normalize_cached_songs(value) -> list[dict] | None:
 
 
 def _api_key() -> str | None:
-    return os.environ.get("SETLISTFM_API_KEY")
+    env_key = os.environ.get("SETLISTFM_API_KEY")
+    if env_key:
+        return env_key
+    try:
+        from crate.db.cache_settings import get_setting
+
+        return get_setting("setlistfm_api_key")
+    except Exception:
+        log.debug("Could not read Setlist.fm API key from settings", exc_info=True)
+        return None
 
 
 def _api_get(endpoint: str, params: dict | None = None) -> dict | None:
     key = _api_key()
     if not key:
+        log.debug("Setlist.fm API key is not configured")
         return None
     try:
         resp = requests.get(
@@ -62,10 +73,31 @@ def _api_get(endpoint: str, params: dict | None = None) -> dict | None:
             params=params or {},
             timeout=10,
         )
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            log.warning(
+                "Setlist.fm API call failed: endpoint=%s status=%s params=%s body=%s",
+                endpoint,
+                resp.status_code,
+                params or {},
+                resp.text[:300],
+            )
+            return None
         return resp.json()
-    except Exception:
-        log.debug("Setlist.fm API call failed: %s", endpoint)
+    except RequestException as exc:
+        log.warning(
+            "Setlist.fm API request failed: endpoint=%s params=%s error=%s",
+            endpoint,
+            params or {},
+            exc,
+        )
+        return None
+    except ValueError as exc:
+        log.warning(
+            "Setlist.fm API returned invalid JSON: endpoint=%s params=%s error=%s",
+            endpoint,
+            params or {},
+            exc,
+        )
         return None
 
 

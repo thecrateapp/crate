@@ -210,21 +210,95 @@ def get_duplicate_tracks() -> list[dict]:
 
     Rows with broken metadata (empty title, track number 0, duration 0) are
     handled by shadow-quality repair instead of being reported as duplicates.
+    Ambiguous candidates are deliberately excluded because the duplicate-track
+    fixer is destructive and only safe when every copy belongs to the same
+    physical album directory, has matching duration, and matches the canonical
+    album identity. Conflicting audio fingerprints are only reported when the
+    durations are near-identical; the fixer then requires readable tags before
+    it quarantines anything.
     """
     with read_scope() as session:
         rows = (
             session.execute(
                 text("""
-            SELECT album_id, artist, title, album, track_number, disc_number,
-                   COUNT(*) AS cnt,
-                   array_agg(path ORDER BY path) AS paths
-            FROM library_tracks
-            WHERE album_id IS NOT NULL
-              AND NULLIF(BTRIM(title), '') IS NOT NULL
-              AND COALESCE(track_number, 0) > 0
-              AND COALESCE(duration, 0) > 1
-            GROUP BY album_id, artist, title, album, track_number, disc_number
-            HAVING COUNT(*) > 1
+            WITH candidates AS (
+                SELECT
+                    lt.album_id,
+                    la.artist AS artist,
+                    la.name AS album,
+                    lt.title,
+                    lt.track_number,
+                    lt.disc_number,
+                    COUNT(*) AS cnt,
+                    array_agg(lt.path ORDER BY lt.path) AS paths,
+                    array_agg(lt.id ORDER BY lt.path) AS track_ids,
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'id', lt.id,
+                            'path', lt.path,
+                            'filename', lt.filename,
+                            'format', lt.format,
+                            'bitrate', lt.bitrate,
+                            'sample_rate', lt.sample_rate,
+                            'bit_depth', lt.bit_depth,
+                            'duration', lt.duration,
+                            'size', lt.size,
+                            'has_audio_fingerprint',
+                                NULLIF(lt.audio_fingerprint, '') IS NOT NULL,
+                            'audio_fingerprint_source',
+                                lt.audio_fingerprint_source
+                        )
+                        ORDER BY lt.path
+                    ) AS tracks,
+                    COUNT(*) FILTER (
+                        WHERE NULLIF(lt.audio_fingerprint, '') IS NOT NULL
+                    ) AS fingerprinted_count,
+                    COUNT(*) FILTER (
+                        WHERE NULLIF(lt.audio_fingerprint, '') IS NULL
+                    ) AS missing_fingerprint_count,
+                    COUNT(DISTINCT regexp_replace(lt.path, '/[^/]+$', '')) AS parent_count,
+                    MAX(lt.duration) - MIN(lt.duration) AS duration_delta,
+                    COUNT(DISTINCT NULLIF(lt.audio_fingerprint, '')) AS fingerprint_count,
+                    COUNT(*) FILTER (
+                        WHERE LOWER(COALESCE(lt.artist, '')) <> LOWER(COALESCE(la.artist, ''))
+                           OR LOWER(COALESCE(lt.album, '')) <> LOWER(COALESCE(la.name, ''))
+                    ) AS db_identity_mismatches
+                FROM library_tracks lt
+                JOIN library_albums la ON la.id = lt.album_id
+                WHERE lt.album_id IS NOT NULL
+                  AND NULLIF(BTRIM(lt.title), '') IS NOT NULL
+                  AND COALESCE(lt.track_number, 0) > 0
+                  AND COALESCE(lt.duration, 0) > 1
+                GROUP BY
+                    lt.album_id,
+                    la.artist,
+                    la.name,
+                    lt.title,
+                    lt.track_number,
+                    lt.disc_number
+                HAVING COUNT(*) > 1
+            )
+            SELECT
+                album_id,
+                artist,
+                title,
+                album,
+                track_number,
+                disc_number,
+                cnt,
+                paths,
+                track_ids,
+                tracks,
+                fingerprinted_count,
+                missing_fingerprint_count
+            FROM candidates
+            WHERE parent_count = 1
+              AND duration_delta <= 1.0
+              AND (
+                fingerprint_count <= 1
+                OR duration_delta <= 0.25
+              )
+              AND db_identity_mismatches = 0
             ORDER BY artist, album, disc_number, track_number, title
         """)
             )

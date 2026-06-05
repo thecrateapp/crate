@@ -71,9 +71,33 @@ def create_library_genres_schema(cur) -> None:
             target_genre_id INTEGER NOT NULL REFERENCES genre_taxonomy_nodes(id) ON DELETE CASCADE,
             relation_type TEXT NOT NULL,
             weight DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+            source TEXT NOT NULL DEFAULT 'manual',
+            confidence DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+            evidence_json JSONB,
+            created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            locked BOOLEAN NOT NULL DEFAULT FALSE,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (source_genre_id, target_genre_id, relation_type)
         )
     """)
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'"
+    )
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION NOT NULL DEFAULT 1.0"
+    )
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS evidence_json JSONB"
+    )
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id) ON DELETE SET NULL"
+    )
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    cur.execute(
+        "ALTER TABLE genre_taxonomy_edges ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+    )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_genre_taxonomy_alias_genre_id ON genre_taxonomy_aliases(genre_id)"
     )

@@ -1,6 +1,10 @@
 from datetime import date
 
-from crate.db.home_builder_upcoming_feed import _build_release_items, _build_show_items
+from crate.db.home_builder_upcoming_feed import (
+    _build_release_items,
+    _build_show_items,
+    _load_probable_setlists,
+)
 
 
 def test_build_release_items_preserves_card_ready_metadata():
@@ -84,3 +88,54 @@ def test_build_show_items_preserves_home_card_metadata():
         "user_attending": True,
         "probable_setlist": [{"title": "Pure Morning"}],
     }
+
+
+def test_load_probable_setlists_uses_cached_values_and_fetches_missing(monkeypatch):
+    cached = {"Placebo": [{"title": "Pure Morning"}]}
+    fetched: list[str] = []
+
+    def fake_cached(artist_name: str):
+        return cached.get(artist_name)
+
+    def fake_live(artist_name: str):
+        fetched.append(artist_name)
+        return [{"title": "Una historia con las manos"}]
+
+    monkeypatch.setattr("crate.setlistfm.get_cached_probable_setlist", fake_cached)
+    monkeypatch.setattr("crate.setlistfm.get_probable_setlist", fake_live)
+
+    result = _load_probable_setlists(
+        ["Placebo", "Biznaga"],
+        live_fetch_limit=1,
+    )
+
+    assert result == {
+        "Placebo": [{"title": "Pure Morning"}],
+        "Biznaga": [{"title": "Una historia con las manos"}],
+    }
+    assert fetched == ["Biznaga"]
+
+
+def test_load_probable_setlists_limits_live_fetches(monkeypatch):
+    fetched: list[str] = []
+
+    monkeypatch.setattr(
+        "crate.setlistfm.get_cached_probable_setlist", lambda _artist_name: None
+    )
+
+    def fake_live(artist_name: str):
+        fetched.append(artist_name)
+        return [{"title": artist_name}]
+
+    monkeypatch.setattr("crate.setlistfm.get_probable_setlist", fake_live)
+
+    result = _load_probable_setlists(
+        ["Artist A", "Artist B", "Artist C"],
+        live_fetch_limit=2,
+    )
+
+    assert result == {
+        "Artist A": [{"title": "Artist A"}],
+        "Artist B": [{"title": "Artist B"}],
+    }
+    assert fetched == ["Artist A", "Artist B"]

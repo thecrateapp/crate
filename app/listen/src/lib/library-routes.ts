@@ -1,19 +1,24 @@
 import {
   artistPagePath as _artistPagePath,
+  artistSharePath as _artistSharePath,
   artistTopTracksPath as _artistTopTracksPath,
   artistApiPath as _artistApiPath,
   artistPhotoApiUrl as _artistPhotoApiUrl,
   artistBackgroundApiUrl as _artistBackgroundApiUrl,
   albumPagePath as _albumPagePath,
+  albumSharePath as _albumSharePath,
   albumApiPath as _albumApiPath,
   albumDownloadApiPath as _albumDownloadApiPath,
   albumRelatedApiPath as _albumRelatedApiPath,
   albumCoverApiUrl as _albumCoverApiUrl,
   trackDownloadApiPath as _trackDownloadApiPath,
+  trackEffectiveEqApiPath as _trackEffectiveEqApiPath,
   trackEqFeaturesApiPath as _trackEqFeaturesApiPath,
+  trackEqPresetApiPath as _trackEqPresetApiPath,
   trackGenreApiPath as _trackGenreApiPath,
   trackInfoApiPath as _trackInfoApiPath,
   trackPlaybackApiPath as _trackPlaybackApiPath,
+  trackSharePath as _trackSharePath,
   trackOfflineManifestApiPath as _trackOfflineManifestApiPath,
   trackStreamApiPath as _trackStreamApiPath,
   isReservedArtistChildSlug as _isReservedArtistChildSlug,
@@ -29,8 +34,10 @@ import { getApiBase, getAuthToken } from "@/lib/api";
 
 // Page routes — no prefix needed (local navigation)
 export const artistPagePath = _artistPagePath;
+export const artistSharePath = _artistSharePath;
 export const artistTopTracksPath = _artistTopTracksPath;
 export const albumPagePath = _albumPagePath;
+export const albumSharePath = _albumSharePath;
 export const isReservedArtistChildSlug = _isReservedArtistChildSlug;
 
 // Image/media URLs — prefix with the active API base + append ?token=
@@ -73,7 +80,9 @@ export const albumDownloadApiPath = _albumDownloadApiPath;
 export const albumRelatedApiPath = _albumRelatedApiPath;
 export const trackInfoApiPath = _trackInfoApiPath;
 export const trackPlaybackApiPath = _trackPlaybackApiPath;
+export const trackEffectiveEqApiPath = _trackEffectiveEqApiPath;
 export const trackEqFeaturesApiPath = _trackEqFeaturesApiPath;
+export const trackEqPresetApiPath = _trackEqPresetApiPath;
 export const trackGenreApiPath = _trackGenreApiPath;
 export const trackOfflineManifestApiPath = _trackOfflineManifestApiPath;
 
@@ -94,6 +103,7 @@ export const albumCoverApiUrl = authedUrl(((input, options) =>
   )) as typeof _albumCoverApiUrl);
 export const trackStreamApiPath = _trackStreamApiPath;
 export const trackDownloadApiPath = _trackDownloadApiPath;
+export const trackSharePath = _trackSharePath;
 export const recordAssetInvalidationScope = _recordAssetInvalidationScope;
 
 export function downloadApiUrl(path: string) {

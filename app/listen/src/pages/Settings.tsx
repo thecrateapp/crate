@@ -40,6 +40,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { ServersSection } from "@/components/settings/ServersSection";
+import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import { api } from "@/lib/api";
 import { isMobileAudioRuntime } from "@/lib/mobile-audio-mode";
 import { isTauriRuntime } from "@/lib/platform";
@@ -60,18 +61,6 @@ interface AuthProviderState {
 
 interface AuthPublicConfig {
   invite_only?: boolean;
-}
-
-interface UserSession {
-  id: string;
-  created_at: string;
-  expires_at: string;
-  revoked_at?: string | null;
-  last_seen_at?: string | null;
-  last_seen_ip?: string | null;
-  user_agent?: string | null;
-  app_id?: string | null;
-  device_label?: string | null;
 }
 
 interface BandcampStatus {
@@ -1128,7 +1117,7 @@ function ScrobbleSection() {
 }
 
 function AccountSection() {
-  const { user, refetch, logout } = useAuth();
+  const { user, refetch } = useAuth();
   const [name, setName] = useState(user?.name || "");
   const [username, setUsername] = useState(user?.username || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -1141,12 +1130,6 @@ function AccountSection() {
     {},
   );
   const [authConfig, setAuthConfig] = useState<AuthPublicConfig>({});
-  const [sessions, setSessions] = useState<UserSession[]>([]);
-  const [loadingSessions, setLoadingSessions] = useState(false);
-  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
-    null,
-  );
-  const [revokingOthers, setRevokingOthers] = useState(false);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(
     null,
@@ -1165,14 +1148,6 @@ function AccountSection() {
     api<AuthPublicConfig>("/api/auth/config")
       .then(setAuthConfig)
       .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    setLoadingSessions(true);
-    api<UserSession[]>("/api/auth/sessions")
-      .then(setSessions)
-      .catch(() => {})
-      .finally(() => setLoadingSessions(false));
   }, []);
 
   async function handleSaveName() {
@@ -1252,46 +1227,6 @@ function AccountSection() {
       toast.error(`Failed to unlink ${provider}`);
     } finally {
       setUnlinkingProvider(null);
-    }
-  }
-
-  async function handleRevokeSession(sessionId: string) {
-    setRevokingSessionId(sessionId);
-    try {
-      await api(`/api/auth/sessions/${sessionId}`, "DELETE");
-      if (user?.session_id === sessionId) {
-        toast.success("This session was revoked");
-        await logout();
-        return;
-      }
-      setSessions((prev) => prev.filter((session) => session.id !== sessionId));
-      toast.success("Session revoked");
-    } catch {
-      toast.error("Failed to revoke session");
-    } finally {
-      setRevokingSessionId(null);
-    }
-  }
-
-  async function handleRevokeOthers() {
-    setRevokingOthers(true);
-    try {
-      const result = await api<{ revoked: number }>(
-        "/api/auth/sessions/revoke-all",
-        "POST",
-      );
-      setSessions((prev) =>
-        prev.filter((session) => session.id === user?.session_id),
-      );
-      toast.success(
-        `Revoked ${result.revoked} other session${
-          result.revoked === 1 ? "" : "s"
-        }`,
-      );
-    } catch {
-      toast.error("Failed to revoke other sessions");
-    } finally {
-      setRevokingOthers(false);
     }
   }
 
@@ -1415,102 +1350,7 @@ function AccountSection() {
           </div>
         ) : null}
 
-        <div className="space-y-3 rounded-xl bg-white/5 p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-medium text-foreground">
-                Active sessions
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Review where this account is signed in and revoke devices you no
-                longer trust.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled={
-                revokingOthers ||
-                sessions.filter((session) => session.id !== user?.session_id)
-                  .length === 0
-              }
-              onClick={() => void handleRevokeOthers()}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
-            >
-              {revokingOthers ? "Revoking…" : "Revoke others"}
-            </button>
-          </div>
-
-          {loadingSessions ? (
-            <div className="text-sm text-muted-foreground">
-              Loading sessions…
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sessions.map((session) => {
-                const isCurrent = session.id === user?.session_id;
-                const lastSeen = session.last_seen_at || session.created_at;
-                const label =
-                  session.device_label || session.app_id || "Unknown device";
-                return (
-                  <div
-                    key={session.id}
-                    className="flex items-start justify-between gap-4 rounded-lg border border-white/10 px-3 py-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                          <Smartphone
-                            size={14}
-                            className="text-muted-foreground"
-                          />
-                          {label}
-                        </div>
-                        {isCurrent ? (
-                          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300">
-                            Current
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Last seen{" "}
-                        {lastSeen
-                          ? new Date(lastSeen).toLocaleString()
-                          : "recently"}
-                      </div>
-                      {session.user_agent ? (
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {session.user_agent}
-                        </div>
-                      ) : null}
-                      {session.last_seen_ip ? (
-                        <div className="mt-1 text-[11px] text-white/40">
-                          IP {session.last_seen_ip}
-                        </div>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      disabled={revokingSessionId === session.id}
-                      onClick={() => void handleRevokeSession(session.id)}
-                      className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 hover:bg-red-500/15 transition-colors disabled:opacity-50"
-                    >
-                      {revokingSessionId === session.id
-                        ? "Revoking…"
-                        : isCurrent
-                          ? "Sign out"
-                          : "Revoke"}
-                    </button>
-                  </div>
-                );
-              })}
-              {sessions.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  No active sessions found.
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
+        <ConnectDevicesSection />
 
         {authConfig.invite_only ? (
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">

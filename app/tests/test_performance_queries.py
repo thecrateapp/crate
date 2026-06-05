@@ -59,7 +59,12 @@ def test_perf_browse_media_search_required_indexes_exist(pg_db):
             indexes,
             {
                 "idx_tracks_title_trgm",
+                "idx_tracks_artist_trgm",
                 "idx_albums_name_trgm",
+                "idx_albums_artist_trgm",
+                "idx_artists_search_fts",
+                "idx_albums_search_fts",
+                "idx_tracks_search_fts",
                 "idx_lib_tracks_album",
                 "idx_lib_albums_lower_artist_lower_name",
             },

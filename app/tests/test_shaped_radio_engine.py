@@ -32,6 +32,7 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
         {
             "track_id": index,
             "artist": f"Artist {index % 2}",
+            "title": f"Song {index}",
             "bliss_vector": _vector(float(index)),
         }
         for index in range(5)
@@ -53,6 +54,13 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert label == "Your recent likes"
     assert context["seed_artists"] == ["Artist 0", "Artist 1"]
     assert context["seed_track_ids"] == [0, 1, 2, 3, 4]
+    assert context["seed_song_keys"] == [
+        "artist 0::song 0",
+        "artist 1::song 1",
+        "artist 0::song 2",
+        "artist 1::song 3",
+        "artist 0::song 4",
+    ]
     assert context["discovery_excluded_artist_keys"] == ["artist 0"]
 
 
@@ -285,6 +293,163 @@ def test_discovery_radio_skips_global_bliss_fallback_when_fresh_pool_is_enough(
     assert [row["artist"] for row in rows] == ["Home Front", "Ditz", "Sprints"]
 
 
+def test_radio_dedupes_track_versions_and_prefers_studio_take(monkeypatch):
+    from crate import radio_engine
+
+    candidates = [
+        _candidate(
+            1,
+            title="Concubine (Live in Orlando, FL 3/14/2022)",
+            artist="Converge",
+            vector=_vector(0.1),
+        )
+        | {"radio_source": "similar"},
+        _candidate(
+            2,
+            title="Concubine - Radio Edit",
+            artist="Converge",
+            vector=_vector(0.08),
+        )
+        | {"radio_source": "similar"},
+        _candidate(3, title="Concubine", artist="Converge", vector=_vector(0.6))
+        | {"radio_source": "similar"},
+        _candidate(4, title="Nerdy", artist="Poison The Well", vector=_vector(0.2))
+        | {"radio_source": "similar"},
+    ]
+
+    monkeypatch.setattr(
+        radio_engine,
+        "_load_radio_graphs",
+        lambda **_kwargs: (
+            {
+                "seed artist": {
+                    "converge": 1.0,
+                    "poison the well": 0.9,
+                }
+            },
+            {
+                "seed artist": {"hardcore": 1.0},
+                "converge": {"hardcore": 1.0},
+                "poison the well": {"hardcore": 1.0},
+            },
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_seeded_radio_candidate_rows",
+        lambda *_args, **_kwargs: candidates,
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("fresh variant pool should be enough")
+        ),
+    )
+
+    session = {
+        "id": "session",
+        "current_target": _vector(0.1),
+        "seed_vector": _vector(0.1),
+        "seed_type": "discovery",
+        "seed_label": "Your recent likes",
+        "seed_artists": ["Seed Artist"],
+        "seed_genres": [],
+        "seed_track_ids": [],
+        "discovery_excluded_artist_keys": [],
+        "used_track_ids": [],
+        "used_titles": [],
+        "recent_artists": [],
+        "recent_tracks": [],
+        "disliked_vectors": [],
+    }
+
+    tracks = radio_engine._generate_batch(session, count=2)
+
+    assert [track["title"] for track in tracks if track["artist"] == "Converge"] == [
+        "Concubine"
+    ]
+    assert len({(track["artist"], track["title"]) for track in tracks}) == 2
+
+
+def test_discovery_radio_prefers_unique_artists_before_repeating(monkeypatch):
+    from crate import radio_engine
+
+    candidates = [
+        _candidate(1, title="Ocean Planet", artist="Gojira", vector=_vector(0.1))
+        | {"radio_source": "similar"},
+        _candidate(2, title="Backbone", artist="Gojira", vector=_vector(0.11))
+        | {"radio_source": "similar"},
+        _candidate(3, title="Flying Whales", artist="Gojira", vector=_vector(0.12))
+        | {"radio_source": "similar"},
+        _candidate(4, title="You Fail Me", artist="Converge", vector=_vector(0.6))
+        | {"radio_source": "similar"},
+        _candidate(5, title="Paris", artist="Birds In Row", vector=_vector(0.7))
+        | {"radio_source": "similar"},
+        _candidate(6, title="Why", artist="Chat Pile", vector=_vector(0.8))
+        | {"radio_source": "genre"},
+    ]
+
+    monkeypatch.setattr(
+        radio_engine,
+        "_load_radio_graphs",
+        lambda **_kwargs: (
+            {
+                "seed artist": {
+                    "gojira": 1.0,
+                    "converge": 0.9,
+                    "birds in row": 0.8,
+                    "chat pile": 0.7,
+                }
+            },
+            {
+                "seed artist": {"metal": 1.0},
+                "gojira": {"metal": 1.0},
+                "converge": {"hardcore": 1.0},
+                "birds in row": {"hardcore": 1.0},
+                "chat pile": {"noise rock": 1.0},
+            },
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_seeded_radio_candidate_rows",
+        lambda *_args, **_kwargs: candidates,
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "find_candidate_rows",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("fresh artist pool should be enough")
+        ),
+    )
+
+    session = {
+        "id": "session",
+        "current_target": _vector(0.1),
+        "seed_vector": _vector(0.1),
+        "seed_type": "discovery",
+        "seed_label": "Your recent likes",
+        "seed_artists": ["Seed Artist"],
+        "seed_genres": [],
+        "seed_track_ids": [],
+        "discovery_excluded_artist_keys": [],
+        "used_track_ids": [],
+        "used_titles": [],
+        "recent_artists": [],
+        "recent_tracks": [],
+        "disliked_vectors": [],
+    }
+
+    tracks = radio_engine._generate_batch(session, count=4)
+
+    assert len(tracks) == 4
+    assert len({track["artist"] for track in tracks}) == 4
+    assert [track["artist"] for track in tracks].count("Gojira") == 1
+
+
 def test_artist_radio_uses_graph_pool_instead_of_global_bliss(monkeypatch):
     from crate import radio_engine
 
@@ -377,6 +542,9 @@ def test_artist_radio_treats_bliss_as_last_resort_when_candidates_leak_in():
         _vector(1.0),
         used_ids=set(),
         used_titles=set(),
+        used_song_keys=set(),
+        batch_artist_counts={},
+        session_artist_counts={},
         recent_artists=[],
         sim_graph={"high vis": {"home front": 1.0}},
         genre_map={
@@ -488,6 +656,9 @@ def test_track_radio_keeps_bliss_meaningful_inside_contextual_pool():
         _vector(1.0),
         used_ids=set(),
         used_titles=set(),
+        used_song_keys=set(),
+        batch_artist_counts={},
+        session_artist_counts={},
         recent_artists=[],
         sim_graph={"high vis": {"home front": 1.0, "ditz": 0.52}},
         genre_map={
