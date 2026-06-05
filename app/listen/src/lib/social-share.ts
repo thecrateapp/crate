@@ -1,4 +1,4 @@
-import { CapacitorHttp, registerPlugin } from "@capacitor/core";
+import { registerPlugin } from "@capacitor/core";
 
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
@@ -30,6 +30,21 @@ export interface SharePayload {
 interface NativeInstagramStoryResult {
   available?: boolean;
   shared?: boolean;
+}
+
+interface NativeHttpResponse {
+  status: number;
+  data?: unknown;
+  headers?: Record<string, string>;
+}
+
+interface NativeHttpPlugin {
+  get(options: {
+    url: string;
+    responseType: "blob";
+    connectTimeout: number;
+    readTimeout: number;
+  }): Promise<NativeHttpResponse>;
 }
 
 interface CrateSocialSharePlugin {
@@ -516,7 +531,11 @@ async function loadCanvasImage(src: string): Promise<CanvasArtwork> {
 async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
   let response;
   try {
-    response = await CapacitorHttp.get({
+    const nativeHttp = await getNativeHttpPlugin();
+    if (!nativeHttp) {
+      throw new Error("native HTTP plugin is not available");
+    }
+    response = await nativeHttp.get({
       url: src,
       responseType: "blob",
       connectTimeout: 15_000,
@@ -542,6 +561,20 @@ async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
       ?.split(";")[0]
       ?.trim() || inferImageMimeFromUrl(src);
   return `data:${contentType};base64,${base64}`;
+}
+
+let nativeHttpPluginPromise: Promise<NativeHttpPlugin | null> | null = null;
+
+function getNativeHttpPlugin(): Promise<NativeHttpPlugin | null> {
+  nativeHttpPluginPromise ??= import("@capacitor/core")
+    .then((module) => {
+      const maybeModule = module as unknown as {
+        CapacitorHttp?: NativeHttpPlugin;
+      };
+      return maybeModule.CapacitorHttp ?? null;
+    })
+    .catch(() => null);
+  return nativeHttpPluginPromise;
 }
 
 function getResponseHeader(
