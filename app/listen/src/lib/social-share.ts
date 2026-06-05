@@ -139,7 +139,6 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
       artwork?.image ?? null,
       logo?.image ?? null,
     );
-    drawStoryFooter(ctx);
 
     return canvas.toDataURL("image/jpeg", 0.94);
   } finally {
@@ -322,19 +321,6 @@ function drawStoryBrand(
   ctx.font = "800 44px Poppins, ui-sans-serif, system-ui";
   ctx.letterSpacing = "10px";
   ctx.fillText("CRATE", 214, 433);
-  ctx.letterSpacing = "0px";
-}
-
-function drawStoryFooter(ctx: CanvasRenderingContext2D) {
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(248,250,252,0.9)";
-  ctx.font = "600 34px Poppins, ui-sans-serif, system-ui";
-  ctx.fillText("Own your music. Support your artists.", STORY_WIDTH / 2, 1658);
-  ctx.fillText("Refuse the middleman.", STORY_WIDTH / 2, 1708);
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "800 38px Poppins, ui-sans-serif, system-ui";
-  ctx.letterSpacing = "8px";
-  ctx.fillText("RESIST", STORY_WIDTH / 2, 1818);
   ctx.letterSpacing = "0px";
 }
 

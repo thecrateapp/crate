@@ -153,9 +153,6 @@ function renderStoryCard({ kind, title, subtitle, imageHref }) {
     ${renderCenteredText(subtitle, 540, 1514, 690, 43, 54, "subtitle font", 2)}
   </g>
 
-  <text x="540" y="1658" text-anchor="middle" class="font" font-size="34" font-weight="600" fill="#f8fafc" opacity="0.9">Own your music. Support your artists.</text>
-  <text x="540" y="1708" text-anchor="middle" class="font" font-size="34" font-weight="600" fill="#f8fafc" opacity="0.9">Refuse the middleman.</text>
-  <text x="540" y="1818" text-anchor="middle" class="font" font-size="38" font-weight="800" letter-spacing="8" fill="#f8fafc">RESIST</text>
 </svg>
 `;
 }
