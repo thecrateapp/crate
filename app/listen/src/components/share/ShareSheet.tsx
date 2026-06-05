@@ -86,13 +86,12 @@ export function ShareSheetHost() {
       open
       onClose={() => setPayload(null)}
       maxWidthClassName="sm:max-w-[420px]"
-      panelClassName="listen-glass-panel overflow-hidden"
+      panelClassName="listen-glass-panel overflow-hidden rounded-[28px]"
       overlayClassName="bg-black/58"
       mobileSafeArea
     >
       <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(circle_at_20%_0%,rgba(34,211,238,0.28),transparent_62%)]" />
-        <div className="relative flex items-start gap-3 border-b border-white/8 px-4 py-4">
+        <div className="relative flex items-start gap-3 border-b border-white/8 bg-black/[0.08] px-4 py-4">
           <SharePreviewImage payload={payload} />
           <div className="min-w-0 flex-1 pt-0.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
@@ -194,13 +193,13 @@ function ShareAction({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-3 text-left transition",
-        "hover:border-primary/30 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-left transition",
+        "hover:border-white/20 hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         disabled &&
-          "cursor-not-allowed opacity-45 hover:border-white/10 hover:bg-white/[0.045]",
+          "cursor-not-allowed opacity-45 hover:border-white/10 hover:bg-black/20",
       )}
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/30 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur">
         <Icon size={19} className={spinning ? "animate-spin" : ""} />
       </span>
       <span className="min-w-0 flex-1">

@@ -2,11 +2,15 @@ import { registerPlugin } from "@capacitor/core";
 
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { isNative } from "@/lib/capacitor-runtime";
+import { recordDevLog } from "@/lib/dev-logs";
 
 export const SHARE_REQUEST_EVENT = "crate:share-request";
 
 const STORY_WIDTH = 1080;
 const STORY_HEIGHT = 1920;
+const STORY_ASSET_TIMEOUT_MS = 4500;
+const STORY_FONT_TIMEOUT_MS = 1500;
+const STORY_NATIVE_SHARE_TIMEOUT_MS = 8000;
 const CRATE_LOGO_URL = "/icons/logo.svg";
 const POPPINS_600_URL = new URL(
   "../../../shared/fonts/poppins/poppins-600.woff2",
@@ -47,8 +51,13 @@ interface NativeHttpPlugin {
   }): Promise<NativeHttpResponse>;
 }
 
+interface NativeImageDataResult {
+  dataUrl?: string;
+}
+
 interface CrateSocialSharePlugin {
   canShareInstagramStory(): Promise<NativeInstagramStoryResult>;
+  loadImageDataUrl?(options: { url: string }): Promise<NativeImageDataResult>;
   shareInstagramStory(options: {
     imageDataUrl: string;
     contentUrl: string;
@@ -116,14 +125,29 @@ export async function shareInstagramStory(
     );
   }
   const imageDataUrl = await buildInstagramStoryCard(payload);
-  await nativeSocialShare.shareInstagramStory({
-    imageDataUrl,
-    contentUrl: payload.url,
-  });
+  await withTimeout(
+    nativeSocialShare.shareInstagramStory({
+      imageDataUrl,
+      contentUrl: payload.url,
+    }),
+    STORY_NATIVE_SHARE_TIMEOUT_MS,
+    "Instagram Stories did not respond",
+  );
 }
 
 async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
-  await loadInstagramStoryFonts();
+  await withTimeout(
+    loadInstagramStoryFonts(),
+    STORY_FONT_TIMEOUT_MS,
+    "Story font loading timed out",
+  ).catch((error) => {
+    recordDevLog(
+      "share",
+      "Instagram story fonts unavailable; using fallback fonts",
+      { error: formatArtworkError(error) },
+      "warn",
+    );
+  });
 
   const canvas = document.createElement("canvas");
   canvas.width = STORY_WIDTH;
@@ -131,10 +155,12 @@ async function buildInstagramStoryCard(payload: SharePayload): Promise<string> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is not available");
 
-  const artwork = payload.imageUrl
-    ? await loadCanvasImage(payload.imageUrl)
-    : null;
-  const logo = await loadCanvasImage(CRATE_LOGO_URL).catch(() => null);
+  const [artwork, logo] = await Promise.all([
+    payload.imageUrl
+      ? loadOptionalCanvasImage(payload.imageUrl, "artwork")
+      : Promise.resolve(null),
+    loadOptionalCanvasImage(CRATE_LOGO_URL, "logo"),
+  ]);
   try {
     if (artwork) {
       drawStoryArtworkBackground(
@@ -489,6 +515,27 @@ interface CanvasArtwork {
   release: () => void;
 }
 
+async function loadOptionalCanvasImage(
+  src: string,
+  label: string,
+): Promise<CanvasArtwork | null> {
+  try {
+    return await withTimeout(
+      loadCanvasImage(src),
+      STORY_ASSET_TIMEOUT_MS,
+      `${label} loading timed out`,
+    );
+  } catch (error) {
+    recordDevLog(
+      "share",
+      `Instagram story ${label} unavailable; using fallback`,
+      { error: formatArtworkError(error), src },
+      "warn",
+    );
+    return null;
+  }
+}
+
 async function loadCanvasImage(src: string): Promise<CanvasArtwork> {
   const resolvedSrc = resolveMaybeApiAssetUrl(src) || src;
   if (isNative && isHttpUrl(resolvedSrc)) {
@@ -529,6 +576,19 @@ async function loadCanvasImage(src: string): Promise<CanvasArtwork> {
 }
 
 async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
+  const pluginDataUrl = await loadNativeSharePluginImageDataUrl(src).catch(
+    (error) => {
+      recordDevLog(
+        "share",
+        "Native story artwork loader failed; falling back to CapacitorHttp",
+        { error: formatArtworkError(error), src },
+        "warn",
+      );
+      return null;
+    },
+  );
+  if (pluginDataUrl) return pluginDataUrl;
+
   let response;
   try {
     const nativeHttp = await getNativeHttpPlugin();
@@ -551,16 +611,34 @@ async function loadNativeHttpImageDataUrl(src: string): Promise<string> {
     throw new Error(`Failed to load share artwork: HTTP ${response.status}`);
   }
 
-  const base64 = typeof response.data === "string" ? response.data : "";
+  const base64 = typeof response.data === "string" ? response.data.trim() : "";
   if (!base64) {
     throw new Error("Failed to load share artwork: empty response");
   }
+  if (base64.startsWith("data:image/")) return base64;
 
   const contentType =
     getResponseHeader(response.headers, "content-type")
       ?.split(";")[0]
-      ?.trim() || inferImageMimeFromUrl(src);
+      ?.trim() ||
+    inferImageMimeFromBase64(base64) ||
+    inferImageMimeFromUrl(src);
   return `data:${contentType};base64,${base64}`;
+}
+
+async function loadNativeSharePluginImageDataUrl(
+  src: string,
+): Promise<string | null> {
+  if (!nativeSocialShare.loadImageDataUrl) return null;
+  const result = await nativeSocialShare.loadImageDataUrl({ url: src });
+  const dataUrl = result.dataUrl?.trim();
+  if (!dataUrl) {
+    throw new Error("native social image loader returned empty data");
+  }
+  if (!dataUrl.startsWith("data:image/")) {
+    throw new Error("native social image loader returned non-image data");
+  }
+  return dataUrl;
 }
 
 let nativeHttpPluginPromise: Promise<NativeHttpPlugin | null> | null = null;
@@ -569,12 +647,33 @@ function getNativeHttpPlugin(): Promise<NativeHttpPlugin | null> {
   nativeHttpPluginPromise ??= import("@capacitor/core")
     .then((module) => {
       const maybeModule = module as unknown as {
+        Capacitor?: {
+          Plugins?: {
+            CapacitorHttp?: NativeHttpPlugin;
+          };
+        };
         CapacitorHttp?: NativeHttpPlugin;
       };
-      return maybeModule.CapacitorHttp ?? null;
+      return (
+        maybeModule.CapacitorHttp ??
+        maybeModule.Capacitor?.Plugins?.CapacitorHttp ??
+        null
+      );
     })
-    .catch(() => null);
+    .catch(() => getWindowCapacitorHttpPlugin());
   return nativeHttpPluginPromise;
+}
+
+function getWindowCapacitorHttpPlugin(): NativeHttpPlugin | null {
+  if (typeof window === "undefined") return null;
+  const maybeWindow = window as unknown as {
+    Capacitor?: {
+      Plugins?: {
+        CapacitorHttp?: NativeHttpPlugin;
+      };
+    };
+  };
+  return maybeWindow.Capacitor?.Plugins?.CapacitorHttp ?? null;
 }
 
 function getResponseHeader(
@@ -599,6 +698,17 @@ function inferImageMimeFromUrl(src: string): string {
   return "image/png";
 }
 
+function inferImageMimeFromBase64(base64: string): string | null {
+  if (base64.startsWith("/9j/")) return "image/jpeg";
+  if (base64.startsWith("iVBORw0KGgo")) return "image/png";
+  if (base64.startsWith("UklGR")) return "image/webp";
+  if (base64.startsWith("R0lGOD")) return "image/gif";
+  if (base64.startsWith("PHN2Zy") || base64.startsWith("PD94bW")) {
+    return "image/svg+xml";
+  }
+  return null;
+}
+
 function safeUrlPathname(src: string): string {
   try {
     return new URL(src).pathname;
@@ -618,6 +728,20 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error("Failed to load share artwork"));
     image.src = src;
+  });
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timeoutId: number | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId != null) window.clearTimeout(timeoutId);
   });
 }
 

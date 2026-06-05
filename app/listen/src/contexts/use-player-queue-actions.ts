@@ -253,8 +253,13 @@ export function usePlayerQueueActions({
           startTrackerSession(activeTrack, nextSource);
         }
         commitIsPlaying(true);
+        void primeOfflineRuntimeProfile().catch((error) => {
+          console.warn(
+            "[offline] failed to prime profile before native load:",
+            error,
+          );
+        });
         void (async () => {
-          await primeOfflineRuntimeProfile();
           const engineTracks = await toFreshEngineTracks(tracks);
           return nativeEngine.loadQueue({
             revision: createQueueRevision(),

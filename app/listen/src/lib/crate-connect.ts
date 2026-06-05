@@ -7,8 +7,16 @@ import type {
 
 export const CONNECT_SESSION_EVENT = "crate:connect-session-updated";
 export const CONNECT_ENABLED_EVENT = "crate:connect-enabled-changed";
-export const CRATE_CONNECT_FEATURE_ENABLED =
-  import.meta.env.VITE_CRATE_CONNECT_FEATURE_ENABLED === "true";
+
+export function isCrateConnectFeatureFlagEnabled(
+  value: string | undefined,
+): boolean {
+  return value !== "false";
+}
+
+export const CRATE_CONNECT_FEATURE_ENABLED = isCrateConnectFeatureFlagEnabled(
+  import.meta.env.VITE_CRATE_CONNECT_FEATURE_ENABLED,
+);
 export const CRATE_CONNECT_V2_TRANSPORT_ENABLED = true;
 let connectEnabled = false;
 let connectPreferencesLoaded = false;
