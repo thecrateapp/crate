@@ -80,6 +80,23 @@ describe("track action shared helpers", () => {
     );
   });
 
+  it("infers track entity uid from UUID player ids", () => {
+    const uuid = "123e4567-e89b-12d3-a456-426614174000";
+
+    expect(
+      trackToMenuData({
+        id: uuid,
+        title: "Track Two",
+        artist: "Artist",
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        id: uuid,
+        entity_uid: uuid,
+      }),
+    );
+  });
+
   it("maps fetched album tracks into playable tracks with quality fields", async () => {
     apiMock.mockResolvedValueOnce({
       artist: "Artist",

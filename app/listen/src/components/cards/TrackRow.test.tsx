@@ -146,4 +146,109 @@ describe("TrackRow playback behavior", () => {
     );
     expect(playAll).not.toHaveBeenCalled();
   });
+
+  it("selects instead of playing on single click when selectable", async () => {
+    const playAll = vi.fn();
+    const onSelect = vi.fn();
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(
+      <TrackRow
+        track={track}
+        queueTracks={[track]}
+        selectable
+        onSelect={onSelect}
+      />,
+      {
+        playerActions: {
+          playAll,
+        },
+      },
+    );
+
+    await userEvent.click(screen.getByText("Track One"));
+
+    expect(onSelect).toHaveBeenCalledWith(track, expect.any(Object));
+    expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("plays from the row on double click when selectable", () => {
+    const playAll = vi.fn();
+    const tracks: TrackRowData[] = [
+      {
+        id: 1,
+        entity_uid: "entity-1",
+        title: "Track One",
+        artist: "Artist",
+        album: "Album",
+      },
+      {
+        id: 2,
+        entity_uid: "entity-2",
+        title: "Track Two",
+        artist: "Artist",
+        album: "Album",
+      },
+    ];
+
+    renderWithListenProviders(
+      <TrackRow track={tracks[0]!} queueTracks={tracks} selectable />,
+      {
+        playerActions: {
+          playAll,
+        },
+      },
+    );
+
+    fireEvent.doubleClick(screen.getByText("Track One"));
+
+    expect(playAll).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ title: "Track One" }),
+        expect.objectContaining({ title: "Track Two" }),
+      ],
+      0,
+    );
+  });
+
+  it("uses selection actions from the row menu button when selected", async () => {
+    const playAll = vi.fn();
+    const onSelectionActionMenuOpen = vi.fn(() => true);
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(
+      <TrackRow
+        track={track}
+        queueTracks={[track]}
+        selectable
+        selected
+        onSelectionActionMenuOpen={onSelectionActionMenuOpen}
+      />,
+      {
+        playerActions: {
+          playAll,
+        },
+      },
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(onSelectionActionMenuOpen).toHaveBeenCalledWith(
+      track,
+      expect.any(Object),
+    );
+    expect(playAll).not.toHaveBeenCalled();
+  });
 });

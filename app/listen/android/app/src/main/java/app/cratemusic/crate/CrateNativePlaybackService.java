@@ -215,6 +215,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 payload.put("code", error.errorCode);
                 payload.put("message", error.getMessage());
                 payload.put("trackId", currentTrack == null ? "" : currentTrack.id);
+                payload.put("index", player.getCurrentMediaItemIndex());
                 payload.put("url", currentTrack == null ? "" : redactUrl(currentTrack.url));
                 payload.put("cause", rootCause == null ? "" : rootCause.getClass().getName());
                 payload.put("causeMessage", rootCause == null ? "" : valueOrDefault(rootCause.getMessage(), ""));

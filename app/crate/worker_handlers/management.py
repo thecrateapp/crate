@@ -1012,6 +1012,136 @@ def _handle_hard_delete_quarantined_track(
     }
 
 
+def _handle_hard_delete_all_quarantined_tracks(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    lib = Path(config["library_path"])
+    trash_tracks = (_crate_trash_root(lib) / "tracks").resolve(strict=False)
+    if not trash_tracks.exists():
+        log_audit(
+            "hard_delete_all_quarantined_tracks",
+            "track",
+            ".crate-trash/tracks",
+            details={
+                "deleted": 0,
+                "skipped": 0,
+                "errors": [],
+                "bytes_deleted": 0,
+                "reason": params.get("reason"),
+            },
+            user_id=params.get("actor_user_id"),
+            task_id=task_id,
+        )
+        return {
+            "status": "ok",
+            "deleted": 0,
+            "skipped": 0,
+            "errors": [],
+            "bytes_deleted": 0,
+        }
+
+    candidates = [
+        path
+        for path in sorted(trash_tracks.rglob("*"))
+        if path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+    ]
+    progress = TaskProgress(
+        phase="hard_delete_quarantined_tracks",
+        phase_count=1,
+        total=len(candidates),
+    )
+    emit_progress(task_id, progress, force=True)
+
+    deleted = 0
+    skipped = 0
+    bytes_deleted = 0
+    errors: list[dict[str, str]] = []
+
+    for index, path in enumerate(candidates, start=1):
+        if is_cancelled(task_id):
+            return {
+                "error": "cancelled",
+                "deleted": deleted,
+                "skipped": skipped,
+                "errors": errors[-20:],
+                "bytes_deleted": bytes_deleted,
+            }
+
+        progress.done = index - 1
+        progress.item = path.name
+        try:
+            relative_path = path.relative_to(trash_tracks).as_posix()
+        except ValueError:
+            skipped += 1
+            continue
+
+        try:
+            if path.is_symlink() or not path.is_file():
+                skipped += 1
+                continue
+            resolved = path.resolve(strict=False)
+            try:
+                resolved.relative_to(trash_tracks)
+            except ValueError:
+                skipped += 1
+                continue
+            size = path.stat().st_size
+            path.unlink()
+            deleted += 1
+            bytes_deleted += size
+            if deleted % 25 == 0:
+                emit_task_event(
+                    task_id,
+                    "info",
+                    {
+                        "message": f"Deleted {deleted} quarantined tracks",
+                        "deleted": deleted,
+                        "total": len(candidates),
+                    },
+                )
+        except OSError as exc:
+            errors.append({"path": relative_path, "error": str(exc)})
+
+        progress.done = index
+        if index % 25 == 0 or index == len(candidates):
+            emit_progress(task_id, progress, force=True)
+
+    emit_progress(task_id, progress, force=True)
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": f"Empty trash complete: {deleted} deleted, {skipped} skipped",
+            "deleted": deleted,
+            "skipped": skipped,
+            "errors": len(errors),
+            "bytes_deleted": bytes_deleted,
+        },
+    )
+    log_audit(
+        "hard_delete_all_quarantined_tracks",
+        "track",
+        ".crate-trash/tracks",
+        details={
+            "deleted": deleted,
+            "skipped": skipped,
+            "errors": errors[-20:],
+            "bytes_deleted": bytes_deleted,
+            "reason": params.get("reason"),
+        },
+        user_id=params.get("actor_user_id"),
+        task_id=task_id,
+    )
+    _broadcast_track_library_invalidation()
+    return {
+        "status": "ok",
+        "deleted": deleted,
+        "skipped": skipped,
+        "errors": errors[-20:],
+        "bytes_deleted": bytes_deleted,
+    }
+
+
 def _handle_move_track(task_id: str, params: dict, config: dict) -> dict:
     lib = Path(config["library_path"])
     track = resolve_library_track_reference(
@@ -2390,6 +2520,9 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "library_track_restore": _handle_restore_track,
     "library_track_hard_delete": _handle_hard_delete_track,
     "library_quarantined_track_hard_delete": _handle_hard_delete_quarantined_track,
+    "library_quarantined_tracks_hard_delete_all": (
+        _handle_hard_delete_all_quarantined_tracks
+    ),
     "library_track_move": _handle_move_track,
     "library_album_move_to_artist": _handle_move_album_to_artist,
     "library_album_merge": _handle_merge_album,

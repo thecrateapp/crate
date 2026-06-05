@@ -66,6 +66,7 @@ export function ArtistCard({
     artistId,
     artistEntityUid,
     artistSlug,
+    imageUrl: photoUrl,
     name,
   });
   const actionMenu = useItemActionMenu(actions, {

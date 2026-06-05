@@ -63,6 +63,15 @@ export type PlayableTrackIdentityInput = Pick<
   | "libraryTrackId"
 >;
 
+export function isUuidLikeTrackId(value: string | null | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
 export function getPlayableTrackLibraryId(
   input: PlayableTrackIdentityInput,
 ): number | undefined {
@@ -77,6 +86,9 @@ export function getPlayableTrackLibraryId(
 export function hasPlayableTrackReference(
   input: PlayableTrackIdentityInput,
 ): boolean {
+  if (typeof input.id === "string" && isUuidLikeTrackId(input.id)) {
+    return true;
+  }
   return (
     getPlayableTrackLibraryId(input) != null ||
     Boolean(
@@ -107,14 +119,17 @@ export function toPlayableTrack(
 ): Track {
   const albumCover =
     resolveMaybeApiAssetUrl(options.cover || input.albumCover) || undefined;
+  const entityUid =
+    input.entityUid ??
+    input.entity_uid ??
+    input.track_entity_uid ??
+    (typeof input.id === "string" && isUuidLikeTrackId(input.id)
+      ? input.id
+      : undefined);
 
   return {
     id: resolvePlayableTrackId(input),
-    entityUid:
-      input.entityUid ??
-      input.entity_uid ??
-      input.track_entity_uid ??
-      undefined,
+    entityUid,
     title: input.title || "Unknown",
     artist: input.artist,
     artistId: input.artistId ?? input.artist_id ?? undefined,

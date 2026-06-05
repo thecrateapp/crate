@@ -223,7 +223,7 @@ def get_upcoming_releases(
               AND nr.status != 'dismissed'
               AND (
                 (nr.release_date IS NOT NULL AND nr.release_date > :today)
-                OR nr.detected_at >= :recent_cutoff
+                OR (nr.release_date IS NULL AND nr.detected_at >= :recent_cutoff)
               )
             ORDER BY COALESCE(nr.release_date, (nr.detected_at AT TIME ZONE 'UTC')::date) ASC
             LIMIT :limit

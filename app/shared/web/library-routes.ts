@@ -74,8 +74,23 @@ function encodeEntityUid(value: string | null | undefined) {
   return value ? encodeURIComponent(value) : "";
 }
 
+function isUuidLike(value: string | null | undefined) {
+  return Boolean(
+    value &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        value,
+      ),
+  );
+}
+
 function resolveTrackEntityUid(input: TrackRouteInput) {
-  return input.entityUid || input.trackEntityUid || null;
+  if (input.entityUid || input.trackEntityUid) {
+    return input.entityUid || input.trackEntityUid || null;
+  }
+  if (isUuidLike(typeof input.id === "string" ? input.id : null)) {
+    return input.id as string;
+  }
+  return null;
 }
 
 function resolveTrackLibraryId(input: TrackRouteInput) {
@@ -469,6 +484,9 @@ export function trackDownloadApiPath(input: TrackRouteInput) {
   if (entityUid)
     return `/api/tracks/by-entity/${encodeEntityUid(entityUid)}/download`;
 
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/tracks/${trackId}/download`;
+
   const path = resolveTrackPath(input);
   if (path) return `/api/download/track/${encodeTrackPath(path)}`;
 
@@ -492,6 +510,13 @@ export function trackOfflineManifestApiPath(input: TrackRouteInput) {
     return `/api/offline/tracks/by-entity/${encodeEntityUid(
       entityUid,
     )}/manifest`;
+
+  const trackId = resolveTrackLibraryId(input);
+  if (trackId != null) return `/api/offline/tracks/${trackId}/manifest`;
+
+  const path = resolveTrackPath(input);
+  if (path)
+    return `/api/offline/tracks/by-path/${encodeTrackPath(path)}/manifest`;
 
   return "";
 }

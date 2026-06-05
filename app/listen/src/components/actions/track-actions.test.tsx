@@ -2,7 +2,6 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigateMock = vi.hoisted(() => vi.fn());
-const shareMock = vi.hoisted(() => vi.fn());
 
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
@@ -41,18 +40,19 @@ vi.mock("@/lib/radio", () => ({
 }));
 
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { SHARE_REQUEST_EVENT, type SharePayload } from "@/lib/social-share";
 
 describe("useTrackActionEntries", () => {
   beforeEach(() => {
     navigateMock.mockReset();
-    shareMock.mockReset();
-    Object.defineProperty(window.navigator, "share", {
-      configurable: true,
-      value: shareMock.mockResolvedValue(undefined),
-    });
   });
 
-  it("shares tracks through the public preview URL", async () => {
+  it("shares tracks through Crate's share sheet with the public preview URL", async () => {
+    let sharePayload: SharePayload | null = null;
+    const onShare = (event: Event) => {
+      sharePayload = (event as CustomEvent<SharePayload>).detail;
+    };
+    window.addEventListener(SHARE_REQUEST_EVENT, onShare);
     const { result } = renderHook(() =>
       useTrackActionEntries({
         track: {
@@ -76,11 +76,56 @@ describe("useTrackActionEntries", () => {
     await act(async () => {
       await shareAction.onSelect();
     });
+    window.removeEventListener(SHARE_REQUEST_EVENT, onShare);
 
-    expect(shareMock).toHaveBeenCalledWith({
-      title: "High Vis - Talk for Hours",
-      text: "High Vis - Talk for Hours",
+    expect(sharePayload).toEqual({
+      kind: "track",
+      title: "Talk for Hours",
+      subtitle: "High Vis",
       url: `${window.location.origin}/share/track/track-entity-12/talk-for-hours`,
     });
+  });
+
+  it("keeps share enabled when player snapshots only expose a UUID id", () => {
+    const { result } = renderHook(() =>
+      useTrackActionEntries({
+        track: {
+          id: "123e4567-e89b-12d3-a456-426614174000",
+          title: "Talk for Hours",
+          artist: "High Vis",
+        },
+      }),
+    );
+
+    const shareAction = result.current.find((entry) => entry.key === "share");
+    if (
+      !shareAction ||
+      shareAction.type === "divider" ||
+      shareAction.type === "label"
+    ) {
+      throw new Error("Share action missing");
+    }
+
+    expect(shareAction.disabled).toBe(false);
+  });
+
+  it("keeps track identity actions enabled when snapshots only expose a numeric id", () => {
+    const { result } = renderHook(() =>
+      useTrackActionEntries({
+        track: {
+          id: 12,
+          title: "Talk for Hours",
+          artist: "High Vis",
+        },
+      }),
+    );
+
+    for (const key of ["like", "radio", "offline", "download"]) {
+      const action = result.current.find((entry) => entry.key === key);
+      if (!action || action.type === "divider" || action.type === "label") {
+        throw new Error(`${key} action missing`);
+      }
+      expect(action.disabled).toBe(false);
+    }
   });
 });

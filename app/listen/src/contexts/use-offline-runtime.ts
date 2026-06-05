@@ -48,18 +48,27 @@ const EMPTY_SUMMARY: OfflineSummary = {
 
 function aggregateTrackState(
   items: OfflineItemRecord[],
-  entityUid?: string | null,
+  ref?: string | OfflineTrackInput | null,
 ): OfflineItemState {
-  const assetKey = getOfflineTrackAssetKey({ entityUid });
-  if (!assetKey) return "idle";
+  const assetKey = getOfflineTrackAssetKey(ref);
+  const trackId =
+    typeof ref === "object" && ref
+      ? ref.libraryTrackId ?? ref.trackId ?? null
+      : null;
+  if (!assetKey && trackId == null) return "idle";
   const matches = items.filter((item) =>
-    item.tracks.some((track) => getOfflineTrackAssetKey(track) === assetKey),
+    item.tracks.some(
+      (track) =>
+        (assetKey && getOfflineTrackAssetKey(track) === assetKey) ||
+        (trackId != null && track.track_id === trackId),
+    ),
   );
   if (!matches.length) return "idle";
   if (
     matches.some(
       (item) =>
-        item.readyAssetKeys?.includes(assetKey) || item.state === "ready",
+        (assetKey && item.readyAssetKeys?.includes(assetKey)) ||
+        item.state === "ready",
     )
   )
     return "ready";
@@ -73,17 +82,23 @@ function aggregateTrackState(
 
 function findTrackOfflineItem(
   items: Record<string, OfflineItemRecord>,
-  entityUid?: string | null,
+  ref?: string | OfflineTrackInput | null,
 ): OfflineItemRecord | null {
-  const assetKey = getOfflineTrackAssetKey({ entityUid });
-  if (!assetKey) return null;
+  const assetKey = getOfflineTrackAssetKey(ref);
+  const trackId =
+    typeof ref === "object" && ref
+      ? ref.libraryTrackId ?? ref.trackId ?? null
+      : null;
+  if (!assetKey && trackId == null) return null;
   return (
     Object.values(items).find(
       (item) =>
         item.kind === "track" &&
-        (item.entityId === assetKey ||
+        ((assetKey && item.entityId === assetKey) ||
           item.tracks.some(
-            (track) => getOfflineTrackAssetKey(track) === assetKey,
+            (track) =>
+              (assetKey && getOfflineTrackAssetKey(track) === assetKey) ||
+              (trackId != null && track.track_id === trackId),
           )),
     ) || null
   );
@@ -449,20 +464,28 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
   const toggleTrackOffline = useCallback(
     (input: OfflineTrackInput) =>
       enqueue(async () => {
-        const entityUid = input.entityUid?.trim();
-        const assetKey = getOfflineTrackAssetKey({ entityUid });
+        const trackRef = {
+          entityUid: input.entityUid?.trim() || null,
+          storageId: input.storageId?.trim() || null,
+          trackId: input.trackId ?? input.libraryTrackId ?? null,
+          path: input.path?.trim() || null,
+        };
+        const assetKey =
+          getOfflineTrackAssetKey(trackRef) ??
+          (trackRef.trackId != null ? String(trackRef.trackId) : null) ??
+          trackRef.path;
         if (!assetKey) {
-          throw new Error("Track offline requires entity_uid");
+          throw new Error("Track offline requires track identity");
         }
         const existing = findTrackOfflineItem(
           snapshotRef.current.items,
-          entityUid,
+          trackRef,
         );
         if (existing) {
           await removeOfflineItem("track", existing.entityId);
           return "removed" as const;
         }
-        const manifestPaths = getOfflineTrackManifestPaths({ entityUid });
+        const manifestPaths = getOfflineTrackManifestPaths(trackRef);
         let synced = false;
         let lastError: unknown = null;
         for (const manifestPath of manifestPaths) {
@@ -548,7 +571,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
       supported,
       syncing,
       summary,
-      getTrackState: (entityUid) => aggregateTrackState(items, entityUid),
+      getTrackState: (ref) => aggregateTrackState(items, ref),
       getAlbumState: (albumId) =>
         snapshot.items[getOfflineItemKey("album", albumId ?? "")]?.state ??
         "idle",
@@ -559,8 +582,7 @@ export function useOfflineRuntime(user: AuthUser | null): OfflineContextValue {
         snapshot.items[getOfflineItemKey("album", albumId ?? "")] ?? null,
       getPlaylistRecord: (playlistId) =>
         snapshot.items[getOfflineItemKey("playlist", playlistId ?? "")] ?? null,
-      isTrackOffline: (entityUid) =>
-        aggregateTrackState(items, entityUid) === "ready",
+      isTrackOffline: (ref) => aggregateTrackState(items, ref) === "ready",
       isAlbumOffline: (albumId) =>
         snapshot.items[getOfflineItemKey("album", albumId ?? "")]?.state ===
         "ready",

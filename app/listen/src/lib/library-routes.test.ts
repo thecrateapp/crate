@@ -297,6 +297,25 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds track download and offline manifest routes from numeric ids", () => {
+    expect(trackDownloadApiPath({ libraryTrackId: 12 })).toBe(
+      "/api/tracks/12/download",
+    );
+    expect(trackOfflineManifestApiPath({ libraryTrackId: 12 })).toBe(
+      "/api/offline/tracks/12/manifest",
+    );
+  });
+
+  it("builds track offline manifest routes from paths", () => {
+    expect(
+      trackOfflineManifestApiPath({
+        path: "/music/High Vis/Blending/01-talk.flac",
+      }),
+    ).toBe(
+      "/api/offline/tracks/by-path/High%20Vis/Blending/01-talk.flac/manifest",
+    );
+  });
+
   it("builds public track share paths from entity_uid", () => {
     expect(
       trackSharePath({
@@ -305,6 +324,15 @@ describe("library route asset helpers", () => {
         title: "Head to Wall",
       }),
     ).toBe("/share/track/track-entity-1/head-to-wall");
+  });
+
+  it("builds public track share paths from UUID string ids", () => {
+    expect(
+      trackSharePath({
+        id: "123e4567-e89b-12d3-a456-426614174000",
+        title: "Head to Wall",
+      }),
+    ).toBe("/share/track/123e4567-e89b-12d3-a456-426614174000/head-to-wall");
   });
 
   it("falls back to id/path routes only when canonical identity is missing", () => {

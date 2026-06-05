@@ -19,8 +19,8 @@ import {
   type ArtistInfo,
 } from "@/components/artist/artist-model";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
+import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
 import { AppMenuButton, AppPopover } from "@crate/ui/primitives/AppPopover";
-import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -63,6 +63,7 @@ export function ArtistHeroSection({
   const isDesktop = useIsDesktop();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
   const bio = artistInfo?.bio ?? "";
   const heroBackgroundSrc = backgroundUrl
     ? `${backgroundUrl}${
@@ -305,13 +306,12 @@ export function ArtistHeroSection({
               </AppPopover>
             ) : null}
             {menuOpen && !isDesktop ? (
-              <AppModal
-                open={menuOpen}
+              <MobileActionSheet
+                panelRef={mobileMenuRef}
                 onClose={() => setMenuOpen(false)}
-                maxWidthClassName="sm:max-w-sm"
               >
-                <ModalBody className="pb-4">{menuContent}</ModalBody>
-              </AppModal>
+                <div className="pb-4">{menuContent}</div>
+              </MobileActionSheet>
             ) : null}
           </div>
           <BandcampSupportButton

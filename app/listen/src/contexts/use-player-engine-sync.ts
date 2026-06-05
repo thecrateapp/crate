@@ -6,7 +6,7 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { toEngineTracks } from "@/contexts/player-engine-adapter";
+import { toFreshEngineTracks } from "@/contexts/player-engine-adapter";
 import {
   clampIndex,
   resolveQueueFromUrls,
@@ -268,9 +268,10 @@ export function usePlayerEngineSync({
 
         void (async () => {
           await primeOfflineRuntimeProfile();
+          const engineTracks = await toFreshEngineTracks(nextQueue);
           return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),
-            tracks: toEngineTracks(nextQueue),
+            tracks: engineTracks,
             currentIndex: nextIndex,
             positionMs,
             autoplay,

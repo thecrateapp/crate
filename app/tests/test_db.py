@@ -223,6 +223,38 @@ class TestPlaylistTrackEntityRefs:
                 }
             )
 
+        partial_album_id = pg_db.upsert_album(
+            {
+                "artist": "Duplicate Query Artist",
+                "name": "Partial Fingerprint Album",
+                "path": "/music/duplicate-query-artist/partial-fingerprint-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename, fingerprint in (
+            ("01-partial-a.flac", None),
+            ("01-partial-b.flac", "fingerprint-b"),
+        ):
+            payload = {
+                "album_id": partial_album_id,
+                "artist": "Duplicate Query Artist",
+                "album": "Partial Fingerprint Album",
+                "filename": filename,
+                "title": "Partial Fingerprint Duplicate",
+                "path": f"/music/duplicate-query-artist/partial-fingerprint-album/{filename}",
+                "track_number": 1,
+                "disc_number": 1,
+                "duration": 120.0,
+                "size": 1024,
+                "format": "flac",
+            }
+            if fingerprint:
+                payload["audio_fingerprint"] = fingerprint
+            pg_db.upsert_track(payload)
+
         featured_album_id = pg_db.upsert_album(
             {
                 "artist": "Duplicate Query Artist",
@@ -289,6 +321,15 @@ class TestPlaylistTrackEntityRefs:
 
         assert by_title["Safe Duplicate"]["artist"] == "Duplicate Query Artist"
         assert by_title["Strong Duplicate"]["artist"] == "Duplicate Query Artist"
+        partial = by_title["Partial Fingerprint Duplicate"]
+        assert partial["album_id"] == partial_album_id
+        assert partial["fingerprinted_count"] == 1
+        assert partial["missing_fingerprint_count"] == 1
+        assert len(partial["track_ids"]) == 2
+        assert [track["has_audio_fingerprint"] for track in partial["tracks"]] == [
+            False,
+            True,
+        ]
         assert "Featured Duplicate" not in by_title
         assert "Unsafe Duplicate" not in by_title
 

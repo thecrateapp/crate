@@ -56,8 +56,12 @@ vi.mock("@/lib/offline", () => ({
       | {
           entity_uid?: string | null;
           storage_id?: string | null;
+          track_id?: number | null;
           entityUid?: string | null;
           storageId?: string | null;
+          trackId?: number | null;
+          libraryTrackId?: number | null;
+          path?: string | null;
         },
   ) => {
     if (typeof track === "string") return track;
@@ -66,9 +70,14 @@ vi.mock("@/lib/offline", () => ({
       track.entityUid ||
       track.storage_id ||
       track.storageId ||
+      (track.track_id != null ? String(track.track_id) : null) ||
+      (track.libraryTrackId != null ? String(track.libraryTrackId) : null) ||
+      (track.trackId != null ? String(track.trackId) : null) ||
+      track.path ||
       null
     );
   },
+  getOfflineTrackManifestPaths: vi.fn(() => ["/api/offline/tracks/1/manifest"]),
   hasCachedTrackAsset: vi.fn(async () => false),
   hydrateOfflineProfileState: hydrateOfflineProfileStateMock,
   isOfflineBusy: (state: string) =>

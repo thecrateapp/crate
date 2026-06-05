@@ -30,8 +30,8 @@ import {
   setVolume as gpSetVolume,
 } from "@/lib/gapless-player";
 import {
-  toEngineTrack,
-  toEngineTracks,
+  toFreshEngineTrack,
+  toFreshEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
@@ -60,6 +60,7 @@ import {
 } from "@/contexts/use-soft-interruption";
 import { usePlayerShortcuts } from "@/contexts/use-player-shortcuts";
 import { useMediaSession } from "@/contexts/use-media-session";
+import { refreshAuthToken } from "@/lib/api";
 import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
@@ -70,6 +71,7 @@ import type {
   EnginePositionEvent,
   EngineState,
 } from "@/lib/playback-engine";
+import { createQueueRevision } from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
   getPlaybackDeliveryPolicyPreference,
@@ -275,6 +277,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   } = usePlayerRuntimeState();
   const nativeBufferingWatchdogRef = useRef<number | null>(null);
   const nativeBufferingProbeIdRef = useRef(0);
+  const nativeAuthRetryKeyRef = useRef<string | null>(null);
 
   // queue, currentIndex, currentTrack, currentTime, duration, isPlaying are
   // kept in sync with their refs by their respective commit* helpers.
@@ -483,14 +486,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue, ...unique];
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
-        void androidNativeEngine
-          .appendTracks(toEngineTracks(unique))
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to append intelligence tracks:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTracks = await toFreshEngineTracks(unique);
+          return androidNativeEngine.appendTracks(engineTracks);
+        })().catch((error) => {
+          console.error(
+            "[native-player] failed to append intelligence tracks:",
+            error,
+          );
+        });
       } else {
         for (const track of unique) {
           gpAddTrack(registerEngineTrack(track));
@@ -533,14 +537,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue];
       nextQueue.splice(insertionIndex, 0, marked);
       if (shouldUseAndroidNativePlayer()) {
-        void androidNativeEngine
-          .insertTrack(insertionIndex, toEngineTrack(marked))
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to insert suggested track:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(marked);
+          return androidNativeEngine.insertTrack(insertionIndex, engineTrack);
+        })().catch((error) => {
+          console.error(
+            "[native-player] failed to insert suggested track:",
+            error,
+          );
+        });
       } else {
         gpInsertTrack(insertionIndex, registerEngineTrack(marked));
       }
@@ -577,17 +582,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const nextQueue = [...queue, ...unique];
       const nativePlayerActive = shouldUseAndroidNativePlayer();
       if (nativePlayerActive) {
-        void androidNativeEngine
-          .appendTracks(toEngineTracks(unique))
-          .then(() => {
-            void androidNativeEngine.jumpTo(queue.length, true);
-          })
-          .catch((error) => {
-            console.error(
-              "[native-player] failed to append and advance:",
-              error,
-            );
-          });
+        void (async () => {
+          const engineTracks = await toFreshEngineTracks(unique);
+          await androidNativeEngine.appendTracks(engineTracks);
+          return androidNativeEngine.jumpTo(queue.length, true);
+        })().catch((error) => {
+          console.error("[native-player] failed to append and advance:", error);
+        });
       } else {
         for (const track of unique) {
           gpAddTrack(registerEngineTrack(track));
@@ -714,6 +715,84 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       void probeNativeBuffering();
     }, NATIVE_BUFFERING_WATCHDOG_MS);
   }, [clearNativeBufferingWatchdog, probeNativeBuffering]);
+
+  const retryNativePlaybackAfterAuthError = useCallback(
+    (nativeError: EngineEventMap["error"]): boolean => {
+      if (nativeError.httpStatus !== 401) return false;
+      if (!shouldUseAndroidNativePlayer()) return false;
+
+      const queueSnapshot = queueRef.current;
+      if (queueSnapshot.length === 0) return false;
+
+      const nativeIndex =
+        typeof nativeError.index === "number" &&
+        Number.isFinite(nativeError.index)
+          ? nativeError.index
+          : currentIndexRef.current;
+      const index = clampIndex(nativeIndex, queueSnapshot.length);
+      const targetTrack = queueSnapshot[index];
+      const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+      const retryKey = [
+        nativeError.revision,
+        nativeError.trackId || targetTrack?.id || index,
+        Math.floor(positionMs / 10_000),
+      ].join(":");
+      if (nativeAuthRetryKeyRef.current === retryKey) return false;
+      nativeAuthRetryKeyRef.current = retryKey;
+
+      bufferingIntentRef.current = true;
+      commitIsBuffering(true);
+      commitIsPlaying(true);
+
+      void (async () => {
+        if (!(await refreshAuthToken())) {
+          throw new Error("Could not refresh the native playback token");
+        }
+        const engineTracks = await toFreshEngineTracks(queueSnapshot);
+        await androidNativeEngine.loadQueue({
+          revision: createQueueRevision(),
+          tracks: engineTracks,
+          currentIndex: index,
+          positionMs,
+          autoplay: true,
+          repeat: repeatRef.current,
+          crossfadeMs: effectiveCrossfadeMsRef.current,
+          volume: lastNonZeroVolumeRef.current,
+        });
+      })().catch((error) => {
+        const summary = nativePlaybackErrorMessage(nativeError);
+        console.error("[native-player] failed to recover auth error:", error);
+        persistNativePlaybackDiagnostic({
+          type: "auth-retry-failed",
+          ...nativeError,
+          url: redactDiagnosticUrl(nativeError.url),
+          retryError: error instanceof Error ? error.message : String(error),
+        });
+        toast.error("Native playback failed", {
+          description: summary,
+          duration: 9000,
+        });
+        bufferingIntentRef.current = false;
+        commitIsPlaying(false);
+        commitIsBuffering(false);
+        beginSoftInterruption("stream");
+      });
+
+      return true;
+    },
+    [
+      beginSoftInterruption,
+      bufferingIntentRef,
+      commitIsBuffering,
+      commitIsPlaying,
+      currentIndexRef,
+      currentTimeRef,
+      effectiveCrossfadeMsRef,
+      lastNonZeroVolumeRef,
+      queueRef,
+      repeatRef,
+    ],
+  );
 
   const applyNativePosition = useCallback(
     (event: EnginePositionEvent) => {
@@ -963,6 +1042,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         });
         clearNativeBufferingWatchdog();
         console.error("[native-player] playback error:", payload);
+        if (retryNativePlaybackAfterAuthError(nativeError)) {
+          return;
+        }
         toast.error("Native playback failed", {
           description: summary,
           duration: 9000,
@@ -985,6 +1067,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       currentIndexRef,
       flushCurrentPlayEvent,
       queueRef,
+      retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
     ],
   );

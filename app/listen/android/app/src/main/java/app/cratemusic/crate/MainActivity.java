@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CrateMediaSessionPlugin.class);
         registerPlugin(CrateCastPlugin.class);
         registerPlugin(CrateNativePlaybackPlugin.class);
+        registerPlugin(CrateSocialSharePlugin.class);
         super.onCreate(savedInstanceState);
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
     }

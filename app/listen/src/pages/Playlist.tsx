@@ -54,6 +54,8 @@ import {
 } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { fetchPlaylistRadio } from "@/lib/radio";
+import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
@@ -297,21 +299,13 @@ export function Playlist() {
 
   async function handleShare() {
     if (!data) return;
-    const shareUrl = `${window.location.origin}/playlist/${data.id}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: data.name,
-          text: data.name,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("Playlist link copied");
-      }
-    } catch {
-      toast.error("Failed to share playlist");
-    }
+    openShareSheet({
+      kind: "playlist",
+      title: data.name,
+      subtitle: data.description,
+      imageUrl: data.cover_data_url,
+      url: publicShareUrl(`/playlist/${data.id}`),
+    });
   }
 
   async function handleToggleOffline() {

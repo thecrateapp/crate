@@ -18,7 +18,11 @@ import {
 } from "@/components/actions/shared";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { artistPagePath, artistSharePath } from "@/lib/library-routes";
+import {
+  artistPagePath,
+  artistPhotoApiUrl,
+  artistSharePath,
+} from "@/lib/library-routes";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 
@@ -42,6 +46,17 @@ export function useArtistActionEntries(
       artistSlug: input.artistSlug,
       artistName: input.name,
     });
+    const artistImage =
+      input.imageUrl ||
+      artistPhotoApiUrl(
+        {
+          artistId: input.artistId,
+          artistEntityUid: input.artistEntityUid,
+          artistSlug: input.artistSlug,
+          artistName: input.name,
+        },
+        { size: 1024 },
+      );
 
     return [
       action({
@@ -125,7 +140,10 @@ export function useArtistActionEntries(
         key: "share",
         label: "Share artist",
         icon: Share2,
-        onSelect: sharePath(artistShare || artistPath, input.name),
+        onSelect: sharePath(artistShare || artistPath, input.name, {
+          kind: "artist",
+          imageUrl: artistImage,
+        }),
       }),
     ];
   }, [following, input, playAll, toggleArtistFollow]);

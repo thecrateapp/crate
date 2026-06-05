@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import {
   AlertCircle,
@@ -11,10 +11,12 @@ import {
   Loader2,
   MoreHorizontal,
   Play,
+  Plus,
   Radio,
   Share2,
   Shuffle,
   User,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,7 +25,6 @@ import {
   AppPopover,
   AppPopoverDivider,
 } from "@crate/ui/primitives/AppPopover";
-import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -32,12 +33,14 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
+import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
+import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
@@ -46,6 +49,7 @@ import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 import { toTrackReferencePayload } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
@@ -172,9 +176,10 @@ export function Album() {
   const location = useLocation();
   const sharedTrackUid = new URLSearchParams(location.search).get("track");
   const isDesktop = useIsDesktop();
-  const { playAll, playNext } = usePlayerActions();
+  const { addToQueue, playAll, playNext } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
   const { isSaved, saveAlbum, unsaveAlbum } = useSavedAlbums();
+  const { isLiked, likeTrack } = useLikedTracks();
   const {
     supported: offlineSupported,
     getAlbumState,
@@ -183,7 +188,19 @@ export function Album() {
   } = useOffline();
   const [menuOpen, setMenuOpen] = useState(false);
   const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
+  const [selectedTrackIds, setSelectedTrackIds] = useState<number[]>([]);
+  const [selectionPlaylistPickerOpen, setSelectionPlaylistPickerOpen] =
+    useState(false);
+  const [selectionMenuPosition, setSelectionMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [selectionMenuPlaylistOpen, setSelectionMenuPlaylistOpen] =
+    useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const selectionBarRef = useRef<HTMLDivElement>(null);
+  const selectionMenuRef = useRef<HTMLDivElement>(null);
 
   const routeAlbumId = albumIdParam ? Number(albumIdParam) : undefined;
 
@@ -204,13 +221,27 @@ export function Album() {
     useLazyPlaylistOptions();
 
   useDismissibleLayer({
-    active: menuOpen || playlistPickerOpen,
-    refs: [menuRef],
+    active:
+      menuOpen ||
+      playlistPickerOpen ||
+      selectionPlaylistPickerOpen ||
+      Boolean(selectionMenuPosition),
+    refs: [menuRef, mobileMenuRef, selectionBarRef, selectionMenuRef],
     onDismiss: () => {
       setMenuOpen(false);
       setPlaylistPickerOpen(false);
+      setSelectionPlaylistPickerOpen(false);
+      setSelectionMenuPosition(null);
+      setSelectionMenuPlaylistOpen(false);
     },
   });
+
+  useEffect(() => {
+    setSelectedTrackIds([]);
+    setSelectionPlaylistPickerOpen(false);
+    setSelectionMenuPosition(null);
+    setSelectionMenuPlaylistOpen(false);
+  }, [data?.id]);
 
   useEffect(() => {
     if (!data?.name) return;
@@ -262,8 +293,9 @@ export function Album() {
     );
   }
 
+  const albumData = data;
   const coverUrl =
-    data.cover_url ||
+    resolveMaybeApiAssetUrl(data.cover_url) ||
     albumCoverApiUrl(
       {
         albumId: data.id,
@@ -290,6 +322,10 @@ export function Album() {
   const albumTracks = data.tracks;
   const playableAlbumTracks = albumTracks.filter(
     (track) => track.is_available !== false,
+  );
+  const selectedTrackIdSet = new Set(selectedTrackIds);
+  const selectedAlbumTracks = playableAlbumTracks.filter((track) =>
+    selectedTrackIdSet.has(track.id),
   );
   const isPreRelease = Boolean(data.is_pre_release);
   const canPersistAlbum = !isPreRelease && albumId > 0;
@@ -373,6 +409,8 @@ export function Album() {
       (track) => track.id === trackId,
     );
     if (startIndex < 0) return;
+    setSelectedTrackIds([]);
+    setSelectionPlaylistPickerOpen(false);
     handlePlay(startIndex);
   };
 
@@ -447,21 +485,46 @@ export function Album() {
       : "";
   }
 
+  function albumTrackRowData(track: AlbumTrack, fallbackIndex: number) {
+    return toTrackRowData({
+      id: track.id,
+      entity_uid: track.entity_uid,
+      title: track.tags.title || track.filename,
+      artist: albumData.artist,
+      artist_id: albumData.artist_id,
+      artist_entity_uid: albumData.artist_entity_uid,
+      artist_slug: albumData.artist_slug,
+      album: displayName,
+      album_id: albumData.id,
+      album_entity_uid: albumData.entity_uid,
+      album_slug: albumData.slug,
+      duration: track.length_sec,
+      path: track.path,
+      track_number: parseInt(track.tags.tracknumber) || fallbackIndex + 1,
+      format: track.format,
+      bitrate: track.bitrate,
+      sample_rate: track.sample_rate,
+      bit_depth: track.bit_depth,
+      bpm: track.bpm,
+      audio_key: track.audio_key,
+      audio_scale: track.audio_scale,
+      energy: track.energy,
+      danceability: track.danceability,
+      valence: track.valence,
+      bliss_vector: track.bliss_vector,
+      library_track_id: track.is_available === false ? undefined : track.id,
+      disabled: track.is_available === false,
+    });
+  }
+
   async function handleShare() {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: `${artistName} - ${displayName}`,
-          text: `${artistName} - ${displayName}`,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("Album link copied");
-      }
-    } catch {
-      toast.error("Failed to share album");
-    }
+    openShareSheet({
+      kind: "album",
+      title: displayName,
+      subtitle: artistName,
+      imageUrl: coverUrl,
+      url: shareUrl,
+    });
   }
 
   async function handleToggleSaved() {
@@ -505,6 +568,39 @@ export function Album() {
       library_track_id: track.id,
     }),
   }));
+  const selectedPlaylistTracksPayload = selectedAlbumTracks.map((track) => ({
+    ...toTrackReferencePayload({
+      id: track.id,
+      entity_uid: track.entity_uid,
+      path: track.path,
+      title: track.tags.title || track.filename,
+      artist: artistName,
+      album: displayName,
+      duration: track.length_sec,
+      library_track_id: track.id,
+    }),
+  }));
+  const selectedPlayerTracks = selectedAlbumTracks.map((track) =>
+    toPlayableTrack({
+      id: track.id,
+      entity_uid: track.entity_uid,
+      title: track.tags.title || track.filename,
+      artist: artistName,
+      artist_entity_uid: albumData.artist_entity_uid,
+      album: displayName,
+      album_entity_uid: albumData.entity_uid,
+      duration: track.length_sec,
+      path: track.path,
+      library_track_id: track.id,
+      bpm: track.bpm,
+      audio_key: track.audio_key,
+      audio_scale: track.audio_scale,
+      energy: track.energy,
+      danceability: track.danceability,
+      valence: track.valence,
+      bliss_vector: track.bliss_vector,
+    }),
+  );
 
   async function handleAddToPlaylist(playlistId: number) {
     try {
@@ -516,6 +612,79 @@ export function Album() {
       setPlaylistPickerOpen(false);
     } catch {
       toast.error("Failed to add album to playlist");
+    }
+  }
+
+  async function handleAddSelectedToPlaylist(playlistId: number) {
+    if (!selectedPlaylistTracksPayload.length) return;
+    try {
+      await api(`/api/playlists/${playlistId}/tracks`, "POST", {
+        tracks: selectedPlaylistTracksPayload,
+      });
+      toast.success(
+        `${selectedPlaylistTracksPayload.length} track${
+          selectedPlaylistTracksPayload.length === 1 ? "" : "s"
+        } added to playlist`,
+      );
+      setSelectedTrackIds([]);
+      setSelectionPlaylistPickerOpen(false);
+      handleCloseSelectionMenu();
+    } catch {
+      toast.error("Failed to add selected tracks");
+    }
+  }
+
+  function handleCloseSelectionMenu() {
+    setSelectionMenuPosition(null);
+    setSelectionMenuPlaylistOpen(false);
+  }
+
+  function handlePlaySelectedNext() {
+    if (!selectedPlayerTracks.length) return;
+    [...selectedPlayerTracks].reverse().forEach((track) => playNext(track));
+    toast.success(
+      `${selectedPlayerTracks.length} track${
+        selectedPlayerTracks.length === 1 ? "" : "s"
+      } queued to play next`,
+    );
+    handleCloseSelectionMenu();
+  }
+
+  function handleAddSelectedToQueue() {
+    if (!selectedPlayerTracks.length) return;
+    selectedPlayerTracks.forEach((track) => addToQueue(track));
+    toast.success(
+      `${selectedPlayerTracks.length} track${
+        selectedPlayerTracks.length === 1 ? "" : "s"
+      } added to queue`,
+    );
+    handleCloseSelectionMenu();
+  }
+
+  async function handleAddSelectedToCollection() {
+    const missing = selectedAlbumTracks.filter(
+      (track) => !isLiked(track.id, track.entity_uid, track.path),
+    );
+    if (!missing.length) {
+      toast.info("Selected tracks are already in your collection");
+      handleCloseSelectionMenu();
+      return;
+    }
+
+    try {
+      await Promise.all(
+        missing.map((track) =>
+          likeTrack(track.id, track.entity_uid ?? null, track.path),
+        ),
+      );
+      toast.success(
+        `${missing.length} track${
+          missing.length === 1 ? "" : "s"
+        } added to your collection`,
+      );
+      handleCloseSelectionMenu();
+    } catch {
+      toast.error("Failed to update your collection");
     }
   }
 
@@ -582,9 +751,64 @@ export function Album() {
     });
   }
 
+  function handleCreatePlaylistFromSelection() {
+    if (!selectedPlayerTracks.length) return;
+    openCreatePlaylist({
+      name: `${displayName} selection`,
+      tracks: selectedPlayerTracks,
+    });
+    setSelectedTrackIds([]);
+    setSelectionPlaylistPickerOpen(false);
+    handleCloseSelectionMenu();
+  }
+
   function handleTogglePlaylistPicker() {
     ensurePlaylistOptionsLoaded();
     setPlaylistPickerOpen((open) => !open);
+  }
+
+  function handleToggleSelectionPlaylistPicker() {
+    ensurePlaylistOptionsLoaded();
+    setSelectionPlaylistPickerOpen((open) => !open);
+  }
+
+  function handleToggleTrackSelection(trackId: number) {
+    setSelectedTrackIds((current) =>
+      current.includes(trackId)
+        ? current.filter((id) => id !== trackId)
+        : [...current, trackId],
+    );
+  }
+
+  function openSelectionMenu(trackId: number, x: number, y: number) {
+    if (!isDesktop) return false;
+    if (!selectedTrackIdSet.has(trackId)) {
+      setSelectedTrackIds([trackId]);
+    }
+    ensurePlaylistOptionsLoaded();
+    setSelectionPlaylistPickerOpen(false);
+    setSelectionMenuPlaylistOpen(false);
+    setSelectionMenuPosition({ x, y });
+    return true;
+  }
+
+  function handleSelectionContextMenu(
+    trackId: number,
+    event: MouseEvent<HTMLDivElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return openSelectionMenu(trackId, event.clientX + 4, event.clientY + 4);
+  }
+
+  function handleSelectionActionMenuOpen(
+    trackId: number,
+    event: MouseEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    return openSelectionMenu(trackId, rect.right - 8, rect.bottom + 8);
   }
 
   // Group tracks by disc if multi-disc
@@ -901,60 +1125,58 @@ export function Album() {
               </AppPopover>
             )}
             {menuOpen && !isDesktop && (
-              <AppModal
-                open={menuOpen}
+              <MobileActionSheet
+                panelRef={mobileMenuRef}
                 onClose={() => setMenuOpen(false)}
-                maxWidthClassName="sm:max-w-sm"
               >
-                <ModalBody className="pb-4">
-                  <AlbumMenuContent
-                    data={data}
-                    coverUrl={coverUrl}
-                    displayName={displayName}
-                    saved={saved}
-                    canPersistAlbum={canPersistAlbum}
-                    playlists={playlists}
-                    playlistPickerOpen={playlistPickerOpen}
-                    onTogglePlaylistPicker={handleTogglePlaylistPicker}
-                    onPlay={() => {
-                      handlePlay();
-                      setMenuOpen(false);
-                    }}
-                    onPlayNext={handlePlayNextAlbum}
-                    onCreatePlaylist={handleCreatePlaylistFromAlbum}
-                    onAddToPlaylist={handleAddToPlaylist}
-                    onToggleSaved={async () => {
-                      await handleToggleSaved();
-                      setMenuOpen(false);
-                    }}
-                    offlineSupported={offlineSupported}
-                    offlineState={offlineState}
-                    offlineLabel={offlineButtonLabel}
-                    onToggleOffline={async () => {
-                      await handleToggleOffline();
-                      setMenuOpen(false);
-                    }}
-                    onGoToArtist={() => {
-                      navigate(
-                        artistPagePath({
-                          artistId: data.artist_id,
-                          artistSlug: data.artist_slug,
-                        }),
-                      );
-                      setMenuOpen(false);
-                    }}
-                    onShare={async () => {
-                      await handleShare();
-                      setMenuOpen(false);
-                    }}
-                  />
-                </ModalBody>
-              </AppModal>
+                <AlbumMenuContent
+                  data={data}
+                  coverUrl={coverUrl}
+                  displayName={displayName}
+                  saved={saved}
+                  canPersistAlbum={canPersistAlbum}
+                  playlists={playlists}
+                  playlistPickerOpen={playlistPickerOpen}
+                  onTogglePlaylistPicker={handleTogglePlaylistPicker}
+                  onPlay={() => {
+                    handlePlay();
+                    setMenuOpen(false);
+                  }}
+                  onPlayNext={handlePlayNextAlbum}
+                  onCreatePlaylist={handleCreatePlaylistFromAlbum}
+                  onAddToPlaylist={handleAddToPlaylist}
+                  onToggleSaved={async () => {
+                    await handleToggleSaved();
+                    setMenuOpen(false);
+                  }}
+                  offlineSupported={offlineSupported}
+                  offlineState={offlineState}
+                  offlineLabel={offlineButtonLabel}
+                  onToggleOffline={async () => {
+                    await handleToggleOffline();
+                    setMenuOpen(false);
+                  }}
+                  onGoToArtist={() => {
+                    navigate(
+                      artistPagePath({
+                        artistId: data.artist_id,
+                        artistSlug: data.artist_slug,
+                      }),
+                    );
+                    setMenuOpen(false);
+                  }}
+                  onShare={async () => {
+                    await handleShare();
+                    setMenuOpen(false);
+                  }}
+                />
+              </MobileActionSheet>
             )}
           </div>
           <BandcampSupportButton
             entityType="album"
             entityUid={data.entity_uid}
+            fallbackArtistEntityUid={data.artist_entity_uid}
             className="ml-auto shrink-0"
           />
         </div>
@@ -981,6 +1203,131 @@ export function Album() {
 
       {/* Track List */}
       <div className="mx-auto w-full max-w-[1480px] px-4 sm:px-6 pb-8">
+        {isDesktop && selectedAlbumTracks.length > 0 ? (
+          <div
+            ref={selectionBarRef}
+            className="listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-2xl px-3 py-3"
+          >
+            <div className="mr-auto min-w-0 px-1">
+              <p className="text-sm font-semibold text-foreground">
+                {selectedAlbumTracks.length} selected
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Double-click any track to play it.
+              </p>
+            </div>
+            <div className="relative">
+              <button
+                className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
+                onClick={handleToggleSelectionPlaylistPicker}
+              >
+                <ListPlus size={14} />
+                Add to playlist
+              </button>
+              {selectionPlaylistPickerOpen ? (
+                <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-2xl">
+                  <div className="p-1.5">
+                    <button
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
+                      onClick={handleCreatePlaylistFromSelection}
+                    >
+                      Add new playlist
+                    </button>
+                    {playlists.length > 0 ? (
+                      <AppPopoverDivider className="mx-1" />
+                    ) : null}
+                    {playlists.map((playlist) => (
+                      <button
+                        key={playlist.id}
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                        onClick={() =>
+                          void handleAddSelectedToPlaylist(playlist.id)
+                        }
+                      >
+                        {playlist.name}
+                      </button>
+                    ))}
+                  </div>
+                </AppPopover>
+              ) : null}
+            </div>
+            <button
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
+              onClick={handleCreatePlaylistFromSelection}
+            >
+              Create playlist
+            </button>
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              onClick={() => setSelectedTrackIds([])}
+              aria-label="Clear selected tracks"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ) : null}
+        {selectionMenuPosition && selectedAlbumTracks.length > 0 ? (
+          <AppPopover
+            ref={selectionMenuRef}
+            className="fixed z-app-popover w-72 overflow-hidden rounded-2xl p-1 animate-pop-in"
+            style={{
+              left: selectionMenuPosition.x,
+              top: selectionMenuPosition.y,
+            }}
+          >
+            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-white/40">
+              {selectedAlbumTracks.length} selected
+            </div>
+            <AppMenuButton onClick={handlePlaySelectedNext}>
+              <ListPlus size={15} /> Play next
+            </AppMenuButton>
+            <AppMenuButton onClick={handleAddSelectedToQueue}>
+              <Plus size={15} /> Add to queue
+            </AppMenuButton>
+            <AppMenuButton
+              className="justify-between"
+              onClick={() => {
+                ensurePlaylistOptionsLoaded();
+                setSelectionMenuPlaylistOpen((open) => !open);
+              }}
+            >
+              <span className="flex items-center gap-3">
+                <ListPlus size={15} /> Add to playlist
+              </span>
+              <span className="text-white/40">
+                {selectionMenuPlaylistOpen ? "−" : "+"}
+              </span>
+            </AppMenuButton>
+            {selectionMenuPlaylistOpen ? (
+              <div className="px-3 pb-2 space-y-1">
+                <button
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
+                  onClick={handleCreatePlaylistFromSelection}
+                >
+                  Add new playlist
+                </button>
+                {playlists.length > 0 ? (
+                  <AppPopoverDivider className="mx-1" />
+                ) : null}
+                {playlists.map((playlist) => (
+                  <button
+                    key={playlist.id}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                    onClick={() =>
+                      void handleAddSelectedToPlaylist(playlist.id)
+                    }
+                  >
+                    {playlist.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <AppPopoverDivider />
+            <AppMenuButton onClick={() => void handleAddSelectedToCollection()}>
+              <Heart size={15} /> Add to my collection
+            </AppMenuButton>
+          </AppPopover>
+        ) : null}
         {hasMultipleDiscs
           ? [...tracksByDisc.entries()]
               .sort(([a], [b]) => a - b)
@@ -990,102 +1337,80 @@ export function Album() {
                     <Disc size={12} />
                     Disc {disc}
                   </div>
-                  {tracks.map((t, idx) => (
-                    <div
-                      key={t.id}
-                      id={trackPreviewId(t)}
-                      className={sharedTrackClass(t)}
-                    >
-                      <TrackRow
-                        track={toTrackRowData({
-                          id: t.id,
-                          entity_uid: t.entity_uid,
-                          title: t.tags.title || t.filename,
-                          artist: data.artist,
-                          artist_id: data.artist_id,
-                          artist_entity_uid: data.artist_entity_uid,
-                          artist_slug: data.artist_slug,
-                          album: displayName,
-                          album_id: data.id,
-                          album_entity_uid: data.entity_uid,
-                          album_slug: data.slug,
-                          duration: t.length_sec,
-                          path: t.path,
-                          track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                          format: t.format,
-                          bitrate: t.bitrate,
-                          sample_rate: t.sample_rate,
-                          bit_depth: t.bit_depth,
-                          bpm: t.bpm,
-                          audio_key: t.audio_key,
-                          audio_scale: t.audio_scale,
-                          energy: t.energy,
-                          danceability: t.danceability,
-                          valence: t.valence,
-                          bliss_vector: t.bliss_vector,
-                          library_track_id:
-                            t.is_available === false ? undefined : t.id,
-                          disabled: t.is_available === false,
-                        })}
-                        index={parseInt(t.tags.tracknumber) || idx + 1}
-                        albumCover={coverUrl}
-                        playlistOptions={playlists ?? undefined}
-                        onAddToPlaylist={handleAddTrackToPlaylist}
-                        onCreatePlaylist={handleCreatePlaylistFromTrack}
-                        onActionMenuOpen={ensurePlaylistOptionsLoaded}
-                        onPlayOverride={() => handlePlayTrack(t.id)}
-                      />
-                    </div>
-                  ))}
+                  {tracks.map((t, idx) => {
+                    const rowTrack = albumTrackRowData(t, idx);
+                    return (
+                      <div
+                        key={t.id}
+                        id={trackPreviewId(t)}
+                        className={sharedTrackClass(t)}
+                      >
+                        <TrackRow
+                          track={rowTrack}
+                          index={parseInt(t.tags.tracknumber) || idx + 1}
+                          albumCover={coverUrl}
+                          playlistOptions={playlists ?? undefined}
+                          onAddToPlaylist={handleAddTrackToPlaylist}
+                          onCreatePlaylist={handleCreatePlaylistFromTrack}
+                          onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                          onPlayOverride={() => handlePlayTrack(t.id)}
+                          selectable={isDesktop}
+                          selected={selectedTrackIdSet.has(t.id)}
+                          onSelect={() => handleToggleTrackSelection(t.id)}
+                          onSelectionContextMenu={(track, event) =>
+                            handleSelectionContextMenu(
+                              Number(track.id ?? t.id),
+                              event,
+                            )
+                          }
+                          onSelectionActionMenuOpen={(track, event) =>
+                            handleSelectionActionMenuOpen(
+                              Number(track.id ?? t.id),
+                              event,
+                            )
+                          }
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               ))
-          : data.tracks.map((t, idx) => (
-              <div
-                key={t.id}
-                id={trackPreviewId(t)}
-                className={sharedTrackClass(t)}
-              >
-                <TrackRow
-                  track={toTrackRowData({
-                    id: t.id,
-                    entity_uid: t.entity_uid,
-                    title: t.tags.title || t.filename,
-                    artist: data.artist,
-                    artist_id: data.artist_id,
-                    artist_entity_uid: data.artist_entity_uid,
-                    artist_slug: data.artist_slug,
-                    album: displayName,
-                    album_id: data.id,
-                    album_entity_uid: data.entity_uid,
-                    album_slug: data.slug,
-                    duration: t.length_sec,
-                    path: t.path,
-                    track_number: parseInt(t.tags.tracknumber) || idx + 1,
-                    format: t.format,
-                    bitrate: t.bitrate,
-                    sample_rate: t.sample_rate,
-                    bit_depth: t.bit_depth,
-                    bpm: t.bpm,
-                    audio_key: t.audio_key,
-                    audio_scale: t.audio_scale,
-                    energy: t.energy,
-                    danceability: t.danceability,
-                    valence: t.valence,
-                    bliss_vector: t.bliss_vector,
-                    library_track_id:
-                      t.is_available === false ? undefined : t.id,
-                    disabled: t.is_available === false,
-                  })}
-                  index={parseInt(t.tags.tracknumber) || idx + 1}
-                  albumCover={coverUrl}
-                  playlistOptions={playlists ?? undefined}
-                  onAddToPlaylist={handleAddTrackToPlaylist}
-                  onCreatePlaylist={handleCreatePlaylistFromTrack}
-                  onActionMenuOpen={ensurePlaylistOptionsLoaded}
-                  onPlayOverride={() => handlePlayTrack(t.id)}
-                />
-              </div>
-            ))}
+          : data.tracks.map((t, idx) => {
+              const rowTrack = albumTrackRowData(t, idx);
+              return (
+                <div
+                  key={t.id}
+                  id={trackPreviewId(t)}
+                  className={sharedTrackClass(t)}
+                >
+                  <TrackRow
+                    track={rowTrack}
+                    index={parseInt(t.tags.tracknumber) || idx + 1}
+                    albumCover={coverUrl}
+                    playlistOptions={playlists ?? undefined}
+                    onAddToPlaylist={handleAddTrackToPlaylist}
+                    onCreatePlaylist={handleCreatePlaylistFromTrack}
+                    onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                    onPlayOverride={() => handlePlayTrack(t.id)}
+                    selectable={isDesktop}
+                    selected={selectedTrackIdSet.has(t.id)}
+                    onSelect={() => handleToggleTrackSelection(t.id)}
+                    onSelectionContextMenu={(track, event) =>
+                      handleSelectionContextMenu(
+                        Number(track.id ?? t.id),
+                        event,
+                      )
+                    }
+                    onSelectionActionMenuOpen={(track, event) =>
+                      handleSelectionActionMenuOpen(
+                        Number(track.id ?? t.id),
+                        event,
+                      )
+                    }
+                  />
+                </div>
+              );
+            })}
       </div>
     </div>
   );

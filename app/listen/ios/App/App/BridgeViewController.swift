@@ -5,5 +5,6 @@ class BridgeViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(CrateMediaSessionPlugin())
         bridge?.registerPluginInstance(CrateCastPlugin())
+        bridge?.registerPluginInstance(CrateSocialSharePlugin())
     }
 }

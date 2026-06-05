@@ -40,6 +40,7 @@ import {
   setAuthTokens,
   getApiAuthHeaders,
   shouldRedirectToLoginOnUnauthorized,
+  ensureFreshAuthToken,
   refreshAuthToken,
   apiFetch,
   api,
@@ -540,6 +541,31 @@ describe("refreshAuthToken", () => {
     ]);
     expect(r1).toBe(false);
     expect(r2).toBe(false);
+  });
+});
+
+describe("ensureFreshAuthToken", () => {
+  it("does not refresh when the access token has enough lifetime left", async () => {
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    setAuthTokens("fresh-token", null, expiresAt);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    expect(await ensureFreshAuthToken()).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("refreshes when the access token is close to expiry", async () => {
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    setAuthTokens("stale-token", null, expiresAt);
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      mockJsonResponse({
+        token: "refreshed-token",
+        access_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    );
+
+    expect(await ensureFreshAuthToken()).toBe(true);
+    expect(getAuthToken()).toBe("refreshed-token");
   });
 });
 

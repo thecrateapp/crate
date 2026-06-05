@@ -150,4 +150,31 @@ describe("TopBarSearch", () => {
       expect(screen.getByText("High Vis")).toBeTruthy();
     });
   });
+
+  it("clears the query from the clear search button", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api).mockResolvedValue({
+      artists: [],
+      albums: [],
+      tracks: [],
+    });
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    await user.click(searchButton);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    await user.type(input, "converge");
+
+    await user.click(
+      await screen.findByRole("button", { name: "Clear search" }),
+    );
+
+    expect(input).toHaveValue("");
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+  });
 });

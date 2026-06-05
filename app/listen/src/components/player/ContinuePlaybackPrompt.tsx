@@ -145,7 +145,7 @@ export function ContinuePlaybackPrompt() {
   };
 
   return (
-    <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-[1700] mx-auto max-w-xl rounded-xl border border-white/15 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur sm:bottom-24">
+    <div className="listen-glass-panel fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-[1700] mx-auto max-w-xl rounded-xl p-3 sm:bottom-24">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 rounded-lg border border-cyan-400/25 bg-cyan-400/10 p-2 text-cyan-200">
           <MonitorSpeaker size={18} />

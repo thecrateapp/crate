@@ -1414,7 +1414,7 @@ def upcoming(request: Request, limit: int = 120):
                 "tidal_url": release.get("tidal_url") or release.get("source_url"),
                 "source_url": release.get("source_url"),
                 "release_id": release.get("id"),
-                "is_upcoming": bool(scheduled_date and scheduled_date >= today),
+                "is_upcoming": bool(scheduled_date and scheduled_date > today),
             }
         )
 

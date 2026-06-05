@@ -24,18 +24,41 @@ export function useDismissibleLayer({
 
   useEffect(() => {
     if (!active) return;
+    let suppressClick = false;
+    let suppressClickTimer: number | undefined;
 
     const isInside = (target: Node | null) =>
       refsRef.current.some(
         (ref) => ref.current && target && ref.current.contains(target),
       );
 
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!closeOnPointerDownOutside) return;
-      if (isInside(event.target as Node | null)) return;
+    const stopOutsideEvent = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation?.();
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!closeOnPointerDownOutside) return;
+      if (isInside(event.target as Node | null)) return;
+      suppressClick = true;
+      if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
+      suppressClickTimer = window.setTimeout(() => {
+        suppressClick = false;
+        suppressClickTimer = undefined;
+      }, 400);
+      stopOutsideEvent(event);
       onDismissRef.current();
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      if (suppressClickTimer) {
+        window.clearTimeout(suppressClickTimer);
+        suppressClickTimer = undefined;
+      }
+      stopOutsideEvent(event);
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -45,15 +68,14 @@ export function useDismissibleLayer({
       onDismissRef.current();
     };
 
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("touchstart", handlePointerDown, {
-      passive: true,
-    });
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("click", handleClick, true);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("touchstart", handlePointerDown);
+      if (suppressClickTimer) window.clearTimeout(suppressClickTimer);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("click", handleClick, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [active, closeOnEscape, closeOnPointerDownOutside]);

@@ -33,6 +33,8 @@ import {
 } from "@/lib/track-reference";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { fetchHomePlaylistRadio } from "@/lib/radio";
+import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
 
 export function HomePlaylist() {
@@ -110,23 +112,12 @@ export function HomePlaylist() {
 
   async function handleShare() {
     if (!data) return;
-    const shareUrl = `${
-      window.location.origin
-    }/home/playlist/${encodeURIComponent(data.id)}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: data.name,
-          text: data.name,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("Playlist link copied");
-      }
-    } catch {
-      toast.error("Failed to share playlist");
-    }
+    openShareSheet({
+      kind: "playlist",
+      title: data.name,
+      subtitle: data.description,
+      url: publicShareUrl(`/home/playlist/${encodeURIComponent(data.id)}`),
+    });
   }
 
   async function handleRadio() {

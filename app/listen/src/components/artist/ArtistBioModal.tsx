@@ -13,6 +13,7 @@ import {
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 import { formatCompact } from "@/lib/utils";
 import { Globe, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -104,8 +105,13 @@ export function ArtistBioModal({
   const displayBio = bioExpanded ? bio : bio.slice(0, 500);
 
   return (
-    <AppModal open={open} onClose={onClose} maxWidthClassName="sm:max-w-2xl">
-      <ModalHeader>
+    <AppModal
+      open={open}
+      onClose={onClose}
+      maxWidthClassName="sm:max-w-2xl"
+      panelClassName="listen-glass-panel"
+    >
+      <ModalHeader className="bg-transparent">
         <div className="flex items-start justify-between gap-4 px-5 py-5 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
             <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl bg-white/5 shadow-xl">
@@ -159,7 +165,7 @@ export function ArtistBioModal({
         </div>
       </ModalHeader>
 
-      <ModalBody className="max-h-[calc(92vh-124px)] px-5 py-5 sm:px-6 space-y-6">
+      <ModalBody className="max-h-[calc(92vh-124px)] space-y-6 px-5 py-5 sm:px-6">
         {/* Stats */}
         {(listeners > 0 || spotifyFollowers > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -281,6 +287,10 @@ export function ArtistBioModal({
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void openExternalUrl(link.url);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-white/50 hover:border-white/20 hover:bg-white/5 hover:text-white/70 transition-colors"
               >
                 <Globe size={11} /> {linkLabel(link.type, link.url)}

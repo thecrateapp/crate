@@ -96,6 +96,26 @@ dev-admin: ## Start only the Admin UI dev server (:5173)
 dev-listen: ## Start only the Listen dev server (:5174)
 	@npm run --workspace=app/listen dev -- --port 5174 --host
 
+.PHONY: listen-story-card
+listen-story-card: ## Render an Instagram Story share-card preview (vars: kind title subtitle image out)
+	@node app/listen/scripts/render-instagram-story-card.mjs \
+		--kind "$(or $(kind),album)" \
+		--title "$(or $(title),FENIAN)" \
+		--subtitle "$(or $(subtitle),Album by KNEECAP)" \
+		--image "$(image)" \
+		--out "$(or $(out),/tmp/crate-instagram-story.svg)"
+	@if command -v open >/dev/null 2>&1; then \
+		open "$(or $(out),/tmp/crate-instagram-story.svg)" 2>/dev/null || \
+		open -a "Google Chrome" "$(or $(out),/tmp/crate-instagram-story.svg)" 2>/dev/null || \
+		open -a "Safari" "$(or $(out),/tmp/crate-instagram-story.svg)" 2>/dev/null || \
+		echo "Preview: $(or $(out),/tmp/crate-instagram-story.svg)"; \
+	elif command -v xdg-open >/dev/null 2>&1; then \
+		xdg-open "$(or $(out),/tmp/crate-instagram-story.svg)" >/dev/null 2>&1 || \
+		echo "Preview: $(or $(out),/tmp/crate-instagram-story.svg)"; \
+	else \
+		echo "Preview: $(or $(out),/tmp/crate-instagram-story.svg)"; \
+	fi
+
 .PHONY: dev-docs
 dev-docs: ## Start only the docs dev server (:5175)
 	@cd app/docs && npx vite --port 5175 --host

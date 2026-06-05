@@ -314,6 +314,7 @@ const innerApi = createApiClient({
 });
 
 let refreshPromise: Promise<boolean> | null = null;
+const AUTH_TOKEN_FRESHNESS_MARGIN_MS = 10 * 60 * 1000;
 
 function shouldAttemptRefresh(path: string): boolean {
   return (
@@ -374,6 +375,22 @@ export async function refreshAuthToken(): Promise<boolean> {
     refreshPromise = null;
   });
   return refreshPromise;
+}
+
+export async function ensureFreshAuthToken(
+  minValidityMs = AUTH_TOKEN_FRESHNESS_MARGIN_MS,
+): Promise<boolean> {
+  const token = getAuthToken();
+  if (!token) return true;
+
+  const expiresAt = getAuthTokenExpiresAt();
+  if (!expiresAt) return true;
+
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs)) return true;
+
+  if (expiresMs - Date.now() > minValidityMs) return true;
+  return refreshAuthToken();
 }
 
 export function api<T = unknown>(

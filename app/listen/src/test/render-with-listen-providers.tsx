@@ -11,6 +11,7 @@ import {
 import {
   OfflineContext,
   type OfflineContextValue,
+  type OfflineTrackInput,
 } from "@/contexts/offline-context";
 import {
   PlayerActionsContext,
@@ -131,7 +132,10 @@ export function createMockOfflineValue(
   overrides: Partial<OfflineContextValue> = {},
 ): OfflineContextValue {
   const getIdleState = vi.fn<
-    (value?: string | number | null) => OfflineItemState
+    (value?: string | OfflineTrackInput | null) => OfflineItemState
+  >(() => "idle");
+  const getNumericIdleState = vi.fn<
+    (value?: number | null) => OfflineItemState
   >(() => "idle");
   const toggleOffline = vi.fn<() => Promise<"enabled" | "removed">>(
     async () => "enabled",
@@ -148,8 +152,8 @@ export function createMockOfflineValue(
       totalBytes: 0,
     },
     getTrackState: getIdleState,
-    getAlbumState: getIdleState,
-    getPlaylistState: getIdleState,
+    getAlbumState: getNumericIdleState,
+    getPlaylistState: getNumericIdleState,
     getAlbumRecord: vi.fn(() => null),
     getPlaylistRecord: vi.fn(() => null),
     isTrackOffline: vi.fn(() => false),

@@ -7,8 +7,8 @@ import {
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import {
-  toEngineTracks,
-  toEngineTrack,
+  toFreshEngineTrack,
+  toFreshEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import {
   addTrack as gpAddTrack,
@@ -255,9 +255,10 @@ export function usePlayerQueueActions({
         commitIsPlaying(true);
         void (async () => {
           await primeOfflineRuntimeProfile();
+          const engineTracks = await toFreshEngineTracks(tracks);
           return nativeEngine.loadQueue({
             revision: createQueueRevision(),
-            tracks: toEngineTracks(tracks),
+            tracks: engineTracks,
             currentIndex: normalizedIndex,
             positionMs: 0,
             autoplay: true,
@@ -867,11 +868,12 @@ export function usePlayerQueueActions({
       nextQueue.splice(insertAt, 0, track);
 
       if (shouldUseAndroidNativePlayer()) {
-        void nativeEngine
-          .insertTrack(insertAt, toEngineTrack(track))
-          .catch((error) => {
-            console.error("[native-player] failed to insert track:", error);
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(track);
+          return nativeEngine.insertTrack(insertAt, engineTrack);
+        })().catch((error) => {
+          console.error("[native-player] failed to insert track:", error);
+        });
       } else {
         gpInsertTrack(insertAt, registerEngineTrack(track));
       }
@@ -894,11 +896,12 @@ export function usePlayerQueueActions({
     (track: Track) => {
       const nextQueue = [...queueRef.current, track];
       if (shouldUseAndroidNativePlayer()) {
-        void nativeEngine
-          .appendTracks([toEngineTrack(track)])
-          .catch((error) => {
-            console.error("[native-player] failed to append track:", error);
-          });
+        void (async () => {
+          const engineTrack = await toFreshEngineTrack(track);
+          return nativeEngine.appendTracks([engineTrack]);
+        })().catch((error) => {
+          console.error("[native-player] failed to append track:", error);
+        });
       } else {
         gpAddTrack(registerEngineTrack(track));
       }

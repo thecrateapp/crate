@@ -191,10 +191,11 @@ export function useAlbumActionEntries(
         key: "share",
         label: "Share album",
         icon: Share2,
-        onSelect: sharePath(
-          albumShare || albumPath,
-          `${input.artist} - ${input.album}`,
-        ),
+        onSelect: sharePath(albumShare || albumPath, input.album, {
+          kind: "album",
+          subtitle: input.artist,
+          imageUrl: input.cover,
+        }),
       }),
     ];
   }, [

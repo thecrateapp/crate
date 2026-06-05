@@ -187,6 +187,20 @@ describe("offline metadata helpers", () => {
       "/api/offline/tracks/by-storage/entity-legacy/manifest",
     ]);
   });
+
+  it("builds offline track manifest candidates from track ids and paths", () => {
+    expect(getOfflineTrackManifestPaths({ track_id: 42 })).toEqual([
+      "/api/offline/tracks/42/manifest",
+    ]);
+
+    expect(
+      getOfflineTrackManifestPaths({
+        path: "/music/High Vis/Blending/01-talk.flac",
+      }),
+    ).toEqual([
+      "/api/offline/tracks/by-path/High%20Vis/Blending/01-talk.flac/manifest",
+    ]);
+  });
 });
 
 describe("getOfflineTrackAssetKey", () => {

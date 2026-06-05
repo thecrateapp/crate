@@ -231,6 +231,31 @@ def get_duplicate_tracks() -> list[dict]:
                     lt.disc_number,
                     COUNT(*) AS cnt,
                     array_agg(lt.path ORDER BY lt.path) AS paths,
+                    array_agg(lt.id ORDER BY lt.path) AS track_ids,
+                    jsonb_agg(
+                        jsonb_build_object(
+                            'id', lt.id,
+                            'path', lt.path,
+                            'filename', lt.filename,
+                            'format', lt.format,
+                            'bitrate', lt.bitrate,
+                            'sample_rate', lt.sample_rate,
+                            'bit_depth', lt.bit_depth,
+                            'duration', lt.duration,
+                            'size', lt.size,
+                            'has_audio_fingerprint',
+                                NULLIF(lt.audio_fingerprint, '') IS NOT NULL,
+                            'audio_fingerprint_source',
+                                lt.audio_fingerprint_source
+                        )
+                        ORDER BY lt.path
+                    ) AS tracks,
+                    COUNT(*) FILTER (
+                        WHERE NULLIF(lt.audio_fingerprint, '') IS NOT NULL
+                    ) AS fingerprinted_count,
+                    COUNT(*) FILTER (
+                        WHERE NULLIF(lt.audio_fingerprint, '') IS NULL
+                    ) AS missing_fingerprint_count,
                     COUNT(DISTINCT regexp_replace(lt.path, '/[^/]+$', '')) AS parent_count,
                     MAX(lt.duration) - MIN(lt.duration) AS duration_delta,
                     COUNT(DISTINCT NULLIF(lt.audio_fingerprint, '')) AS fingerprint_count,
@@ -253,7 +278,19 @@ def get_duplicate_tracks() -> list[dict]:
                     lt.disc_number
                 HAVING COUNT(*) > 1
             )
-            SELECT album_id, artist, title, album, track_number, disc_number, cnt, paths
+            SELECT
+                album_id,
+                artist,
+                title,
+                album,
+                track_number,
+                disc_number,
+                cnt,
+                paths,
+                track_ids,
+                tracks,
+                fingerprinted_count,
+                missing_fingerprint_count
             FROM candidates
             WHERE parent_count = 1
               AND duration_delta <= 1.0

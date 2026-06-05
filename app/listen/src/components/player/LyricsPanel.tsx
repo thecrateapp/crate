@@ -87,13 +87,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
   if (!open) return null;
 
   return (
-    <div
-      className="z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[480px] flex-col overflow-hidden border-l border-white/5 shadow-2xl"
-      style={{
-        background:
-          "linear-gradient(180deg, rgba(6,182,212,0.12) 0%, rgba(12,12,20,0.96) 22%, var(--surface-panel) 100%)",
-      }}
-    >
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[480px] flex-col overflow-hidden border-l border-white/10">
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-40 blur-3xl"
         style={{

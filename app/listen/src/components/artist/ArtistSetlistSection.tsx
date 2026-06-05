@@ -55,9 +55,9 @@ export function ArtistSetlistModal({
       className="fixed inset-0 z-app-modal flex items-end justify-center sm:items-center"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/70" />
+      <div className="absolute inset-0 bg-black/68" />
       <div
-        className="relative w-full max-w-md max-h-[85vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-card border border-white/10 shadow-2xl flex flex-col"
+        className="listen-glass-panel relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

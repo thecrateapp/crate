@@ -1,16 +1,28 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
 import { api } from "@/lib/api";
+import { openExternalUrl } from "@/lib/external-links";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(),
 }));
 
+vi.mock("@/lib/external-links", () => ({
+  openExternalUrl: vi.fn(),
+}));
+
 const mockApi = vi.mocked(api);
+const mockOpenExternalUrl = vi.mocked(openExternalUrl);
 
 describe("BandcampSupportButton", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockOpenExternalUrl.mockReset();
+  });
+
   it("shows an owned badge instead of a buy CTA for purchased albums", async () => {
     mockApi.mockResolvedValueOnce({
       entity_type: "album",
@@ -66,5 +78,53 @@ describe("BandcampSupportButton", () => {
     expect(
       screen.getByRole("button", { name: /buy this album on bandcamp/i }),
     ).toBeInTheDocument();
+  });
+
+  it("opens Bandcamp links through the external opener", async () => {
+    mockApi.mockResolvedValueOnce({
+      entity_type: "artist",
+      entity_uid: "artist-1",
+      artist_url: "https://highvis.bandcamp.com",
+      user_owned: false,
+      user_downloadable: false,
+      latest_import_status: null,
+    });
+
+    render(<BandcampSupportButton entityType="artist" entityUid="artist-1" />);
+
+    await userEvent.click(await screen.findByText("Support on Bandcamp"));
+
+    expect(mockOpenExternalUrl).toHaveBeenCalledWith(
+      "https://highvis.bandcamp.com",
+    );
+  });
+
+  it("falls back to the artist Bandcamp link when an album link is missing", async () => {
+    mockApi
+      .mockResolvedValueOnce({
+        entity_type: "album",
+        entity_uid: "album-1",
+        album_url: null,
+        item_url: null,
+        artist_url: null,
+      })
+      .mockResolvedValueOnce({
+        entity_type: "artist",
+        entity_uid: "artist-1",
+        artist_url: "https://highvis.bandcamp.com",
+        user_owned: false,
+        user_downloadable: false,
+        latest_import_status: null,
+      });
+
+    render(
+      <BandcampSupportButton
+        entityType="album"
+        entityUid="album-1"
+        fallbackArtistEntityUid="artist-1"
+      />,
+    );
+
+    expect(await screen.findByText("Support on Bandcamp")).toBeInTheDocument();
   });
 });

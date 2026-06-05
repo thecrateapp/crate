@@ -833,6 +833,33 @@ def test_quarantined_track_hard_delete_api_requires_file_delete(monkeypatch):
     ]
 
 
+def test_quarantined_tracks_bulk_hard_delete_api_requires_file_delete(monkeypatch):
+    from crate.api.management import hard_delete_all_quarantined_tracks
+    from crate.api.schemas.management import TrackQuarantineRequest
+
+    created: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        "crate.api.management.create_task",
+        lambda task_type, params: created.append((task_type, params)) or "task-7",
+    )
+
+    response = hard_delete_all_quarantined_tracks(
+        _request_for("librarian", user_id=88),  # type: ignore[arg-type]
+        TrackQuarantineRequest(reason="empty trash"),
+    )
+
+    assert response == {"task_id": "task-7"}
+    assert created == [
+        (
+            "library_quarantined_tracks_hard_delete_all",
+            {
+                "reason": "empty trash",
+                "actor_user_id": 88,
+            },
+        )
+    ]
+
+
 def test_list_contributions_requires_import_manager(monkeypatch):
     from uuid import UUID
 
@@ -1108,6 +1135,61 @@ def test_hard_delete_quarantined_track_deletes_crate_trash_file(tmp_path, monkey
         "track",
         "Artist/Album/01.flac",
     )
+
+
+def test_hard_delete_all_quarantined_tracks_deletes_audio_only(tmp_path, monkeypatch):
+    from crate.worker_handlers.management import (
+        _handle_hard_delete_all_quarantined_tracks,
+    )
+
+    trash_root = tmp_path / ".crate-trash" / "tracks"
+    album_dir = trash_root / "Artist" / "Album"
+    album_dir.mkdir(parents=True)
+    first = album_dir / "01.flac"
+    second = album_dir / "02.m4a"
+    cover = album_dir / "cover.jpg"
+    outside_target = tmp_path / "outside.flac"
+    symlink = album_dir / "03.flac"
+    first.write_bytes(b"fake-1")
+    second.write_bytes(b"fake-2")
+    cover.write_bytes(b"cover")
+    outside_target.write_bytes(b"outside")
+    symlink.symlink_to(outside_target)
+    audit = MagicMock()
+    invalidations: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr("crate.worker_handlers.management.log_audit", audit)
+    monkeypatch.setattr("crate.worker_handlers.management.emit_task_event", MagicMock())
+    monkeypatch.setattr("crate.worker_handlers.management.emit_progress", MagicMock())
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: invalidations.append(tuple(scopes)),
+    )
+
+    result = _handle_hard_delete_all_quarantined_tracks(
+        "task-8",
+        {"actor_user_id": 88, "reason": "empty trash"},
+        {"library_path": str(tmp_path)},
+    )
+
+    assert result["status"] == "ok"
+    assert result["deleted"] == 2
+    assert result["skipped"] == 1
+    assert result["errors"] == []
+    assert result["bytes_deleted"] == len(b"fake-1") + len(b"fake-2")
+    assert not first.exists()
+    assert not second.exists()
+    assert cover.exists()
+    assert outside_target.exists()
+    assert symlink.exists()
+    audit.assert_called_once()
+    assert audit.call_args.args[:3] == (
+        "hard_delete_all_quarantined_tracks",
+        "track",
+        ".crate-trash/tracks",
+    )
+    assert audit.call_args.kwargs["user_id"] == 88
+    assert invalidations == [("library", "home")]
 
 
 def test_hard_delete_track_deletes_file_and_db(tmp_path, monkeypatch):

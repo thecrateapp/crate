@@ -103,7 +103,7 @@ def _subsonic_auth(request: Request) -> dict | None:
         # Try username field too
         user = get_user_by_username(username)
 
-    if not user or not user.get("password_hash"):
+    if not user:
         return None
 
     if token and salt:
@@ -126,7 +126,8 @@ def _subsonic_auth(request: Request) -> dict | None:
                 pw = bytes.fromhex(pw[4:]).decode("utf-8")
             except (ValueError, UnicodeDecodeError):
                 return None
-        if verify_password(pw, user["password_hash"]):
+        password_hash = user.get("password_hash")
+        if password_hash and verify_password(pw, password_hash):
             return user
 
     return None

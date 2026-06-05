@@ -70,6 +70,50 @@ class TestDuplicateFolders:
             assert hc._check_duplicate_folders() == []
 
 
+class TestDuplicateTracks:
+    def test_details_include_track_ids_and_fingerprint_metadata(self):
+        from crate.health_check import LibraryHealthCheck
+
+        row = {
+            "album_id": 42,
+            "artist": "Converge",
+            "album": "Hum of Hurt",
+            "title": "Detonator",
+            "track_number": 4,
+            "disc_number": 1,
+            "cnt": 2,
+            "paths": ["/music/converge/hum/04-a.flac", "/music/converge/hum/04-b.flac"],
+            "track_ids": [1001, 1002],
+            "tracks": [
+                {
+                    "id": 1001,
+                    "path": "/music/converge/hum/04-a.flac",
+                    "has_audio_fingerprint": True,
+                },
+                {
+                    "id": 1002,
+                    "path": "/music/converge/hum/04-b.flac",
+                    "has_audio_fingerprint": False,
+                },
+            ],
+            "fingerprinted_count": 1,
+            "missing_fingerprint_count": 1,
+        }
+
+        hc = LibraryHealthCheck({"library_path": "/tmp/fake-library"})
+        with patch("crate.health_check.get_duplicate_tracks", return_value=[row]):
+            issues = hc._check_duplicate_tracks()
+
+        assert len(issues) == 1
+        details = issues[0]["details"]
+        assert details["album_id"] == 42
+        assert details["track_ids"] == [1001, 1002]
+        assert details["fingerprinted_count"] == 1
+        assert details["missing_fingerprint_count"] == 1
+        assert details["tracks"][0]["has_audio_fingerprint"] is True
+        assert details["tracks"][1]["has_audio_fingerprint"] is False
+
+
 class TestStaleArtists:
     def test_detects_missing_folder(self):
         """Artist in DB but folder doesn't exist on disk should be flagged."""

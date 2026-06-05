@@ -95,6 +95,13 @@ export function Trash() {
   const [deleteTarget, setDeleteTarget] = useState<QuarantinedTrack | null>(
     null,
   );
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const totalSizeBytes = items.reduce(
+    (total, item) => total + (Number(item.size_bytes) || 0),
+    0,
+  );
 
   async function load() {
     setLoading(true);
@@ -174,6 +181,45 @@ export function Trash() {
     );
   }
 
+  async function hardDeleteAll() {
+    setBulkDeleting(true);
+    try {
+      const { task_id } = await api<{ task_id: string }>(
+        "/api/manage/tracks/quarantine/hard-delete-all",
+        "POST",
+        { reason: "Manual empty trash from admin" },
+      );
+      const task = await waitForTask(task_id, 10 * 60 * 1000);
+      if (task.status === "completed") {
+        const deleted =
+          typeof task.result?.deleted === "number" ? task.result.deleted : null;
+        const bytesDeleted =
+          typeof task.result?.bytes_deleted === "number"
+            ? task.result.bytes_deleted
+            : null;
+        const suffix =
+          deleted !== null
+            ? `: ${deleted} tracks${
+                bytesDeleted !== null ? `, ${formatBytes(bytesDeleted)}` : ""
+              }`
+            : "";
+        toast.success(`Trash emptied${suffix}`);
+        await load();
+      } else {
+        toast.error(task.error || "Empty trash failed");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "Empty trash failed",
+      );
+    } finally {
+      setBulkDeleting(false);
+      setBulkDeleteOpen(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-white/10 bg-card/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
@@ -192,18 +238,38 @@ export function Trash() {
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading}
-            onClick={() => void load()}
-          >
-            <RefreshCw
-              size={15}
-              className={loading ? "mr-2 animate-spin" : "mr-2"}
-            />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading || bulkDeleting}
+              onClick={() => void load()}
+            >
+              <RefreshCw
+                size={15}
+                className={loading ? "mr-2 animate-spin" : "mr-2"}
+              />
+              Refresh
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={
+                loading ||
+                items.length === 0 ||
+                busyPath !== null ||
+                bulkDeleting
+              }
+              onClick={() => setBulkDeleteOpen(true)}
+            >
+              {bulkDeleting ? (
+                <Loader2 size={15} className="mr-2 animate-spin" />
+              ) : (
+                <Trash2 size={15} className="mr-2" />
+              )}
+              Empty trash
+            </Button>
+          </div>
         </div>
       </section>
 
@@ -253,7 +319,7 @@ export function Trash() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      disabled={busyPath !== null}
+                      disabled={busyPath !== null || bulkDeleting}
                       onClick={() => void restore(item)}
                     >
                       {busy ? (
@@ -267,7 +333,7 @@ export function Trash() {
                       type="button"
                       size="sm"
                       variant="destructive"
-                      disabled={busyPath !== null}
+                      disabled={busyPath !== null || bulkDeleting}
                       onClick={() => setDeleteTarget(item)}
                     >
                       <Trash2 size={14} className="mr-2" />
@@ -291,6 +357,20 @@ export function Trash() {
         confirmLabel="Delete Permanently"
         variant="destructive"
         onConfirm={() => deleteTarget && void hardDelete(deleteTarget)}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={setBulkDeleteOpen}
+        title="Empty Library Trash"
+        description={`Permanently delete ${items.length} quarantined track${
+          items.length === 1 ? "" : "s"
+        } (${formatBytes(
+          totalSizeBytes,
+        )}) from .crate-trash? This cannot be undone.`}
+        confirmLabel="Empty Trash"
+        variant="destructive"
+        onConfirm={() => void hardDeleteAll()}
       />
     </div>
   );

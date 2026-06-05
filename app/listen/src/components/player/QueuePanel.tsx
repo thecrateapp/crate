@@ -140,7 +140,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   const played = queue.slice(0, currentIndex);
 
   return (
-    <div className="z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-white/5 bg-panel-surface shadow-2xl">
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-white/10">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <h2 className="text-sm font-bold text-white">Queue</h2>

@@ -29,6 +29,7 @@ import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
 import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
@@ -108,20 +109,15 @@ export function Artist() {
         artistName: data.name,
       }),
     );
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: data.name,
-          text: data.name,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success("Artist link copied");
-      }
-    } catch {
-      toast.error("Failed to share artist");
-    }
+    openShareSheet({
+      kind: "artist",
+      title: data.name,
+      imageUrl: artistPhotoApiUrl(
+        { artistId: data.id, artistSlug: data.slug, artistName: data.name },
+        { size: 512, version: data.updated_at ?? undefined },
+      ),
+      url: shareUrl,
+    });
   }
   const info: ArtistInfo | undefined = pageData?.info;
   const topTracks: ArtistTopTrack[] = canonicalTopTracks ?? [];

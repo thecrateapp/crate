@@ -6,6 +6,7 @@ response shape, auth behavior, and error handling.
 """
 
 from contextlib import contextmanager
+import hashlib
 from unittest.mock import MagicMock, patch
 
 # ── Synthetic test data ──────────────────────────────────────────────
@@ -171,6 +172,115 @@ class TestSubsonicSystem:
             assert user["streamRole"] is True
             assert user["adminRole"] is True
             assert "scrobblingEnabled" in user
+
+
+class TestSubsonicRealAuth:
+    """Auth compatibility without mocking password verification."""
+
+    @contextmanager
+    def _user(self, user):
+        with (
+            patch("crate.api.subsonic.get_user_by_email", return_value=user),
+            patch("crate.api.subsonic.get_user_by_username", return_value=user),
+        ):
+            yield
+
+    def test_ping_view_accepts_plain_password_with_real_hash(self, test_app):
+        from crate.auth import hash_password
+
+        user = {
+            **_FAKE_USER,
+            "password_hash": hash_password("crate-secret"),
+            "subsonic_token": None,
+        }
+        with self._user(user):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={"u": "admin", "p": "crate-secret"},
+            )
+
+        assert resp.status_code == 200
+        _subsonic_ok_response(resp)
+
+    def test_ping_view_accepts_hex_encoded_password_with_real_hash(self, test_app):
+        from crate.auth import hash_password
+
+        user = {
+            **_FAKE_USER,
+            "password_hash": hash_password("crate-secret"),
+            "subsonic_token": None,
+        }
+        encoded = "enc:" + "crate-secret".encode().hex()
+        with self._user(user):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={"u": "admin", "p": encoded},
+            )
+
+        assert resp.status_code == 200
+        _subsonic_ok_response(resp)
+
+    def test_ping_view_rejects_wrong_password_with_subsonic_error(self, test_app):
+        from crate.auth import hash_password
+
+        user = {
+            **_FAKE_USER,
+            "password_hash": hash_password("crate-secret"),
+            "subsonic_token": None,
+        }
+        with self._user(user):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={"u": "admin", "p": "wrong"},
+            )
+
+        assert resp.status_code == 200
+        _subsonic_error_response(resp, code=40)
+
+    def test_ping_view_accepts_token_auth_for_sso_only_user(self, test_app):
+        salt = "substreamer-salt"
+        subsonic_token = "generated-subsonic-token"
+        token = hashlib.md5((subsonic_token + salt).encode()).hexdigest()
+        user = {
+            **_FAKE_USER,
+            "password_hash": None,
+            "subsonic_token": subsonic_token,
+        }
+
+        with self._user(user):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/ping.view",
+                params={"u": "admin", "t": token, "s": salt},
+            )
+
+        assert resp.status_code == 200
+        _subsonic_ok_response(resp)
+
+    def test_missing_credentials_returns_subsonic_auth_error(self, test_app):
+        resp = test_app.get(f"{_SUBSONIC_BASE}/ping.view")
+
+        assert resp.status_code == 200
+        _subsonic_error_response(resp, code=40)
+
+    def test_get_license_ignores_unsupported_format_without_breaking_auth(
+        self, test_app
+    ):
+        from crate.auth import hash_password
+
+        user = {
+            **_FAKE_USER,
+            "password_hash": hash_password("crate-secret"),
+            "subsonic_token": None,
+        }
+        with self._user(user):
+            resp = test_app.get(
+                f"{_SUBSONIC_BASE}/getLicense.view",
+                params={"u": "admin", "p": "crate-secret", "f": "xml"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers.get("content-type", "").startswith("application/json")
+        _subsonic_ok_response(resp)
 
 
 # ── Browse endpoints ─────────────────────────────────────────────────
