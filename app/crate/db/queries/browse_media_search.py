@@ -60,85 +60,49 @@ def build_substring_pattern(user_query: str) -> str:
     return f"%{_escape_like(user_query.strip())}%"
 
 
+def normalize_search_query(query: str) -> str:
+    """Accept raw user text and legacy LIKE patterns as the same search input."""
+    value = str(query or "").strip()
+    if "%" in value or "_" in value:
+        value = value.strip("%").replace("%", " ").replace("_", " ")
+    return re.sub(r"\s+", " ", value).strip()
+
+
 def _search_params(query: str, limit: int) -> dict[str, Any]:
+    normalized = normalize_search_query(query)
     return {
-        "fts_query": build_fts_query(query),
-        "prefix": build_prefix_pattern(query),
-        "substring": build_substring_pattern(query),
+        "fts_query": build_fts_query(normalized),
+        "prefix": build_prefix_pattern(normalized),
+        "substring": build_substring_pattern(normalized),
         "limit": limit,
     }
 
 
-def search_artists(like: str, limit: int) -> list[dict]:
+def search_artists(query: str, limit: int) -> list[dict]:
+    params = _search_params(query, limit)
+    if not normalize_search_query(query):
+        return []
     with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT id, entity_uid::text AS entity_uid, slug, name, album_count, has_photo
-                FROM library_artists
-                WHERE name ILIKE :like
-                ORDER BY listeners DESC NULLS LAST, album_count DESC, name ASC
-                LIMIT :limit
-                """
-                ),
-                {"like": like, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-        return [_serialize_artist_row(row) for row in rows]
+        rows = session.execute(_HYBRID_ARTISTS_SQL, params).mappings().all()
+    return [_serialize_artist_row(row) for row in rows]
 
 
-def search_albums(like: str, limit: int) -> list[dict]:
+def search_albums(query: str, limit: int) -> list[dict]:
+    params = _search_params(query, limit)
+    if not normalize_search_query(query):
+        return []
     with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.artist, a.name, a.year, a.has_cover,
-                       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug
-                FROM library_albums a
-                LEFT JOIN library_artists ar ON ar.name = a.artist
-                WHERE a.name ILIKE :like OR a.artist ILIKE :like
-                ORDER BY year DESC NULLS LAST, name ASC
-                LIMIT :limit
-                """
-                ),
-                {"like": like, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-        return [_serialize_album_row(row) for row in rows]
+        rows = session.execute(_HYBRID_ALBUMS_SQL, params).mappings().all()
+    return [_serialize_album_row(row) for row in rows]
 
 
-def search_tracks(like: str, limit: int) -> list[dict]:
+def search_tracks(query: str, limit: int) -> list[dict]:
+    params = _search_params(query, limit)
+    if not normalize_search_query(query):
+        return []
     with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT t.id, t.entity_uid::text AS entity_uid, t.slug, t.title, t.artist, a.id AS album_id, a.slug AS album_slug,
-                       a.entity_uid::text AS album_entity_uid, a.name AS album,
-                       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
-                       t.path, t.duration,
-                       t.bpm, t.audio_key, t.audio_scale, t.energy,
-                       t.danceability, t.valence, t.bliss_vector
-                FROM library_tracks t
-                JOIN library_albums a ON t.album_id = a.id
-                LEFT JOIN library_artists ar ON ar.name = t.artist
-                WHERE t.title ILIKE :like OR t.artist ILIKE :like OR a.name ILIKE :like
-                ORDER BY t.title ASC
-                LIMIT :limit
-                """
-                ),
-                {"like": like, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-        return [_serialize_track_row(row) for row in rows]
+        rows = session.execute(_HYBRID_TRACKS_SQL, params).mappings().all()
+    return [_serialize_track_row(row) for row in rows]
 
 
 def _artist_payload(row: Mapping[Any, Any]) -> dict:
@@ -240,12 +204,14 @@ _HYBRID_TRACKS_SQL = text(
     WITH ranked AS (
         SELECT t.id, t.entity_uid::text AS entity_uid, t.slug,
                t.title, t.artist,
-               a.id AS album_id, a.slug AS album_slug,
+               a.id AS album_id, a.slug AS album_slug, a.has_cover,
                a.entity_uid::text AS album_entity_uid, a.name AS album,
                ar.id AS artist_id,
                ar.entity_uid::text AS artist_entity_uid,
                ar.slug AS artist_slug,
-               t.path, t.duration,
+               t.path, t.duration, t.genre, t.format, t.bitrate, t.year,
+               t.bpm, t.audio_key, t.audio_scale, t.energy,
+               t.danceability, t.valence, t.bliss_vector,
                COALESCE(ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0) AS fts_rank,
                CASE WHEN t.title ILIKE :prefix ESCAPE '\\' THEN 0.3
                     WHEN t.artist ILIKE :prefix ESCAPE '\\' THEN 0.2
@@ -273,6 +239,8 @@ _HYBRID_TRACKS_SQL = text(
 
 def search_all_hybrid(query: str, limit: int) -> dict[str, list[dict]]:
     params = _search_params(query, limit)
+    if not normalize_search_query(query):
+        return {"artists": [], "albums": [], "tracks": []}
     with read_scope() as session:
         artist_rows = session.execute(_HYBRID_ARTISTS_SQL, params).mappings().all()
         album_rows = session.execute(_HYBRID_ALBUMS_SQL, params).mappings().all()
@@ -289,6 +257,7 @@ __all__ = [
     "build_fts_query",
     "build_prefix_pattern",
     "build_substring_pattern",
+    "normalize_search_query",
     "search_all_hybrid",
     "search_albums",
     "search_artists",

@@ -35,6 +35,7 @@ def get_recent_global_artist_rows(limit: int = 10) -> list[dict]:
 
 def get_home_hero_rows(
     *,
+    user_id: int | None = None,
     followed_names_lower: list[str],
     similar_target_names_lower: list[str],
     top_genres_lower: list[str],
@@ -64,6 +65,19 @@ def get_home_hero_rows(
                   AND COALESCE(la.folder_name, '') NOT LIKE '.%'
                   AND COALESCE(la.bio, '') <> ''
                   AND NOT (LOWER(la.name) = ANY(:followed))
+                  AND (
+                    :user_id IS NULL
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM user_recommendation_feedback urf
+                        WHERE urf.user_id = :user_id
+                          AND urf.surface = 'home.hero'
+                          AND urf.entity_type = 'artist'
+                          AND urf.entity_key = 'artist:' || la.slug
+                          AND urf.action = ANY(:negative_actions)
+                          AND (urf.expires_at IS NULL OR urf.expires_at > NOW())
+                    )
+                  )
                 GROUP BY la.id, la.slug, la.name, la.listeners, la.lastfm_playcount, la.album_count, la.track_count, la.bio
                 HAVING COUNT(DISTINCT CASE WHEN LOWER(g.name) = ANY(:top_genres) THEN g.name END) > 0
                 ORDER BY
@@ -78,6 +92,12 @@ def get_home_hero_rows(
                     "top_genres": top_genres_lower,
                     "similar_targets": similar_target_names_lower,
                     "followed": followed_names_lower,
+                    "user_id": user_id,
+                    "negative_actions": [
+                        "dismiss",
+                        "not_interested",
+                        "ignored_cooldown",
+                    ],
                 },
             )
             .mappings()
@@ -104,11 +124,32 @@ def get_home_hero_rows(
                       AND COALESCE(folder_name, '') NOT LIKE '.%'
                       AND COALESCE(bio, '') <> ''
                       AND NOT (LOWER(name) = ANY(:followed))
+                      AND (
+                        :user_id IS NULL
+                        OR NOT EXISTS (
+                            SELECT 1
+                            FROM user_recommendation_feedback urf
+                            WHERE urf.user_id = :user_id
+                              AND urf.surface = 'home.hero'
+                              AND urf.entity_type = 'artist'
+                              AND urf.entity_key = 'artist:' || library_artists.slug
+                              AND urf.action = ANY(:negative_actions)
+                              AND (urf.expires_at IS NULL OR urf.expires_at > NOW())
+                        )
+                      )
                     ORDER BY COALESCE(listeners, 0) DESC, COALESCE(lastfm_playcount, 0) DESC
                     LIMIT 7
                     """
                     ),
-                    {"followed": followed_names_lower},
+                    {
+                        "followed": followed_names_lower,
+                        "user_id": user_id,
+                        "negative_actions": [
+                            "dismiss",
+                            "not_interested",
+                            "ignored_cooldown",
+                        ],
+                    },
                 )
                 .mappings()
                 .all()

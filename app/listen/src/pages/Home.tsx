@@ -103,6 +103,10 @@ function snapshotVersion(
   return Number(payload?.snapshot?.version || 0);
 }
 
+function homeHeroEntityKey(artist: HomeHeroArtist): string {
+  return `artist:${artist.slug || artist.id || artist.name}`;
+}
+
 const HOME_DISCOVERY_SSE_CHANNEL = "home-discovery";
 const HOME_DISCOVERY_DEGRADE_AFTER_MS = 75_000;
 const HOME_DISCOVERY_DEGRADED_REFRESH_MS = 60_000;
@@ -113,6 +117,9 @@ export function Home() {
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const isDesktop = useIsDesktop();
   const [startingDiscoveryRadio, setStartingDiscoveryRadio] = useState(false);
+  const [dismissedHeroKeys, setDismissedHeroKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const { data: discovery, refetch: refetchDiscovery } =
     useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
@@ -288,6 +295,7 @@ export function Home() {
         scope === "home" ||
         scope === "library" ||
         scope === "upcoming" ||
+        scope.startsWith("home:user:") ||
         scope.startsWith("artist:") ||
         scope.startsWith("album:") ||
         scope.startsWith("playlist:")
@@ -311,6 +319,9 @@ export function Home() {
     : heroRaw
       ? [heroRaw]
       : [];
+  const visibleHeroes = heroes.filter(
+    (hero) => !dismissedHeroKeys.has(homeHeroEntityKey(hero)),
+  );
   const recentGlobalArtists = currentDiscovery?.recent_global_artists || [];
   const upcoming = currentDiscovery?.upcoming;
   const replay = currentDiscovery?.replay as ReplayMix | undefined;
@@ -346,8 +357,58 @@ export function Home() {
     navigate(homeSectionPath(sectionId));
   }
 
+  async function recordHeroRecommendationAction(
+    artist: HomeHeroArtist,
+    action: "opened" | "played" | "followed" | "not_interested",
+  ) {
+    try {
+      await api("/api/me/recommendations/feedback", "POST", {
+        surface: "home.hero",
+        entity_type: "artist",
+        entity_key: homeHeroEntityKey(artist),
+        action,
+      });
+    } catch {
+      // Recommendation telemetry should never block the primary action.
+    }
+  }
+
+  async function recordHeroExposure(artist: HomeHeroArtist) {
+    try {
+      await api("/api/me/recommendations/exposures", "POST", {
+        surface: "home.hero",
+        entity_type: "artist",
+        entity_key: homeHeroEntityKey(artist),
+      });
+    } catch {
+      // Best-effort telemetry only.
+    }
+  }
+
+  async function dismissHeroArtist(artist: HomeHeroArtist) {
+    const key = homeHeroEntityKey(artist);
+    setDismissedHeroKeys((previous) => new Set(previous).add(key));
+    try {
+      await api("/api/me/recommendations/feedback", "POST", {
+        surface: "home.hero",
+        entity_type: "artist",
+        entity_key: key,
+        action: "not_interested",
+      });
+      void refreshLiveDiscovery(true);
+    } catch {
+      setDismissedHeroKeys((previous) => {
+        const next = new Set(previous);
+        next.delete(key);
+        return next;
+      });
+      toast.error("Failed to update recommendation");
+    }
+  }
+
   async function playHeroArtist(artist: HomeHeroArtist) {
     try {
+      void recordHeroRecommendationAction(artist, "played");
       const queue = await fetchArtistTopTracks({
         artistId: artist.id,
         artistSlug: artist.slug,
@@ -369,6 +430,7 @@ export function Home() {
 
   async function toggleHeroFollow(artist: HomeHeroArtist) {
     try {
+      void recordHeroRecommendationAction(artist, "followed");
       await toggleArtistFollow(artist.id);
       // Refetch to replace followed artist with a new one
       refetchDiscovery();
@@ -607,9 +669,10 @@ export function Home() {
           </div>
         ) : (
           <HomeTasteHero
-            heroes={heroes}
+            heroes={visibleHeroes}
             isFollowing={isFollowing}
             onOpenArtist={(artist) => {
+              void recordHeroRecommendationAction(artist, "opened");
               navigate(
                 artistPagePath({
                   artistId: artist.id,
@@ -621,6 +684,7 @@ export function Home() {
             onPlay={(artist) => void playHeroArtist(artist)}
             onToggleFollow={(artist) => void toggleHeroFollow(artist)}
             onInfo={(artist) => {
+              void recordHeroRecommendationAction(artist, "opened");
               navigate(
                 artistPagePath({
                   artistId: artist.id,
@@ -629,6 +693,8 @@ export function Home() {
                 }),
               );
             }}
+            onDismiss={(artist) => void dismissHeroArtist(artist)}
+            onExpose={(artist) => void recordHeroExposure(artist)}
           />
         )}
       </div>

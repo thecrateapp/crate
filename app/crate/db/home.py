@@ -9,6 +9,7 @@ from crate.db.home_context import get_home_context
 from crate.db.home_discovery_surface import (
     get_cached_home_discovery,
     get_home_discovery,
+    get_home_discovery_debug,
 )
 from crate.db.home_personalized_sections import (
     get_home_essentials,
@@ -79,6 +80,7 @@ __all__ = [
     "get_followed_artist_genre_names",
     "get_followed_artists",
     "get_home_discovery",
+    "get_home_discovery_debug",
     "get_home_essentials",
     "get_home_favorite_artists",
     "get_home_hero",

@@ -187,6 +187,10 @@ export interface PlaylistDetailTrack {
   danceability?: number | null;
   valence?: number | null;
   bliss_vector?: number[] | null;
+  release_week?: string | null;
+  release_week_index?: number | null;
+  release_week_label?: string | null;
+  source_release_date?: string | null;
 }
 
 export interface PlaylistDetailData {
@@ -321,6 +325,10 @@ export interface HomeRecommendedTrack {
   danceability?: number | null;
   valence?: number | null;
   bliss_vector?: number[] | null;
+  release_week?: string | null;
+  release_week_index?: number | null;
+  release_week_label?: string | null;
+  source_release_date?: string | null;
 }
 
 export interface HomeRadioStation {

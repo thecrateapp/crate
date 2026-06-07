@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useRef,
   useState,
@@ -10,6 +11,7 @@ import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
   Copy,
+  GripVertical,
   ImagePlus,
   ListMusic,
   Loader2,
@@ -17,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Sparkles,
   Trash2,
   Upload,
@@ -84,10 +87,22 @@ interface SmartRule {
 
 interface Track {
   id?: number;
+  track_id?: number;
+  entity_uid?: string | null;
+  track_entity_uid?: string | null;
+  track_storage_id?: string | null;
+  track_path?: string | null;
+  path?: string | null;
   title: string;
   artist: string;
   album: string;
   duration: number | null;
+  position?: number | null;
+  source?: string | null;
+  locked?: boolean | null;
+  genre?: string | null;
+  format?: string | null;
+  year?: string | number | null;
 }
 
 interface GenerationLog {
@@ -124,6 +139,34 @@ interface PreviewResult {
 interface PlaylistEditorSurface {
   playlist: Playlist;
   history: GenerationLog[];
+}
+
+interface TrackSearchResponse {
+  tracks: Track[];
+  scope: "rules" | "library";
+}
+
+interface RefinementIssue {
+  type: string;
+  severity: string;
+  message: string;
+  positions: number[];
+}
+
+interface RefinementAction {
+  id: string;
+  type: string;
+  label: string;
+  reason: string;
+  position?: number | null;
+  track_id?: number | null;
+}
+
+interface RefinementProposal {
+  summary: string;
+  issues: RefinementIssue[];
+  actions: RefinementAction[];
+  score_version: string;
 }
 
 interface FilterOptions {
@@ -248,6 +291,27 @@ function formatTrackDuration(seconds: number | null | undefined): string {
   const minutes = Math.floor(wholeSeconds / 60);
   const remaining = String(wholeSeconds % 60).padStart(2, "0");
   return `${minutes}:${remaining}`;
+}
+
+function playlistTrackPayload(track: Track): Record<string, unknown> {
+  return {
+    track_id: track.track_id ?? track.id,
+    entity_uid: track.track_entity_uid ?? track.entity_uid,
+    track_entity_uid: track.track_entity_uid ?? track.entity_uid,
+    track_storage_id: track.track_storage_id,
+    path: track.track_path ?? track.path,
+    title: track.title,
+    artist: track.artist,
+    album: track.album,
+    duration: track.duration,
+  };
+}
+
+function trackSourceLabel(track: Track): string {
+  if (track.locked) return "locked";
+  if (track.source === "manual") return "manual";
+  if (track.source === "generated") return "generated";
+  return track.source || "track";
 }
 
 function Field({
@@ -412,6 +476,19 @@ export function PlaylistEditor() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const deferredTrackSearchQuery = useDeferredValue(trackSearchQuery);
+  const [trackSearchScope, setTrackSearchScope] = useState<"rules" | "library">(
+    "rules",
+  );
+  const [trackSearchResults, setTrackSearchResults] = useState<Track[]>([]);
+  const [trackSearching, setTrackSearching] = useState(false);
+  const [addingTrackId, setAddingTrackId] = useState<number | null>(null);
+  const [draggedTrackId, setDraggedTrackId] = useState<number | null>(null);
+  const [refining, setRefining] = useState(false);
+  const [applyingRefinement, setApplyingRefinement] = useState(false);
+  const [refineProposal, setRefineProposal] =
+    useState<RefinementProposal | null>(null);
 
   useEffect(() => {
     const basePlaylist = surface?.playlist;
@@ -444,6 +521,48 @@ export function PlaylistEditor() {
     isSmart &&
     JSON.stringify(currentSmartRules) !==
       JSON.stringify(persistedSmartRules ?? null);
+
+  useEffect(() => {
+    if (!isSmart && trackSearchScope === "rules") {
+      setTrackSearchScope("library");
+    }
+  }, [isSmart, trackSearchScope]);
+
+  useEffect(() => {
+    const query = deferredTrackSearchQuery.trim();
+    if (!playlist || query.length < 2) {
+      setTrackSearchResults([]);
+      setTrackSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTrackSearching(true);
+    const timeout = window.setTimeout(() => {
+      api<TrackSearchResponse>(
+        `/api/admin/system-playlists/${id}/track-search?q=${encodeURIComponent(
+          query,
+        )}&scope=${trackSearchScope}&limit=12`,
+      )
+        .then((response) => {
+          if (!cancelled) setTrackSearchResults(response.tracks || []);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTrackSearchResults([]);
+            toast.error("Track search failed");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setTrackSearching(false);
+        });
+    }, 220);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [deferredTrackSearchQuery, id, playlist, trackSearchScope]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -600,6 +719,137 @@ export function PlaylistEditor() {
       toast.error("Failed to remove cover");
     }
   }, [id, refetch]);
+
+  const handleAddCandidateTrack = useCallback(
+    async (track: Track) => {
+      const trackId = track.track_id ?? track.id ?? null;
+      setAddingTrackId(trackId);
+      try {
+        const result = await api<Playlist>(
+          `/api/admin/system-playlists/${id}/tracks`,
+          "POST",
+          { tracks: [playlistTrackPayload(track)] },
+        );
+        setLiveSurface((current) =>
+          current ? { ...current, playlist: result } : current,
+        );
+        setTrackSearchQuery("");
+        setTrackSearchResults([]);
+        toast.success("Track added and locked");
+        void refetch();
+      } catch {
+        toast.error("Failed to add track");
+      } finally {
+        setAddingTrackId(null);
+      }
+    },
+    [id, refetch],
+  );
+
+  const handleRemoveTrack = useCallback(
+    async (track: Track, fallbackPosition: number) => {
+      const position = track.position ?? fallbackPosition;
+      try {
+        const result = await api<Playlist>(
+          `/api/admin/system-playlists/${id}/tracks/${position}`,
+          "DELETE",
+        );
+        setLiveSurface((current) =>
+          current ? { ...current, playlist: result } : current,
+        );
+        toast.success("Track removed");
+        void refetch();
+      } catch {
+        toast.error("Failed to remove track");
+      }
+    },
+    [id, refetch],
+  );
+
+  const handleTrackDrop = useCallback(
+    async (targetTrackId: number | undefined) => {
+      if (
+        !playlist ||
+        draggedTrackId == null ||
+        targetTrackId == null ||
+        draggedTrackId === targetTrackId
+      ) {
+        setDraggedTrackId(null);
+        return;
+      }
+      const ids = playlist.tracks
+        .map((track) => track.id)
+        .filter((trackId): trackId is number => typeof trackId === "number");
+      const fromIndex = ids.indexOf(draggedTrackId);
+      const toIndex = ids.indexOf(targetTrackId);
+      if (fromIndex < 0 || toIndex < 0) {
+        setDraggedTrackId(null);
+        return;
+      }
+      const nextIds = [...ids];
+      const [moved] = nextIds.splice(fromIndex, 1);
+      if (moved == null) {
+        setDraggedTrackId(null);
+        return;
+      }
+      nextIds.splice(toIndex, 0, moved);
+      setDraggedTrackId(null);
+
+      try {
+        const result = await api<Playlist>(
+          `/api/admin/system-playlists/${id}/tracks/reorder`,
+          "POST",
+          { track_ids: nextIds },
+        );
+        setLiveSurface((current) =>
+          current ? { ...current, playlist: result } : current,
+        );
+        toast.success("Track order locked");
+        void refetch();
+      } catch {
+        toast.error("Failed to reorder tracks");
+      }
+    },
+    [draggedTrackId, id, playlist, refetch],
+  );
+
+  const handleRefineTracklist = useCallback(async () => {
+    if (!llmAvailable) {
+      toast.error(llmUnavailableReason);
+      return;
+    }
+    setRefining(true);
+    try {
+      const result = await api<RefinementProposal>(
+        `/api/admin/system-playlists/${id}/refine`,
+        "POST",
+      );
+      setRefineProposal(result);
+      toast.success("AI refinement staged for review");
+    } catch (error) {
+      toast.error(apiErrorDetail(error, "Failed to refine tracklist"));
+    } finally {
+      setRefining(false);
+    }
+  }, [id, llmAvailable, llmUnavailableReason]);
+
+  const handleApplyRefinement = useCallback(async () => {
+    if (!refineProposal?.actions.length) return;
+    setApplyingRefinement(true);
+    try {
+      await api(`/api/admin/system-playlists/${id}/refine/apply`, "POST", {
+        actions: refineProposal.actions,
+        action_ids: refineProposal.actions.map((action) => action.id),
+      });
+      toast.success("Refinement applied");
+      setRefineProposal(null);
+      void refetch();
+    } catch (error) {
+      toast.error(apiErrorDetail(error, "Failed to apply refinement"));
+    } finally {
+      setApplyingRefinement(false);
+    }
+  }, [id, refineProposal, refetch]);
 
   function addRule() {
     setRules((current) => [
@@ -1265,40 +1515,263 @@ export function PlaylistEditor() {
           ) : null}
 
           <Card className="border-white/10 bg-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ListMusic size={16} /> Tracks
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Current content snapshot for this playlist.
-              </p>
+            <CardHeader className="space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ListMusic size={16} /> Tracks
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Curate the generated snapshot. Manual adds and dragged rows
+                    are locked against future auto-refreshes.
+                  </p>
+                </div>
+                <AIButton
+                  type="button"
+                  onClick={handleRefineTracklist}
+                  loading={refining}
+                  disabled={
+                    refining ||
+                    !llmAvailable ||
+                    (playlist.tracks?.length ?? 0) === 0
+                  }
+                  title={!llmAvailable ? llmUnavailableReason : undefined}
+                >
+                  Refine tracklist with AI
+                </AIButton>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div className="rounded-md border border-primary/15 bg-primary/[0.04] p-3">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
+                  <div className="relative">
+                    <Search
+                      size={14}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+                    />
+                    <Input
+                      value={trackSearchQuery}
+                      onChange={(event) =>
+                        setTrackSearchQuery(event.target.value)
+                      }
+                      placeholder={
+                        isSmart
+                          ? "Search tracks matching this playlist..."
+                          : "Search library tracks..."
+                      }
+                      className="border-white/10 bg-black/25 pl-9"
+                    />
+                  </div>
+                  <AdminSelect
+                    value={trackSearchScope}
+                    onChange={(value) =>
+                      setTrackSearchScope(value as "rules" | "library")
+                    }
+                    options={[
+                      {
+                        value: "rules",
+                        label: "Matching rules",
+                      },
+                      { value: "library", label: "Entire library" },
+                    ]}
+                    allowClear={false}
+                    disabled={!isSmart}
+                    placeholder="Search scope"
+                    triggerClassName="w-full max-w-none"
+                  />
+                </div>
+
+                {trackSearching ? (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 size={13} className="animate-spin" /> Searching
+                    candidates...
+                  </div>
+                ) : trackSearchResults.length > 0 ? (
+                  <div className="mt-3 space-y-1.5 border-t border-primary/10 pt-3">
+                    {trackSearchResults.map((track) => {
+                      const trackId = track.track_id ?? track.id ?? 0;
+                      return (
+                        <div
+                          key={`${trackId}-${track.title}`}
+                          className="flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-medium">
+                              {track.title || "Untitled"}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {[track.artist, track.album]
+                                .filter(Boolean)
+                                .join(" — ")}
+                            </div>
+                          </div>
+                          {track.duration != null ? (
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                              {formatTrackDuration(track.duration)}
+                            </span>
+                          ) : null}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={addingTrackId === trackId}
+                            onClick={() => void handleAddCandidateTrack(track)}
+                          >
+                            {addingTrackId === trackId ? (
+                              <Loader2
+                                size={13}
+                                className="mr-1.5 animate-spin"
+                              />
+                            ) : (
+                              <Plus size={13} className="mr-1.5" />
+                            )}
+                            Add locked
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : deferredTrackSearchQuery.trim().length >= 2 ? (
+                  <div className="mt-3 rounded-md border border-dashed border-white/10 bg-black/15 px-3 py-4 text-center text-xs text-muted-foreground">
+                    No candidate tracks found in this scope.
+                  </div>
+                ) : null}
+              </div>
+
+              {refineProposal ? (
+                <div className="rounded-md border border-primary/25 bg-primary/[0.06] p-4 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                        AI refinement proposal
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {refineProposal.summary}
+                      </p>
+                    </div>
+                    {refineProposal.actions.length > 0 ? (
+                      <Button
+                        size="sm"
+                        onClick={handleApplyRefinement}
+                        disabled={applyingRefinement}
+                      >
+                        {applyingRefinement ? (
+                          <Loader2 size={14} className="mr-1 animate-spin" />
+                        ) : (
+                          <Sparkles size={14} className="mr-1" />
+                        )}
+                        Apply safe fixes
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setRefineProposal(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+
+                  {refineProposal.issues.length > 0 ? (
+                    <div className="mt-4 grid gap-2">
+                      {refineProposal.issues.slice(0, 8).map((issue) => (
+                        <div
+                          key={`${issue.type}-${issue.positions.join("-")}`}
+                          className="rounded-md border border-white/10 bg-black/20 px-3 py-2"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CrateChip active className="text-[10px]">
+                              {issue.severity}
+                            </CrateChip>
+                            <span className="text-sm">{issue.message}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {refineProposal.actions.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {refineProposal.actions.slice(0, 10).map((action) => (
+                        <CrateChip key={action.id} className="text-[10px]">
+                          {action.label}
+                        </CrateChip>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               {playlist.tracks?.length > 0 ? (
                 <div className="space-y-1.5">
-                  {playlist.tracks.map((track, index) => (
-                    <div
-                      key={track.id ?? index}
-                      className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/[0.03]"
-                    >
-                      <span className="w-6 text-right text-xs text-muted-foreground">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">
-                          {track.title}
-                        </div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {track.artist} — {track.album}
-                        </div>
-                      </div>
-                      {track.duration != null ? (
-                        <span className="text-xs tabular-nums text-muted-foreground">
-                          {formatTrackDuration(track.duration)}
+                  {playlist.tracks.map((track, index) => {
+                    const rowId = track.id;
+                    return (
+                      <div
+                        key={rowId ?? index}
+                        draggable={typeof rowId === "number"}
+                        onDragStart={() => {
+                          if (typeof rowId === "number") {
+                            setDraggedTrackId(rowId);
+                          }
+                        }}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => void handleTrackDrop(rowId)}
+                        onDragEnd={() => setDraggedTrackId(null)}
+                        className={
+                          "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10 hover:bg-white/[0.03] " +
+                          (draggedTrackId === rowId
+                            ? "bg-primary/10"
+                            : "bg-transparent")
+                        }
+                      >
+                        <GripVertical
+                          size={14}
+                          className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
+                        />
+                        <span className="w-6 text-right text-xs text-muted-foreground">
+                          {index + 1}
                         </span>
-                      ) : null}
-                    </div>
-                  ))}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium">
+                            {track.title}
+                          </div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {track.artist} — {track.album}
+                          </div>
+                        </div>
+                        <div className="hidden shrink-0 gap-1.5 xl:flex">
+                          <CrateChip
+                            active={Boolean(track.locked)}
+                            className="text-[10px]"
+                          >
+                            {trackSourceLabel(track)}
+                          </CrateChip>
+                          {track.format ? (
+                            <CrateChip className="text-[10px]">
+                              {track.format}
+                            </CrateChip>
+                          ) : null}
+                        </div>
+                        {track.duration != null ? (
+                          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+                            {formatTrackDuration(track.duration)}
+                          </span>
+                        ) : null}
+                        <ActionIconButton
+                          variant="row"
+                          tone="danger"
+                          className="h-8 w-8 opacity-70 hover:opacity-100"
+                          onClick={() =>
+                            void handleRemoveTrack(track, index + 1)
+                          }
+                        >
+                          <Trash2 size={14} />
+                        </ActionIconButton>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed border-white/10 bg-black/10 px-4 py-8 text-center text-sm text-muted-foreground">

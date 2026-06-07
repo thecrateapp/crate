@@ -43,6 +43,10 @@ def _track_payload(row: dict) -> dict:
         "danceability": row.get("danceability"),
         "valence": row.get("valence"),
         "bliss_vector": list(bliss_vector) if bliss_vector is not None else None,
+        "release_week": row.get("release_week"),
+        "release_week_index": row.get("release_week_index"),
+        "release_week_label": row.get("release_week_label"),
+        "source_release_date": row.get("source_release_date"),
     }
 
 

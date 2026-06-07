@@ -34,7 +34,6 @@ from crate.db.repositories.playlists import (
     create_playlist_invite,
     execute_smart_rules,
     get_playlist_filter_options,
-    replace_playlist_tracks,
     add_playlist_member,
     add_playlist_tracks,
     can_edit_playlist,
@@ -46,6 +45,7 @@ from crate.db.repositories.playlists import (
     get_playlist_tracks,
     get_playlists,
     is_playlist_owner,
+    regenerate_playlist_tracks,
     reorder_playlist,
     remove_playlist_member,
     remove_playlist_track,
@@ -277,7 +277,13 @@ def remove_track(request: Request, playlist_id: int, position: int):
         raise HTTPException(status_code=404, detail="Playlist not found")
     if user.get("role") != "admin" and not can_edit_playlist(pl, user["id"]):
         raise HTTPException(status_code=403, detail="Not allowed to edit this playlist")
-    remove_playlist_track(playlist_id, position)
+    is_smart_playlist = bool(pl.get("is_smart") or pl.get("generation_mode") == "smart")
+    remove_playlist_track(
+        playlist_id,
+        position,
+        record_exclusion=is_smart_playlist,
+        excluded_by_user_id=user["id"],
+    )
     return {"ok": True}
 
 
@@ -294,7 +300,8 @@ def reorder(request: Request, playlist_id: int, body: ReorderRequest):
         raise HTTPException(status_code=404, detail="Playlist not found")
     if user.get("role") != "admin" and not can_edit_playlist(pl, user["id"]):
         raise HTTPException(status_code=403, detail="Not allowed to edit this playlist")
-    reorder_playlist(playlist_id, body.track_ids)
+    is_smart_playlist = bool(pl.get("is_smart") or pl.get("generation_mode") == "smart")
+    reorder_playlist(playlist_id, body.track_ids, lock_tracks=is_smart_playlist)
     return {"ok": True}
 
 
@@ -320,8 +327,12 @@ def generate_smart(request: Request, playlist_id: int):
 
     rules = pl["smart_rules"]
     tracks = execute_smart_rules(rules)
-
-    track_count = replace_playlist_tracks(playlist_id, tracks or [])
+    target_count = int(rules.get("limit") or len(tracks or []) or 50)
+    track_count = regenerate_playlist_tracks(
+        playlist_id,
+        tracks or [],
+        target_count=target_count,
+    )
 
     return {"ok": True, "track_count": track_count}
 

@@ -125,6 +125,43 @@ class TestHomeCatalog:
         assert len(rows) >= 1
         assert rows[0]["name"] == "Hero Artist"
 
+    def test_get_home_hero_rows_excludes_active_negative_feedback(self, pg_db):
+        from crate.db.queries.home_catalog import get_home_hero_rows
+        from crate.db.repositories.recommendations import record_recommendation_feedback
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        user = pg_db.create_user("hero-feedback-query@test.com")
+        pg_db.upsert_artist({"name": "Dismissed Hero"})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET has_photo = 1,
+                        bio = 'A great artist',
+                        listeners = 999999
+                    WHERE name = 'Dismissed Hero'
+                    """
+                )
+            )
+        record_recommendation_feedback(
+            user_id=user["id"],
+            surface="home.hero",
+            entity_type="artist",
+            entity_key="artist:dismissed-hero",
+            action="not_interested",
+        )
+
+        rows = get_home_hero_rows(
+            user_id=user["id"],
+            followed_names_lower=[],
+            similar_target_names_lower=[],
+            top_genres_lower=["post-punk"],
+        )
+
+        assert all(row["name"] != "Dismissed Hero" for row in rows)
+
 
 class TestHomeTrackArtistCore:
     def _setup_artist_with_tracks(self, pg_db, artist_name, track_titles):

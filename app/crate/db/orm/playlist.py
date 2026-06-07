@@ -71,6 +71,8 @@ class PlaylistTrack(Base):
     album: Mapped[str | None] = mapped_column(Text)
     duration: Mapped[float | None] = mapped_column(Float)
     position: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str | None] = mapped_column(Text)
+    locked: Mapped[bool | None] = mapped_column(Boolean)
     added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

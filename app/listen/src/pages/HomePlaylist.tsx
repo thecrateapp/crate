@@ -37,6 +37,34 @@ import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { formatTotalDuration, shuffleArray } from "@/lib/utils";
 
+export function newArrivalsWindowLabel(
+  data: HomeGeneratedPlaylistDetail | null,
+): string | null {
+  if (!data || data.id !== "my-new-arrivals") return null;
+  const bucketIndexes = Array.from(
+    new Set(
+      data.tracks
+        .map((track) => track.release_week_index)
+        .filter((value): value is number => typeof value === "number"),
+    ),
+  ).sort((a, b) => a - b);
+  if (!bucketIndexes.length) return null;
+
+  const firstLabel =
+    data.tracks.find((track) => track.release_week_index === bucketIndexes[0])
+      ?.release_week_label || null;
+  if (bucketIndexes.length === 1) {
+    return firstLabel;
+  }
+  if (bucketIndexes[0] === 0) {
+    const previousWeeks = Math.max(...bucketIndexes);
+    return `This week + ${previousWeeks} previous week${
+      previousWeeks === 1 ? "" : "s"
+    }`;
+  }
+  return `Past ${bucketIndexes.length} release weeks`;
+}
+
 export function HomePlaylist() {
   const navigate = useNavigate();
   const { playlistId } = useParams<{ playlistId: string }>();
@@ -54,6 +82,10 @@ export function HomePlaylist() {
   );
   const { playlistOptions, ensurePlaylistOptionsLoaded } =
     useLazyPlaylistOptions();
+  const releaseWindowLabel = useMemo(
+    () => newArrivalsWindowLabel(data),
+    [data],
+  );
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
@@ -229,6 +261,7 @@ export function HomePlaylist() {
             {data.total_duration > 0 ? (
               <span>{formatTotalDuration(data.total_duration)}</span>
             ) : null}
+            {releaseWindowLabel ? <span>{releaseWindowLabel}</span> : null}
             <span>Generated for you</span>
           </div>
         </div>

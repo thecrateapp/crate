@@ -7,6 +7,11 @@ from sqlalchemy import text
 from crate.db.repositories.playlists_rule_engine_builder import build_rule_conditions
 from crate.db.repositories.playlists_rule_engine_config import SORT_MAP
 from crate.db.repositories.playlists_rule_engine_genre import combine_sql_extrema
+from crate.db.tracklist_engine import (
+    TracklistRequest,
+    generate_tracklist,
+    get_tracklist_profile,
+)
 from crate.db.tx import read_scope
 from crate.genre_taxonomy import get_related_genre_terms
 from crate.track_versions import dedupe_track_variants
@@ -127,6 +132,7 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
             limit=limit,
             max_per_artist=max_per_artist,
             max_per_album=max_per_album,
+            deduplicate_variants=deduplicate_variants,
         )
     return results[:limit]
 
@@ -186,6 +192,7 @@ def _execute_single_genre_rules(
             limit=limit,
             max_per_artist=max_per_artist,
             max_per_album=max_per_album,
+            deduplicate_variants=deduplicate_variants,
         )
 
     return results[:limit]
@@ -455,41 +462,25 @@ def _select_diverse_smart_rows(
     limit: int,
     max_per_artist: int,
     max_per_album: int,
+    deduplicate_variants: bool,
 ) -> list[dict]:
-    rows = dedupe_track_variants(rows)
-    selected: list[dict] = []
-    seen_tracks: set[object] = set()
-    artist_counts: dict[str, int] = {}
-    album_counts: dict[tuple[str, str], int] = {}
-    passes = [
-        (max_per_artist, max_per_album),
-        (max(max_per_artist + 1, 3), max(max_per_album + 1, 3)),
-        (limit, limit),
-    ]
-
-    for artist_limit, album_limit in passes:
-        for track in rows:
-            track_key = _track_identity(track)
-            if not track_key or track_key in seen_tracks:
-                continue
-            artist = str(track.get("artist") or "").strip().lower()
-            album = str(track.get("album") or "").strip().lower()
-            album_key = (artist, album)
-            if artist and artist_counts.get(artist, 0) >= artist_limit:
-                continue
-            if album and album_counts.get(album_key, 0) >= album_limit:
-                continue
-
-            seen_tracks.add(track_key)
-            if artist:
-                artist_counts[artist] = artist_counts.get(artist, 0) + 1
-            if album:
-                album_counts[album_key] = album_counts.get(album_key, 0) + 1
-            selected.append(track)
-            if len(selected) >= limit:
-                return selected
-
-    return selected
+    profile = get_tracklist_profile(
+        "curator_smart_playlist_v1",
+        overrides={
+            "max_per_artist": max_per_artist,
+            "max_per_album": max_per_album,
+            "strict_song_identity": deduplicate_variants,
+        },
+    )
+    result = generate_tracklist(
+        TracklistRequest(
+            rows=dedupe_track_variants(rows) if deduplicate_variants else rows,
+            profile=profile,
+            limit=limit,
+            seed_id="smart-playlist",
+        )
+    )
+    return result.tracks
 
 
 __all__ = ["execute_smart_rules"]

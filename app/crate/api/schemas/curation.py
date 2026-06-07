@@ -6,7 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from crate.api.schemas.common import OkResponse, SnapshotMetadataResponse
-from crate.api.schemas.playlists import PlaylistSummaryResponse, PlaylistTrackResponse
+from crate.api.schemas.playlists import (
+    PlaylistSummaryResponse,
+    PlaylistTrackInput,
+    PlaylistTrackResponse,
+)
 
 
 class CreateSystemPlaylistRequest(BaseModel):
@@ -47,6 +51,51 @@ class UpdateSystemPlaylistRequest(BaseModel):
 
 class PreviewSystemPlaylistRequest(BaseModel):
     smart_rules: dict[str, Any] | None = None
+
+
+class AddSystemPlaylistTracksRequest(BaseModel):
+    tracks: list[PlaylistTrackInput] = Field(default_factory=list)
+
+
+class ReorderSystemPlaylistTracksRequest(BaseModel):
+    track_ids: list[int] = Field(default_factory=list)
+
+
+class SystemPlaylistTrackSearchResponse(BaseModel):
+    tracks: list[PlaylistTrackResponse] = Field(default_factory=list)
+    scope: Literal["rules", "library"] = "rules"
+
+
+class PlaylistRefinementIssueResponse(BaseModel):
+    type: str
+    severity: str
+    message: str
+    positions: list[int] = Field(default_factory=list)
+
+
+class PlaylistRefinementActionResponse(BaseModel):
+    id: str
+    type: str
+    label: str
+    reason: str
+    position: int | None = None
+    track_id: int | None = None
+
+
+class RefineSystemPlaylistResponse(BaseModel):
+    summary: str
+    issues: list[PlaylistRefinementIssueResponse] = Field(default_factory=list)
+    actions: list[PlaylistRefinementActionResponse] = Field(default_factory=list)
+    score_version: str = "playlist_refinement_v1"
+
+
+class ApplyPlaylistRefinementRequest(BaseModel):
+    actions: list[PlaylistRefinementActionResponse] = Field(default_factory=list)
+    action_ids: list[str] | None = None
+
+
+class ApplyPlaylistRefinementResponse(OkResponse):
+    applied_count: int
 
 
 class GeneratePlaylistDescriptionRequest(BaseModel):

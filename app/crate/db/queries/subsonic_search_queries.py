@@ -2,68 +2,55 @@
 
 from __future__ import annotations
 
-from sqlalchemy import text
-
-from crate.db.tx import read_scope
+from crate.db.queries.browse_media_search import (
+    search_albums as search_library_albums,
+)
+from crate.db.queries.browse_media_search import (
+    search_artists as search_library_artists,
+)
+from crate.db.queries.browse_media_search import (
+    search_tracks as search_library_tracks,
+)
 
 
 def search_artists(query: str, limit: int) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    "SELECT id, name FROM library_artists WHERE name ILIKE :query LIMIT :limit"
-                ),
-                {"query": query, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+    return [
+        {"id": row["id"], "name": row["name"]}
+        for row in search_library_artists(query, limit)
+    ]
 
 
 def search_albums(query: str, limit: int) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT a.id, a.name, a.artist, a.year, a.has_cover, ar.id as artist_id
-                FROM library_albums a
-                LEFT JOIN library_artists ar ON ar.name = a.artist
-                WHERE a.name ILIKE :query
-                LIMIT :limit
-                """
-                ),
-                {"query": query, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+    return [
+        {
+            "id": row["id"],
+            "name": row["name"],
+            "artist": row["artist"],
+            "year": row.get("year"),
+            "has_cover": row.get("has_cover"),
+            "artist_id": row.get("artist_id"),
+        }
+        for row in search_library_albums(query, limit)
+    ]
 
 
 def search_tracks(query: str, limit: int) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT t.id, t.title, t.artist, t.album, t.duration, t.path,
-                       t.format, t.bitrate, a.id as album_id, a.has_cover, ar.id as artist_id
-                FROM library_tracks t
-                LEFT JOIN library_albums a ON a.id = t.album_id
-                LEFT JOIN library_artists ar ON ar.name = t.artist
-                WHERE t.title ILIKE :query OR t.artist ILIKE :query
-                LIMIT :limit
-                """
-                ),
-                {"query": query, "limit": limit},
-            )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+    return [
+        {
+            "id": row["id"],
+            "title": row["title"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "duration": row.get("duration"),
+            "path": row.get("path"),
+            "format": row.get("format"),
+            "bitrate": row.get("bitrate"),
+            "album_id": row.get("album_id"),
+            "has_cover": row.get("has_cover"),
+            "artist_id": row.get("artist_id"),
+        }
+        for row in search_library_tracks(query, limit)
+    ]
 
 
 __all__ = [

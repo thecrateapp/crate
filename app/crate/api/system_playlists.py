@@ -14,21 +14,28 @@ from crate.api.permissions import require_permission
 from crate.api.playlist_utils import apply_playlist_cover_payload
 from crate.api.schemas.common import OkResponse
 from crate.api.schemas.curation import (
+    AddSystemPlaylistTracksRequest,
+    ApplyPlaylistRefinementRequest,
+    ApplyPlaylistRefinementResponse,
     CreateSystemPlaylistFromBlueprintRequest,
     CreateSystemPlaylistRequest,
     GeneratePlaylistDescriptionRequest,
     GeneratePlaylistDescriptionResponse,
     PreviewSystemPlaylistRequest,
+    RefineSystemPlaylistResponse,
+    ReorderSystemPlaylistTracksRequest,
     SystemPlaylistBlueprintResponse,
     SystemPlaylistDetailResponse,
     SystemPlaylistEditorSnapshotResponse,
     SystemPlaylistGenerateResponse,
     SystemPlaylistSummaryResponse,
+    SystemPlaylistTrackSearchResponse,
     UpdateSystemPlaylistRequest,
 )
 from crate.playlist_covers import delete_playlist_cover
 from crate.db.cache_runtime import get_redis
 from crate.db.repositories.playlists import (
+    add_playlist_tracks,
     create_playlist,
     delete_playlist,
     duplicate_playlist,
@@ -39,8 +46,15 @@ from crate.db.repositories.playlists import (
     get_playlist_tracks,
     get_system_playlist_by_curation_key,
     list_system_playlists,
+    remove_playlist_track,
+    reorder_playlist,
     set_generation_status,
     update_playlist,
+)
+from crate.db.queries.browse_media_search import search_tracks
+from crate.playlist_refinement import (
+    apply_playlist_refinement_actions,
+    build_playlist_refinement_proposal,
 )
 from crate.playlist_blueprints import blueprint_curation_key, find_playlist_blueprint
 from crate.db.repositories.tasks import create_task
@@ -95,6 +109,15 @@ def _system_playlist_editor_signature(surface: dict) -> str:
             "total_duration": playlist.get("total_duration"),
             "updated_at": playlist.get("updated_at"),
             "cover_data_url": playlist.get("cover_data_url"),
+            "tracks": [
+                {
+                    "id": track.get("id"),
+                    "position": track.get("position"),
+                    "source": track.get("source"),
+                    "locked": track.get("locked"),
+                }
+                for track in playlist.get("tracks", [])
+            ],
         },
         "history": [
             {
@@ -149,6 +172,60 @@ def _validate_generation_mode(
             detail="smart_rules are required for smart system playlists",
         )
     return mode
+
+
+def _positive_limit(value: int, *, default: int = 20, maximum: int = 50) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(1, min(parsed, maximum))
+
+
+def _track_search_payload(track: dict) -> dict:
+    return {
+        "id": track.get("id") or track.get("track_id"),
+        "track_id": track.get("id") or track.get("track_id"),
+        "track_entity_uid": track.get("track_entity_uid") or track.get("entity_uid"),
+        "track_storage_id": track.get("track_storage_id") or track.get("storage_id"),
+        "track_path": track.get("track_path") or track.get("path"),
+        "path": track.get("track_path") or track.get("path"),
+        "title": track.get("title") or "",
+        "artist": track.get("artist") or "",
+        "album": track.get("album") or "",
+        "duration": track.get("duration"),
+        "genre": track.get("genre"),
+        "format": track.get("format"),
+        "year": track.get("year"),
+        "artist_id": track.get("artist_id"),
+        "artist_slug": track.get("artist_slug"),
+        "album_id": track.get("album_id"),
+        "album_slug": track.get("album_slug"),
+        "source": "candidate",
+        "locked": False,
+    }
+
+
+def _track_matches_query(track: dict, query: str) -> bool:
+    needle = query.casefold()
+    return any(
+        needle in str(track.get(key) or "").casefold()
+        for key in ("title", "artist", "album")
+    )
+
+
+def _search_rule_candidate_tracks(*, rules: dict, query: str, limit: int) -> list[dict]:
+    rule_limit = max(limit * 10, 150)
+    scoped_rules = {**rules, "limit": rule_limit}
+    tracks = execute_smart_rules(scoped_rules)
+    if isinstance(tracks, int):
+        return []
+    matches = [
+        _track_search_payload(track)
+        for track in tracks
+        if _track_matches_query(track, query)
+    ]
+    return matches[:limit]
 
 
 @router.get(
@@ -331,6 +408,138 @@ async def admin_stream_system_playlist(request: Request, playlist_id: int):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get(
+    "/{playlist_id}/track-search",
+    response_model=SystemPlaylistTrackSearchResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Search candidate tracks for a system playlist",
+)
+def admin_search_system_playlist_tracks(
+    request: Request,
+    playlist_id: int,
+    q: str = "",
+    scope: str = Query("rules", pattern="^(rules|library)$"),
+    limit: int = Query(20, ge=1, le=50),
+):
+    _require_playlist_curator(request)
+    playlist = _require_system_playlist(playlist_id)
+    query = q.strip()
+    capped_limit = _positive_limit(limit)
+    if len(query) < 2:
+        return {"tracks": [], "scope": scope}
+
+    if scope == "rules" and playlist.get("smart_rules"):
+        tracks = _search_rule_candidate_tracks(
+            rules=playlist["smart_rules"],
+            query=query,
+            limit=capped_limit,
+        )
+    else:
+        tracks = [
+            _track_search_payload(track) for track in search_tracks(query, capped_limit)
+        ]
+        scope = "library"
+    return {"tracks": tracks, "scope": scope}
+
+
+@router.post(
+    "/{playlist_id}/tracks",
+    response_model=SystemPlaylistDetailResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Add manual curator tracks to a system playlist",
+)
+def admin_add_system_playlist_tracks(
+    request: Request, playlist_id: int, body: AddSystemPlaylistTracksRequest
+):
+    _require_playlist_curator(request)
+    _require_system_playlist(playlist_id)
+    tracks = [track.model_dump(exclude_none=True) for track in body.tracks]
+    if not tracks:
+        raise HTTPException(status_code=422, detail="No tracks provided")
+    add_playlist_tracks(
+        playlist_id,
+        [{**track, "source": "manual", "locked": True} for track in tracks],
+    )
+    playlist = _require_system_playlist(playlist_id)
+    return _serialize_admin_playlist(playlist, include_tracks=True)
+
+
+@router.delete(
+    "/{playlist_id}/tracks/{position}",
+    response_model=SystemPlaylistDetailResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Remove a system playlist track by position",
+)
+def admin_remove_system_playlist_track(
+    request: Request, playlist_id: int, position: int
+):
+    admin = _require_playlist_curator(request)
+    _require_system_playlist(playlist_id)
+    remove_playlist_track(
+        playlist_id,
+        position,
+        record_exclusion=True,
+        excluded_by_user_id=admin.get("id"),
+    )
+    playlist = _require_system_playlist(playlist_id)
+    return _serialize_admin_playlist(playlist, include_tracks=True)
+
+
+@router.post(
+    "/{playlist_id}/tracks/reorder",
+    response_model=SystemPlaylistDetailResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Reorder system playlist tracks",
+)
+def admin_reorder_system_playlist_tracks(
+    request: Request, playlist_id: int, body: ReorderSystemPlaylistTracksRequest
+):
+    _require_playlist_curator(request)
+    _require_system_playlist(playlist_id)
+    if not body.track_ids:
+        raise HTTPException(status_code=422, detail="No track ids provided")
+    reorder_playlist(playlist_id, body.track_ids, lock_tracks=True)
+    playlist = _require_system_playlist(playlist_id)
+    return _serialize_admin_playlist(playlist, include_tracks=True)
+
+
+@router.post(
+    "/{playlist_id}/refine",
+    response_model=RefineSystemPlaylistResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Build a reviewable AI-assisted refinement proposal",
+)
+def admin_refine_system_playlist(request: Request, playlist_id: int):
+    _require_playlist_curator(request)
+    playlist = _require_system_playlist(playlist_id)
+    return build_playlist_refinement_proposal(
+        playlist=playlist,
+        tracks=get_playlist_tracks(playlist_id),
+        smart_rules=playlist.get("smart_rules"),
+    )
+
+
+@router.post(
+    "/{playlist_id}/refine/apply",
+    response_model=ApplyPlaylistRefinementResponse,
+    responses=_SYSTEM_PLAYLIST_RESPONSES,
+    summary="Apply selected system playlist refinement actions",
+)
+def admin_apply_system_playlist_refinement(
+    request: Request, playlist_id: int, body: ApplyPlaylistRefinementRequest
+):
+    admin = _require_playlist_curator(request)
+    _require_system_playlist(playlist_id)
+    selected = set(body.action_ids) if body.action_ids else None
+    applied_count = apply_playlist_refinement_actions(
+        playlist_id=playlist_id,
+        actions=[action.model_dump() for action in body.actions],
+        selected_action_ids=selected,
+        user_id=admin.get("id"),
+    )
+    return {"ok": True, "applied_count": applied_count}
 
 
 @router.put(

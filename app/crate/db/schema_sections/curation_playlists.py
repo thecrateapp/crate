@@ -63,6 +63,8 @@ def create_playlist_schema(cur) -> None:
             album TEXT,
             duration DOUBLE PRECISION DEFAULT 0,
             position INTEGER NOT NULL,
+            source TEXT NOT NULL DEFAULT 'manual',
+            locked BOOLEAN NOT NULL DEFAULT FALSE,
             added_at TIMESTAMPTZ NOT NULL
         )
         """
@@ -75,6 +77,18 @@ def create_playlist_schema(cur) -> None:
     )
     cur.execute(
         "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID"
+    )
+    cur.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'"
+    )
+    cur.execute(
+        "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS locked BOOLEAN NOT NULL DEFAULT FALSE"
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_playlist_tracks_source_locked
+        ON playlist_tracks(playlist_id, source, locked)
+        """
     )
     cur.execute(
         """
@@ -97,6 +111,34 @@ def create_playlist_schema(cur) -> None:
         CREATE INDEX IF NOT EXISTS idx_playlist_tracks_track_storage_id
         ON playlist_tracks(track_storage_id)
         WHERE track_storage_id IS NOT NULL
+        """
+    )
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS playlist_track_exclusions (
+            id BIGSERIAL PRIMARY KEY,
+            playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+            track_id INTEGER REFERENCES library_tracks(id) ON DELETE SET NULL,
+            track_entity_uid UUID,
+            track_storage_id UUID,
+            track_path TEXT,
+            reason TEXT NOT NULL DEFAULT 'removed',
+            created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_track_exclusions_identity
+        ON playlist_track_exclusions(
+            playlist_id,
+            COALESCE(track_entity_uid::text, ''),
+            COALESCE(track_storage_id::text, ''),
+            COALESCE(track_path, ''),
+            COALESCE(track_id::text, '')
+        )
         """
     )
 

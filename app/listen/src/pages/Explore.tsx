@@ -43,6 +43,9 @@ import { fetchHomePlaylistRadio } from "@/lib/radio";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { shuffleArray } from "@/lib/utils";
 
+const EXPLORE_HOME_DISCOVERY_ENABLED =
+  import.meta.env.VITE_EXPLORE_HOME_DISCOVERY_ENABLED === "true";
+
 export function Explore() {
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
@@ -57,11 +60,16 @@ export function Explore() {
     refetch,
   } = useApi<ExplorePageData>("/api/browse/explore-page");
   const { data: homeDiscovery, refetch: refetchHomeDiscovery } =
-    useApi<HomeDiscoveryPayload>("/api/me/home/discovery", "GET", undefined, {
-      reactive: false,
-      revalidateIfCached: "idle",
-      idleRevalidateMs: 30_000,
-    });
+    useApi<HomeDiscoveryPayload>(
+      EXPLORE_HOME_DISCOVERY_ENABLED ? "/api/me/home/discovery" : null,
+      "GET",
+      undefined,
+      {
+        reactive: false,
+        revalidateIfCached: "idle",
+        idleRevalidateMs: 30_000,
+      },
+    );
   const filters = explorePage?.filters;
   const featuredPlaylists = explorePage?.playlists || [];
   const moods = explorePage?.moods || [];
@@ -234,30 +242,32 @@ export function Explore() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Explore</h1>
-      <HomeTasteHero
-        heroes={heroes}
-        isFollowing={isFollowing}
-        onOpenArtist={(artist) => {
-          navigate(
-            artistPagePath({
-              artistId: artist.id,
-              artistSlug: artist.slug,
-              artistName: artist.name,
-            }),
-          );
-        }}
-        onPlay={(artist) => void handlePlayHeroArtist(artist)}
-        onToggleFollow={(artist) => void handleToggleHeroFollow(artist)}
-        onInfo={(artist) => {
-          navigate(
-            artistPagePath({
-              artistId: artist.id,
-              artistSlug: artist.slug,
-              artistName: artist.name,
-            }),
-          );
-        }}
-      />
+      {EXPLORE_HOME_DISCOVERY_ENABLED ? (
+        <HomeTasteHero
+          heroes={heroes}
+          isFollowing={isFollowing}
+          onOpenArtist={(artist) => {
+            navigate(
+              artistPagePath({
+                artistId: artist.id,
+                artistSlug: artist.slug,
+                artistName: artist.name,
+              }),
+            );
+          }}
+          onPlay={(artist) => void handlePlayHeroArtist(artist)}
+          onToggleFollow={(artist) => void handleToggleHeroFollow(artist)}
+          onInfo={(artist) => {
+            navigate(
+              artistPagePath({
+                artistId: artist.id,
+                artistSlug: artist.slug,
+                artistName: artist.name,
+              }),
+            );
+          }}
+        />
+      ) : null}
       <div className="space-y-6">
         {loading ? <ExploreLoadingState /> : null}
 
@@ -307,24 +317,28 @@ export function Explore() {
               </button>
             </div>
 
-            <ExploreCustomMixes
-              mixes={homeDiscovery?.custom_mixes || []}
-              onOpen={openHomePlaylist}
-              onPlay={handlePlayHomePlaylist}
-              onShuffle={handleShuffleHomePlaylist}
-              onRadio={handleHomePlaylistRadio}
-              onViewAll={() => openHomeSection("custom-mixes")}
-            />
+            {EXPLORE_HOME_DISCOVERY_ENABLED ? (
+              <>
+                <ExploreCustomMixes
+                  mixes={homeDiscovery?.custom_mixes || []}
+                  onOpen={openHomePlaylist}
+                  onPlay={handlePlayHomePlaylist}
+                  onShuffle={handleShuffleHomePlaylist}
+                  onRadio={handleHomePlaylistRadio}
+                  onViewAll={() => openHomeSection("custom-mixes")}
+                />
 
-            <ExploreNewArrivals
-              albums={homeDiscovery?.suggested_albums || []}
-              onViewAll={openHomeSection}
-            />
+                <ExploreNewArrivals
+                  albums={homeDiscovery?.suggested_albums || []}
+                  onViewAll={openHomeSection}
+                />
 
-            <RecommendedTracksSection
-              tracks={recommendedTracks}
-              onViewAll={openHomeSection}
-            />
+                <RecommendedTracksSection
+                  tracks={recommendedTracks}
+                  onViewAll={openHomeSection}
+                />
+              </>
+            ) : null}
 
             <GenreExplorer
               genres={filters.genres}
@@ -368,11 +382,13 @@ export function Explore() {
               />
             ) : null}
 
-            <JustLandedSection
-              artists={homeDiscovery?.recent_global_artists || []}
-              loading={!homeDiscovery}
-              onOpenExplore={() => navigate("/library?tab=artists")}
-            />
+            {EXPLORE_HOME_DISCOVERY_ENABLED ? (
+              <JustLandedSection
+                artists={homeDiscovery?.recent_global_artists || []}
+                loading={!homeDiscovery}
+                onOpenExplore={() => navigate("/library?tab=artists")}
+              />
+            ) : null}
           </>
         ) : (
           <p className="text-muted-foreground text-sm">No filters available.</p>

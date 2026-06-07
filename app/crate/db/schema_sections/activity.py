@@ -251,6 +251,57 @@ def create_activity_schema(cur) -> None:
     )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_recommendation_feedback (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            surface TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_key TEXT NOT NULL,
+            action TEXT NOT NULL,
+            strength DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+            reason TEXT,
+            metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+            expires_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(user_id, surface, entity_type, entity_key, action)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_recommendation_feedback_lookup
+        ON user_recommendation_feedback(user_id, surface, entity_type, entity_key)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_recommendation_feedback_active
+        ON user_recommendation_feedback(user_id, surface, entity_type, entity_key, action, expires_at)
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS user_recommendation_exposures (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            surface TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_key TEXT NOT NULL,
+            shown_on DATE NOT NULL,
+            shown_count INTEGER NOT NULL DEFAULT 1,
+            acted_at TIMESTAMPTZ,
+            expires_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(user_id, surface, entity_type, entity_key, shown_on)
+        )
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_recommendation_exposures_lookup
+        ON user_recommendation_exposures(user_id, surface, entity_type, entity_key, shown_on DESC)
+    """)
+    cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_user_recommendation_exposures_expiry
+        ON user_recommendation_exposures(expires_at)
+        WHERE expires_at IS NOT NULL
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS jam_rooms (
             id UUID PRIMARY KEY,
             host_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

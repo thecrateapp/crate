@@ -18,6 +18,7 @@ def get_home_hero(
     top_genres_lower: list[str],
 ) -> list[dict] | None:
     rows = get_home_hero_rows(
+        user_id=user_id,
         followed_names_lower=followed_names_lower,
         similar_target_names_lower=similar_target_names_lower,
         top_genres_lower=top_genres_lower,
