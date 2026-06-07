@@ -44,7 +44,7 @@ from crate.db.repositories.playlists import (
     log_generation_complete,
     log_generation_failed,
     log_generation_start,
-    replace_playlist_tracks,
+    regenerate_playlist_tracks,
     set_generation_status,
     update_playlist,
 )
@@ -2099,7 +2099,12 @@ def _handle_generate_system_playlist(task_id: str, params: dict, config: dict) -
             }
             for t in tracks
         ]
-        track_count = replace_playlist_tracks(playlist_id, track_dicts)
+        target_count = int(rules.get("limit") or len(track_dicts) or 50)
+        track_count = regenerate_playlist_tracks(
+            playlist_id,
+            track_dicts,
+            target_count=target_count,
+        )
         refreshed = get_playlist(playlist_id) or {}
         total_duration = refreshed.get("total_duration") or 0
 

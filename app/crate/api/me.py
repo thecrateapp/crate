@@ -15,6 +15,7 @@ from crate.api._deps import (
 )
 from crate.api.auth import _require_auth
 from crate.api.cache_events import (
+    broadcast_invalidation,
     get_invalidation_events_since,
     get_latest_invalidation_event_id,
 )
@@ -58,6 +59,10 @@ from crate.api.schemas.me import (
     PlayStatsResponse,
     RecordPlayEventRequest,
     RecordPlayRequest,
+    RecommendationExposureRequest,
+    RecommendationExposureResponse,
+    RecommendationFeedbackRequest,
+    RecommendationFeedbackResponse,
     ReplayMixResponse,
     SaveAlbumRequest,
     SaveAlbumResponse,
@@ -82,7 +87,12 @@ from crate.api.schemas.me import (
     UserLibraryCountsResponse,
 )
 from crate.db.cache_store import delete_cache, get_cache, set_cache
-from crate.db.home import get_cached_home_discovery, get_home_playlist, get_home_section
+from crate.db.home import (
+    get_cached_home_discovery,
+    get_home_discovery_debug,
+    get_home_playlist,
+    get_home_section,
+)
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
@@ -136,6 +146,10 @@ from crate.db.repositories.library_contributions import (
     list_user_album_contributions,
 )
 from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
+from crate.db.repositories.recommendations import (
+    record_recommendation_exposure,
+    record_recommendation_feedback,
+)
 from crate.db.repositories.shows import attend_show, create_show_reminder, unattend_show
 from crate.db.repositories.tasks import create_task
 from crate.db.repositories.user_library import (
@@ -196,6 +210,73 @@ def suggest_artist(request: Request, body: ArtistSuggestionCreateRequest):
 def my_artist_suggestions(request: Request):
     user = _require_auth(request)
     return list_user_artist_suggestions(int(user["id"]))
+
+
+@router.post(
+    "/recommendations/feedback",
+    response_model=RecommendationFeedbackResponse,
+    responses=_ME_RESPONSES,
+    summary="Record explicit recommendation feedback for the current user",
+)
+def recommendation_feedback(
+    request: Request, body: RecommendationFeedbackRequest
+) -> RecommendationFeedbackResponse:
+    user = _require_auth(request)
+    try:
+        row = record_recommendation_feedback(
+            user_id=int(user["id"]),
+            surface=body.surface,
+            entity_type=body.entity_type,
+            entity_key=body.entity_key,
+            action=body.action,
+            strength=body.strength,
+            reason=body.reason,
+            metadata=body.metadata,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    broadcast_invalidation(f"home:user:{int(user['id'])}")
+    return RecommendationFeedbackResponse(
+        id=int(row["id"]),
+        surface=str(row["surface"]),
+        entity_type=str(row["entity_type"]),
+        entity_key=str(row["entity_key"]),
+        action=str(row["action"]),
+        expires_at=row.get("expires_at"),
+    )
+
+
+@router.post(
+    "/recommendations/exposures",
+    response_model=RecommendationExposureResponse,
+    responses=_ME_RESPONSES,
+    summary="Record a visible recommendation impression for the current user",
+)
+def recommendation_exposure(
+    request: Request, body: RecommendationExposureRequest
+) -> RecommendationExposureResponse:
+    user = _require_auth(request)
+    try:
+        row = record_recommendation_exposure(
+            user_id=int(user["id"]),
+            surface=body.surface,
+            entity_type=body.entity_type,
+            entity_key=body.entity_key,
+            shown_on=body.shown_on,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if bool(row.get("cooldown_created")):
+        broadcast_invalidation(f"home:user:{int(user['id'])}")
+    return RecommendationExposureResponse(
+        id=int(row["id"]),
+        surface=str(row["surface"]),
+        entity_type=str(row["entity_type"]),
+        entity_key=str(row["entity_key"]),
+        shown_on=row["shown_on"],
+        shown_count=int(row["shown_count"]),
+        cooldown_created=bool(row.get("cooldown_created")),
+    )
 
 
 def _record_home_endpoint_metric(name: str, value: float = 1.0) -> None:
@@ -1192,6 +1273,16 @@ def home_discovery(request: Request):
     user = _require_auth(request)
     fresh = request.query_params.get("fresh") == "1"
     return get_cached_home_discovery(user["id"], fresh=fresh)
+
+
+@router.get(
+    "/home/debug",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Debug personalized home discovery selection",
+)
+def home_discovery_debug(request: Request):
+    user = _require_auth(request)
+    return get_home_discovery_debug(user["id"])
 
 
 @router.get(

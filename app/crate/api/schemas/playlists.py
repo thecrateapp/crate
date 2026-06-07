@@ -91,6 +91,11 @@ class PlaylistTrackResponse(IdentityFieldsMixin):
     album: str | None = None
     duration: float | int | None = None
     position: int | None = None
+    source: str | None = None
+    locked: bool | None = None
+    genre: str | None = None
+    format: str | None = None
+    year: str | int | None = None
     added_at: datetime | str | None = None
     artist_id: int | None = None
     artist_entity_uid: str | None = None

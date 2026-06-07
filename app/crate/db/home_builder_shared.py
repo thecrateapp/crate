@@ -16,6 +16,7 @@ from crate.db.home_builder_track_selection import (
     _merge_track_rows,
     _select_diverse_tracks,
     _select_diverse_tracks_with_backfill,
+    _select_home_mix_tracks,
 )
 
 
@@ -30,6 +31,7 @@ __all__ = [
     "_merge_track_rows",
     "_select_diverse_tracks",
     "_select_diverse_tracks_with_backfill",
+    "_select_home_mix_tracks",
     "_track_payload",
     "_trim_bio",
 ]

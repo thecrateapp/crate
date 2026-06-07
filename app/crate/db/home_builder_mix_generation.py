@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from crate.db.home_builder_discovery import (
     _fallback_recent_interest_tracks,
     _filter_interesting_releases,
     _query_discovery_tracks,
     _track_candidates_for_album_ids,
 )
+from crate.db.home_release_weeks import build_new_arrivals_release_index
 from crate.db.home_builder_shared import (
     _artwork_artists,
     _artwork_tracks,
     _daily_rotation_index,
     _merge_track_rows,
-    _select_diverse_tracks_with_backfill,
+    _select_home_mix_tracks,
 )
 from crate.db.releases import get_new_releases
 from crate.genre_taxonomy import get_genre_display_name, get_related_genre_terms
@@ -91,6 +94,39 @@ def _prepare_mix_candidate_rows(rows: list[dict]) -> list[dict]:
     return _prefer_acoustic_variety(_rank_personalized_rows(rows))
 
 
+def _with_recommendation_source(rows: list[dict], source: str) -> list[dict]:
+    return [{**row, "recommendation_source": source} for row in rows]
+
+
+def _normalized_terms(terms: list[str]) -> set[str]:
+    return {term.strip().lower() for term in terms if term.strip()}
+
+
+def _with_release_week_metadata(
+    rows: list[dict], releases_by_album_id: dict[int, dict]
+) -> list[dict]:
+    annotated: list[dict] = []
+    for row in rows:
+        try:
+            album_id = int(row.get("album_id") or 0)
+        except (TypeError, ValueError):
+            album_id = 0
+        release = releases_by_album_id.get(album_id)
+        if not release:
+            continue
+        annotated.append(
+            {
+                **row,
+                "release_week": release.get("release_week"),
+                "release_week_index": release.get("release_week_index"),
+                "release_week_label": release.get("release_week_label"),
+                "source_release_date": release.get("source_release_date"),
+                "release_date": release.get("source_release_date"),
+            }
+        )
+    return annotated
+
+
 def _discovery_seed_genres(top_genres_lower: list[str], *, limit: int = 3) -> list[str]:
     return (top_genres_lower or _COLD_START_DISCOVERY_GENRES)[:limit]
 
@@ -112,39 +148,71 @@ def _build_mix_rows(
     recent_releases: list[dict] | None = None,
 ) -> tuple[str, str, list[dict]]:
     if mix_id == "daily-discovery":
-        primary_rows = _query_discovery_tracks(
+        seed_genres = _discovery_seed_genres(top_genres_lower)
+        adjacent_rows = _query_discovery_tracks(
             user_id,
-            genres=_discovery_seed_genres(top_genres_lower),
+            genres=seed_genres,
             excluded_artist_names=interest_artists_lower[:12] or [""],
             limit=max(limit * 5, 120),
         )
-        primary_rows = [
+        adjacent_rows = [
             row
-            for row in primary_rows
+            for row in adjacent_rows
             if not row.get("user_play_count") and not row.get("is_liked")
         ]
-        fallback_rows: list[dict] = []
-        if len(primary_rows) < limit:
-            fallback_rows = _query_discovery_tracks(
+
+        underplayed_rows: list[dict] = []
+        comfort_rows: list[dict] = []
+        if len(adjacent_rows) < limit:
+            interest_rows = _fallback_recent_interest_tracks(
                 user_id,
-                genres=_discovery_seed_genres(top_genres_lower),
-                excluded_artist_names=[],
-                limit=max(limit * 6, 160),
+                interest_artists_lower[:18] or [""],
+                limit=max(limit * 5, 140),
             )
-            fallback_rows = [
+            underplayed_rows = [
                 row
-                for row in fallback_rows
+                for row in interest_rows
                 if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 1
             ]
-        rows = _merge_track_rows(primary_rows, fallback_rows)
+            if len(adjacent_rows) + len(underplayed_rows) < limit:
+                comfort_rows = [
+                    row
+                    for row in interest_rows
+                    if not row.get("is_liked")
+                    and 1 < int(row.get("user_play_count") or 0) <= 4
+                ]
+            if len(adjacent_rows) + len(underplayed_rows) + len(comfort_rows) < limit:
+                broad_rows = _query_discovery_tracks(
+                    user_id,
+                    genres=seed_genres,
+                    excluded_artist_names=[],
+                    limit=max(limit * 6, 160),
+                )
+                underplayed_rows = _merge_track_rows(
+                    underplayed_rows,
+                    [
+                        row
+                        for row in broad_rows
+                        if not row.get("is_liked")
+                        and int(row.get("user_play_count") or 0) <= 1
+                    ],
+                )
+        rows = _merge_track_rows(
+            _with_recommendation_source(adjacent_rows, "discovery"),
+            _with_recommendation_source(underplayed_rows, "underplayed"),
+            _with_recommendation_source(comfort_rows, "comfort"),
+        )
         return (
             "Daily Discovery",
             "Fresh tracks orbiting around your favorite scenes.",
-            _select_diverse_tracks_with_backfill(
+            _select_home_mix_tracks(
                 _prepare_mix_candidate_rows(_daily_rotate_rows(rows, user_id)),
                 limit=limit,
                 max_per_artist=2,
                 max_per_album=2,
+                mix_id=mix_id,
+                profile_id="home_daily_discovery_v1",
+                user_id=user_id,
             ),
         )
 
@@ -159,62 +227,75 @@ def _build_mix_rows(
                 days=180,
             )
         )
-        album_ids = [row["album_id"] for row in releases if row.get("album_id")][:40]
+        releases_by_album_id = build_new_arrivals_release_index(
+            releases,
+            today=datetime.now(timezone.utc).date(),
+            max_lookback_weeks=12,
+        )
+        album_ids = list(releases_by_album_id)[:40]
+        if not album_ids:
+            return ("", "", [])
         primary_rows = _track_candidates_for_album_ids(
             user_id, album_ids, limit=max(limit * 5, 120)
         )
-        primary_rows = [row for row in primary_rows if not row.get("is_liked")]
-        fallback_rows: list[dict] = []
-        if len(primary_rows) < limit:
-            fallback_candidates = _fallback_recent_interest_tracks(
-                user_id,
-                interest_artists_lower[:18] or [""],
-                limit=max(limit * 6, 160),
-            )
-            fallback_rows = [
-                row
-                for row in fallback_candidates
-                if not row.get("is_liked") and int(row.get("user_play_count") or 0) <= 2
-            ]
-            if len(fallback_rows) < limit:
-                fallback_rows = _merge_track_rows(
-                    fallback_rows,
-                    [row for row in fallback_candidates if not row.get("is_liked")],
-                )
-            if len(fallback_rows) < limit:
-                fallback_rows = _merge_track_rows(fallback_rows, fallback_candidates)
-        rows = _merge_track_rows(primary_rows, fallback_rows)
+        rows = _with_release_week_metadata(
+            [row for row in primary_rows if not row.get("is_liked")],
+            releases_by_album_id,
+        )
         return (
             "My New Arrivals",
             "Recent material from the artists already in your orbit.",
-            _select_diverse_tracks_with_backfill(
+            _select_home_mix_tracks(
                 _prepare_mix_candidate_rows(rows),
                 limit=limit,
                 max_per_artist=2,
                 max_per_album=2,
+                mix_id=mix_id,
+                profile_id="home_new_arrivals_v1",
+                user_id=user_id,
             ),
         )
 
     if mix_id.startswith("genre-"):
         genre_slug = mix_id.removeprefix("genre-")
         genre_name = get_genre_display_name(genre_slug)
+        direct_genres = [genre_slug, genre_name]
         related_genres = get_related_genre_terms(genre_slug, limit=16, max_depth=2)
-        if not related_genres:
-            return ("", "", [])
-        rows = _query_discovery_tracks(
+        direct_terms = _normalized_terms(direct_genres)
+        related_genres = [
+            term for term in related_genres if term.strip().lower() not in direct_terms
+        ]
+        direct_rows = _query_discovery_tracks(
+            user_id,
+            genres=direct_genres,
+            excluded_artist_names=[],
+            limit=max(limit * 5, 140),
+        )
+        related_rows = _query_discovery_tracks(
             user_id,
             genres=related_genres,
             excluded_artist_names=[],
             limit=max(limit * 6, 180),
         )
+        rows = _merge_track_rows(
+            _with_recommendation_source(direct_rows, "direct_genre"),
+            _with_recommendation_source(related_rows, "related_genre"),
+        )
+        if not rows:
+            return ("", "", [])
+        max_per_artist = 1 if limit <= 8 else 2
+        max_per_album = 1 if limit <= 8 else 2
         return (
             f"{genre_name} mix",
             f"Tracks from your library matching {genre_name} and closely related scenes.",
-            _select_diverse_tracks_with_backfill(
-                _prepare_mix_candidate_rows(rows),
+            _select_home_mix_tracks(
+                _prepare_mix_candidate_rows(_daily_rotate_rows(rows, user_id)),
                 limit=limit,
-                max_per_artist=2,
-                max_per_album=2,
+                max_per_artist=max_per_artist,
+                max_per_album=max_per_album,
+                mix_id=mix_id,
+                profile_id="home_genre_mix_v1",
+                user_id=user_id,
             ),
         )
 

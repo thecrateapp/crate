@@ -91,6 +91,8 @@ def add_playlist_tracks(
                     album=resolved["album"],
                     duration=resolved["duration"],
                     position=position,
+                    source=str(track.get("source") or "manual"),
+                    locked=bool(track.get("locked", False)),
                     added_at=now,
                 )
             )
@@ -126,10 +128,36 @@ def add_playlist_tracks(
 
 
 def remove_playlist_track(
-    playlist_id: int, position: int, *, session: Session | None = None
+    playlist_id: int,
+    position: int,
+    *,
+    session: Session | None = None,
+    record_exclusion: bool = False,
+    excluded_by_user_id: int | None = None,
 ) -> None:
     def _impl(s: Session) -> None:
         now = datetime.now(timezone.utc)
+        removed = (
+            s.execute(
+                text(
+                    """
+                    SELECT id, track_id, track_entity_uid, track_storage_id, track_path, source
+                    FROM playlist_tracks
+                    WHERE playlist_id = :playlist_id AND position = :position
+                    """
+                ),
+                {"playlist_id": playlist_id, "position": position},
+            )
+            .mappings()
+            .first()
+        )
+        if record_exclusion and removed and removed.get("source") == "generated":
+            _insert_playlist_track_exclusion(
+                s,
+                playlist_id=playlist_id,
+                track=dict(removed),
+                created_by=excluded_by_user_id,
+            )
         s.execute(
             text(
                 "DELETE FROM playlist_tracks WHERE playlist_id = :playlist_id AND position = :position"
@@ -176,16 +204,25 @@ def remove_playlist_track(
 
 
 def reorder_playlist(
-    playlist_id: int, track_ids: list[int], *, session: Session | None = None
+    playlist_id: int,
+    track_ids: list[int],
+    *,
+    session: Session | None = None,
+    lock_tracks: bool = False,
 ) -> None:
     def _impl(s: Session) -> None:
         now = datetime.now(timezone.utc)
         for position, track_id in enumerate(track_ids, 1):
             s.execute(
                 text(
-                    "UPDATE playlist_tracks SET position = :pos WHERE id = :tid AND playlist_id = :playlist_id"
+                    "UPDATE playlist_tracks SET position = :pos, locked = CASE WHEN :lock_tracks THEN TRUE ELSE locked END WHERE id = :tid AND playlist_id = :playlist_id"
                 ),
-                {"pos": position, "tid": track_id, "playlist_id": playlist_id},
+                {
+                    "pos": position,
+                    "tid": track_id,
+                    "playlist_id": playlist_id,
+                    "lock_tracks": lock_tracks,
+                },
             )
         playlist = s.get(Playlist, playlist_id)
         if playlist is not None:
@@ -231,6 +268,8 @@ def replace_playlist_tracks(
                     album=resolved["album"],
                     duration=resolved["duration"],
                     position=position,
+                    source=str(track.get("source") or "generated"),
+                    locked=bool(track.get("locked", False)),
                     added_at=now,
                 )
             )
@@ -252,9 +291,177 @@ def replace_playlist_tracks(
         return _impl(s)
 
 
+def regenerate_playlist_tracks(
+    playlist_id: int,
+    tracks: list[dict],
+    *,
+    target_count: int,
+    session: Session | None = None,
+) -> int:
+    def _impl(s: Session) -> int:
+        preserved = _get_preserved_playlist_tracks(s, playlist_id)
+        exclusions = _get_playlist_track_exclusion_keys(s, playlist_id)
+        preserved_keys = {_track_identity_key(track) for track in preserved}
+        generated: list[dict] = []
+        for track in tracks:
+            resolved = _resolve_playlist_track(track, session=s)
+            if resolved is None:
+                continue
+            key = _track_identity_key(resolved)
+            if key in exclusions or key in preserved_keys:
+                continue
+            generated.append({**resolved, "source": "generated", "locked": False})
+
+        desired_count = max(target_count, len(preserved))
+        output = _merge_preserved_and_generated(
+            preserved, generated, target_count=desired_count
+        )
+        return replace_playlist_tracks(playlist_id, output, session=s)
+
+    with optional_scope(session) as s:
+        return _impl(s)
+
+
+def set_playlist_track_lock(
+    playlist_id: int,
+    position: int,
+    *,
+    locked: bool,
+    session: Session | None = None,
+) -> None:
+    def _impl(s: Session) -> None:
+        now = datetime.now(timezone.utc)
+        s.execute(
+            text(
+                """
+                UPDATE playlist_tracks
+                SET locked = :locked
+                WHERE playlist_id = :playlist_id AND position = :position
+                """
+            ),
+            {"playlist_id": playlist_id, "position": position, "locked": locked},
+        )
+        playlist = s.get(Playlist, playlist_id)
+        if playlist is not None:
+            playlist.updated_at = now
+        emit_playlist_domain_event(
+            s,
+            playlist_id=playlist_id,
+            action="track_lock_changed",
+            payload={"position": position, "locked": locked},
+        )
+
+    with optional_scope(session) as s:
+        _impl(s)
+
+
+def _insert_playlist_track_exclusion(
+    s: Session, *, playlist_id: int, track: dict, created_by: int | None
+) -> None:
+    s.execute(
+        text(
+            """
+            INSERT INTO playlist_track_exclusions (
+                playlist_id, track_id, track_entity_uid, track_storage_id, track_path, created_by
+            )
+            VALUES (
+                :playlist_id, :track_id, :track_entity_uid, :track_storage_id, :track_path, :created_by
+            )
+            ON CONFLICT DO NOTHING
+            """
+        ),
+        {
+            "playlist_id": playlist_id,
+            "track_id": track.get("track_id"),
+            "track_entity_uid": track.get("track_entity_uid"),
+            "track_storage_id": track.get("track_storage_id"),
+            "track_path": track.get("track_path"),
+            "created_by": created_by,
+        },
+    )
+
+
+def _get_preserved_playlist_tracks(s: Session, playlist_id: int) -> list[dict]:
+    rows = (
+        s.execute(
+            text(
+                """
+                SELECT track_id, track_entity_uid, track_storage_id, track_path,
+                       title, artist, album, duration, position, source, locked
+                FROM playlist_tracks
+                WHERE playlist_id = :playlist_id
+                  AND (source != 'generated' OR locked = TRUE)
+                ORDER BY position
+                """
+            ),
+            {"playlist_id": playlist_id},
+        )
+        .mappings()
+        .all()
+    )
+    return [dict(row) for row in rows]
+
+
+def _get_playlist_track_exclusion_keys(s: Session, playlist_id: int) -> set[tuple]:
+    rows = (
+        s.execute(
+            text(
+                """
+                SELECT track_id, track_entity_uid, track_storage_id, track_path
+                FROM playlist_track_exclusions
+                WHERE playlist_id = :playlist_id
+                """
+            ),
+            {"playlist_id": playlist_id},
+        )
+        .mappings()
+        .all()
+    )
+    return {_track_identity_key(dict(row)) for row in rows}
+
+
+def _track_identity_key(track: dict) -> tuple:
+    return (
+        str(track.get("track_entity_uid") or ""),
+        str(track.get("track_storage_id") or ""),
+        str(track.get("track_path") or ""),
+        str(track.get("track_id") or ""),
+    )
+
+
+def _merge_preserved_and_generated(
+    preserved: list[dict], generated: list[dict], *, target_count: int
+) -> list[dict]:
+    preserved_by_position = {
+        int(track.get("position") or index + 1): track
+        for index, track in enumerate(preserved)
+    }
+    generated_iter = iter(generated)
+    output: list[dict] = []
+    for position in range(1, target_count + 1):
+        preserved_track = preserved_by_position.get(position)
+        if preserved_track is not None:
+            output.append(preserved_track)
+            continue
+        try:
+            output.append(next(generated_iter))
+        except StopIteration:
+            continue
+
+    overflow = [
+        track
+        for position, track in sorted(preserved_by_position.items())
+        if position > target_count
+    ]
+    output.extend(overflow)
+    return output
+
+
 __all__ = [
     "add_playlist_tracks",
+    "regenerate_playlist_tracks",
     "remove_playlist_track",
     "replace_playlist_tracks",
     "reorder_playlist",
+    "set_playlist_track_lock",
 ]

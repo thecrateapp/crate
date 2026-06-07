@@ -58,6 +58,44 @@ class NowPlayingRequest(IdentityFieldsMixin):
     app_platform: str | None = None
 
 
+class RecommendationFeedbackRequest(BaseModel):
+    surface: str = Field(min_length=1, max_length=80)
+    entity_type: str = Field(min_length=1, max_length=40)
+    entity_key: str = Field(min_length=1, max_length=240)
+    action: str = Field(min_length=1, max_length=40)
+    strength: float = Field(default=1.0, ge=0.0, le=10.0)
+    reason: str | None = Field(default=None, max_length=160)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecommendationFeedbackResponse(BaseModel):
+    ok: bool = True
+    id: int
+    surface: str
+    entity_type: str
+    entity_key: str
+    action: str
+    expires_at: datetime | None = None
+
+
+class RecommendationExposureRequest(BaseModel):
+    surface: str = Field(min_length=1, max_length=80)
+    entity_type: str = Field(min_length=1, max_length=40)
+    entity_key: str = Field(min_length=1, max_length=240)
+    shown_on: date_type | None = None
+
+
+class RecommendationExposureResponse(BaseModel):
+    ok: bool = True
+    id: int
+    surface: str
+    entity_type: str
+    entity_key: str
+    shown_on: date_type
+    shown_count: int
+    cooldown_created: bool = False
+
+
 class RecordPlayEventRequest(IdentityFieldsMixin):
     client_event_id: str | None = None
     track_id: int | None = None

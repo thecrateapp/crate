@@ -20,9 +20,11 @@ from crate.db.repositories.playlists_invites import (
 )
 from crate.db.repositories.playlists_tracks import (
     add_playlist_tracks,
+    regenerate_playlist_tracks,
     remove_playlist_track,
     replace_playlist_tracks,
     reorder_playlist,
+    set_playlist_track_lock,
 )
 
 __all__ = [
@@ -34,10 +36,12 @@ __all__ = [
     "delete_playlist",
     "duplicate_playlist",
     "follow_playlist",
+    "regenerate_playlist_tracks",
     "remove_playlist_member",
     "remove_playlist_track",
     "replace_playlist_tracks",
     "reorder_playlist",
+    "set_playlist_track_lock",
     "unfollow_playlist",
     "update_playlist",
 ]

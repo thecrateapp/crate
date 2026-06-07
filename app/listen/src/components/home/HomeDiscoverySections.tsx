@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  X,
 } from "lucide-react";
 
 import {
@@ -336,6 +337,8 @@ export function HomeTasteHero({
   onPlay,
   onToggleFollow,
   onInfo,
+  onDismiss,
+  onExpose,
 }: {
   heroes: HomeHeroArtist[];
   isFollowing: (id?: number) => boolean;
@@ -343,10 +346,15 @@ export function HomeTasteHero({
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
   onInfo: (artist: HomeHeroArtist) => void;
+  onDismiss?: (artist: HomeHeroArtist) => void;
+  onExpose?: (artist: HomeHeroArtist) => void;
 }) {
   const [idx, setIdx] = useState(0);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchRef = useRef<{ x: number; t: number } | null>(null);
+  const exposedRef = useRef<Set<string>>(new Set());
+  const visibleRef = useRef(false);
   const count = heroes.length;
   const readyBackgrounds = useHeroBackgroundPreloader(heroes, idx);
 
@@ -372,6 +380,39 @@ export function HomeTasteHero({
     if (count <= 1) return;
     autoRef.current = setInterval(() => setIdx((p) => (p + 1) % count), 8000);
   };
+
+  const exposeCurrent = () => {
+    if (!onExpose || !visibleRef.current || !count) return;
+    const hero = heroes[idx];
+    if (!hero) return;
+    const key = `${hero.id || hero.slug || hero.name}:${idx}`;
+    if (exposedRef.current.has(key)) return;
+    exposedRef.current.add(key);
+    onExpose(hero);
+  };
+
+  useEffect(() => {
+    if (!onExpose) return;
+    const node = rootRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      visibleRef.current = true;
+      exposeCurrent();
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        visibleRef.current = Boolean(entry?.isIntersecting);
+        exposeCurrent();
+      },
+      { threshold: 0.45 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onExpose]);
+
+  useEffect(() => {
+    exposeCurrent();
+  }, [idx, heroes, onExpose]);
 
   // Touch swipe
   const onTouchStart = (e: React.TouchEvent) => {
@@ -432,6 +473,7 @@ export function HomeTasteHero({
           onPlay={() => onPlay(hero)}
           onToggleFollow={() => onToggleFollow(hero)}
           onInfo={() => onInfo(hero)}
+          onDismiss={onDismiss ? () => onDismiss(hero) : undefined}
         />
       </div>
     );
@@ -439,6 +481,7 @@ export function HomeTasteHero({
 
   return (
     <div
+      ref={rootRef}
       className="relative"
       onMouseEnter={pause}
       onMouseLeave={resume}
@@ -506,6 +549,7 @@ function HeroSlide({
   onPlay,
   onToggleFollow,
   onInfo,
+  onDismiss,
 }: {
   hero: HomeHeroArtist;
   backgroundSrc?: string;
@@ -514,6 +558,7 @@ function HeroSlide({
   onPlay: () => void;
   onToggleFollow: () => void;
   onInfo: () => void;
+  onDismiss?: () => void;
 }) {
   const genres = (hero as any).genres as string[] | undefined;
 
@@ -542,6 +587,19 @@ function HeroSlide({
       ) : null}
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,7,11,0.92)_0%,rgba(5,7,11,0.75)_45%,rgba(5,7,11,0.32)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.26),transparent_42%)]" />
+      {onDismiss ? (
+        <button
+          type="button"
+          className="absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-black/35 px-3 text-[11px] font-semibold text-white/70 backdrop-blur-xl transition hover:bg-black/55 hover:text-white"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismiss();
+          }}
+        >
+          <X size={13} />
+          Not interested
+        </button>
+      ) : null}
 
       <div className="relative z-10 flex min-h-[260px] flex-col justify-between px-4 py-5 pb-12 sm:min-h-[280px] sm:px-8 sm:py-8 lg:px-10">
         <div>
