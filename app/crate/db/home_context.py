@@ -310,6 +310,6 @@ def recent_releases_from_context(context: dict, *, days: int = 240) -> list[dict
     return _filter_interesting_releases(
         _cached_new_releases(limit=250),
         interest_artists_lower=set(context["interest_artists_lower"]),
-        saved_album_ids=set(context["saved_album_ids"]),
+        saved_album_ids=set(),
         days=days,
     )

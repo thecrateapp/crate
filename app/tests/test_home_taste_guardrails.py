@@ -43,6 +43,17 @@ def test_canonical_mix_song_key_collapses_known_versions():
     assert canonical_mix_song_key(row) == ("converge", "concubine")
 
 
+def test_canonical_mix_song_key_collapses_named_mix_versions():
+    row = _row(
+        1,
+        title="Bizarre Love Triangle (Armand Van Helden Mix)",
+        artist="New Order",
+        album="Brotherhood (Collector's Edition)",
+    )
+
+    assert canonical_mix_song_key(row) == ("new order", "bizarre love triangle")
+
+
 def test_track_version_penalty_uses_title_and_album_markers():
     assert (
         track_version_penalty(

@@ -13,6 +13,7 @@ _LIVEISH_MARKER_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_NAMED_MIX_MARKER_RE = re.compile(r"\bmix(?:es)?\b", re.IGNORECASE)
 _ALT_MARKER_RE = re.compile(
     r"\b("
     r"acoustic|demo|session|radio edit|edit|version|alternate take|alt take|"
@@ -44,7 +45,7 @@ def _normalized_track_title_key(title: str) -> str:
 def _variant_marker_rank(marker: str) -> int:
     if not marker:
         return 0
-    if _LIVEISH_MARKER_RE.search(marker):
+    if _LIVEISH_MARKER_RE.search(marker) or _NAMED_MIX_MARKER_RE.search(marker):
         return 3
     if _ALT_MARKER_RE.search(marker):
         return 2
