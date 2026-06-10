@@ -10,6 +10,7 @@
   --z-player: 1350;
   --z-popover: 1400;
   --z-player-overlay: 1410;
+  --z-context-menu: 1520;
   --z-dropdown: 1450;
   --z-modal: 1500;
   --z-upcoming-overlay: 1510;
@@ -35,6 +36,9 @@
 }
 .z-app-popover {
   z-index: var(--z-popover);
+}
+.z-app-context-menu {
+  z-index: var(--z-context-menu);
 }
 .z-app-player-overlay {
   z-index: var(--z-player-overlay);

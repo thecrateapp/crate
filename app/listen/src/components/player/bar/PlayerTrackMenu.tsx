@@ -5,6 +5,7 @@ import {
   ItemActionMenuButton,
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
+import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
@@ -19,6 +20,7 @@ interface PlayerTrackMenuProps {
 
 export function PlayerTrackMenu({
   currentTrack,
+  onOverlayChange,
   className,
 }: PlayerTrackMenuProps) {
   const menuTrack = useMemo(
@@ -29,7 +31,9 @@ export function PlayerTrackMenu({
     track: menuTrack,
     albumCover: currentTrack.albumCover,
   });
-  const actionMenu = useItemActionMenu(actions);
+  const actionMenu = useItemActionMenu(actions, {
+    onOpenChange: onOverlayChange,
+  });
 
   return (
     <>
@@ -41,6 +45,14 @@ export function PlayerTrackMenu({
       />
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={currentTrack.albumCover}
+            title={currentTrack.title}
+            artist={currentTrack.artist}
+            album={currentTrack.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

@@ -1071,6 +1071,13 @@ export function Album() {
               <Heart size={16} className={saved ? "fill-current" : ""} />
             </button>
           ) : null}
+          <BandcampSupportButton
+            entityType="album"
+            entityUid={data.entity_uid}
+            fallbackArtistEntityUid={data.artist_entity_uid}
+            className={isDesktop ? "ml-auto shrink-0" : "shrink-0"}
+            iconOnly={!isDesktop}
+          />
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
@@ -1124,8 +1131,9 @@ export function Album() {
                 />
               </AppPopover>
             )}
-            {menuOpen && !isDesktop && (
+            {!isDesktop ? (
               <MobileActionSheet
+                open={menuOpen}
                 panelRef={mobileMenuRef}
                 onClose={() => setMenuOpen(false)}
               >
@@ -1171,14 +1179,8 @@ export function Album() {
                   }}
                 />
               </MobileActionSheet>
-            )}
+            ) : null}
           </div>
-          <BandcampSupportButton
-            entityType="album"
-            entityUid={data.entity_uid}
-            fallbackArtistEntityUid={data.artist_entity_uid}
-            className="ml-auto shrink-0"
-          />
         </div>
       </div>
 

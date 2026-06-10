@@ -292,6 +292,14 @@ export function ArtistHeroSection({
           >
             {following ? <UserCheck size={16} /> : <UserPlus size={16} />}
           </button>
+          {isDesktop ? null : (
+            <BandcampSupportButton
+              entityType="artist"
+              entityUid={artist.entity_uid}
+              iconOnly
+              className="shrink-0"
+            />
+          )}
           <div className="relative" ref={menuRef}>
             <button
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
@@ -305,8 +313,9 @@ export function ArtistHeroSection({
                 {menuContent}
               </AppPopover>
             ) : null}
-            {menuOpen && !isDesktop ? (
+            {!isDesktop ? (
               <MobileActionSheet
+                open={menuOpen}
                 panelRef={mobileMenuRef}
                 onClose={() => setMenuOpen(false)}
               >
@@ -314,11 +323,14 @@ export function ArtistHeroSection({
               </MobileActionSheet>
             ) : null}
           </div>
-          <BandcampSupportButton
-            entityType="artist"
-            entityUid={artist.entity_uid}
-            className="ml-auto shrink-0"
-          />
+          {isDesktop ? (
+            <BandcampSupportButton
+              entityType="artist"
+              entityUid={artist.entity_uid}
+              className="ml-auto shrink-0"
+              iconOnly={false}
+            />
+          ) : null}
         </div>
       </div>
     </>

@@ -6,6 +6,7 @@ import {
   ItemActionMenuButton,
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
+import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
@@ -79,6 +80,14 @@ function HomeTrackRowAction({
       />
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={track.albumCover}
+            title={track.title}
+            artist={track.artist}
+            album={track.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -165,6 +174,14 @@ function HomeReplayRowAction({
       />
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={cover}
+            title={item.title}
+            artist={item.artist}
+            album={item.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -240,6 +257,14 @@ function HomeQueueCardAction({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={track.albumCover}
+            title={track.title}
+            artist={track.artist}
+            album={track.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

@@ -1,5 +1,7 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -45,6 +47,7 @@ export type ItemActionMenuEntry =
 
 interface ItemActionMenuProps {
   actions: ItemActionMenuEntry[];
+  header?: ReactNode;
   open: boolean;
   position: { x: number; y: number } | null;
   menuRef: RefObject<HTMLDivElement | null>;
@@ -53,6 +56,7 @@ interface ItemActionMenuProps {
 
 interface UseItemActionMenuOptions {
   disabled?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function useItemActionMenu(
@@ -60,7 +64,7 @@ export function useItemActionMenu(
   options: UseItemActionMenuOptions = {},
 ) {
   const isDesktop = useIsDesktop();
-  const { disabled = false } = options;
+  const { disabled = false, onOpenChange } = options;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -86,6 +90,10 @@ export function useItemActionMenu(
     setPosition(null);
     setMeasured(false);
   };
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   const openAtPoint = (x: number, y: number) => {
     if (!hasActions || disabled) return;
@@ -202,12 +210,14 @@ export function useItemActionMenu(
 
 export function ItemActionMenu({
   actions,
+  header,
   open,
   position,
   menuRef,
   onClose,
 }: ItemActionMenuProps) {
   const isDesktop = useIsDesktop();
+  const hasHeader = Boolean(header);
   const actionEntries = actions.filter(
     (entry) => entry.type == null || entry.type === "action",
   );
@@ -229,6 +239,7 @@ export function ItemActionMenu({
 
   const content = (
     <>
+      {hasHeader ? header : null}
       {actions.map((entry) => {
         if (entry.type === "divider") {
           return <AppPopoverDivider key={entry.key} />;
@@ -282,8 +293,10 @@ export function ItemActionMenu({
 
   if (!isDesktop) {
     return (
-      <MobileActionSheet panelRef={menuRef} onClose={onClose}>
-        <div className="space-y-1 px-3 pb-3 pt-1">{content}</div>
+      <MobileActionSheet open={open} panelRef={menuRef} onClose={onClose}>
+        <div className="max-h-[calc(100%-5rem)] overflow-y-auto px-3 pb-3 pt-1">
+          {content}
+        </div>
       </MobileActionSheet>
     );
   }
@@ -291,7 +304,8 @@ export function ItemActionMenu({
   return createPortal(
     <AppPopover
       ref={menuRef}
-      className="fixed z-app-popover w-60 origin-top-left p-1 animate-pop-in"
+      layer="context"
+      className="fixed w-60 origin-top-left p-1 animate-pop-in"
       style={{
         left: position?.x ?? 12,
         top: position?.y ?? 12,

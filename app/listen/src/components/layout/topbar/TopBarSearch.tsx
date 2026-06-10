@@ -21,6 +21,7 @@ import {
   flattenTopBarSearchResults,
   getTopBarSearchRecents,
   type SearchResult,
+  type TopBarSearchRecentEntry,
   type TopBarSearchItem,
 } from "./topbar-search-model";
 
@@ -72,7 +73,9 @@ export function TopBarSearch() {
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [recents, setRecents] = useState<string[]>(getTopBarSearchRecents);
+  const [recents, setRecents] = useState<TopBarSearchRecentEntry[]>(
+    getTopBarSearchRecents,
+  );
   const [expanded, setExpanded] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,7 +249,7 @@ export function TopBarSearch() {
 
   const selectItem = useCallback(
     (item: TopBarSearchItem) => {
-      addTopBarSearchRecent(item.label);
+      addTopBarSearchRecent(item);
       setRecents(getTopBarSearchRecents());
       if (item.trackData) {
         play(
@@ -264,17 +267,31 @@ export function TopBarSearch() {
   );
 
   const selectRecent = useCallback(
-    (term: string) => {
+    (recent: TopBarSearchRecentEntry) => {
+      addTopBarSearchRecent(recent);
+      setRecents(getTopBarSearchRecents());
+
+      if (recent.navigateTo) {
+        navigate(recent.navigateTo);
+        setShowDropdown(false);
+        setExpanded(false);
+        setQuery("");
+        setResults([]);
+        return;
+      }
+
       setExpanded(true);
-      setQuery(term);
+      setQuery(recent.label);
       setShowDropdown(true);
       focusInputSoon();
     },
-    [focusInputSoon],
+    [focusInputSoon, navigate],
   );
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    const items = query.trim() ? results : recents.map((label) => ({ label }));
+    const items = query.trim()
+      ? results
+      : recents.map((recent) => ({ type: recent.type, label: recent.label }));
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveIdx((prev) => Math.min(prev + 1, items.length - 1));
@@ -358,17 +375,17 @@ export function TopBarSearch() {
                 <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
                   Recent
                 </p>
-                {recents.map((term, index) => (
+                {recents.map((recent, index) => (
                   <button
-                    key={term}
-                    onClick={() => selectRecent(term)}
+                    key={`${recent.type ?? "query"}:${recent.label}:${index}`}
+                    onClick={() => selectRecent(recent)}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
                       index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
                     }`}
                   >
                     <Search size={12} className="shrink-0 text-white/20" />
                     <span className="truncate text-[13px] text-white/60">
-                      {term}
+                      {recent.label}
                     </span>
                   </button>
                 ))}

@@ -4,6 +4,8 @@ import {
   useRef,
   useState,
   type HTMLAttributes,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { X } from "lucide-react";
@@ -146,6 +148,33 @@ export function AppModal({
     setSwipeY(0);
     swipeStartRef.current = null;
   }, [swipeY, onClose]);
+  const isDismissedRef = useRef(false);
+  const handleOverlayPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!closeOnOverlay) return;
+      event.preventDefault();
+      event.stopPropagation();
+      isDismissedRef.current = true;
+      onClose();
+    },
+    [closeOnOverlay, onClose],
+  );
+
+  const handleOverlayClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (!closeOnOverlay) return;
+      if (isDismissedRef.current) {
+        isDismissedRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    },
+    [closeOnOverlay, onClose],
+  );
 
   if (!open) return null;
 
@@ -157,9 +186,8 @@ export function AppModal({
         "z-app-modal fixed inset-0 flex items-end justify-center bg-black/72 p-0 backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
         overlayClassName,
       )}
-      onClick={() => {
-        if (closeOnOverlay) onClose();
-      }}
+      onClick={handleOverlayClick}
+      onPointerDown={handleOverlayPointerDown}
     >
       <div
         ref={panelRef}
@@ -177,6 +205,10 @@ export function AppModal({
           transition: swipeY > 0 ? "none" : undefined,
         }}
         onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => {
+          isDismissedRef.current = false;
+          event.stopPropagation();
+        }}
         onTouchStart={onSwipeStart}
         onTouchMove={onSwipeMove}
         onTouchEnd={onSwipeEnd}

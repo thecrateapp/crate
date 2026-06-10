@@ -9,10 +9,11 @@ import { cn } from "@crate/ui/lib/cn";
 export const APP_FLOATING_SURFACE_BASE =
   "rounded-md border border-[var(--idle-border)] bg-popover-surface shadow-[0_24px_64px_rgba(0,0,0,0.42)] backdrop-blur-xl animate-pop-in";
 export const APP_POPOVER_SURFACE = `z-app-popover ${APP_FLOATING_SURFACE_BASE}`;
+export const APP_CONTEXT_MENU_SURFACE = `z-app-context-menu ${APP_FLOATING_SURFACE_BASE}`;
 export const APP_DROPDOWN_SURFACE = `z-app-dropdown ${APP_FLOATING_SURFACE_BASE}`;
 
 interface AppPopoverProps extends ComponentPropsWithoutRef<"div"> {
-  layer?: "popover" | "dropdown";
+  layer?: "popover" | "dropdown" | "context";
 }
 
 export const AppPopover = forwardRef<HTMLDivElement, AppPopoverProps>(
@@ -21,7 +22,11 @@ export const AppPopover = forwardRef<HTMLDivElement, AppPopoverProps>(
       <div
         ref={ref}
         className={cn(
-          layer === "dropdown" ? APP_DROPDOWN_SURFACE : APP_POPOVER_SURFACE,
+          layer === "dropdown"
+            ? APP_DROPDOWN_SURFACE
+            : layer === "context"
+              ? APP_CONTEXT_MENU_SURFACE
+              : APP_POPOVER_SURFACE,
           className,
         )}
         {...props}

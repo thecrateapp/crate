@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   AppModal,
@@ -37,6 +37,19 @@ describe("AppModal", () => {
       </AppModal>,
     );
     await userEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses on pointer down and ignores the follow-up click", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose}>
+        Content
+      </AppModal>,
+    );
+    const overlay = screen.getByRole("dialog");
+    fireEvent.pointerDown(overlay);
+    fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

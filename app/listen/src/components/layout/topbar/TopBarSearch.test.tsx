@@ -8,6 +8,16 @@ vi.mock("@/lib/api", () => ({
   getAuthToken: vi.fn(() => null),
 }));
 
+const navigateMock = vi.fn();
+vi.mock("react-router", async () => {
+  const actual =
+    await vi.importActual<typeof import("react-router")>("react-router");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 import { api } from "@/lib/api";
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -176,5 +186,40 @@ describe("TopBarSearch", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(input);
     });
+  });
+
+  it("navigates directly when a recent entry has a destination", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      "listen-search-recents",
+      JSON.stringify([
+        { label: "High Vis", type: "artist", navigateTo: "/artists/high-vis" },
+      ]),
+    );
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    await user.click(searchButton);
+
+    await user.click(await screen.findByText("High Vis"));
+
+    expect(navigateMock).toHaveBeenCalledWith("/artists/high-vis");
+  });
+
+  it("keeps query search behaviour for legacy plain recent entries", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("listen-search-recents", JSON.stringify(["Converge"]));
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    await user.click(searchButton);
+
+    await user.click(await screen.findByText("Converge"));
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    expect(input).toHaveValue("Converge");
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });
