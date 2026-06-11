@@ -733,6 +733,21 @@ def api_album_by_entity_uid(request: Request, album_entity_uid: str):
     summary="Get detailed album information",
 )
 def api_album_by_id(request: Request, album_id: int):
+    if album_id < 0:
+        release = get_release_by_virtual_album_id(album_id)
+        if not release:
+            return JSONResponse({"error": "Not found"}, status_code=404)
+
+        artist = get_library_artist_by_slug(release.get("artist_slug") or "")
+        if not artist:
+            artist = {
+                "id": release.get("artist_id"),
+                "entity_uid": None,
+                "slug": release.get("artist_slug"),
+                "name": release.get("artist_name", ""),
+            }
+        return _pre_release_album_payload(request, artist, release)
+
     album = get_library_album_by_id(album_id)
     if not album:
         return JSONResponse({"error": "Not found"}, status_code=404)

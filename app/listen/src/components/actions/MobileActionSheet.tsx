@@ -34,7 +34,18 @@ export function MobileActionSheet({
   const swipeStartRef = useRef<number | null>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const closeScheduledRef = useRef(false);
+  const isDismissedRef = useRef(false);
+  const shouldSuppressNextClickRef = useRef(false);
   const isMountedRef = useRef(true);
+
+  const isPanelTarget = useCallback(
+    (target: EventTarget | null) => {
+      if (target == null) return false;
+      const node = target as Node;
+      return panelRef?.current ? panelRef.current.contains(node) : false;
+    },
+    [panelRef],
+  );
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -67,27 +78,43 @@ export function MobileActionSheet({
     setSwipeY(0);
     window.setTimeout(() => {
       if (isMountedRef.current) {
+        closeScheduledRef.current = false;
         onClose();
       }
     }, 140);
   }, [isClosing, onClose]);
 
+  const suppressAndRequestClose = useCallback(() => {
+    shouldSuppressNextClickRef.current = true;
+    isDismissedRef.current = true;
+    requestClose();
+  }, [requestClose]);
+
   const handleOverlayTouchStart = useCallback(
     (event: ReactTouchEvent<HTMLDivElement>) => {
+      if (isPanelTarget(event.target)) return;
       event.preventDefault();
       event.stopPropagation();
-      requestClose();
+      suppressAndRequestClose();
     },
-    [requestClose],
+    [suppressAndRequestClose],
   );
 
   const handleOverlayClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (isPanelTarget(event.target)) return;
+      if (isDismissedRef.current || shouldSuppressNextClickRef.current) {
+        isDismissedRef.current = false;
+        shouldSuppressNextClickRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
-      requestClose();
+      suppressAndRequestClose();
     },
-    [requestClose],
+    [suppressAndRequestClose],
   );
 
   const handlePanelTouchStart = useCallback(
@@ -118,11 +145,12 @@ export function MobileActionSheet({
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (isPanelTarget(event.target)) return;
       event.preventDefault();
       event.stopPropagation();
-      requestClose();
+      suppressAndRequestClose();
     },
-    [requestClose],
+    [isPanelTarget, suppressAndRequestClose],
   );
 
   const handleContentTouchStart = useCallback(
@@ -155,9 +183,9 @@ export function MobileActionSheet({
         isClosing ? "animate-fade-out" : "animate-fade-in",
       )}
       style={{ zIndex: 1700 }}
-      onClick={handleOverlayClick}
-      onPointerDown={handlePointerDown}
-      onTouchStart={handleOverlayTouchStart}
+      onClickCapture={handleOverlayClick}
+      onPointerDownCapture={handlePointerDown}
+      onTouchStartCapture={handleOverlayTouchStart}
       onTouchEnd={() => {
         setSwipeY(0);
         swipeStartRef.current = null;
@@ -171,10 +199,14 @@ export function MobileActionSheet({
           className,
         )}
         style={{
-          bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
+          top: "auto",
+          left: 0,
+          right: 0,
+          bottom:
+            "calc(var(--listen-mobile-bottom-chrome-height, 4.75rem) + 0.75rem)",
           maxHeight:
-            "max(14rem, calc(var(--listen-viewport-height) - var(--listen-safe-top) - var(--listen-mobile-bottom-chrome-height) - 1.75rem))",
-          transform: `translateY(${swipeY}px)`,
+            "min(86vh, max(14rem, calc(var(--listen-viewport-height, 100dvh) - var(--listen-safe-top, env(safe-area-inset-top, 0px)) - var(--listen-mobile-bottom-chrome-height, 4.75rem) - 1.75rem)) )",
+          transform: swipeY ? `translateY(${swipeY}px)` : undefined,
           transition: swipeY > 0 ? "none" : undefined,
         }}
         onClick={(event) => event.stopPropagation()}

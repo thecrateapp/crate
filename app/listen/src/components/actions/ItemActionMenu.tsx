@@ -22,6 +22,7 @@ import {
 } from "@crate/ui/primitives/AppPopover";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
+import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { cn } from "@/lib/utils";
 
 export type ItemActionMenuEntry =
@@ -64,6 +65,7 @@ export function useItemActionMenu(
   options: UseItemActionMenuOptions = {},
 ) {
   const isDesktop = useIsDesktop();
+  const canHover = useHoverCapability();
   const { disabled = false, onOpenChange } = options;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -83,6 +85,7 @@ export function useItemActionMenu(
       actions.some((entry) => entry.type == null || entry.type === "action"),
     [actions],
   );
+  const shouldUseDesktopMenu = isDesktop && canHover;
 
   const close = () => {
     setOpen(false);
@@ -131,7 +134,7 @@ export function useItemActionMenu(
   const handleLongPressPointerDown = (
     event: ReactPointerEvent<HTMLElement>,
   ) => {
-    if (isDesktop || !hasActions || disabled) return;
+    if (shouldUseDesktopMenu || !hasActions || disabled) return;
     if (event.pointerType === "mouse") return;
     longPressTriggeredRef.current = false;
     clearLongPress();
@@ -167,14 +170,15 @@ export function useItemActionMenu(
   };
 
   useDismissibleLayer({
-    active: open,
+    active: shouldUseDesktopMenu && open,
     refs: [menuRef, triggerRef],
     onDismiss: close,
   });
 
   // Measure + clamp into viewport before the browser paints to avoid flash.
   useLayoutEffect(() => {
-    if (!open || !isDesktop || !rawPosition || !menuRef.current) return;
+    if (!open || !shouldUseDesktopMenu || !rawPosition || !menuRef.current)
+      return;
     const rect = menuRef.current.getBoundingClientRect();
     const padding = 12;
     const maxX = Math.max(padding, window.innerWidth - rect.width - padding);
@@ -184,7 +188,7 @@ export function useItemActionMenu(
       y: Math.min(rawPosition.y, maxY),
     });
     setMeasured(true);
-  }, [isDesktop, open, rawPosition]);
+  }, [shouldUseDesktopMenu, open, rawPosition]);
 
   return {
     hasActions,
@@ -198,6 +202,7 @@ export function useItemActionMenu(
     openFromTrigger,
     handleContextMenu,
     handleKeyboardTrigger,
+    shouldUseDesktopMenu,
     longPressHandlers: {
       onPointerDown: handleLongPressPointerDown,
       onPointerUp: handleLongPressPointerUp,
@@ -217,6 +222,8 @@ export function ItemActionMenu({
   onClose,
 }: ItemActionMenuProps) {
   const isDesktop = useIsDesktop();
+  const canHover = useHoverCapability();
+  const shouldUseDesktopMenu = isDesktop && canHover;
   const hasHeader = Boolean(header);
   const actionEntries = actions.filter(
     (entry) => entry.type == null || entry.type === "action",
@@ -291,7 +298,7 @@ export function ItemActionMenu({
 
   if (!open) return null;
 
-  if (!isDesktop) {
+  if (!shouldUseDesktopMenu) {
     return (
       <MobileActionSheet open={open} panelRef={menuRef} onClose={onClose}>
         <div className="max-h-[calc(100%-5rem)] overflow-y-auto px-3 pb-3 pt-1">

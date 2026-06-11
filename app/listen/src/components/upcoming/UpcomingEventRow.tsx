@@ -37,13 +37,19 @@ export function UpcomingEventRow({
       { size: 800 },
     ) ||
     undefined;
+  const useVirtualAlbumRoute =
+    !item.album_id && item.release_id != null && item.release_id > 0;
+  const virtualAlbumId = useVirtualAlbumRoute ? item.release_id : null;
   const albumPath =
-    canOpenUpcomingRelease(item) && (item.album_id || item.album_slug)
+    canOpenUpcomingRelease(item) &&
+    (item.album_id || item.album_slug || item.release_id)
       ? albumPagePath({
-          albumId: item.album_id,
-          albumSlug: item.album_slug,
+          albumId:
+            item.album_id ??
+            (virtualAlbumId != null ? -virtualAlbumId : undefined),
+          albumSlug: useVirtualAlbumRoute ? undefined : item.album_slug,
           albumName: item.title,
-          artistSlug: item.artist_slug,
+          artistSlug: useVirtualAlbumRoute ? undefined : item.artist_slug,
           artistName: item.artist,
         })
       : null;

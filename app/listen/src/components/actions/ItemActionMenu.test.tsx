@@ -39,12 +39,48 @@ describe("ItemActionMenu mobile sheet", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveStyle({ zIndex: "1700" });
     expect(dialog.querySelector(".listen-glass-panel")).toHaveStyle({
-      bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
+      bottom:
+        "calc(var(--listen-mobile-bottom-chrome-height, 4.75rem) + 0.75rem)",
     });
 
     await user.click(screen.getByRole("button", { name: /Share track/i }));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onOuterClick).not.toHaveBeenCalled();
+  });
+
+  it("closes on overlay tap and swallows the underlying click", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onSelect = vi.fn();
+    const onOuterClick = vi.fn();
+    const menuRef = createRef<HTMLDivElement>();
+    const actions: ItemActionMenuEntry[] = [
+      {
+        key: "share",
+        label: "Share track",
+        onSelect,
+      },
+    ];
+
+    render(
+      <div className="min-h-screen" onClick={onOuterClick}>
+        <ItemActionMenu
+          actions={actions}
+          open
+          position={null}
+          menuRef={menuRef}
+          onClose={onClose}
+        />
+      </div>,
+    );
+
+    const overlay = screen.getByRole("dialog");
+    await user.click(overlay);
+
+    await new Promise((resolve) => setTimeout(resolve, 180));
+
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onOuterClick).not.toHaveBeenCalled();
   });
