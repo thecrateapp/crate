@@ -10,6 +10,22 @@ export function canUseHoverPointer(): boolean {
   return window.matchMedia(HOVER_POINTER_MEDIA_QUERY).matches;
 }
 
+export function isTouchDominantPointer(): boolean {
+  if (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function"
+  ) {
+    return false;
+  }
+  if (navigator.maxTouchPoints > 0) {
+    return true;
+  }
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(hover: none)").matches
+  );
+}
+
 export function subscribeHoverPointer(
   callback: (canHover: boolean) => void,
 ): () => void {

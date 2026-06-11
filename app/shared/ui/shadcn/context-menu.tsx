@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui";
 
-import { APP_DROPDOWN_SURFACE } from "../primitives/AppPopover";
+import { APP_CONTEXT_MENU_SURFACE } from "../primitives/AppPopover";
 import { cn } from "@crate/ui/lib/cn";
 
 function ContextMenu({
@@ -27,7 +27,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
-          `${APP_DROPDOWN_SURFACE} max-h-[var(--radix-context-menu-content-available-height)] min-w-[11rem] overflow-x-hidden overflow-y-auto p-1 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95`,
+          `${APP_CONTEXT_MENU_SURFACE} max-h-[var(--radix-context-menu-content-available-height)] min-w-[11rem] overflow-x-hidden overflow-y-auto p-1 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95`,
           className,
         )}
         {...props}

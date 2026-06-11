@@ -998,18 +998,18 @@ export function Album() {
 
       {/* Action Row */}
       <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-wrap items-center gap-2">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] max-[430px]:gap-1.5 [&::-webkit-scrollbar]:hidden">
           <button
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45 max-[430px]:w-10 max-[430px]:px-0"
             onClick={() => handlePlay()}
             disabled={playerTracks.length === 0}
             aria-label="Play"
           >
             <Play size={16} fill="currentColor" />
-            Play
+            <span className="max-[430px]:sr-only">Play</span>
           </button>
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
             onClick={handleShuffle}
             disabled={playerTracks.length === 0}
             aria-label="Shuffle"
@@ -1018,7 +1018,7 @@ export function Album() {
           </button>
           {!isPreRelease ? (
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
               onClick={handleAlbumRadio}
               aria-label="Album Radio"
             >
@@ -1027,7 +1027,7 @@ export function Album() {
           ) : null}
           {canPersistAlbum ? (
             <button
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
                 offlineState === "ready"
                   ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
                   : offlineBusy
@@ -1058,7 +1058,7 @@ export function Album() {
           ) : null}
           {canPersistAlbum ? (
             <button
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
                 saved
                   ? "border border-primary/30 bg-primary/15 text-primary"
                   : "border border-white/15 text-foreground hover:bg-white/5"
@@ -1078,9 +1078,9 @@ export function Album() {
             className={isDesktop ? "ml-auto shrink-0" : "shrink-0"}
             iconOnly={!isDesktop}
           />
-          <div className="relative" ref={menuRef}>
+          <div className="relative shrink-0" ref={menuRef}>
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
               onClick={() => setMenuOpen((open) => !open)}
               aria-label="More"
             >

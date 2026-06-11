@@ -61,7 +61,7 @@ export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
             }
             close();
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-200"
+          className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/80 animate-in fade-in duration-200"
         >
           <img
             src={src}

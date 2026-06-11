@@ -23,6 +23,8 @@ import {
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
+import { isCapacitorRuntime } from "@/lib/platform";
+import { isTouchDominantPointer } from "@/lib/input-capabilities";
 import { cn } from "@/lib/utils";
 
 export type ItemActionMenuEntry =
@@ -60,6 +62,17 @@ interface UseItemActionMenuOptions {
   onOpenChange?: (open: boolean) => void;
 }
 
+function shouldRenderDesktopMenu(
+  isDesktop: boolean,
+  canHover: boolean,
+): boolean {
+  if (!isDesktop || !canHover) return false;
+  if (isCapacitorRuntime) return false;
+  if (typeof window === "undefined") return false;
+  if (isTouchDominantPointer()) return false;
+  return true;
+}
+
 export function useItemActionMenu(
   actions: ItemActionMenuEntry[],
   options: UseItemActionMenuOptions = {},
@@ -85,7 +98,7 @@ export function useItemActionMenu(
       actions.some((entry) => entry.type == null || entry.type === "action"),
     [actions],
   );
-  const shouldUseDesktopMenu = isDesktop && canHover;
+  const shouldUseDesktopMenu = shouldRenderDesktopMenu(isDesktop, canHover);
 
   const close = () => {
     setOpen(false);
@@ -223,7 +236,7 @@ export function ItemActionMenu({
 }: ItemActionMenuProps) {
   const isDesktop = useIsDesktop();
   const canHover = useHoverCapability();
-  const shouldUseDesktopMenu = isDesktop && canHover;
+  const shouldUseDesktopMenu = shouldRenderDesktopMenu(isDesktop, canHover);
   const hasHeader = Boolean(header);
   const actionEntries = actions.filter(
     (entry) => entry.type == null || entry.type === "action",

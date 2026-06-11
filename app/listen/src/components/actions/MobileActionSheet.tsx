@@ -30,7 +30,9 @@ export function MobileActionSheet({
 }: MobileActionSheetProps) {
   const [shouldRender, setShouldRender] = useState(open);
   const [isClosing, setIsClosing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [swipeY, setSwipeY] = useState(0);
+  const swipeYRef = useRef(0);
   const swipeStartRef = useRef<number | null>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const closeScheduledRef = useRef(false);
@@ -58,7 +60,9 @@ export function MobileActionSheet({
     if (open) {
       setShouldRender(true);
       setIsClosing(false);
+      setIsDragging(false);
       setSwipeY(0);
+      swipeYRef.current = 0;
       closeScheduledRef.current = false;
       return;
     }
@@ -71,18 +75,45 @@ export function MobileActionSheet({
     return () => window.clearTimeout(timer);
   }, [open]);
 
+  const setDragOffset = useCallback((offset: number) => {
+    swipeYRef.current = offset;
+    setSwipeY(offset);
+  }, []);
+
+  const getPanelHeight = useCallback(() => {
+    const height = panelRef?.current?.getBoundingClientRect().height ?? 0;
+    return height > 0 ? height : 240;
+  }, [panelRef]);
+
   const requestClose = useCallback(() => {
     if (isClosing || closeScheduledRef.current) return;
     closeScheduledRef.current = true;
     setIsClosing(true);
-    setSwipeY(0);
+    setIsDragging(false);
+    setDragOffset(0);
+    shouldSuppressNextClickRef.current = true;
     window.setTimeout(() => {
       if (isMountedRef.current) {
         closeScheduledRef.current = false;
         onClose();
       }
     }, 140);
-  }, [isClosing, onClose]);
+  }, [isClosing, onClose, setDragOffset]);
+
+  const requestDragClose = useCallback(() => {
+    if (isClosing || closeScheduledRef.current) return;
+    closeScheduledRef.current = true;
+    setIsDragging(false);
+    setIsClosing(true);
+    setDragOffset(getPanelHeight() + 24);
+    shouldSuppressNextClickRef.current = true;
+    window.setTimeout(() => {
+      if (isMountedRef.current) {
+        closeScheduledRef.current = false;
+        onClose();
+      }
+    }, 180);
+  }, [getPanelHeight, isClosing, onClose, setDragOffset]);
 
   const suppressAndRequestClose = useCallback(() => {
     shouldSuppressNextClickRef.current = true;
@@ -123,25 +154,34 @@ export function MobileActionSheet({
       const firstTouch = event.touches[0];
       if (firstTouch == null) return;
       swipeStartRef.current = firstTouch.clientY;
-      setSwipeY(0);
+      setIsDragging(true);
+      setDragOffset(0);
     },
-    [],
+    [setDragOffset],
   );
 
-  const onSwipeMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    if (swipeStartRef.current === null) return;
-    const dy = event.touches[0]!.clientY - swipeStartRef.current;
-    setSwipeY(dy > 0 ? Math.min(dy * 0.6, 240) : 0);
-  }, []);
+  const onSwipeMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>) => {
+      if (swipeStartRef.current === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const dy = event.touches[0]!.clientY - swipeStartRef.current;
+      setDragOffset(dy > 0 ? Math.min(dy, getPanelHeight() + 24) : 0);
+    },
+    [getPanelHeight, setDragOffset],
+  );
 
   const onSwipeEnd = useCallback(() => {
-    if (swipeY > 80) {
-      requestClose();
+    if (swipeStartRef.current === null) return;
+    const shouldDismiss = swipeYRef.current >= getPanelHeight() / 2;
+    swipeStartRef.current = null;
+    if (shouldDismiss) {
+      requestDragClose();
       return;
     }
-    setSwipeY(0);
-    swipeStartRef.current = null;
-  }, [requestClose, swipeY]);
+    setIsDragging(false);
+    setDragOffset(0);
+  }, [getPanelHeight, requestDragClose, setDragOffset]);
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -168,9 +208,10 @@ export function MobileActionSheet({
   );
 
   const handleContentTouchCancel = useCallback(() => {
-    setSwipeY(0);
+    setIsDragging(false);
+    setDragOffset(0);
     swipeStartRef.current = null;
-  }, []);
+  }, [setDragOffset]);
 
   if (!shouldRender) return null;
 
@@ -182,12 +223,13 @@ export function MobileActionSheet({
         "fixed inset-0 flex items-end justify-center bg-black/58 p-0 backdrop-blur-md z-app-modal",
         isClosing ? "animate-fade-out" : "animate-fade-in",
       )}
-      style={{ zIndex: 1700 }}
       onClickCapture={handleOverlayClick}
       onPointerDownCapture={handlePointerDown}
       onTouchStartCapture={handleOverlayTouchStart}
-      onTouchEnd={() => {
-        setSwipeY(0);
+      onTouchEnd={(event) => {
+        if (isPanelTarget(event.target)) return;
+        setIsDragging(false);
+        setDragOffset(0);
         swipeStartRef.current = null;
       }}
     >
@@ -195,19 +237,22 @@ export function MobileActionSheet({
         ref={panelRef}
         className={cn(
           "listen-glass-panel fixed inset-x-0 overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl",
-          isClosing ? "animate-sheet-down" : "animate-sheet-up",
+          isClosing && swipeY === 0 ? "animate-sheet-down" : "animate-sheet-up",
           className,
         )}
         style={{
           top: "auto",
           left: 0,
           right: 0,
-          bottom:
-            "calc(var(--listen-mobile-bottom-chrome-height, 4.75rem) + 0.75rem)",
+          bottom: "0px",
           maxHeight:
-            "min(86vh, max(14rem, calc(var(--listen-viewport-height, 100dvh) - var(--listen-safe-top, env(safe-area-inset-top, 0px)) - var(--listen-mobile-bottom-chrome-height, 4.75rem) - 1.75rem)) )",
+            "min(88vh, max(14rem, calc(var(--listen-viewport-height, 100dvh) - var(--listen-safe-top, env(safe-area-inset-top, 0px)) - 0.75rem)))",
+          paddingBottom:
+            "var(--listen-safe-bottom, env(safe-area-inset-bottom, 0px))",
           transform: swipeY ? `translateY(${swipeY}px)` : undefined,
-          transition: swipeY > 0 ? "none" : undefined,
+          transition: isDragging
+            ? "none"
+            : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
         }}
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}

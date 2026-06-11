@@ -110,7 +110,7 @@ export function ArtistBioModal({
       onClose={onClose}
       maxWidthClassName="sm:max-w-2xl"
       overlayClassName="bg-black/58"
-      panelClassName="listen-glass-panel fixed inset-x-3 bottom-[calc(var(--listen-mobile-bottom-chrome-height)+0.75rem)] flex min-h-0 max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-var(--listen-mobile-bottom-chrome-height)-1.75rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border-0"
+      panelClassName="listen-glass-panel flex min-h-0 w-full max-w-2xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
       mobileSafeArea
     >
       <ModalHeader className="bg-transparent">

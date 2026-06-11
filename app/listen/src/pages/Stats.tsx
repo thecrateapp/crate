@@ -971,7 +971,7 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
 
               <div
                 className={cn(
-                  "pointer-events-none absolute bottom-full z-50 mb-3 w-64 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0d0f15]/95 p-3 text-left opacity-0 shadow-2xl shadow-black/45 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
+                  "pointer-events-none absolute bottom-full z-app-popover mb-3 w-64 -translate-x-1/2 rounded-2xl border border-white/10 bg-[#0d0f15]/95 p-3 text-left opacity-0 shadow-2xl shadow-black/45 backdrop-blur transition group-hover:opacity-100 group-focus-within:opacity-100",
                   index < 2
                     ? "left-0 translate-x-0"
                     : index > coordinates.length - 3

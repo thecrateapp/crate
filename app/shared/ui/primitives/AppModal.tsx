@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -128,26 +129,69 @@ export function AppModal({
   }, [open]);
 
   // Swipe-to-dismiss (mobile bottom sheet — drag handle only)
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDragClosing, setIsDragClosing] = useState(false);
   const [swipeY, setSwipeY] = useState(0);
+  const swipeYRef = useRef(0);
   const swipeStartRef = useRef<number | null>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
-  const onSwipeStart = useCallback((e: React.TouchEvent) => {
-    if (!dragHandleRef.current) return;
-    const handleRect = dragHandleRef.current.getBoundingClientRect();
-    const touchY = e.touches[0]!.clientY;
-    if (touchY > handleRect.bottom + 8) return;
-    swipeStartRef.current = touchY;
+  const dragCloseTimerRef = useRef<number | null>(null);
+  const setDragOffset = useCallback((offset: number) => {
+    swipeYRef.current = offset;
+    setSwipeY(offset);
   }, []);
-  const onSwipeMove = useCallback((e: React.TouchEvent) => {
-    if (swipeStartRef.current === null) return;
-    const dy = e.touches[0]!.clientY - swipeStartRef.current;
-    setSwipeY(dy > 0 ? Math.min(dy * 0.6, 300) : 0);
+  const getPanelHeight = useCallback(() => {
+    const height = panelRef.current?.getBoundingClientRect().height ?? 0;
+    return height > 0 ? height : 240;
   }, []);
+  const requestDragClose = useCallback(() => {
+    if (isDragClosing) return;
+    setIsDragging(false);
+    setIsDragClosing(true);
+    setDragOffset(getPanelHeight() + 24);
+    dragCloseTimerRef.current = window.setTimeout(() => {
+      onClose();
+    }, 180);
+  }, [getPanelHeight, isDragClosing, onClose, setDragOffset]);
+  const onSwipeStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!dragHandleRef.current) return;
+      const handleRect = dragHandleRef.current.getBoundingClientRect();
+      const touchY = e.touches[0]!.clientY;
+      if (touchY > handleRect.bottom + 8) return;
+      e.stopPropagation();
+      swipeStartRef.current = touchY;
+      setIsDragging(true);
+      setDragOffset(0);
+    },
+    [setDragOffset],
+  );
+  const onSwipeMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (swipeStartRef.current === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const dy = e.touches[0]!.clientY - swipeStartRef.current;
+      setDragOffset(dy > 0 ? Math.min(dy, getPanelHeight() + 24) : 0);
+    },
+    [getPanelHeight, setDragOffset],
+  );
   const onSwipeEnd = useCallback(() => {
-    if (swipeY > 80) onClose();
-    setSwipeY(0);
+    if (swipeStartRef.current === null) return;
+    const shouldDismiss = swipeYRef.current >= getPanelHeight() / 2;
     swipeStartRef.current = null;
-  }, [swipeY, onClose]);
+    if (shouldDismiss) {
+      requestDragClose();
+      return;
+    }
+    setIsDragging(false);
+    setDragOffset(0);
+  }, [getPanelHeight, requestDragClose, setDragOffset]);
+  const onSwipeCancel = useCallback(() => {
+    setIsDragging(false);
+    setDragOffset(0);
+    swipeStartRef.current = null;
+  }, [setDragOffset]);
   const isDismissedRef = useRef(false);
   const handleOverlayPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -176,9 +220,26 @@ export function AppModal({
     [closeOnOverlay, onClose],
   );
 
+  useEffect(() => {
+    if (open) {
+      setIsDragging(false);
+      setIsDragClosing(false);
+      setDragOffset(0);
+      return;
+    }
+  }, [open, setDragOffset]);
+
+  useEffect(() => {
+    return () => {
+      if (dragCloseTimerRef.current != null) {
+        window.clearTimeout(dragCloseTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -193,7 +254,8 @@ export function AppModal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "bg-modal-surface w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl animate-sheet-up sm:rounded-3xl sm:animate-pop-in",
+          "bg-modal-surface w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl sm:rounded-3xl",
+          isDragClosing ? "" : "animate-sheet-up sm:animate-pop-in",
           mobileSafeArea
             ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
             : "max-h-[92vh]",
@@ -202,7 +264,9 @@ export function AppModal({
         )}
         style={{
           transform: swipeY > 0 ? `translateY(${swipeY}px)` : undefined,
-          transition: swipeY > 0 ? "none" : undefined,
+          transition: isDragging
+            ? "none"
+            : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
         }}
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => {
@@ -212,6 +276,7 @@ export function AppModal({
         onTouchStart={onSwipeStart}
         onTouchMove={onSwipeMove}
         onTouchEnd={onSwipeEnd}
+        onTouchCancel={onSwipeCancel}
       >
         {/* Drag handle — visible on mobile only */}
         <div
@@ -225,7 +290,8 @@ export function AppModal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

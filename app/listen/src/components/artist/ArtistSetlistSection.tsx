@@ -58,7 +58,7 @@ export function ArtistSetlistModal({
       maxWidthClassName="max-w-md"
       mobileSafeArea
       overlayClassName="bg-black/58"
-      panelClassName="listen-glass-panel fixed inset-x-3 bottom-[calc(var(--listen-mobile-bottom-chrome-height)+0.75rem)] flex min-h-0 max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-var(--listen-mobile-bottom-chrome-height)-1.75rem)] flex-col overflow-hidden rounded-3xl border-0 pb-4 animate-sheet-up"
+      panelClassName="listen-glass-panel flex min-h-0 flex-col overflow-hidden border-0 pb-4 sm:max-h-[92vh]"
     >
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}

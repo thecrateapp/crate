@@ -130,11 +130,20 @@ export function BandcampSupportButton({
   if (ownedAlbum && !canImport) {
     return (
       <span
-        className={`inline-flex h-10 items-center gap-2 rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 px-4 text-sm font-medium text-[#7ee7ff]/90 ${className}`}
+        className={`inline-flex h-10 items-center rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff]/90 ${
+          iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
+        } ${className}`}
+        aria-label={ownedLabel}
       >
         <BandcampLogo size={15} />
-        <span className="hidden sm:inline">{ownedLabel}</span>
-        <span className="sm:hidden">Owned</span>
+        {iconOnly ? (
+          <span className="sr-only">{ownedLabel}</span>
+        ) : (
+          <>
+            <span className="hidden sm:inline">{ownedLabel}</span>
+            <span className="sm:hidden">Owned</span>
+          </>
+        )}
       </span>
     );
   }

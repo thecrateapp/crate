@@ -250,31 +250,31 @@ export function ArtistHeroSection({
       </div>
 
       <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-wrap items-center gap-2">
+        <div className="mx-auto flex w-full max-w-[1480px] flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] max-[430px]:gap-1.5 [&::-webkit-scrollbar]:hidden">
           <button
-            className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 max-[430px]:w-10 max-[430px]:px-0"
             onClick={onPlay}
             aria-label="Play"
           >
             <Play size={16} fill="currentColor" />
-            Play
+            <span className="max-[430px]:sr-only">Play</span>
           </button>
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
             onClick={onShuffle}
             aria-label="Shuffle"
           >
             <Shuffle size={16} />
           </button>
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
             onClick={onArtistRadio}
             aria-label="Artist Radio"
           >
             <Radio size={16} />
           </button>
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
             onClick={onPlaySetlist}
             disabled={!hasSetlist}
             aria-label="Setlist"
@@ -282,7 +282,7 @@ export function ArtistHeroSection({
             <ListMusic size={16} />
           </button>
           <button
-            className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
               following
                 ? "border border-primary/30 bg-primary/15 text-primary"
                 : "border border-white/15 text-foreground hover:bg-white/5"
@@ -300,9 +300,9 @@ export function ArtistHeroSection({
               className="shrink-0"
             />
           )}
-          <div className="relative" ref={menuRef}>
+          <div className="relative shrink-0" ref={menuRef}>
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
               onClick={() => setMenuOpen((current) => !current)}
               aria-label="More"
             >
