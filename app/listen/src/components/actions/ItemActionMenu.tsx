@@ -1,5 +1,7 @@
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -20,6 +22,9 @@ import {
 } from "@crate/ui/primitives/AppPopover";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
+import { useHoverCapability } from "@/hooks/use-hover-capability";
+import { isCapacitorRuntime } from "@/lib/platform";
+import { isTouchDominantPointer } from "@/lib/input-capabilities";
 import { cn } from "@/lib/utils";
 
 export type ItemActionMenuEntry =
@@ -45,6 +50,7 @@ export type ItemActionMenuEntry =
 
 interface ItemActionMenuProps {
   actions: ItemActionMenuEntry[];
+  header?: ReactNode;
   open: boolean;
   position: { x: number; y: number } | null;
   menuRef: RefObject<HTMLDivElement | null>;
@@ -53,6 +59,18 @@ interface ItemActionMenuProps {
 
 interface UseItemActionMenuOptions {
   disabled?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+function shouldRenderDesktopMenu(
+  isDesktop: boolean,
+  canHover: boolean,
+): boolean {
+  if (!isDesktop || !canHover) return false;
+  if (isCapacitorRuntime) return false;
+  if (typeof window === "undefined") return false;
+  if (isTouchDominantPointer()) return false;
+  return true;
 }
 
 export function useItemActionMenu(
@@ -60,7 +78,8 @@ export function useItemActionMenu(
   options: UseItemActionMenuOptions = {},
 ) {
   const isDesktop = useIsDesktop();
-  const { disabled = false } = options;
+  const canHover = useHoverCapability();
+  const { disabled = false, onOpenChange } = options;
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -79,6 +98,7 @@ export function useItemActionMenu(
       actions.some((entry) => entry.type == null || entry.type === "action"),
     [actions],
   );
+  const shouldUseDesktopMenu = shouldRenderDesktopMenu(isDesktop, canHover);
 
   const close = () => {
     setOpen(false);
@@ -86,6 +106,10 @@ export function useItemActionMenu(
     setPosition(null);
     setMeasured(false);
   };
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
 
   const openAtPoint = (x: number, y: number) => {
     if (!hasActions || disabled) return;
@@ -123,7 +147,7 @@ export function useItemActionMenu(
   const handleLongPressPointerDown = (
     event: ReactPointerEvent<HTMLElement>,
   ) => {
-    if (isDesktop || !hasActions || disabled) return;
+    if (shouldUseDesktopMenu || !hasActions || disabled) return;
     if (event.pointerType === "mouse") return;
     longPressTriggeredRef.current = false;
     clearLongPress();
@@ -159,14 +183,15 @@ export function useItemActionMenu(
   };
 
   useDismissibleLayer({
-    active: open,
+    active: shouldUseDesktopMenu && open,
     refs: [menuRef, triggerRef],
     onDismiss: close,
   });
 
   // Measure + clamp into viewport before the browser paints to avoid flash.
   useLayoutEffect(() => {
-    if (!open || !isDesktop || !rawPosition || !menuRef.current) return;
+    if (!open || !shouldUseDesktopMenu || !rawPosition || !menuRef.current)
+      return;
     const rect = menuRef.current.getBoundingClientRect();
     const padding = 12;
     const maxX = Math.max(padding, window.innerWidth - rect.width - padding);
@@ -176,7 +201,7 @@ export function useItemActionMenu(
       y: Math.min(rawPosition.y, maxY),
     });
     setMeasured(true);
-  }, [isDesktop, open, rawPosition]);
+  }, [shouldUseDesktopMenu, open, rawPosition]);
 
   return {
     hasActions,
@@ -190,6 +215,7 @@ export function useItemActionMenu(
     openFromTrigger,
     handleContextMenu,
     handleKeyboardTrigger,
+    shouldUseDesktopMenu,
     longPressHandlers: {
       onPointerDown: handleLongPressPointerDown,
       onPointerUp: handleLongPressPointerUp,
@@ -202,12 +228,16 @@ export function useItemActionMenu(
 
 export function ItemActionMenu({
   actions,
+  header,
   open,
   position,
   menuRef,
   onClose,
 }: ItemActionMenuProps) {
   const isDesktop = useIsDesktop();
+  const canHover = useHoverCapability();
+  const shouldUseDesktopMenu = shouldRenderDesktopMenu(isDesktop, canHover);
+  const hasHeader = Boolean(header);
   const actionEntries = actions.filter(
     (entry) => entry.type == null || entry.type === "action",
   );
@@ -229,6 +259,7 @@ export function ItemActionMenu({
 
   const content = (
     <>
+      {hasHeader ? header : null}
       {actions.map((entry) => {
         if (entry.type === "divider") {
           return <AppPopoverDivider key={entry.key} />;
@@ -280,10 +311,12 @@ export function ItemActionMenu({
 
   if (!open) return null;
 
-  if (!isDesktop) {
+  if (!shouldUseDesktopMenu) {
     return (
-      <MobileActionSheet panelRef={menuRef} onClose={onClose}>
-        <div className="space-y-1 px-3 pb-3 pt-1">{content}</div>
+      <MobileActionSheet open={open} panelRef={menuRef} onClose={onClose}>
+        <div className="max-h-[calc(100%-5rem)] overflow-y-auto px-3 pb-3 pt-1">
+          {content}
+        </div>
       </MobileActionSheet>
     );
   }
@@ -291,7 +324,8 @@ export function ItemActionMenu({
   return createPortal(
     <AppPopover
       ref={menuRef}
-      className="fixed z-app-popover w-60 origin-top-left p-1 animate-pop-in"
+      layer="context"
+      className="fixed w-60 origin-top-left p-1 animate-pop-in"
       style={{
         left: position?.x ?? 12,
         top: position?.y ?? 12,

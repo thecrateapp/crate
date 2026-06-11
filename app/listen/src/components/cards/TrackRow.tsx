@@ -6,6 +6,7 @@ import {
   ItemActionMenuButton,
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
+import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
 import { OfflineBadge } from "@/components/offline/OfflineBadge";
@@ -427,6 +428,14 @@ export const TrackRow = memo(function TrackRow({
       {!disabled ? (
         <ItemActionMenu
           actions={actions}
+          header={
+            <TrackActionMenuHeader
+              coverUrl={cover}
+              title={track.title}
+              artist={track.artist}
+              album={track.album}
+            />
+          }
           open={actionMenu.open}
           position={actionMenu.position}
           menuRef={actionMenu.menuRef}

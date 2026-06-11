@@ -394,7 +394,7 @@ export function Shows() {
       {/* Detail overlay */}
       {selectedShow && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/70"
           onClick={() => setSelectedShow(null)}
         >
           <div onClick={(e) => e.stopPropagation()}>

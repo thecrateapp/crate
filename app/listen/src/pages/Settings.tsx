@@ -1693,7 +1693,7 @@ function ShowsLocationSection() {
               />
             )}
             {showDropdown && searchResults.length > 0 && (
-              <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a2e] shadow-xl">
+              <div className="absolute inset-x-0 top-full z-app-dropdown mt-1 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a2e] shadow-xl">
                 {searchResults.map((result) => (
                   <button
                     key={`${result.latitude}-${result.longitude}`}

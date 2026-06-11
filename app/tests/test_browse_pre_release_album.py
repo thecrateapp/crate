@@ -1,8 +1,11 @@
 from typing import Any, cast
 
 from crate.api import browse_artist
-from crate.api.browse_album import _pre_release_album_payload
-from crate.api.browse_album import api_album_by_artist_slug
+from crate.api.browse_album import (
+    _pre_release_album_payload,
+    api_album_by_artist_slug,
+    api_album_by_id,
+)
 import crate.db.releases as release_queries
 
 
@@ -117,6 +120,32 @@ def test_album_slug_route_prefers_pre_release_payload_over_local_partial_album(
 
     assert payload == {"id": -91, "is_pre_release": True}
     assert called_local_album is False
+
+
+def test_api_album_by_id_routes_negative_id_to_pre_release_payload(monkeypatch):
+    monkeypatch.setattr(
+        "crate.api.browse_album.get_library_artist_by_slug",
+        lambda _slug: {"id": 7, "slug": "converge", "name": "Converge"},
+    )
+    monkeypatch.setattr(
+        "crate.api.browse_album.get_release_by_virtual_album_id",
+        lambda _album_id: {
+            "id": 91,
+            "artist_name": "Converge",
+            "album_title": "Hum Of Hurt",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.api.browse_album._pre_release_album_payload",
+        lambda _request, _artist, _release: {
+            "id": -91,
+            "is_pre_release": True,
+        },
+    )
+
+    payload = api_album_by_id(cast(Any, object()), -91)
+
+    assert payload == {"id": -91, "is_pre_release": True}
 
 
 def test_find_upcoming_release_matches_artist_prefixed_album_slug(monkeypatch):

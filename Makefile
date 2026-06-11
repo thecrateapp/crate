@@ -635,6 +635,8 @@ trust-local-ca: ## Trust Caddy's local CA for HTTPS (run after first 'make dev',
 CAP_DIR := app/listen
 CAP_IOS_TARGET ?= $(shell cd $(CAP_DIR) && npx cap run ios --list 2>/dev/null | grep "iPhone.*Pro " | head -1 | awk '{print $$NF}')
 CAP_DEBUG_SERVER_URL ?= https://listen.lespedants.org
+CAP_ANDROID_OUTPUT_DIR ?= artifacts/capacitor/android
+CAP_ANDROID_GRADLE_VARIANT ?= debug
 
 # Android Studio JBR + SDK paths (required for Gradle/emulator)
 export JAVA_HOME ?= $(HOME)/Applications/Android Studio.app/Contents/jbr/Contents/Home
@@ -672,6 +674,27 @@ cap-ios-list: ## List available iOS Simulator targets
 .PHONY: cap-android-list
 cap-android-list: ## List available Android Emulator targets
 	@cd $(CAP_DIR) && npx cap run android --list
+
+.PHONY: cap-android-artifacts
+cap-android-artifacts: ## Build Android APK and copy output to a local artifacts folder
+	@cd $(CAP_DIR) && VITE_API_URL="$(CAP_DEBUG_SERVER_URL)" npm run build:cap
+	@cd $(CAP_DIR)/android && variant="$(CAP_ANDROID_GRADLE_VARIANT)"; \
+	task="assemble$$(printf '%s' "$$variant" | awk '{print toupper(substr($$0,1,1)) substr($$0,2)}')"; \
+	./gradlew "$$task"
+	@mkdir -p "$(CAP_ANDROID_OUTPUT_DIR)"
+	@out="$$(ls -1t $(CAP_DIR)/android/app/build/outputs/apk/$(CAP_ANDROID_GRADLE_VARIANT)/app-$(CAP_ANDROID_GRADLE_VARIANT).apk 2>/dev/null || true)"; \
+	if [ -z "$$out" ]; then \
+		out="$$(ls -1t $(CAP_DIR)/android/app/build/outputs/apk/$(CAP_ANDROID_GRADLE_VARIANT)/*.apk 2>/dev/null | head -n 1 || true)"; \
+	fi; \
+	if [ -z "$$out" ]; then \
+		echo "$(RED)No APK found under $(CAP_DIR)/android/app/build/outputs/apk/$(CAP_ANDROID_GRADLE_VARIANT)$(NC)"; \
+		exit 1; \
+	fi; \
+	ts="$$(date +%Y%m%d-%H%M%S)"; \
+	sha="$$(git rev-parse --short HEAD 2>/dev/null || echo local)"; \
+	dst="$(CAP_ANDROID_OUTPUT_DIR)/crate-listen-$(CAP_ANDROID_GRADLE_VARIANT)-$${ts}-$${sha}.apk"; \
+	cp "$$out" "$$dst"; \
+	echo "$(GREEN)Artifact copied to:$$dst$(NC)"
 
 # ===========================================================================
 # TAURI (desktop native builds)

@@ -91,6 +91,7 @@ export interface HomeUpcomingItem {
   artist_slug?: string;
   album_id?: number;
   album_slug?: string;
+  release_id?: number;
   title: string;
   subtitle: string;
   cover_url?: string | null;

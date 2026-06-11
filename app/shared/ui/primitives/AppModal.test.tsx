@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   AppModal,
@@ -8,6 +8,11 @@ import {
   ModalFooter,
   ModalCloseButton,
 } from "./AppModal";
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("AppModal", () => {
   it("renders nothing when closed", () => {
@@ -29,6 +34,20 @@ describe("AppModal", () => {
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
 
+  it("portals the overlay to document.body", () => {
+    const { container } = render(
+      <div className="stacking-context">
+        <AppModal open onClose={() => {}}>
+          Portal content
+        </AppModal>
+      </div>,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(container).not.toContainElement(dialog);
+    expect(document.body).toContainElement(dialog);
+  });
+
   it("calls onClose when overlay is clicked", async () => {
     const onClose = vi.fn();
     render(
@@ -37,6 +56,80 @@ describe("AppModal", () => {
       </AppModal>,
     );
     await userEvent.click(screen.getByRole("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses on pointer down and ignores the follow-up click", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose}>
+        Content
+      </AppModal>,
+    );
+    const overlay = screen.getByRole("dialog");
+    fireEvent.pointerDown(overlay);
+    fireEvent.click(overlay);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("snaps back when dragged less than half the sheet height", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose} mobileSafeArea>
+        Content
+      </AppModal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const handle = dialog.querySelector(".touch-pan-y") as HTMLElement;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 240,
+      height: 200,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+
+    fireEvent.touchStart(handle, { touches: [{ clientY: 0 }] });
+    fireEvent.touchMove(panel, { touches: [{ clientY: 80 }] });
+    fireEvent.touchEnd(panel);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(panel.style.transform).toBe("");
+  });
+
+  it("dismisses after dragging more than half the sheet height", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose} mobileSafeArea>
+        Content
+      </AppModal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const handle = dialog.querySelector(".touch-pan-y") as HTMLElement;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 240,
+      height: 200,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+
+    fireEvent.touchStart(handle, { touches: [{ clientY: 0 }] });
+    fireEvent.touchMove(panel, { touches: [{ clientY: 140 }] });
+    fireEvent.touchEnd(panel);
+    vi.advanceTimersByTime(180);
+
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

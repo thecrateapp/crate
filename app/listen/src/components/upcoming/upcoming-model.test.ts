@@ -72,6 +72,20 @@ describe("upcoming model", () => {
         is_upcoming: false,
       }),
     ).toBe(true);
+
+    expect(
+      canOpenUpcomingRelease({
+        type: "release",
+        date: "2026-07-17",
+        artist: "SOFTPLAY",
+        title: "Ghostly",
+        subtitle: "EP",
+        cover_url: null,
+        status: "detected",
+        is_upcoming: true,
+        release_id: 12,
+      }),
+    ).toBe(true);
   });
 
   it("labels release rows by current availability state", () => {

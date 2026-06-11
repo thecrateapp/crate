@@ -7,6 +7,7 @@ import {
 } from "@/components/actions/ItemActionMenu";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import { SpinningDisc } from "@/components/player/SpinningDisc";
 import { getPlaySourceLabel } from "@/components/player/player-source";
@@ -158,6 +159,14 @@ function FullscreenQueueRow({
       />
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={track.albumCover}
+            title={track.title}
+            artist={track.artist}
+            album={track.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

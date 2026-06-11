@@ -7,6 +7,7 @@ import {
   type ItemActionMenuEntry,
   useItemActionMenu,
 } from "@/components/actions/ItemActionMenu";
+import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
@@ -120,6 +121,14 @@ function QueuePanelRow({
       />
       <ItemActionMenu
         actions={actions}
+        header={
+          <TrackActionMenuHeader
+            coverUrl={track.albumCover}
+            title={track.title}
+            artist={track.artist}
+            album={track.album}
+          />
+        }
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

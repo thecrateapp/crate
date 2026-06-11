@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  useState,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 
 interface ImageLightboxProps {
   src: string;
@@ -8,6 +16,21 @@ interface ImageLightboxProps {
 
 export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
   const [open, setOpen] = useState(false);
+  const isDismissedRef = useRef(false);
+  const handleOverlayPointerDown = (
+    event: ReactPointerEvent<HTMLDivElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    isDismissedRef.current = true;
+    close();
+  };
+  const handleOverlayTouchStart = (event: ReactTouchEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    isDismissedRef.current = true;
+    close();
+  };
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -27,8 +50,18 @@ export function ImageLightbox({ src, alt, children }: ImageLightboxProps) {
       </div>
       {open && (
         <div
-          onClick={close}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-200"
+          onPointerDown={handleOverlayPointerDown}
+          onTouchStart={handleOverlayTouchStart}
+          onClick={(event: ReactMouseEvent<HTMLDivElement>) => {
+            if (isDismissedRef.current) {
+              isDismissedRef.current = false;
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            close();
+          }}
+          className="fixed inset-0 z-app-modal flex items-center justify-center bg-black/80 animate-in fade-in duration-200"
         >
           <img
             src={src}

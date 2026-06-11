@@ -109,7 +109,9 @@ export function ArtistBioModal({
       open={open}
       onClose={onClose}
       maxWidthClassName="sm:max-w-2xl"
-      panelClassName="listen-glass-panel"
+      overlayClassName="bg-black/58"
+      panelClassName="listen-glass-panel flex min-h-0 w-full max-w-2xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
+      mobileSafeArea
     >
       <ModalHeader className="bg-transparent">
         <div className="flex items-start justify-between gap-4 px-5 py-5 sm:px-6">
@@ -165,7 +167,7 @@ export function ArtistBioModal({
         </div>
       </ModalHeader>
 
-      <ModalBody className="max-h-[calc(92vh-124px)] space-y-6 px-5 py-5 sm:px-6">
+      <ModalBody className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
         {/* Stats */}
         {(listeners > 0 || spotifyFollowers > 0) && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

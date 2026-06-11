@@ -2,6 +2,7 @@ import { ListMusic, Play, Save, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { AppModal } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 
 interface SetlistTrack {
@@ -51,15 +52,15 @@ export function ArtistSetlistModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-app-modal flex items-end justify-center sm:items-center"
-      onClick={onClose}
+    <AppModal
+      open={open}
+      onClose={onClose}
+      maxWidthClassName="max-w-md"
+      mobileSafeArea
+      overlayClassName="bg-black/58"
+      panelClassName="listen-glass-panel flex min-h-0 flex-col overflow-hidden border-0 pb-4 sm:max-h-[92vh]"
     >
-      <div className="absolute inset-0 bg-black/68" />
-      <div
-        className="listen-glass-panel relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
           <div className="flex items-center gap-3">
@@ -135,6 +136,6 @@ export function ArtistSetlistModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppModal>
   );
 }

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
+import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 
 interface EqualizerPopoverProps {
@@ -15,36 +16,11 @@ interface EqualizerPopoverProps {
 export function EqualizerPopover({ open, onClose }: EqualizerPopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Esc closes, click-outside closes.
-  useEffect(() => {
-    if (!open) return;
-
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    const onPointerDown = (event: PointerEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(event.target as Node)
-      ) {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", onKey);
-    // Defer the pointerdown listener to the next tick so the same click
-    // that opened the popover doesn't immediately close it.
-    const timer = window.setTimeout(
-      () => window.addEventListener("pointerdown", onPointerDown, true),
-      0,
-    );
-
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("pointerdown", onPointerDown, true);
-      window.clearTimeout(timer);
-    };
-  }, [open, onClose]);
+  useDismissibleLayer({
+    active: open,
+    refs: [panelRef],
+    onDismiss: onClose,
+  });
 
   if (!open) return null;
 

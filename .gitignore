@@ -18,6 +18,7 @@ coverage.out
 lcov.info
 **/lcov.info
 desktop-artifacts/
+artifacts/
 
 # Python
 __pycache__/

@@ -72,12 +72,23 @@ export function HomeUpcomingSection({
       { size: 800 },
     );
   const releasePath =
-    !isShow && (nextUpcoming.album_id || nextUpcoming.album_slug)
+    !isShow &&
+    (nextUpcoming.album_id ||
+      nextUpcoming.release_id ||
+      nextUpcoming.album_slug)
       ? albumPagePath({
-          albumId: nextUpcoming.album_id,
-          albumSlug: nextUpcoming.album_slug,
+          albumId: nextUpcoming.album_id
+            ? nextUpcoming.album_id
+            : nextUpcoming.release_id
+              ? -nextUpcoming.release_id
+              : undefined,
+          albumSlug: nextUpcoming.album_id
+            ? nextUpcoming.album_slug
+            : undefined,
           albumName: nextUpcoming.title,
-          artistSlug: nextUpcoming.artist_slug,
+          artistSlug: nextUpcoming.album_id
+            ? nextUpcoming.artist_slug
+            : undefined,
           artistName: nextUpcoming.artist,
         })
       : null;

@@ -23,6 +23,7 @@ interface BandcampSupportButtonProps {
   entityUid?: string | null;
   fallbackArtistEntityUid?: string | null;
   className?: string;
+  iconOnly?: boolean;
 }
 
 interface ResolvedBandcampLink {
@@ -54,6 +55,7 @@ export function BandcampSupportButton({
   entityUid,
   fallbackArtistEntityUid,
   className = "",
+  iconOnly = false,
 }: BandcampSupportButtonProps) {
   const [resolved, setResolved] = useState<ResolvedBandcampLink | null>(null);
   const [busy, setBusy] = useState(false);
@@ -128,11 +130,20 @@ export function BandcampSupportButton({
   if (ownedAlbum && !canImport) {
     return (
       <span
-        className={`inline-flex h-10 items-center gap-2 rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 px-4 text-sm font-medium text-[#7ee7ff]/90 ${className}`}
+        className={`inline-flex h-10 items-center rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff]/90 ${
+          iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
+        } ${className}`}
+        aria-label={ownedLabel}
       >
         <BandcampLogo size={15} />
-        <span className="hidden sm:inline">{ownedLabel}</span>
-        <span className="sm:hidden">Owned</span>
+        {iconOnly ? (
+          <span className="sr-only">{ownedLabel}</span>
+        ) : (
+          <>
+            <span className="hidden sm:inline">{ownedLabel}</span>
+            <span className="sm:hidden">Owned</span>
+          </>
+        )}
       </span>
     );
   }
@@ -163,15 +174,26 @@ export function BandcampSupportButton({
     <button
       onClick={handleClick}
       disabled={busy}
-      className={`inline-flex h-10 items-center gap-2 rounded-full border border-[#1da0c3]/30 bg-[#1da0c3]/10 px-4 text-sm font-medium text-[#7ee7ff] transition-colors hover:bg-[#1da0c3]/15 disabled:opacity-50 ${className}`}
+      className={`inline-flex h-10 items-center ${
+        iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
+      } rounded-full border border-[#1da0c3]/30 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff] transition-colors hover:bg-[#1da0c3]/15 disabled:opacity-50 ${className}`}
+      aria-label={ownedAlbum && !canImport ? ownedLabel : label}
     >
       {busy ? (
         <Loader2 size={15} className="animate-spin" />
       ) : (
         <BandcampLogo size={15} />
       )}
-      <span className="hidden sm:inline">{label}</span>
-      <span className="sm:hidden">Bandcamp</span>
+      {iconOnly ? (
+        <span className="sr-only">
+          {ownedAlbum && !canImport ? ownedLabel : label}
+        </span>
+      ) : (
+        <>
+          <span className="hidden sm:inline">{label}</span>
+          <span className="sm:hidden">Bandcamp</span>
+        </>
+      )}
     </button>
   );
 }
