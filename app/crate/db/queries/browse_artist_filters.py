@@ -108,17 +108,21 @@ def get_browse_filter_genres(
             .mappings()
             .all()
         )
-        return [
-            {
-                "name": row["name"],
-                "cnt": row["cnt"],
-                "count": row["cnt"],
-                "description": row["description"],
-                "top_artists": list(row["top_artists"] or []),
-                "cover_url": row["cover_url"],
-            }
-            for row in rows
-        ]
+        items = []
+        for row in rows:
+            item = dict(row)
+            top_artists = item.get("top_artists") or []
+            items.append(
+                {
+                    "name": item["name"],
+                    "cnt": item["cnt"],
+                    "count": item["cnt"],
+                    "description": item.get("description"),
+                    "top_artists": list(top_artists),
+                    "cover_url": item.get("cover_url"),
+                }
+            )
+        return items
 
 
 def get_browse_filter_countries() -> list[dict]:
