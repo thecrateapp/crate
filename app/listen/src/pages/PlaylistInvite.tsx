@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";

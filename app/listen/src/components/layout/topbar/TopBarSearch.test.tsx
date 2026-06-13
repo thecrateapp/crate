@@ -2,11 +2,15 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/api", () => ({
-  api: vi.fn(),
-  getApiBase: vi.fn(() => ""),
-  getAuthToken: vi.fn(() => null),
-}));
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: vi.fn(),
+    getApiBase: vi.fn(() => ""),
+    getAuthToken: vi.fn(() => null),
+  };
+});
 
 const navigateMock = vi.fn();
 vi.mock("react-router", async () => {
@@ -18,7 +22,7 @@ vi.mock("react-router", async () => {
   };
 });
 
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -32,6 +36,20 @@ function mockHoverPointer(matches: boolean) {
       removeEventListener: vi.fn(),
     })),
   );
+}
+
+function mockSearchBoxRect() {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: 320,
+    bottom: 44,
+    width: 320,
+    height: 44,
+    toJSON: () => ({}),
+  });
 }
 
 describe("TopBarSearch", () => {
@@ -68,6 +86,15 @@ describe("TopBarSearch", () => {
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("false");
     });
+  });
+
+  it("keeps the collapsed mobile search affordance visible", () => {
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+
+    expect(searchButton.getAttribute("aria-expanded")).toBe("false");
+    expect(searchButton).toHaveTextContent("Search");
   });
 
   it("opens on hover and collapses again when idle", async () => {
@@ -130,17 +157,7 @@ describe("TopBarSearch", () => {
       albums: [],
       tracks: [],
     });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      right: 320,
-      bottom: 44,
-      width: 320,
-      height: 44,
-      toJSON: () => ({}),
-    });
+    mockSearchBoxRect();
 
     renderWithListenProviders(<TopBarSearch />);
 
@@ -159,6 +176,78 @@ describe("TopBarSearch", () => {
       expect(api).toHaveBeenCalledWith("/api/search?q=high&limit=10");
       expect(screen.getByText("High Vis")).toBeTruthy();
     });
+
+    expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
+      "listen-glass-panel",
+      "rounded-2xl",
+    );
+  });
+
+  it("shows a clear empty state when a query returns no music", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({
+      artists: [],
+      albums: [],
+      tracks: [],
+    });
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "zzzz" } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText("No music found")).toBeInTheDocument();
+    });
+  });
+
+  it("shows an error state instead of no results when search fails", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockRejectedValue(new ApiError(401, "Not authenticated"));
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText("Search unavailable")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("No music found")).not.toBeInTheDocument();
+  });
+
+  it("does not show the empty state before the current query completes", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockReturnValue(new Promise(() => {}));
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+
+    expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 
   it("clears the query from the clear search button", async () => {

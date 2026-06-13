@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from crate.db.home_builders import (
     _build_core_playlists,
     _build_core_discovery_artists,
@@ -24,8 +26,7 @@ from crate.db.home_personalized_collections import (
     get_home_favorite_artists,
     get_home_recently_played,
 )
-from crate.db.queries.user_library import get_replay_mix
-from crate.db.queries.user_library_stats_tops import get_listening_history_cards
+from crate.db.queries.user_library_stats_month import get_month_replay_mix
 
 
 def _build_home_recommended_tracks(
@@ -142,7 +143,7 @@ def get_home_section(user_id: int, section_id: str, limit: int = 42) -> dict | N
         )
         return {
             "id": section_id,
-            "title": "Core tracks",
+            "title": "Artist Sets",
             "subtitle": "Discovery-forward artist sets, ending with familiar anchors.",
             "items": _build_core_playlists(
                 user_id,
@@ -208,6 +209,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         interest_artists_lower=interest_artists_lower,
         limit=14,
     )
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
 
     return {
         "hero": hero,
@@ -221,8 +223,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
             user_id, merged_artists, 7, discovery_artists=discovery_artists
         ),
         "recent_global_artists": _build_recent_global_artists(7),
-        "listening_history": get_listening_history_cards(user_id, limit=8),
-        "replay": get_replay_mix(user_id, window="30d", limit=18),
+        "replay": get_month_replay_mix(user_id, current_month, limit=18),
         "upcoming": _build_home_upcoming(
             user_id, lookup_limit=120, item_limit=12, followed=followed
         ),

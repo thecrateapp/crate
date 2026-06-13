@@ -5,7 +5,7 @@ import {
   Upload as UploadIcon,
   Archive,
   CheckCircle2,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";

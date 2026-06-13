@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Calendar } from "@crate/ui/icons";
 
-import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { useShowActionEntries } from "@/components/actions/show-actions";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +19,15 @@ export function UpcomingShowCard({
   expanded,
   onToggle,
   onAttendanceChange,
+  featured = false,
+  showClose = true,
 }: {
   item: UpcomingItem;
   expanded: boolean;
   onToggle: () => void;
   onAttendanceChange?: (attending: boolean) => void;
+  featured?: boolean;
+  showClose?: boolean;
 }) {
   const {
     attending,
@@ -75,7 +77,11 @@ export function UpcomingShowCard({
       className={cn(
         "relative overflow-hidden rounded-xl border",
         expanded
-          ? "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out"
+          ? cn(
+              "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out",
+              featured &&
+                "border-primary/25 shadow-[0_18px_60px_rgba(6,182,212,0.14)]",
+            )
           : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
       )}
       style={{ height: cardHeight }}
@@ -102,11 +108,22 @@ export function UpcomingShowCard({
             onToggleAttendance={toggleAttendance}
             onPlaySetlist={playProbableSetlist}
             onClose={onToggle}
+            showClose={showClose}
           />
         )}
       </div>
       <ItemActionMenu
         actions={menuActions}
+        header={{
+          type: "media",
+          title: item.artist,
+          subtitle: item.title,
+          detail: item.subtitle,
+          imageUrl: item.cover_url,
+          imageAlt: item.artist,
+          imageShape: "square",
+          fallbackIcon: Calendar,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

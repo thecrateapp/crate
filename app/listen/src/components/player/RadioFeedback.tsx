@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
+import { ThumbsDown, ThumbsUp } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { sendRadioFeedback } from "@/lib/radio";

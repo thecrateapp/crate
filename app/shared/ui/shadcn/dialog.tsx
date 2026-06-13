@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { XIcon } from "lucide-react";
+import { XIcon } from "@crate/ui/icons";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -70,7 +70,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-4 right-4 rounded-md p-2 text-white/45 transition-colors hover:bg-white/5 hover:text-white focus-visible:bg-white/10 focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="absolute top-4 right-4 flex size-10 items-center justify-center text-white/45 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-6"
           >
             <XIcon />
             <span className="sr-only">Close</span>

@@ -32,4 +32,24 @@ func TestExtractToken(t *testing.T) {
 		token := ExtractToken(req, false)
 		assert.Equal(t, "default-cookie", token)
 	})
+
+	t.Run("returns cookie candidates in fallback order", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: listenCookieName, Value: "stale-listen-cookie"})
+		req.AddCookie(&http.Cookie{Name: defaultCookieName, Value: "valid-default-cookie"})
+
+		candidates := ExtractTokenCandidates(req, false)
+
+		assert.Equal(t, []string{"stale-listen-cookie", "valid-default-cookie"}, candidates)
+	})
+
+	t.Run("keeps bearer token authoritative", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/?token=query-token", nil)
+		req.Header.Set("Authorization", "Bearer header-token")
+		req.AddCookie(&http.Cookie{Name: listenCookieName, Value: "cookie-token"})
+
+		candidates := ExtractTokenCandidates(req, true)
+
+		assert.Equal(t, []string{"header-token"}, candidates)
+	})
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Star } from "lucide-react";
+import { Loader2, Star } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";

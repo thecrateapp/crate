@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router";
-import { Loader2, UserPlus, UserRoundCheck } from "lucide-react";
+import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { cn } from "@crate/ui/lib/cn";

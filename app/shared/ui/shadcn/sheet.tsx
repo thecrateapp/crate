@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { XIcon } from "lucide-react";
+import { XIcon } from "@crate/ui/icons";
 import { Dialog as SheetPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
@@ -75,8 +75,8 @@ function SheetContent({
       >
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close className="absolute top-4 right-4 rounded-md p-2 text-white/45 transition-colors hover:bg-white/5 hover:text-white focus-visible:bg-white/10 focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none">
-            <XIcon className="size-4" />
+          <SheetPrimitive.Close className="absolute top-4 right-4 flex size-10 items-center justify-center text-white/45 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none">
+            <XIcon className="size-6" />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
         )}

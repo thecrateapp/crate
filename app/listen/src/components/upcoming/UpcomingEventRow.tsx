@@ -1,5 +1,11 @@
 import { Link } from "react-router";
-import { Calendar, ChevronDown, Disc3, ExternalLink, Play } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  Disc3,
+  ExternalLink,
+  Play,
+} from "@crate/ui/icons";
 
 import {
   albumPagePath,

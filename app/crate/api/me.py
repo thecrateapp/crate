@@ -1939,6 +1939,7 @@ def update_location(request: Request, body: UpdateLocationBody):
 
     if updates:
         update_user_location(user["id"], **updates)
+        broadcast_invalidation("shows", "upcoming")
 
     return {"ok": True}
 

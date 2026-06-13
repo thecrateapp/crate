@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { CRATE_ICON_SIZE, type LucideIcon } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -73,7 +73,7 @@ export function OpsStatTile({
             toneClass.iconWrap,
           )}
         >
-          <Icon size={16} />
+          <Icon size={CRATE_ICON_SIZE.md} />
         </div>
       </div>
       <div

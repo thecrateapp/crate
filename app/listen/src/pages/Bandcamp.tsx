@@ -6,8 +6,8 @@ import {
   Loader2,
   Radar,
   RefreshCw,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+} from "@crate/ui/icons";
+import type { LucideIcon } from "@crate/ui/icons";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 

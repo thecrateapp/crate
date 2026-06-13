@@ -17,6 +17,9 @@ class BrowseGenreFilterOptionResponse(BaseModel):
     name: str
     cnt: int | None = None
     count: int | None = None
+    description: str | None = None
+    top_artists: list[str] = Field(default_factory=list)
+    cover_url: str | None = None
 
 
 class BrowseCountryFilterOptionResponse(BaseModel):

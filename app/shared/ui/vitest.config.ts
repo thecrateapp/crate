@@ -7,11 +7,12 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     include: [
+      "icons/**/*.test.tsx",
       "lib/**/*.test.ts",
       "primitives/**/*.test.tsx",
       "shadcn/**/*.test.tsx",
       "composites/**/*.test.tsx",
-      "domain/**/*.test.tsx",
+      "domain/**/*.test.{ts,tsx}",
     ],
     setupFiles: ["test-setup.ts"],
     coverage: {

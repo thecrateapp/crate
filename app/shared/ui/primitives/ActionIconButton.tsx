@@ -16,19 +16,19 @@ function actionToneClassName(tone: ActionTone, disabled: boolean) {
   }
 
   if (tone === "primary") {
-    return "text-primary hover:bg-[var(--active-bg)] hover:text-primary";
+    return "text-primary hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.45)]";
   }
 
   if (tone === "danger") {
-    return "text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--status-danger-text)]";
+    return "text-[var(--status-danger-text)] hover:text-[var(--status-danger-text)] hover:drop-shadow-[0_0_8px_rgba(248,113,113,0.35)]";
   }
 
-  return "text-[var(--idle-text-muted)] hover:bg-[var(--hover-bg-strong)] hover:text-foreground";
+  return "text-[var(--idle-text-muted)] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]";
 }
 
 function actionVariantClassName(variant: ActionVariant) {
   if (variant === "card") {
-    return "h-9 min-h-11 w-9 min-w-11 border border-[var(--idle-border)] bg-black/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md hover:bg-black/70 md:min-h-0 md:min-w-0";
+    return "h-9 min-h-11 w-9 min-w-11 border border-[var(--idle-border)] bg-black/55 shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md md:min-h-0 md:min-w-0";
   }
 
   return "h-10 min-h-11 w-10 min-w-11 md:min-h-0 md:min-w-0";
@@ -64,9 +64,10 @@ export const ActionIconButton = forwardRef<
       type={type}
       disabled={disabled}
       className={cn(
-        "flex items-center justify-center rounded-full transition-colors",
+        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled),
+        active && "animate-crate-icon-active-pulse",
         className,
       )}
       {...props}
@@ -99,9 +100,10 @@ export function ActionIconLink({
       href={href || "#"}
       aria-disabled={disabled || !href}
       className={cn(
-        "flex items-center justify-center rounded-full transition-colors",
+        "flex items-center justify-center rounded-full transition-[color,filter,transform] hover:-translate-y-px [&_svg:not([class*='size-'])]:size-[18px]",
         actionVariantClassName(variant),
         actionToneClassName(active ? "primary" : tone, disabled || !href),
+        active && "animate-crate-icon-active-pulse",
         className,
       )}
       {...props}

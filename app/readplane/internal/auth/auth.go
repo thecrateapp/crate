@@ -67,8 +67,8 @@ func NewAuthenticator(pool *pgxpool.Pool, envSecret string, queryTimeout time.Du
 
 // Authenticate verifies the request's session token and returns the associated user.
 func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*User, error) {
-	token := ExtractToken(r, allowQueryToken)
-	if token == "" {
+	tokens := ExtractTokenCandidates(r, allowQueryToken)
+	if len(tokens) == 0 {
 		return nil, ErrUnauthorized
 	}
 
@@ -76,42 +76,76 @@ func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*Us
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
-	payload, err := VerifyHS256(token, secret, time.Now())
-	if err != nil {
-		return nil, ErrUnauthorized
+
+	for _, token := range tokens {
+		payload, err := VerifyHS256(token, secret, time.Now())
+		if err != nil {
+			continue
+		}
+
+		user, err := a.loadUser(r.Context(), payload)
+		if err == nil {
+			return user, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+		}
 	}
 
-	user, err := a.loadUser(r.Context(), payload)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUnauthorized
-		}
-		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
-	}
-	return user, nil
+	return nil, ErrUnauthorized
 }
 
 // ExtractToken extracts a bearer token from the Authorization header, query string, or cookies.
 func ExtractToken(r *http.Request, allowQueryToken bool) string {
+	tokens := ExtractTokenCandidates(r, allowQueryToken)
+	if len(tokens) == 0 {
+		return ""
+	}
+	return tokens[0]
+}
+
+// ExtractTokenCandidates extracts auth candidates in the same priority order as FastAPI.
+//
+// Bearer and query-string tokens are authoritative. Cookies can have stale app-specific
+// values, so return both the Listen cookie and the default cookie as fallbacks.
+func ExtractTokenCandidates(r *http.Request, allowQueryToken bool) []string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	if authHeader != "" {
 		scheme, token, ok := strings.Cut(authHeader, " ")
 		if ok && strings.EqualFold(scheme, "Bearer") {
-			return strings.TrimSpace(token)
+			token = strings.TrimSpace(token)
+			if token != "" {
+				return []string{token}
+			}
 		}
 	}
 	if allowQueryToken {
 		if token := strings.TrimSpace(r.URL.Query().Get("token")); token != "" {
-			return token
+			return []string{token}
 		}
 	}
+	tokens := make([]string, 0, 2)
 	if cookie, err := r.Cookie(listenCookieName); err == nil {
-		return strings.TrimSpace(cookie.Value)
+		if token := strings.TrimSpace(cookie.Value); token != "" {
+			tokens = append(tokens, token)
+		}
 	}
 	if cookie, err := r.Cookie(defaultCookieName); err == nil {
-		return strings.TrimSpace(cookie.Value)
+		token := strings.TrimSpace(cookie.Value)
+		if token != "" && !containsToken(tokens, token) {
+			tokens = append(tokens, token)
+		}
 	}
-	return ""
+	return tokens
+}
+
+func containsToken(tokens []string, token string) bool {
+	for _, candidate := range tokens {
+		if candidate == token {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Authenticator) jwtSecret(ctx context.Context) (string, error) {

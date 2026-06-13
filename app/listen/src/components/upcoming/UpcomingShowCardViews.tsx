@@ -8,14 +8,15 @@ import {
   MapPin,
   Play,
   X,
-} from "lucide-react";
+} from "@crate/ui/icons";
 
-import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
+import { ItemActionMenuButton } from "@crate/ui/domain/actions";
 import {
   artistBackgroundApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 
 /** Hidden img that preloads the artist background into the browser cache */
 function PreloadBackground({ item }: { item: UpcomingItem }) {
@@ -52,6 +53,73 @@ interface ExpandedViewProps {
   onToggleAttendance: () => void;
   onPlaySetlist: () => void;
   onClose: () => void;
+  showClose?: boolean;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+export function formatShowTimeRemaining(
+  item: UpcomingItem,
+  now = new Date(),
+): string | null {
+  if (!item.date) return null;
+
+  const showDate = new Date(`${item.date}T${item.time || "12:00:00"}`);
+  if (Number.isNaN(showDate.getTime())) return null;
+
+  const diff = showDate.getTime() - now.getTime();
+  if (diff <= 0) return "Show time";
+
+  const days = Math.floor(diff / DAY_MS);
+  if (days >= 60) return `${Math.round(days / 30)} months to go`;
+  if (days >= 30) return "1 month to go";
+  if (days >= 1) return `${days} ${days === 1 ? "day" : "days"} to go`;
+
+  const hours = Math.floor(diff / HOUR_MS);
+  if (hours >= 1) return `${hours} ${hours === 1 ? "hour" : "hours"} to go`;
+
+  return "Starting soon";
+}
+
+function showDestination(item: UpcomingItem): string | null {
+  if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+    return `${item.latitude},${item.longitude}`;
+  }
+
+  const destination = [
+    item.venue,
+    item.address_line1,
+    item.city,
+    item.region,
+    item.postal_code,
+    item.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return destination || null;
+}
+
+export function showDirectionsUrl(
+  item: UpcomingItem,
+  provider: "auto" | "apple" | "google" = "auto",
+): string | null {
+  const destination = showDestination(item);
+  if (!destination) return null;
+
+  const encodedDestination = encodeURIComponent(destination);
+  const isApplePlatform =
+    provider === "apple" ||
+    (provider === "auto" &&
+      typeof navigator !== "undefined" &&
+      /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent));
+
+  if (isApplePlatform) {
+    return `https://maps.apple.com/?daddr=${encodedDestination}`;
+  }
+
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}`;
 }
 
 // ── Collapsed — Poster Strip ─────────────────────────────────────
@@ -185,6 +253,7 @@ export function UpcomingShowExpandedView({
   onToggleAttendance,
   onPlaySetlist,
   onClose,
+  showClose = true,
 }: ExpandedViewProps) {
   const backgroundUrl = artistBackgroundApiUrl({
     artistId: item.artist_id,
@@ -217,6 +286,9 @@ export function UpcomingShowExpandedView({
   const addressLabel = [item.address_line1, item.postal_code]
     .filter(Boolean)
     .join(" · ");
+  const timeRemaining = formatShowTimeRemaining(item);
+  const directionsUrl = showDirectionsUrl(item);
+  const genreItems = (item.genres || []).slice(0, 3).map((name) => ({ name }));
 
   return (
     <div className="relative flex h-full flex-col">
@@ -238,15 +310,23 @@ export function UpcomingShowExpandedView({
       {/* Top section — close button, date, artist overlay */}
       <div className="relative h-[130px] flex-shrink-0">
         {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
-        >
-          <X size={14} />
-        </button>
+        {showClose ? (
+          <button
+            onClick={onClose}
+            aria-label="Close show details"
+            className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
+          >
+            <X size={14} />
+          </button>
+        ) : null}
 
         {/* Date + time */}
         <div className="absolute top-2.5 right-3 z-10 text-right">
+          {timeRemaining ? (
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+              {timeRemaining}
+            </div>
+          ) : null}
           <div className="text-[10px] font-bold tracking-wide text-primary/70">
             {dateLabel}
           </div>
@@ -305,28 +385,21 @@ export function UpcomingShowExpandedView({
         </div>
 
         {/* Genres */}
-        {item.genres && item.genres.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {item.genres.slice(0, 3).map((genre) => (
-              <span
-                key={genre}
-                className="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/40"
-              >
-                {genre}
-              </span>
-            ))}
-          </div>
-        )}
+        <GenrePillRow items={genreItems} max={3} className="mt-2" />
 
-        {/* Action buttons — 3 equal width */}
-        <div className="mt-3 flex gap-2">
+        {/* Action buttons */}
+        <div
+          className={`mt-3 grid gap-2 sm:grid-cols-2 ${
+            directionsUrl ? "lg:grid-cols-4" : "lg:grid-cols-3"
+          }`}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
               void onToggleAttendance();
             }}
             disabled={!item.id || savingAttendance}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border py-2.5 text-[11px] font-semibold transition-colors ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg border py-2.5 text-[11px] font-semibold transition-colors ${
               attending
                 ? "border-primary/30 bg-primary/10 text-primary"
                 : "border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary"
@@ -344,7 +417,7 @@ export function UpcomingShowExpandedView({
           <button
             onClick={() => void onPlaySetlist()}
             disabled={!item.probable_setlist?.length || playingSetlist}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-primary/20 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/8 disabled:opacity-25"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-primary/20 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/8 disabled:opacity-25"
           >
             {playingSetlist ? (
               <Loader2 size={13} className="animate-spin" />
@@ -353,6 +426,17 @@ export function UpcomingShowExpandedView({
             )}
             Play Setlist
           </button>
+          {directionsUrl ? (
+            <a
+              href={directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
+            >
+              <MapPin size={13} />
+              Directions
+            </a>
+          ) : null}
           <a
             href={item.url || "#"}
             target="_blank"
@@ -360,7 +444,7 @@ export function UpcomingShowExpandedView({
             onClick={(e) => {
               if (!item.url) e.preventDefault();
             }}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
+            className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
           >
             <ExternalLink size={13} />
             Get Tickets

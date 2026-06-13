@@ -12,10 +12,14 @@ import {
   ModalCloseButton,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import {
+  GenrePillRow,
+  type GenreProfileItem,
+} from "@crate/ui/domain/genres/GenrePill";
 import { api } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
 import { formatCompact } from "@/lib/utils";
-import { Globe, ChevronDown, ChevronUp } from "lucide-react";
+import { Globe, ChevronDown, ChevronUp } from "@crate/ui/icons";
 
 interface MBMember {
   name: string;
@@ -103,6 +107,14 @@ export function ArtistBioModal({
   const spotifyFollowers = enrichment?.spotify?.followers ?? 0;
   const spotifyPopularity = enrichment?.spotify?.popularity ?? 0;
   const displayBio = bioExpanded ? bio : bio.slice(0, 500);
+  const genreItems: GenreProfileItem[] =
+    artist.genre_profile && artist.genre_profile.length > 0
+      ? artist.genre_profile
+      : tags.map((tag) => ({
+          name: tag,
+          slug: artistGenreSlug(tag),
+          source: "artist",
+        }));
 
   return (
     <AppModal
@@ -113,7 +125,10 @@ export function ArtistBioModal({
       panelClassName="listen-glass-panel flex min-h-0 w-full max-w-2xl flex-col overflow-hidden border-0 sm:max-h-[92vh]"
       mobileSafeArea
     >
-      <ModalHeader className="bg-transparent">
+      <ModalHeader
+        data-testid="artist-bio-header"
+        className="relative top-auto z-auto border-b-0 bg-transparent backdrop-blur-none"
+      >
         <div className="flex items-start justify-between gap-4 px-5 py-5 sm:px-6">
           <div className="flex min-w-0 items-start gap-4">
             <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-2xl bg-white/5 shadow-xl">
@@ -138,31 +153,26 @@ export function ArtistBioModal({
                   </span>
                 )}
               </div>
-              {tags.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {tags.map((tag) => (
-                    <button
-                      key={tag}
-                      className="rounded-full border border-white/10 bg-white/8 px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-white/12 hover:text-white"
-                      onClick={() => {
-                        navigate(
-                          `/explore?genre=${encodeURIComponent(
-                            artistGenreSlug(tag),
-                          )}`,
-                        );
-                        onClose();
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+              {genreItems.length > 0 ? (
+                <GenrePillRow
+                  items={genreItems}
+                  max={3}
+                  className="mt-3"
+                  onSelect={(item) => {
+                    navigate(
+                      `/explore?genre=${encodeURIComponent(
+                        item.slug || artistGenreSlug(item.name),
+                      )}`,
+                    );
+                    onClose();
+                  }}
+                />
               ) : null}
             </div>
           </div>
           <ModalCloseButton
             onClick={onClose}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+            className="flex-shrink-0 text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.34)]"
           />
         </div>
       </ModalHeader>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { TrackCoverThumb } from "./TrackCoverThumb";
+import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
 
 describe("TrackCoverThumb", () => {
   it("renders fallback icon when no src", () => {

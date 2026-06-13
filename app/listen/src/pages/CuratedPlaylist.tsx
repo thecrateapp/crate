@@ -11,22 +11,23 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowDownToLine,
-  CheckCircle2,
+  ArrowDownToLineBold,
   Heart,
+  HeartBold,
   Loader2,
   Play,
   Radio,
   Shuffle,
   Share2,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
 import { api } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
   EditorialPlaylistArtwork,
@@ -550,7 +551,7 @@ export function CuratedPlaylist() {
           title={offlineButtonLabel}
         >
           {offlineState === "ready" ? (
-            <CheckCircle2 size={15} />
+            <ArrowDownToLineBold size={15} />
           ) : offlineBusy ? (
             <Loader2 size={15} className="animate-spin" />
           ) : offlineState === "error" ? (
@@ -570,11 +571,10 @@ export function CuratedPlaylist() {
         >
           {togglingFollow ? (
             <Loader2 size={15} className="animate-spin" />
+          ) : data.is_followed ? (
+            <HeartBold size={15} className="animate-crate-icon-active-pulse" />
           ) : (
-            <Heart
-              size={15}
-              className={data.is_followed ? "fill-current" : ""}
-            />
+            <Heart size={15} />
           )}
           {data.is_followed ? "Following" : "Follow"}
         </button>

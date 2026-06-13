@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { Check, Mic2, Music2, Ticket } from "lucide-react";
+import { Check, Mic2, Music2, Ticket } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import { action } from "@/components/actions/shared";
 import { artistPagePath } from "@/lib/library-routes";
 import type { UpcomingItem } from "@/components/upcoming/upcoming-model";

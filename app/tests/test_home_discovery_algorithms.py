@@ -116,6 +116,31 @@ def test_core_tracks_blend_orders_discovery_before_comfort():
     ]
 
 
+def test_radio_stations_expose_seed_metadata_without_generic_copy():
+    from crate.db.home_builder_curated_lists import _build_radio_stations
+
+    stations = _build_radio_stations(
+        [{"artist_id": 12, "artist_name": "Converge", "play_count": 44}],
+        [
+            {
+                "album_id": 34,
+                "album": "Jane Doe",
+                "artist": "Converge",
+                "artist_id": 12,
+                "play_count": 21,
+            }
+        ],
+        limit=2,
+    )
+
+    assert stations[0]["seed_type"] == "artist"
+    assert stations[0]["seed_label"] == "Converge"
+    assert stations[0]["subtitle"] == ""
+    assert stations[1]["seed_type"] == "album"
+    assert stations[1]["seed_label"] == "Jane Doe"
+    assert stations[1]["seed_subtitle"] == "Converge"
+
+
 def test_listening_history_cards_put_all_time_before_months(monkeypatch):
     from crate.db.queries import user_library_stats_tops
 

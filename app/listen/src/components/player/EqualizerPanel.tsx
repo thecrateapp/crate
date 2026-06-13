@@ -1,6 +1,7 @@
 import {
   Activity,
   Brain,
+  CRATE_ICON_SIZE,
   RotateCcw,
   Save,
   SlidersHorizontal,
@@ -11,7 +12,7 @@ import {
   Volume2,
   X,
   Zap,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -398,7 +399,10 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={16} className="text-cyan-400" />
+          <SlidersHorizontal
+            size={CRATE_ICON_SIZE.md}
+            className="text-cyan-400"
+          />
           <h2 className="text-sm font-semibold text-foreground">Equalizer</h2>
         </div>
         <div className="flex items-center gap-2">
@@ -427,9 +431,9 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               type="button"
               onClick={onClose}
               aria-label="Close equalizer"
-              className="rounded-md p-1 text-white/50 hover:bg-white/5 hover:text-white"
+              className="flex size-9 items-center justify-center text-white/50 hover:text-white"
             >
-              <X size={14} />
+              <X size={CRATE_ICON_SIZE.lg} />
             </button>
           ) : null}
         </div>

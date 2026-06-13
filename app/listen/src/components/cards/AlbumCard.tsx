@@ -1,13 +1,17 @@
 import { memo, useState } from "react";
 import { useNavigate } from "react-router";
-import { Heart, Loader2, Play } from "lucide-react";
-
 import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+  CRATE_ICON_SIZE,
+  Disc3,
+  Heart,
+  HeartBold,
+  Loader2,
+  Play,
+} from "@crate/ui/icons";
+
+import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { useAlbumActionEntries } from "@/components/actions/album-actions";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
@@ -109,7 +113,7 @@ export const AlbumCard = memo(function AlbumCard({
     albumSlug,
     cover: coverUrl,
   });
-  const actionMenu = useItemActionMenu(actions, { disabled: albumId == null });
+  const actionMenu = useItemActionMenu(actions);
 
   async function handlePlayOverlay(event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
@@ -230,7 +234,11 @@ export const AlbumCard = memo(function AlbumCard({
               }
             }}
           >
-            <Heart size={16} className={saved ? "fill-current" : ""} />
+            {saved ? (
+              <HeartBold size={CRATE_ICON_SIZE.md} />
+            ) : (
+              <Heart size={CRATE_ICON_SIZE.md} />
+            )}
           </ActionIconButton>
         )}
         <OfflineBadge
@@ -245,17 +253,17 @@ export const AlbumCard = memo(function AlbumCard({
         ) : null}
         <div className="absolute inset-0 hidden bg-black/0 transition-colors md:flex md:items-center md:justify-center md:p-0 md:group-hover:bg-black/40">
           <button
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-primary opacity-0 shadow-lg transition-all md:translate-y-2 md:group-hover:translate-y-0 md:group-hover:opacity-100"
             onClick={handlePlayOverlay}
           >
             {playing ? (
               <Loader2
-                size={18}
+                size={CRATE_ICON_SIZE.lg}
                 className="text-primary-foreground animate-spin"
               />
             ) : (
               <Play
-                size={18}
+                size={CRATE_ICON_SIZE.lg}
                 fill="#0a0a0f"
                 className="text-primary-foreground ml-0.5"
               />
@@ -294,6 +302,15 @@ export const AlbumCard = memo(function AlbumCard({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: album,
+          subtitle: artist,
+          imageUrl: coverUrl,
+          imageAlt: album,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

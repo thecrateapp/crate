@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { CRATE_ICON_SIZE, ChevronDown, Search } from "@crate/ui/icons";
 
 import { CrateChip } from "@crate/ui/primitives/CrateBadge";
 import { Input } from "@crate/ui/shadcn/input";
@@ -84,7 +84,10 @@ export function AdminSelect({
           )}
         >
           <span className="truncate">{selectedLabel}</span>
-          <ChevronDown size={14} className="ml-auto shrink-0 text-white/35" />
+          <ChevronDown
+            size={CRATE_ICON_SIZE.sm}
+            className="ml-auto shrink-0 text-white/35"
+          />
         </button>
       </PopoverTrigger>
 

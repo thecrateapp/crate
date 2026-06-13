@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Loader2, Play, UserMinus, UserPlus } from "lucide-react";
+import {
+  CRATE_ICON_SIZE,
+  Heart,
+  HeartBold,
+  Loader2,
+  Play,
+  UserRound,
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
@@ -70,7 +74,7 @@ export function ArtistCard({
     name,
   });
   const actionMenu = useItemActionMenu(actions, {
-    disabled: external || artistId == null,
+    disabled: external,
   });
   const imageSize = compact ? 100 : large ? 156 : 140;
   const wrapperClassName = cn(
@@ -143,9 +147,12 @@ export function ArtistCard({
                   title="Play top tracks"
                 >
                   {playingTopTracks ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2
+                      size={CRATE_ICON_SIZE.md}
+                      className="animate-spin"
+                    />
                   ) : (
-                    <Play size={14} fill="currentColor" />
+                    <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
                   )}
                 </button>
                 <button
@@ -174,11 +181,17 @@ export function ArtistCard({
                   title={following ? "Following" : "Follow"}
                 >
                   {togglingFollow ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Loader2
+                      size={CRATE_ICON_SIZE.md}
+                      className="animate-spin"
+                    />
                   ) : following ? (
-                    <UserMinus size={14} />
+                    <HeartBold
+                      size={CRATE_ICON_SIZE.md}
+                      className="animate-crate-icon-active-pulse"
+                    />
                   ) : (
-                    <UserPlus size={14} />
+                    <Heart size={CRATE_ICON_SIZE.md} />
                   )}
                 </button>
               </div>
@@ -229,6 +242,15 @@ export function ArtistCard({
       {content}
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: name,
+          subtitle,
+          imageUrl: photoUrl,
+          imageAlt: name,
+          imageShape: "circle",
+          fallbackIcon: UserRound,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

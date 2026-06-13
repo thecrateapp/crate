@@ -1,4 +1,9 @@
-import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDownToLine,
+  ArrowDownToLineBold,
+  Loader2,
+} from "@crate/ui/icons";
 
 import {
   getOfflineStateLabel,
@@ -26,11 +31,11 @@ export function OfflineBadge({
     const iconSize = compact ? 12 : 14;
     const icon =
       state === "ready" ? (
-        <CheckCircle2 size={iconSize} />
+        <ArrowDownToLineBold size={iconSize} />
       ) : state === "error" ? (
         <AlertCircle size={iconSize} />
       ) : state === "queued" ? (
-        <Download size={iconSize} />
+        <ArrowDownToLine size={iconSize} />
       ) : (
         <Loader2 size={iconSize} className="animate-spin" />
       );
@@ -63,7 +68,7 @@ export function OfflineBadge({
           className,
         )}
       >
-        <CheckCircle2 size={compact ? 11 : 12} />
+        <ArrowDownToLineBold size={compact ? 11 : 12} />
         {!compact ? label : null}
       </span>
     );
@@ -93,7 +98,7 @@ export function OfflineBadge({
       )}
     >
       {state === "queued" ? (
-        <Download size={compact ? 11 : 12} />
+        <ArrowDownToLine size={compact ? 11 : 12} />
       ) : (
         <Loader2 size={compact ? 11 : 12} className="animate-spin" />
       )}

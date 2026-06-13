@@ -1,9 +1,14 @@
 import { useEffect, useMemo } from "react";
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, Play } from "@crate/ui/icons";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import {
+  buildArtistPlayerTrack,
+  topTrackToTrackRowData,
+  type ArtistTopTrack,
+} from "@/components/artist/artist-model";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import {
@@ -14,67 +19,19 @@ import {
   artistTopTracksPath,
 } from "@/lib/library-routes";
 
-interface ArtistTopTrack {
-  id: string;
-  track_entity_uid?: string;
-  artist_id?: number;
-  artist_entity_uid?: string;
-  artist_slug?: string;
-  album_id?: number;
-  album_entity_uid?: string;
-  album_slug?: string;
-  title: string;
-  artist: string;
-  album: string;
-  duration: number;
-  track: number;
-  bpm?: number | null;
-  audio_key?: string | null;
-  audio_scale?: string | null;
-  energy?: number | null;
-  danceability?: number | null;
-  valence?: number | null;
-  bliss_vector?: number[] | null;
-}
-
 function toPlayerTracks(tracks: ArtistTopTrack[]): Track[] {
-  return tracks.map((track) => ({
-    id: track.id,
-    title: track.title || "Unknown",
-    artist: track.artist,
-    artistId: track.artist_id,
-    artistEntityUid: track.artist_entity_uid,
-    artistSlug: track.artist_slug,
-    album: track.album,
-    albumId: track.album_id,
-    albumEntityUid: track.album_entity_uid,
-    albumSlug: track.album_slug,
-    bpm: track.bpm,
-    audioKey: track.audio_key,
-    audioScale: track.audio_scale,
-    energy: track.energy,
-    danceability: track.danceability,
-    valence: track.valence,
-    blissVector: track.bliss_vector,
-    albumCover:
-      track.artist && track.album
-        ? albumCoverApiUrl({
-            albumId: track.album_id,
-            albumEntityUid: track.album_entity_uid,
-            artistEntityUid: track.artist_entity_uid,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
-          })
-        : artistPhotoApiUrl({
-            artistId: track.artist_id,
-            artistEntityUid: track.artist_entity_uid,
-            artistSlug: track.artist_slug,
-            artistName: track.artist,
-          }),
-    path: track.id.includes("/") ? track.id : undefined,
-    entityUid: track.track_entity_uid,
-  }));
+  return tracks.map((track) =>
+    buildArtistPlayerTrack(
+      track,
+      track.artist,
+      artistPhotoApiUrl({
+        artistId: track.artist_id,
+        artistEntityUid: track.artist_entity_uid,
+        artistSlug: track.artist_slug,
+        artistName: track.artist,
+      }),
+    ),
+  );
 }
 
 export function ArtistTopTracks() {
@@ -122,21 +79,7 @@ export function ArtistTopTracks() {
   }
 
   const trackRows = useMemo<TrackRowData[]>(
-    () =>
-      (topTracks || []).map((track) => ({
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        artist_id: track.artist_id,
-        artist_entity_uid: track.artist_entity_uid,
-        artist_slug: track.artist_slug,
-        album: track.album,
-        album_id: track.album_id,
-        album_entity_uid: track.album_entity_uid,
-        album_slug: track.album_slug,
-        duration: track.duration,
-        path: track.id.includes("/") ? track.id : undefined,
-      })),
+    () => (topTracks || []).map((track) => topTrackToTrackRowData(track)),
     [topTracks],
   );
 

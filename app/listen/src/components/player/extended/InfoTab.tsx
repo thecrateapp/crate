@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import {
   Activity,
   AudioLines,
+  CRATE_ICON_SIZE,
   Gauge,
   HardDrive,
   Loader2,
@@ -10,7 +11,7 @@ import {
   Sparkles,
   Star,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useTrackInfo } from "@/hooks/use-track-info";
@@ -115,7 +116,7 @@ function SectionCard({
           ) : null}
         </div>
         <div className="rounded-full border border-white/8 bg-white/[0.05] p-2 text-white/55">
-          <Icon size={15} />
+          <Icon size={CRATE_ICON_SIZE.md} />
         </div>
       </div>
       <div className="space-y-4 px-4 py-4">{children}</div>
@@ -129,7 +130,7 @@ function StarRating({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map((score) => (
         <Star
           key={score}
-          size={15}
+          size={CRATE_ICON_SIZE.sm}
           className={
             score <= rating ? "fill-amber-400 text-amber-400" : "text-white/12"
           }

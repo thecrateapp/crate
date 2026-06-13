@@ -1,4 +1,4 @@
-import { ListMusic, Play, Save, X } from "lucide-react";
+import { ListMusic, Play, Save, X } from "@crate/ui/icons";
 import { useState } from "react";
 import { toast } from "sonner";
 

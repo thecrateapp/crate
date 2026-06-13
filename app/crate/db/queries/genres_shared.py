@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import (
     get_genre_description,
     get_genre_display_name,
@@ -26,6 +27,7 @@ def invalid_genre_taxonomy_reason(slug: str) -> str | None:
 def annotate_genre_mapping(items: list[dict]) -> list[dict]:
     for item in items:
         canonical_slug = item.get("canonical_slug")
+        cover_path = item.pop("canonical_cover_path", None)
         item["mapped"] = canonical_slug is not None
         if canonical_slug:
             top_level_slug = get_top_level_slug(canonical_slug) or canonical_slug
@@ -35,11 +37,15 @@ def annotate_genre_mapping(items: list[dict]) -> list[dict]:
             item["description"] = item.get(
                 "canonical_description"
             ) or get_genre_description(canonical_slug)
+            item["cover_url"] = (
+                genre_cover_public_url(canonical_slug) if cover_path else None
+            )
         else:
             item["top_level_slug"] = None
             item["top_level_name"] = None
             item["top_level_description"] = None
             item["description"] = None
+            item["cover_url"] = None
             item["external_description"] = None
             item["external_description_source"] = None
             item["musicbrainz_mbid"] = None
@@ -72,11 +78,36 @@ def get_genre_summary_by_slug(session, slug: str) -> dict | None:
                 g.slug,
                 COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count,
                 COUNT(DISTINCT alg.album_id)::INTEGER AS album_count,
+                (
+                    WITH matched_albums AS (
+                        SELECT DISTINCT a.id, COALESCE(a.track_count, 0) AS track_count
+                        FROM library_albums a
+                        LEFT JOIN album_genres alg_track
+                            ON alg_track.album_id = a.id
+                           AND alg_track.genre_id = g.id
+                        LEFT JOIN artist_genres ag_track
+                            ON ag_track.artist_name = a.artist
+                           AND ag_track.genre_id = g.id
+                        WHERE alg_track.genre_id IS NOT NULL
+                           OR ag_track.genre_id IS NOT NULL
+                    ),
+                    matched_track_count AS (
+                        SELECT COUNT(DISTINCT lt.id)::INTEGER AS count
+                        FROM library_tracks lt
+                        JOIN matched_albums ma ON ma.id = lt.album_id
+                    )
+                    SELECT COALESCE(
+                        NULLIF((SELECT count FROM matched_track_count), 0),
+                        (SELECT COALESCE(SUM(track_count), 0)::INTEGER FROM matched_albums),
+                        0
+                    )
+                ) AS track_count,
                 tn.slug AS canonical_slug,
                 tn.name AS canonical_name,
                 tn.description AS canonical_description,
                 tn.external_description,
                 tn.external_description_source,
+                tn.cover_path AS canonical_cover_path,
                 tn.musicbrainz_mbid,
                 tn.wikidata_entity_id,
                 tn.wikidata_url,
@@ -98,6 +129,7 @@ def get_genre_summary_by_slug(session, slug: str) -> dict | None:
                 tn.description,
                 tn.external_description,
                 tn.external_description_source,
+                tn.cover_path,
                 tn.musicbrainz_mbid,
                 tn.wikidata_entity_id,
                 tn.wikidata_url,

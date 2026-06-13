@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -26,11 +26,14 @@ vi.mock("@/contexts/ArtistFollowsContext", () => ({
   }),
 }));
 
-beforeAll(() => {
+function mockPointerEnvironment(desktop: boolean) {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches:
+        desktop &&
+        (query.includes("min-width: 768px") ||
+          query === "(hover: hover) and (pointer: fine)"),
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -38,9 +41,17 @@ beforeAll(() => {
       dispatchEvent: vi.fn(),
     })),
   });
+}
+
+beforeAll(() => {
+  Object.defineProperty(navigator, "maxTouchPoints", {
+    configurable: true,
+    value: 0,
+  });
 });
 
 beforeEach(() => {
+  mockPointerEnvironment(false);
   resolveMaybeApiAssetUrlMock.mockImplementation(
     (url: string | null | undefined) => url ?? null,
   );
@@ -92,5 +103,29 @@ describe("ArtistCard", () => {
       "src",
       "https://api.example.test/api/network/external-artist/photo?name=Poison%20The%20Well&token=desktop-token",
     );
+  });
+
+  it("opens the desktop action menu when the artist only has stable route identifiers", async () => {
+    mockPointerEnvironment(true);
+
+    renderWithListenProviders(
+      <ArtistCard
+        name="Dredg"
+        artistEntityUid="artist-entity-1"
+        artistSlug="dredg"
+      />,
+    );
+
+    const card = screen.getByText("Dredg").closest('[role="button"]');
+    expect(card).not.toBeNull();
+
+    fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
+
+    const menu = await screen.findByRole("menu");
+    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-2xl");
+    expect(within(menu).getByText("Dredg")).toBeInTheDocument();
+    expect(
+      await within(menu).findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
   });
 });

@@ -430,6 +430,7 @@ export async function apiFetch(
     fetch(`${getApiBase()}${path}`, {
       ...init,
       credentials: apiCredentials(),
+      cache: "no-store",
       headers,
     });
   let response = await request();
@@ -445,6 +446,7 @@ export async function apiFetch(
         ...((init?.headers as Record<string, string>) || {}),
         ...getApiAuthHeaders(),
       },
+      cache: "no-store",
     });
   }
   if (response.status === 401) {

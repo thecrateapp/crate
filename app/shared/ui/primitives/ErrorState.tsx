@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, CRATE_ICON_SIZE, RefreshCw } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
 
 interface ErrorStateProps {
@@ -16,7 +16,7 @@ export function ErrorState({
       <p className="text-muted-foreground mb-4">{message}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
-          <RefreshCw size={14} className="mr-1" /> Retry
+          <RefreshCw size={CRATE_ICON_SIZE.sm} className="mr-1" /> Retry
         </Button>
       )}
     </div>

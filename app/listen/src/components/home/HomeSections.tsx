@@ -6,26 +6,16 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Loader2,
-  Play,
-} from "lucide-react";
+import { ArrowRight, Clock3, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
-import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
   EditorialPlaylistArtwork,
   editorialPlaylistLabel,
 } from "@/components/playlists/EditorialPlaylistArtwork";
-import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +41,6 @@ export function SectionHeader({
   subtitle,
   actionLabel,
   onAction,
-  railControls,
 }: {
   title: string;
   subtitle?: string;
@@ -75,28 +64,6 @@ export function SectionHeader({
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {railControls ? (
-          <div className="flex items-center gap-1.5 md:gap-2">
-            <button
-              type="button"
-              onClick={railControls.onScrollLeft}
-              disabled={!railControls.canScrollLeft}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-35 md:h-8 md:w-8"
-              aria-label={`Scroll ${title} left`}
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={railControls.onScrollRight}
-              disabled={!railControls.canScrollRight}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/65 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-35 md:h-8 md:w-8"
-              aria-label={`Scroll ${title} right`}
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        ) : null}
         {actionLabel && onAction ? (
           <button
             onClick={onAction}
@@ -159,16 +126,23 @@ export function SectionRail({
   children,
   railRef,
   className,
+  fit = "content",
 }: {
   children: ReactNode;
   railRef?: RefObject<HTMLDivElement | null>;
   className?: string;
+  fit?: "content" | "square-card";
 }) {
+  const squareFitClassName =
+    "grid grid-flow-col auto-cols-[calc((100%_-_1rem)/2)] sm:auto-cols-[calc((100%_-_2rem)/3)] md:auto-cols-[calc((100%_-_3rem)/4)] lg:auto-cols-[calc((100%_-_4rem)/5)] xl:auto-cols-[calc((100%_-_5rem)/6)] 2xl:auto-cols-[calc((100%_-_6rem)/7)]";
+
   return (
     <div
       ref={railRef}
+      data-rail-fit={fit}
       className={cn(
-        "hide-rail-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overflow-y-hidden pb-2 transform-gpu will-change-scroll",
+        "hide-rail-scrollbar snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overflow-y-hidden pb-2 transform-gpu will-change-scroll",
+        fit === "square-card" ? squareFitClassName : "flex",
         className,
       )}
     >
@@ -315,6 +289,14 @@ export function FeaturedPlaylistCard({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: name,
+          subtitle: description || meta,
+          detail: meta,
+          imageShape: "square",
+          fallbackIcon: Sparkles,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

@@ -1,9 +1,12 @@
 import re
+from datetime import date
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from crate.api.auth import _require_auth
+from crate.api.image_variants import build_image_response
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -18,6 +21,7 @@ from crate.api.schemas.genres import (
     GenreSummaryResponse,
     GenreTaxonomyAliasesUpdateRequest,
     GenreTaxonomyAliasesUpdateResponse,
+    GenreTaxonomyCoverUpdateResponse,
     GenreTaxonomyNodeProposalApplyRequest,
     GenreTaxonomyNodeProposalApplyResponse,
     GenreTaxonomyNodeProposalResponse,
@@ -35,12 +39,15 @@ from crate.db.genres import (
     get_all_genres,
     get_genre_detail,
     get_genre_graph,
+    get_genre_taxonomy_cover_path,
     get_genre_taxonomy_node_id,
     get_unmapped_genres,
     list_invalid_genre_taxonomy_nodes,
     set_genre_eq_gains,
 )
+from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
 from crate.db.queries.tasks import list_tasks
+from crate.db.repositories.auth import get_user_by_id
 from crate.db.repositories.tasks import create_task
 from crate.db.queries.sound_intelligence import get_sound_intelligence_health
 from crate.db.repositories.genres_taxonomy_edges import (
@@ -54,6 +61,12 @@ from crate.db.repositories.genres_taxonomy_nodes import upsert_genre_taxonomy_no
 from crate.db.repositories.genres_delete import (
     delete_library_genre,
     delete_taxonomy_genre,
+)
+from crate.genre_covers import (
+    genre_cover_abspath,
+    genre_cover_media_type,
+    genre_cover_public_url,
+    persist_genre_cover_upload,
 )
 from crate.db.jobs.genre_taxonomy import assign_genre_alias_value
 from crate.genre_taxonomy import (
@@ -80,6 +93,21 @@ _GENRE_ADMIN_RESPONSES = merge_responses(
     },
 )
 
+_GENRE_IMAGE_RESPONSES = merge_responses(
+    AUTH_ERROR_RESPONSES,
+    {
+        200: {
+            "description": "Binary image response.",
+            "content": {
+                "image/jpeg": {},
+                "image/png": {},
+                "image/webp": {},
+            },
+        },
+        404: error_response("The requested genre cover could not be found."),
+    },
+)
+
 
 def _require_genre_curator(request: Request) -> dict:
     return require_permission(request, "curation.genres.write")
@@ -96,6 +124,84 @@ def _broadcast_genre_taxonomy_changed(*scopes: str) -> None:
 
 def _normalize_taxonomy_slug(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (value or "").strip().lower()).strip("-")
+
+
+def _coerce_api_date(value) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value or "")
+
+
+def _genre_show_location(
+    request: Request, user_id: int
+) -> tuple[float, float, int] | None:
+    full_user = get_user_by_id(user_id) or {}
+    user_lat, user_lon = None, None
+    location_mode = full_user.get("show_location_mode") or "fixed"
+    if location_mode == "near_me":
+        from crate.geolocation import detect_location_from_ip, get_client_ip
+
+        geo = detect_location_from_ip(get_client_ip(request))
+        if geo:
+            user_lat, user_lon = geo["latitude"], geo["longitude"]
+    else:
+        user_lat = full_user.get("latitude")
+        user_lon = full_user.get("longitude")
+
+    if user_lat is None or user_lon is None:
+        return None
+    return float(user_lat), float(user_lon), int(full_user.get("show_radius_km") or 60)
+
+
+def _genre_show_payload(show: dict) -> dict:
+    city = show.get("city") or ""
+    country = show.get("country") or ""
+    return {
+        "id": show.get("id"),
+        "type": "show",
+        "date": _coerce_api_date(show.get("date")),
+        "time": show.get("local_time"),
+        "artist": show.get("artist_name") or "",
+        "artist_id": show.get("artist_id"),
+        "artist_slug": show.get("artist_slug"),
+        "title": show.get("venue") or "",
+        "subtitle": ", ".join(part for part in [city, country] if part),
+        "cover_url": show.get("image_url"),
+        "status": show.get("status") or "onsale",
+        "is_upcoming": True,
+        "url": show.get("tickets_url") or show.get("url") or show.get("lastfm_url"),
+        "venue": show.get("venue"),
+        "address_line1": show.get("address_line1"),
+        "city": show.get("city"),
+        "region": show.get("region"),
+        "postal_code": show.get("postal_code"),
+        "country": show.get("country"),
+        "country_code": show.get("country_code"),
+        "latitude": show.get("latitude"),
+        "longitude": show.get("longitude"),
+        "lineup": show.get("lineup"),
+        "genres": list(show.get("artist_genres") or [])[:3],
+        "source": show.get("source"),
+        "lastfm_attendance": show.get("lastfm_attendance"),
+        "lastfm_url": show.get("lastfm_url"),
+        "tickets_url": show.get("tickets_url"),
+        "distance_km": show.get("distance_km"),
+    }
+
+
+def _genre_show_items(request: Request, user_id: int, slug: str) -> list[dict]:
+    location = _genre_show_location(request, user_id)
+    if not location:
+        return []
+    latitude, longitude, radius_km = location
+    shows = get_genre_upcoming_shows(
+        slug,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km,
+        limit=5,
+    )
+    return [_genre_show_payload(show) for show in shows]
 
 
 def _proposal_alias_candidates(
@@ -335,6 +441,48 @@ def update_taxonomy_node(
     invalidate_runtime_taxonomy_cache(broadcast=True)
     _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
     return {"ok": True, "slug": canonical_slug}
+
+
+@router.post(
+    "/taxonomy/{slug}/cover",
+    response_model=GenreTaxonomyCoverUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Upload a curated cover image for a taxonomy genre",
+)
+async def upload_taxonomy_cover(
+    request: Request,
+    slug: str,
+    file: UploadFile = File(...),
+):
+    _require_genre_curator(request)
+    canonical_slug = _normalize_taxonomy_slug(slug)
+    if not canonical_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    if not get_genre_taxonomy_node_id(canonical_slug):
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+
+    payload = await file.read()
+    try:
+        cover_path = persist_genre_cover_upload(
+            canonical_slug,
+            filename=file.filename or "",
+            content_type=file.content_type,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    updated = update_genre_taxonomy_node_metadata(canonical_slug, cover_path=cover_path)
+    if not updated:
+        raise HTTPException(status_code=400, detail="No taxonomy cover changed")
+
+    invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {
+        "ok": True,
+        "slug": canonical_slug,
+        "cover_url": genre_cover_public_url(canonical_slug),
+    }
 
 
 @router.delete(
@@ -577,6 +725,36 @@ def delete_genre(request: Request, slug: str):
 
 
 @router.get(
+    "/{slug}/cover",
+    responses=_GENRE_IMAGE_RESPONSES,
+    summary="Get a curated genre cover image",
+)
+def genre_cover(
+    request: Request,
+    slug: str,
+    size: int | None = Query(None, ge=32, le=2048),
+    image_format: str | None = Query(None, alias="format", pattern="^webp$"),
+):
+    _require_auth(request)
+    canonical_slug = _normalize_taxonomy_slug(slug)
+    if not canonical_slug:
+        return Response(status_code=404)
+    cover_path = get_genre_taxonomy_cover_path(canonical_slug)
+    absolute = genre_cover_abspath(cover_path)
+    if not absolute or not absolute.exists():
+        return Response(status_code=404)
+    return build_image_response(
+        absolute.read_bytes(),
+        genre_cover_media_type(absolute),
+        size=size,
+        output_format=image_format,
+        headers={
+            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
+        },
+    )
+
+
+@router.get(
     "/{slug}/graph",
     response_model=GenreGraphResponse,
     responses=_GENRE_RESPONSES,
@@ -597,10 +775,11 @@ def genre_graph(request: Request, slug: str):
     summary="Get detailed genre information",
 )
 def genre_detail(request: Request, slug: str):
-    _require_auth(request)
+    user = _require_auth(request)
     genre = get_genre_detail(slug)
     if not genre:
         raise HTTPException(status_code=404, detail="Genre not found")
+    genre["shows"] = _genre_show_items(request, int(user["id"]), slug)
     return genre
 
 

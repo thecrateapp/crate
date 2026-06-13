@@ -1,12 +1,22 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useLocation } from "react-router";
 import {
   AlertCircle,
   ArrowDownToLine,
-  CheckCircle2,
+  ArrowDownToLineBold,
   Clock,
+  CRATE_ICON_SIZE,
   Disc,
   Heart,
+  HeartBold,
   ListPlus,
   Loader2,
   MoreHorizontal,
@@ -17,14 +27,10 @@ import {
   Shuffle,
   User,
   X,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import {
-  AppMenuButton,
-  AppPopover,
-  AppPopoverDivider,
-} from "@crate/ui/primitives/AppPopover";
+import { AppPopover, AppPopoverDivider } from "@crate/ui/primitives/AppPopover";
 import {
   GenrePillRow,
   type GenreProfileItem,
@@ -40,10 +46,11 @@ import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useSavedAlbums } from "@/contexts/SavedAlbumsContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
-import { MobileActionSheet } from "@/components/actions/MobileActionSheet";
+import { CrateLoader } from "@/components/ui/CrateLoader";
+import { ContextMenu, type ContextMenuEntry } from "@crate/ui/domain/actions";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
@@ -78,6 +85,17 @@ function albumGenreSlug(name: string) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/[\s-]+/g, "-");
 }
+
+const SECONDARY_ACTION_CLASS =
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+
+const ALBUM_MOBILE_INFO_ACTION_GAP_PX = 20;
+
+const ALBUM_MOBILE_HERO_SPACING = {
+  "--album-mobile-action-overlap": "2rem",
+  "--album-mobile-info-action-gap": `${ALBUM_MOBILE_INFO_ACTION_GAP_PX}px`,
+  "--album-mobile-info-y": "0px",
+} as CSSProperties;
 
 interface AlbumTrack {
   id: number;
@@ -187,6 +205,10 @@ export function Album() {
     toggleAlbumOffline,
   } = useOffline();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [playlistPickerOpen, setPlaylistPickerOpen] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<number[]>([]);
   const [selectionPlaylistPickerOpen, setSelectionPlaylistPickerOpen] =
@@ -198,9 +220,19 @@ export function Album() {
   const [selectionMenuPlaylistOpen, setSelectionMenuPlaylistOpen] =
     useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const desktopMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const selectionBarRef = useRef<HTMLDivElement>(null);
   const selectionMenuRef = useRef<HTMLDivElement>(null);
+  const selectionAnchorTrackIdRef = useRef<number | null>(null);
+  const albumHeroInfoRef = useRef<HTMLDivElement>(null);
+  const albumPrimaryActionsRef = useRef<HTMLDivElement>(null);
+  const [mobileHeroInfoOffset, setMobileHeroInfoOffset] = useState(0);
+
+  function clearTrackSelection() {
+    selectionAnchorTrackIdRef.current = null;
+    setSelectedTrackIds([]);
+  }
 
   const routeAlbumId = albumIdParam ? Number(albumIdParam) : undefined;
 
@@ -220,16 +252,27 @@ export function Album() {
   const { playlistOptions: playlists, ensurePlaylistOptionsLoaded } =
     useLazyPlaylistOptions();
 
+  function closeAlbumMenu() {
+    setMenuOpen(false);
+    setDesktopMenuPosition(null);
+    setPlaylistPickerOpen(false);
+  }
+
   useDismissibleLayer({
     active:
       menuOpen ||
       playlistPickerOpen ||
       selectionPlaylistPickerOpen ||
       Boolean(selectionMenuPosition),
-    refs: [menuRef, mobileMenuRef, selectionBarRef, selectionMenuRef],
+    refs: [
+      menuRef,
+      desktopMenuRef,
+      mobileMenuRef,
+      selectionBarRef,
+      selectionMenuRef,
+    ],
     onDismiss: () => {
-      setMenuOpen(false);
-      setPlaylistPickerOpen(false);
+      closeAlbumMenu();
       setSelectionPlaylistPickerOpen(false);
       setSelectionMenuPosition(null);
       setSelectionMenuPlaylistOpen(false);
@@ -237,11 +280,63 @@ export function Album() {
   });
 
   useEffect(() => {
-    setSelectedTrackIds([]);
+    clearTrackSelection();
     setSelectionPlaylistPickerOpen(false);
     setSelectionMenuPosition(null);
     setSelectionMenuPlaylistOpen(false);
   }, [data?.id]);
+
+  useLayoutEffect(() => {
+    if (isDesktop) {
+      setMobileHeroInfoOffset((current) => (current === 0 ? current : 0));
+      return;
+    }
+
+    const info = albumHeroInfoRef.current;
+    const actions = albumPrimaryActionsRef.current;
+    if (!info || !actions) return;
+
+    let frame = 0;
+    const applyMeasurement = () => {
+      const infoRect = info.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      if (
+        (infoRect.width === 0 && infoRect.height === 0) ||
+        (actionsRect.width === 0 && actionsRect.height === 0)
+      ) {
+        return;
+      }
+
+      const currentGap = actionsRect.top - infoRect.bottom;
+      const nextOffset = Math.round(
+        mobileHeroInfoOffset + currentGap - ALBUM_MOBILE_INFO_ACTION_GAP_PX,
+      );
+
+      setMobileHeroInfoOffset((current) =>
+        Math.abs(current - nextOffset) > 1 ? nextOffset : current,
+      );
+    };
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(applyMeasurement);
+    };
+
+    applyMeasurement();
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    resizeObserver?.observe(info);
+    resizeObserver?.observe(actions);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isDesktop, mobileHeroInfoOffset]);
 
   useEffect(() => {
     if (!data?.name) return;
@@ -278,11 +373,7 @@ export function Album() {
   }, [data?.id, hasTracks, sharedTrackUid]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <CrateLoader label="Loading album." />;
   }
 
   if (error || !data) {
@@ -409,7 +500,7 @@ export function Album() {
       (track) => track.id === trackId,
     );
     if (startIndex < 0) return;
-    setSelectedTrackIds([]);
+    clearTrackSelection();
     setSelectionPlaylistPickerOpen(false);
     handlePlay(startIndex);
   };
@@ -626,7 +717,7 @@ export function Album() {
           selectedPlaylistTracksPayload.length === 1 ? "" : "s"
         } added to playlist`,
       );
-      setSelectedTrackIds([]);
+      clearTrackSelection();
       setSelectionPlaylistPickerOpen(false);
       handleCloseSelectionMenu();
     } catch {
@@ -757,7 +848,7 @@ export function Album() {
       name: `${displayName} selection`,
       tracks: selectedPlayerTracks,
     });
-    setSelectedTrackIds([]);
+    clearTrackSelection();
     setSelectionPlaylistPickerOpen(false);
     handleCloseSelectionMenu();
   }
@@ -767,22 +858,70 @@ export function Album() {
     setPlaylistPickerOpen((open) => !open);
   }
 
+  function handleToggleAlbumMenu(event: MouseEvent<HTMLButtonElement>) {
+    if (menuOpen) {
+      closeAlbumMenu();
+      return;
+    }
+
+    if (isDesktop) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const width = 288;
+      const padding = 12;
+      const maxX = Math.max(padding, window.innerWidth - width - padding);
+      setDesktopMenuPosition({
+        x: Math.min(Math.max(padding, rect.right - width), maxX),
+        y: rect.bottom + 8,
+      });
+    }
+
+    setMenuOpen(true);
+  }
+
   function handleToggleSelectionPlaylistPicker() {
     ensurePlaylistOptionsLoaded();
     setSelectionPlaylistPickerOpen((open) => !open);
   }
 
-  function handleToggleTrackSelection(trackId: number) {
-    setSelectedTrackIds((current) =>
-      current.includes(trackId)
-        ? current.filter((id) => id !== trackId)
-        : [...current, trackId],
-    );
+  function handleTrackSelection(
+    trackId: number,
+    event: MouseEvent<HTMLDivElement>,
+  ) {
+    const orderedTrackIds = playableAlbumTracks.map((track) => track.id);
+    const trackIndex = orderedTrackIds.indexOf(trackId);
+    const anchorTrackId = selectionAnchorTrackIdRef.current;
+    const anchorIndex =
+      anchorTrackId == null ? -1 : orderedTrackIds.indexOf(anchorTrackId);
+    const additive = event.metaKey || event.ctrlKey;
+    const rangeSelection =
+      event.shiftKey && anchorIndex >= 0 && trackIndex >= 0;
+
+    setSelectedTrackIds((current) => {
+      if (rangeSelection) {
+        const start = Math.min(anchorIndex, trackIndex);
+        const end = Math.max(anchorIndex, trackIndex);
+        const range = orderedTrackIds.slice(start, end + 1);
+        return additive ? Array.from(new Set([...current, ...range])) : range;
+      }
+
+      if (additive) {
+        return current.includes(trackId)
+          ? current.filter((id) => id !== trackId)
+          : [...current, trackId];
+      }
+
+      return [trackId];
+    });
+
+    if (!rangeSelection) {
+      selectionAnchorTrackIdRef.current = trackId;
+    }
   }
 
   function openSelectionMenu(trackId: number, x: number, y: number) {
     if (!isDesktop) return false;
     if (!selectedTrackIdSet.has(trackId)) {
+      selectionAnchorTrackIdRef.current = trackId;
       setSelectedTrackIds([trackId]);
     }
     ensurePlaylistOptionsLoaded();
@@ -819,34 +958,235 @@ export function Album() {
     tracksByDisc.get(disc)!.push(t);
   }
 
+  const albumMenuItems: ContextMenuEntry[] = [
+    {
+      key: "play",
+      label: "Play now",
+      icon: Play,
+      onSelect: () => handlePlay(),
+    },
+    {
+      key: "play-next",
+      label: "Play next",
+      icon: ListPlus,
+      onSelect: handlePlayNextAlbum,
+    },
+    {
+      type: "disclosure",
+      key: "playlist",
+      label: "Add to playlist",
+      icon: ListPlus,
+      expanded: playlistPickerOpen,
+      onToggle: handleTogglePlaylistPicker,
+      items: [
+        {
+          key: "playlist-create",
+          label: "Add new playlist",
+          onSelect: handleCreatePlaylistFromAlbum,
+        },
+        ...playlists.map((playlist) => ({
+          key: `playlist-${playlist.id}`,
+          label: playlist.name,
+          onSelect: () => handleAddToPlaylist(playlist.id),
+        })),
+      ],
+    },
+    ...(canPersistAlbum
+      ? [
+          {
+            key: "save",
+            label: saved ? "Remove from collection" : "Add to collection",
+            icon: Heart,
+            active: saved,
+            onSelect: handleToggleSaved,
+          },
+          {
+            key: "offline",
+            label: offlineButtonLabel,
+            icon:
+              offlineState === "ready"
+                ? ArrowDownToLineBold
+                : isOfflineBusy(offlineState)
+                  ? Loader2
+                  : offlineState === "error"
+                    ? AlertCircle
+                    : ArrowDownToLine,
+            active: offlineState === "ready",
+            disabled: !offlineSupported || isOfflineBusy(offlineState),
+            onSelect: handleToggleOffline,
+          },
+        ]
+      : []),
+    {
+      key: "artist",
+      label: "Go to artist",
+      icon: User,
+      onSelect: () =>
+        navigate(
+          artistPagePath({
+            artistId: data.artist_id,
+            artistSlug: data.artist_slug,
+          }),
+        ),
+    },
+    {
+      key: "share",
+      label: "Share",
+      icon: Share2,
+      onSelect: handleShare,
+    },
+  ];
+
+  const selectionMenuItems: ContextMenuEntry[] = [
+    {
+      type: "label",
+      key: "selected-count",
+      label: `${selectedAlbumTracks.length} selected`,
+    },
+    {
+      key: "play-next",
+      label: "Play next",
+      icon: ListPlus,
+      onSelect: handlePlaySelectedNext,
+    },
+    {
+      key: "queue",
+      label: "Add to queue",
+      icon: Plus,
+      onSelect: handleAddSelectedToQueue,
+    },
+    {
+      type: "disclosure",
+      key: "playlist",
+      label: "Add to playlist",
+      icon: ListPlus,
+      expanded: selectionMenuPlaylistOpen,
+      onToggle: () => {
+        ensurePlaylistOptionsLoaded();
+        setSelectionMenuPlaylistOpen((open) => !open);
+      },
+      items: [
+        {
+          key: "playlist-create",
+          label: "Add new playlist",
+          onSelect: handleCreatePlaylistFromSelection,
+        },
+        ...playlists.map((playlist) => ({
+          key: `playlist-${playlist.id}`,
+          label: playlist.name,
+          onSelect: () => handleAddSelectedToPlaylist(playlist.id),
+        })),
+      ],
+    },
+    {
+      type: "divider",
+      key: "collection-divider",
+    },
+    {
+      key: "collection",
+      label: "Add to my collection",
+      icon: Heart,
+      onSelect: handleAddSelectedToCollection,
+    },
+  ];
+  const mobileAlbumMenuTrigger =
+    !isDesktop && typeof document !== "undefined" ? (
+      <div
+        className="fixed z-app-header"
+        style={{
+          top: "calc(var(--listen-safe-top) + 0.625rem)",
+          right: "max(1rem, var(--listen-safe-right))",
+        }}
+        ref={menuRef}
+      >
+        <button
+          data-testid="album-mobile-hero-menu"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
+          onClick={handleToggleAlbumMenu}
+          aria-label="More"
+        >
+          <MoreHorizontal
+            data-testid="album-mobile-hero-menu-icon"
+            size={CRATE_ICON_SIZE.navMobile}
+            className="rotate-90"
+          />
+        </button>
+        <ContextMenu
+          header={{
+            type: "media",
+            title: displayName,
+            subtitle: data.artist,
+            imageUrl: data.has_cover || coverUrl ? coverUrl : undefined,
+            imageAlt: displayName,
+            imageShape: "square",
+            fallbackIcon: Disc,
+          }}
+          items={albumMenuItems}
+          menuRef={mobileMenuRef}
+          onClose={closeAlbumMenu}
+          open={menuOpen}
+          position={desktopMenuPosition}
+        />
+      </div>
+    ) : null;
+  const albumHeroStyle = {
+    ...ALBUM_MOBILE_HERO_SPACING,
+    "--album-mobile-info-y": `${mobileHeroInfoOffset}px`,
+  } as CSSProperties;
+
   return (
-    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+    <div
+      data-testid="album-shell"
+      className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6"
+      style={albumHeroStyle}
+    >
+      {mobileAlbumMenuTrigger
+        ? createPortal(mobileAlbumMenuTrigger, document.body)
+        : null}
       {/* Header */}
       <div className="relative min-h-[520px] overflow-hidden sm:h-[430px] sm:min-h-0 lg:h-[460px]">
         {data.has_cover || data.cover_url ? (
           <img
+            data-testid="album-hero-background"
             src={coverUrl}
             alt=""
-            className="absolute inset-0 h-full w-full scale-[1.04] object-cover grayscale brightness-[0.42] contrast-110 opacity-35"
+            className="absolute inset-0 h-full w-full scale-[1.04] object-cover brightness-[0.72] contrast-110 opacity-[0.82] sm:grayscale sm:brightness-[0.42] sm:opacity-[0.42]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : null}
-        <div className="absolute inset-0 bg-black/32" />
+        <div className="absolute inset-0 bg-black/10 sm:bg-black/32" />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 sm:hidden"
+          style={{
+            background:
+              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.04) 34%, rgba(8, 10, 14, 0.28) 64%, var(--surface-app) 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden sm:block"
           style={{
             background:
               "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.16) 34%, rgba(8, 10, 14, 0.5) 64%, var(--surface-app) 100%)",
           }}
         />
-
-        <div className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-6 pt-[var(--listen-mobile-page-top)] sm:px-6 sm:pt-0">
+        <div
+          data-testid="album-hero-content"
+          className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))] pt-[var(--listen-mobile-page-top)] sm:px-6 sm:pb-6 sm:pt-0"
+        >
           <div className="flex w-full flex-col gap-6 sm:flex-row sm:items-end">
             {/* Cover */}
             <div className="w-[200px] flex-shrink-0 self-center sm:w-[240px] sm:self-auto lg:w-[280px]">
-              <div className="aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10">
+              <div
+                data-testid="album-mobile-cover-spacer"
+                aria-hidden="true"
+                className="aspect-square sm:hidden"
+              />
+              <div
+                data-testid="album-desktop-cover"
+                className="hidden aspect-square overflow-hidden rounded-2xl bg-white/5 shadow-2xl ring-1 ring-white/10 sm:block"
+              >
                 {data.has_cover || data.cover_url ? (
                   <img
                     src={coverUrl}
@@ -865,7 +1205,11 @@ export function Album() {
             </div>
 
             {/* Info */}
-            <div className="flex min-w-0 flex-col justify-end text-left">
+            <div
+              ref={albumHeroInfoRef}
+              data-testid="album-hero-info"
+              className="flex min-w-0 translate-y-[var(--album-mobile-info-y)] flex-col justify-end text-left sm:translate-y-0"
+            >
               <div className="mb-1.5 flex flex-wrap items-center gap-2">
                 {isPreRelease ? (
                   <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
@@ -916,7 +1260,7 @@ export function Album() {
                   </span>
                 ) : null}
                 {!data.genre_profile?.length && genre ? (
-                  <span>{genre}</span>
+                  <span className="hidden sm:inline">{genre}</span>
                 ) : null}
                 {data.track_count > 0 && <span>{data.track_count} tracks</span>}
                 {isPreRelease ? (
@@ -981,7 +1325,7 @@ export function Album() {
                 <GenrePillRow
                   items={data.genre_profile}
                   max={6}
-                  className="mt-3"
+                  className="mt-3 hidden sm:flex"
                   onSelect={(item) =>
                     navigate(
                       `/explore?genre=${encodeURIComponent(
@@ -997,188 +1341,149 @@ export function Album() {
       </div>
 
       {/* Action Row */}
-      <div className="px-4 py-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-[1480px] flex-nowrap items-center gap-2 overflow-x-auto [scrollbar-width:none] max-[430px]:gap-1.5 [&::-webkit-scrollbar]:hidden">
-          <button
-            className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45 max-[430px]:w-10 max-[430px]:px-0"
-            onClick={() => handlePlay()}
-            disabled={playerTracks.length === 0}
-            aria-label="Play"
+      <div
+        data-testid="album-action-row"
+        className="relative z-10 -mt-[var(--album-mobile-action-overlap)] px-4 pb-4 pt-0 sm:mt-0 sm:px-6 sm:py-4"
+      >
+        <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+          <div
+            ref={albumPrimaryActionsRef}
+            data-testid="album-primary-actions"
+            role="group"
+            aria-label="Primary album actions"
+            className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
-            <Play size={16} fill="currentColor" />
-            <span className="max-[430px]:sr-only">Play</span>
-          </button>
-          <button
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-45"
-            onClick={handleShuffle}
-            disabled={playerTracks.length === 0}
-            aria-label="Shuffle"
+            <button
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-[15px]"
+              onClick={() => handlePlay()}
+              disabled={playerTracks.length === 0}
+              aria-label="Play"
+            >
+              <Play size={17} fill="currentColor" />
+              <span>Play</span>
+            </button>
+            <button
+              className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
+              onClick={handleShuffle}
+              disabled={playerTracks.length === 0}
+              aria-label="Shuffle"
+            >
+              <Shuffle size={17} />
+              <span>Shuffle</span>
+            </button>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Secondary album actions"
+            className="grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4"
           >
-            <Shuffle size={16} />
-          </button>
-          {!isPreRelease ? (
-            <button
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-foreground transition-colors hover:bg-white/5"
-              onClick={handleAlbumRadio}
-              aria-label="Album Radio"
-            >
-              <Radio size={16} />
-            </button>
-          ) : null}
-          {canPersistAlbum ? (
-            <button
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-                offlineState === "ready"
-                  ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                  : offlineBusy
-                    ? "border border-primary/25 bg-primary/10 text-primary"
-                    : offlineState === "error"
-                      ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                      : "border border-white/15 text-foreground hover:bg-white/5"
-              }`}
-              onClick={handleToggleOffline}
-              disabled={!offlineSupported || offlineBusy}
-              aria-label={
-                offlineState === "ready"
-                  ? "Remove offline copy"
-                  : "Make available offline"
-              }
-              title={offlineButtonLabel}
-            >
-              {offlineState === "ready" ? (
-                <CheckCircle2 size={16} />
-              ) : offlineBusy ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : offlineState === "error" ? (
-                <AlertCircle size={16} />
-              ) : (
-                <ArrowDownToLine size={16} />
-              )}
-            </button>
-          ) : null}
-          {canPersistAlbum ? (
-            <button
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-                saved
-                  ? "border border-primary/30 bg-primary/15 text-primary"
-                  : "border border-white/15 text-foreground hover:bg-white/5"
-              }`}
-              onClick={handleToggleSaved}
-              aria-label={
-                saved ? "Remove from collection" : "Add to collection"
-              }
-            >
-              <Heart size={16} className={saved ? "fill-current" : ""} />
-            </button>
-          ) : null}
-          <BandcampSupportButton
-            entityType="album"
-            entityUid={data.entity_uid}
-            fallbackArtistEntityUid={data.artist_entity_uid}
-            className={isDesktop ? "ml-auto shrink-0" : "shrink-0"}
-            iconOnly={!isDesktop}
-          />
-          <div className="relative shrink-0" ref={menuRef}>
-            <button
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label="More"
-            >
-              <MoreHorizontal size={16} />
-            </button>
-            {menuOpen && isDesktop && (
-              <AppPopover className="absolute top-full right-0 mt-2 w-72 overflow-hidden rounded-2xl">
-                <AlbumMenuContent
-                  data={data}
-                  coverUrl={coverUrl}
-                  displayName={displayName}
-                  saved={saved}
-                  canPersistAlbum={canPersistAlbum}
-                  playlists={playlists}
-                  playlistPickerOpen={playlistPickerOpen}
-                  onTogglePlaylistPicker={handleTogglePlaylistPicker}
-                  onPlay={() => {
-                    handlePlay();
-                    setMenuOpen(false);
-                  }}
-                  onPlayNext={handlePlayNextAlbum}
-                  onCreatePlaylist={handleCreatePlaylistFromAlbum}
-                  onAddToPlaylist={handleAddToPlaylist}
-                  onToggleSaved={async () => {
-                    await handleToggleSaved();
-                    setMenuOpen(false);
-                  }}
-                  offlineSupported={offlineSupported}
-                  offlineState={offlineState}
-                  offlineLabel={offlineButtonLabel}
-                  onToggleOffline={async () => {
-                    await handleToggleOffline();
-                    setMenuOpen(false);
-                  }}
-                  onGoToArtist={() => {
-                    navigate(
-                      artistPagePath({
-                        artistId: data.artist_id,
-                        artistSlug: data.artist_slug,
-                      }),
-                    );
-                    setMenuOpen(false);
-                  }}
-                  onShare={async () => {
-                    await handleShare();
-                    setMenuOpen(false);
-                  }}
-                />
-              </AppPopover>
-            )}
-            {!isDesktop ? (
-              <MobileActionSheet
-                open={menuOpen}
-                panelRef={mobileMenuRef}
-                onClose={() => setMenuOpen(false)}
+            {!isPreRelease ? (
+              <button
+                className={SECONDARY_ACTION_CLASS}
+                onClick={handleAlbumRadio}
+                aria-label="Album Radio"
               >
-                <AlbumMenuContent
-                  data={data}
-                  coverUrl={coverUrl}
-                  displayName={displayName}
-                  saved={saved}
-                  canPersistAlbum={canPersistAlbum}
-                  playlists={playlists}
-                  playlistPickerOpen={playlistPickerOpen}
-                  onTogglePlaylistPicker={handleTogglePlaylistPicker}
-                  onPlay={() => {
-                    handlePlay();
-                    setMenuOpen(false);
+                <Radio size={CRATE_ICON_SIZE.lg} />
+                <span>Radio</span>
+              </button>
+            ) : null}
+            {canPersistAlbum ? (
+              <button
+                className={`${SECONDARY_ACTION_CLASS} ${
+                  offlineState === "ready"
+                    ? "text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                    : offlineBusy
+                      ? "text-primary"
+                      : offlineState === "error"
+                        ? "text-amber-300/90"
+                        : "text-white/62"
+                }`}
+                onClick={handleToggleOffline}
+                disabled={!offlineSupported || offlineBusy}
+                aria-label={
+                  offlineState === "ready"
+                    ? "Remove offline copy"
+                    : "Make available offline"
+                }
+                title={offlineButtonLabel}
+              >
+                {offlineState === "ready" ? (
+                  <ArrowDownToLineBold size={CRATE_ICON_SIZE.lg} />
+                ) : offlineBusy ? (
+                  <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
+                ) : offlineState === "error" ? (
+                  <AlertCircle size={CRATE_ICON_SIZE.lg} />
+                ) : (
+                  <ArrowDownToLine size={CRATE_ICON_SIZE.lg} />
+                )}
+                <span>Offline</span>
+              </button>
+            ) : null}
+            {canPersistAlbum ? (
+              <button
+                className={`${SECONDARY_ACTION_CLASS} ${
+                  saved
+                    ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+                    : "text-white/62"
+                }`}
+                onClick={handleToggleSaved}
+                aria-label={
+                  saved ? "Remove from collection" : "Add to collection"
+                }
+              >
+                {saved ? (
+                  <HeartBold
+                    size={CRATE_ICON_SIZE.lg}
+                    className="animate-crate-icon-active-pulse"
+                  />
+                ) : (
+                  <Heart size={CRATE_ICON_SIZE.lg} />
+                )}
+                <span>{saved ? "Added" : "Add"}</span>
+              </button>
+            ) : null}
+            <button
+              className={SECONDARY_ACTION_CLASS}
+              onClick={handleShare}
+              aria-label="Share"
+            >
+              <Share2 size={CRATE_ICON_SIZE.lg} />
+              <span>Share</span>
+            </button>
+            <BandcampSupportButton
+              entityType="album"
+              entityUid={data.entity_uid}
+              fallbackArtistEntityUid={data.artist_entity_uid}
+              presentation="secondary-action"
+            />
+            {isDesktop ? (
+              <div className="relative shrink-0" ref={menuRef}>
+                <button
+                  className={SECONDARY_ACTION_CLASS}
+                  onClick={handleToggleAlbumMenu}
+                  aria-label="More"
+                >
+                  <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
+                  <span>More</span>
+                </button>
+                <ContextMenu
+                  header={{
+                    type: "media",
+                    title: displayName,
+                    subtitle: data.artist,
+                    imageUrl: data.has_cover || coverUrl ? coverUrl : undefined,
+                    imageAlt: displayName,
+                    imageShape: "square",
+                    fallbackIcon: Disc,
                   }}
-                  onPlayNext={handlePlayNextAlbum}
-                  onCreatePlaylist={handleCreatePlaylistFromAlbum}
-                  onAddToPlaylist={handleAddToPlaylist}
-                  onToggleSaved={async () => {
-                    await handleToggleSaved();
-                    setMenuOpen(false);
-                  }}
-                  offlineSupported={offlineSupported}
-                  offlineState={offlineState}
-                  offlineLabel={offlineButtonLabel}
-                  onToggleOffline={async () => {
-                    await handleToggleOffline();
-                    setMenuOpen(false);
-                  }}
-                  onGoToArtist={() => {
-                    navigate(
-                      artistPagePath({
-                        artistId: data.artist_id,
-                        artistSlug: data.artist_slug,
-                      }),
-                    );
-                    setMenuOpen(false);
-                  }}
-                  onShare={async () => {
-                    await handleShare();
-                    setMenuOpen(false);
-                  }}
+                  items={albumMenuItems}
+                  menuRef={isDesktop ? desktopMenuRef : mobileMenuRef}
+                  onClose={closeAlbumMenu}
+                  open={menuOpen}
+                  position={desktopMenuPosition}
                 />
-              </MobileActionSheet>
+              </div>
             ) : null}
           </div>
         </div>
@@ -1261,75 +1566,22 @@ export function Album() {
             </button>
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
-              onClick={() => setSelectedTrackIds([])}
+              onClick={clearTrackSelection}
               aria-label="Clear selected tracks"
             >
               <X size={14} />
             </button>
           </div>
         ) : null}
-        {selectionMenuPosition && selectedAlbumTracks.length > 0 ? (
-          <AppPopover
-            ref={selectionMenuRef}
-            className="fixed z-app-popover w-72 overflow-hidden rounded-2xl p-1 animate-pop-in"
-            style={{
-              left: selectionMenuPosition.x,
-              top: selectionMenuPosition.y,
-            }}
-          >
-            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-white/40">
-              {selectedAlbumTracks.length} selected
-            </div>
-            <AppMenuButton onClick={handlePlaySelectedNext}>
-              <ListPlus size={15} /> Play next
-            </AppMenuButton>
-            <AppMenuButton onClick={handleAddSelectedToQueue}>
-              <Plus size={15} /> Add to queue
-            </AppMenuButton>
-            <AppMenuButton
-              className="justify-between"
-              onClick={() => {
-                ensurePlaylistOptionsLoaded();
-                setSelectionMenuPlaylistOpen((open) => !open);
-              }}
-            >
-              <span className="flex items-center gap-3">
-                <ListPlus size={15} /> Add to playlist
-              </span>
-              <span className="text-white/40">
-                {selectionMenuPlaylistOpen ? "−" : "+"}
-              </span>
-            </AppMenuButton>
-            {selectionMenuPlaylistOpen ? (
-              <div className="px-3 pb-2 space-y-1">
-                <button
-                  className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
-                  onClick={handleCreatePlaylistFromSelection}
-                >
-                  Add new playlist
-                </button>
-                {playlists.length > 0 ? (
-                  <AppPopoverDivider className="mx-1" />
-                ) : null}
-                {playlists.map((playlist) => (
-                  <button
-                    key={playlist.id}
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
-                    onClick={() =>
-                      void handleAddSelectedToPlaylist(playlist.id)
-                    }
-                  >
-                    {playlist.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <AppPopoverDivider />
-            <AppMenuButton onClick={() => void handleAddSelectedToCollection()}>
-              <Heart size={15} /> Add to my collection
-            </AppMenuButton>
-          </AppPopover>
-        ) : null}
+        <ContextMenu
+          items={selectionMenuItems}
+          menuRef={selectionMenuRef}
+          onClose={handleCloseSelectionMenu}
+          open={
+            Boolean(selectionMenuPosition) && selectedAlbumTracks.length > 0
+          }
+          position={selectionMenuPosition}
+        />
         {hasMultipleDiscs
           ? [...tracksByDisc.entries()]
               .sort(([a], [b]) => a - b)
@@ -1358,18 +1610,14 @@ export function Album() {
                           onPlayOverride={() => handlePlayTrack(t.id)}
                           selectable={isDesktop}
                           selected={selectedTrackIdSet.has(t.id)}
-                          onSelect={() => handleToggleTrackSelection(t.id)}
-                          onSelectionContextMenu={(track, event) =>
-                            handleSelectionContextMenu(
-                              Number(track.id ?? t.id),
-                              event,
-                            )
+                          onSelect={(_, event) =>
+                            handleTrackSelection(t.id, event)
                           }
-                          onSelectionActionMenuOpen={(track, event) =>
-                            handleSelectionActionMenuOpen(
-                              Number(track.id ?? t.id),
-                              event,
-                            )
+                          onSelectionContextMenu={(_, event) =>
+                            handleSelectionContextMenu(t.id, event)
+                          }
+                          onSelectionActionMenuOpen={(_, event) =>
+                            handleSelectionActionMenuOpen(t.id, event)
                           }
                         />
                       </div>
@@ -1396,18 +1644,12 @@ export function Album() {
                     onPlayOverride={() => handlePlayTrack(t.id)}
                     selectable={isDesktop}
                     selected={selectedTrackIdSet.has(t.id)}
-                    onSelect={() => handleToggleTrackSelection(t.id)}
-                    onSelectionContextMenu={(track, event) =>
-                      handleSelectionContextMenu(
-                        Number(track.id ?? t.id),
-                        event,
-                      )
+                    onSelect={(_, event) => handleTrackSelection(t.id, event)}
+                    onSelectionContextMenu={(_, event) =>
+                      handleSelectionContextMenu(t.id, event)
                     }
-                    onSelectionActionMenuOpen={(track, event) =>
-                      handleSelectionActionMenuOpen(
-                        Number(track.id ?? t.id),
-                        event,
-                      )
+                    onSelectionActionMenuOpen={(_, event) =>
+                      handleSelectionActionMenuOpen(t.id, event)
                     }
                   />
                 </div>
@@ -1415,154 +1657,5 @@ export function Album() {
             })}
       </div>
     </div>
-  );
-}
-
-function AlbumMenuContent({
-  data,
-  coverUrl,
-  displayName,
-  saved,
-  canPersistAlbum,
-  playlists,
-  playlistPickerOpen,
-  onTogglePlaylistPicker,
-  onPlay,
-  onPlayNext,
-  onCreatePlaylist,
-  onAddToPlaylist,
-  onToggleSaved,
-  offlineSupported,
-  offlineState,
-  offlineLabel,
-  onToggleOffline,
-  onGoToArtist,
-  onShare,
-}: {
-  data: { has_cover: boolean; artist: string };
-  coverUrl: string;
-  displayName: string;
-  saved: boolean;
-  canPersistAlbum: boolean;
-  playlists: { id: number; name: string }[];
-  playlistPickerOpen: boolean;
-  onTogglePlaylistPicker: () => void;
-  onPlay: () => void;
-  onPlayNext: () => void;
-  onCreatePlaylist: () => void;
-  onAddToPlaylist: (id: number) => void;
-  onToggleSaved: () => void;
-  offlineSupported: boolean;
-  offlineState:
-    | "idle"
-    | "queued"
-    | "downloading"
-    | "syncing"
-    | "ready"
-    | "error";
-  offlineLabel: string;
-  onToggleOffline: () => void;
-  onGoToArtist: () => void;
-  onShare: () => void;
-}) {
-  return (
-    <>
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
-        <div className="w-12 h-12 rounded-lg overflow-hidden bg-white/5 flex-shrink-0">
-          {data.has_cover || coverUrl ? (
-            <img
-              src={coverUrl}
-              alt={displayName}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Disc size={20} className="text-white/20" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-foreground truncate">
-            {displayName}
-          </div>
-          <div className="text-xs text-muted-foreground truncate">
-            {data.artist}
-          </div>
-        </div>
-      </div>
-      <div className="p-1.5">
-        <AppMenuButton onClick={onPlay}>
-          <Play size={15} /> Play now
-        </AppMenuButton>
-        <AppMenuButton onClick={onPlayNext}>
-          <ListPlus size={15} /> Play next
-        </AppMenuButton>
-        <AppMenuButton
-          className="justify-between"
-          onClick={onTogglePlaylistPicker}
-        >
-          <span className="flex items-center gap-3">
-            <ListPlus size={15} /> Add to playlist
-          </span>
-          <span className="text-white/40">
-            {playlistPickerOpen ? "−" : "+"}
-          </span>
-        </AppMenuButton>
-        {playlistPickerOpen && (
-          <div className="px-3 pb-2 space-y-1">
-            <button
-              className="w-full text-left rounded-lg px-3 py-2 text-sm text-foreground hover:bg-white/5 transition-colors"
-              onClick={onCreatePlaylist}
-            >
-              Add new playlist
-            </button>
-            {playlists.length > 0 ? (
-              <AppPopoverDivider className="mx-1" />
-            ) : null}
-            {playlists.map((p) => (
-              <button
-                key={p.id}
-                className="w-full text-left rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-                onClick={() => onAddToPlaylist(p.id)}
-              >
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-        {canPersistAlbum ? (
-          <AppMenuButton onClick={onToggleSaved}>
-            <Heart
-              size={15}
-              className={saved ? "fill-current text-primary" : ""}
-            />
-            {saved ? "Remove from collection" : "Add to collection"}
-          </AppMenuButton>
-        ) : null}
-        {canPersistAlbum ? (
-          <AppMenuButton
-            onClick={onToggleOffline}
-            disabled={!offlineSupported || isOfflineBusy(offlineState)}
-          >
-            {offlineState === "ready" ? (
-              <CheckCircle2 size={15} className="text-cyan-200" />
-            ) : isOfflineBusy(offlineState) ? (
-              <Loader2 size={15} className="animate-spin text-primary" />
-            ) : offlineState === "error" ? (
-              <AlertCircle size={15} className="text-amber-200" />
-            ) : (
-              <ArrowDownToLine size={15} />
-            )}
-            {offlineLabel}
-          </AppMenuButton>
-        ) : null}
-        <AppMenuButton onClick={onGoToArtist}>
-          <User size={15} /> Go to artist
-        </AppMenuButton>
-        <AppMenuButton onClick={onShare}>
-          <Share2 size={15} /> Share
-        </AppMenuButton>
-      </div>
-    </>
   );
 }

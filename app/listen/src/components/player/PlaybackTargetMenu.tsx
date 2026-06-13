@@ -4,10 +4,11 @@ import {
   Airplay,
   Cast,
   Check,
+  CRATE_ICON_SIZE,
   Loader2,
   MonitorSpeaker,
   RadioTower,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { cn } from "@crate/ui/lib/cn";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
@@ -33,10 +34,11 @@ interface PlaybackTargetMenuProps {
 }
 
 function TargetIcon({ target }: { target: PlaybackTarget }) {
-  if (target.kind === "google-cast") return <Cast size={16} />;
-  if (target.kind === "airplay") return <Airplay size={16} />;
-  if (target.kind === "crate-device") return <RadioTower size={16} />;
-  return <MonitorSpeaker size={16} />;
+  if (target.kind === "google-cast") return <Cast size={CRATE_ICON_SIZE.md} />;
+  if (target.kind === "airplay") return <Airplay size={CRATE_ICON_SIZE.md} />;
+  if (target.kind === "crate-device")
+    return <RadioTower size={CRATE_ICON_SIZE.md} />;
+  return <MonitorSpeaker size={CRATE_ICON_SIZE.md} />;
 }
 
 function badgeText(target: PlaybackTarget): string {
@@ -205,13 +207,13 @@ export function PlaybackTargetMenu({
           onOverlayChange?.(nextOpen);
         }}
         className={cn(
-          "relative inline-flex items-center gap-1.5 rounded-md p-1.5 transition-colors hover:bg-white/5",
+          "relative inline-flex items-center gap-1.5 rounded-md p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]",
           open || (activeTarget && activeTarget.kind !== "local")
-            ? "text-primary"
-            : "text-white/30 hover:text-white/60",
+            ? "text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+            : "text-white/30",
         )}
       >
-        <Airplay size={16} />
+        <Airplay size={CRATE_ICON_SIZE.md} />
         {activeTarget && activeTarget.kind !== "local" ? (
           <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(34,211,238,0.7)]" />
         ) : null}
@@ -236,7 +238,7 @@ export function PlaybackTargetMenu({
               </div>
               {loading ? (
                 <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
-                  <Loader2 size={14} className="animate-spin" />
+                  <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
                   Loading targets...
                 </div>
               ) : (

@@ -6,14 +6,22 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Disc, Loader2, Music, Search, User, X } from "lucide-react";
+import {
+  CRATE_ICON_SIZE,
+  Disc,
+  Loader2,
+  Music,
+  Search,
+  User,
+  X,
+} from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import {
@@ -43,25 +51,35 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
   if (item.type === "artist") {
     return (
       <User
-        size={14}
-        className="h-8 w-8 shrink-0 rounded-full bg-white/5 p-2 text-white/30"
+        size={CRATE_ICON_SIZE.md}
+        className="h-8 w-8 shrink-0 rounded-full bg-white/5 p-1.5 text-white/30"
       />
     );
   }
   if (item.type === "album") {
     return (
       <Disc
-        size={14}
-        className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+        size={CRATE_ICON_SIZE.md}
+        className="h-8 w-8 shrink-0 rounded bg-white/5 p-1.5 text-white/30"
       />
     );
   }
   return (
     <Music
-      size={14}
-      className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
+      size={CRATE_ICON_SIZE.md}
+      className="h-8 w-8 shrink-0 rounded bg-white/5 p-1.5 text-white/30"
     />
   );
+}
+
+function searchErrorHint(error: unknown): string {
+  if (
+    error instanceof ApiError &&
+    (error.status === 401 || error.status === 403)
+  ) {
+    return "Your session needs a refresh. Try reloading or signing in again.";
+  }
+  return "Try again in a moment.";
 }
 
 export function TopBarSearch() {
@@ -71,6 +89,8 @@ export function TopBarSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TopBarSearchItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [completedQuery, setCompletedQuery] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const [recents, setRecents] = useState<TopBarSearchRecentEntry[]>(
@@ -90,7 +110,8 @@ export function TopBarSearch() {
     top: number;
     width: number;
   } | null>(null);
-  const queryActive = query.trim().length > 0;
+  const trimmedQuery = query.trim();
+  const queryActive = trimmedQuery.length > 0;
   const searchOpen = expanded || showDropdown || queryActive;
 
   useEffect(() => {
@@ -185,23 +206,41 @@ export function TopBarSearch() {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
+    const requestQuery = query.trim();
+    if (!requestQuery) {
       setResults([]);
       setLoading(false);
+      setCompletedQuery(null);
+      setSearchError(null);
       return;
     }
 
     setLoading(true);
+    setCompletedQuery(null);
+    setSearchError(null);
     debounceRef.current = setTimeout(() => {
       api<SearchResult>(
-        `/api/search?q=${encodeURIComponent(query.trim())}&limit=10`,
+        `/api/search?q=${encodeURIComponent(requestQuery)}&limit=10`,
       )
         .then((data) => {
+          if (queryRef.current.trim() !== requestQuery) return;
           setResults(flattenTopBarSearchResults(data));
           setActiveIdx(-1);
+          setCompletedQuery(requestQuery);
+          setSearchError(null);
         })
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false));
+        .catch((error) => {
+          if (queryRef.current.trim() !== requestQuery) return;
+          setResults([]);
+          setActiveIdx(-1);
+          setCompletedQuery(requestQuery);
+          setSearchError(searchErrorHint(error));
+        })
+        .finally(() => {
+          if (queryRef.current.trim() === requestQuery) {
+            setLoading(false);
+          }
+        });
     }, 200);
 
     return () => {
@@ -220,6 +259,8 @@ export function TopBarSearch() {
     setShowDropdown(false);
     setQuery("");
     setResults([]);
+    setCompletedQuery(null);
+    setSearchError(null);
     setExpanded(false);
     setActiveIdx(-1);
     inputRef.current?.blur();
@@ -262,6 +303,8 @@ export function TopBarSearch() {
       setShowDropdown(false);
       setQuery("");
       setExpanded(false);
+      setCompletedQuery(null);
+      setSearchError(null);
     },
     [navigate, play],
   );
@@ -277,6 +320,8 @@ export function TopBarSearch() {
         setExpanded(false);
         setQuery("");
         setResults([]);
+        setCompletedQuery(null);
+        setSearchError(null);
         return;
       }
 
@@ -310,16 +355,31 @@ export function TopBarSearch() {
     }
   }
 
-  const showRecents = showDropdown && !query.trim() && recents.length > 0;
+  const showRecents = showDropdown && !trimmedQuery && recents.length > 0;
+  const showSearchError =
+    showDropdown &&
+    trimmedQuery.length > 0 &&
+    !loading &&
+    completedQuery === trimmedQuery &&
+    Boolean(searchError);
+  const showEmptyResults =
+    showDropdown &&
+    trimmedQuery.length > 0 &&
+    !loading &&
+    completedQuery === trimmedQuery &&
+    !searchError &&
+    results.length === 0;
   const showResults =
-    showDropdown && query.trim().length > 0 && (results.length > 0 || loading);
+    showDropdown &&
+    trimmedQuery.length > 0 &&
+    (results.length > 0 || loading || showEmptyResults || showSearchError);
   const dropdown =
     dropdownStyle && (showResults || showRecents)
       ? createPortal(
           <AppPopover
             ref={dropdownRef}
             className={cn(
-              "fixed max-h-80 overflow-y-auto py-1",
+              "listen-glass-panel fixed max-h-80 overflow-y-auto rounded-2xl py-1",
               showRecents ? "max-h-none" : undefined,
             )}
             style={{
@@ -354,17 +414,43 @@ export function TopBarSearch() {
                     </span>
                   </button>
                 ))}
-                {query.trim() && (
+                {showSearchError ? (
+                  <div className="px-4 py-5 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
+                      <Search size={CRATE_ICON_SIZE.md} />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-white/86">
+                      Search unavailable
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">{searchError}</p>
+                  </div>
+                ) : null}
+                {showEmptyResults ? (
+                  <div className="px-4 py-5 text-center">
+                    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+                      <Search size={CRATE_ICON_SIZE.md} />
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-white/86">
+                      No music found
+                    </p>
+                    <p className="mt-1 text-xs text-white/45">
+                      Try another artist, album, or track.
+                    </p>
+                  </div>
+                ) : null}
+                {trimmedQuery && !showSearchError && (
                   <button
                     onClick={() => {
-                      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                      navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
                       setShowDropdown(false);
                       setQuery("");
                       setExpanded(false);
+                      setCompletedQuery(null);
+                      setSearchError(null);
                     }}
                     className="mt-1 w-full border-t border-white/5 px-3 py-2 text-center text-xs text-primary transition-colors hover:bg-white/5"
                   >
-                    See all results for "{query.trim()}"
+                    See all results for "{trimmedQuery}"
                   </button>
                 )}
               </>
@@ -383,7 +469,10 @@ export function TopBarSearch() {
                       index === activeIdx ? "bg-white/10" : "hover:bg-white/5"
                     }`}
                   >
-                    <Search size={12} className="shrink-0 text-white/20" />
+                    <Search
+                      size={CRATE_ICON_SIZE.xs}
+                      className="shrink-0 text-white/20"
+                    />
                     <span className="truncate text-[13px] text-white/60">
                       {recent.label}
                     </span>
@@ -404,7 +493,7 @@ export function TopBarSearch() {
         "transition-[width,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
         searchOpen
           ? "w-[min(22rem,calc(100vw-8.75rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
-          : "w-12 md:w-11",
+          : "w-[7.25rem] sm:w-[8rem] md:w-11",
       )}
       onMouseEnter={() => {
         if (canHover) openSearch(false);
@@ -419,7 +508,7 @@ export function TopBarSearch() {
           "focus-within:border focus-within:border-cyan-400/25 focus-within:bg-app-surface/78 focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_18px_42px_rgba(0,0,0,0.22)]",
           searchOpen
             ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
-            : "border-0 bg-transparent shadow-none",
+            : "border border-cyan-200/16 bg-black/28 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-md md:border-0 md:bg-transparent md:shadow-none md:backdrop-blur-0",
           searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",
         )}
       >
@@ -435,17 +524,27 @@ export function TopBarSearch() {
               focusInputSoon();
             }}
             className={cn(
-              "absolute left-0 top-0 z-10 flex h-12 w-12 touch-manipulation items-center justify-center rounded-xl transition-[color,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11",
+              "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
               searchOpen
-                ? "text-white/42"
-                : "text-white/56 group-hover:text-white/82 group-hover:scale-[1.03]",
+                ? "w-12 justify-center px-0 text-white/42"
+                : "w-full justify-start gap-2 px-4 text-white/72 group-hover:scale-[1.03] group-hover:text-white/88",
             )}
           >
-            <Search size={17} />
+            <Search size={CRATE_ICON_SIZE.md} />
+            <span
+              className={cn(
+                "text-sm font-semibold tracking-[-0.01em] transition-[opacity,transform] duration-300 md:hidden",
+                searchOpen
+                  ? "pointer-events-none -translate-x-1 opacity-0"
+                  : "translate-x-0 opacity-100",
+              )}
+            >
+              Search
+            </span>
           </button>
           {loading && searchOpen ? (
             <Loader2
-              size={15}
+              size={CRATE_ICON_SIZE.sm}
               className="absolute right-4 animate-spin text-white/40"
             />
           ) : null}
@@ -455,13 +554,15 @@ export function TopBarSearch() {
               onClick={() => {
                 setQuery("");
                 setResults([]);
+                setCompletedQuery(null);
+                setSearchError(null);
                 setShowDropdown(true);
                 focusInputSoon();
               }}
-              className="absolute right-4 z-20 touch-manipulation text-white/30 hover:text-white/60"
+              className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-white/30 hover:text-white/65"
               aria-label="Clear search"
             >
-              <X size={15} />
+              <X size={CRATE_ICON_SIZE.lg} />
             </button>
           ) : null}
           <input

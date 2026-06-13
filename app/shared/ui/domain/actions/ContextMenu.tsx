@@ -1,0 +1,337 @@
+import {
+  type CSSProperties,
+  type ReactNode,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CRATE_ICON_SIZE,
+} from "@crate/ui/icons";
+import {
+  AppMenuButton,
+  AppPopoverDivider,
+} from "@crate/ui/primitives/AppPopover";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
+import { cn } from "@crate/ui/lib/cn";
+
+import { MobileActionSheet } from "./MobileActionSheet";
+import type {
+  ContextMenuEntry,
+  ContextMenuHeader,
+  ContextMenuMediaHeader,
+  ContextMenuProps,
+  DesktopMenuEnvironment,
+} from "./types";
+
+export type {
+  ContextMenuEntry,
+  ContextMenuHeader,
+  ContextMenuMediaHeader,
+  ContextMenuProps,
+};
+
+export function detectTouchDominant(): boolean {
+  if (typeof window === "undefined") return false;
+  if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) {
+    return true;
+  }
+  if (typeof window.matchMedia === "function") {
+    if (window.matchMedia("(pointer: coarse)").matches) return true;
+    if (window.matchMedia("(hover: none)").matches) return true;
+  }
+  return false;
+}
+
+function detectCapacitor(): boolean {
+  if (typeof window === "undefined") return false;
+  const capacitor = (window as unknown as Record<string, unknown>).Capacitor as
+    | { isNativePlatform?: () => boolean }
+    | undefined;
+  if (typeof capacitor?.isNativePlatform === "function") {
+    return capacitor.isNativePlatform();
+  }
+  if (typeof navigator !== "undefined") {
+    return /Capacitor\/\d/.test(navigator.userAgent);
+  }
+  return false;
+}
+
+export function shouldRenderDesktopContextMenu(
+  environment: DesktopMenuEnvironment,
+): boolean {
+  const {
+    isDesktop,
+    canHover,
+    isTouchDominant,
+    isCapacitor = detectCapacitor(),
+    forceMobileSheet = false,
+  } = environment;
+
+  if (!isDesktop || !canHover) return false;
+  if (forceMobileSheet) return false;
+  if (isCapacitor) return false;
+  if (typeof window === "undefined") return false;
+  if (isTouchDominant) return false;
+  return true;
+}
+
+function hasSelectableEntries(items: ContextMenuEntry[]): boolean {
+  return items.some((item) => {
+    if (item.type === "divider" || item.type === "label") return false;
+    return true;
+  });
+}
+
+function isStructuredHeader(
+  header: ContextMenuHeader | ReactNode | undefined,
+): header is ContextMenuMediaHeader {
+  return (
+    typeof header === "object" &&
+    header !== null &&
+    "type" in header &&
+    header.type === "media"
+  );
+}
+
+function ContextMenuMediaHeaderView({
+  header,
+}: {
+  header: ContextMenuMediaHeader;
+}) {
+  const FallbackIcon = header.fallbackIcon;
+  const imageShape =
+    header.imageShape === "circle" ? "rounded-full" : "rounded-lg";
+
+  return (
+    <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
+      <div
+        className={cn(
+          "flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden bg-white/5",
+          imageShape,
+        )}
+      >
+        {header.imageUrl ? (
+          <img
+            src={header.imageUrl}
+            alt={header.imageAlt ?? header.title}
+            width={48}
+            height={48}
+            loading="lazy"
+            onError={header.imageOnError}
+            className="h-full w-full object-cover"
+          />
+        ) : FallbackIcon ? (
+          <FallbackIcon size={CRATE_ICON_SIZE.xl} className="text-white/35" />
+        ) : null}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-foreground">
+          {header.title}
+        </div>
+        {header.subtitle ? (
+          <div className="truncate text-xs text-muted-foreground">
+            {header.subtitle}
+          </div>
+        ) : null}
+        {header.detail ? (
+          <div className="truncate text-[11px] text-white/55">
+            {header.detail}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ContextMenuHeaderView({
+  header,
+}: {
+  header?: ContextMenuHeader | ReactNode;
+}) {
+  if (!header) return null;
+  if (isStructuredHeader(header)) {
+    return <ContextMenuMediaHeaderView header={header} />;
+  }
+  return <>{header}</>;
+}
+
+function ContextMenuItems({
+  items,
+  onClose,
+}: {
+  items: ContextMenuEntry[];
+  onClose: () => void;
+}) {
+  const handleSelect = (
+    entry: Extract<ContextMenuEntry, { type?: "action" }>,
+  ) => {
+    if (entry.disabled) return;
+    const result = entry.onSelect();
+    onClose();
+    if (result && typeof (result as Promise<void>).then === "function") {
+      void (result as Promise<void>).catch(() => {
+        /* callers surface action failures via toast */
+      });
+    }
+  };
+
+  return (
+    <>
+      {items.map((entry) => {
+        if (entry.type === "divider") {
+          return <AppPopoverDivider key={entry.key} className="mx-1" />;
+        }
+
+        if (entry.type === "label") {
+          return (
+            <div
+              key={entry.key}
+              className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-white/40"
+            >
+              {entry.label}
+            </div>
+          );
+        }
+
+        const Icon = entry.icon;
+
+        if (entry.type === "disclosure") {
+          const Indicator = entry.expanded ? ChevronDown : ChevronRight;
+
+          return (
+            <div key={entry.key}>
+              <AppMenuButton
+                role="menuitem"
+                aria-expanded={entry.expanded}
+                disabled={entry.disabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!entry.disabled) entry.onToggle();
+                }}
+                className={cn(entry.disabled ? "opacity-50" : undefined)}
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-3">
+                  {Icon ? (
+                    <Icon size={CRATE_ICON_SIZE.md} className="shrink-0" />
+                  ) : (
+                    <span className="w-[18px] shrink-0" />
+                  )}
+                  <span className="truncate">{entry.label}</span>
+                </span>
+                <Indicator size={17} className="shrink-0 text-white/45" />
+              </AppMenuButton>
+              {entry.expanded ? (
+                <div className="space-y-1 px-3 pb-2">
+                  <ContextMenuItems items={entry.items} onClose={onClose} />
+                </div>
+              ) : null}
+            </div>
+          );
+        }
+
+        return (
+          <AppMenuButton
+            key={entry.key}
+            role="menuitem"
+            danger={entry.danger}
+            disabled={entry.disabled}
+            onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
+              event.stopPropagation();
+              handleSelect(entry);
+            }}
+            className={cn(
+              entry.active ? "text-primary" : undefined,
+              entry.disabled ? "opacity-50" : undefined,
+            )}
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              {Icon ? (
+                <Icon
+                  size={CRATE_ICON_SIZE.md}
+                  className={cn(
+                    "shrink-0",
+                    entry.active && "animate-crate-icon-active-pulse",
+                  )}
+                />
+              ) : (
+                <span className="w-[18px] shrink-0" />
+              )}
+              <span className="truncate">{entry.label}</span>
+            </span>
+            {entry.active ? (
+              <Check size={17} className="shrink-0 text-primary" />
+            ) : null}
+          </AppMenuButton>
+        );
+      })}
+    </>
+  );
+}
+
+export function ContextMenu({
+  items,
+  header,
+  open,
+  position,
+  menuRef,
+  onClose,
+  className,
+}: ContextMenuProps) {
+  const isDesktop = useIsDesktop();
+  const canHover = useHoverCapability();
+  const shouldUseDesktopMenu = shouldRenderDesktopContextMenu({
+    isDesktop,
+    canHover,
+    isTouchDominant: detectTouchDominant(),
+  });
+
+  if (!open || !hasSelectableEntries(items)) return null;
+
+  const content = (
+    <>
+      <ContextMenuHeaderView header={header} />
+      <div className="p-1.5">
+        <ContextMenuItems items={items} onClose={onClose} />
+      </div>
+    </>
+  );
+
+  if (!shouldUseDesktopMenu) {
+    return (
+      <MobileActionSheet open={open} panelRef={menuRef} onClose={onClose}>
+        <div
+          role="menu"
+          className="max-h-[calc(100%-5rem)] overflow-y-auto pb-3"
+        >
+          {content}
+        </div>
+      </MobileActionSheet>
+    );
+  }
+
+  if (typeof document === "undefined") return null;
+
+  const style: CSSProperties = {
+    left: position?.x ?? 12,
+    top: position?.y ?? 12,
+  };
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      className={cn(
+        "listen-glass-panel fixed z-app-context-menu w-72 origin-top-left overflow-hidden rounded-2xl animate-pop-in",
+        className,
+      )}
+      style={style}
+    >
+      {content}
+    </div>,
+    document.body,
+  );
+}

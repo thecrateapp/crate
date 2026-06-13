@@ -6,7 +6,7 @@ import {
   Sparkles,
   ThumbsDown,
   ThumbsUp,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";

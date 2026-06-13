@@ -79,6 +79,109 @@ def _setup_artist_album_track(
     )
 
 
+def test_browse_filter_genres_include_editorial_metadata(pg_db):
+    from crate.db.queries.browse_artist_filters import get_browse_filter_genres
+    from crate.db.tx import transaction_scope
+
+    pg_db.upsert_artist({"name": "Converge"})
+    pg_db.upsert_artist({"name": "Botch"})
+    pg_db.set_artist_genres("Converge", [("mathcore", 1.0, "test")])
+    pg_db.set_artist_genres("Botch", [("mathcore", 0.9, "test")])
+
+    with transaction_scope() as session:
+        converge_id = (
+            session.execute(
+                text("SELECT id FROM library_artists WHERE name = 'Converge'")
+            )
+            .scalars()
+            .one()
+        )
+        session.execute(
+            text(
+                """
+                UPDATE library_artists
+                SET listeners = CASE name
+                    WHEN 'Converge' THEN 200
+                    WHEN 'Botch' THEN 100
+                    ELSE listeners
+                END
+                WHERE name IN ('Converge', 'Botch')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_nodes (slug, name, description)
+                VALUES ('mathcore', 'Mathcore', 'Angular hardcore, odd meters and controlled chaos.')
+                ON CONFLICT (slug) DO UPDATE
+                SET description = EXCLUDED.description
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
+                SELECT 'mathcore', 'mathcore', id
+                FROM genre_taxonomy_nodes
+                WHERE slug = 'mathcore'
+                ON CONFLICT (alias_slug) DO UPDATE
+                SET genre_id = EXCLUDED.genre_id
+                """
+            )
+        )
+
+    rows = get_browse_filter_genres()
+    mathcore = next(row for row in rows if row["name"] == "mathcore")
+
+    assert mathcore["description"] == (
+        "Angular hardcore, odd meters and controlled chaos."
+    )
+    assert mathcore["top_artists"] == ["Converge", "Botch"]
+    assert mathcore["cover_url"] == (
+        f"/api/artists/{converge_id}/background?size=640&format=webp"
+    )
+
+
+def test_browse_filter_genres_prefers_manual_taxonomy_cover(pg_db):
+    from crate.db.queries.browse_artist_filters import get_browse_filter_genres
+    from crate.db.tx import transaction_scope
+
+    pg_db.upsert_artist({"name": "Orchid"})
+    pg_db.set_artist_genres("Orchid", [("screamo", 1.0, "test")])
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_nodes (slug, name, description, cover_path)
+                VALUES ('screamo', 'Screamo', 'Raw emotional hardcore.', 'screamo.webp')
+                ON CONFLICT (slug) DO UPDATE
+                SET description = EXCLUDED.description,
+                    cover_path = EXCLUDED.cover_path
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
+                SELECT 'screamo', 'screamo', id
+                FROM genre_taxonomy_nodes
+                WHERE slug = 'screamo'
+                ON CONFLICT (alias_slug) DO UPDATE
+                SET genre_id = EXCLUDED.genre_id
+                """
+            )
+        )
+
+    rows = get_browse_filter_genres()
+    screamo = next(row for row in rows if row["name"] == "screamo")
+
+    assert screamo["cover_url"] == "/api/genres/screamo/cover?size=640&format=webp"
+
+
 # ══════════════════════════════════════════════════════════════════════
 # browse_media_track_lookup
 # ══════════════════════════════════════════════════════════════════════

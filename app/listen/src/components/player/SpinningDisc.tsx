@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Disc3, Loader2, Pause, Play } from "lucide-react";
+import { Disc3, Loader2, Pause, Play } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 

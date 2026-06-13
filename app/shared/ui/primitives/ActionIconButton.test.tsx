@@ -28,6 +28,25 @@ describe("ActionIconButton", () => {
     expect(container.querySelector("button")).toHaveClass("text-primary");
   });
 
+  it("uses glow-only hover without framed hover backgrounds", () => {
+    const { container } = render(<ActionIconButton>Icon</ActionIconButton>);
+    const button = container.querySelector("button");
+
+    expect(button?.className).toContain("hover:text-primary");
+    expect(button?.className).toContain("hover:drop-shadow");
+    expect(button?.className).not.toContain("hover:bg-");
+  });
+
+  it("adds a subtle pulse for active icon states", () => {
+    const { container } = render(
+      <ActionIconButton active>Icon</ActionIconButton>,
+    );
+
+    expect(container.querySelector("button")).toHaveClass(
+      "animate-crate-icon-active-pulse",
+    );
+  });
+
   it("forwards ref correctly", () => {
     const ref = { current: null as HTMLButtonElement | null };
     render(<ActionIconButton ref={ref}>Icon</ActionIconButton>);

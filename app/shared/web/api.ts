@@ -69,6 +69,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
     const requestOptions: RequestInit = {
       method,
       headers,
+      cache: "no-store",
     };
 
     if (credentials) {

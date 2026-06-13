@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import {
+  Heart,
+  HeartBold,
   Play,
   Radio,
   Share2,
   Shuffle,
-  UserMinus,
-  UserPlus,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
   action,
   fetchArtistTopTracks,
@@ -107,7 +107,7 @@ export function useArtistActionEntries(
       action({
         key: "follow",
         label: following ? "Unfollow artist" : "Follow artist",
-        icon: following ? UserMinus : UserPlus,
+        icon: following ? HeartBold : Heart,
         active: following,
         disabled: input.artistId == null,
         onSelect: async () => {

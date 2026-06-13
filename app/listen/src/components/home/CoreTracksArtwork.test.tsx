@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { CoreTracksArtwork } from "./CoreTracksArtwork";
 
 describe("CoreTracksArtwork", () => {
@@ -18,6 +18,8 @@ describe("CoreTracksArtwork", () => {
     const { container } = render(<CoreTracksArtwork item={baseItem} />);
     // When no photoUrl, there should be no <img> with alt text
     expect(container.querySelector("img[alt='Test Mix']")).toBeNull();
+    expect(screen.getByText("Artist Set")).toBeInTheDocument();
+    expect(screen.queryByText("Core Tracks")).toBeNull();
   });
 
   it("renders photo when first track has artist slug", () => {

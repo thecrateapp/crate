@@ -1,6 +1,6 @@
 """Contract tests for the Genre API endpoints."""
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 
 async def _unauthenticated(self, request):
@@ -82,13 +82,78 @@ class TestGenreDetailAPI:
             "id": 1,
             "name": "Post-Hardcore",
             "slug": "post-hardcore",
+            "track_count": 118,
+            "cover_url": "/api/genres/post-hardcore/cover?size=640&format=webp",
             "artists": [],
             "albums": [],
         }
-        with patch("crate.api.genres.get_genre_detail", return_value=detail):
+        with (
+            patch("crate.api.genres.get_genre_detail", return_value=detail),
+            patch("crate.api.genres.get_user_by_id", return_value={}),
+        ):
             resp = test_app.get("/api/genres/post-hardcore")
         assert resp.status_code == 200
         assert resp.json()["name"] == "Post-Hardcore"
+        assert resp.json()["track_count"] == 118
+        assert resp.json()["shows"] == []
+        assert (
+            resp.json()["cover_url"]
+            == "/api/genres/post-hardcore/cover?size=640&format=webp"
+        )
+
+    def test_genre_detail_includes_location_filtered_shows(self, test_app):
+        detail = {
+            "id": 1,
+            "name": "Post-Hardcore",
+            "slug": "post-hardcore",
+            "track_count": 118,
+            "artists": [],
+            "albums": [],
+        }
+        show = {
+            "id": 9,
+            "artist_name": "Converge",
+            "artist_id": 12,
+            "artist_slug": "converge",
+            "date": "2030-07-03",
+            "local_time": "20:00",
+            "venue": "Circolo Magnolia",
+            "city": "Segrate",
+            "country": "Italy",
+            "country_code": "IT",
+            "latitude": 45.48,
+            "longitude": 9.27,
+            "url": "https://tickets.example",
+            "artist_genres": ["hardcore"],
+        }
+        with (
+            patch("crate.api.genres.get_genre_detail", return_value=detail),
+            patch(
+                "crate.api.genres.get_user_by_id",
+                return_value={
+                    "latitude": 45.46,
+                    "longitude": 9.19,
+                    "show_radius_km": 80,
+                    "show_location_mode": "fixed",
+                },
+            ),
+            patch(
+                "crate.api.genres.get_genre_upcoming_shows",
+                return_value=[show],
+            ) as get_shows,
+        ):
+            resp = test_app.get("/api/genres/post-hardcore")
+
+        assert resp.status_code == 200
+        assert resp.json()["shows"][0]["artist"] == "Converge"
+        assert resp.json()["shows"][0]["title"] == "Circolo Magnolia"
+        get_shows.assert_called_once_with(
+            "post-hardcore",
+            latitude=45.46,
+            longitude=9.19,
+            radius_km=80,
+            limit=5,
+        )
 
     def test_genre_detail_not_found(self, test_app):
         with patch("crate.api.genres.get_genre_detail", return_value=None):
@@ -269,6 +334,43 @@ class TestGenreTaxonomyAPI:
             top_level=False,
         )
         invalidate.assert_called_once_with(broadcast=True)
+
+    def test_upload_taxonomy_cover_stores_cover_path(self, test_app):
+        with (
+            patch("crate.api.genres.get_genre_taxonomy_node_id", return_value=1),
+            patch(
+                "crate.api.genres.persist_genre_cover_upload",
+                return_value="post-hardcore.png",
+            ) as persist_cover,
+            patch(
+                "crate.api.genres.update_genre_taxonomy_node_metadata",
+                return_value=True,
+            ) as update_metadata,
+            patch("crate.api.genres.invalidate_runtime_taxonomy_cache") as invalidate,
+            patch("crate.api.genres._broadcast_genre_taxonomy_changed") as broadcast,
+        ):
+            resp = test_app.post(
+                "/api/genres/taxonomy/Post-Hardcore/cover",
+                files={"file": ("cover.png", b"fake image bytes", "image/png")},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "ok": True,
+            "slug": "post-hardcore",
+            "cover_url": "/api/genres/post-hardcore/cover?size=640&format=webp",
+        }
+        persist_cover.assert_called_once_with(
+            "post-hardcore",
+            filename="cover.png",
+            content_type="image/png",
+            payload=ANY,
+        )
+        update_metadata.assert_called_once_with(
+            "post-hardcore", cover_path="post-hardcore.png"
+        )
+        invalidate.assert_called_once_with(broadcast=True)
+        broadcast.assert_called_once_with("genre:post-hardcore")
 
     def test_infer_taxonomy_node_proposal_returns_reviewable_diff(self, test_app):
         proposal = {

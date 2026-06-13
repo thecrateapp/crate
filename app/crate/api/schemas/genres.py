@@ -37,6 +37,40 @@ class GenreAlbumRef(BaseModel):
     weight: float | None = None
 
 
+class GenreShowRef(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: int | None = None
+    type: str = "show"
+    date: str
+    time: str | None = None
+    artist: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    title: str
+    subtitle: str
+    cover_url: str | None = None
+    status: str | None = None
+    is_upcoming: bool = True
+    url: str | None = None
+    venue: str | None = None
+    address_line1: str | None = None
+    city: str | None = None
+    region: str | None = None
+    postal_code: str | None = None
+    country: str | None = None
+    country_code: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    lineup: list[str] | None = None
+    genres: list[str] = Field(default_factory=list)
+    source: str | None = None
+    lastfm_attendance: int | None = None
+    lastfm_url: str | None = None
+    tickets_url: str | None = None
+    distance_km: float | None = None
+
+
 class GenreSummaryResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
@@ -46,6 +80,7 @@ class GenreSummaryResponse(IdentityFieldsMixin):
     slug: str
     artist_count: int = 0
     album_count: int = 0
+    track_count: int = 0
     mapped: bool = False
     canonical_slug: str | None = None
     canonical_name: str | None = None
@@ -54,6 +89,7 @@ class GenreSummaryResponse(IdentityFieldsMixin):
     top_level_name: str | None = None
     top_level_description: str | None = None
     description: str | None = None
+    cover_url: str | None = None
     external_description: str | None = None
     external_description_source: str | None = None
     musicbrainz_mbid: str | None = None
@@ -66,6 +102,7 @@ class GenreSummaryResponse(IdentityFieldsMixin):
 class GenreDetailResponse(GenreSummaryResponse):
     artists: list[GenreArtistRef] = Field(default_factory=list)
     albums: list[GenreAlbumRef] = Field(default_factory=list)
+    shows: list[GenreShowRef] = Field(default_factory=list)
 
 
 class GenreGraphNode(BaseModel):
@@ -164,6 +201,12 @@ class GenreTaxonomyNodeUpdateRequest(BaseModel):
 class GenreTaxonomyNodeUpdateResponse(BaseModel):
     ok: bool = True
     slug: str
+
+
+class GenreTaxonomyCoverUpdateResponse(BaseModel):
+    ok: bool = True
+    slug: str
+    cover_url: str
 
 
 class GenreDeleteResponse(BaseModel):

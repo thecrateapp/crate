@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { X, Loader2 } from "lucide-react";
+import { CRATE_ICON_SIZE, X, Loader2 } from "@crate/ui/icons";
 import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 
@@ -101,9 +101,9 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
         <button
           onClick={onClose}
           aria-label="Close lyrics"
-          className="p-1 text-white/40 hover:text-white transition-colors"
+          className="flex size-10 items-center justify-center text-white/40 transition-colors hover:text-white"
         >
-          <X size={18} />
+          <X size={CRATE_ICON_SIZE.xl} />
         </button>
       </div>
 

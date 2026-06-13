@@ -6,7 +6,13 @@ import {
   useState,
 } from "react";
 import { Link } from "react-router";
-import { ExternalLink, MapPin, Ticket, X } from "lucide-react";
+import {
+  CRATE_ICON_SIZE,
+  ExternalLink,
+  MapPin,
+  Ticket,
+  X,
+} from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 import { type NormalizedShow, formatShowDateParts } from "./show-types";
@@ -110,7 +116,7 @@ function CollapsedView({
               title="Open tickets"
               className="flex h-8 w-8 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
             >
-              <ExternalLink size={15} />
+              <ExternalLink size={CRATE_ICON_SIZE.md} />
             </a>
           ) : (
             <div className="h-8 w-8" />
@@ -162,10 +168,10 @@ function ExpandedView({
           <button
             type="button"
             onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
+            className="absolute left-2.5 top-2.5 z-10 flex size-10 items-center justify-center text-white/60 transition-colors hover:text-white"
             aria-label="Close show details"
           >
-            <X size={14} />
+            <X size={CRATE_ICON_SIZE.xl} />
           </button>
         ) : null}
 

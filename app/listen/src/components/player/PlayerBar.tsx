@@ -16,12 +16,14 @@ import {
   Repeat,
   Repeat1,
   Heart,
+  HeartBold,
   ListMusic,
   Mic2,
   Maximize2,
   Loader2,
   SlidersHorizontal,
-} from "lucide-react";
+  CRATE_ICON_SIZE,
+} from "@crate/ui/icons";
 import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
 import type { PlaySource } from "@/contexts/player-types";
 import { artistPagePath, albumPagePath } from "@/lib/library-routes";
@@ -67,6 +69,7 @@ import {
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import { PlayerVolumeControl } from "@/components/player/bar/PlayerVolumeControl";
 import { WaveformCanvas } from "@/components/player/bar/WaveformCanvas";
+import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
 import {
@@ -102,60 +105,6 @@ function getStoredFsOpen(): boolean {
   }
 }
 
-type TransportTone = "default" | "album" | "playlist" | "radio" | "discovery";
-
-function getTransportTone(playSource: PlaySource | null): TransportTone {
-  if (playSource?.radio?.seedType === "discovery") return "discovery";
-  if (playSource?.type === "album") return "album";
-  if (playSource?.type === "playlist") return "playlist";
-  if (playSource?.type === "radio" || playSource?.radio) return "radio";
-  return "default";
-}
-
-function getTransportButtonToneClass(
-  playSource: PlaySource | null,
-  active: boolean,
-): string {
-  const tone = getTransportTone(playSource);
-
-  switch (tone) {
-    case "album":
-      return cn(
-        "border-primary/20 bg-[linear-gradient(180deg,#fbfeff,#dffbff)]",
-        "shadow-[0_0_0_1px_rgba(103,232,249,0.12),0_8px_22px_rgba(8,145,178,0.2)]",
-        active &&
-          "shadow-[0_0_0_1px_rgba(103,232,249,0.16),0_10px_28px_rgba(8,145,178,0.28)]",
-      );
-    case "playlist":
-      return cn(
-        "border-primary/16 bg-[linear-gradient(180deg,#ffffff,#ecfbff)]",
-        "shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_20px_rgba(14,116,144,0.16)]",
-        active &&
-          "shadow-[0_0_0_1px_rgba(255,255,255,0.12),0_10px_26px_rgba(14,116,144,0.22)]",
-      );
-    case "radio":
-      return cn(
-        "border-primary/24 bg-[linear-gradient(180deg,#f3fdff,#d4f8ff)]",
-        "shadow-[0_0_18px_rgba(34,211,238,0.2),0_10px_24px_rgba(8,145,178,0.18)]",
-        active &&
-          "shadow-[0_0_22px_rgba(34,211,238,0.28),0_12px_28px_rgba(8,145,178,0.24)]",
-      );
-    case "discovery":
-      return cn(
-        "border-primary/30 bg-[linear-gradient(180deg,#f8feff,#d6fbff)]",
-        "shadow-[0_0_22px_rgba(34,211,238,0.26),0_10px_26px_rgba(8,145,178,0.2)]",
-        active &&
-          "animate-pulse-subtle shadow-[0_0_28px_rgba(34,211,238,0.34),0_14px_32px_rgba(8,145,178,0.28)]",
-      );
-    default:
-      return cn(
-        "border-white/75 bg-white",
-        "shadow-[0_8px_20px_rgba(255,255,255,0.1)]",
-        active && "shadow-[0_10px_24px_rgba(255,255,255,0.14)]",
-      );
-  }
-}
-
 function PlayerSurfaceFallback({
   fullscreen = false,
 }: {
@@ -170,7 +119,10 @@ function PlayerSurfaceFallback({
         }}
       >
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/75 px-3 py-2 text-[11px] text-white/70 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <Loader2 size={14} className="animate-spin text-primary" />
+          <Loader2
+            size={CRATE_ICON_SIZE.sm}
+            className="animate-spin text-primary"
+          />
           Loading player…
         </div>
       </div>
@@ -247,6 +199,13 @@ export function PlayerBar() {
   const [optimisticRemoteVolume, setOptimisticRemoteVolume] = useState<
     number | null
   >(null);
+  const coverLongPressTimerRef = useRef<number | null>(null);
+  const coverLongPressTriggeredRef = useRef(false);
+  const clearCoverLongPressTimer = useCallback(() => {
+    if (coverLongPressTimerRef.current === null) return;
+    window.clearTimeout(coverLongPressTimerRef.current);
+    coverLongPressTimerRef.current = null;
+  }, []);
   const activeConnectDeviceId = activeConnectSession?.active_device_id ?? null;
   const legacyRemoteConnectActive = Boolean(
     legacyConnectEnabled &&
@@ -829,10 +788,6 @@ export function PlayerBar() {
     currentTrackPlayback &&
       currentTrackPlayback.effective_policy !== "original",
   );
-  const transportButtonClass = getTransportButtonToneClass(
-    displayPlaySource,
-    effectiveIsPlaying || effectiveIsBuffering,
-  );
   const shapedRadioSessionId = displayPlaySource?.radio?.shapedSessionId;
   const isShapedRadioTrack = !!(
     shapedRadioSessionId && displayTrack?.libraryTrackId
@@ -895,6 +850,23 @@ export function PlayerBar() {
       );
     };
   }, [currentTrack, isDesktop, setFsOpen]);
+
+  useEffect(() => {
+    const handleOpenQueue = () => {
+      if (!displayTrack) return;
+      setShouldRenderQueuePanel(true);
+      void preloadQueuePanel();
+      setShowQueue(true);
+      setShowLyrics(false);
+      setShowEqualizer(false);
+    };
+    window.addEventListener("crate:open-player-queue", handleOpenQueue);
+    return () => {
+      window.removeEventListener("crate:open-player-queue", handleOpenQueue);
+    };
+  }, [displayTrack]);
+
+  useEffect(() => clearCoverLongPressTimer, [clearCoverLongPressTimer]);
 
   if (!displayTrack) return null;
 
@@ -976,20 +948,48 @@ export function PlayerBar() {
     }
   }
 
-  async function toggleLike() {
-    if (!displayTrack) return;
+  async function toggleLike(): Promise<boolean | null> {
+    if (!displayTrack) return null;
     const trackId = displayTrack.libraryTrackId ?? null;
     const trackEntityUid = displayTrack.entityUid ?? null;
     const trackPath = displayTrack.path || displayTrack.id;
     try {
       if (liked) {
         await unlikeTrack(trackId, trackEntityUid, trackPath);
+        return false;
       } else {
         await likeTrack(trackId, trackEntityUid, trackPath);
+        return true;
       }
     } catch {
       /* ignore */
     }
+    return null;
+  }
+
+  function handleCoverTouchStart() {
+    if (isDesktop) return;
+    coverLongPressTriggeredRef.current = false;
+    clearCoverLongPressTimer();
+    coverLongPressTimerRef.current = window.setTimeout(() => {
+      coverLongPressTriggeredRef.current = true;
+      coverLongPressTimerRef.current = null;
+      triggerHaptic("selection");
+      void toggleLike().then((nextLiked) => {
+        if (nextLiked === null) return;
+        toast.success(
+          nextLiked ? "Added to liked tracks" : "Removed from liked tracks",
+        );
+      });
+    }, 520);
+  }
+
+  function handleCoverTouchMove() {
+    clearCoverLongPressTimer();
+  }
+
+  function handleCoverTouchEnd() {
+    clearCoverLongPressTimer();
   }
 
   async function handleAddToCollection() {
@@ -1018,9 +1018,7 @@ export function PlayerBar() {
       {!hidePlayerBarForMobileFullscreen ? (
         <div
           className={cn(
-            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-hidden border border-white/10 transition-all duration-200 md:left-3 md:right-3 md:h-[82px] md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl",
-            !isDesktop &&
-              "rounded-t-[2rem] rounded-b-none border-b-0 bg-[#181818]/95 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl",
+            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-all duration-200 md:left-3 md:right-3 md:h-[82px]",
             hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
           )}
           style={{
@@ -1031,12 +1029,19 @@ export function PlayerBar() {
             right: isDesktop
               ? undefined
               : "max(1rem, var(--listen-safe-right))",
-            contain: isDesktop ? "paint" : undefined,
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <div className="flex h-full items-center gap-2 px-3 lg:px-4">
+          <div
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute inset-0 z-0 border border-white/10 md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl",
+              !isDesktop &&
+                "rounded-t-[2rem] rounded-b-none border-b-0 bg-[#181818]/95 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl",
+            )}
+          />
+          <div className="relative z-10 flex h-full items-center gap-2 px-3 lg:px-4">
             {/* ── Block 1: Track Info ── */}
             <div
               role={isDesktop ? undefined : "button"}
@@ -1059,10 +1064,21 @@ export function PlayerBar() {
               {/* Album art — crossfades outgoing ↔ incoming during audio crossfade.
                 On desktop, clicking navigates to the album page. */}
               <div
+                aria-label={isDesktop ? undefined : "Track artwork"}
                 className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white/5 md:h-12 md:w-12 ${
                   isDesktop && displayTrack.albumId ? "cursor-pointer" : ""
                 }`}
+                onTouchStart={handleCoverTouchStart}
+                onTouchMove={handleCoverTouchMove}
+                onTouchEnd={handleCoverTouchEnd}
+                onTouchCancel={handleCoverTouchEnd}
                 onClick={(e) => {
+                  if (!isDesktop && coverLongPressTriggeredRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    coverLongPressTriggeredRef.current = false;
+                    return;
+                  }
                   if (isDesktop && displayTrack.albumId) {
                     e.stopPropagation();
                     navigate(
@@ -1104,6 +1120,17 @@ export function PlayerBar() {
                 ) : (
                   <div className="w-full h-full bg-white/10" />
                 )}
+                {!isDesktop && liked ? (
+                  <span
+                    aria-label="Liked track"
+                    className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-primary/60 bg-black/80 text-primary shadow-[0_0_10px_rgba(34,211,238,0.48)] backdrop-blur-md"
+                  >
+                    <HeartBold
+                      size={10}
+                      className="animate-crate-icon-active-pulse"
+                    />
+                  </span>
+                ) : null}
               </div>
 
               {/* Text — crossfades outgoing ↔ incoming. Stacks absolutely to allow
@@ -1212,49 +1239,48 @@ export function PlayerBar() {
                     </p>
                   </div>
                 )}
-                {effectiveIsBuffering && (
-                  <p className="text-[10px] text-primary/80 truncate leading-tight mt-0.5">
-                    Buffering...
-                  </p>
-                )}
               </div>
 
-              <div className="ml-1 flex shrink-0 items-center gap-0.5">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleLike();
-                  }}
-                  className="shrink-0 rounded-md p-1.5 transition-colors hover:bg-white/5"
-                >
-                  <Heart
-                    size={16}
-                    className={
-                      liked
-                        ? "text-primary fill-primary"
-                        : "text-white/30 hover:text-white/60"
-                    }
-                  />
-                </button>
+              {isDesktop ? (
+                <div className="ml-1 flex shrink-0 items-center gap-0.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleLike();
+                    }}
+                    className="shrink-0 p-1.5 transition-[color,filter,transform] hover:-translate-y-px"
+                  >
+                    {liked ? (
+                      <HeartBold
+                        size={CRATE_ICON_SIZE.md}
+                        className="animate-crate-icon-active-pulse text-primary"
+                      />
+                    ) : (
+                      <Heart
+                        size={CRATE_ICON_SIZE.md}
+                        className="text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
+                      />
+                    )}
+                  </button>
 
-                {/* Radio shaping — thumbs up/down when shaped radio is active */}
-                {isDesktop && isShapedRadioTrack && (
-                  <RadioFeedback
-                    sessionId={shapedRadioSessionId!}
-                    trackId={displayTrack.libraryTrackId}
-                    onDislike={handleNextTrack}
-                  />
-                )}
+                  {isShapedRadioTrack && (
+                    <RadioFeedback
+                      sessionId={shapedRadioSessionId!}
+                      trackId={displayTrack.libraryTrackId}
+                      onDislike={handleNextTrack}
+                    />
+                  )}
 
-                <div onClick={(e) => e.stopPropagation()}>
-                  <PlayerTrackMenu
-                    currentTrack={displayTrack}
-                    duration={effectiveDisplayedDuration || duration}
-                    onOverlayChange={setHasFloatingOverlayOpen}
-                    onAddToCollection={handleAddToCollection}
-                  />
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <PlayerTrackMenu
+                      currentTrack={displayTrack}
+                      duration={effectiveDisplayedDuration || duration}
+                      onOverlayChange={setHasFloatingOverlayOpen}
+                      onAddToCollection={handleAddToCollection}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {/* ── Block 2: Controls + Progress ── */}
@@ -1277,44 +1303,45 @@ export function PlayerBar() {
                     className={`transition-colors ${
                       shuffle
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                     }`}
                   >
-                    <Shuffle size={15} />
+                    <Shuffle size={CRATE_ICON_SIZE.md} />
                   </button>
                   <button
                     onClick={handlePreviousTrack}
                     aria-label="Previous track"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                   >
-                    <SkipBack size={18} fill="currentColor" />
+                    <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
                   </button>
-                  <button
+                  <SpectrumPlayButton
                     onClick={handlePlayPause}
                     aria-label={effectiveIsPlaying ? "Pause" : "Play"}
-                    className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 hover:scale-105",
-                      transportButtonClass,
-                    )}
+                    size="sm"
+                    active={effectiveIsPlaying}
                   >
                     {effectiveIsBuffering ? (
-                      <Loader2 size={15} className="animate-spin text-black" />
+                      <Loader2 size={17} className="animate-spin text-white" />
                     ) : effectiveIsPlaying ? (
-                      <Pause size={16} className="text-black" />
+                      <Pause size={CRATE_ICON_SIZE.md} className="text-white" />
                     ) : (
                       <Play
-                        size={16}
-                        className="text-black ml-0.5"
-                        fill="black"
+                        size={CRATE_ICON_SIZE.md}
+                        className="ml-0.5 text-white"
+                        fill="currentColor"
                       />
                     )}
-                  </button>
+                  </SpectrumPlayButton>
                   <button
                     onClick={handleNextTrack}
                     aria-label="Next track"
-                    className="text-white/50 hover:text-white transition-colors"
+                    className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                   >
-                    <SkipForward size={18} fill="currentColor" />
+                    <SkipForward
+                      size={CRATE_ICON_SIZE.lg}
+                      fill="currentColor"
+                    />
                   </button>
                   <button
                     onClick={handleCycleRepeat}
@@ -1322,13 +1349,13 @@ export function PlayerBar() {
                     className={`transition-colors ${
                       repeat !== "off"
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                     }`}
                   >
                     {repeat === "one" ? (
-                      <Repeat1 size={15} />
+                      <Repeat1 size={CRATE_ICON_SIZE.md} />
                     ) : (
-                      <Repeat size={15} />
+                      <Repeat size={CRATE_ICON_SIZE.md} />
                     )}
                   </button>
                 </div>
@@ -1402,57 +1429,39 @@ export function PlayerBar() {
             </div>
 
             {/* ── Mobile/tablet play controls (md only, no progress) ── */}
-            <div className="flex items-center gap-0.5 md:hidden">
-              {isShapedRadioTrack ? (
-                <RadioFeedback
-                  sessionId={shapedRadioSessionId!}
-                  trackId={displayTrack.libraryTrackId}
-                  onDislike={handleNextTrack}
-                  size="sm"
-                />
-              ) : (
-                <button
-                  onClick={handlePreviousTrack}
-                  aria-label="Previous track"
-                  className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white"
-                >
-                  <SkipBack size={18} fill="currentColor" />
-                </button>
-              )}
-              <button
+            <div className="flex items-center gap-1 md:hidden">
+              <SpectrumPlayButton
                 onClick={handlePlayPause}
                 aria-label={effectiveIsPlaying ? "Pause" : "Play"}
-                className={cn(
-                  "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border text-black transition-[transform,background-color,box-shadow,border-color] duration-200 active:scale-95",
-                  transportButtonClass,
-                )}
+                size="md"
+                active={effectiveIsPlaying}
+                className="touch-manipulation"
               >
                 {effectiveIsBuffering ? (
-                  <Loader2 size={15} className="animate-spin text-black" />
+                  <Loader2
+                    size={CRATE_ICON_SIZE.md}
+                    className="animate-spin text-white"
+                  />
                 ) : effectiveIsPlaying ? (
-                  <Pause size={16} className="text-black" />
+                  <Pause size={CRATE_ICON_SIZE.lg} className="text-white" />
                 ) : (
-                  <Play size={16} className="text-black ml-0.5" fill="black" />
+                  <Play
+                    size={CRATE_ICON_SIZE.lg}
+                    className="ml-0.5 text-white"
+                    fill="currentColor"
+                  />
                 )}
+              </SpectrumPlayButton>
+              <button
+                onClick={handleNextTrack}
+                aria-label="Next track"
+                className="flex h-12 w-12 touch-manipulation items-center justify-center text-white/50 transition-[color,filter,transform] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] active:scale-[0.96] active:text-primary"
+              >
+                <SkipForward
+                  size={CRATE_ICON_SIZE.navMobile}
+                  fill="currentColor"
+                />
               </button>
-              {isShapedRadioTrack && !isRemoteConnectActive ? (
-                <button
-                  onTouchStart={prepareFullscreenPlayer}
-                  onClick={openFullscreenPlayer}
-                  aria-label="Open fullscreen player"
-                  className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/35 transition-colors active:bg-white/5 active:text-white/60 hover:text-white/60"
-                >
-                  <Maximize2 size={16} />
-                </button>
-              ) : (
-                <button
-                  onClick={handleNextTrack}
-                  aria-label="Next track"
-                  className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/50 transition-colors active:bg-white/5 active:text-white"
-                >
-                  <SkipForward size={18} fill="currentColor" />
-                </button>
-              )}
             </div>
 
             {/* ── Block 3: Action Buttons ── */}
@@ -1493,13 +1502,13 @@ export function PlayerBar() {
                     onMouseEnter={prepareEqualizerPopover}
                     onFocus={prepareEqualizerPopover}
                     aria-label="Equalizer"
-                    className={`rounded-md p-1.5 transition-colors hover:bg-white/5 ${
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                       showEqualizer
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary"
                     }`}
                   >
-                    <SlidersHorizontal size={16} />
+                    <SlidersHorizontal size={CRATE_ICON_SIZE.md} />
                   </button>
                 )}
 
@@ -1509,14 +1518,14 @@ export function PlayerBar() {
                     onClick={handleToggleQueue}
                     onMouseEnter={prepareQueuePanel}
                     onFocus={prepareQueuePanel}
-                    className={`relative rounded-md p-1.5 transition-colors hover:bg-white/5 ${
+                    className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                       showQueue
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary"
                     }`}
                     aria-label="Queue"
                   >
-                    <ListMusic size={16} />
+                    <ListMusic size={CRATE_ICON_SIZE.md} />
                     {displayQueue.length > 1 && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] font-bold text-primary-foreground">
                         {displayQueue.length - displayCurrentIndex - 1}
@@ -1531,14 +1540,14 @@ export function PlayerBar() {
                     onClick={handleToggleLyrics}
                     onMouseEnter={prepareLyricsPanel}
                     onFocus={prepareLyricsPanel}
-                    className={`hidden rounded-md p-1.5 transition-colors hover:bg-white/5 xl:block ${
+                    className={`hidden p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] xl:block ${
                       showLyrics
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary"
                     }`}
                     aria-label="Lyrics"
                   >
-                    <Mic2 size={16} />
+                    <Mic2 size={CRATE_ICON_SIZE.md} />
                   </button>
                 )}
 
@@ -1548,14 +1557,14 @@ export function PlayerBar() {
                     onClick={handleToggleExtendedPlayer}
                     onMouseEnter={prepareExtendedPlayer}
                     onFocus={prepareExtendedPlayer}
-                    className={`rounded-md p-1.5 transition-colors hover:bg-white/5 ${
+                    className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                       extendedOpen
                         ? "text-primary"
-                        : "text-white/30 hover:text-white/60"
+                        : "text-white/30 hover:text-primary"
                     }`}
                     aria-label="Expand player"
                   >
-                    <Maximize2 size={16} />
+                    <Maximize2 size={CRATE_ICON_SIZE.md} />
                   </button>
                 )}
               </div>
@@ -1569,13 +1578,13 @@ export function PlayerBar() {
                   onMouseEnter={prepareQueuePanel}
                   onFocus={prepareQueuePanel}
                   aria-label="Queue"
-                  className={`p-1.5 hover:bg-white/5 rounded-md transition-colors relative ${
+                  className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                     showQueue
                       ? "text-primary"
-                      : "text-white/30 hover:text-white/60"
+                      : "text-white/30 hover:text-primary"
                   }`}
                 >
-                  <ListMusic size={16} />
+                  <ListMusic size={CRATE_ICON_SIZE.md} />
                 </button>
               )}
               {!isRemoteConnectActive && (
@@ -1584,13 +1593,13 @@ export function PlayerBar() {
                   onMouseEnter={prepareExtendedPlayer}
                   onFocus={prepareExtendedPlayer}
                   aria-label="Expand player"
-                  className={`p-1.5 hover:bg-white/5 rounded-md transition-colors ${
+                  className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                     extendedOpen
                       ? "text-primary"
-                      : "text-white/30 hover:text-white/60"
+                      : "text-white/30 hover:text-primary"
                   }`}
                 >
-                  <Maximize2 size={16} />
+                  <Maximize2 size={CRATE_ICON_SIZE.md} />
                 </button>
               )}
             </div>

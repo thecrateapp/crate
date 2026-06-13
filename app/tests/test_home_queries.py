@@ -33,6 +33,53 @@ class TestHomeCatalog:
         rows = get_recent_global_artist_rows(limit=1)
         assert len(rows) == 1
 
+    def test_get_recent_global_artist_rows_uses_artist_first_album_not_metadata_update(
+        self, pg_db
+    ):
+        from crate.db.queries.home_catalog import get_recent_global_artist_rows
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Old Photo Update", "has_photo": 1})
+        pg_db.upsert_album(
+            {
+                "artist": "Old Photo Update",
+                "name": "Old Album",
+                "path": "/music/old-photo-update/old-album",
+                "dir_mtime": 100,
+                "track_count": 1,
+            }
+        )
+        pg_db.upsert_artist({"name": "Actually New Artist", "has_photo": 1})
+        pg_db.upsert_album(
+            {
+                "artist": "Actually New Artist",
+                "name": "First Album",
+                "path": "/music/actually-new-artist/first-album",
+                "dir_mtime": 900,
+                "track_count": 1,
+            }
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET updated_at = NOW() + INTERVAL '1 day',
+                        dir_mtime = NULL,
+                        has_photo = 1
+                    WHERE name = 'Old Photo Update'
+                    """
+                )
+            )
+
+        rows = get_recent_global_artist_rows(limit=2)
+
+        assert [row["name"] for row in rows] == [
+            "Actually New Artist",
+            "Old Photo Update",
+        ]
+
     def test_get_artist_genres_map_empty(self, pg_db):
         from crate.db.queries.home_catalog import get_artist_genres_map
 

@@ -81,7 +81,9 @@ describe("AppModal", () => {
     );
     const dialog = screen.getByRole("dialog");
     const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
-    const handle = dialog.querySelector(".touch-pan-y") as HTMLElement;
+    const handle = dialog.querySelector(
+      "[data-mobile-sheet-drag-handle='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 240,
       height: 200,
@@ -112,7 +114,9 @@ describe("AppModal", () => {
     );
     const dialog = screen.getByRole("dialog");
     const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
-    const handle = dialog.querySelector(".touch-pan-y") as HTMLElement;
+    const handle = dialog.querySelector(
+      "[data-mobile-sheet-drag-handle='true']",
+    ) as HTMLElement;
     vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
       bottom: 240,
       height: 200,
@@ -131,6 +135,131 @@ describe("AppModal", () => {
     vi.advanceTimersByTime(180);
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses after pointer dragging the mobile sheet handle", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose} mobileSafeArea>
+        Content
+      </AppModal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    const handle = dialog.querySelector(
+      "[data-mobile-sheet-drag-handle='true']",
+    ) as HTMLElement;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 240,
+      height: 200,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+
+    fireEvent.pointerDown(handle, {
+      button: 0,
+      clientY: 0,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(handle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(handle, {
+      clientY: 140,
+      pointerId: 1,
+      pointerType: "touch",
+    });
+    vi.advanceTimersByTime(180);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("dismisses after dragging down from the mobile sheet header", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose} mobileSafeArea>
+        <ModalHeader data-testid="sheet-header">Title</ModalHeader>
+        <ModalBody>Body</ModalBody>
+      </AppModal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 280,
+      height: 240,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+
+    fireEvent.touchStart(screen.getByTestId("sheet-header"), {
+      touches: [{ clientY: 90 }],
+    });
+    fireEvent.touchMove(panel, { touches: [{ clientY: 230 }] });
+    fireEvent.touchEnd(panel);
+    vi.advanceTimersByTime(180);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the entrance animation while dragging so the drag transform wins", () => {
+    const onClose = vi.fn();
+    render(
+      <AppModal open onClose={onClose} mobileSafeArea>
+        <ModalHeader data-testid="sheet-header">Title</ModalHeader>
+        <ModalBody>Body</ModalBody>
+      </AppModal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    const panel = dialog.querySelector("[tabindex='-1']") as HTMLElement;
+    vi.spyOn(panel, "getBoundingClientRect").mockReturnValue({
+      bottom: 280,
+      height: 240,
+      left: 0,
+      right: 320,
+      top: 40,
+      width: 320,
+      x: 0,
+      y: 40,
+      toJSON: () => {},
+    });
+
+    fireEvent.touchStart(screen.getByTestId("sheet-header"), {
+      touches: [{ clientY: 90 }],
+    });
+    fireEvent.touchMove(panel, { touches: [{ clientY: 130 }] });
+
+    expect(panel).toHaveStyle({ transform: "translateY(40px)" });
+    expect(panel).not.toHaveClass("animate-sheet-up");
+  });
+
+  it("uses a non-scroll touch target for the mobile drag handle", () => {
+    render(
+      <AppModal open onClose={vi.fn()} mobileSafeArea>
+        Content
+      </AppModal>,
+    );
+
+    const handle = screen
+      .getByRole("dialog")
+      .querySelector("[data-mobile-sheet-drag-handle='true']");
+
+    expect(handle).toHaveClass("touch-none");
+    expect(handle).not.toHaveClass("touch-pan-y");
   });
 
   it("does not call onClose when overlay click is disabled", async () => {

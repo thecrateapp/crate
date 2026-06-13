@@ -205,7 +205,7 @@ export function JustLandedSection({
       ) : artists?.length ? (
         <>
           <div className="xl:hidden">
-            <SectionRail>
+            <SectionRail fit="square-card">
               {artists.slice(0, 7).map((artist) => {
                 const albumCount = artist.albums ?? artist.album_count ?? 0;
                 const trackCount = artist.tracks ?? artist.track_count ?? 0;
@@ -219,6 +219,8 @@ export function JustLandedSection({
                     subtitle={`${albumCount} album${
                       albumCount === 1 ? "" : "s"
                     } · ${trackCount} tracks`}
+                    layout="grid"
+                    fillGrid
                   />
                 );
               })}

@@ -26,6 +26,11 @@ class BandcampSearchResult:
     url: str
 
 
+KNOWN_ARTIST_BANDCAMP_SLUGS: dict[str, tuple[str, ...]] = {
+    "converge": ("convergecult",),
+}
+
+
 class _BandcampSearchParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -358,7 +363,15 @@ def _title_artist(title: str) -> str:
 
 
 def _candidate_artist_urls(artist_name: str) -> list[str]:
-    return [f"https://{slug}.bandcamp.com" for slug in _candidate_slugs(artist_name)]
+    artist_key = normalize_key(artist_name)
+    slugs = [
+        *KNOWN_ARTIST_BANDCAMP_SLUGS.get(artist_key, ()),
+        *_candidate_slugs(artist_name),
+    ]
+    return [
+        f"https://{slug}.bandcamp.com"
+        for slug in dict.fromkeys(slug for slug in slugs if slug)
+    ]
 
 
 def _candidate_slugs(value: str) -> list[str]:

@@ -192,6 +192,25 @@ def _run_projector_loop(stop_event: threading.Event):
     run_projector_loop(stop_event, interval_seconds=5, limit=200)
 
 
+def _run_periodic_cleanup() -> None:
+    from crate.db.events import cleanup_old_events, cleanup_old_tasks
+    from crate.db.repositories.auth import (
+        cleanup_ended_jam_rooms,
+        cleanup_expired_sessions,
+    )
+    from crate.db.repositories.recommendations import (
+        delete_expired_recommendation_exposures,
+    )
+    from crate.db.worker_logs import cleanup_old_logs
+
+    cleanup_old_events(max_age_hours=48)
+    cleanup_old_tasks(max_age_days=7)
+    cleanup_expired_sessions(max_age_days=3, stale_age_days=30)
+    cleanup_ended_jam_rooms(max_age_days=30)
+    delete_expired_recommendation_exposures()
+    cleanup_old_logs(max_age_days=7)
+
+
 def _run_service_loop(config: dict, stop_event: threading.Event):
     """Background thread: scheduler checks, watcher, zombie cleanup, import queue."""
     import time as _time
@@ -447,18 +466,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
         if now - last_cleanup > 3600:
             last_cleanup = now
             try:
-                from crate.db.events import cleanup_old_events, cleanup_old_tasks
-                from crate.db.repositories.auth import (
-                    cleanup_expired_sessions,
-                    cleanup_ended_jam_rooms,
-                )
-                from crate.db.worker_logs import cleanup_old_logs
-
-                cleanup_old_events(max_age_hours=48)
-                cleanup_old_tasks(max_age_days=7)
-                cleanup_expired_sessions(max_age_days=3, stale_age_days=30)
-                cleanup_ended_jam_rooms(max_age_days=30)
-                cleanup_old_logs(max_age_days=7)
+                _run_periodic_cleanup()
             except Exception:
                 log.debug("Auto-cleanup failed")
 

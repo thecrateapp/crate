@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { OfflineBadge } from "./OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 
 describe("OfflineBadge", () => {
   it("returns null for idle state", () => {

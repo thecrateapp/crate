@@ -128,6 +128,7 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 		"tracks":  tracks,
 	}, nil
 }
+
 // Favorites returns all favorited items ordered by creation time.
 func (s *Store) Favorites(ctx context.Context) (map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
@@ -349,6 +350,7 @@ func (s *Store) PlayHistory(ctx context.Context, userID int64, limit int) ([]map
 	}
 	return rows, nil
 }
+
 // Genres returns all genres with artist/album counts and taxonomy metadata.
 func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
@@ -421,6 +423,16 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 	defer cancel()
 
 	artists, err := rowsToMaps(s.pool.Query(queryCtx, `
+		WITH ranked_artist_genres AS (
+			SELECT
+				ag.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY ag.artist_name
+					ORDER BY ag.weight DESC NULLS LAST, g.name ASC
+				) AS genre_rank
+			FROM artist_genres ag
+			JOIN genres g ON g.id = ag.genre_id
+		)
 		SELECT
 			ag.artist_name,
 			la.id AS artist_id,
@@ -432,15 +444,38 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 			la.has_photo,
 			la.spotify_popularity,
 			la.listeners
-		FROM artist_genres ag
+		FROM ranked_artist_genres ag
 		JOIN library_artists la ON ag.artist_name = la.name
-		WHERE ag.genre_id = $1
+		WHERE ag.genre_rank = 1
+		  AND ag.genre_id = $1
 		ORDER BY ag.weight DESC, la.listeners DESC NULLS LAST
 	`, genreID))
 	if err != nil {
 		return nil, err
 	}
 	albums, err := rowsToMaps(s.pool.Query(queryCtx, `
+		WITH ranked_artist_genres AS (
+			SELECT
+				ag.*,
+				ROW_NUMBER() OVER (
+					PARTITION BY ag.artist_name
+					ORDER BY ag.weight DESC NULLS LAST, g.name ASC
+				) AS genre_rank
+			FROM artist_genres ag
+			JOIN genres g ON g.id = ag.genre_id
+		),
+		primary_artists AS (
+			SELECT artist_name, weight
+			FROM ranked_artist_genres
+			WHERE genre_rank = 1
+			  AND genre_id = $1
+		),
+		album_genre_weights AS (
+			SELECT album_id, MAX(weight) AS weight
+			FROM album_genres
+			WHERE genre_id = $1
+			GROUP BY album_id
+		)
 		SELECT DISTINCT ON (a.id)
 			a.id AS album_id,
 			a.slug AS album_slug,
@@ -449,19 +484,25 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 			ar.slug AS artist_slug,
 			a.name,
 			a.year,
-			a.track_count,
-			a.has_cover,
-			COALESCE(alg.weight, ag.weight, 0.5) AS weight
-		FROM library_albums a
-		LEFT JOIN library_artists ar ON ar.name = a.artist
-		LEFT JOIN album_genres alg ON alg.album_id = a.id AND alg.genre_id = $1
-		LEFT JOIN artist_genres ag ON ag.artist_name = a.artist AND ag.genre_id = $1
-		WHERE alg.genre_id IS NOT NULL OR ag.genre_id IS NOT NULL
-		ORDER BY a.id, a.year DESC NULLS LAST
-	`, genreID))
+				a.track_count,
+				a.has_cover,
+				COALESCE(alg.weight, pa.weight, 0.5) AS weight
+			FROM library_albums a
+			JOIN primary_artists pa ON pa.artist_name = a.artist
+			LEFT JOIN library_artists ar ON ar.name = a.artist
+			LEFT JOIN album_genre_weights alg ON alg.album_id = a.id
+			ORDER BY a.id, a.year DESC NULLS LAST
+		`, genreID))
 	if err != nil {
 		return nil, err
 	}
+	summary["artist_count"] = len(artists)
+	summary["album_count"] = len(albums)
+	var trackTotal int64
+	for _, album := range albums {
+		trackTotal += intValue(album["track_count"])
+	}
+	summary["track_count"] = trackTotal
 	summary["artists"] = artists
 	summary["albums"] = albums
 	return summary, nil

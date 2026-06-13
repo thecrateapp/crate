@@ -127,4 +127,52 @@ describe("BandcampSupportButton", () => {
 
     expect(await screen.findByText("Support on Bandcamp")).toBeInTheDocument();
   });
+
+  it("uses the artist URL returned by an album link when the album URL is missing", async () => {
+    mockApi.mockResolvedValueOnce({
+      entity_type: "album",
+      entity_uid: "album-4",
+      album_url: null,
+      item_url: null,
+      artist_url: "https://artist-only.bandcamp.com",
+      user_owned: false,
+      user_downloadable: false,
+      latest_import_status: null,
+    });
+
+    render(<BandcampSupportButton entityType="album" entityUid="album-4" />);
+
+    await userEvent.click(await screen.findByText("Support on Bandcamp"));
+
+    expect(mockOpenExternalUrl).toHaveBeenCalledWith(
+      "https://artist-only.bandcamp.com",
+    );
+  });
+
+  it("can render as a frameless secondary action with a visible label", async () => {
+    mockApi.mockResolvedValueOnce({
+      entity_type: "artist",
+      entity_uid: "artist-2",
+      artist_url: "https://crossed.bandcamp.com",
+      user_owned: false,
+      user_downloadable: false,
+      latest_import_status: null,
+    });
+
+    render(
+      <BandcampSupportButton
+        entityType="artist"
+        entityUid="artist-2"
+        presentation="secondary-action"
+      />,
+    );
+
+    const action = await screen.findByRole("button", {
+      name: /support on bandcamp/i,
+    });
+    expect(action).toHaveTextContent("Bandcamp");
+    expect(action).toHaveClass("hover:text-primary");
+    expect(action.className).toContain("hover:drop-shadow");
+    expect(action).not.toHaveClass("rounded-full");
+  });
 });

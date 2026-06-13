@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { Loader2, Search, UserRoundPlus, Users } from "lucide-react";
+import { Loader2, Search, UserRoundPlus, Users } from "@crate/ui/icons";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";

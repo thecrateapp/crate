@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import { CRATE_ICON_SIZE, type LucideIcon } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -28,7 +28,7 @@ export function OpsPanel({
       <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/70">
-            <Icon size={16} />
+            <Icon size={CRATE_ICON_SIZE.md} />
           </div>
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-tight text-white">

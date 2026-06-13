@@ -133,6 +133,7 @@ def update_genre_taxonomy_node_metadata(
     name: str | None = None,
     description: str | None = None,
     top_level: bool | None = None,
+    cover_path: str | None = None,
     session=None,
 ) -> bool:
     slug = (slug or "").strip().lower()
@@ -152,6 +153,9 @@ def update_genre_taxonomy_node_metadata(
     if top_level is not None:
         fields.append("is_top_level = :top_level")
         params["top_level"] = bool(top_level)
+    if cover_path is not None:
+        fields.append("cover_path = :cover_path")
+        params["cover_path"] = (cover_path or "").strip() or None
     if not fields:
         return False
 
@@ -162,6 +166,7 @@ def update_genre_taxonomy_node_metadata(
                 name=name,
                 description=description,
                 top_level=top_level,
+                cover_path=cover_path,
                 session=s,
             )
 

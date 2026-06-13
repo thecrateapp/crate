@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
 import type { Track } from "@/contexts/PlayerContext";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import type { UpcomingItem } from "@/components/upcoming/upcoming-model";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
@@ -57,7 +58,13 @@ export interface SearchResults {
 }
 
 export interface BrowseFilters {
-  genres: { name: string; count: number }[];
+  genres: {
+    name: string;
+    count: number;
+    description?: string | null;
+    top_artists?: string[];
+    cover_url?: string | null;
+  }[];
   decades: string[];
 }
 
@@ -109,6 +116,14 @@ export interface GenreDetail {
   id: number;
   name: string;
   slug: string;
+  canonical_slug?: string | null;
+  description?: string | null;
+  canonical_description?: string | null;
+  external_description?: string | null;
+  cover_url?: string | null;
+  artist_count?: number;
+  album_count?: number;
+  track_count?: number;
   artists: {
     artist_name: string;
     artist_id?: number;
@@ -129,6 +144,7 @@ export interface GenreDetail {
     track_count: number;
     has_cover: boolean;
   }[];
+  shows?: UpcomingItem[];
 }
 
 export interface DecadeArtists {

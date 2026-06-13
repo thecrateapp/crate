@@ -33,7 +33,7 @@ import {
   Trash2,
   Upload,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { useAuth } from "@/contexts/AuthContext";

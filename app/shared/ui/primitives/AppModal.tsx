@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { X } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 
@@ -39,6 +39,34 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
+const SHEET_DRAG_ACTIVATION_PX = 8;
+
+function getTouchClientY(event: TouchEvent): number | null {
+  return event.touches[0]?.clientY ?? event.changedTouches[0]?.clientY ?? null;
+}
+
+function getScrollableAncestor(
+  target: EventTarget | null,
+  boundary: HTMLElement,
+): HTMLElement | null {
+  if (!(target instanceof Node)) return null;
+
+  let node: HTMLElement | null =
+    target instanceof HTMLElement ? target : target.parentElement;
+
+  while (node && node !== boundary) {
+    const style = window.getComputedStyle(node);
+    const canScrollY =
+      /(auto|scroll|overlay)/.test(style.overflowY) &&
+      node.scrollHeight > node.clientHeight;
+
+    if (canScrollY) return node;
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
 export function AppModal({
   open,
   onClose,
@@ -58,8 +86,15 @@ export function AppModal({
     if (!open) return undefined;
 
     const previousOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousHtmlOverscroll =
+      document.documentElement.style.overscrollBehavior;
     if (lockBodyScroll) {
       document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "none";
+      document.documentElement.style.overflow = "hidden";
+      document.documentElement.style.overscrollBehavior = "none";
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -100,6 +135,10 @@ export function AppModal({
     return () => {
       if (lockBodyScroll) {
         document.body.style.overflow = previousOverflow;
+        document.body.style.overscrollBehavior = previousBodyOverscroll;
+        document.documentElement.style.overflow = previousHtmlOverflow;
+        document.documentElement.style.overscrollBehavior =
+          previousHtmlOverscroll;
       }
       window.removeEventListener("keydown", onKeyDown);
     };
@@ -129,11 +168,15 @@ export function AppModal({
   }, [open]);
 
   // Swipe-to-dismiss (mobile bottom sheet — drag handle only)
+  const [isEntering, setIsEntering] = useState(open);
   const [isDragging, setIsDragging] = useState(false);
   const [isDragClosing, setIsDragClosing] = useState(false);
   const [swipeY, setSwipeY] = useState(0);
   const swipeYRef = useRef(0);
   const swipeStartRef = useRef<number | null>(null);
+  const pointerDragIdRef = useRef<number | null>(null);
+  const pendingTouchStartYRef = useRef<number | null>(null);
+  const pendingTouchTargetRef = useRef<EventTarget | null>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const dragCloseTimerRef = useRef<number | null>(null);
   const setDragOffset = useCallback((offset: number) => {
@@ -153,29 +196,46 @@ export function AppModal({
       onClose();
     }, 180);
   }, [getPanelHeight, isDragClosing, onClose, setDragOffset]);
-  const onSwipeStart = useCallback(
-    (e: React.TouchEvent) => {
-      if (!dragHandleRef.current) return;
-      const handleRect = dragHandleRef.current.getBoundingClientRect();
-      const touchY = e.touches[0]!.clientY;
-      if (touchY > handleRect.bottom + 8) return;
-      e.stopPropagation();
-      swipeStartRef.current = touchY;
+  const beginDrag = useCallback(
+    (clientY: number) => {
+      swipeStartRef.current = clientY;
+      setIsEntering(false);
       setIsDragging(true);
       setDragOffset(0);
     },
     [setDragOffset],
   );
-  const onSwipeMove = useCallback(
-    (e: React.TouchEvent) => {
+
+  const updateDrag = useCallback(
+    (clientY: number) => {
       if (swipeStartRef.current === null) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const dy = e.touches[0]!.clientY - swipeStartRef.current;
+      const dy = clientY - swipeStartRef.current;
       setDragOffset(dy > 0 ? Math.min(dy, getPanelHeight() + 24) : 0);
     },
     [getPanelHeight, setDragOffset],
   );
+
+  const canStartDragFromTarget = useCallback((target: EventTarget | null) => {
+    const panel = panelRef.current;
+    if (!panel || !(target instanceof Node) || !panel.contains(target)) {
+      return false;
+    }
+    if (dragHandleRef.current?.contains(target)) return true;
+
+    const scrollable = getScrollableAncestor(target, panel);
+    return !scrollable || scrollable.scrollTop <= 0;
+  }, []);
+
+  const handlePointerDragMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (swipeStartRef.current === null) return;
+      event.preventDefault();
+      event.stopPropagation();
+      updateDrag(event.clientY);
+    },
+    [updateDrag],
+  );
+
   const onSwipeEnd = useCallback(() => {
     if (swipeStartRef.current === null) return;
     const shouldDismiss = swipeYRef.current >= getPanelHeight() / 2;
@@ -191,7 +251,42 @@ export function AppModal({
     setIsDragging(false);
     setDragOffset(0);
     swipeStartRef.current = null;
+    pointerDragIdRef.current = null;
+    pendingTouchStartYRef.current = null;
+    pendingTouchTargetRef.current = null;
   }, [setDragOffset]);
+
+  const onPointerSwipeStart = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      pointerDragIdRef.current = event.pointerId;
+      beginDrag(event.clientY);
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    },
+    [beginDrag],
+  );
+
+  const onPointerSwipeMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (pointerDragIdRef.current !== event.pointerId) return;
+      handlePointerDragMove(event);
+    },
+    [handlePointerDragMove],
+  );
+
+  const onPointerSwipeEnd = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (pointerDragIdRef.current !== event.pointerId) return;
+      pointerDragIdRef.current = null;
+      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      onSwipeEnd();
+    },
+    [onSwipeEnd],
+  );
   const isDismissedRef = useRef(false);
   const handleOverlayPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -222,12 +317,84 @@ export function AppModal({
 
   useEffect(() => {
     if (open) {
+      setIsEntering(true);
       setIsDragging(false);
       setIsDragClosing(false);
       setDragOffset(0);
       return;
     }
   }, [open, setDragOffset]);
+
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const handleNativeTouchStart = (event: TouchEvent) => {
+      const clientY = getTouchClientY(event);
+      if (clientY === null) return;
+      pendingTouchStartYRef.current = clientY;
+      pendingTouchTargetRef.current = event.target;
+    };
+
+    const handleNativeTouchMove = (event: TouchEvent) => {
+      const startY = pendingTouchStartYRef.current;
+      if (startY === null) return;
+
+      const clientY = getTouchClientY(event);
+      if (clientY === null) return;
+
+      const dy = clientY - startY;
+      if (swipeStartRef.current === null) {
+        if (dy <= SHEET_DRAG_ACTIVATION_PX) return;
+        if (!canStartDragFromTarget(pendingTouchTargetRef.current)) return;
+        beginDrag(startY);
+      }
+
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+      updateDrag(clientY);
+    };
+
+    const handleNativeTouchEnd = () => {
+      pendingTouchStartYRef.current = null;
+      pendingTouchTargetRef.current = null;
+      if (swipeStartRef.current !== null) {
+        onSwipeEnd();
+      }
+    };
+
+    const handleNativeTouchCancel = () => {
+      pendingTouchStartYRef.current = null;
+      pendingTouchTargetRef.current = null;
+      onSwipeCancel();
+    };
+
+    panel.addEventListener("touchstart", handleNativeTouchStart, {
+      passive: true,
+    });
+    panel.addEventListener("touchmove", handleNativeTouchMove, {
+      passive: false,
+    });
+    panel.addEventListener("touchend", handleNativeTouchEnd);
+    panel.addEventListener("touchcancel", handleNativeTouchCancel);
+
+    return () => {
+      panel.removeEventListener("touchstart", handleNativeTouchStart);
+      panel.removeEventListener("touchmove", handleNativeTouchMove);
+      panel.removeEventListener("touchend", handleNativeTouchEnd);
+      panel.removeEventListener("touchcancel", handleNativeTouchCancel);
+    };
+  }, [
+    beginDrag,
+    canStartDragFromTarget,
+    onSwipeCancel,
+    onSwipeEnd,
+    open,
+    updateDrag,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -254,8 +421,12 @@ export function AppModal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "bg-modal-surface w-full overflow-hidden rounded-t-3xl border border-white/10 shadow-2xl sm:rounded-3xl",
-          isDragClosing ? "" : "animate-sheet-up sm:animate-pop-in",
+          "bg-modal-surface w-full overflow-hidden overscroll-contain rounded-t-3xl border border-white/10 shadow-2xl sm:rounded-3xl",
+          isDragClosing
+            ? undefined
+            : isEntering && !isDragging
+              ? "animate-sheet-up sm:animate-pop-in"
+              : undefined,
           mobileSafeArea
             ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
             : "max-h-[92vh]",
@@ -273,18 +444,19 @@ export function AppModal({
           isDismissedRef.current = false;
           event.stopPropagation();
         }}
-        onTouchStart={onSwipeStart}
-        onTouchMove={onSwipeMove}
-        onTouchEnd={onSwipeEnd}
-        onTouchCancel={onSwipeCancel}
       >
         {/* Drag handle — visible on mobile only */}
         <div
           ref={dragHandleRef}
+          data-mobile-sheet-drag-handle="true"
           className={cn(
             "flex justify-center sm:hidden",
-            mobileSafeArea ? "touch-pan-y pt-4 pb-3" : "pt-2 pb-1",
+            mobileSafeArea ? "touch-none pt-4 pb-3" : "touch-none pt-2 pb-1",
           )}
+          onPointerDown={onPointerSwipeStart}
+          onPointerMove={onPointerSwipeMove}
+          onPointerUp={onPointerSwipeEnd}
+          onPointerCancel={onSwipeCancel}
         >
           <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
@@ -319,7 +491,10 @@ export function ModalBody({
   ...props
 }: ModalSectionProps) {
   return (
-    <div {...props} className={cn("overflow-y-auto", className)}>
+    <div
+      {...props}
+      className={cn("overflow-y-auto overscroll-contain", className)}
+    >
       {children}
     </div>
   );
@@ -359,13 +534,13 @@ export function ModalCloseButton({
       type="button"
       aria-label="Close"
       className={cn(
-        "rounded-full p-2 text-white/60 hover:text-white hover:bg-white/5 transition-colors",
+        "flex size-10 items-center justify-center text-white/55 transition-colors hover:text-white focus-visible:text-white focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       onClick={onClick}
       disabled={disabled}
     >
-      <X size={18} />
+      <X size={24} />
     </button>
   );
 }

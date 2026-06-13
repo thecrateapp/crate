@@ -27,7 +27,7 @@ import {
   Trash2,
   Users,
   Zap,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";

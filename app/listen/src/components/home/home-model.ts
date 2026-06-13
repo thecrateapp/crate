@@ -205,6 +205,7 @@ export interface HomeHeroArtist {
   id: number;
   slug?: string;
   name: string;
+  genres?: string[];
   listeners: number;
   scrobbles: number;
   album_count: number;
@@ -333,11 +334,14 @@ export interface HomeRecommendedTrack {
 }
 
 export interface HomeRadioStation {
-  type: "artist" | "album";
+  type: "artist" | "album" | "track" | "genre";
   title: string;
   subtitle: string;
+  seed_type?: "artist" | "album" | "track" | "genre";
+  seed_label?: string;
+  seed_subtitle?: string;
   play_count: number;
-  artist_name: string;
+  artist_name?: string;
   artist_id?: number;
   artist_entity_uid?: string;
   artist_slug?: string;
@@ -345,6 +349,10 @@ export interface HomeRadioStation {
   album_id?: number;
   album_entity_uid?: string;
   album_slug?: string;
+  track_title?: string;
+  track_id?: number;
+  genre_name?: string;
+  genre_slug?: string;
 }
 
 export interface HomeFavoriteArtist {

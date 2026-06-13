@@ -7,7 +7,7 @@ import {
   Play,
   RadioTower,
   Sparkles,
-} from "lucide-react";
+} from "@crate/ui/icons";
 
 import {
   albumPagePath,
@@ -101,9 +101,9 @@ export function HomeUpcomingSection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Upcoming"
+        title="Radar"
         subtitle="Next shows and releases from the artists you follow."
-        actionLabel="Open Upcoming"
+        actionLabel="Open Radar"
         onAction={onOpenUpcoming}
       />
 
@@ -205,7 +205,7 @@ export function HomeUpcomingSection({
                   className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
                 >
                   <Calendar size={15} />
-                  View radar
+                  View Radar
                 </button>
                 {!isShow && nextUpcoming.tidal_url ? (
                   <a
@@ -275,7 +275,7 @@ export function HomeShowPrepSection({
       <SectionHeader
         title="Show prep"
         subtitle="A couple of timely prompts from the shows you're planning to attend."
-        actionLabel="Open Upcoming"
+        actionLabel="Open Radar"
         onAction={onOpenUpcoming}
       />
 

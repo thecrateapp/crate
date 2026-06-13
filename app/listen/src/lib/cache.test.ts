@@ -246,6 +246,20 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/genres")).toEqual(["library"]);
   });
 
+  it("returns show-dependent scopes for genre detail", () => {
+    expect(scopesForUrl("/api/genres/hardcore?view=genre-detail-v5")).toEqual([
+      "library",
+      "shows",
+      "upcoming",
+    ]);
+  });
+
+  it("keeps genre cover assets scoped to library", () => {
+    expect(scopesForUrl("/api/genres/hardcore/cover?size=640")).toEqual([
+      "library",
+    ]);
+  });
+
   // Radio
   it("returns library scope for radio", () => {
     expect(scopesForUrl("/api/radio")).toEqual(["library"]);
