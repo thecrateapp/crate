@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import {
   AlertCircle,
   ArrowDownToLine,
-  CheckCircle2,
+  ArrowDownToLineBold,
   Play,
   Shuffle,
   Loader2,
@@ -16,7 +16,7 @@ import {
   Users,
   Copy,
   UserMinus,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
@@ -58,7 +58,7 @@ import { publicShareUrl } from "@/lib/share-url";
 import { openShareSheet } from "@/lib/social-share";
 import { shuffleArray, formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 
@@ -595,7 +595,7 @@ export function Playlist() {
             title={offlineButtonLabel}
           >
             {offlineState === "ready" ? (
-              <CheckCircle2 size={16} />
+              <ArrowDownToLineBold size={16} />
             ) : offlineBusy ? (
               <Loader2 size={16} className="animate-spin" />
             ) : offlineState === "error" ? (

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "@crate/ui/icons";
 
 import { cn } from "@crate/ui/lib/cn";
 

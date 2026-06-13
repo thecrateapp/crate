@@ -34,7 +34,7 @@ function walk(dir: string, extensions: string[], out: Record<string, string>) {
 
 export default defineConfig({
   entry: collectEntries(
-    ["lib", "primitives", "shadcn", "composites", "domain", "charts"],
+    ["lib", "icons", "primitives", "shadcn", "composites", "domain", "charts"],
     [".ts", ".tsx"],
   ),
   format: ["esm"],
@@ -43,11 +43,13 @@ export default defineConfig({
   splitting: true,
   treeshake: true,
   external: [
+    "@solar-icons/react-perf",
+    "@solar-icons/react-perf/Outline",
+    "@solar-icons/react-perf/Bold",
     "react",
     "react-dom",
     "react-router",
     "radix-ui",
-    "lucide-react",
     "class-variance-authority",
     "clsx",
     "tailwind-merge",

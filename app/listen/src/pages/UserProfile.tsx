@@ -10,7 +10,7 @@ import {
   UserPlus,
   UserRoundCheck,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";

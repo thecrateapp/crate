@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Copy, Loader2, MessageCircle, Send, X } from "lucide-react";
+import { Camera, Copy, Loader2, MessageCircle, Send, X } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";

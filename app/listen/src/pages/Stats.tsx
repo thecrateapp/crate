@@ -11,7 +11,7 @@ import {
   Play,
   Repeat2,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 
 import { WindowPicker } from "@/components/stats/StatsPanels";

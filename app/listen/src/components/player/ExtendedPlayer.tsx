@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { ChevronDown, Settings, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Settings, SlidersHorizontal } from "@crate/ui/icons";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
 import { PlayerSurfaceModeSwitch } from "@/components/player/PlayerSurfaceModeSwitch";

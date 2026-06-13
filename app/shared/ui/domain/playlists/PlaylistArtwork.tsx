@@ -1,4 +1,4 @@
-import { ListMusic } from "lucide-react";
+import { ListMusic } from "@crate/ui/icons";
 
 export interface PlaylistArtworkTrack {
   artist?: string;

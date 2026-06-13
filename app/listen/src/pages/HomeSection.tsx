@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
@@ -133,7 +133,11 @@ export function HomeSection() {
 
   async function playRadioStation(station: HomeRadioStation) {
     try {
-      if (station.type === "artist" && station.artist_id != null) {
+      if (
+        station.type === "artist" &&
+        station.artist_id != null &&
+        station.artist_name
+      ) {
         const radio = await fetchArtistRadio(
           station.artist_id,
           station.artist_name,
@@ -146,7 +150,11 @@ export function HomeSection() {
         playAll(radio.tracks, 0, radio.source);
         return;
       }
-      if (station.type === "album" && station.album_id != null) {
+      if (
+        station.type === "album" &&
+        station.album_id != null &&
+        station.artist_name
+      ) {
         const radio = await fetchAlbumRadio({
           albumId: station.album_id,
           artistName: station.artist_name,

@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from "react-router";
-import { ArrowLeft, Loader2, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus, Users } from "@crate/ui/icons";
 
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";

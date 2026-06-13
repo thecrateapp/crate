@@ -6,6 +6,24 @@ from crate.db.queries.genres_shared import get_genre_summary_by_slug
 from crate.db.tx import read_scope
 
 
+def _genre_target_cte() -> str:
+    return """
+        WITH target_genres AS (
+            SELECT :genre_id AS id
+        ),
+        ranked_artist_genres AS (
+            SELECT
+                ag.*,
+                ROW_NUMBER() OVER (
+                    PARTITION BY ag.artist_name
+                    ORDER BY ag.weight DESC NULLS LAST, g.name ASC
+                ) AS genre_rank
+            FROM artist_genres ag
+            JOIN genres g ON g.id = ag.genre_id
+        )
+    """
+
+
 def get_genre_detail(slug: str) -> dict | None:
     with read_scope() as session:
         genre = get_genre_summary_by_slug(session, slug)
@@ -19,7 +37,8 @@ def get_genre_detail(slug: str) -> dict | None:
         rows = (
             session.execute(
                 text(
-                    """
+                    _genre_target_cte()
+                    + """
                 SELECT
                     ag.artist_name,
                     la.id AS artist_id,
@@ -31,10 +50,15 @@ def get_genre_detail(slug: str) -> dict | None:
                     la.has_photo,
                     la.spotify_popularity,
                     la.listeners
-                FROM artist_genres ag
+                FROM ranked_artist_genres ag
                 JOIN library_artists la ON ag.artist_name = la.name
-                WHERE ag.genre_id = :genre_id
-                ORDER BY ag.weight DESC, la.listeners DESC NULLS LAST
+                WHERE ag.genre_rank = 1
+                  AND ag.genre_id IN (SELECT id FROM target_genres)
+                ORDER BY
+                    la.listeners DESC NULLS LAST,
+                    la.spotify_popularity DESC NULLS LAST,
+                    la.album_count DESC NULLS LAST,
+                    ag.artist_name ASC
                 """
                 ),
                 {"genre_id": genre["id"]},
@@ -47,8 +71,22 @@ def get_genre_detail(slug: str) -> dict | None:
         rows = (
             session.execute(
                 text(
-                    """
-                SELECT DISTINCT ON (a.id)
+                    _genre_target_cte()
+                    + """
+                ,
+                primary_artists AS (
+                    SELECT artist_name, weight
+                    FROM ranked_artist_genres
+                    WHERE genre_rank = 1
+                      AND genre_id IN (SELECT id FROM target_genres)
+                ),
+                album_genre_weights AS (
+                    SELECT album_id, MAX(weight) AS weight
+                    FROM album_genres
+                    WHERE genre_id IN (SELECT id FROM target_genres)
+                    GROUP BY album_id
+                )
+                SELECT
                     a.id AS album_id,
                     a.slug AS album_slug,
                     a.artist,
@@ -58,13 +96,16 @@ def get_genre_detail(slug: str) -> dict | None:
                     a.year,
                     a.track_count,
                     a.has_cover,
-                    COALESCE(alg.weight, ag.weight, 0.5) AS weight
+                    COALESCE(alg.weight, pa.weight, 0.5) AS weight
                 FROM library_albums a
+                JOIN primary_artists pa ON pa.artist_name = a.artist
                 LEFT JOIN library_artists ar ON ar.name = a.artist
-                LEFT JOIN album_genres alg ON alg.album_id = a.id AND alg.genre_id = :genre_id
-                LEFT JOIN artist_genres ag ON ag.artist_name = a.artist AND ag.genre_id = :genre_id
-                WHERE alg.genre_id IS NOT NULL OR ag.genre_id IS NOT NULL
-                ORDER BY a.id, a.year DESC NULLS LAST
+                LEFT JOIN album_genre_weights alg ON alg.album_id = a.id
+                ORDER BY
+                    ar.listeners DESC NULLS LAST,
+                    ar.spotify_popularity DESC NULLS LAST,
+                    a.year DESC NULLS LAST,
+                    a.name ASC
                 """
                 ),
                 {"genre_id": genre["id"]},
@@ -73,8 +114,126 @@ def get_genre_detail(slug: str) -> dict | None:
             .all()
         )
         genre["albums"] = [dict(r) for r in rows]
+        genre["artist_count"] = len(genre["artists"])
+        genre["album_count"] = len(genre["albums"])
+        genre["track_count"] = sum(
+            int(album.get("track_count") or 0) for album in genre["albums"]
+        )
 
         return genre
+
+
+def get_genre_upcoming_shows(
+    slug: str,
+    *,
+    latitude: float,
+    longitude: float,
+    radius_km: int = 60,
+    limit: int = 5,
+) -> list[dict]:
+    with read_scope() as session:
+        genre = get_genre_summary_by_slug(session, slug)
+        if not genre:
+            return []
+
+        delta = radius_km / 111.0
+        rows = (
+            session.execute(
+                text(
+                    _genre_target_cte()
+                    + """
+                ,
+                primary_artists AS (
+                    SELECT artist_name, weight
+                    FROM ranked_artist_genres
+                    WHERE genre_rank = 1
+                      AND genre_id IN (SELECT id FROM target_genres)
+                ),
+                candidate_shows AS (
+                    SELECT
+                        s.*,
+                        la.id AS artist_id,
+                        la.slug AS artist_slug,
+                        CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL THEN
+                            6371 * acos(
+                                LEAST(1.0, GREATEST(-1.0,
+                                    cos(radians(:lat)) * cos(radians(s.latitude))
+                                    * cos(radians(s.longitude) - radians(:lon))
+                                    + sin(radians(:lat)) * sin(radians(s.latitude))
+                                ))
+                            )
+                        ELSE NULL END AS distance_km,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY s.artist_name
+                            ORDER BY s.date ASC, s.local_time ASC NULLS LAST, s.id ASC
+                        ) AS artist_show_rank,
+                        ARRAY(
+                            SELECT g2.name
+                            FROM artist_genres ag2
+                            JOIN genres g2 ON g2.id = ag2.genre_id
+                            WHERE ag2.artist_name = s.artist_name
+                            ORDER BY ag2.weight DESC, g2.name ASC
+                            LIMIT 3
+                        ) AS artist_genres
+                    FROM shows s
+                    JOIN primary_artists pa ON pa.artist_name = s.artist_name
+                    LEFT JOIN library_artists la ON la.name = s.artist_name
+                    WHERE s.date >= CURRENT_DATE
+                      AND COALESCE(s.status, '') != 'cancelled'
+                      AND s.latitude IS NOT NULL
+                      AND s.longitude IS NOT NULL
+                      AND s.latitude BETWEEN :lat_min AND :lat_max
+                      AND s.longitude BETWEEN :lon_min AND :lon_max
+                )
+                SELECT
+                    id,
+                    artist_name,
+                    artist_id,
+                    artist_slug,
+                    date,
+                    local_time,
+                    venue,
+                    address_line1,
+                    city,
+                    region,
+                    postal_code,
+                    country,
+                    country_code,
+                    latitude,
+                    longitude,
+                    url,
+                    image_url,
+                    lineup,
+                    status,
+                    source,
+                    lastfm_attendance,
+                    lastfm_url,
+                    tickets_url,
+                    artist_genres,
+                    distance_km
+                FROM candidate_shows
+                WHERE artist_show_rank = 1
+                  AND distance_km <= :radius_km
+                ORDER BY date ASC, local_time ASC NULLS LAST, id ASC
+                LIMIT :lim
+                """
+                ),
+                {
+                    "genre_id": genre["id"],
+                    "lat": latitude,
+                    "lon": longitude,
+                    "lat_min": latitude - delta,
+                    "lat_max": latitude + delta,
+                    "lon_min": longitude - delta * 1.5,
+                    "lon_max": longitude + delta * 1.5,
+                    "radius_km": radius_km,
+                    "lim": limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
 
 
 def get_artists_with_tags() -> list[dict]:
@@ -159,4 +318,5 @@ __all__ = [
     "get_artists_missing_genre_mapping",
     "get_artists_with_tags",
     "get_genre_detail",
+    "get_genre_upcoming_shows",
 ]

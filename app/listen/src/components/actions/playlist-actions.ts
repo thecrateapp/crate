@@ -1,16 +1,18 @@
 import { useMemo } from "react";
 import {
   ArrowDownToLine,
+  ArrowDownToLineBold,
   Heart,
+  HeartBold,
   Loader2,
   Play,
   Radio,
   Share2,
   Shuffle,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
   action,
   sharePath,
@@ -106,7 +108,7 @@ export function usePlaylistActionEntries(
           label: input.isFollowed
             ? "Remove from your library"
             : "Add to your library",
-          icon: Heart,
+          icon: input.isFollowed ? HeartBold : Heart,
           active: input.isFollowed,
           onSelect: async () => {
             await input.onToggleFollow?.();
@@ -122,7 +124,11 @@ export function usePlaylistActionEntries(
         label: input.isSmart
           ? "Offline is only available for static playlists"
           : getOfflineActionLabel(offlineState),
-        icon: isOfflineBusy(offlineState) ? Loader2 : ArrowDownToLine,
+        icon: isOfflineBusy(offlineState)
+          ? Loader2
+          : offlineState === "ready"
+            ? ArrowDownToLineBold
+            : ArrowDownToLine,
         active: offlineState === "ready",
         disabled:
           !offlineSupported ||

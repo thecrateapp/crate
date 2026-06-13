@@ -153,6 +153,25 @@ def get_genre_taxonomy_node_id(slug: str) -> int | None:
     return row["id"] if row else None
 
 
+def get_genre_taxonomy_cover_path(slug: str) -> str | None:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT cover_path
+                    FROM genre_taxonomy_nodes
+                    WHERE slug = :slug
+                    """
+                ),
+                {"slug": (slug or "").strip().lower()},
+            )
+            .mappings()
+            .first()
+        )
+    return (row["cover_path"] or None) if row else None
+
+
 def get_remaining_without_external_description() -> int:
     with read_scope() as session:
         row = (
@@ -168,6 +187,7 @@ def get_remaining_without_external_description() -> int:
 
 
 __all__ = [
+    "get_genre_taxonomy_cover_path",
     "get_genre_taxonomy_node_id",
     "get_remaining_without_external_description",
     "list_genre_taxonomy_nodes_for_external_enrichment",

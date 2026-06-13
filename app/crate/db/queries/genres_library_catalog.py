@@ -24,6 +24,7 @@ def get_all_genres() -> list[dict]:
                     tn.description AS canonical_description,
                     tn.external_description,
                     tn.external_description_source,
+                    tn.cover_path AS canonical_cover_path,
                     tn.musicbrainz_mbid,
                     tn.wikidata_entity_id,
                     tn.wikidata_url
@@ -42,6 +43,7 @@ def get_all_genres() -> list[dict]:
                     tn.description,
                     tn.external_description,
                     tn.external_description_source,
+                    tn.cover_path,
                     tn.musicbrainz_mbid,
                     tn.wikidata_entity_id,
                     tn.wikidata_url
@@ -100,6 +102,7 @@ def get_unmapped_genres(limit: int = 24) -> list[dict]:
         item["top_level_name"] = None
         item["top_level_description"] = None
         item["description"] = None
+        item["cover_url"] = None
         item["external_description"] = None
         item["external_description_source"] = None
         item["musicbrainz_mbid"] = None

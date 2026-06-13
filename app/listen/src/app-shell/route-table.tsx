@@ -122,6 +122,8 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
   { path: "explore", element: deferred(<Explore />) },
   { path: "search", element: deferred(<SearchResults />) },
   { path: "library", element: deferred(<Library />) },
+  { path: "collection", element: deferred(<Library />) },
+  { path: "collection/:section", element: deferred(<Library />) },
   { path: "stats", element: deferred(<Stats />) },
   { path: "stats/global", element: deferred(<Stats />) },
   { path: "upload", element: deferred(<Upload />) },

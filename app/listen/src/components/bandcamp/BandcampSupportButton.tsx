@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -24,6 +24,7 @@ interface BandcampSupportButtonProps {
   fallbackArtistEntityUid?: string | null;
   className?: string;
   iconOnly?: boolean;
+  presentation?: "default" | "secondary-action";
 }
 
 interface ResolvedBandcampLink {
@@ -40,6 +41,23 @@ function linkUrlForType(
     : link.album_url || link.item_url || "";
 }
 
+function resolveBandcampLink(
+  entityType: "artist" | "album",
+  link: BandcampLinkState,
+): ResolvedBandcampLink | null {
+  if (entityType === "artist") {
+    return linkUrlForType("artist", link)
+      ? { entityType: "artist", link }
+      : null;
+  }
+
+  if (link.album_url || link.item_url) {
+    return { entityType: "album", link };
+  }
+
+  return link.artist_url ? { entityType: "artist", link } : null;
+}
+
 async function fetchBandcampLink(
   entityType: "artist" | "album",
   entityUid: string,
@@ -47,7 +65,7 @@ async function fetchBandcampLink(
   const payload = await api<BandcampLinkState>(
     `/api/bandcamp/links/${entityType}/by-entity/${entityUid}`,
   );
-  return linkUrlForType(entityType, payload) ? payload : null;
+  return resolveBandcampLink(entityType, payload);
 }
 
 export function BandcampSupportButton({
@@ -56,6 +74,7 @@ export function BandcampSupportButton({
   fallbackArtistEntityUid,
   className = "",
   iconOnly = false,
+  presentation = "default",
 }: BandcampSupportButtonProps) {
   const [resolved, setResolved] = useState<ResolvedBandcampLink | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +92,7 @@ export function BandcampSupportButton({
           : null;
         if (cancelled) return;
         if (primary) {
-          setResolved({ entityType, link: primary });
+          setResolved(primary);
           return;
         }
 
@@ -82,10 +101,7 @@ export function BandcampSupportButton({
             "artist",
             fallbackArtistEntityUid,
           );
-          if (!cancelled)
-            setResolved(
-              fallback ? { entityType: "artist", link: fallback } : null,
-            );
+          if (!cancelled) setResolved(fallback);
           return;
         }
 
@@ -126,28 +142,6 @@ export function BandcampSupportButton({
       : canImport
         ? "Import from Bandcamp"
         : "Buy this album on Bandcamp";
-
-  if (ownedAlbum && !canImport) {
-    return (
-      <span
-        className={`inline-flex h-10 items-center rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff]/90 ${
-          iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
-        } ${className}`}
-        aria-label={ownedLabel}
-      >
-        <BandcampLogo size={15} />
-        {iconOnly ? (
-          <span className="sr-only">{ownedLabel}</span>
-        ) : (
-          <>
-            <span className="hidden sm:inline">{ownedLabel}</span>
-            <span className="sm:hidden">Owned</span>
-          </>
-        )}
-      </span>
-    );
-  }
-
   const handleClick = async () => {
     if (canImport && link.bandcamp_item_id) {
       setBusy(true);
@@ -169,6 +163,61 @@ export function BandcampSupportButton({
     }
     await openExternalUrl(url);
   };
+  const secondaryActionClassName =
+    "inline-flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+
+  if (presentation === "secondary-action") {
+    const ariaLabel = ownedAlbum && !canImport ? ownedLabel : label;
+
+    if (ownedAlbum && !canImport) {
+      return (
+        <span
+          className={`${secondaryActionClassName} text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.28)] ${className}`}
+          aria-label={ariaLabel}
+        >
+          <BandcampLogo size={CRATE_ICON_SIZE.lg} />
+          <span>Bandcamp</span>
+        </span>
+      );
+    }
+
+    return (
+      <button
+        onClick={handleClick}
+        disabled={busy}
+        className={`${secondaryActionClassName} ${className}`}
+        aria-label={ariaLabel}
+      >
+        {busy ? (
+          <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
+        ) : (
+          <BandcampLogo size={CRATE_ICON_SIZE.lg} />
+        )}
+        <span>Bandcamp</span>
+      </button>
+    );
+  }
+
+  if (ownedAlbum && !canImport) {
+    return (
+      <span
+        className={`inline-flex h-10 items-center rounded-full border border-[#1da0c3]/25 bg-[#1da0c3]/10 text-sm font-medium text-[#7ee7ff]/90 ${
+          iconOnly ? "w-10 justify-center px-0" : "gap-2 px-4"
+        } ${className}`}
+        aria-label={ownedLabel}
+      >
+        <BandcampLogo size={15} />
+        {iconOnly ? (
+          <span className="sr-only">{ownedLabel}</span>
+        ) : (
+          <>
+            <span className="hidden sm:inline">{ownedLabel}</span>
+            <span className="sm:hidden">Owned</span>
+          </>
+        )}
+      </span>
+    );
+  }
 
   return (
     <button

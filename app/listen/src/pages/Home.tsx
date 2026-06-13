@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
-import { Radio as RadioIcon, RotateCcw } from "lucide-react";
+import { Radio as RadioIcon, RotateCcw } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
@@ -16,7 +16,6 @@ import {
   EssentialsSection,
   FavoriteArtistsSection,
   HomeTasteHero,
-  ListeningHistorySection,
   openRecentItemPath,
   RadioStationsSection,
   RecentlyPlayedSection,
@@ -28,6 +27,7 @@ import {
   getHomeDateString,
   getHomeGreeting,
 } from "@/components/home/HomeSections";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { HomeReplaySection } from "@/components/home/HomePlaybackSections";
 import {
   HomeShowPrepSection,
@@ -325,6 +325,9 @@ export function Home() {
   const recentGlobalArtists = currentDiscovery?.recent_global_artists || [];
   const upcoming = currentDiscovery?.upcoming;
   const replay = currentDiscovery?.replay as ReplayMix | undefined;
+  const replayMonth = replay?.window?.startsWith("month:")
+    ? replay.window.slice(6)
+    : undefined;
   const globalArtistsLoading = !currentDiscovery;
 
   const onRefresh = useCallback(async () => {
@@ -504,7 +507,11 @@ export function Home() {
 
   async function playRadioStation(station: HomeRadioStation) {
     try {
-      if (station.type === "artist" && station.artist_id != null) {
+      if (
+        station.type === "artist" &&
+        station.artist_id != null &&
+        station.artist_name
+      ) {
         const radio = await fetchArtistRadio(
           station.artist_id,
           station.artist_name,
@@ -517,7 +524,11 @@ export function Home() {
         playAll(radio.tracks, 0, radio.source);
         return;
       }
-      if (station.type === "album" && station.album_id != null) {
+      if (
+        station.type === "album" &&
+        station.album_id != null &&
+        station.artist_name
+      ) {
         const radio = await fetchAlbumRadio({
           albumId: station.album_id,
           artistName: station.artist_name,
@@ -611,6 +622,14 @@ export function Home() {
     playAll(queue, 0, { type: "playlist", name: replay.title });
   }
 
+  function openReplayStats() {
+    navigate(
+      replayMonth
+        ? `/stats?month=${encodeURIComponent(replayMonth)}`
+        : "/stats",
+    );
+  }
+
   async function startDiscoveryRadio() {
     if (startingDiscoveryRadio) return;
     setStartingDiscoveryRadio(true);
@@ -626,6 +645,10 @@ export function Home() {
     } finally {
       setStartingDiscoveryRadio(false);
     }
+  }
+
+  if (!currentDiscovery) {
+    return <CrateLoader label="Loading home." />;
   }
 
   return (
@@ -664,7 +687,7 @@ export function Home() {
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-primary">
                 <RotateCcw size={18} />
               </span>
-              Replay
+              DNA
             </button>
           </div>
         ) : (
@@ -768,26 +791,10 @@ export function Home() {
 
       {isDesktop ? (
         <>
-          <ListeningHistorySection
-            items={currentDiscovery?.listening_history || []}
-            onOpenHistory={(item) => {
-              if (!item) {
-                navigate("/stats");
-                return;
-              }
-              if (item.kind === "all_time") {
-                navigate("/stats?window=all_time");
-                return;
-              }
-              const month = item.period_start.slice(0, 7);
-              navigate(`/stats?month=${encodeURIComponent(month)}`);
-            }}
-          />
-
           <HomeReplaySection
             replay={replay || undefined}
             replayPreview={replayPreview}
-            onOpenStats={() => navigate("/stats")}
+            onOpenStats={openReplayStats}
             onPlayReplay={playReplayMix}
             onPlayTrack={(item) =>
               play(toPlayerTrack(item), { type: "track", name: item.title })

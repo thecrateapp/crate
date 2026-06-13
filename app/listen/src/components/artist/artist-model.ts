@@ -1,5 +1,7 @@
 import { type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
+import { toTrackRowData } from "@/lib/track-row-data";
+import type { TrackRowData } from "@/components/cards/TrackRow";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
 import {
@@ -61,15 +63,24 @@ export interface ArtistInfo {
 
 export interface ArtistTopTrack {
   id: string;
+  track_id?: number;
+  track_entity_uid?: string;
+  library_track_id?: number;
   artist_id?: number;
+  artist_entity_uid?: string;
   artist_slug?: string;
   album_id?: number;
+  album_entity_uid?: string;
   album_slug?: string;
   title: string;
   artist: string;
   album: string;
   duration: number;
   track: number;
+  format?: string | null;
+  bitrate?: number | null;
+  sample_rate?: number | null;
+  bit_depth?: number | null;
   bpm?: number | null;
   audio_key?: string | null;
   audio_scale?: string | null;
@@ -178,16 +189,25 @@ export function buildArtistPlayerTrack(
   artistName: string,
   coverFallback?: string,
 ): Track {
-  const isPath = track.id.includes("/");
   return {
-    id: track.id,
+    id: track.track_entity_uid || track.id,
+    entityUid: track.track_entity_uid,
     title: track.title || "Unknown",
     artist: track.artist || artistName,
     artistId: track.artist_id,
+    artistEntityUid: track.artist_entity_uid,
     artistSlug: track.artist_slug,
     album: track.album,
     albumId: track.album_id,
+    albumEntityUid: track.album_entity_uid,
     albumSlug: track.album_slug,
+    duration: track.duration,
+    path: track.id.includes("/") ? track.id : undefined,
+    libraryTrackId: track.library_track_id ?? track.track_id,
+    format: track.format ?? undefined,
+    bitrate: track.bitrate ?? null,
+    sampleRate: track.sample_rate ?? null,
+    bitDepth: track.bit_depth ?? null,
     bpm: track.bpm,
     audioKey: track.audio_key,
     audioScale: track.audio_scale,
@@ -204,8 +224,14 @@ export function buildArtistPlayerTrack(
             track.album_slug,
           )
         : coverFallback,
-    path: isPath ? track.id : undefined,
   };
+}
+
+export function topTrackToTrackRowData(track: ArtistTopTrack): TrackRowData {
+  return toTrackRowData({
+    ...track,
+    track_number: track.track,
+  });
 }
 
 export function buildArtistShowItems(events: ArtistShowEvent[]) {

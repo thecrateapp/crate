@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, LogOut, MonitorSpeaker } from "lucide-react";
+import { Loader2, LogOut, MonitorSpeaker } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";

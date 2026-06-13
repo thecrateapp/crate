@@ -1,4 +1,4 @@
-import { Disc3, Square, WandSparkles } from "lucide-react";
+import { Disc3, Square, WandSparkles } from "@crate/ui/icons";
 
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { cn } from "@crate/ui/lib/cn";

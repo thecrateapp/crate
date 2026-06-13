@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Star } from "lucide-react";
+import { Star } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 interface StarRatingProps {

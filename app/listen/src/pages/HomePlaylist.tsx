@@ -8,7 +8,7 @@ import {
   Share2,
   Shuffle,
   Sparkles,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";

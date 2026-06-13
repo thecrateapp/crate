@@ -1,42 +1,19 @@
 import { type ReactNode, useMemo, useState } from "react";
-import {
-  Calendar,
-  Check,
-  Loader2,
-  Play,
-  RadioTower,
-  Sparkles,
-} from "lucide-react";
+import { useSearchParams } from "react-router";
+import { Calendar, Loader2, Sparkles } from "@crate/ui/icons";
 
-import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 import {
   groupByMonth,
+  itemKey,
   UpcomingMonthGroup,
+  UpcomingShowCard,
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
-import { api } from "@/lib/api";
-import { fetchPlayableSetlist } from "@/lib/upcoming";
-import { toast } from "sonner";
-
-interface UpcomingInsight {
-  type: "one_month" | "one_week" | "show_prep";
-  show_id: number;
-  artist: string;
-  artist_id?: number;
-  artist_slug?: string;
-  date: string;
-  title: string;
-  subtitle: string;
-  message: string;
-  has_setlist?: boolean;
-  weight?: "normal" | "high";
-}
 
 interface UpcomingResponse {
   items: UpcomingItem[];
-  insights: UpcomingInsight[];
   summary: {
     followed_artists: number;
     show_count: number;
@@ -46,22 +23,40 @@ interface UpcomingResponse {
   };
 }
 
+interface GenreShowsResponse {
+  name: string;
+  slug: string;
+  shows?: UpcomingItem[];
+}
+
 type Filter = "all" | "shows" | "releases";
 
 export function Shows() {
+  const [searchParams] = useSearchParams();
+  const genreSlug = searchParams.get("genre");
+  const focusShowId = searchParams.get("show");
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [dismissedInsights, setDismissedInsights] = useState<
-    Record<string, boolean>
-  >({});
-  const [actingInsightKey, setActingInsightKey] = useState<string | null>(null);
-  const { data, loading } = useApi<UpcomingResponse>("/api/me/upcoming");
-  const { playAll } = usePlayerActions();
+  const { data, loading: upcomingLoading } = useApi<UpcomingResponse>(
+    genreSlug ? null : "/api/me/upcoming",
+  );
+  const { data: genreData, loading: genreLoading } = useApi<GenreShowsResponse>(
+    genreSlug ? `/api/genres/${genreSlug}?view=genre-detail-v5` : null,
+  );
 
-  const items = data?.items ?? [];
-  const insights = data?.insights ?? [];
-  const summary = data?.summary;
+  const isGenreRadar = Boolean(genreSlug);
+  const items = isGenreRadar ? genreData?.shows ?? [] : data?.items ?? [];
+  const loading = isGenreRadar ? genreLoading : upcomingLoading;
+  const summary = isGenreRadar
+    ? {
+        followed_artists: 0,
+        show_count: items.length,
+        release_count: 0,
+        attending_count: 0,
+        insight_count: 0,
+      }
+    : data?.summary;
 
   const filtered = useMemo(() => {
     let next = items;
@@ -81,24 +76,27 @@ export function Shows() {
   }, [filter, items, search]);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const comingUp = filtered.filter(
-    (item) => item.is_upcoming || item.date >= today,
-  );
   const attendingShows = items.filter(
     (item) => item.type === "show" && item.user_attending,
   );
   const nextAttendingShow = attendingShows
     .filter((item) => item.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
-  const nextAttendingDate = nextAttendingShow?.date
-    ? new Date(`${nextAttendingShow.date}T12:00:00`).toLocaleDateString(
-        "en-US",
-        {
-          month: "long",
-          day: "numeric",
-        },
-      )
+  const focusedGenreShow = isGenreRadar
+    ? items.find(
+        (item) => item.type === "show" && String(item.id) === focusShowId,
+      ) || items.find((item) => item.type === "show")
     : null;
+  const featuredCandidate = focusedGenreShow || nextAttendingShow || null;
+  const featuredShow =
+    featuredCandidate &&
+    filter !== "releases" &&
+    filtered.some((item) => isSameUpcomingItem(item, featuredCandidate))
+      ? featuredCandidate
+      : null;
+  const comingUp = filtered
+    .filter((item) => item.is_upcoming || item.date >= today)
+    .filter((item) => !featuredShow || !isSameUpcomingItem(item, featuredShow));
   const recentlyReleased = filtered
     .filter(
       (item) =>
@@ -106,74 +104,30 @@ export function Shows() {
     )
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
-  const hasFollowedArtists = (summary?.followed_artists ?? 0) > 0;
-  const visibleInsights = insights.filter(
-    (insight) => !dismissedInsights[insightKey(insight)],
-  );
-
-  async function acknowledgeInsight(insight: UpcomingInsight) {
-    const key = insightKey(insight);
-    setActingInsightKey(key);
-    try {
-      await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
-        reminder_type: insight.type,
-      });
-      setDismissedInsights((current) => ({ ...current, [key]: true }));
-    } catch {
-      toast.error("Failed to save reminder");
-    } finally {
-      setActingInsightKey(null);
-    }
-  }
-
-  async function handleInsightPlay(insight: UpcomingInsight) {
-    const key = insightKey(insight);
-    setActingInsightKey(key);
-    try {
-      if (!insight.artist_id) return;
-      const queue = await fetchPlayableSetlist({
-        artistId: insight.artist_id,
-        artistName: insight.artist,
-      });
-      if (!queue.length) {
-        toast.info("No probable setlist tracks matched your library");
-      } else {
-        playAll(queue, 0, {
-          type: "playlist",
-          name: `${insight.artist} Probable Setlist`,
-        });
-        await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
-          reminder_type: insight.type,
-        });
-        setDismissedInsights((current) => ({ ...current, [key]: true }));
-        toast.success(`Playing probable setlist: ${queue.length} tracks`);
-      }
-    } catch {
-      toast.error("Failed to load probable setlist");
-    } finally {
-      setActingInsightKey(null);
-    }
-  }
+  const hasFollowedArtists =
+    isGenreRadar || (summary?.followed_artists ?? 0) > 0;
+  const headingCopy = isGenreRadar
+    ? `Upcoming ${
+        genreData?.name || genreSlug
+      } shows near your concert location.`
+    : "Shows, releases, and signals from artists you follow, with the latest releases you might have missed.";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
-            <RadioTower size={12} className="text-primary" />
-            Upcoming
-          </div>
-          <h1 className="mt-3 text-3xl font-bold text-foreground">
-            Shows & Upcoming Releases
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground">Radar</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Everything coming up from the artists you follow: upcoming shows,
-            future releases, and the latest releases you might have missed.
+            {headingCopy}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {summary ? (
+        <div
+          role="list"
+          aria-label="Radar summary"
+          className="hidden flex-wrap items-center gap-2 md:flex"
+        >
+          {summary && !isGenreRadar ? (
             <>
               <SummaryPill
                 label="Followed artists"
@@ -194,136 +148,33 @@ export function Shows() {
                 value={attendingShows.length}
                 accent="cyan"
               />
-              <SummaryPill
-                label="Insights"
-                value={visibleInsights.length}
-                accent="cyan"
-              />
             </>
+          ) : summary ? (
+            <SummaryPill
+              label="Shows"
+              value={summary.show_count}
+              accent="cyan"
+            />
           ) : null}
         </div>
       </div>
 
-      {visibleInsights.length > 0 ? (
+      {featuredShow ? (
         <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <Sparkles size={15} className="text-primary" />
+            <Calendar size={15} className="text-primary" />
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-              Show prep
+              Next show
             </h2>
           </div>
-          <div className="grid gap-3 xl:grid-cols-2">
-            {visibleInsights.map((insight) => {
-              const key = insightKey(insight);
-              const busy = actingInsightKey === key;
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "rounded-[1.25rem] border p-4 transition-colors",
-                    insight.weight === "high"
-                      ? "border-primary/25 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.18),transparent_38%),rgba(255,255,255,0.03)]"
-                      : "border-white/8 bg-white/[0.03]",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
-                        {insight.type === "show_prep"
-                          ? "Show prep"
-                          : insight.type === "one_week"
-                            ? "This week"
-                            : "One month"}
-                      </div>
-                      <h3 className="mt-3 text-lg font-semibold text-foreground">
-                        {insight.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {insight.subtitle}
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-white/70">
-                        {insight.message}
-                      </p>
-                    </div>
-                    {insight.weight === "high" ? (
-                      <span className="rounded-full border border-primary/20 bg-primary/12 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
-                        Listening a lot
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
-                    {insight.has_setlist ? (
-                      <button
-                        onClick={() => void handleInsightPlay(insight)}
-                        disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:brightness-105 disabled:opacity-60"
-                      >
-                        {busy ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Play size={14} className="fill-current" />
-                        )}
-                        Play probable setlist
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={() => void acknowledgeInsight(insight)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/65 transition hover:border-white/20 hover:text-foreground disabled:opacity-60"
-                    >
-                      {busy ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Check size={14} />
-                      )}
-                      Got it
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <UpcomingShowCard
+            item={featuredShow}
+            expanded
+            featured
+            showClose={false}
+            onToggle={() => undefined}
+          />
         </section>
-      ) : null}
-
-      {nextAttendingShow ? (
-        <div className="overflow-hidden rounded-[1.5rem] border border-primary/15 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.16),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-primary">
-                <Calendar size={12} />
-                Attending soon
-              </div>
-              <h2 className="mt-4 text-2xl font-bold text-foreground">
-                {nextAttendingShow.artist}
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {nextAttendingShow.title} · {nextAttendingShow.subtitle}
-              </p>
-            </div>
-            <div className="flex gap-3">
-              {nextAttendingDate ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                    Date
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-foreground">
-                    {nextAttendingDate}
-                  </div>
-                </div>
-              ) : null}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                  Venue
-                </div>
-                <div className="mt-1 text-sm font-semibold text-foreground">
-                  {nextAttendingShow.title}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       ) : null}
 
       <div className="flex flex-col gap-3 rounded-[1.25rem] border border-white/5 bg-white/[0.02] p-4 md:flex-row md:items-center md:justify-between">
@@ -365,15 +216,26 @@ export function Shows() {
         </div>
       ) : null}
 
-      {!loading && !hasFollowedArtists ? (
+      {!loading && isGenreRadar && items.length === 0 ? (
         <EmptyState
-          icon={<Sparkles size={22} className="text-primary" />}
-          title="Follow some artists to unlock Upcoming"
-          body="As soon as you follow artists, you'll see their upcoming shows and new releases here."
+          icon={<Calendar size={22} className="text-primary" />}
+          title="No genre shows near your show location"
+          body="Crate will show upcoming shows here when this genre has nearby artists on your Radar."
         />
       ) : null}
 
-      {!loading && hasFollowedArtists && filtered.length === 0 ? (
+      {!loading && !isGenreRadar && !hasFollowedArtists ? (
+        <EmptyState
+          icon={<Sparkles size={22} className="text-primary" />}
+          title="Follow some artists to unlock Radar"
+          body="As soon as you follow artists, Radar will show their upcoming shows and new releases here."
+        />
+      ) : null}
+
+      {!loading &&
+      hasFollowedArtists &&
+      items.length > 0 &&
+      filtered.length === 0 ? (
         <EmptyState
           icon={<Calendar size={22} className="text-primary" />}
           title="Nothing matches your filters"
@@ -448,6 +310,7 @@ function SummaryPill({
 
   return (
     <div
+      role="listitem"
       className={cn(
         "rounded-2xl border bg-white/[0.03] px-3 py-2",
         accentClass,
@@ -461,8 +324,14 @@ function SummaryPill({
   );
 }
 
-function insightKey(insight: UpcomingInsight) {
-  return `${insight.type}:${insight.show_id}`;
+function isSameUpcomingItem(left: UpcomingItem, right: UpcomingItem) {
+  if (left.event_key && right.event_key) {
+    return left.event_key === right.event_key;
+  }
+  if (left.id != null && right.id != null && left.type === right.type) {
+    return left.id === right.id;
+  }
+  return itemKey(left, 0) === itemKey(right, 0);
 }
 
 function EmptyState({

@@ -92,7 +92,12 @@ describe("PlaybackTargetMenu", () => {
   it("opens the unified output menu with local and Crate targets", async () => {
     render(<PlaybackTargetMenu />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Output" }));
+    const outputButton = screen.getByRole("button", { name: "Output" });
+    expect(outputButton.className).not.toContain("hover:bg");
+    expect(outputButton.className).toContain("hover:text-primary");
+    expect(outputButton.className).toContain("hover:drop-shadow");
+
+    fireEvent.click(outputButton);
 
     expect(await screen.findByText("Crate on Chrome")).toBeVisible();
     expect(screen.getByText("System-selected output")).toBeVisible();

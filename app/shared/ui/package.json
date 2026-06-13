@@ -18,6 +18,14 @@
       "types": "./lib/*.ts",
       "default": "./lib/*.ts"
     },
+    "./icons": {
+      "types": "./icons/index.tsx",
+      "default": "./icons/index.tsx"
+    },
+    "./icons/*": {
+      "types": "./icons/*.tsx",
+      "default": "./icons/*.tsx"
+    },
     "./primitives/*": {
       "types": "./primitives/*.tsx",
       "default": "./primitives/*.tsx"
@@ -34,6 +42,82 @@
       "types": "./domain/*.tsx",
       "default": "./domain/*.tsx"
     },
+    "./domain/actions": {
+      "types": "./domain/actions/index.ts",
+      "default": "./domain/actions/index.ts"
+    },
+    "./domain/actions/ContextMenu": {
+      "types": "./domain/actions/ContextMenu.tsx",
+      "default": "./domain/actions/ContextMenu.tsx"
+    },
+    "./domain/actions/ItemActionMenu": {
+      "types": "./domain/actions/ItemActionMenu.tsx",
+      "default": "./domain/actions/ItemActionMenu.tsx"
+    },
+    "./domain/actions/MobileActionSheet": {
+      "types": "./domain/actions/MobileActionSheet.tsx",
+      "default": "./domain/actions/MobileActionSheet.tsx"
+    },
+    "./domain/actions/useItemActionMenu": {
+      "types": "./domain/actions/useItemActionMenu.ts",
+      "default": "./domain/actions/useItemActionMenu.ts"
+    },
+    "./domain/actions/shared": {
+      "types": "./domain/actions/shared.ts",
+      "default": "./domain/actions/shared.ts"
+    },
+    "./domain/actions/types": {
+      "types": "./domain/actions/types.ts",
+      "default": "./domain/actions/types.ts"
+    },
+    "./domain/media": {
+      "types": "./domain/media/index.ts",
+      "default": "./domain/media/index.ts"
+    },
+    "./domain/media/MediaEntity": {
+      "types": "./domain/media/MediaEntity.ts",
+      "default": "./domain/media/MediaEntity.ts"
+    },
+    "./domain/media/MediaCover": {
+      "types": "./domain/media/MediaCover.tsx",
+      "default": "./domain/media/MediaCover.tsx"
+    },
+    "./domain/lists": {
+      "types": "./domain/lists/index.ts",
+      "default": "./domain/lists/index.ts"
+    },
+    "./domain/lists/MediaGrid": {
+      "types": "./domain/lists/MediaGrid.tsx",
+      "default": "./domain/lists/MediaGrid.tsx"
+    },
+    "./domain/lists/MediaRail": {
+      "types": "./domain/lists/MediaRail.tsx",
+      "default": "./domain/lists/MediaRail.tsx"
+    },
+    "./domain/lists/SectionHeader": {
+      "types": "./domain/lists/SectionHeader.tsx",
+      "default": "./domain/lists/SectionHeader.tsx"
+    },
+    "./domain/lists/EmptyState": {
+      "types": "./domain/lists/EmptyState.tsx",
+      "default": "./domain/lists/EmptyState.tsx"
+    },
+    "./domain/navigation": {
+      "types": "./domain/navigation/index.ts",
+      "default": "./domain/navigation/index.ts"
+    },
+    "./domain/navigation/SearchBar": {
+      "types": "./domain/navigation/SearchBar.tsx",
+      "default": "./domain/navigation/SearchBar.tsx"
+    },
+    "./domain/user": {
+      "types": "./domain/user/index.ts",
+      "default": "./domain/user/index.ts"
+    },
+    "./domain/user/UserMenu": {
+      "types": "./domain/user/UserMenu.tsx",
+      "default": "./domain/user/UserMenu.tsx"
+    },
     "./charts/*": {
       "types": "./charts/*.ts",
       "default": "./charts/*.ts"
@@ -45,6 +129,14 @@
       "./lib/*": {
         "types": "./dist/lib/*.d.ts",
         "default": "./dist/lib/*.js"
+      },
+      "./icons": {
+        "types": "./dist/icons/index.d.ts",
+        "default": "./dist/icons/index.js"
+      },
+      "./icons/*": {
+        "types": "./dist/icons/*.d.ts",
+        "default": "./dist/icons/*.js"
       },
       "./primitives/*": {
         "types": "./dist/primitives/*.d.ts",
@@ -62,6 +154,82 @@
         "types": "./dist/domain/*.d.ts",
         "default": "./dist/domain/*.js"
       },
+      "./domain/actions": {
+        "types": "./dist/domain/actions/index.d.ts",
+        "default": "./dist/domain/actions/index.js"
+      },
+      "./domain/actions/ContextMenu": {
+        "types": "./dist/domain/actions/ContextMenu.d.ts",
+        "default": "./dist/domain/actions/ContextMenu.js"
+      },
+      "./domain/actions/ItemActionMenu": {
+        "types": "./dist/domain/actions/ItemActionMenu.d.ts",
+        "default": "./dist/domain/actions/ItemActionMenu.js"
+      },
+      "./domain/actions/MobileActionSheet": {
+        "types": "./dist/domain/actions/MobileActionSheet.d.ts",
+        "default": "./dist/domain/actions/MobileActionSheet.js"
+      },
+      "./domain/actions/useItemActionMenu": {
+        "types": "./dist/domain/actions/useItemActionMenu.d.ts",
+        "default": "./dist/domain/actions/useItemActionMenu.js"
+      },
+      "./domain/actions/shared": {
+        "types": "./dist/domain/actions/shared.d.ts",
+        "default": "./dist/domain/actions/shared.js"
+      },
+      "./domain/actions/types": {
+        "types": "./dist/domain/actions/types.d.ts",
+        "default": "./dist/domain/actions/types.js"
+      },
+      "./domain/media": {
+        "types": "./dist/domain/media/index.d.ts",
+        "default": "./dist/domain/media/index.js"
+      },
+      "./domain/media/MediaEntity": {
+        "types": "./dist/domain/media/MediaEntity.d.ts",
+        "default": "./dist/domain/media/MediaEntity.js"
+      },
+      "./domain/media/MediaCover": {
+        "types": "./dist/domain/media/MediaCover.d.ts",
+        "default": "./dist/domain/media/MediaCover.js"
+      },
+      "./domain/lists": {
+        "types": "./dist/domain/lists/index.d.ts",
+        "default": "./dist/domain/lists/index.js"
+      },
+      "./domain/lists/MediaGrid": {
+        "types": "./dist/domain/lists/MediaGrid.d.ts",
+        "default": "./dist/domain/lists/MediaGrid.js"
+      },
+      "./domain/lists/MediaRail": {
+        "types": "./dist/domain/lists/MediaRail.d.ts",
+        "default": "./dist/domain/lists/MediaRail.js"
+      },
+      "./domain/lists/SectionHeader": {
+        "types": "./dist/domain/lists/SectionHeader.d.ts",
+        "default": "./dist/domain/lists/SectionHeader.js"
+      },
+      "./domain/lists/EmptyState": {
+        "types": "./dist/domain/lists/EmptyState.d.ts",
+        "default": "./dist/domain/lists/EmptyState.js"
+      },
+      "./domain/navigation": {
+        "types": "./dist/domain/navigation/index.d.ts",
+        "default": "./dist/domain/navigation/index.js"
+      },
+      "./domain/navigation/SearchBar": {
+        "types": "./dist/domain/navigation/SearchBar.d.ts",
+        "default": "./dist/domain/navigation/SearchBar.js"
+      },
+      "./domain/user": {
+        "types": "./dist/domain/user/index.d.ts",
+        "default": "./dist/domain/user/index.js"
+      },
+      "./domain/user/UserMenu": {
+        "types": "./dist/domain/user/UserMenu.d.ts",
+        "default": "./dist/domain/user/UserMenu.js"
+      },
       "./charts/*": {
         "types": "./dist/charts/*.d.ts",
         "default": "./dist/charts/*.js"
@@ -78,9 +246,9 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
+    "@solar-icons/react-perf": "^2.1.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
-    "lucide-react": ">=0.400.0",
     "radix-ui": "^1.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -88,6 +256,7 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
+    "@solar-icons/react-perf": "^2.1.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.1",

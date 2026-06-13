@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { Heart, Loader2, Play } from "lucide-react";
+import { Heart, HeartBold, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
-import {
-  ItemActionMenu,
-  useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import {
   PlaylistArtwork,
@@ -157,8 +154,10 @@ export function PlaylistCard({
           >
             {togglingFollow ? (
               <Loader2 size={16} className="animate-spin" />
+            ) : isFollowed ? (
+              <HeartBold size={16} />
             ) : (
-              <Heart size={16} className={isFollowed ? "fill-current" : ""} />
+              <Heart size={16} />
             )}
           </ActionIconButton>
         ) : null}
@@ -228,6 +227,14 @@ export function PlaylistCard({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: name,
+          subtitle: description || meta,
+          detail: badge,
+          imageShape: "square",
+          fallbackIcon: Sparkles,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

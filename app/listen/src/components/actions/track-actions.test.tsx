@@ -68,7 +68,8 @@ describe("useTrackActionEntries", () => {
     if (
       !shareAction ||
       shareAction.type === "divider" ||
-      shareAction.type === "label"
+      shareAction.type === "label" ||
+      shareAction.type === "disclosure"
     ) {
       throw new Error("Share action missing");
     }

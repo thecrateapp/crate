@@ -16,6 +16,7 @@ import { AIButton } from "@/components/ui/AIButton";
 import { GenreNetworkGraph } from "@/components/genres/GenreNetworkGraph";
 import { GenreEqEditor } from "@/components/genres/GenreEqEditor";
 import { GenreTaxonomyTree } from "@/components/genres/GenreTaxonomyTree";
+import { ImageCropUpload } from "@/components/ImageCropUpload";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
@@ -68,6 +69,7 @@ interface Genre {
   top_level_slug?: string | null;
   top_level_name?: string | null;
   top_level_description?: string | null;
+  cover_url?: string | null;
   eq_gains?: number[] | null;
   eq_reasoning?: string | null;
   eq_preset_resolved?: {
@@ -143,6 +145,7 @@ interface TaxonomyNode {
   slug: string;
   name: string;
   description: string | null;
+  cover_url?: string | null;
   top_level: boolean;
   parent_slugs: string[];
   children_slugs: string[];
@@ -524,6 +527,7 @@ function TaskButton({
 
 function TaxonomyNodeEditorialEditor({
   canonicalSlug,
+  coverUrl,
   rawSlug,
   rawName,
   canCurate,
@@ -531,6 +535,7 @@ function TaxonomyNodeEditorialEditor({
   onDeleted,
 }: {
   canonicalSlug: string | null | undefined;
+  coverUrl?: string | null;
   rawSlug: string;
   rawName: string;
   canCurate: boolean;
@@ -555,6 +560,7 @@ function TaxonomyNodeEditorialEditor({
   >({});
   const [proposal, setProposal] = useState<TaxonomyNodeProposal | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [coverVersion, setCoverVersion] = useState(0);
   const [deleteNodeOpen, setDeleteNodeOpen] = useState(false);
 
   useEffect(() => {
@@ -576,6 +582,16 @@ function TaxonomyNodeEditorialEditor({
     refetch();
     onSaved();
   };
+
+  const refreshCover = () => {
+    setCoverVersion(Date.now());
+    refresh();
+  };
+
+  const visibleCoverUrl =
+    coverUrl && coverVersion > 0
+      ? `${coverUrl}${coverUrl.includes("?") ? "&" : "?"}v=${coverVersion}`
+      : coverUrl;
 
   const inferNodeProposal = async () => {
     if (!proposalSlug) return;
@@ -934,28 +950,63 @@ function TaxonomyNodeEditorialEditor({
               </div>
             </div>
 
-            <label className="block">
-              <span className="text-[11px] uppercase tracking-wider text-white/35">
-                Description
-              </span>
-              <textarea
-                value={descriptionDraft}
-                onChange={(event) => setDescriptionDraft(event.target.value)}
-                rows={4}
-                className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
-                placeholder="Short editorial description for this genre."
-              />
-            </label>
+            <div className="grid gap-4 lg:grid-cols-[minmax(180px,240px)_minmax(0,1fr)]">
+              <div className="space-y-2">
+                <div className="group/genre-cover relative aspect-[2/1] overflow-hidden rounded-md border border-white/10 bg-black/30 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+                  {visibleCoverUrl ? (
+                    <img
+                      src={visibleCoverUrl}
+                      alt={`${node.name} genre cover`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] text-center">
+                      <Tag size={20} className="text-cyan-300/70" />
+                      <span className="text-[11px] font-medium text-white/45">
+                        No genre cover
+                      </span>
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(0,0,0,0.42))]" />
+                  {node ? (
+                    <ImageCropUpload
+                      endpoint={`/api/genres/taxonomy/${node.slug}/cover`}
+                      aspect={2}
+                      onUploaded={refreshCover}
+                      label="Edit cover"
+                      className="absolute inset-0 z-10 flex items-end justify-center gap-1.5 bg-black/0 p-3 text-xs font-semibold text-white/0 outline-none transition hover:bg-black/35 hover:text-white/85 focus-visible:bg-black/35 focus-visible:text-cyan-100 focus-visible:ring-2 focus-visible:ring-cyan-300/40"
+                    />
+                  ) : null}
+                </div>
+              </div>
 
-            <label className="inline-flex items-center gap-2 text-xs text-white/60">
-              <input
-                type="checkbox"
-                checked={topLevelDraft}
-                onChange={(event) => setTopLevelDraft(event.target.checked)}
-                className="h-3.5 w-3.5 accent-cyan-400"
-              />
-              Top-level genre
-            </label>
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="text-[11px] uppercase tracking-wider text-white/35">
+                    Description
+                  </span>
+                  <textarea
+                    value={descriptionDraft}
+                    onChange={(event) =>
+                      setDescriptionDraft(event.target.value)
+                    }
+                    rows={5}
+                    className="mt-1 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white/75 outline-none transition focus:border-cyan-400/40"
+                    placeholder="Short editorial description for this genre."
+                  />
+                </label>
+
+                <label className="inline-flex items-center gap-2 text-xs text-white/60">
+                  <input
+                    type="checkbox"
+                    checked={topLevelDraft}
+                    onChange={(event) => setTopLevelDraft(event.target.checked)}
+                    className="h-3.5 w-3.5 accent-cyan-400"
+                  />
+                  Top-level genre
+                </label>
+              </div>
+            </div>
 
             {proposal ? (
               <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs text-white/55">
@@ -2056,6 +2107,7 @@ function GenreView({ slug }: { slug: string }) {
 
       <TaxonomyNodeEditorialEditor
         canonicalSlug={genre.canonical_slug}
+        coverUrl={genre.cover_url}
         rawSlug={genre.slug}
         rawName={genre.name}
         canCurate={canCurateGenres}

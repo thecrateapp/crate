@@ -181,6 +181,11 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
             log.debug("Failed to clear backend cache prefix: %s", prefix, exc_info=True)
 
     try:
+        for scope in scopes:
+            if scope.startswith("home:user:"):
+                user_id = scope.split(":")[-1]
+                if user_id:
+                    mark_ui_snapshots_stale(scope="home:discovery", subject_key=user_id)
         if any(
             scope
             in {

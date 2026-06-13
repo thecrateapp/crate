@@ -6,7 +6,7 @@ import {
   Server,
   AlertCircle,
   CheckCircle2,
-} from "lucide-react";
+} from "@crate/ui/icons";
 
 import {
   addServer,

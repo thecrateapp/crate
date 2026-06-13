@@ -1,7 +1,8 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
+  CRATE_ICON_SIZE,
   LogOut,
   Radio,
   Send,
@@ -10,15 +11,10 @@ import {
   User,
   UserPlus,
   Users,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
-import {
-  AppMenuButton,
-  AppPopover,
-  AppPopoverDivider,
-} from "@crate/ui/primitives/AppPopover";
 import {
   AppModal,
   ModalBody,
@@ -26,30 +22,25 @@ import {
   ModalFooter,
   ModalHeader,
 } from "@crate/ui/primitives/AppModal";
+import {
+  ContextMenu,
+  type ContextMenuEntry,
+  useItemActionMenu,
+} from "@crate/ui/domain/actions";
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 
 export function TopBarUserMenu() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const { user, logout } = useAuth();
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestArtist, setSuggestArtist] = useState("");
   const [suggestUrl, setSuggestUrl] = useState("");
   const [suggestNote, setSuggestNote] = useState("");
   const [suggesting, setSuggesting] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
-
-  useDismissibleLayer({
-    active: showUserMenu && isDesktop,
-    refs: [userMenuRef, userMenuButtonRef],
-    onDismiss: () => setShowUserMenu(false),
-  });
 
   const userName = user?.name || user?.email || null;
   const userInitial = userName ? userName.charAt(0).toUpperCase() : null;
@@ -65,12 +56,10 @@ export function TopBarUserMenu() {
   );
 
   function go(path: string) {
-    setShowUserMenu(false);
     navigate(path);
   }
 
   function openSuggestArtist() {
-    setShowUserMenu(false);
     setSuggestOpen(true);
   }
 
@@ -99,101 +88,79 @@ export function TopBarUserMenu() {
     }
   }
 
-  const menuContent = (
-    <>
-      <div className="px-3 pb-2 pt-2">
-        <div className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-2">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              onError={handleAvatarError}
-              className="h-8 w-8 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white/60">
-              {userInitial || <User size={14} />}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-white/85 truncate">
-              {userName || "Signed in"}
-            </p>
-            {user?.email ? (
-              <p className="truncate text-[10px] text-muted-foreground">
-                {user.email}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </div>
-      <AppPopoverDivider />
-      <AppMenuButton
-        onClick={() => go(profilePath)}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <User size={14} /> Profile
-      </AppMenuButton>
-      <AppMenuButton
-        onClick={() => go("/people")}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <Users size={14} /> People
-      </AppMenuButton>
-      <AppMenuButton
-        onClick={() => go("/jam")}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <Radio size={14} /> Jam sessions
-      </AppMenuButton>
-      <AppMenuButton
-        onClick={() => go("/upload")}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <Upload size={14} /> Upload music
-      </AppMenuButton>
-      <AppMenuButton
-        onClick={openSuggestArtist}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <UserPlus size={14} /> Suggest an artist
-      </AppMenuButton>
-      {isDesktop ? (
-        <AppMenuButton
-          onClick={() => go("/stats")}
-          className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-        >
-          <BarChart3 size={14} /> Stats
-        </AppMenuButton>
-      ) : null}
-      <AppMenuButton
-        onClick={() => go("/settings")}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px] text-white/70 hover:text-white"
-      >
-        <Settings size={14} /> Settings
-      </AppMenuButton>
-      <AppPopoverDivider />
-      <AppMenuButton
-        onClick={() => {
-          setShowUserMenu(false);
-          void logout();
-        }}
-        className="min-h-11 gap-2.5 px-3 py-2 text-[13px]"
-        danger
-      >
-        <LogOut size={14} /> Sign out
-      </AppMenuButton>
-    </>
-  );
+  const menuItems: ContextMenuEntry[] = [
+    {
+      key: "profile",
+      label: "Profile",
+      icon: User,
+      onSelect: () => go(profilePath),
+    },
+    {
+      key: "people",
+      label: "People",
+      icon: Users,
+      onSelect: () => go("/people"),
+    },
+    {
+      key: "jam",
+      label: "Jam sessions",
+      icon: Radio,
+      onSelect: () => go("/jam"),
+    },
+    {
+      key: "upload",
+      label: "Upload music",
+      icon: Upload,
+      onSelect: () => go("/upload"),
+    },
+    {
+      key: "suggest-artist",
+      label: "Suggest an artist",
+      icon: UserPlus,
+      onSelect: openSuggestArtist,
+    },
+    ...(isDesktop
+      ? [
+          {
+            key: "stats",
+            label: "Stats",
+            icon: BarChart3,
+            onSelect: () => go("/stats"),
+          } satisfies ContextMenuEntry,
+        ]
+      : []),
+    {
+      key: "settings",
+      label: "Settings",
+      icon: Settings,
+      onSelect: () => go("/settings"),
+    },
+    { type: "divider", key: "account-divider" },
+    {
+      key: "logout",
+      label: "Sign out",
+      icon: LogOut,
+      danger: true,
+      onSelect: () => {
+        void logout();
+      },
+    },
+  ];
+  const actionMenu = useItemActionMenu(menuItems);
 
   return (
     <>
       <div className="relative pointer-events-auto">
         <button
-          ref={userMenuButtonRef}
-          onClick={() => setShowUserMenu(!showUserMenu)}
+          ref={actionMenu.triggerRef}
+          onClick={actionMenu.openFromTrigger}
+          onContextMenu={actionMenu.handleContextMenu}
+          onKeyDown={actionMenu.handleKeyboardTrigger}
+          aria-expanded={actionMenu.open}
+          aria-haspopup="menu"
           aria-label="User menu"
           className="flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-white/10 bg-black/30 text-sm font-medium text-white/70 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+          {...actionMenu.longPressHandlers}
         >
           {avatarUrl ? (
             <img
@@ -203,32 +170,28 @@ export function TopBarUserMenu() {
               className="h-full w-full object-cover"
             />
           ) : (
-            userInitial || <User size={18} />
+            userInitial || <User size={CRATE_ICON_SIZE.lg} />
           )}
         </button>
-
-        {showUserMenu && isDesktop && (
-          <AppPopover
-            ref={userMenuRef}
-            className="absolute right-0 top-full mt-2 w-60 py-1"
-          >
-            {menuContent}
-          </AppPopover>
-        )}
       </div>
 
-      {showUserMenu &&
-        !isDesktop &&
-        createPortal(
-          <AppModal
-            open={showUserMenu}
-            onClose={() => setShowUserMenu(false)}
-            maxWidthClassName="sm:max-w-sm"
-          >
-            <ModalBody className="py-2">{menuContent}</ModalBody>
-          </AppModal>,
-          document.body,
-        )}
+      <ContextMenu
+        header={{
+          type: "media",
+          title: userName || "Signed in",
+          subtitle: user?.email ?? undefined,
+          imageUrl: avatarUrl,
+          imageAlt: userName || "User",
+          imageOnError: handleAvatarError,
+          imageShape: "circle",
+          fallbackIcon: User,
+        }}
+        items={menuItems}
+        open={actionMenu.open}
+        position={actionMenu.position}
+        menuRef={actionMenu.menuRef}
+        onClose={actionMenu.close}
+      />
 
       {suggestOpen &&
         createPortal(
@@ -324,7 +287,7 @@ export function TopBarUserMenu() {
                   disabled={suggesting || suggestArtistName.length < 2}
                   className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Send size={14} />
+                  <Send size={CRATE_ICON_SIZE.sm} />
                   {suggesting ? "Sending..." : "Send suggestion"}
                 </button>
               </ModalFooter>

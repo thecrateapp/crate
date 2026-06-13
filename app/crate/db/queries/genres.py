@@ -18,6 +18,7 @@ from crate.db.queries.genres_library import (
     list_unmapped_genres_for_inference,
 )
 from crate.db.queries.genres_taxonomy import (
+    get_genre_taxonomy_cover_path,
     get_genre_taxonomy_node_id,
     get_remaining_without_external_description,
     list_genre_taxonomy_nodes_for_external_enrichment,
@@ -37,6 +38,7 @@ __all__ = [
     "get_genre_detail",
     "get_genre_graph",
     "get_genre_seed_artists",
+    "get_genre_taxonomy_cover_path",
     "get_genre_taxonomy_node_id",
     "get_remaining_without_external_description",
     "get_total_genre_count",

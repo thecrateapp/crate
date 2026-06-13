@@ -1,5 +1,11 @@
-import { type ComponentType, useCallback, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import {
+  type ComponentType,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Link, useParams, useSearchParams } from "react-router";
 import {
   Plus,
   Heart,
@@ -13,7 +19,9 @@ import {
   Pencil,
   Trash2,
   Search,
-} from "lucide-react";
+  Check,
+  ChevronDown,
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -50,6 +58,7 @@ import {
 import { toTrackRowData } from "@/lib/track-row-data";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 
 type Tab =
   | "playlists"
@@ -60,6 +69,9 @@ type Tab =
   | "contributions";
 
 type TabIcon = ComponentType<{ size?: number; className?: string }>;
+type ArtistSort = "recent" | "name" | "popularity";
+type AlbumSort = "recent" | "name" | "artist" | "year";
+type LikedSort = "recent" | "title" | "artist" | "album";
 
 interface MeStats {
   followed_artists: number;
@@ -209,6 +221,35 @@ const tabs: { key: Tab; label: string; icon: TabIcon }[] = [
   { key: "contributions", label: "Contributions", icon: Plus },
 ];
 
+const tabTitles: Record<Tab, string> = {
+  playlists: "Collection",
+  artists: "Artists",
+  albums: "Albums",
+  liked: "Liked tracks",
+  bandcamp: "Bandcamp",
+  contributions: "Contributions",
+};
+
+const artistSortOptions: { value: ArtistSort; label: string }[] = [
+  { value: "recent", label: "Recently added" },
+  { value: "name", label: "Name" },
+  { value: "popularity", label: "Popularity" },
+];
+
+const albumSortOptions: { value: AlbumSort; label: string }[] = [
+  { value: "recent", label: "Recently added" },
+  { value: "name", label: "Name" },
+  { value: "artist", label: "Artist" },
+  { value: "year", label: "Year" },
+];
+
+const likedSortOptions: { value: LikedSort; label: string }[] = [
+  { value: "recent", label: "Recently added" },
+  { value: "title", label: "Title" },
+  { value: "artist", label: "Artist" },
+  { value: "album", label: "Album" },
+];
+
 function parseTab(value: string | null): Tab {
   if (
     value === "artists" ||
@@ -242,6 +283,88 @@ function StatBox({ value, label }: { value: number; label: string }) {
     <div className="flex-1 rounded-lg bg-white/5 px-3 py-2.5 text-center">
       <div className="text-lg font-bold text-foreground">{value ?? 0}</div>
       <div className="text-[11px] text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function CollectionSortDropdown<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected =
+    options.find((option) => option.value === value) ?? options[0];
+
+  useDismissibleLayer({
+    active: open,
+    refs: [rootRef],
+    onDismiss: () => setOpen(false),
+  });
+
+  if (!selected) return null;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        aria-label={`${label}: ${selected.label}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-xl border px-4 text-sm font-semibold text-foreground transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-primary/40 hover:shadow-[0_0_18px_rgba(34,211,238,0.16)] focus-visible:border-primary/70 focus-visible:outline-none focus-visible:shadow-[0_0_20px_rgba(34,211,238,0.22)] ${
+          open
+            ? "border-primary/45 shadow-[0_0_20px_rgba(34,211,238,0.18)]"
+            : "border-white/10"
+        }`}
+      >
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown
+          size={16}
+          className={`shrink-0 text-white/55 transition-transform ${
+            open ? "rotate-180 text-primary" : ""
+          }`}
+        />
+      </button>
+
+      {open ? (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="listen-glass-panel absolute right-0 top-full z-app-dropdown mt-2 w-48 overflow-hidden rounded-xl border border-white/10 p-1 shadow-[0_20px_48px_rgba(0,0,0,0.42)] animate-pop-in"
+        >
+          {options.map((option) => {
+            const selected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={`flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-[background-color,color,filter] ${
+                  selected
+                    ? "bg-primary/14 text-primary drop-shadow-[0_0_8px_rgba(34,211,238,0.22)]"
+                    : "text-foreground hover:bg-white/7 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.18)]"
+                }`}
+              >
+                <span>{option.label}</span>
+                {selected ? <Check size={16} className="shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -537,6 +660,25 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 function ArtistsTab() {
   const { data: artists, loading } =
     useApi<FollowedArtist[]>("/api/me/follows");
+  const isDesktop = useIsDesktop();
+  const [sort, setSort] = useState<"recent" | "name" | "popularity">("recent");
+
+  const sortedArtists = useMemo(() => {
+    if (!artists) return [];
+    return [...artists].sort((a, b) => {
+      if (sort === "name") {
+        return a.artist_name.localeCompare(b.artist_name);
+      }
+      if (sort === "popularity") {
+        const aScore = a.album_count * 12 + a.track_count;
+        const bScore = b.album_count * 12 + b.track_count;
+        return bScore - aScore || a.artist_name.localeCompare(b.artist_name);
+      }
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
+  }, [artists, sort]);
 
   if (loading) return <Spinner />;
   if (!artists || artists.length === 0) {
@@ -546,24 +688,60 @@ function ArtistsTab() {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
-      {artists.map((a) => (
-        <ArtistCard
-          key={a.artist_id ?? a.artist_name}
-          name={a.artist_name}
-          artistId={a.artist_id}
-          artistEntityUid={a.artist_entity_uid}
-          artistSlug={a.artist_slug}
-          subtitle={`${a.album_count} album${a.album_count !== 1 ? "s" : ""}`}
-          layout="grid"
-        />
-      ))}
+    <div className="space-y-4">
+      {!isDesktop ? (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
+            Sort
+          </span>
+          <CollectionSortDropdown
+            label="Sort artists"
+            value={sort}
+            options={artistSortOptions}
+            onChange={setSort}
+          />
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+        {sortedArtists.map((a) => (
+          <ArtistCard
+            key={a.artist_id ?? a.artist_name}
+            name={a.artist_name}
+            artistId={a.artist_id}
+            artistEntityUid={a.artist_entity_uid}
+            artistSlug={a.artist_slug}
+            subtitle={`${a.album_count} album${a.album_count !== 1 ? "s" : ""}`}
+            layout="grid"
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 function AlbumsTab() {
   const { data: albums, loading } = useApi<SavedAlbum[]>("/api/me/albums");
+  const isDesktop = useIsDesktop();
+  const [sort, setSort] = useState<AlbumSort>("recent");
+
+  const sortedAlbums = useMemo(() => {
+    if (!albums) return [];
+    return [...albums].sort((a, b) => {
+      if (sort === "name") {
+        return a.name.localeCompare(b.name);
+      }
+      if (sort === "artist") {
+        return a.artist.localeCompare(b.artist) || a.name.localeCompare(b.name);
+      }
+      if (sort === "year") {
+        return (
+          Number(b.year || 0) - Number(a.year || 0) ||
+          a.name.localeCompare(b.name)
+        );
+      }
+      return new Date(b.saved_at).getTime() - new Date(a.saved_at).getTime();
+    });
+  }, [albums, sort]);
 
   if (loading) return <Spinner />;
   if (!albums || albums.length === 0) {
@@ -571,20 +749,35 @@ function AlbumsTab() {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
-      {albums.map((a) => (
-        <AlbumCard
-          key={a.id}
-          artist={a.artist}
-          album={a.name}
-          albumId={a.id}
-          albumEntityUid={a.album_entity_uid}
-          artistEntityUid={a.artist_entity_uid}
-          albumSlug={a.slug}
-          year={a.year}
-          layout="grid"
-        />
-      ))}
+    <div className="space-y-4">
+      {!isDesktop ? (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
+            Sort
+          </span>
+          <CollectionSortDropdown
+            label="Sort albums"
+            value={sort}
+            options={albumSortOptions}
+            onChange={setSort}
+          />
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+        {sortedAlbums.map((a) => (
+          <AlbumCard
+            key={a.id}
+            artist={a.artist}
+            album={a.name}
+            albumId={a.id}
+            albumEntityUid={a.album_entity_uid}
+            artistEntityUid={a.artist_entity_uid}
+            albumSlug={a.slug}
+            year={a.year}
+            layout="grid"
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -1061,8 +1254,6 @@ function bandcampItemTitle(item: BandcampItem): string {
   );
 }
 
-type LikedSort = "recent" | "title" | "artist" | "album";
-
 function LikedTab() {
   const { likedTracks: tracks, loading } = useLikedTracks();
   const { playAll } = usePlayerActions();
@@ -1140,7 +1331,7 @@ function LikedTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handlePlayAll}
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
@@ -1148,7 +1339,7 @@ function LikedTab() {
           <Play size={16} fill="currentColor" />
           Play {filtered.length < tracks.length ? `${filtered.length}` : "All"}
         </button>
-        <div className="relative flex-1">
+        <div className="relative min-w-[180px] flex-1">
           <Search
             size={14}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40"
@@ -1161,16 +1352,12 @@ function LikedTab() {
             className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 text-sm text-white placeholder:text-white/40 outline-none focus:bg-white/8"
           />
         </div>
-        <select
+        <CollectionSortDropdown
+          label="Sort liked tracks"
           value={sort}
-          onChange={(e) => setSort(e.target.value as LikedSort)}
-          className="h-10 rounded-lg bg-white/5 px-3 text-sm text-white/70 outline-none"
-        >
-          <option value="recent">Recent</option>
-          <option value="title">Title</option>
-          <option value="artist">Artist</option>
-          <option value="album">Album</option>
-        </select>
+          options={likedSortOptions}
+          onChange={setSort}
+        />
       </div>
       <WindowVirtualList
         items={trackRows}
@@ -1209,11 +1396,12 @@ function LikedTab() {
 
 export function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
   const { data: stats, refetch: refetchStats } = useApi<MeStats>(
     isDesktop ? "/api/me" : null,
   );
-  const tab = parseTab(searchParams.get("tab"));
+  const tab = section ? parseTab(section) : parseTab(searchParams.get("tab"));
   const [refreshKey, setRefreshKey] = useState(0);
 
   const onRefresh = useCallback(async () => {
@@ -1236,7 +1424,9 @@ export function Library() {
       <PullIndicator distance={pullDistance} refreshing={refreshing} />
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Your Library</h1>
+        <h1 className="text-2xl font-bold">
+          {isDesktop ? "Your Library" : tabTitles[tab]}
+        </h1>
       </div>
 
       {/* Stats */}
@@ -1250,25 +1440,26 @@ export function Library() {
       )}
 
       {/* Tab bar */}
-      <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-gradient-to-l from-[var(--surface-app)] to-transparent sm:hidden" />
-        <div className="flex scroll-px-4 gap-2 overflow-x-auto pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0">
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex min-h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                tab === key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-              }`}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
+      {isDesktop ? (
+        <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex scroll-px-4 gap-2 overflow-x-auto pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0">
+            {tabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                className={`flex min-h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                }`}
+              >
+                <Icon size={14} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Tab content */}
       {tab === "playlists" && <PlaylistsTab key={refreshKey} />}

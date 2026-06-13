@@ -41,10 +41,12 @@ describe("recordDevLog / getDevLogs / clearDevLogs", () => {
     expect(logs[0]!.level).toBe("info");
   });
 
-  it("dispatches a custom event", () => {
+  it("dispatches a custom event asynchronously", async () => {
     const handler = vi.fn();
     window.addEventListener(DEV_LOG_EVENT, handler);
     recordDevLog("test", "evt");
+    expect(handler).not.toHaveBeenCalled();
+    await Promise.resolve();
     expect(handler).toHaveBeenCalled();
     window.removeEventListener(DEV_LOG_EVENT, handler);
   });

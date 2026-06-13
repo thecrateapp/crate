@@ -121,7 +121,7 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
         "artwork_artists": _artwork_artists(rows),
         "track_count": len(rows),
         "total_duration": sum(int(row.get("duration") or 0) for row in rows),
-        "badge": "Core Tracks",
+        "badge": "Artist Set",
         "kind": "core",
         "tracks": [_track_payload(row) for row in rows],
     }

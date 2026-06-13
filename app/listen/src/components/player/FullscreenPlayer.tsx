@@ -4,12 +4,12 @@ import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+} from "@crate/ui/domain/actions";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import { SpinningDisc } from "@/components/player/SpinningDisc";
+import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
 import { getPlaySourceLabel } from "@/components/player/player-source";
 import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerArtist";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
@@ -31,11 +31,12 @@ import {
 import {
   ChevronDown,
   ListMusic,
-  AlignLeft,
   Disc3,
   Heart,
+  HeartBold,
   Info,
   Loader2,
+  Mic3,
   Pause,
   Play,
   Repeat,
@@ -45,7 +46,8 @@ import {
   SkipBack,
   SkipForward,
   Square,
-} from "lucide-react";
+  CRATE_ICON_SIZE,
+} from "@crate/ui/icons";
 import { artistPagePath } from "@/lib/library-routes";
 import {
   usePlayer,
@@ -57,6 +59,7 @@ import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
 } from "@/hooks/use-crossfade-progress";
+import { cn } from "@crate/ui/lib/cn";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
 import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
@@ -65,7 +68,7 @@ import { getHorizontalPlayerSwipeAction } from "@/components/player/player-gestu
 import { toast } from "sonner";
 import { triggerHaptic } from "@/lib/haptics";
 
-type FSTab = "player" | "queue" | "lyrics" | "info";
+type FSPanel = "queue" | "lyrics" | "info";
 
 interface LyricLine {
   time: number;
@@ -159,14 +162,16 @@ function FullscreenQueueRow({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={track.albumCover}
-            title={track.title}
-            artist={track.artist}
-            album={track.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: track.title,
+          subtitle: track.artist,
+          detail: track.album,
+          imageUrl: track.albumCover,
+          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -216,7 +221,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     ? "commit"
     : "live";
 
-  const [activeTab, setActiveTab] = useState<FSTab>("player");
+  const [activePanel, setActivePanel] = useState<FSPanel | null>(null);
   const [surfaceMode, setSurfaceMode] = useState<PlayerSurfaceMode>(
     getMobileSurfaceModePreference,
   );
@@ -332,8 +337,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       setShowEqualizer(false);
       return;
     }
-    if (activeTab !== "player") {
-      setActiveTab("player");
+    if (activePanel !== null) {
+      setActivePanel(null);
       return;
     }
     onClose();
@@ -371,7 +376,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   // Lyrics fetch
   useEffect(() => {
-    if (!visible || activeTab !== "lyrics" || !currentTrack) {
+    if (!visible || activePanel !== "lyrics" || !currentTrack) {
       if (!visible || !currentTrack) setLyrics(null);
       return;
     }
@@ -398,7 +403,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       });
     return () => controller.abort();
   }, [
-    activeTab,
+    activePanel,
     visible,
     currentTrack?.id,
     currentTrack?.artist,
@@ -417,17 +422,17 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   // Auto-scroll lyrics
   useEffect(() => {
-    if (activeTab !== "lyrics" || !activeLyricRef.current) return;
-    activeLyricRef.current.scrollIntoView({
+    if (activePanel !== "lyrics" || !activeLyricRef.current) return;
+    activeLyricRef.current.scrollIntoView?.({
       behavior: "smooth",
       block: "center",
     });
-  }, [activeLyricIndex, activeTab]);
+  }, [activeLyricIndex, activePanel]);
 
   // Reset tab when player closes
   useEffect(() => {
     if (visible) return;
-    setActiveTab("player");
+    setActivePanel(null);
     swipeYRef.current = 0;
     setSwipeY(0);
     setShowEqualizer(false);
@@ -450,8 +455,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         setShowEqualizer(false);
         return;
       }
-      if (activeTab !== "player") {
-        setActiveTab("player");
+      if (activePanel !== null) {
+        setActivePanel(null);
         return;
       }
       onClose();
@@ -459,7 +464,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     window.addEventListener("crate:native-back", handleNativeBack);
     return () =>
       window.removeEventListener("crate:native-back", handleNativeBack);
-  }, [activeTab, onClose, showEqualizer, visible]);
+  }, [activePanel, onClose, showEqualizer, visible]);
 
   useEffect(
     () => () => {
@@ -489,11 +494,11 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       const startY = touch.clientY;
       const el = (e.currentTarget as HTMLElement).getBoundingClientRect();
       horizontalSwipeStartRef.current =
-        activeTab === "player" ? { x: startX, y: startY } : null;
+        activePanel === null ? { x: startX, y: startY } : null;
       if (startY - el.top > Math.min(260, el.height * 0.35)) return;
       swipeStartRef.current = startY;
     },
-    [activeTab],
+    [activePanel],
   );
   const onSwipeMove = useCallback(
     (e: React.TouchEvent) => {
@@ -508,7 +513,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       const horizontalStart = horizontalSwipeStartRef.current;
       horizontalSwipeStartRef.current = null;
 
-      if (horizontalStart && activeTab === "player" && !draggingRef.current) {
+      if (horizontalStart && activePanel === null && !draggingRef.current) {
         const touch = e.changedTouches[0];
         if (touch) {
           const action = getHorizontalPlayerSwipeAction({
@@ -537,7 +542,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       swipeStartRef.current = null;
     },
     [
-      activeTab,
+      activePanel,
       goNextWithFeedback,
       goPrevWithFeedback,
       onClose,
@@ -554,10 +559,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const scrollTabBottomClearance =
     "var(--listen-mobile-fullscreen-scroll-clearance)";
 
-  const TAB_PILLS: { id: FSTab; icon: typeof Disc3; label: string }[] = [
-    { id: "player", icon: Disc3, label: "Player" },
+  const PANEL_SWITCHES: { id: FSPanel; icon: typeof Disc3; label: string }[] = [
     { id: "queue", icon: ListMusic, label: "Queue" },
-    { id: "lyrics", icon: AlignLeft, label: "Lyrics" },
+    { id: "lyrics", icon: Mic3, label: "Lyrics" },
     { id: "info", icon: Info, label: "Info" },
   ];
 
@@ -587,7 +591,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         <div className="w-10 h-1 rounded-full bg-white/20" />
       </div>
 
-      {/* Header: close + tab pills */}
+      {/* Header: close + panel switches */}
       <div className="flex items-center gap-2 px-4 pb-3">
         <button
           onClick={closeWithFeedback}
@@ -597,24 +601,43 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
           <ChevronDown size={28} />
         </button>
 
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {TAB_PILLS.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              onClick={() => {
-                triggerHaptic("selection");
-                setActiveTab(id);
-              }}
-              className={`flex min-h-11 shrink-0 touch-manipulation items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                activeTab === id
-                  ? "bg-white/12 text-white border border-white/15"
-                  : "text-white/40 border border-transparent active:text-white/60"
-              }`}
-            >
-              <Icon size={13} />
-              {label}
-            </button>
-          ))}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+          {PANEL_SWITCHES.map(({ id, icon: Icon, label }) => {
+            const selected = activePanel === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                aria-label={label}
+                aria-pressed={selected}
+                onClick={() => {
+                  triggerHaptic("selection");
+                  setActivePanel((current) => (current === id ? null : id));
+                }}
+                className={cn(
+                  "group relative flex h-14 min-w-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] font-semibold leading-none transition-[color,filter,transform] active:scale-[0.96]",
+                  selected
+                    ? "text-primary drop-shadow-[0_0_12px_rgba(34,211,238,0.42)]"
+                    : "text-white/42 active:text-white/70",
+                )}
+              >
+                <Icon
+                  size={CRATE_ICON_SIZE.xl}
+                  className="transition-transform group-active:scale-95"
+                />
+                <span>{label}</span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute bottom-0 h-0.5 w-4 rounded-full transition-[opacity,box-shadow]",
+                    selected
+                      ? "bg-primary opacity-100 shadow-[0_0_10px_rgba(34,211,238,0.62)]"
+                      : "opacity-0",
+                  )}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -633,12 +656,12 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       )}
 
       {/* ── Player tab ── */}
-      {activeTab === "player" && (
+      {activePanel === null && (
         <div
           className="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-6"
           style={{ paddingBottom: playerTabBottomClearance }}
         >
-          <div className="mx-auto w-full max-w-[360px]">
+          <div className="relative z-10 mx-auto w-full max-w-[360px]">
             <div ref={coverRef} className="relative">
               {isCdMode ? (
                 <SpinningDisc
@@ -706,7 +729,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
           </div>
 
           {/* Track info */}
-          <div className="w-full mt-5 text-center">
+          <div className="relative z-10 w-full mt-5 text-center">
             <PlayerTrackIdentity
               currentTrack={currentTrack}
               crossfadeTransition={crossfadeTransition}
@@ -743,34 +766,43 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     : "text-white/35 active:text-white/70"
                 }`}
               >
-                <Shuffle size={18} />
+                <Shuffle size={CRATE_ICON_SIZE.lg} />
               </button>
               <button
                 onClick={goPrevWithFeedback}
                 aria-label="Previous track"
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
               >
-                <SkipBack size={22} fill="currentColor" />
+                <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
-              <button
+              <SpectrumPlayButton
                 onClick={togglePlaybackWithFeedback}
                 aria-label={isPlaying ? "Pause" : "Play"}
-                className="flex h-16 w-16 touch-manipulation items-center justify-center rounded-full bg-primary text-black shadow-[0_12px_36px_rgba(6,182,212,0.28)] transition-transform active:scale-95"
+                size="lg"
+                active={isPlaying}
+                className="touch-manipulation"
               >
                 {isBuffering ? (
-                  <Loader2 size={22} className="animate-spin" />
+                  <Loader2
+                    size={CRATE_ICON_SIZE.xl}
+                    className="animate-spin text-white"
+                  />
                 ) : isPlaying ? (
-                  <Pause size={24} />
+                  <Pause size={26} className="text-white" />
                 ) : (
-                  <Play size={24} className="ml-1" fill="currentColor" />
+                  <Play
+                    size={26}
+                    className="ml-1 text-white"
+                    fill="currentColor"
+                  />
                 )}
-              </button>
+              </SpectrumPlayButton>
               <button
                 onClick={goNextWithFeedback}
                 aria-label="Next track"
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
               >
-                <SkipForward size={22} fill="currentColor" />
+                <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
               <button
                 onClick={cycleRepeatWithFeedback}
@@ -782,9 +814,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 }`}
               >
                 {repeat === "one" ? (
-                  <Repeat1 size={18} />
+                  <Repeat1 size={CRATE_ICON_SIZE.lg} />
                 ) : (
-                  <Repeat size={18} />
+                  <Repeat size={CRATE_ICON_SIZE.lg} />
                 )}
               </button>
             </div>
@@ -797,10 +829,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 aria-label={liked ? "Unlike track" : "Like track"}
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
               >
-                <Heart
-                  size={19}
-                  className={liked ? "fill-primary text-primary" : ""}
-                />
+                {liked ? (
+                  <HeartBold
+                    size={19}
+                    className="animate-crate-icon-active-pulse text-primary"
+                  />
+                ) : (
+                  <Heart size={19} />
+                )}
               </button>
               {allowMobileEqualizer ? (
                 <button
@@ -816,7 +852,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                       : "text-white/55 active:text-white"
                   }`}
                 >
-                  <SlidersHorizontal size={19} />
+                  <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
                 </button>
               ) : isMobileAudioRuntime ? (
                 <button
@@ -832,7 +868,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                   aria-label="Equalizer is disabled in stable mobile audio mode"
                   className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/20"
                 >
-                  <SlidersHorizontal size={19} />
+                  <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
                 </button>
               ) : null}
               <button
@@ -846,9 +882,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/55 transition-colors active:bg-white/8 active:text-white"
               >
                 {surfaceMode === "cd" ? (
-                  <Square size={18} />
+                  <Square size={CRATE_ICON_SIZE.lg} />
                 ) : (
-                  <Disc3 size={19} />
+                  <Disc3 size={CRATE_ICON_SIZE.lg} />
                 )}
               </button>
               <PlayerTrackMenu
@@ -861,7 +897,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       )}
 
       {/* ── Queue tab ── */}
-      {activeTab === "queue" && (
+      {activePanel === "queue" && (
         <div
           className="flex-1 overflow-y-auto"
           style={{ paddingBottom: scrollTabBottomClearance }}
@@ -888,51 +924,61 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       )}
 
       {/* ── Lyrics tab ── */}
-      {activeTab === "lyrics" && (
+      {activePanel === "lyrics" && (
         <div
           ref={lyricsContainerRef}
-          className="flex-1 overflow-y-auto px-6 py-4"
+          className="relative flex-1 overflow-y-auto px-5 py-4"
           style={{ paddingBottom: scrollTabBottomClearance }}
         >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(34,211,238,0.2),transparent_32%),radial-gradient(circle_at_84%_56%,rgba(37,99,235,0.24),transparent_44%),linear-gradient(180deg,rgba(12,18,34,0.22),rgba(4,6,12,0.86))] opacity-70"
+          />
           {!lyrics ? (
-            <p className="text-center text-white/40 text-sm mt-20">
+            <p className="relative z-10 mt-20 text-center text-sm text-white/40">
               Loading lyrics...
             </p>
           ) : lyrics.synced ? (
-            <div className="flex flex-col items-center gap-1 py-8">
-              {lyrics.synced.map((line, i) => (
-                <button
-                  key={i}
-                  ref={i === activeLyricIndex ? activeLyricRef : null}
-                  onClick={() => {
-                    triggerHaptic("selection");
-                    seek(line.time);
-                  }}
-                  className={`w-full max-w-md rounded-md px-3 py-1 text-center transition-all duration-500 ${
-                    i === activeLyricIndex
-                      ? "bg-primary/10 text-lg font-semibold text-primary"
-                      : i < activeLyricIndex
-                        ? "text-[15px] text-white/25"
-                        : "text-[15px] text-white/50"
-                  }`}
-                >
-                  {line.text || "♪"}
-                </button>
-              ))}
+            <div className="relative z-10 mx-auto flex w-full max-w-[560px] flex-col items-start gap-3 py-8">
+              {lyrics.synced.map((line, i) => {
+                const active = i === activeLyricIndex;
+                const past = i < activeLyricIndex;
+
+                return (
+                  <button
+                    key={i}
+                    ref={active ? activeLyricRef : null}
+                    onClick={() => {
+                      triggerHaptic("selection");
+                      seek(line.time);
+                    }}
+                    className={cn(
+                      "w-full rounded-xl px-1 py-1 text-left font-extrabold tracking-normal transition-[color,filter,opacity,transform] duration-500",
+                      active
+                        ? "text-[1.9rem] leading-[1.08] text-white opacity-100 drop-shadow-[0_0_20px_rgba(255,255,255,0.16)]"
+                        : past
+                          ? "text-[1.55rem] leading-[1.12] text-white/18 opacity-75 blur-[0.7px]"
+                          : "text-[1.55rem] leading-[1.12] text-white/30 opacity-85 blur-[0.35px]",
+                    )}
+                  >
+                    {line.text || "♪"}
+                  </button>
+                );
+              })}
             </div>
           ) : lyrics.plain ? (
-            <pre className="text-sm text-muted-foreground whitespace-pre-wrap text-center leading-relaxed py-8">
+            <pre className="relative z-10 mx-auto max-w-[560px] whitespace-pre-wrap py-8 text-left text-[1.45rem] font-extrabold leading-[1.16] text-white/82">
               {lyrics.plain}
             </pre>
           ) : (
-            <p className="text-center text-white/40 text-sm mt-20">
+            <p className="relative z-10 mt-20 text-center text-sm text-white/40">
               No lyrics available
             </p>
           )}
         </div>
       )}
 
-      {activeTab === "info" && (
+      {activePanel === "info" && (
         <div
           className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3"
           style={{ paddingBottom: scrollTabBottomClearance }}

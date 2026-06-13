@@ -2,12 +2,13 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Heart,
+  HeartBold,
   Loader2,
   Play,
   Shuffle,
   Sparkles,
   type LucideIcon,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import {
@@ -15,9 +16,9 @@ import {
   ItemActionMenuButton,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+} from "@crate/ui/domain/actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import { api } from "@/lib/api";
 import {
@@ -331,11 +332,10 @@ export function PlaylistListRow({
           >
             {togglingFollow ? (
               <Loader2 size={15} className="animate-spin" />
+            ) : followState.isFollowed ? (
+              <HeartBold size={15} />
             ) : (
-              <Heart
-                size={15}
-                className={followState.isFollowed ? "fill-current" : ""}
-              />
+              <Heart size={15} />
             )}
           </ActionIconButton>
         ) : null}
@@ -369,6 +369,16 @@ export function PlaylistListRow({
       </div>
       <ItemActionMenu
         actions={menuActions}
+        header={{
+          type: "media",
+          title: name,
+          subtitle: `${trackCount} track${trackCount !== 1 ? "s" : ""}${
+            meta ? ` · ${meta}` : ""
+          }`,
+          detail: description,
+          imageShape: "square",
+          fallbackIcon: Sparkles,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

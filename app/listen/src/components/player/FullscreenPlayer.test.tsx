@@ -159,7 +159,7 @@ vi.mock("@/components/player/player-gestures", () => ({
   getHorizontalPlayerSwipeAction: vi.fn(() => null),
 }));
 
-vi.mock("@/components/actions/ItemActionMenu", () => ({
+vi.mock("@crate/ui/domain/actions/ItemActionMenu", () => ({
   ItemActionMenu: () => <div data-testid="item-action-menu" />,
   ItemActionMenuButton: () => <div data-testid="item-action-menu-btn" />,
   useItemActionMenu: () => ({
@@ -285,7 +285,7 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Player")).toBeInTheDocument();
+        expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
       });
     });
 
@@ -740,11 +740,9 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      await waitFor(() => {
-        expect(screen.getByText("Player")).toBeInTheDocument();
-      });
+      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
 
-      await user.click(screen.getByText("Queue"));
+      await user.click(queueSwitch);
 
       await waitFor(() => {
         expect(screen.getByText("Queue Track 0")).toBeInTheDocument();
@@ -806,7 +804,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("highlights the active tab pill", async () => {
+    it("treats queue as a panel switch that can return to player", async () => {
       const track = makeTrack();
       const user = userEvent.setup();
 
@@ -818,15 +816,23 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
+      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
+      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
+
+      await user.click(queueSwitch);
+
       await waitFor(() => {
-        expect(screen.getByText("Queue")).toBeInTheDocument();
+        expect(screen.getByText("Nothing queued")).toBeInTheDocument();
       });
+      expect(queueSwitch).toHaveAttribute("aria-pressed", "true");
 
-      await user.click(screen.getByText("Queue"));
+      await user.click(queueSwitch);
 
-      // The active tab should have bg-white/12 class; the pill itself is a button
-      const queuePill = screen.getByText("Queue").closest("button");
-      expect(queuePill?.className).toContain("bg-white/12");
+      await waitFor(() => {
+        expect(screen.queryByText("Nothing queued")).not.toBeInTheDocument();
+        expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
+      });
+      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
     });
   });
 
@@ -1133,6 +1139,49 @@ describe("FullscreenPlayer", () => {
         expect(screen.getByText("No lyrics available")).toBeInTheDocument();
       });
     });
+
+    it("renders synced lyrics with a large active Apple Music-style hierarchy", async () => {
+      apiMock.mockReset();
+      apiMock.mockImplementation(() =>
+        Promise.resolve({
+          syncedLyrics:
+            "[00:00.00]Picking petals\n[00:10.00]Do you love me? Do you love me not?",
+          plainLyrics: null,
+        }),
+      );
+
+      const track = makeTrack();
+      const user = userEvent.setup();
+
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerProgress: createMockPlayerProgress({
+          currentTime: 1,
+          duration: 60,
+        }),
+        playerActions: createMockPlayerActions({
+          currentTrack: track,
+          queue: [track],
+          currentIndex: 0,
+        }),
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Lyrics" }));
+
+      const activeLine = await screen.findByRole("button", {
+        name: "Picking petals",
+      });
+      const nextLine = screen.getByRole("button", {
+        name: "Do you love me? Do you love me not?",
+      });
+
+      expect(activeLine).toHaveClass(
+        "text-[1.9rem]",
+        "font-extrabold",
+        "text-white",
+      );
+      expect(nextLine).toHaveClass("text-[1.55rem]");
+      expect(nextLine.className).toContain("blur-[0.35px]");
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -1157,7 +1206,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("renders all four tab pills", async () => {
+    it("renders three panel switches and no player tab", async () => {
       const track = makeTrack();
       renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
         playerActions: createMockPlayerActions({
@@ -1168,10 +1217,21 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Player")).toBeInTheDocument();
-        expect(screen.getByText("Queue")).toBeInTheDocument();
-        expect(screen.getByText("Lyrics")).toBeInTheDocument();
-        expect(screen.getByText("Info")).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: "Player" }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Queue" })).toHaveAttribute(
+          "aria-pressed",
+          "false",
+        );
+        expect(screen.getByRole("button", { name: "Lyrics" })).toHaveAttribute(
+          "aria-pressed",
+          "false",
+        );
+        expect(screen.getByRole("button", { name: "Info" })).toHaveAttribute(
+          "aria-pressed",
+          "false",
+        );
       });
     });
 

@@ -131,7 +131,7 @@ describe("TrackRow playback behavior", () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("button", { name: "Play next" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Play next" }));
 
     expect(playNext).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Track One" }),
@@ -139,7 +139,7 @@ describe("TrackRow playback behavior", () => {
     expect(playAll).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("button", { name: "Add to queue" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to queue" }));
 
     expect(addToQueue).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Track One" }),
@@ -157,11 +157,18 @@ describe("TrackRow playback behavior", () => {
       artist: "Artist",
       album: "Album",
     };
+    const nextTrack: TrackRowData = {
+      id: 2,
+      entity_uid: "entity-2",
+      title: "Track Two",
+      artist: "Artist",
+      album: "Album",
+    };
 
     renderWithListenProviders(
       <TrackRow
         track={track}
-        queueTracks={[track]}
+        queueTracks={[track, nextTrack]}
         selectable
         onSelect={onSelect}
       />,
@@ -176,6 +183,52 @@ describe("TrackRow playback behavior", () => {
 
     expect(onSelect).toHaveBeenCalledWith(track, expect.any(Object));
     expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("plays from the leading play control when selectable", async () => {
+    const playAll = vi.fn();
+    const onSelect = vi.fn();
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+    const nextTrack: TrackRowData = {
+      id: 2,
+      entity_uid: "entity-2",
+      title: "Track Two",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    renderWithListenProviders(
+      <TrackRow
+        track={track}
+        queueTracks={[track, nextTrack]}
+        selectable
+        onSelect={onSelect}
+      />,
+      {
+        playerActions: {
+          playAll,
+        },
+      },
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Play Track One" }),
+    );
+
+    expect(playAll).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({ title: "Track One" }),
+        expect.objectContaining({ title: "Track Two" }),
+      ],
+      0,
+    );
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("plays from the row on double click when selectable", () => {
@@ -250,5 +303,45 @@ describe("TrackRow playback behavior", () => {
       expect.any(Object),
     );
     expect(playAll).not.toHaveBeenCalled();
+  });
+
+  it("keeps circular progress and global play glow on the active playing row", () => {
+    const track: TrackRowData = {
+      id: 1,
+      entity_uid: "entity-1",
+      title: "Track One",
+      artist: "Artist",
+      album: "Album",
+    };
+
+    const { container } = renderWithListenProviders(
+      <TrackRow track={track} />,
+      {
+        playerActions: {
+          currentTrack: {
+            id: "entity-1",
+            entityUid: "entity-1",
+            title: "Track One",
+            artist: "Artist",
+          },
+        },
+        playerProgress: {
+          currentTime: 30,
+          duration: 120,
+        },
+        playerState: {
+          isPlaying: true,
+        },
+      },
+    );
+
+    const progress = screen.getByTestId("track-row-playback-progress");
+
+    expect(progress.innerHTML).toContain("animate-crate-play-aura-pulse");
+    expect(progress.innerHTML).toContain("animate-crate-play-rim-pulse");
+    expect(progress.innerHTML).toContain("animate-crate-play-core-pulse");
+    expect(progress.className).not.toContain("conic-gradient");
+    expect(progress.innerHTML).not.toContain("conic-gradient");
+    expect(container.innerHTML).toContain("stroke-dashoffset");
   });
 });

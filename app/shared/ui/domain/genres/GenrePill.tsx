@@ -31,9 +31,9 @@ export function GenrePill({
   const percent = resolveGenrePercent(item);
   const content = (
     <>
-      <span className="truncate">{item.name.toLowerCase()}</span>
+      <span className="min-w-0 truncate">{item.name.toLowerCase()}</span>
       {percent != null ? (
-        <span className="rounded-sm border border-[var(--active-border)] bg-[var(--active-bg-strong)] px-1 py-0.5 text-[10px] font-semibold text-[var(--active-text)]">
+        <span className="shrink-0 rounded-sm border border-[var(--active-border)] bg-[var(--active-bg-strong)] px-1 py-0.5 text-[10px] font-semibold text-[var(--active-text)]">
           {percent}%
         </span>
       ) : null}
@@ -52,7 +52,7 @@ export function GenrePill({
         onClick={onClick}
         title={title}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)] transition-colors hover:border-[var(--pill-active-border)] hover:bg-[var(--pill-active-bg)]",
+          "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)] transition-colors hover:border-[var(--pill-active-border)] hover:bg-[var(--pill-active-bg)]",
           className,
         )}
       >
@@ -65,7 +65,7 @@ export function GenrePill({
     <span
       title={title}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)]",
+        "inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-[var(--chip-active-border)] bg-[var(--chip-active-bg)] px-2 py-1 text-[11px] text-[var(--active-text)]",
         className,
       )}
     >
@@ -88,7 +88,12 @@ export function GenrePillRow({
   if (!items.length) return null;
 
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
+    <div
+      className={cn(
+        "flex w-full min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden",
+        className,
+      )}
+    >
       {items.slice(0, max).map((item) => (
         <GenrePill
           key={`${item.slug ?? item.name}-${item.source ?? "genre"}`}

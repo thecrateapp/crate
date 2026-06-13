@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";

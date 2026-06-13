@@ -466,6 +466,27 @@ def test_bandcamp_direct_probe_resolves_artist_and_album_urls(monkeypatch):
                 </head></html>
                 """,
             )
+        if url == "https://convergecult.bandcamp.com":
+            return Response(
+                "https://convergecult.bandcamp.com/album/hum-of-hurt",
+                """
+                <html><head>
+                  <title>Hum of Hurt | Converge</title>
+                  <meta property="og:site_name" content="Converge" />
+                </head></html>
+                """,
+            )
+        if url == "https://convergecult.bandcamp.com/album/you-fail-me":
+            return Response(
+                url,
+                """
+                <html><head>
+                  <title>You Fail Me | Converge</title>
+                  <meta property="og:title" content="You Fail Me, by Converge" />
+                  <meta property="og:site_name" content="Converge" />
+                </head></html>
+                """,
+            )
         response = Response(url, "")
         response.status_code = 404
         return response
@@ -483,6 +504,18 @@ def test_bandcamp_direct_probe_resolves_artist_and_album_urls(monkeypatch):
             allow_search=False,
         )
         == "https://highvis.bandcamp.com/album/blending"
+    )
+    assert (
+        bandcamp_search.find_exact_artist_url("Converge", allow_search=False)
+        == "https://convergecult.bandcamp.com"
+    )
+    assert (
+        bandcamp_search.find_exact_album_url(
+            "Converge",
+            "You Fail Me",
+            allow_search=False,
+        )
+        == "https://convergecult.bandcamp.com/album/you-fail-me"
     )
 
 

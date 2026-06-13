@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Save, X } from "lucide-react";
+import { Disc3, Save, X } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import {
@@ -7,8 +7,7 @@ import {
   ItemActionMenuButton,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
+} from "@crate/ui/domain/actions";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { getPlaySourceLabel } from "@/components/player/player-source";
@@ -111,14 +110,16 @@ function QueueTabRow({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={track.albumCover}
-            title={track.title}
-            artist={track.artist}
-            album={track.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: track.title,
+          subtitle: track.artist,
+          detail: track.album,
+          imageUrl: track.albumCover,
+          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

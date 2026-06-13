@@ -1,13 +1,14 @@
 import { useMemo } from "react";
-import { X } from "lucide-react";
+import { CRATE_ICON_SIZE, Disc3, X } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
   ItemActionMenuButton,
+  MobileActionSheet,
   type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
+} from "@crate/ui/domain/actions";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
@@ -121,14 +122,16 @@ function QueuePanelRow({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={track.albumCover}
-            title={track.title}
-            artist={track.artist}
-            album={track.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: track.title,
+          subtitle: track.artist,
+          detail: track.album,
+          imageUrl: track.albumCover,
+          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -139,6 +142,7 @@ function QueuePanelRow({
 }
 
 export function QueuePanel({ open, onClose }: QueuePanelProps) {
+  const isDesktop = useIsDesktop();
   const { isPlaying } = usePlayerState();
   const { queue, currentIndex, jumpTo, removeFromQueue, currentTrack } =
     usePlayerActions();
@@ -148,17 +152,17 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   const upcoming = queue.slice(currentIndex + 1);
   const played = queue.slice(0, currentIndex);
 
-  return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-white/10">
+  const content = (
+    <>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <h2 className="text-sm font-bold text-white">Queue</h2>
         <button
           onClick={onClose}
           aria-label="Close queue"
-          className="p-1 text-white/40 hover:text-white transition-colors"
+          className="flex size-10 items-center justify-center text-white/40 transition-colors hover:text-white"
         >
-          <X size={18} />
+          <X size={CRATE_ICON_SIZE.xl} />
         </button>
       </div>
 
@@ -254,6 +258,20 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           </>
         )}
       </div>
+    </>
+  );
+
+  if (!isDesktop) {
+    return (
+      <MobileActionSheet open={open} onClose={onClose}>
+        <div className="flex max-h-[inherit] flex-col pb-3">{content}</div>
+      </MobileActionSheet>
+    );
+  }
+
+  return (
+    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-[72px] flex w-[360px] animate-in slide-in-from-right flex-col border-l border-white/10">
+      {content}
     </div>
   );
 }

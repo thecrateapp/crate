@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 
 interface SpinnerProps {

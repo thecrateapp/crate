@@ -1,15 +1,14 @@
 import { useMemo } from "react";
-import { Clock3, Play, Sparkles } from "lucide-react";
+import { Clock3, Disc3, Play, Sparkles } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
+} from "@crate/ui/domain/actions";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
-import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
 import type { Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -80,14 +79,16 @@ function HomeTrackRowAction({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={track.albumCover}
-            title={track.title}
-            artist={track.artist}
-            album={track.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: track.title,
+          subtitle: track.artist,
+          detail: track.album,
+          imageUrl: track.albumCover,
+          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -174,14 +175,16 @@ function HomeReplayRowAction({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={cover}
-            title={item.title}
-            artist={item.artist}
-            album={item.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: item.title,
+          subtitle: item.artist,
+          detail: item.album,
+          imageUrl: cover,
+          imageAlt: item.album ? `${item.title} cover` : item.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -257,14 +260,16 @@ function HomeQueueCardAction({
       </div>
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={track.albumCover}
-            title={track.title}
-            artist={track.artist}
-            album={track.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: track.title,
+          subtitle: track.artist,
+          detail: track.album,
+          imageUrl: track.albumCover,
+          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -369,12 +374,13 @@ export function HomeReplaySection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title={replay?.title || "Replay this month"}
+        title="Crate DNA"
         subtitle={
-          replay?.subtitle ||
-          "A playable recap of your current listening window."
+          replay?.title && replay?.subtitle
+            ? `${replay.title} · ${replay.subtitle}`
+            : "Your current month in Crate, with a playable replay."
         }
-        actionLabel={isDesktop ? "Open Stats" : undefined}
+        actionLabel={isDesktop ? "Open Pulse" : undefined}
         onAction={isDesktop ? onOpenStats : undefined}
       />
 
@@ -382,13 +388,13 @@ export function HomeReplaySection({
         <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.14),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-5">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
             <Sparkles size={12} />
-            Replay
+            Crate DNA
           </div>
           <h2 className="mt-4 text-2xl font-bold text-foreground">
-            {replay?.title}
+            {replay?.title || "This month"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {replay?.subtitle}
+            {replay?.subtitle || "A playable recap of your current month."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -413,14 +419,14 @@ export function HomeReplaySection({
             className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Play size={15} fill="currentColor" />
-            Play replay
+            Play month replay
           </button>
         </div>
 
         <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.03] p-4">
           <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
             <Clock3 size={12} />
-            Replay picks
+            Month replay
           </div>
           <div className="space-y-1">
             {replayPreview.map((item) => (

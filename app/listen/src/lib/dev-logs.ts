@@ -45,6 +45,21 @@ function persistLogs(logs: DevLogEntry[]): void {
   }
 }
 
+function dispatchRecordedLogEvent(entry: DevLogEntry): void {
+  const dispatch = () => {
+    window.dispatchEvent(
+      new CustomEvent<DevLogEntry>(DEV_LOG_EVENT, { detail: entry }),
+    );
+  };
+
+  if (typeof window.queueMicrotask === "function") {
+    window.queueMicrotask(dispatch);
+    return;
+  }
+
+  window.setTimeout(dispatch, 0);
+}
+
 export function redactUrl(value: string): string {
   try {
     const url = new URL(value);
@@ -82,9 +97,7 @@ export function recordDevLog(
   const next = [...logs, entry].slice(-MAX_LOGS);
   window.__crateDevLogs = next;
   persistLogs(next);
-  window.dispatchEvent(
-    new CustomEvent<DevLogEntry>(DEV_LOG_EVENT, { detail: entry }),
-  );
+  dispatchRecordedLogEvent(entry);
 
   const consoleMethod =
     level === "debug"

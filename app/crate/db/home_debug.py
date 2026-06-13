@@ -30,4 +30,11 @@ def record_home_mix_debug(mix_id: str, diagnostics: dict) -> None:
     mixes[mix_id] = diagnostics
 
 
-__all__ = ["collect_home_debug", "record_home_mix_debug"]
+def record_home_hero_debug(diagnostics: dict) -> None:
+    payload = _HOME_DEBUG.get()
+    if payload is None:
+        return
+    payload["hero"] = diagnostics
+
+
+__all__ = ["collect_home_debug", "record_home_hero_debug", "record_home_mix_debug"]

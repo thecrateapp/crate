@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from "react";
-import { MonitorSpeaker, X } from "lucide-react";
+import { CRATE_ICON_SIZE, MonitorSpeaker, X } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -185,9 +185,9 @@ export function ContinuePlaybackPrompt() {
           type="button"
           aria-label="Dismiss"
           onClick={() => setDismissed(true)}
-          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+          className="flex size-9 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
         >
-          <X size={16} />
+          <X size={CRATE_ICON_SIZE.lg} />
         </button>
       </div>
     </div>

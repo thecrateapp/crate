@@ -14,7 +14,7 @@ import {
   Search,
   Upload,
   X,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -334,11 +334,12 @@ export function PlaylistCreateModal({
         if (!submitting) onClose();
       }}
       maxWidthClassName="sm:max-w-3xl"
+      panelClassName="listen-glass-panel border-white/10"
       closeOnEscape={!submitting}
       closeOnOverlay={!submitting}
     >
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[92vh]">
-        <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
+        <ModalHeader className="flex items-center justify-between gap-4 bg-transparent px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               {modalTitle}
@@ -566,7 +567,7 @@ export function PlaylistCreateModal({
           </div>
         </ModalBody>
 
-        <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
+        <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
           <button
             type="button"
             className="rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"

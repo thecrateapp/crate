@@ -1,19 +1,26 @@
-import { memo, type MouseEvent } from "react";
+import { memo, useId, type MouseEvent } from "react";
 import { useNavigate } from "react-router";
-import { Play, Pause, Heart } from "lucide-react";
+import {
+  CRATE_ICON_SIZE,
+  Disc3,
+  Play,
+  Pause,
+  Heart,
+  HeartBold,
+} from "@crate/ui/icons";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
+} from "@crate/ui/domain/actions";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { buildTrackMenuPlayerTrack } from "@/components/actions/shared";
-import { OfflineBadge } from "@/components/offline/OfflineBadge";
+import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { useOffline } from "@/contexts/OfflineContext";
 import {
   usePlayerState,
   usePlayerActions,
+  usePlayerProgress,
   type Track,
 } from "@/contexts/PlayerContext";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
@@ -23,7 +30,7 @@ import {
   toPlayableTrack,
 } from "@/lib/playable-track";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { TrackCoverThumb } from "@/components/cards/TrackCoverThumb";
+import { TrackCoverThumb } from "@crate/ui/domain/cards/TrackCoverThumb";
 import { getOfflineStateLabel, isOfflineBusy } from "@/lib/offline";
 import { cn, formatDuration } from "@/lib/utils";
 import {
@@ -95,6 +102,98 @@ interface TrackRowProps {
   ) => boolean | void;
   /** Pass the full sibling track list so clicking plays all from this track's position. */
   queueTracks?: TrackRowData[];
+}
+
+function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
+  const { currentTime, duration } = usePlayerProgress();
+  const gradientId = useId().replace(/:/g, "");
+  const size = 38;
+  const stroke = 2.5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress =
+    Number.isFinite(duration) && duration > 0
+      ? Math.max(0, Math.min(1, currentTime / duration))
+      : 0;
+
+  return (
+    <span
+      className="group/track-progress relative isolate flex h-10 w-10 items-center justify-center overflow-visible rounded-full bg-black/62 text-white shadow-[0_8px_22px_rgba(0,0,0,0.4),0_0_12px_rgba(34,211,238,0.2),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md"
+      data-testid="track-row-playback-progress"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute -inset-[13px] z-0 origin-[46%_57%] rounded-[45%_55%_49%_51%/53%_47%_56%_44%] bg-[radial-gradient(ellipse_58%_46%_at_46%_57%,rgba(34,211,238,0.38)_0%,rgba(34,211,238,0.22)_24%,rgba(34,211,238,0.09)_42%,transparent_64%),radial-gradient(ellipse_38%_32%_at_68%_34%,rgba(165,243,252,0.22)_0%,rgba(165,243,252,0.09)_34%,transparent_66%),radial-gradient(ellipse_34%_42%_at_30%_66%,rgba(8,145,178,0.25)_0%,rgba(8,145,178,0.09)_38%,transparent_68%)] opacity-[0.64] blur-[1px]",
+          isPlaying && "animate-crate-play-aura-pulse",
+        )}
+      />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-[4px] z-10 rounded-full bg-[radial-gradient(circle_at_48%_42%,rgba(207,250,254,0.18)_0%,rgba(34,211,238,0.16)_28%,rgba(6,182,212,0.08)_54%,transparent_74%)] opacity-70",
+          isPlaying && "animate-crate-play-rim-pulse",
+        )}
+      />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-[2px] z-20 rounded-full bg-[#121326] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08),inset_0_-10px_24px_rgba(0,0,0,0.48)]",
+          isPlaying && "animate-crate-play-core-pulse",
+        )}
+      />
+      <svg
+        aria-hidden="true"
+        viewBox={`0 0 ${size} ${size}`}
+        className="absolute inset-[1px] z-30 h-[calc(100%-2px)] w-[calc(100%-2px)] -rotate-90 overflow-visible"
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="rgba(207,250,254,0.98)" />
+            <stop offset="48%" stopColor="rgba(34,211,238,0.96)" />
+            <stop offset="100%" stopColor="rgba(6,182,212,0.72)" />
+          </linearGradient>
+        </defs>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.12)"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - progress)}
+          strokeLinecap="round"
+          strokeWidth={stroke}
+          className="transition-[stroke-dashoffset] duration-300 ease-linear"
+          style={{
+            filter:
+              "drop-shadow(0 0 5px rgba(34,211,238,0.84)) drop-shadow(0 0 12px rgba(6,182,212,0.42))",
+          }}
+        />
+      </svg>
+      {isPlaying ? (
+        <Pause
+          size={CRATE_ICON_SIZE.sm}
+          className="relative z-40 drop-shadow-[0_0_4px_rgba(255,255,255,0.35)]"
+          fill="currentColor"
+        />
+      ) : (
+        <Play
+          size={CRATE_ICON_SIZE.sm}
+          className="relative z-40 ml-0.5 drop-shadow-[0_0_4px_rgba(255,255,255,0.35)]"
+          fill="currentColor"
+        />
+      )}
+    </span>
+  );
 }
 
 export const TrackRow = memo(function TrackRow({
@@ -188,10 +287,20 @@ export const TrackRow = memo(function TrackRow({
     play(playerTrack);
   }
 
+  const playControlLabel = `${isActive && isPlaying ? "Pause" : "Play"} ${
+    track.title || "track"
+  }`;
+
+  function handlePlayControlClick(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleActivate();
+  }
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer",
+        "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors cursor-pointer",
         disabled
           ? "cursor-not-allowed opacity-55"
           : selected
@@ -225,10 +334,17 @@ export const TrackRow = memo(function TrackRow({
       }
     >
       {showCoverThumb ? (
-        <div className="relative h-11 w-11 flex-shrink-0">
+        <button
+          type="button"
+          className="relative h-12 w-12 flex-shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed"
+          aria-label={playControlLabel}
+          title={playControlLabel}
+          disabled={disabled}
+          onClick={handlePlayControlClick}
+        >
           <TrackCoverThumb
             src={cover}
-            iconSize={16}
+            iconSize={CRATE_ICON_SIZE.md}
             className="absolute inset-0 rounded-md"
           />
           <div
@@ -236,11 +352,11 @@ export const TrackRow = memo(function TrackRow({
               isActive ? "bg-black/40" : "bg-black/0 group-hover:bg-black/45"
             }`}
           >
-            {disabled ? null : isActive && isPlaying ? (
-              <Pause size={16} className="text-white" fill="currentColor" />
+            {disabled ? null : isActive ? (
+              <TrackRowPlaybackProgress isPlaying={isPlaying} />
             ) : (
               <Play
-                size={16}
+                size={CRATE_ICON_SIZE.md}
                 className={`text-white transition-opacity ${
                   isActive
                     ? "opacity-100"
@@ -250,27 +366,34 @@ export const TrackRow = memo(function TrackRow({
               />
             )}
           </div>
-        </div>
+        </button>
       ) : (
-        <div className="w-8 text-center flex-shrink-0">
+        <button
+          type="button"
+          className="flex w-10 flex-shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 disabled:cursor-not-allowed"
+          aria-label={playControlLabel}
+          title={playControlLabel}
+          disabled={disabled}
+          onClick={handlePlayControlClick}
+        >
           {disabled ? (
             <span className="text-xs text-muted-foreground">
               {index != null ? index : track.track_number || "-"}
             </span>
-          ) : isActive && isPlaying ? (
-            <Pause size={14} className="text-primary mx-auto" />
+          ) : isActive ? (
+            <TrackRowPlaybackProgress isPlaying={isPlaying} />
           ) : (
             <>
               <span className="text-xs text-muted-foreground md:group-hover:hidden">
                 {index != null ? index : track.track_number || "-"}
               </span>
               <Play
-                size={14}
+                size={CRATE_ICON_SIZE.sm}
                 className="text-foreground mx-auto hidden md:group-hover:block"
               />
             </>
           )}
-        </div>
+        </button>
       )}
 
       {/* Title + optional artist/album */}
@@ -394,7 +517,14 @@ export const TrackRow = memo(function TrackRow({
             }
           }}
         >
-          <Heart size={14} className={liked ? "fill-current" : ""} />
+          {liked ? (
+            <HeartBold
+              size={CRATE_ICON_SIZE.md}
+              className="animate-crate-icon-active-pulse"
+            />
+          ) : (
+            <Heart size={CRATE_ICON_SIZE.md} />
+          )}
         </ActionIconButton>
       ) : (
         <div className="h-9 w-9 flex-shrink-0" />
@@ -428,14 +558,16 @@ export const TrackRow = memo(function TrackRow({
       {!disabled ? (
         <ItemActionMenu
           actions={actions}
-          header={
-            <TrackActionMenuHeader
-              coverUrl={cover}
-              title={track.title}
-              artist={track.artist}
-              album={track.album}
-            />
-          }
+          header={{
+            type: "media",
+            title: track.title,
+            subtitle: track.artist,
+            detail: track.album,
+            imageUrl: cover,
+            imageAlt: track.album ? `${track.title} cover` : track.title,
+            imageShape: "square",
+            fallbackIcon: Disc3,
+          }}
           open={actionMenu.open}
           position={actionMenu.position}
           menuRef={actionMenu.menuRef}

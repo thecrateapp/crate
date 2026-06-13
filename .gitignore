@@ -6,6 +6,8 @@ test-data/.tiddl/
 # Data directories
 data/
 media/
+!app/shared/ui/domain/media/
+!app/shared/ui/domain/media/**
 test-music/
 
 # Node
@@ -45,6 +47,8 @@ worktrees/
 docs/plans/
 docs/technical/.obsidian/
 app/shared/web/node_modules
+docs/superpowers/
+.superpowers
 
 # MemPalace per-project files (issue #185)
 mempalace.yaml

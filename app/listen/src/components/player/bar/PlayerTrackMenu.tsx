@@ -1,11 +1,11 @@
 import { useMemo } from "react";
+import { Disc3 } from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
   ItemActionMenuButton,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
-import { TrackActionMenuHeader } from "@/components/actions/TrackActionMenuHeader";
+} from "@crate/ui/domain/actions";
 import { trackToMenuData } from "@/components/actions/shared";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import type { Track } from "@/contexts/PlayerContext";
@@ -45,14 +45,18 @@ export function PlayerTrackMenu({
       />
       <ItemActionMenu
         actions={actions}
-        header={
-          <TrackActionMenuHeader
-            coverUrl={currentTrack.albumCover}
-            title={currentTrack.title}
-            artist={currentTrack.artist}
-            album={currentTrack.album}
-          />
-        }
+        header={{
+          type: "media",
+          title: currentTrack.title,
+          subtitle: currentTrack.artist,
+          detail: currentTrack.album,
+          imageUrl: currentTrack.albumCover,
+          imageAlt: currentTrack.album
+            ? `${currentTrack.title} cover`
+            : currentTrack.title,
+          imageShape: "square",
+          fallbackIcon: Disc3,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}

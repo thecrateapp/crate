@@ -1,4 +1,4 @@
-import { Calendar, Play } from "lucide-react";
+import { Calendar, Play } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
@@ -9,6 +9,7 @@ import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import {
   buildArtistAlbumCover,
   buildArtistPhotoUrl,
+  topTrackToTrackRowData,
   type ArtistAlbum,
   type ArtistPlaylistAppearance,
   type ArtistTopTrack,
@@ -36,17 +37,7 @@ export function ArtistTopTracksSection({
 }: ArtistTopTracksSectionProps) {
   const navigate = useNavigate();
   const trackRows = useMemo<TrackRowData[]>(
-    () =>
-      tracks.map((track) => ({
-        id: track.id,
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        album_id: track.album_id,
-        album_slug: track.album_slug,
-        duration: track.duration,
-        path: track.id.includes("/") ? track.id : undefined,
-      })),
+    () => tracks.map((track) => topTrackToTrackRowData(track)),
     [tracks],
   );
   if (!tracks.length) return null;

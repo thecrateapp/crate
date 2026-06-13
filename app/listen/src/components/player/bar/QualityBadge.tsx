@@ -1,4 +1,4 @@
-import { Sparkles, Disc3, AudioLines } from "lucide-react";
+import { Sparkles, Disc3, AudioLines } from "@crate/ui/icons";
 import type { QualityBadge as QualityBadgeData } from "./player-bar-utils";
 
 const tierStyles: Record<

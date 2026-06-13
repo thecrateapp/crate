@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowDownToLine,
+  ArrowDownToLineBold,
   Download,
   Loader2,
   Disc3,
   Heart,
+  HeartBold,
   ListMusic,
   ListPlus,
   Play,
@@ -13,10 +15,10 @@ import {
   Radio,
   Share2,
   UserRound,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
   action,
   buildTrackMenuPlayerTrack,
@@ -125,7 +127,7 @@ export function useTrackActionEntries(
       action({
         key: "like",
         label: liked ? "Unlike track" : "Like track",
-        icon: Heart,
+        icon: liked ? HeartBold : Heart,
         active: liked,
         disabled: !hasTrackRef,
         onSelect: async () => {
@@ -176,7 +178,11 @@ export function useTrackActionEntries(
       action({
         key: "offline",
         label: getOfflineActionLabel(offlineState),
-        icon: isOfflineBusy(offlineState) ? Loader2 : ArrowDownToLine,
+        icon: isOfflineBusy(offlineState)
+          ? Loader2
+          : offlineState === "ready"
+            ? ArrowDownToLineBold
+            : ArrowDownToLine,
         active: offlineState === "ready",
         disabled:
           !offlineSupported || !hasTrackRef || isOfflineBusy(offlineState),

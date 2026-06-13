@@ -57,6 +57,9 @@ class TestExploreFiltersContract:
                 "Metalcore",
                 "Post-Hardcore",
             ]
+            assert data["genres"][0]["description"] is None
+            assert data["genres"][0]["top_artists"] == []
+            assert data["genres"][0]["cover_url"] is None
             assert data["decades"] == ["1990s", "2000s"]
             assert data["formats"][0]["name"] == "FLAC"
 

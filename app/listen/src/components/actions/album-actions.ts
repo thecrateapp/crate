@@ -1,17 +1,19 @@
 import { useMemo } from "react";
 import {
   ArrowDownToLine,
+  ArrowDownToLineBold,
   Download,
   Heart,
+  HeartBold,
   Loader2,
   Play,
   Radio,
   Share2,
   Shuffle,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
+import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
 import {
   action,
   fetchAlbumTracks,
@@ -113,7 +115,7 @@ export function useAlbumActionEntries(
       action({
         key: "save",
         label: saved ? "Remove from saved albums" : "Save album",
-        icon: Heart,
+        icon: saved ? HeartBold : Heart,
         active: saved,
         disabled: input.albumId == null,
         onSelect: async () => {
@@ -147,7 +149,11 @@ export function useAlbumActionEntries(
       action({
         key: "offline",
         label: getOfflineActionLabel(offlineState),
-        icon: isOfflineBusy(offlineState) ? Loader2 : ArrowDownToLine,
+        icon: isOfflineBusy(offlineState)
+          ? Loader2
+          : offlineState === "ready"
+            ? ArrowDownToLineBold
+            : ArrowDownToLine,
         active: offlineState === "ready",
         disabled:
           !offlineSupported ||

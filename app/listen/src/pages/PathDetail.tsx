@@ -7,7 +7,7 @@ import {
   Play,
   RefreshCw,
   Trash2,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";

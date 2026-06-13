@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { Loader2, Play } from "lucide-react";
+import { Loader2, Play, Search } from "@crate/ui/icons";
 import { api, ApiError } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -48,30 +48,47 @@ interface SearchData {
   }[];
 }
 
+function searchErrorHint(error: unknown): string {
+  if (
+    error instanceof ApiError &&
+    (error.status === 401 || error.status === 403)
+  ) {
+    return "Your session needs a refresh. Try reloading or signing in again.";
+  }
+  return "Try again in a moment.";
+}
+
 export function SearchResults() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
   const [data, setData] = useState<SearchData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { playAll } = usePlayerActions();
 
   useEffect(() => {
     if (!query.trim()) {
       setData(null);
+      setSearchError(null);
       return;
     }
     const controller = new AbortController();
     setLoading(true);
+    setSearchError(null);
     api<SearchData>(
       `/api/search?q=${encodeURIComponent(query)}&limit=50`,
       "GET",
       undefined,
       { signal: controller.signal },
     )
-      .then(setData)
+      .then((nextData) => {
+        setData(nextData);
+        setSearchError(null);
+      })
       .catch((e) => {
-        if (!(e instanceof ApiError)) return;
-        setData({ artists: [], albums: [], tracks: [] });
+        if (controller.signal.aborted) return;
+        setData(null);
+        setSearchError(searchErrorHint(e));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -99,7 +116,26 @@ export function SearchResults() {
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
       </div>
     );
+  if (searchError)
+    return (
+      <div className="space-y-8">
+        <h1 className="text-2xl font-bold">Results for "{query}"</h1>
+        <div className="mx-auto max-w-sm rounded-3xl border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
+            <Search size={18} />
+          </div>
+          <p className="mt-4 text-base font-semibold text-foreground">
+            Search unavailable
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{searchError}</p>
+        </div>
+      </div>
+    );
   if (!data) return null;
+  const noResults =
+    data.artists.length === 0 &&
+    data.albums.length === 0 &&
+    data.tracks.length === 0;
 
   const trackToPlayer = (t: SearchData["tracks"][0]): Track =>
     toPlayableTrack(
@@ -209,13 +245,19 @@ export function SearchResults() {
         </section>
       )}
 
-      {data.artists.length === 0 &&
-        data.albums.length === 0 &&
-        data.tracks.length === 0 && (
-          <p className="text-muted-foreground text-center py-12">
-            No results found for "{query}"
+      {noResults ? (
+        <div className="mx-auto max-w-sm rounded-3xl border border-cyan-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-cyan-300/15 bg-cyan-300/8 text-cyan-200">
+            <Search size={18} />
+          </div>
+          <p className="mt-4 text-base font-semibold text-foreground">
+            No music found
           </p>
-        )}
+          <p className="mt-2 text-sm text-muted-foreground">
+            Try another artist, album, or track.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

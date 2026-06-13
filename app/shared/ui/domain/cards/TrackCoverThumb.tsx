@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ListMusic } from "lucide-react";
+import { ListMusic } from "@crate/ui/icons";
 
 interface TrackCoverThumbProps {
   src?: string;

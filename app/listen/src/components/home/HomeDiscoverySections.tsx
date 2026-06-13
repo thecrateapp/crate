@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import {
   Play,
   Sparkles,
@@ -9,12 +15,19 @@ import {
   ChevronRight,
   Info,
   X,
-} from "lucide-react";
+} from "@crate/ui/icons";
 
 import {
   ItemActionMenu,
+  ItemActionMenuButton,
+  type ContextMenuHeader,
+  type ItemActionMenuEntry,
   useItemActionMenu,
-} from "@/components/actions/ItemActionMenu";
+} from "@crate/ui/domain/actions";
+import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
+import { useAlbumActionEntries } from "@/components/actions/album-actions";
+import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { usePlaylistActionEntries } from "@/components/actions/playlist-actions";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -153,6 +166,20 @@ function recentArtwork(item: HomeRecentItem): string | null {
   );
 }
 
+function recentTitle(item: HomeRecentItem): string {
+  if (item.type === "playlist") return item.playlist_name;
+  if (item.type === "artist") return item.artist_name;
+  return item.album_name;
+}
+
+function recentSubtitle(item: HomeRecentItem): string | undefined {
+  if (item.type === "playlist") {
+    return item.playlist_description || item.subtitle;
+  }
+  if (item.type === "artist") return item.subtitle;
+  return item.artist_name;
+}
+
 function radioArtwork(station: HomeRadioStation): string | null {
   if (station.type === "album") {
     return (
@@ -179,6 +206,34 @@ function radioArtwork(station: HomeRadioStation): string | null {
       },
       { size: 256 },
     ) || null
+  );
+}
+
+function radioSeedTypeLabel(station: HomeRadioStation): string {
+  const seedType = station.seed_type ?? station.type;
+  if (seedType === "track") return "Track Radio";
+  if (seedType === "album") return "Album Radio";
+  if (seedType === "genre") return "Genre Radio";
+  return "Artist Radio";
+}
+
+function radioSeedLabel(station: HomeRadioStation): string {
+  return (
+    station.seed_label ||
+    station.track_title ||
+    station.album_name ||
+    station.artist_name ||
+    station.genre_name ||
+    station.title.replace(/\s+Radio$/i, "")
+  );
+}
+
+function radioSeedSubtitle(station: HomeRadioStation): string | null {
+  return (
+    station.seed_subtitle ||
+    (station.type === "album" ? station.artist_name : null) ||
+    (station.type === "track" ? station.artist_name : null) ||
+    null
   );
 }
 
@@ -560,7 +615,8 @@ function HeroSlide({
   onInfo: () => void;
   onDismiss?: () => void;
 }) {
-  const genres = (hero as any).genres as string[] | undefined;
+  const genres =
+    hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
 
   return (
     <section
@@ -604,22 +660,17 @@ function HeroSlide({
       <div className="relative z-10 flex min-h-[260px] flex-col justify-between px-4 py-5 pb-12 sm:min-h-[280px] sm:px-8 sm:py-8 lg:px-10">
         <div>
           <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-            <div className="inline-flex shrink-0 items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
-              <Sparkles size={12} />
-              Recommended
-            </div>
-            {genres && genres.length > 0 && (
-              <div className="flex min-w-0 flex-wrap gap-1.5">
-                {genres.slice(0, 2).map((g) => (
-                  <span
-                    key={g}
-                    className="max-w-[42vw] truncate rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-0.5 text-[10px] text-white/50 sm:max-w-none"
-                  >
-                    {g}
-                  </span>
+            {genres.length > 0 ? (
+              <div className="flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
+                {genres.slice(0, 2).map((genre) => (
+                  <GenrePill
+                    key={genre.name}
+                    item={genre}
+                    className="max-w-[42vw] sm:max-w-none"
+                  />
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
 
           <h1 className="mt-4 truncate text-3xl font-black tracking-tight text-white min-[380px]:text-4xl sm:text-5xl lg:text-6xl">
@@ -682,12 +733,151 @@ export function RecentEntityRow({
   item: HomeRecentItem;
   onClick: () => void;
 }) {
+  if (item.type === "album") {
+    return <RecentAlbumEntityRow item={item} onClick={onClick} />;
+  }
+  if (item.type === "artist") {
+    return <RecentArtistEntityRow item={item} onClick={onClick} />;
+  }
+  return <RecentPlaylistEntityRow item={item} onClick={onClick} />;
+}
+
+function RecentAlbumEntityRow({
+  item,
+  onClick,
+}: {
+  item: Extract<HomeRecentItem, { type: "album" }>;
+  onClick: () => void;
+}) {
   const artworkUrl = recentArtwork(item);
+  const actions = useAlbumActionEntries({
+    artist: item.artist_name,
+    artistSlug: item.artist_slug,
+    artistEntityUid: item.artist_entity_uid,
+    album: item.album_name,
+    albumId: item.album_id,
+    albumEntityUid: item.album_entity_uid,
+    albumSlug: item.album_slug,
+    cover: artworkUrl ?? undefined,
+  });
 
   return (
-    <button
+    <RecentEntityRowFrame
+      item={item}
+      actions={actions}
+      header={{
+        type: "media",
+        title: item.album_name,
+        subtitle: item.artist_name,
+        imageUrl: artworkUrl,
+        imageAlt: item.album_name,
+        imageShape: "square",
+        fallbackIcon: Disc3,
+      }}
       onClick={onClick}
+    />
+  );
+}
+
+function RecentArtistEntityRow({
+  item,
+  onClick,
+}: {
+  item: Extract<HomeRecentItem, { type: "artist" }>;
+  onClick: () => void;
+}) {
+  const artworkUrl = recentArtwork(item);
+  const actions = useArtistActionEntries({
+    artistId: item.artist_id,
+    artistEntityUid: item.artist_entity_uid,
+    artistSlug: item.artist_slug,
+    imageUrl: artworkUrl,
+    name: item.artist_name,
+  });
+
+  return (
+    <RecentEntityRowFrame
+      item={item}
+      actions={actions}
+      header={{
+        type: "media",
+        title: item.artist_name,
+        subtitle: item.subtitle,
+        imageUrl: artworkUrl,
+        imageAlt: item.artist_name,
+        imageShape: "circle",
+        fallbackIcon: UserRound,
+      }}
+      onClick={onClick}
+    />
+  );
+}
+
+function RecentPlaylistEntityRow({
+  item,
+  onClick,
+}: {
+  item: Extract<HomeRecentItem, { type: "playlist" }>;
+  onClick: () => void;
+}) {
+  const actions = usePlaylistActionEntries({
+    playlistId: item.playlist_id,
+    name: item.playlist_name,
+    isSmart: item.playlist_scope === "system",
+    href: openRecentItemPath(item),
+  });
+
+  return (
+    <RecentEntityRowFrame
+      item={item}
+      actions={actions}
+      header={{
+        type: "media",
+        title: item.playlist_name,
+        subtitle: item.playlist_description || item.subtitle,
+        imageUrl: item.playlist_cover_data_url,
+        imageAlt: item.playlist_name,
+        imageShape: "square",
+        fallbackIcon: Sparkles,
+      }}
+      onClick={onClick}
+    />
+  );
+}
+
+function RecentEntityRowFrame({
+  item,
+  actions,
+  header,
+  onClick,
+}: {
+  item: HomeRecentItem;
+  actions: ItemActionMenuEntry[];
+  header: ContextMenuHeader;
+  onClick: () => void;
+}) {
+  const artworkUrl = recentArtwork(item);
+  const title = recentTitle(item);
+  const subtitle = recentSubtitle(item);
+  const actionMenu = useItemActionMenu(actions);
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    actionMenu.handleKeyboardTrigger(event);
+    if (event.defaultPrevented) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onClick();
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      onContextMenu={actionMenu.handleContextMenu}
       className="group flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]"
+      {...actionMenu.longPressHandlers}
     >
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/5">
         {item.type === "playlist" ? (
@@ -718,25 +908,33 @@ export function RecentEntityRow({
 
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-foreground">
-          {item.type === "playlist"
-            ? item.playlist_name
-            : item.type === "artist"
-              ? item.artist_name
-              : item.album_name}
+          {title}
         </div>
-        <div className="mt-1 truncate text-xs text-muted-foreground">
-          {item.type === "playlist"
-            ? item.playlist_description || item.subtitle
-            : item.type === "artist"
-              ? item.subtitle
-              : item.artist_name}
-        </div>
+        {subtitle ? (
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {subtitle}
+          </div>
+        ) : null}
       </div>
 
-      <div className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-        {item.type}
+      <div className="flex shrink-0 items-center gap-2">
+        <ItemActionMenuButton
+          buttonRef={actionMenu.triggerRef}
+          hasActions={actionMenu.hasActions}
+          onClick={actionMenu.openFromTrigger}
+          className="h-9 w-9 opacity-75 transition-opacity hover:opacity-100 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+        />
       </div>
-    </button>
+
+      <ItemActionMenu
+        actions={actions}
+        header={header}
+        open={actionMenu.open}
+        position={actionMenu.position}
+        menuRef={actionMenu.menuRef}
+        onClose={actionMenu.close}
+      />
+    </div>
   );
 }
 
@@ -749,7 +947,9 @@ export function RecentlyPlayedSection({
   onOpenItem: (item: HomeRecentItem) => void;
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
-  const pages = chunkItems(items, 9);
+  const isDesktop = useIsDesktop();
+  const visibleItems = isDesktop ? items : items.slice(0, 4);
+  const pages = chunkItems(visibleItems, 9);
   const rail = useSectionRail(pages.length);
   if (!items.length) return null;
 
@@ -811,7 +1011,7 @@ export function CustomMixesSection({
         onAction={() => onViewAll("custom-mixes")}
         railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail railRef={rail.railRef} fit="square-card">
         {mixes.map((mix) => (
           <CustomMixCard
             key={mix.id}
@@ -868,7 +1068,7 @@ export function CustomMixCard({
       {...actionMenu.longPressHandlers}
       className={cn(
         "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
-        layout === "grid" ? "w-full min-w-0" : "w-[180px] flex-shrink-0",
+        layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
       <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
@@ -903,6 +1103,14 @@ export function CustomMixCard({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: item.name,
+          subtitle: mixArtistSummary(item),
+          detail: `${item.track_count} tracks`,
+          imageShape: "square",
+          fallbackIcon: Sparkles,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -1011,7 +1219,7 @@ export function SuggestedAlbumsSection({
         onAction={() => onViewAll("suggested-albums")}
         railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail railRef={rail.railRef} fit="square-card">
         {albums.map((album) => (
           <AlbumCard
             key={`${
@@ -1024,6 +1232,7 @@ export function SuggestedAlbumsSection({
             artistEntityUid={album.artist_entity_uid}
             albumSlug={album.album_slug}
             year={album.year}
+            layout="grid"
           />
         ))}
       </SectionRail>
@@ -1088,15 +1297,16 @@ export function RadioStationCard({
   layout?: "rail" | "grid";
 }) {
   const artworkUrl = radioArtwork(station);
+  const seedTypeLabel = radioSeedTypeLabel(station);
+  const seedLabel = radioSeedLabel(station);
+  const seedSubtitle = radioSeedSubtitle(station);
 
   return (
     <button
       onClick={onPlay}
       className={cn(
         "group relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] text-left",
-        layout === "grid"
-          ? "w-full min-w-0"
-          : "w-[180px] flex-shrink-0 lg:w-[calc((100%-4rem)/5)] xl:w-[calc((100%-6rem)/7)]",
+        layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
       <div
@@ -1106,16 +1316,18 @@ export function RadioStationCard({
         }}
       />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(6,8,12,0.92)_100%)]" />
-      <div className="absolute left-3 top-3 rounded-full border border-primary/20 bg-primary/12 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-primary">
-        <Radio size={11} className="inline-block" /> Station
+      <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-black/35 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary shadow-[0_0_18px_rgba(6,182,212,0.16)] backdrop-blur-md">
+        <Radio size={12} className="inline-block" /> {seedTypeLabel}
       </div>
       <div className="absolute inset-x-0 bottom-0 p-4">
         <div className="truncate text-sm font-semibold text-white">
-          {station.title}
+          {seedLabel}
         </div>
-        <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
-          {station.subtitle}
-        </div>
+        {seedSubtitle ? (
+          <div className="mt-1 line-clamp-2 text-xs leading-5 text-white/60">
+            {seedSubtitle}
+          </div>
+        ) : null}
       </div>
     </button>
   );
@@ -1142,7 +1354,7 @@ export function RadioStationsSection({
         onAction={() => onViewAll("radio-stations")}
         railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail railRef={rail.railRef} fit="square-card">
         {stations.map((station) => (
           <RadioStationCard
             key={`${station.type}-${
@@ -1176,7 +1388,7 @@ export function FavoriteArtistsSection({
         onAction={() => onViewAll("favorite-artists")}
         railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail railRef={rail.railRef} fit="square-card">
         {artists.map((artist) => (
           <ArtistCard
             key={artist.artist_id ?? artist.artist_name}
@@ -1185,6 +1397,8 @@ export function FavoriteArtistsSection({
             artistEntityUid={artist.artist_entity_uid}
             artistSlug={artist.artist_slug}
             subtitle={`${artist.play_count} plays`}
+            layout="grid"
+            fillGrid
           />
         ))}
       </SectionRail>
@@ -1233,9 +1447,7 @@ export function CoreTracksPlaylistCard({
       {...actionMenu.longPressHandlers}
       className={cn(
         "group cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-3xl",
-        layout === "grid"
-          ? "w-full min-w-0"
-          : "w-[180px] flex-shrink-0 lg:w-[calc((100%-4rem)/5)] xl:w-[calc((100%-6rem)/7)]",
+        layout === "grid" ? "w-full min-w-0" : "w-full min-w-0 snap-start",
       )}
     >
       <div className="relative mb-2 overflow-hidden rounded-3xl bg-white/5">
@@ -1261,6 +1473,13 @@ export function CoreTracksPlaylistCard({
       </div>
       <ItemActionMenu
         actions={actions}
+        header={{
+          type: "media",
+          title: item.name,
+          subtitle: `${item.track_count} tracks`,
+          imageShape: "square",
+          fallbackIcon: Sparkles,
+        }}
         open={actionMenu.open}
         position={actionMenu.position}
         menuRef={actionMenu.menuRef}
@@ -1291,13 +1510,13 @@ export function EssentialsSection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Core tracks"
+        title="Artist Sets"
         subtitle="Discovery-forward artist sets, ending with familiar anchors."
         actionLabel="View all"
         onAction={() => onViewAll("core-tracks")}
         railControls={rail}
       />
-      <SectionRail railRef={rail.railRef}>
+      <SectionRail railRef={rail.railRef} fit="square-card">
         {items.map((item) => (
           <CoreTracksPlaylistCard
             key={item.id}

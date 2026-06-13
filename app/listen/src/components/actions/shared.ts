@@ -1,11 +1,11 @@
 import { toast } from "sonner";
-import type { LucideIcon } from "lucide-react";
+
+import { action, type MenuActionConfig } from "@crate/ui/domain/actions";
 
 import {
   buildArtistPlayerTrack,
   type ArtistTopTrack,
 } from "@/components/artist/artist-model";
-import type { ItemActionMenuEntry } from "@/components/actions/ItemActionMenu";
 import type { Track } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 import { isUuidLikeTrackId, toPlayableTrack } from "@/lib/playable-track";
@@ -17,15 +17,8 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 
-export interface MenuActionConfig {
-  key: string;
-  label: string;
-  icon?: LucideIcon;
-  active?: boolean;
-  danger?: boolean;
-  disabled?: boolean;
-  onSelect: () => void | Promise<void>;
-}
+export type { MenuActionConfig };
+export { action };
 
 export interface TrackMenuData {
   id?: string | number;
@@ -146,18 +139,6 @@ export function buildTrackMenuPlayerTrack(
       : undefined);
 
   return toPlayableTrack(track, { cover: resolvedCover });
-}
-
-export function action(config: MenuActionConfig): ItemActionMenuEntry {
-  return {
-    key: config.key,
-    label: config.label,
-    icon: config.icon,
-    active: config.active,
-    danger: config.danger,
-    disabled: config.disabled,
-    onSelect: config.onSelect,
-  };
 }
 
 export function sharePath(

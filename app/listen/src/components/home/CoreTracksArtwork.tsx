@@ -37,7 +37,7 @@ export function CoreTracksArtwork({
   return (
     <EditorialPlaylistArtwork
       title={item.name}
-      kicker="Core Tracks"
+      kicker="Artist Set"
       tracks={item.artwork_tracks}
       backgroundImageUrl={photoUrl}
       variant="core"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { PullIndicator } from "./PullIndicator";
+import { PullIndicator } from "@crate/ui/primitives/PullIndicator";
 
 describe("PullIndicator", () => {
   it("returns null when distance is 0 and not refreshing", () => {

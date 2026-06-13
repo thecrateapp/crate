@@ -1,23 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ArrowRight, Disc3, Radio, Route } from "lucide-react";
+import { ArrowRight, Radio, Route } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { fetchArtistTopTracks } from "@/components/actions/shared";
-import {
-  CustomMixCard,
-  HomeTasteHero,
-  RecommendedTracksSection,
-  SuggestedAlbumsSection,
-} from "@/components/home/HomeDiscoverySections";
-import { JustLandedSection } from "@/components/home/HomeLibrarySections";
-import type {
-  HomeDiscoveryPayload,
-  HomeGeneratedPlaylistDetail,
-  HomeGeneratedPlaylistSummary,
-  HomeHeroArtist,
-  HomeSectionId,
-} from "@/components/home/home-model";
 import {
   DecadeDetailView,
   ExploreLoadingState,
@@ -34,22 +19,14 @@ import {
 } from "@/components/explore/explore-model";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { albumCoverApiUrl, artistPagePath } from "@/lib/library-routes";
+import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
-import { fetchHomePlaylistRadio } from "@/lib/radio";
-import { toTrackRowData } from "@/lib/track-row-data";
-import { shuffleArray } from "@/lib/utils";
-
-const EXPLORE_HOME_DISCOVERY_ENABLED =
-  import.meta.env.VITE_EXPLORE_HOME_DISCOVERY_ENABLED === "true";
 
 export function Explore() {
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
-  const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const [searchParams, setSearchParams] = useSearchParams();
   const genreSlug = searchParams.get("genre");
   const playlistCategory = searchParams.get("playlistCategory");
@@ -59,66 +36,9 @@ export function Explore() {
     loading,
     refetch,
   } = useApi<ExplorePageData>("/api/browse/explore-page");
-  const { data: homeDiscovery, refetch: refetchHomeDiscovery } =
-    useApi<HomeDiscoveryPayload>(
-      EXPLORE_HOME_DISCOVERY_ENABLED ? "/api/me/home/discovery" : null,
-      "GET",
-      undefined,
-      {
-        reactive: false,
-        revalidateIfCached: "idle",
-        idleRevalidateMs: 30_000,
-      },
-    );
   const filters = explorePage?.filters;
   const featuredPlaylists = explorePage?.playlists || [];
   const moods = explorePage?.moods || [];
-  const recommendedTracks = useMemo(
-    () =>
-      (homeDiscovery?.recommended_tracks || []).map((track) =>
-        toTrackRowData(track),
-      ),
-    [homeDiscovery?.recommended_tracks],
-  );
-  const heroes = useMemo(() => {
-    const hero = homeDiscovery?.hero;
-    return Array.isArray(hero) ? hero : hero ? [hero] : [];
-  }, [homeDiscovery?.hero]);
-
-  async function handlePlayHeroArtist(artist: HomeHeroArtist) {
-    try {
-      const queue = await fetchArtistTopTracks({
-        artistId: artist.id,
-        artistSlug: artist.slug,
-        name: artist.name,
-      });
-      if (!queue.length) {
-        toast.info("No top tracks available yet");
-        return;
-      }
-      playAll(queue, 0, {
-        type: "playlist",
-        name: `${artist.name} Top Tracks`,
-        radio: { seedType: "artist", seedId: artist.id },
-      });
-    } catch {
-      toast.error("Failed to load artist tracks");
-    }
-  }
-
-  async function handleToggleHeroFollow(artist: HomeHeroArtist) {
-    try {
-      await toggleArtistFollow(artist.id);
-      refetchHomeDiscovery();
-      toast.success(
-        isFollowing(artist.id)
-          ? `Unfollowed ${artist.name}`
-          : `Following ${artist.name}`,
-      );
-    } catch {
-      toast.error("Failed to update follow");
-    }
-  }
 
   async function handlePlayPlaylist(playlistId: number, playlistName: string) {
     try {
@@ -129,76 +49,6 @@ export function Explore() {
     } catch {
       toast.error("Failed to play playlist");
     }
-  }
-
-  async function loadHomePlaylist(playlistId: string) {
-    return api<HomeGeneratedPlaylistDetail>(
-      `/api/me/home/playlists/${encodeURIComponent(playlistId)}`,
-    );
-  }
-
-  async function handlePlayHomePlaylist(item: HomeGeneratedPlaylistSummary) {
-    try {
-      const playlist = await loadHomePlaylist(item.id);
-      const queue = (playlist.tracks || []).map((track) =>
-        toPlayableTrack(track),
-      );
-      if (!queue.length) {
-        toast.info("This playlist is still warming up");
-        return;
-      }
-      playAll(queue, 0, {
-        type: "playlist",
-        name: playlist.name || item.name,
-        id: playlist.id,
-      });
-    } catch {
-      toast.error("Failed to load playlist");
-    }
-  }
-
-  async function handleShuffleHomePlaylist(item: HomeGeneratedPlaylistSummary) {
-    try {
-      const playlist = await loadHomePlaylist(item.id);
-      const queue = (playlist.tracks || []).map((track) =>
-        toPlayableTrack(track),
-      );
-      if (!queue.length) {
-        toast.info("This playlist is still warming up");
-        return;
-      }
-      playAll(shuffleArray(queue), 0, {
-        type: "playlist",
-        name: playlist.name || item.name,
-        id: playlist.id,
-      });
-    } catch {
-      toast.error("Failed to load playlist");
-    }
-  }
-
-  async function handleHomePlaylistRadio(item: HomeGeneratedPlaylistSummary) {
-    try {
-      const radio = await fetchHomePlaylistRadio({
-        playlistId: item.id,
-        playlistName: item.name,
-      });
-      if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
-        return;
-      }
-      playAll(radio.tracks, 0, radio.source);
-    } catch {
-      toast.error("Failed to start playlist radio");
-    }
-  }
-
-  function openHomePlaylist(item: HomeGeneratedPlaylistSummary) {
-    navigate(`/home/playlist/${encodeURIComponent(item.id)}`);
-  }
-
-  function openHomeSection(sectionId: HomeSectionId) {
-    navigate(`/home/section/${sectionId}`);
   }
 
   async function handleToggleFollow(playlistId: number, isFollowed: boolean) {
@@ -242,103 +92,25 @@ export function Explore() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Explore</h1>
-      {EXPLORE_HOME_DISCOVERY_ENABLED ? (
-        <HomeTasteHero
-          heroes={heroes}
-          isFollowing={isFollowing}
-          onOpenArtist={(artist) => {
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-          onPlay={(artist) => void handlePlayHeroArtist(artist)}
-          onToggleFollow={(artist) => void handleToggleHeroFollow(artist)}
-          onInfo={(artist) => {
-            navigate(
-              artistPagePath({
-                artistId: artist.id,
-                artistSlug: artist.slug,
-                artistName: artist.name,
-              }),
-            );
-          }}
-        />
-      ) : null}
       <div className="space-y-6">
         {loading ? <ExploreLoadingState /> : null}
 
         {filters ? (
           <>
-            {/* Radio + Paths */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <button
+              <ExploreFeatureCard
+                title="Radio"
+                subtitle="Start from a track, artist, album or genre."
+                icon={Radio}
                 onClick={() => navigate("/radio")}
-                className="group flex items-center gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 text-left transition hover:border-primary/30 hover:bg-primary/10"
-              >
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-                  <Radio size={19} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">
-                    Radio
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-white/50">
-                    Infinite music shaped by your likes and dislikes
-                  </div>
-                </div>
-                <ArrowRight
-                  size={16}
-                  className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary"
-                />
-              </button>
-              <button
+              />
+              <ExploreFeatureCard
+                title="Music Paths"
+                subtitle="Find the route between scenes, artists and records."
+                icon={Route}
                 onClick={() => navigate("/paths")}
-                className="group flex items-center gap-4 rounded-xl border border-primary/15 bg-primary/5 p-4 text-left transition hover:border-primary/30 hover:bg-primary/10"
-              >
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-                  <Route size={19} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-foreground">
-                    Music Paths
-                  </div>
-                  <div className="mt-0.5 text-[12px] text-white/50">
-                    Trace a route between artists, genres, or tracks
-                  </div>
-                </div>
-                <ArrowRight
-                  size={16}
-                  className="flex-shrink-0 text-primary/40 transition group-hover:translate-x-0.5 group-hover:text-primary"
-                />
-              </button>
+              />
             </div>
-
-            {EXPLORE_HOME_DISCOVERY_ENABLED ? (
-              <>
-                <ExploreCustomMixes
-                  mixes={homeDiscovery?.custom_mixes || []}
-                  onOpen={openHomePlaylist}
-                  onPlay={handlePlayHomePlaylist}
-                  onShuffle={handleShuffleHomePlaylist}
-                  onRadio={handleHomePlaylistRadio}
-                  onViewAll={() => openHomeSection("custom-mixes")}
-                />
-
-                <ExploreNewArrivals
-                  albums={homeDiscovery?.suggested_albums || []}
-                  onViewAll={openHomeSection}
-                />
-
-                <RecommendedTracksSection
-                  tracks={recommendedTracks}
-                  onViewAll={openHomeSection}
-                />
-              </>
-            ) : null}
 
             <GenreExplorer
               genres={filters.genres}
@@ -381,14 +153,6 @@ export function Explore() {
                 onToggleFollow={handleToggleFollow}
               />
             ) : null}
-
-            {EXPLORE_HOME_DISCOVERY_ENABLED ? (
-              <JustLandedSection
-                artists={homeDiscovery?.recent_global_artists || []}
-                loading={!homeDiscovery}
-                onOpenExplore={() => navigate("/library?tab=artists")}
-              />
-            ) : null}
           </>
         ) : (
           <p className="text-muted-foreground text-sm">No filters available.</p>
@@ -420,55 +184,46 @@ interface ExplorePageData {
   moods: MoodPreset[];
 }
 
-function ExploreCustomMixes({
-  mixes,
-  onOpen,
-  onPlay,
-  onShuffle,
-  onRadio,
-  onViewAll,
+function ExploreFeatureCard({
+  title,
+  subtitle,
+  icon: Icon,
+  onClick,
 }: {
-  mixes: HomeGeneratedPlaylistSummary[];
-  onOpen: (mix: HomeGeneratedPlaylistSummary) => void;
-  onPlay: (mix: HomeGeneratedPlaylistSummary) => void;
-  onShuffle: (mix: HomeGeneratedPlaylistSummary) => void;
-  onRadio: (mix: HomeGeneratedPlaylistSummary) => void;
-  onViewAll: () => void;
+  title: string;
+  subtitle: string;
+  icon: typeof Radio;
+  onClick: () => void;
 }) {
-  if (!mixes.length) return null;
   return (
-    <section className="space-y-4">
-      <ExploreSectionHeader
-        title="Made for your library"
-        subtitle="Daily discovery and genre mixes built from your own collection."
-        actionLabel="View all"
-        onAction={onViewAll}
-      />
-      <ExploreSectionRail>
-        {mixes.slice(0, 8).map((mix) => (
-          <CustomMixCard
-            key={mix.id}
-            item={mix}
-            onOpenMix={onOpen}
-            onPlayMix={onPlay}
-            onShuffleMix={onShuffle}
-            onStartRadio={onRadio}
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.025))] p-5 text-left shadow-[0_18px_60px_rgba(0,0,0,0.24)] transition hover:border-primary/35 hover:bg-white/[0.07]"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(6,182,212,0.28),transparent_38%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.11),transparent_38%)] opacity-80 transition group-hover:opacity-100" />
+      <div className="relative flex h-full flex-col justify-between gap-8">
+        <div className="flex items-center justify-between">
+          <Icon
+            size={24}
+            className="text-primary drop-shadow-[0_0_16px_rgba(6,182,212,0.35)]"
           />
-        ))}
-      </ExploreSectionRail>
-    </section>
+          <ArrowRight
+            size={18}
+            className="text-white/35 transition group-hover:translate-x-1 group-hover:text-primary"
+          />
+        </div>
+        <div>
+          <div className="text-xl font-black tracking-[-0.035em] text-foreground">
+            {title}
+          </div>
+          <div className="mt-2 max-w-[28rem] text-sm leading-5 text-white/58">
+            {subtitle}
+          </div>
+        </div>
+      </div>
+    </button>
   );
-}
-
-function ExploreNewArrivals({
-  albums,
-  onViewAll,
-}: {
-  albums: HomeDiscoveryPayload["suggested_albums"];
-  onViewAll: (sectionId: HomeSectionId) => void;
-}) {
-  if (!albums.length) return null;
-  return <SuggestedAlbumsSection albums={albums} onViewAll={onViewAll} />;
 }
 
 function ExploreCratePlaylists({
@@ -540,42 +295,63 @@ function GenreExplorer({
         subtitle="Start from a scene, then let Crate lead you sideways."
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {topGenres.slice(0, 8).map((genre, index) => (
-          <button
-            key={genre.name}
-            type="button"
-            onClick={() => onOpen(genre.name)}
-            className="group relative min-h-28 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/25 hover:bg-white/[0.06]"
-          >
-            <div
-              className="absolute inset-0 opacity-70"
-              style={{
-                background: `radial-gradient(circle at ${
-                  20 + (index % 4) * 18
-                }% 20%, rgba(34, 211, 238, 0.22), transparent 34%), radial-gradient(circle at 85% 85%, rgba(255,255,255,0.08), transparent 36%)`,
-              }}
-            />
-            <div className="relative flex h-full flex-col justify-between gap-5">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-                  Scene
-                </span>
-                <Disc3
-                  size={16}
-                  className="text-white/30 transition group-hover:text-primary"
+        {topGenres.slice(0, 8).map((genre, index) => {
+          const detail =
+            genre.description ||
+            (genre.top_artists?.length
+              ? genre.top_artists.slice(0, 3).join(", ")
+              : null);
+
+          return (
+            <button
+              key={genre.name}
+              type="button"
+              onClick={() => onOpen(genre.name)}
+              className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
+            >
+              {genre.cover_url ? (
+                <img
+                  src={genre.cover_url}
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover opacity-60 blur-[1px] saturate-125 transition duration-300 group-hover:scale-[1.04] group-hover:opacity-70"
                 />
-              </div>
-              <div>
-                <div className="text-lg font-black leading-none tracking-[-0.04em] text-foreground">
-                  {genre.name}
+              ) : null}
+              <div
+                className="absolute inset-0 opacity-80"
+                style={{
+                  background: genre.cover_url
+                    ? "linear-gradient(180deg, rgba(3,6,10,0.16) 0%, rgba(3,6,10,0.82) 100%)"
+                    : `radial-gradient(circle at ${
+                        20 + (index % 4) * 18
+                      }% 20%, rgba(34, 211, 238, 0.24), transparent 36%), radial-gradient(circle at 85% 85%, rgba(255,255,255,0.1), transparent 38%)`,
+                }}
+              />
+              <div className="relative flex h-full flex-col justify-between gap-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/90">
+                    Genre Room
+                  </span>
+                  <Radio
+                    size={15}
+                    className="text-white/30 transition group-hover:text-primary"
+                  />
                 </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {genre.count} artists indexed
+                <div>
+                  <div className="text-lg font-black leading-none tracking-[-0.04em] text-foreground">
+                    {genre.name}
+                  </div>
+                  {detail ? (
+                    <div className="mt-2 line-clamp-2 text-xs leading-5 text-white/62">
+                      {detail}
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </section>
   );

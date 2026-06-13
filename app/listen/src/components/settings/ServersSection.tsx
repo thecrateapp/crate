@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Plus, Trash2, Server, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Server, CheckCircle2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { usesConfigurableServer } from "@/lib/platform";

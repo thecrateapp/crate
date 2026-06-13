@@ -85,10 +85,11 @@ export function createApiClient(options: ApiClientOptions = {}) {
     }
 
     const execute = async (signal?: AbortSignal) => {
-      const res = await fetch(`${base}${url}`, {
-        ...requestOptions,
-        signal,
-      });
+      const requestInit: RequestInit = { ...requestOptions };
+      if (signal) {
+        requestInit.signal = signal;
+      }
+      const res = await fetch(`${base}${url}`, requestInit);
       if (!res.ok) {
         if (
           res.status === 401 &&

@@ -205,11 +205,14 @@ def _build_radio_stations(
         radio_stations.append(
             {
                 "type": "artist",
+                "seed_type": "artist",
+                "seed_label": row.get("artist_name") or "",
+                "seed_subtitle": "Artist",
                 "artist_id": artist_id,
                 "artist_slug": row.get("artist_slug"),
                 "artist_name": row.get("artist_name") or "",
                 "title": f"{row.get('artist_name') or ''} Radio",
-                "subtitle": "Based on your heavy rotation",
+                "subtitle": "",
                 "play_count": row.get("play_count") or 0,
             }
         )
@@ -227,6 +230,9 @@ def _build_radio_stations(
         radio_stations.append(
             {
                 "type": "album",
+                "seed_type": "album",
+                "seed_label": row.get("album") or "",
+                "seed_subtitle": row.get("artist") or "Album",
                 "album_id": album_id,
                 "album_slug": row.get("album_slug"),
                 "album_name": row.get("album") or "",
@@ -234,7 +240,7 @@ def _build_radio_stations(
                 "artist_id": row.get("artist_id"),
                 "artist_slug": row.get("artist_slug"),
                 "title": f"{row.get('album') or ''} Radio",
-                "subtitle": "Seeded from an album you keep coming back to",
+                "subtitle": "",
                 "play_count": row.get("play_count") or 0,
             }
         )
@@ -341,7 +347,7 @@ def _build_core_playlists(
                 "artwork_tracks": _artwork_tracks(rows),
                 "artwork_artists": _artwork_artists(rows),
                 "track_count": len(rows),
-                "badge": "Core Tracks",
+                "badge": "Artist Set",
                 "kind": "core",
                 "recommendation_source": recommendation_source,
             }

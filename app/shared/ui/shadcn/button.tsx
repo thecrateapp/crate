@@ -5,7 +5,7 @@ import { Slot } from "radix-ui";
 import { cn } from "@crate/ui/lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-all outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:border-white/15 focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium transition-all outline-none disabled:pointer-events-none disabled:opacity-50 focus-visible:border-white/15 focus-visible:shadow-[0_0_0_1px_rgba(255,255,255,0.08)] aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
   {
     variants: {
       variant: {
@@ -23,13 +23,14 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-10 px-4 py-2 text-sm has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 text-sm has-[>svg]:px-2.5",
+        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-[14px]",
+        sm: "h-8 gap-1.5 rounded-md px-3 text-sm has-[>svg]:px-2.5 [&_svg:not([class*='size-'])]:size-4",
         lg: "h-11 rounded-md px-6 text-sm has-[>svg]:px-4",
         icon: "size-10 rounded-md",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8 rounded-md",
-        "icon-lg": "size-11 rounded-md",
+        "icon-xs":
+          "size-6 rounded-md [&_svg:not([class*='size-'])]:size-[14px]",
+        "icon-sm": "size-8 rounded-md [&_svg:not([class*='size-'])]:size-4",
+        "icon-lg": "size-11 rounded-md [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {

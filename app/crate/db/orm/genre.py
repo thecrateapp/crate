@@ -22,6 +22,7 @@ class GenreTaxonomyNode(Base):
     external_description_source: Mapped[str] = mapped_column(
         Text, nullable=False, server_default=""
     )
+    cover_path: Mapped[str | None] = mapped_column(Text)
     musicbrainz_mbid: Mapped[str | None] = mapped_column(Text)
     wikidata_entity_id: Mapped[str | None] = mapped_column(Text)
     wikidata_url: Mapped[str | None] = mapped_column(Text)

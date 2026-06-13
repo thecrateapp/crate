@@ -47,6 +47,7 @@ def create_library_genres_schema(cur) -> None:
             description TEXT NOT NULL DEFAULT '',
             external_description TEXT NOT NULL DEFAULT '',
             external_description_source TEXT NOT NULL DEFAULT '',
+            cover_path TEXT,
             musicbrainz_mbid TEXT,
             wikidata_entity_id TEXT,
             wikidata_url TEXT,
@@ -57,6 +58,10 @@ def create_library_genres_schema(cur) -> None:
     cur.execute("""
         ALTER TABLE genre_taxonomy_nodes
         ADD COLUMN IF NOT EXISTS eq_gains DOUBLE PRECISION[]
+    """)
+    cur.execute("""
+        ALTER TABLE genre_taxonomy_nodes
+        ADD COLUMN IF NOT EXISTS cover_path TEXT
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS genre_taxonomy_aliases (

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { api } from "@/lib/api";
 
 import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Volume2, VolumeX } from "lucide-react";
+import { CRATE_ICON_SIZE, Volume2, VolumeX } from "@crate/ui/icons";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
@@ -116,10 +116,14 @@ export function PlayerVolumeControl({
           onOverlayChange(nextOpen);
         }}
         aria-label={volume === 0 ? "Unmute" : "Volume"}
-        className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
+        className="rounded-md p-1.5 text-white/30 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
       >
         <span ref={volumeIconRef} className="block">
-          {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          {volume === 0 ? (
+            <VolumeX size={CRATE_ICON_SIZE.md} />
+          ) : (
+            <Volume2 size={CRATE_ICON_SIZE.md} />
+          )}
         </span>
       </button>
       {showVolume && popoverPosition

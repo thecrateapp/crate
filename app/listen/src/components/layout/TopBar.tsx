@@ -1,10 +1,14 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
 import { TopBarUserMenu } from "@/components/layout/topbar/TopBarUserMenu";
 
-export function TopBar() {
+interface TopBarProps {
+  hideMobileActions?: boolean;
+}
+
+export function TopBar({ hideMobileActions = false }: TopBarProps) {
   const navigate = useNavigate();
 
   return (
@@ -12,28 +16,36 @@ export function TopBar() {
       <div className="flex flex-shrink-0 items-center gap-2 pointer-events-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white/60 transition-colors hover:bg-black/50 hover:text-white md:h-9 md:w-9"
+          className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/60 transition-colors hover:text-white md:h-10 md:w-10"
           aria-label="Go back"
           title="Go back"
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft
+            size={CRATE_ICON_SIZE.navMobile}
+            className="md:size-[21px]"
+          />
         </button>
         <button
           onClick={() => navigate(1)}
-          className="hidden h-9 w-9 items-center justify-center rounded-full bg-black/30 backdrop-blur-sm text-white/60 transition-colors hover:bg-black/50 hover:text-white md:flex"
+          className="hidden h-10 w-10 items-center justify-center text-white/60 transition-colors hover:text-white md:flex"
           aria-label="Go forward"
           title="Go forward"
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={CRATE_ICON_SIZE.nav} />
         </button>
       </div>
 
       <div className="hidden md:block flex-1" />
 
-      <div className="flex min-w-0 flex-1 items-center gap-3 md:flex-none md:gap-4 pointer-events-auto">
-        <TopBarSearch />
-        <TopBarUserMenu />
-      </div>
+      {hideMobileActions ? null : (
+        <div
+          data-testid="topbar-actions"
+          className="flex min-w-0 flex-1 items-center gap-3 md:flex-none md:gap-4 pointer-events-auto"
+        >
+          <TopBarSearch />
+          <TopBarUserMenu />
+        </div>
+      )}
     </div>
   );
 }
