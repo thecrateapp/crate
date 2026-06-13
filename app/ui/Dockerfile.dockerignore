@@ -12,3 +12,5 @@ requirements.txt
 Dockerfile
 listen/node_modules/
 listen/dist/
+shared/ui/node_modules/
+shared/ui/dist/

@@ -12,3 +12,7 @@ requirements.txt
 Dockerfile
 ui/node_modules/
 ui/dist/
+shared/ui/node_modules/
+shared/ui/dist/
+listen/android/
+listen/ios/

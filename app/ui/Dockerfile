@@ -21,7 +21,7 @@ COPY ui/ .
 RUN ln -s /app-shared/shared ../shared
 
 # Symlink node_modules into shared/ui so its imports resolve react etc.
-RUN ln -s /app/node_modules /app-shared/shared/ui/node_modules
+RUN rm -rf /app-shared/shared/ui/node_modules && ln -s /app/node_modules /app-shared/shared/ui/node_modules
 # Skip tsc typecheck in Docker (CI handles it separately).
 RUN npx vite build
 
