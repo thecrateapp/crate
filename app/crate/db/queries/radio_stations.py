@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.genre_covers import genre_cover_public_url
@@ -7,6 +9,10 @@ from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
 
 def _int_value(value: object) -> int:
+    if value is None:
+        return 0
+    if not isinstance(value, int | float | Decimal | str):
+        return 0
     try:
         return int(value or 0)
     except (TypeError, ValueError):
