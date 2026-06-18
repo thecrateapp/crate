@@ -179,6 +179,55 @@ describe("ArtistHeroSection", () => {
     ).toHaveTextContent("More");
   });
 
+  it("keeps the circular artist picture in the desktop hero", () => {
+    render(
+      <MemoryRouter>
+        <ArtistHeroSection
+          artist={{
+            id: 7,
+            entity_uid: "artist-entity-7",
+            slug: "crossed",
+            name: "Crossed",
+            albums: [],
+            total_tracks: 10,
+            total_size_mb: 120,
+            primary_format: "flac",
+            genres: ["hardcore"],
+            issue_count: 0,
+          }}
+          artistInfo={{
+            bio: "",
+            tags: [],
+            similar: [],
+            listeners: 1000,
+            playcount: 2000,
+            image_url: null,
+            url: "",
+          }}
+          photoUrl="/artist.jpg"
+          tags={["hardcore"]}
+          following={false}
+          onPlay={vi.fn()}
+          onShuffle={vi.fn()}
+          onArtistRadio={vi.fn()}
+          onToggleFollow={vi.fn()}
+          onShare={vi.fn()}
+          onOpenBio={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const picture = screen.getByAltText("Crossed");
+    expect(picture).toHaveAttribute("src", "/artist.jpg");
+    expect(picture.parentElement).toHaveClass(
+      "hidden",
+      "sm:block",
+      "rounded-full",
+      "h-40",
+      "w-40",
+    );
+  });
+
   it("renders the desktop more menu outside the horizontally scrolling action row", async () => {
     render(
       <MemoryRouter>

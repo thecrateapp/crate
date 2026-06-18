@@ -243,14 +243,21 @@ class TestGenresLibraryDetail:
         assert len(result["artists"]) >= 1
         assert result["artists"][0]["artist_name"] == "Detail Artist"
 
-    def test_get_genre_detail_only_includes_primary_genre_artists(self, pg_db):
+    def test_get_genre_detail_includes_all_genre_artists_by_weight_then_popularity(
+        self, pg_db
+    ):
         from crate.db.queries.genres_library_detail import get_genre_detail
 
         self._setup_genre_library_data(pg_db)
         pg_db.upsert_artist({"name": "Secondary Detail Artist", "listeners": 999999})
+        pg_db.upsert_artist({"name": "Weak Detail Artist", "listeners": 9999999})
         pg_db.set_artist_genres(
             "Secondary Detail Artist",
             [("experimental", 1.0, "test"), ("post-punk", 0.5, "test")],
+        )
+        pg_db.set_artist_genres(
+            "Weak Detail Artist",
+            [("experimental", 1.0, "test"), ("post-punk", 0.3, "test")],
         )
         pg_db.upsert_album(
             {
@@ -263,19 +270,244 @@ class TestGenresLibraryDetail:
                 "formats": ["flac"],
             }
         )
+        pg_db.upsert_album(
+            {
+                "artist": "Weak Detail Artist",
+                "name": "Weak Detail Album",
+                "path": "/music/Weak Detail Artist/Weak Detail Album",
+                "track_count": 7,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
 
         result = get_genre_detail("post-punk")
 
         assert result is not None
-        assert "Detail Artist" in [artist["artist_name"] for artist in result["artists"]]
-        assert "Secondary Detail Artist" not in [
-            artist["artist_name"] for artist in result["artists"]
-        ]
-        assert "Secondary Detail Album" not in [
-            album["name"] for album in result["albums"]
-        ]
+        artist_names = [artist["artist_name"] for artist in result["artists"]]
+        assert "Detail Artist" in artist_names
+        assert "Weak Detail Artist" not in artist_names
+        assert result["artists"][0]["artist_name"] == "Detail Artist"
+        assert result["artists"][1]["artist_name"] == "Secondary Detail Artist"
+        assert (
+            result["artists"][0]["membership_score"]
+            > result["artists"][1]["membership_score"]
+        )
+        assert result["artists"][0]["membership_tier"] == "core"
+        assert result["artists"][1]["membership_tier"] == "adjacent"
+        album_names = [album["name"] for album in result["albums"]]
+        assert "Secondary Detail Album" not in album_names
+        assert "Weak Detail Album" not in album_names
         assert result["artist_count"] == len(result["artists"])
         assert result["album_count"] == len(result["albums"])
+
+    def test_get_genre_albums_use_album_membership_before_artist_fallback(self, pg_db):
+        from crate.db.queries.genres_library_detail import get_genre_detail
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        self._setup_genre_library_data(pg_db)
+        pg_db.upsert_artist({"name": "Indirect Popular Artist", "listeners": 999999})
+        pg_db.set_artist_genres(
+            "Indirect Popular Artist",
+            [("post-punk", 0.9, "test")],
+        )
+        indirect_album_id = pg_db.upsert_album(
+            {
+                "artist": "Indirect Popular Artist",
+                "name": "Huge Indirect Album",
+                "path": "/music/Indirect Popular Artist/Huge Indirect Album",
+                "track_count": 10,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        pg_db.upsert_artist({"name": "Direct Album Artist", "listeners": 10})
+        pg_db.set_artist_genres(
+            "Direct Album Artist",
+            [("post-punk", 0.5, "test")],
+        )
+        direct_album_id = pg_db.upsert_album(
+            {
+                "artist": "Direct Album Artist",
+                "name": "Essential Direct Album",
+                "path": "/music/Direct Album Artist/Essential Direct Album",
+                "track_count": 10,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+
+        with transaction_scope() as session:
+            genre_id = session.execute(
+                text("SELECT id FROM genres WHERE slug = 'post-punk'")
+            ).scalar_one()
+            session.execute(
+                text(
+                    """
+                    INSERT INTO album_genres (album_id, genre_id, weight, source)
+                    VALUES (:album_id, :genre_id, 0.95, 'test')
+                    """
+                ),
+                {"album_id": direct_album_id, "genre_id": genre_id},
+            )
+            session.execute(
+                text("UPDATE library_albums SET popularity = 100 WHERE id = :album_id"),
+                {"album_id": indirect_album_id},
+            )
+
+        result = get_genre_detail("post-punk")
+
+        assert result is not None
+        album_names = [album["name"] for album in result["albums"]]
+        assert album_names.index("Essential Direct Album") < album_names.index(
+            "Huge Indirect Album"
+        )
+        direct_album = next(
+            album
+            for album in result["albums"]
+            if album["name"] == "Essential Direct Album"
+        )
+        assert direct_album["direct_genre_match"] is True
+        assert direct_album["membership_tier"] == "core"
+        assert direct_album["membership_score"] == 0.95
+
+    def test_get_genre_albums_hide_weak_artist_fallback_without_direct_match(
+        self, pg_db
+    ):
+        from crate.db.queries.genres_library_detail import get_genre_detail
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        self._setup_genre_library_data(pg_db)
+        pg_db.upsert_artist({"name": "Weak Album Artist", "listeners": 999999})
+        pg_db.set_artist_genres(
+            "Weak Album Artist",
+            [("experimental", 1.0, "test"), ("post-punk", 0.3, "test")],
+        )
+        weak_fallback_album_id = pg_db.upsert_album(
+            {
+                "artist": "Weak Album Artist",
+                "name": "Weak Fallback Album",
+                "path": "/music/Weak Album Artist/Weak Fallback Album",
+                "track_count": 8,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        weak_direct_album_id = pg_db.upsert_album(
+            {
+                "artist": "Weak Album Artist",
+                "name": "Weak Direct Album",
+                "path": "/music/Weak Album Artist/Weak Direct Album",
+                "track_count": 8,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+
+        with transaction_scope() as session:
+            genre_id = session.execute(
+                text("SELECT id FROM genres WHERE slug = 'post-punk'")
+            ).scalar_one()
+            session.execute(
+                text(
+                    """
+                    INSERT INTO album_genres (album_id, genre_id, weight, source)
+                    VALUES (:album_id, :genre_id, 0.8, 'test')
+                    """
+                ),
+                {"album_id": weak_direct_album_id, "genre_id": genre_id},
+            )
+
+        result = get_genre_detail("post-punk")
+
+        assert result is not None
+        album_names = [album["name"] for album in result["albums"]]
+        assert "Weak Direct Album" in album_names
+        assert "Weak Fallback Album" not in album_names
+        assert weak_fallback_album_id is not None
+
+    def test_get_genre_albums_ordered_by_popularity_not_artist(self, pg_db):
+        from crate.db.queries.genres_library_detail import get_genre_detail
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        self._setup_genre_library_data(pg_db)
+        pg_db.upsert_artist({"name": "Loud Listener Artist", "listeners": 999999})
+        pg_db.set_artist_genres(
+            "Loud Listener Artist",
+            [("post-punk", 0.9, "test")],
+        )
+        top_album_id = pg_db.upsert_album(
+            {
+                "artist": "Loud Listener Artist",
+                "name": "Single Loud Hit",
+                "path": "/music/Loud Listener Artist/Single Loud Hit",
+                "track_count": 4,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        low_album_a_id = pg_db.upsert_album(
+            {
+                "artist": "Detail Artist",
+                "name": "Hidden Gem A",
+                "path": "/music/Detail Artist/Hidden Gem A",
+                "track_count": 7,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        low_album_b_id = pg_db.upsert_album(
+            {
+                "artist": "Detail Artist",
+                "name": "Hidden Gem B",
+                "path": "/music/Detail Artist/Hidden Gem B",
+                "track_count": 5,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_albums SET popularity = :pop WHERE id = :album_id"
+                ),
+                {"pop": 20, "album_id": top_album_id},
+            )
+            session.execute(
+                text(
+                    "UPDATE library_albums SET popularity = :pop WHERE id = :album_id"
+                ),
+                {"pop": 100, "album_id": low_album_a_id},
+            )
+            session.execute(
+                text(
+                    "UPDATE library_albums SET popularity = :pop WHERE id = :album_id"
+                ),
+                {"pop": 90, "album_id": low_album_b_id},
+            )
+
+        result = get_genre_detail("post-punk")
+
+        assert result is not None
+        album_names = [album["name"] for album in result["albums"]]
+        assert album_names[:4] == [
+            "Detail Album",
+            "Hidden Gem A",
+            "Hidden Gem B",
+            "Single Loud Hit",
+        ]
 
     def test_get_genre_detail_uses_canonical_cover_for_alias(self, pg_db):
         from crate.db.queries.genres_library_detail import get_genre_detail
@@ -372,11 +604,48 @@ class TestGenresLibraryDetail:
         result = get_genre_detail("post-punk")
 
         assert result is not None
-        assert "Detail Artist" in [artist["artist_name"] for artist in result["artists"]]
+        assert "Detail Artist" in [
+            artist["artist_name"] for artist in result["artists"]
+        ]
         assert "Alias Primary Artist" not in [
             artist["artist_name"] for artist in result["artists"]
         ]
-        assert "Alias Primary Album" not in [album["name"] for album in result["albums"]]
+        assert "Alias Primary Album" not in [
+            album["name"] for album in result["albums"]
+        ]
+
+    def test_get_genre_detail_includes_related_genres_ranked_by_library_content(
+        self, pg_db
+    ):
+        from crate.db.queries.genres_library_detail import get_genre_detail
+
+        self._setup_genre_library_data(pg_db)
+        for index in range(3):
+            artist_name = f"Gothic Detail Artist {index}"
+            pg_db.upsert_artist(
+                {
+                    "name": artist_name,
+                    "has_photo": 1 if index == 0 else 0,
+                    "listeners": 1000 - index,
+                }
+            )
+            pg_db.set_artist_genres(artist_name, [("gothic-rock", 0.9, "test")])
+        pg_db.upsert_artist({"name": "New Wave Detail Artist"})
+        pg_db.set_artist_genres("New Wave Detail Artist", [("new-wave", 0.9, "test")])
+
+        result = get_genre_detail("post-punk")
+
+        assert result is not None
+        related = result["related_genres"]
+        assert related[0]["slug"] == "gothic-rock"
+        assert related[0]["relation_type"] == "related"
+        assert related[0]["artist_count"] >= 3
+        assert related[0]["top_artist_name"] == "Gothic Detail Artist 0"
+        assert related[0]["top_artist_photo_url"].startswith("/api/artists/")
+        assert related[0]["top_artist_photo_url"].endswith(
+            "/photo?size=640&format=webp"
+        )
+        assert "new-wave" in [genre["slug"] for genre in related]
 
     def test_get_genre_upcoming_shows_uses_primary_genre_and_location(self, pg_db):
         from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
@@ -385,9 +654,14 @@ class TestGenresLibraryDetail:
 
         self._setup_genre_library_data(pg_db)
         pg_db.upsert_artist({"name": "Secondary Detail Artist", "listeners": 999999})
+        pg_db.upsert_artist({"name": "Weak Detail Artist", "listeners": 9999999})
         pg_db.set_artist_genres(
             "Secondary Detail Artist",
             [("experimental", 1.0, "test"), ("post-punk", 0.5, "test")],
+        )
+        pg_db.set_artist_genres(
+            "Weak Detail Artist",
+            [("experimental", 1.0, "test"), ("post-punk", 0.3, "test")],
         )
 
         with transaction_scope() as session:
@@ -412,6 +686,7 @@ class TestGenresLibraryDetail:
                         ('Detail Artist', 'Near Room', 'Berlin', 'Germany', 'DE', 52.520, 13.405, CURRENT_DATE + INTERVAL '7 days', 'onsale', 'lastfm', NOW(), NOW()),
                         ('Detail Artist', 'Later Room', 'Berlin', 'Germany', 'DE', 52.520, 13.405, CURRENT_DATE + INTERVAL '14 days', 'onsale', 'lastfm', NOW(), NOW()),
                         ('Secondary Detail Artist', 'Wrong Room', 'Berlin', 'Germany', 'DE', 52.520, 13.405, CURRENT_DATE + INTERVAL '8 days', 'onsale', 'lastfm', NOW(), NOW()),
+                        ('Weak Detail Artist', 'Weak Room', 'Berlin', 'Germany', 'DE', 52.520, 13.405, CURRENT_DATE + INTERVAL '9 days', 'onsale', 'lastfm', NOW(), NOW()),
                         ('Detail Artist', 'Far Room', 'Paris', 'France', 'FR', 48.8566, 2.3522, CURRENT_DATE + INTERVAL '6 days', 'onsale', 'lastfm', NOW(), NOW())
                     """
                 )
@@ -425,7 +700,10 @@ class TestGenresLibraryDetail:
             limit=5,
         )
 
-        assert [show["artist_name"] for show in shows] == ["Detail Artist"]
+        assert [show["artist_name"] for show in shows] == [
+            "Detail Artist",
+            "Secondary Detail Artist",
+        ]
         assert shows[0]["venue"] == "Near Room"
 
     def test_get_artists_with_tags_empty(self, pg_db):

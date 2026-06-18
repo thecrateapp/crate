@@ -16,6 +16,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
 
 /** Hidden img that preloads the artist background into the browser cache */
@@ -137,7 +138,7 @@ export function UpcomingShowCollapsedView({
       artistSlug: item.artist_slug,
       artistName: item.artist,
     }) ||
-    item.cover_url ||
+    resolveMaybeApiAssetUrl(item.cover_url) ||
     undefined;
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;
@@ -266,7 +267,7 @@ export function UpcomingShowExpandedView({
       artistSlug: item.artist_slug,
       artistName: item.artist,
     }) ||
-    item.cover_url ||
+    resolveMaybeApiAssetUrl(item.cover_url) ||
     undefined;
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;

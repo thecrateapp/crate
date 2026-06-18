@@ -14,6 +14,8 @@ class GenreArtistRef(BaseModel):
     artist_id: int | None = None
     artist_slug: str | None = None
     weight: float | None = None
+    membership_score: float | None = None
+    membership_tier: str | None = None
     source: str | None = None
     album_count: int | None = None
     track_count: int | None = None
@@ -35,6 +37,9 @@ class GenreAlbumRef(BaseModel):
     track_count: int | None = None
     has_cover: bool | int | None = None
     weight: float | None = None
+    membership_score: float | None = None
+    membership_tier: str | None = None
+    direct_genre_match: bool | None = None
 
 
 class GenreShowRef(BaseModel):
@@ -71,6 +76,25 @@ class GenreShowRef(BaseModel):
     distance_km: float | None = None
 
 
+class GenreRelatedRef(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    slug: str
+    name: str
+    page_slug: str | None = None
+    relation_type: str
+    relation_label: str
+    description: str | None = None
+    artist_count: int = 0
+    album_count: int = 0
+    content_score: int = 0
+    cover_url: str | None = None
+    top_artist_id: int | None = None
+    top_artist_slug: str | None = None
+    top_artist_name: str | None = None
+    top_artist_photo_url: str | None = None
+
+
 class GenreSummaryResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
@@ -103,6 +127,7 @@ class GenreDetailResponse(GenreSummaryResponse):
     artists: list[GenreArtistRef] = Field(default_factory=list)
     albums: list[GenreAlbumRef] = Field(default_factory=list)
     shows: list[GenreShowRef] = Field(default_factory=list)
+    related_genres: list[GenreRelatedRef] = Field(default_factory=list)
 
 
 class GenreGraphNode(BaseModel):

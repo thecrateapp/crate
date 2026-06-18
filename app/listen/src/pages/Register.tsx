@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
-import { Loader2 } from "@crate/ui/icons";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,11 +24,7 @@ export function Register() {
   }, []);
 
   if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-surface px-4">
-        <Loader2 size={20} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader variant="screen" label="Loading Crate." />;
   }
 
   if (user) {

@@ -7,8 +7,8 @@ import {
 import { VtNavLink as NavLink } from "@crate/ui/primitives/VtNavLink";
 import {
   Home,
-  Compass,
   Radar,
+  Search,
   Collection,
   Music,
   Disc,
@@ -230,7 +230,7 @@ function Sidebar() {
             } ${navClass(isActive)}`
           }
         >
-          <Compass size={CRATE_ICON_SIZE.nav} />
+          <Search size={CRATE_ICON_SIZE.nav} />
           {expanded && <span className="text-[13px] font-medium">Explore</span>}
         </NavLink>
 
@@ -352,7 +352,7 @@ function Sidebar() {
 
 const MOBILE_NAV = [
   { to: "/", icon: Home, label: "Home" },
-  { to: "/explore", icon: Compass, label: "Explore" },
+  { to: "/explore", icon: Search, label: "Explore" },
   { to: "/upcoming", icon: Radar, label: "Radar" },
 ] as const;
 
@@ -371,7 +371,10 @@ function hasOverlayHeader(pathname: string, search = "") {
   }
   if (
     /^\/artists\/[^/]+$/.test(pathname) ||
-    /^\/albums\/[^/]+\/[^/]+$/.test(pathname)
+    /^\/albums\/[^/]+\/[^/]+$/.test(pathname) ||
+    /^\/playlist\/[^/]+$/.test(pathname) ||
+    /^\/curation\/playlist\/[^/]+$/.test(pathname) ||
+    /^\/home\/playlist\/[^/]+$/.test(pathname)
   ) {
     return true;
   }
@@ -484,20 +487,22 @@ export function Shell() {
 
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20"
+        className="listen-glass-panel listen-mobile-dock-glass pointer-events-none fixed z-20 rounded-[2rem]"
         style={{
           height: hasTrack
-            ? "var(--listen-mobile-bottom-chrome-height)"
-            : "var(--listen-mobile-bottom-nav-height)",
-          background:
-            "linear-gradient(0deg, rgba(10,10,15,0.98) 0%, rgba(10,10,15,0.94) 68%, rgba(10,10,15,0) 100%)",
+            ? "calc(var(--listen-mobile-player-height) + var(--listen-mobile-bottom-nav-content-height))"
+            : "var(--listen-mobile-bottom-nav-content-height)",
+          bottom:
+            "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset))",
+          left: "max(1rem, var(--listen-safe-left))",
+          right: "max(1rem, var(--listen-safe-right))",
         }}
       />
 
       <PlayerBar />
 
       <nav
-        className={`z-app-player fixed isolate flex items-center justify-around overflow-visible border border-white/10 bg-[#181818]/95 px-1.5 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl ${
+        className={`z-app-player fixed isolate flex items-center justify-around overflow-visible bg-transparent px-1.5 ${
           hasTrack ? "rounded-b-[2rem] border-t-0" : "rounded-[2rem]"
         }`}
         style={{

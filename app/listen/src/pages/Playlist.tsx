@@ -17,15 +17,21 @@ import {
   Copy,
   UserMinus,
 } from "@crate/ui/icons";
+import type { ContextMenuEntry } from "@crate/ui/domain/actions";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistHeroSection,
+  type PlaylistHeroSecondaryAction,
+} from "@/components/playlists/PlaylistHeroSection";
 import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
@@ -303,7 +309,7 @@ export function Playlist() {
       kind: "playlist",
       title: data.name,
       subtitle: data.description,
-      imageUrl: data.cover_data_url,
+      imageUrl: resolveMaybeApiAssetUrl(data.cover_data_url),
       url: publicShareUrl(`/playlist/${data.id}`),
     });
   }
@@ -491,11 +497,7 @@ export function Playlist() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 size={24} className="text-primary animate-spin" />
-      </div>
-    );
+    return <CrateLoader label="Loading playlist." />;
   }
 
   if (!data) {
@@ -506,196 +508,251 @@ export function Playlist() {
     );
   }
 
+  const playlistArtworkTracks = data.artwork_tracks ?? data.tracks;
+  const playlistMetaItems = [
+    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
+  ];
+  const offlineIcon =
+    offlineState === "ready"
+      ? ArrowDownToLineBold
+      : offlineBusy
+        ? Loader2
+        : offlineState === "error"
+          ? AlertCircle
+          : ArrowDownToLine;
+  const secondaryActions: PlaylistHeroSecondaryAction[] = [
+    {
+      key: "radio",
+      label: "Radio",
+      ariaLabel: "Playlist Radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onClick: () => void handlePlaylistRadio(),
+    },
+    {
+      key: "offline",
+      label: "Offline",
+      ariaLabel:
+        offlineState === "ready"
+          ? "Remove offline copy"
+          : "Make available offline",
+      icon: offlineIcon,
+      iconClassName: offlineBusy ? "animate-spin" : undefined,
+      className:
+        offlineState === "ready"
+          ? "text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+          : offlineBusy
+            ? "text-primary"
+            : offlineState === "error"
+              ? "text-amber-300/90"
+              : undefined,
+      disabled: !offlineSupported || data.is_smart || offlineBusy,
+      title: offlineButtonLabel,
+      onClick: () => void handleToggleOffline(),
+    },
+    ...(data.is_collaborative
+      ? [
+          {
+            key: "collaborators",
+            label: "Collabs",
+            ariaLabel: "Collaborators",
+            icon: Users,
+            onClick: () => setMembersOpen(true),
+          } satisfies PlaylistHeroSecondaryAction,
+        ]
+      : []),
+    {
+      key: "edit",
+      label: "Edit",
+      ariaLabel: "Edit",
+      icon: Pencil,
+      onClick: () => setEditorOpen(true),
+    },
+    {
+      key: "share",
+      label: "Share",
+      ariaLabel: "Share",
+      icon: Share2,
+      onClick: () => void handleShare(),
+    },
+  ];
+  const playlistMenuItems: ContextMenuEntry[] = [
+    {
+      key: "play",
+      label: "Play playlist",
+      icon: Play,
+      disabled: playerTracks.length === 0,
+      onSelect: handlePlay,
+    },
+    {
+      key: "shuffle",
+      label: "Shuffle playlist",
+      icon: Shuffle,
+      disabled: playerTracks.length === 0,
+      onSelect: handleShuffle,
+    },
+    {
+      key: "radio",
+      label: "Start playlist radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onSelect: handlePlaylistRadio,
+    },
+    {
+      type: "divider",
+      key: "playlist-state-divider",
+    },
+    {
+      key: "offline",
+      label: offlineButtonLabel,
+      icon: offlineIcon,
+      active: offlineState === "ready",
+      disabled: !offlineSupported || data.is_smart || offlineBusy,
+      onSelect: handleToggleOffline,
+    },
+    ...(data.is_collaborative
+      ? [
+          {
+            key: "collaborators",
+            label: "Collaborators",
+            icon: Users,
+            onSelect: () => setMembersOpen(true),
+          } satisfies ContextMenuEntry,
+        ]
+      : []),
+    {
+      key: "edit",
+      label: "Edit playlist",
+      icon: Pencil,
+      onSelect: () => setEditorOpen(true),
+    },
+    ...(data.is_smart
+      ? [
+          {
+            key: "regenerate",
+            label: "Regenerate playlist",
+            icon: RefreshCw,
+            onSelect: handleRegenerate,
+          } satisfies ContextMenuEntry,
+        ]
+      : []),
+    {
+      key: "share",
+      label: "Share playlist",
+      icon: Share2,
+      onSelect: handleShare,
+    },
+    {
+      type: "divider",
+      key: "playlist-danger-divider",
+    },
+    {
+      key: "delete",
+      label: "Delete playlist",
+      icon: Trash2,
+      danger: true,
+      onSelect: () => setDeleteOpen(true),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+      <PlaylistHeroSection
+        title={data.name}
+        subtitle={
+          data.visibility === "public" ? "Public playlist" : "Private playlist"
+        }
+        description={data.description}
+        metaItems={playlistMetaItems}
+        badges={
+          <>
+            <OfflineBadge state={offlineState} />
+            {data.is_smart ? (
+              <span className="inline-flex items-center rounded-md border border-primary/30 px-1.5 py-0 text-[10px] font-medium text-primary">
+                <Sparkles size={10} className="mr-0.5" />
+                Smart
+              </span>
+            ) : null}
+            <span className="inline-flex items-center rounded-md border border-white/10 px-1.5 py-0 text-[10px] font-medium text-white/60">
+              {data.visibility === "public" ? "Public" : "Private"}
+            </span>
+            {data.is_collaborative ? (
+              <span className="inline-flex items-center rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0 text-[10px] font-medium text-cyan-300">
+                Collaborative
+              </span>
+            ) : null}
+          </>
+        }
+        artwork={(className) => (
           <PlaylistArtwork
             name={data.name}
             coverDataUrl={data.cover_data_url}
-            tracks={data.tracks}
-            className="w-40 h-40 sm:w-48 sm:h-48 rounded-2xl shadow-2xl flex-shrink-0"
+            tracks={playlistArtworkTracks}
+            className={className}
           />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl font-bold text-foreground truncate">
-                {data.name}
-              </h1>
-              <OfflineBadge state={offlineState} />
-              {data.is_smart && (
-                <span className="inline-flex items-center rounded-md border border-primary/30 text-primary text-[10px] px-1.5 py-0 font-medium">
-                  <Sparkles size={10} className="mr-0.5" />
-                  Smart
-                </span>
-              )}
-              <span className="inline-flex items-center rounded-md border border-white/10 px-1.5 py-0 text-[10px] font-medium text-white/60">
-                {data.visibility === "public" ? "Public" : "Private"}
-              </span>
-              {data.is_collaborative ? (
-                <span className="inline-flex items-center rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0 text-[10px] font-medium text-cyan-300">
-                  Collaborative
-                </span>
-              ) : null}
-            </div>
-            {data.description && (
-              <p className="text-sm text-muted-foreground mb-2">
-                {data.description}
-              </p>
-            )}
-            <div className="text-xs text-muted-foreground">
-              {data.track_count} track{data.track_count !== 1 ? "s" : ""}
-              {data.total_duration > 0 &&
-                ` · ${formatTotalDuration(data.total_duration)}`}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <button
-            onClick={handlePlay}
-            disabled={playerTracks.length === 0}
-            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            <Play size={16} fill="currentColor" />
-            Play
-          </button>
-          <button
-            onClick={handleShuffle}
-            disabled={playerTracks.length === 0}
-            className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
-          >
-            <Shuffle size={16} />
-            Shuffle
-          </button>
-          <button
-            onClick={handlePlaylistRadio}
-            disabled={playerTracks.length === 0}
-            className="flex items-center gap-2 rounded-lg border border-white/20 px-5 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
-          >
-            <Radio size={16} />
-            Playlist Radio
-          </button>
-          <button
-            onClick={handleToggleOffline}
-            disabled={!offlineSupported || data.is_smart || offlineBusy}
-            className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors disabled:opacity-50 ${
-              offlineState === "ready"
-                ? "border border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                : offlineBusy
-                  ? "border border-primary/25 bg-primary/10 text-primary"
-                  : offlineState === "error"
-                    ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                    : "border-white/20 text-foreground hover:bg-white/10"
-            }`}
-            aria-label={
-              offlineState === "ready"
-                ? "Remove offline copy"
-                : "Make available offline"
-            }
-            title={offlineButtonLabel}
-          >
-            {offlineState === "ready" ? (
-              <ArrowDownToLineBold size={16} />
-            ) : offlineBusy ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : offlineState === "error" ? (
-              <AlertCircle size={16} />
-            ) : (
-              <ArrowDownToLine size={16} />
-            )}
-          </button>
-          {data.is_collaborative ? (
-            <button
-              onClick={() => setMembersOpen(true)}
-              className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-            >
-              <Users size={16} />
-              Collaborators
-            </button>
-          ) : null}
-          <button
-            onClick={() => setEditorOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-          >
-            <Pencil size={16} />
-            Edit
-          </button>
-          <button
-            onClick={handleShare}
-            className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-          >
-            <Share2 size={16} />
-            Share
-          </button>
-          <button
-            onClick={() => setDeleteOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-red-500/25 px-4 py-2.5 text-sm font-medium text-red-300 hover:bg-red-500/10 transition-colors"
-          >
-            <Trash2 size={16} />
-            Delete
-          </button>
-          {data.is_smart && (
-            <button
-              onClick={handleRegenerate}
-              className="flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
-            >
-              <RefreshCw size={16} />
-              Regenerate
-            </button>
-          )}
-        </div>
-
-        {offlineStatusDetail ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {offlineStatusDetail}
-          </p>
-        ) : null}
-      </div>
-
-      <PlaylistTrackFilterBar
-        query={filterQuery}
-        onQueryChange={setFilterQuery}
-        totalCount={data.tracks.length}
-        filteredCount={filteredTracks.length}
+        )}
+        menuImageUrl={data.cover_data_url}
+        menuImageAlt={data.name}
+        onPlay={handlePlay}
+        onShuffle={handleShuffle}
+        playDisabled={playerTracks.length === 0}
+        shuffleDisabled={playerTracks.length === 0}
+        secondaryActions={secondaryActions}
+        menuItems={playlistMenuItems}
       />
 
-      {/* Track list */}
-      {data.tracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            This playlist has no tracks yet
-          </p>
-        </div>
-      ) : filteredTracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            No tracks match this filter
-          </p>
-        </div>
-      ) : (
-        <WindowVirtualList
-          items={filteredTracks}
-          estimateSize={72}
-          itemKey={(t) => t.id ?? `${t.track_path}-${t.position}`}
-          renderItem={(t, i) => (
-            <TrackRow
-              track={toTrackRowData({
-                ...t,
-                id: t.track_id ?? t.track_path ?? t.title,
-                library_track_id: t.track_id,
-              })}
-              index={i + 1}
-              showArtist
-              showAlbum
-              playlistOptions={destinationPlaylistOptions}
-              onAddToPlaylist={handleAddTrackToPlaylist}
-              onCreatePlaylist={handleCreatePlaylistFromTrack}
-              onActionMenuOpen={ensurePlaylistOptionsLoaded}
-              onPlayOverride={() => handlePlayTrack(t.id)}
-            />
-          )}
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+        {offlineStatusDetail ? (
+          <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
+        ) : null}
+
+        <PlaylistTrackFilterBar
+          query={filterQuery}
+          onQueryChange={setFilterQuery}
+          totalCount={data.tracks.length}
+          filteredCount={filteredTracks.length}
         />
-      )}
+
+        {/* Track list */}
+        {data.tracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              This playlist has no tracks yet
+            </p>
+          </div>
+        ) : filteredTracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              No tracks match this filter
+            </p>
+          </div>
+        ) : (
+          <WindowVirtualList
+            items={filteredTracks}
+            estimateSize={72}
+            itemKey={(t) => t.id ?? `${t.track_path}-${t.position}`}
+            renderItem={(t, i) => (
+              <TrackRow
+                track={toTrackRowData({
+                  ...t,
+                  id: t.track_id ?? t.track_path ?? t.title,
+                  library_track_id: t.track_id,
+                })}
+                index={i + 1}
+                showCoverThumb
+                showArtist
+                showAlbum
+                playlistOptions={destinationPlaylistOptions}
+                onAddToPlaylist={handleAddTrackToPlaylist}
+                onCreatePlaylist={handleCreatePlaylistFromTrack}
+                onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                onPlayOverride={() => handlePlayTrack(t.id)}
+              />
+            )}
+          />
+        )}
+      </div>
 
       <PlaylistCreateModal
         open={editorOpen}

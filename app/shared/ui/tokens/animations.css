@@ -348,13 +348,31 @@
   animation: cratePlayCorePulse 2.55s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
+@keyframes crateLoaderDotBounce {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: translateY(0);
+  }
+  42% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.animate-crate-loader-dot-bounce {
+  animation: crateLoaderDotBounce 1.05s ease-in-out infinite;
+  display: inline-block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-discovery-logo-pulse,
   .animate-discovery-logo-glow,
   .animate-crate-icon-active-pulse,
   .animate-crate-play-aura-pulse,
   .animate-crate-play-rim-pulse,
-  .animate-crate-play-core-pulse {
+  .animate-crate-play-core-pulse,
+  .animate-crate-loader-dot-bounce {
     animation: none;
   }
 }

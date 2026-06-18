@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
-import { Loader2, Play, Search } from "@crate/ui/icons";
+import { Play, Search } from "@crate/ui/icons";
 import { api, ApiError } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -8,6 +8,7 @@ import { toTrackRowData } from "@/lib/track-row-data";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { TrackRow } from "@/components/cards/TrackRow";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 
 interface SearchData {
@@ -110,12 +111,7 @@ export function SearchResults() {
 
   if (!query)
     return <p className="text-muted-foreground">Enter a search term</p>;
-  if (loading && !data)
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    );
+  if (loading && !data) return <CrateLoader label="Loading search results." />;
   if (searchError)
     return (
       <div className="space-y-8">

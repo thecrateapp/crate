@@ -48,6 +48,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -66,6 +67,9 @@ const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 const HERO_BACKGROUND_VERSION = "home-hero-bg-v2";
+const HERO_SWIPE_MIN_DISTANCE_PX = 44;
+const HERO_SWIPE_MAX_DURATION_MS = 1_200;
+const HERO_SWIPE_AXIS_DOMINANCE = 1.2;
 
 function statValue(value: number): string {
   return numberFormatter.format(value || 0);
@@ -407,10 +411,11 @@ export function HomeTasteHero({
   const [idx, setIdx] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const autoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const touchRef = useRef<{ x: number; t: number } | null>(null);
+  const touchRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const exposedRef = useRef<Set<string>>(new Set());
   const visibleRef = useRef(false);
   const count = heroes.length;
+  const isDesktop = useIsDesktop();
   const readyBackgrounds = useHeroBackgroundPreloader(heroes, idx);
 
   const go = (to: number) => setIdx(((to % count) + count) % count);
@@ -473,7 +478,13 @@ export function HomeTasteHero({
   const onTouchStart = (e: React.TouchEvent) => {
     pause();
     const touch = e.touches[0];
-    if (touch) touchRef.current = { x: touch.clientX, t: Date.now() };
+    if (touch) {
+      touchRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+        t: Date.now(),
+      };
+    }
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     const start = touchRef.current;
@@ -487,8 +498,15 @@ export function HomeTasteHero({
       return;
     }
     const dx = endTouch.clientX - start.x;
+    const dy = endTouch.clientY - start.y;
     const dt = Date.now() - start.t;
-    if (Math.abs(dx) > 40 && dt < 500) {
+    const horizontal = Math.abs(dx);
+    const vertical = Math.abs(dy);
+    if (
+      horizontal > HERO_SWIPE_MIN_DISTANCE_PX &&
+      horizontal > vertical * HERO_SWIPE_AXIS_DOMINANCE &&
+      dt <= HERO_SWIPE_MAX_DURATION_MS
+    ) {
       go(idx + (dx < 0 ? 1 : -1));
     }
     touchRef.current = null;
@@ -537,7 +555,7 @@ export function HomeTasteHero({
   return (
     <div
       ref={rootRef}
-      className="relative"
+      className="relative touch-pan-y"
       onMouseEnter={pause}
       onMouseLeave={resume}
       onTouchStart={onTouchStart}
@@ -547,7 +565,7 @@ export function HomeTasteHero({
       {slides}
 
       {/* Nav arrows */}
-      {count > 1 && (
+      {isDesktop && count > 1 && (
         <>
           <button
             onClick={() => {
@@ -835,7 +853,7 @@ function RecentPlaylistEntityRow({
         type: "media",
         title: item.playlist_name,
         subtitle: item.playlist_description || item.subtitle,
-        imageUrl: item.playlist_cover_data_url,
+        imageUrl: resolveMaybeApiAssetUrl(item.playlist_cover_data_url),
         imageAlt: item.playlist_name,
         imageShape: "square",
         fallbackIcon: Sparkles,

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
@@ -120,11 +121,7 @@ export function PathDetail() {
   }, []);
 
   if (loading || !path) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={20} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader label="Loading music path." />;
   }
 
   const nodeCount = path.tracks.length;

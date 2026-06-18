@@ -5,11 +5,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useParams } from "react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
   AlertCircle,
-  ArrowLeft,
   ArrowDownToLine,
   ArrowDownToLineBold,
   Heart,
@@ -19,20 +18,24 @@ import {
   Radio,
   Shuffle,
   Share2,
-  Users,
 } from "@crate/ui/icons";
+import type { ContextMenuEntry } from "@crate/ui/domain/actions";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { useLazyPlaylistOptions } from "@/hooks/use-lazy-playlist-options";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import {
-  EditorialPlaylistArtwork,
-  editorialPlaylistLabel,
-} from "@/components/playlists/EditorialPlaylistArtwork";
+  PlaylistArtwork,
+  type PlaylistArtworkTrack,
+} from "@/components/playlists/PlaylistArtwork";
+import {
+  PlaylistHeroSection,
+  type PlaylistHeroSecondaryAction,
+} from "@/components/playlists/PlaylistHeroSection";
 import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
@@ -97,7 +100,7 @@ interface CuratedPlaylistData {
 }
 
 const VIRTUAL_TRACK_THRESHOLD = 80;
-const TRACK_ROW_ESTIMATE_PX = 58;
+const TRACK_ROW_ESTIMATE_PX = 72;
 
 interface CuratedTrackListProps {
   tracks: CuratedPlaylistTrack[];
@@ -128,6 +131,7 @@ function CuratedTrackRow({
         library_track_id: track.track_id,
       })}
       index={index}
+      showCoverThumb
       showArtist
       showAlbum
       playlistOptions={playlistOptions}
@@ -226,7 +230,6 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
 }
 
 export function CuratedPlaylist() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -330,7 +333,7 @@ export function CuratedPlaylist() {
       kind: "playlist",
       title: data.name,
       subtitle: data.description,
-      imageUrl: data.cover_data_url,
+      imageUrl: resolveMaybeApiAssetUrl(data.cover_data_url),
       url: publicShareUrl(`/curation/playlist/${data.id}`),
     });
   }
@@ -382,11 +385,7 @@ export function CuratedPlaylist() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={24} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader label="Loading playlist." />;
   }
 
   if (!data) {
@@ -432,11 +431,6 @@ export function CuratedPlaylist() {
             ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
             : "Offline copy failed. Retry to finish the playlist mirror."
           : null;
-  const editorialLabel = editorialPlaylistLabel(
-    data.name,
-    data.is_smart ? "Core Tracks" : "Crate Selects",
-  );
-
   async function handleToggleOffline() {
     if (!data) return;
     try {
@@ -455,171 +449,186 @@ export function CuratedPlaylist() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </button>
+  const offlineIcon =
+    offlineState === "ready"
+      ? ArrowDownToLineBold
+      : offlineBusy
+        ? Loader2
+        : offlineState === "error"
+          ? AlertCircle
+          : ArrowDownToLine;
+  const secondaryActions: PlaylistHeroSecondaryAction[] = [
+    {
+      key: "radio",
+      label: "Radio",
+      ariaLabel: "Playlist Radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onClick: () => void handlePlaylistRadio(),
+    },
+    {
+      key: "offline",
+      label: "Offline",
+      ariaLabel:
+        offlineState === "ready"
+          ? "Remove offline copy"
+          : "Make available offline",
+      icon: offlineIcon,
+      iconClassName: offlineBusy ? "animate-spin" : undefined,
+      className:
+        offlineState === "ready"
+          ? "text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
+          : offlineBusy
+            ? "text-primary"
+            : offlineState === "error"
+              ? "text-amber-300/90"
+              : undefined,
+      disabled: !offlineSupported || data.is_smart || offlineBusy,
+      title: offlineButtonLabel,
+      onClick: () => void handleToggleOffline(),
+    },
+    {
+      key: "follow",
+      label: data.is_followed ? "Following" : "Follow",
+      ariaLabel: data.is_followed ? "Remove from your library" : "Follow",
+      icon: togglingFollow ? Loader2 : data.is_followed ? HeartBold : Heart,
+      iconClassName: togglingFollow ? "animate-spin" : undefined,
+      active: data.is_followed,
+      pulseIcon: data.is_followed,
+      disabled: togglingFollow,
+      onClick: () => void handleToggleFollow(),
+    },
+    {
+      key: "share",
+      label: "Share",
+      ariaLabel: "Share",
+      icon: Share2,
+      onClick: () => void handleShare(),
+    },
+  ];
+  const playlistMenuItems: ContextMenuEntry[] = [
+    {
+      key: "play",
+      label: "Play playlist",
+      icon: Play,
+      disabled: playerTracks.length === 0,
+      onSelect: handlePlay,
+    },
+    {
+      key: "shuffle",
+      label: "Shuffle playlist",
+      icon: Shuffle,
+      disabled: playerTracks.length === 0,
+      onSelect: handleShuffle,
+    },
+    {
+      key: "radio",
+      label: "Start playlist radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onSelect: handlePlaylistRadio,
+    },
+    {
+      type: "divider",
+      key: "curated-playlist-library-divider",
+    },
+    {
+      key: "follow",
+      label: data.is_followed
+        ? "Remove from your library"
+        : "Add to your library",
+      icon: data.is_followed ? HeartBold : Heart,
+      active: data.is_followed,
+      disabled: togglingFollow,
+      onSelect: handleToggleFollow,
+    },
+    {
+      key: "offline",
+      label: offlineButtonLabel,
+      icon: offlineIcon,
+      active: offlineState === "ready",
+      disabled: !offlineSupported || data.is_smart || offlineBusy,
+      onSelect: handleToggleOffline,
+    },
+    {
+      type: "divider",
+      key: "curated-playlist-share-divider",
+    },
+    {
+      key: "share",
+      label: "Share playlist",
+      icon: Share2,
+      onSelect: handleShare,
+    },
+  ];
+  const playlistMetaItems = [
+    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
+    `${data.follower_count} follower${data.follower_count !== 1 ? "s" : ""}`,
+    data.category,
+  ];
 
-      <div className="flex flex-col gap-6 md:flex-row">
-        <div className="w-[220px] max-w-full shrink-0">
-          <EditorialPlaylistArtwork
-            title={editorialLabel.title}
-            kicker={editorialLabel.kicker}
+  return (
+    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+      <PlaylistHeroSection
+        title={data.name}
+        subtitle="Crate playlist"
+        description={data.description}
+        metaItems={playlistMetaItems}
+        badges={<OfflineBadge state={offlineState} />}
+        artwork={(className) => (
+          <PlaylistArtwork
+            name={data.name}
             coverDataUrl={data.cover_data_url}
             tracks={data.artwork_tracks}
-            variant="core"
-            className="aspect-square rounded-3xl shadow-2xl"
+            className={className}
           />
-        </div>
-
-        <div className="flex flex-col justify-end gap-3 text-left">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-bold text-foreground">
-                {data.name}
-              </h1>
-              <OfflineBadge state={offlineState} />
-            </div>
-            {data.description ? (
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                {data.description}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>{data.track_count} tracks</span>
-            {data.total_duration > 0 ? (
-              <span>{formatTotalDuration(data.total_duration)}</span>
-            ) : null}
-            <span className="inline-flex items-center gap-1">
-              <Users size={12} />
-              {data.follower_count} follower
-              {data.follower_count !== 1 ? "s" : ""}
-            </span>
-            {data.category ? <span>{data.category}</span> : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={handlePlay}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          <Play size={16} fill="currentColor" />
-          Play
-        </button>
-        <button
-          onClick={handleShuffle}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors disabled:opacity-50"
-        >
-          <Shuffle size={15} />
-          Shuffle
-        </button>
-        <button
-          onClick={handlePlaylistRadio}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors disabled:opacity-50"
-        >
-          <Radio size={15} />
-          Playlist Radio
-        </button>
-        <button
-          onClick={handleToggleOffline}
-          disabled={!offlineSupported || data.is_smart || offlineBusy}
-          className={`inline-flex h-11 w-11 items-center justify-center rounded-full border text-sm transition-colors disabled:opacity-50 ${
-            offlineState === "ready"
-              ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-              : offlineBusy
-                ? "border border-primary/25 bg-primary/10 text-primary"
-                : offlineState === "error"
-                  ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
-                  : "border-white/15 text-foreground hover:bg-white/5"
-          }`}
-          aria-label={
-            offlineState === "ready"
-              ? "Remove offline copy"
-              : "Make available offline"
-          }
-          title={offlineButtonLabel}
-        >
-          {offlineState === "ready" ? (
-            <ArrowDownToLineBold size={15} />
-          ) : offlineBusy ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : offlineState === "error" ? (
-            <AlertCircle size={15} />
-          ) : (
-            <ArrowDownToLine size={15} />
-          )}
-        </button>
-        <button
-          onClick={handleToggleFollow}
-          disabled={togglingFollow}
-          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm transition-colors ${
-            data.is_followed
-              ? "border-primary/30 bg-primary/15 text-primary"
-              : "border-white/15 text-foreground hover:bg-white/5"
-          }`}
-        >
-          {togglingFollow ? (
-            <Loader2 size={15} className="animate-spin" />
-          ) : data.is_followed ? (
-            <HeartBold size={15} className="animate-crate-icon-active-pulse" />
-          ) : (
-            <Heart size={15} />
-          )}
-          {data.is_followed ? "Following" : "Follow"}
-        </button>
-        <button
-          onClick={handleShare}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground hover:bg-white/5 transition-colors"
-        >
-          <Share2 size={15} />
-          Share
-        </button>
-      </div>
-
-      {offlineStatusDetail ? (
-        <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
-      ) : null}
-
-      <PlaylistTrackFilterBar
-        query={filterQuery}
-        onQueryChange={setFilterQuery}
-        totalCount={data.tracks.length}
-        filteredCount={filteredTracks.length}
+        )}
+        menuImageUrl={data.cover_data_url}
+        menuImageAlt={data.name}
+        onPlay={handlePlay}
+        onShuffle={handleShuffle}
+        playDisabled={playerTracks.length === 0}
+        shuffleDisabled={playerTracks.length === 0}
+        secondaryActions={secondaryActions}
+        menuItems={playlistMenuItems}
       />
 
-      {data.tracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            This playlist has no tracks yet
-          </p>
-        </div>
-      ) : filteredTracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            No tracks match this filter
-          </p>
-        </div>
-      ) : (
-        <CuratedTrackList
-          tracks={filteredTracks}
-          playlistOptions={playlistOptions}
-          onAddToPlaylist={handleAddTrackToPlaylist}
-          onCreatePlaylist={handleCreatePlaylistFromTrack}
-          onActionMenuOpen={ensurePlaylistOptionsLoaded}
-          onPlayTrack={handlePlayTrack}
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+        {offlineStatusDetail ? (
+          <p className="text-xs text-muted-foreground">{offlineStatusDetail}</p>
+        ) : null}
+
+        <PlaylistTrackFilterBar
+          query={filterQuery}
+          onQueryChange={setFilterQuery}
+          totalCount={data.tracks.length}
+          filteredCount={filteredTracks.length}
         />
-      )}
+
+        {data.tracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              This playlist has no tracks yet
+            </p>
+          </div>
+        ) : filteredTracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              No tracks match this filter
+            </p>
+          </div>
+        ) : (
+          <CuratedTrackList
+            tracks={filteredTracks}
+            playlistOptions={playlistOptions}
+            onAddToPlaylist={handleAddTrackToPlaylist}
+            onCreatePlaylist={handleCreatePlaylistFromTrack}
+            onActionMenuOpen={ensurePlaylistOptionsLoaded}
+            onPlayTrack={handlePlayTrack}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -196,25 +196,44 @@ export function ArtistHeroSection({
         ? createPortal(mobileMenuTrigger, document.body)
         : null}
       <div className="relative h-[420px] overflow-hidden sm:h-[400px]">
+        {photoUrl ? (
+          <img
+            src={photoUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] brightness-[0.72] contrast-110 opacity-[0.82] sm:hidden"
+          />
+        ) : heroBackgroundSrc ? (
+          <img
+            src={heroBackgroundSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] brightness-[0.72] contrast-110 opacity-[0.82] sm:hidden"
+          />
+        ) : null}
         {heroBackgroundSrc ? (
           <img
             src={heroBackgroundSrc}
             alt=""
-            className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 opacity-[0.45]"
+            className="absolute inset-0 h-full w-full scale-[1.02] object-cover object-[right_20%] grayscale brightness-[0.5] contrast-110 opacity-[0.45] hidden sm:block"
           />
         ) : null}
-        <div className="absolute inset-0 bg-black/28" />
+        <div className="absolute inset-0 bg-black/10 sm:bg-black/32" />
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 sm:hidden"
           style={{
             background:
-              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.14) 34%, rgba(8, 10, 14, 0.46) 60%, var(--surface-app) 100%)",
+              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.04) 34%, rgba(8, 10, 14, 0.28) 64%, var(--surface-app) 100%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 hidden sm:block"
+          style={{
+            background:
+              "linear-gradient(to bottom, transparent 0%, rgba(8, 10, 14, 0.16) 34%, rgba(8, 10, 14, 0.5) 64%, var(--surface-app) 100%)",
           }}
         />
         <div className="relative mx-auto flex h-full w-full max-w-[1480px] items-end px-4 pb-6 sm:px-6">
           <div className="flex w-full flex-col gap-5 sm:flex-row sm:items-end">
-            {/* Avatar — small inline on mobile, large circle on desktop */}
-            <div className="hidden sm:block h-40 w-40 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-2xl ring-2 ring-white/10">
+            <div className="hidden h-40 w-40 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-2xl ring-2 ring-white/10 sm:block">
               <img
                 src={photoUrl}
                 alt={artist.name}
@@ -224,41 +243,11 @@ export function ArtistHeroSection({
                 }}
               />
             </div>
-
             <div className="max-w-3xl pb-1">
-              <div className="flex items-center gap-3 sm:block">
-                <div className="sm:hidden h-14 w-14 flex-shrink-0 overflow-hidden rounded-full bg-white/5 shadow-xl ring-2 ring-white/10">
-                  <img
-                    src={photoUrl}
-                    alt={artist.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                    }}
-                  />
-                </div>
-                <div>
-                  <h1 className="mb-1 text-2xl font-bold text-foreground sm:mb-2 sm:text-4xl">
-                    {artist.name}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:hidden">
-                    {artistInfo?.listeners ? (
-                      <span className="flex items-center gap-1">
-                        <Users size={12} />
-                        {formatCompact(artistInfo.listeners)}
-                      </span>
-                    ) : null}
-                    {artist.total_tracks > 0 ? (
-                      <span>{artist.total_tracks} tracks</span>
-                    ) : null}
-                    {artist.albums.length > 0 ? (
-                      <span>{artist.albums.length} albums</span>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-
-              <div className="hidden sm:flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <h1 className="mb-1 text-3xl font-bold text-foreground sm:mb-2 sm:text-4xl">
+                {artist.name}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 {artistInfo?.listeners ? (
                   <span className="flex items-center gap-1">
                     <Users size={14} />

@@ -60,6 +60,7 @@ export interface SearchResults {
 export interface BrowseFilters {
   genres: {
     name: string;
+    slug?: string | null;
     count: number;
     description?: string | null;
     top_artists?: string[];
@@ -145,6 +146,19 @@ export interface GenreDetail {
     has_cover: boolean;
   }[];
   shows?: UpcomingItem[];
+  related_genres?: {
+    slug: string;
+    name: string;
+    page_slug?: string | null;
+    relation_type: string;
+    relation_label: string;
+    description?: string | null;
+    artist_count: number;
+    album_count: number;
+    content_score?: number;
+    cover_url?: string | null;
+    top_artist_photo_url?: string | null;
+  }[];
 }
 
 export interface DecadeArtists {

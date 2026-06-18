@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { isTauriRuntime } from "@/lib/platform";
@@ -44,11 +45,7 @@ export function Login() {
   }, []);
 
   if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app-surface px-4">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-      </div>
-    );
+    return <CrateLoader variant="screen" label="Loading Crate." />;
   }
 
   if (user) {

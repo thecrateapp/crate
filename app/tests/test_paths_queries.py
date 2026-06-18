@@ -446,3 +446,147 @@ class TestPathsBlissCandidateQueries:
 
         rows = find_candidate_rows([0.1] * 20, set(), limit=10)
         assert rows == []
+
+    def test_candidate_queries_exclude_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.paths_bliss_candidate_queries import (
+            find_anchor_track_row,
+            find_candidate_rows,
+            find_seeded_radio_candidate_rows,
+        )
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Paths Clean"})
+        clean_album_id = pg_db.upsert_album(
+            {
+                "artist": "Paths Clean",
+                "name": "Paths Clean Album",
+                "path": "/music/Paths Clean/Paths Clean Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        clean_path = "/music/Paths Clean/Paths Clean Album/01-clean.flac"
+        pg_db.upsert_track(
+            {
+                "album_id": clean_album_id,
+                "artist": "Paths Clean",
+                "album": "Paths Clean Album",
+                "filename": "01-clean.flac",
+                "title": "Paths Clean Track",
+                "path": clean_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        pg_db.upsert_artist({"name": ".crate-trash"})
+        hidden_album_id = pg_db.upsert_album(
+            {
+                "artist": ".crate-trash",
+                "name": ".crate-trash",
+                "path": "/music/.crate-trash/Paths Hidden",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        hidden_path = "/music/.crate-trash/Paths Hidden/01-hidden.flac"
+        pg_db.upsert_track(
+            {
+                "album_id": hidden_album_id,
+                "artist": ".crate-trash",
+                "album": ".crate-trash",
+                "filename": "01-hidden.flac",
+                "title": "Paths Hidden Track",
+                "path": hidden_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        pg_db.upsert_artist({"name": "Paths Quarantine"})
+        quarantine_album_id = pg_db.upsert_album(
+            {
+                "artist": "Paths Quarantine",
+                "name": "Paths Quarantine Album",
+                "path": "/music/Paths Quarantine/Paths Quarantine Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        quarantine_path = "/music/Paths Quarantine/Paths Quarantine Album/01-skip.flac"
+        pg_db.upsert_track(
+            {
+                "album_id": quarantine_album_id,
+                "artist": "Paths Quarantine",
+                "album": "Paths Quarantine Album",
+                "filename": "01-skip.flac",
+                "title": "Paths Quarantine Track",
+                "path": quarantine_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        with transaction_scope() as session:
+            rows = (
+                session.execute(
+                    text(
+                        """
+                        SELECT id, path
+                        FROM library_tracks
+                        WHERE path = ANY(:paths)
+                        """
+                    ),
+                    {"paths": [clean_path, hidden_path, quarantine_path]},
+                )
+                .mappings()
+                .all()
+            )
+            ids_by_path = {row["path"]: row["id"] for row in rows}
+            session.execute(
+                text(
+                    "UPDATE library_tracks SET bliss_vector = :bv WHERE path = ANY(:paths)"
+                ),
+                {
+                    "bv": [0.2] * 20,
+                    "paths": [clean_path, hidden_path, quarantine_path],
+                },
+            )
+            session.execute(
+                text("UPDATE library_albums SET quarantined_at = NOW() WHERE id = :id"),
+                {"id": quarantine_album_id},
+            )
+
+        rows = find_candidate_rows([0.1] * 20, set(), limit=10)
+        seeded_rows = find_seeded_radio_candidate_rows(
+            [0.1] * 20,
+            set(),
+            seed_artists=["Paths Clean", ".crate-trash", "Paths Quarantine"],
+            limit=10,
+        )
+
+        row_ids = {row["id"] for row in rows}
+        seeded_ids = {row["id"] for row in seeded_rows}
+
+        assert ids_by_path[clean_path] in row_ids
+        assert ids_by_path[hidden_path] not in row_ids
+        assert ids_by_path[quarantine_path] not in row_ids
+        assert ids_by_path[clean_path] in seeded_ids
+        assert ids_by_path[hidden_path] not in seeded_ids
+        assert ids_by_path[quarantine_path] not in seeded_ids
+        assert (
+            find_anchor_track_row(
+                "track", str(ids_by_path[hidden_path]), [0.1] * 20, set()
+            )
+            is None
+        )

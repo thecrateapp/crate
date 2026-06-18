@@ -4,12 +4,16 @@ from sqlalchemy import text
 
 from crate.db.tx import read_scope
 
+MIN_GENRE_MEMBERSHIP_SCORE = 0.45
+
 
 def get_browse_filter_genres(
     country: str = "", decade: str = "", format: str = ""
 ) -> list[dict]:
     where_clauses = ["1=1"]
-    params: dict[str, str | int] = {}
+    params: dict[str, str | int | float] = {
+        "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE
+    }
 
     if country:
         where_clauses.append("{artist_alias}.country = :country")
@@ -47,6 +51,7 @@ def get_browse_filter_genres(
                     f"""
                 SELECT
                     g.name,
+                    g.slug AS genre_slug,
                     COUNT(DISTINCT la.name) AS cnt,
                     COALESCE(
                         NULLIF(tn.description, ''),
@@ -67,20 +72,23 @@ def get_browse_filter_genres(
                 LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
                 LEFT JOIN LATERAL (
                     SELECT
-                        ARRAY_AGG(ranked.name ORDER BY ranked.listeners_sort DESC, ranked.playcount_sort DESC, ranked.album_count_sort DESC, ranked.name ASC) AS top_artists,
-                        (ARRAY_AGG(ranked.id ORDER BY ranked.listeners_sort DESC, ranked.playcount_sort DESC, ranked.album_count_sort DESC, ranked.name ASC))[1] AS top_artist_id
+                        ARRAY_AGG(ranked.name ORDER BY ranked.weight_sort DESC, ranked.listeners_sort DESC, ranked.playcount_sort DESC, ranked.album_count_sort DESC, ranked.name ASC) AS top_artists,
+                        (ARRAY_AGG(ranked.id ORDER BY ranked.weight_sort DESC, ranked.listeners_sort DESC, ranked.playcount_sort DESC, ranked.album_count_sort DESC, ranked.name ASC))[1] AS top_artist_id
                     FROM (
                         SELECT
                             la2.id,
                             la2.name,
                             COALESCE(la2.listeners, 0) AS listeners_sort,
                             COALESCE(la2.lastfm_playcount, 0) AS playcount_sort,
-                            COALESCE(la2.album_count, 0) AS album_count_sort
+                            COALESCE(la2.album_count, 0) AS album_count_sort,
+                            COALESCE(ag2.weight, 0) AS weight_sort
                         FROM library_artists la2
                         JOIN artist_genres ag2 ON la2.name = ag2.artist_name
                         WHERE ag2.genre_id = g.id
+                          AND COALESCE(ag2.weight, 0) >= :min_membership_score
                           AND {top_artist_where_sql}
                         ORDER BY
+                            COALESCE(ag2.weight, 0) DESC,
                             COALESCE(la2.listeners, 0) DESC,
                             COALESCE(la2.lastfm_playcount, 0) DESC,
                             COALESCE(la2.album_count, 0) DESC,
@@ -89,9 +97,11 @@ def get_browse_filter_genres(
                     ) ranked
                 ) top_artists ON TRUE
                 WHERE {where_sql}
+                  AND COALESCE(ag.weight, 0) >= :min_membership_score
                 GROUP BY
                     g.id,
                     g.name,
+                    g.slug,
                     tn.slug,
                     tn.description,
                     tn.external_description,
@@ -115,6 +125,7 @@ def get_browse_filter_genres(
             items.append(
                 {
                     "name": item["name"],
+                    "slug": item["genre_slug"],
                     "cnt": item["cnt"],
                     "count": item["cnt"],
                     "description": item.get("description"),

@@ -4,6 +4,50 @@ from unittest.mock import patch
 
 
 class TestRadioApiContracts:
+    def test_radio_stations_returns_personalized_station_groups(self, test_app):
+        payload = {
+            "artist_stations": [
+                {
+                    "type": "artist",
+                    "seed_type": "artist",
+                    "seed_value": "7",
+                    "seed_label": "Converge",
+                    "seed_subtitle": "Artist",
+                    "artist_id": 7,
+                    "artist_name": "Converge",
+                    "title": "Converge Radio",
+                    "subtitle": "",
+                    "play_count": 44,
+                    "minutes_listened": 180,
+                }
+            ],
+            "genre_stations": [
+                {
+                    "type": "genre",
+                    "seed_type": "genre",
+                    "seed_value": "hardcore",
+                    "seed_label": "hardcore",
+                    "seed_subtitle": "Genre",
+                    "genre_slug": "hardcore",
+                    "genre_name": "hardcore",
+                    "cover_url": "/api/genres/hardcore/cover?size=640&format=webp",
+                    "title": "hardcore Radio",
+                    "subtitle": "",
+                    "play_count": 88,
+                    "minutes_listened": 320,
+                }
+            ],
+        }
+
+        with patch(
+            "crate.api.radio.get_user_radio_stations", return_value=payload
+        ) as get_stations:
+            resp = test_app.get("/api/radio/stations")
+
+        assert resp.status_code == 200
+        assert resp.json() == payload
+        get_stations.assert_called_once_with(1)
+
     def test_artist_radio_returns_session_and_tracks(self, test_app):
         tracks = [
             {

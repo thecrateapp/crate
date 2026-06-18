@@ -126,5 +126,8 @@ describe("PlaylistEditor", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Add rule")).toBeInTheDocument();
     expect(screen.getByText("generated")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Upload a clean image-only hero asset/i),
+    ).toBeInTheDocument();
   });
 });

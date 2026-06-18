@@ -143,6 +143,33 @@ describe("PlayerBar mobile mini-player", () => {
     expect(screen.queryByTestId("player-track-menu")).toBeNull();
   });
 
+  it("leaves the mobile dock glass to the shared Shell backdrop", () => {
+    const track = createMockTrack({
+      title: "Glass Dock",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
+  });
+
+  it("keeps the desktop PlayerBar off the mobile dock glass surface", () => {
+    useIsDesktopMock.mockReturnValue(true);
+    const track = createMockTrack({
+      title: "Desktop Surface",
+      artist: "Crate",
+    });
+
+    const { container } = renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    expect(container.querySelector(".listen-mobile-player-glass")).toBeNull();
+  });
+
   it("likes the current track with a long press on the cover", async () => {
     vi.useFakeTimers();
     const track = createMockTrack({
@@ -200,5 +227,29 @@ describe("PlayerBar mobile mini-player", () => {
     });
 
     expect(screen.queryByText("Buffering...")).toBeNull();
+  });
+
+  it("keeps the mobile dock artwork, info, and controls vertically aligned", () => {
+    const track = createMockTrack({
+      title: "The Season",
+      artist: "Minor Empires",
+      albumCover: "https://example.test/cover.jpg",
+    });
+
+    renderWithListenProviders(<PlayerBar />, {
+      playerActions: { currentTrack: track, queue: [track] },
+    });
+
+    const trackButton = screen.getByLabelText("Open fullscreen player");
+    const mobileRow = trackButton.parentElement;
+    const mobilePlayButton = screen
+      .getAllByRole("button", { name: "Play" })
+      .find((button) => button.className.includes("h-12"));
+    const mobileControls = mobilePlayButton?.parentElement;
+
+    expect(mobilePlayButton).toBeInTheDocument();
+    expect(mobileRow).toHaveClass("px-4", "pt-3", "pb-0.5");
+    expect(mobileControls).toHaveClass("self-stretch");
+    expect(mobileControls).not.toHaveClass("translate-y-1");
   });
 });

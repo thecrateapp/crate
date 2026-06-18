@@ -138,10 +138,37 @@ def test_browse_filter_genres_include_editorial_metadata(pg_db):
     assert mathcore["description"] == (
         "Angular hardcore, odd meters and controlled chaos."
     )
+    assert mathcore["slug"] == "mathcore"
     assert mathcore["top_artists"] == ["Converge", "Botch"]
     assert mathcore["cover_url"] == (
         f"/api/artists/{converge_id}/background?size=640&format=webp"
     )
+
+
+def test_browse_filter_genres_orders_top_artists_by_genre_weight(pg_db):
+    from crate.db.queries.browse_artist_filters import get_browse_filter_genres
+
+    pg_db.upsert_artist({"name": "Evenly Split 1", "listeners": 1000})
+    pg_db.upsert_artist({"name": "Evenly Split 2", "listeners": 1000})
+    pg_db.upsert_artist({"name": "Weak Split Artist", "listeners": 999999})
+    pg_db.set_artist_genres(
+        "Evenly Split 1",
+        [("mathcore", 0.5, "test"), ("shoegaze", 1.0, "test")],
+    )
+    pg_db.set_artist_genres(
+        "Evenly Split 2",
+        [("mathcore", 0.9, "test")],
+    )
+    pg_db.set_artist_genres(
+        "Weak Split Artist",
+        [("mathcore", 0.3, "test")],
+    )
+
+    rows = get_browse_filter_genres()
+    mathcore = next(row for row in rows if row["name"] == "mathcore")
+
+    assert mathcore["top_artists"] == ["Evenly Split 2", "Evenly Split 1"]
+    assert mathcore["count"] == 2
 
 
 def test_browse_filter_genres_prefers_manual_taxonomy_cover(pg_db):
@@ -179,6 +206,7 @@ def test_browse_filter_genres_prefers_manual_taxonomy_cover(pg_db):
     rows = get_browse_filter_genres()
     screamo = next(row for row in rows if row["name"] == "screamo")
 
+    assert screamo["slug"] == "screamo"
     assert screamo["cover_url"] == "/api/genres/screamo/cover?size=640&format=webp"
 
 

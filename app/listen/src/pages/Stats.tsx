@@ -4,12 +4,12 @@ import {
   Activity,
   BarChart3,
   CalendarDays,
-  Compass,
   Disc3,
   Flame,
   Music2,
   Play,
   Repeat2,
+  Search,
   Users,
 } from "@crate/ui/icons";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
@@ -279,7 +279,7 @@ export function Stats() {
               }
             />
             <SignalCard
-              icon={Compass}
+              icon={Search}
               label={topDiscovery ? "Discovery" : "Gravity"}
               title={
                 topDiscovery?.artist_name ||

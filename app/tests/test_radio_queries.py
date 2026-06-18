@@ -231,6 +231,140 @@ class TestRadioLibraryQueries:
         result = get_track_bliss_vector(track_id)
         assert result == bliss_vec
 
+    def test_library_seed_queries_exclude_hidden_and_quarantined_tracks(
+        self, pg_db, monkeypatch
+    ):
+        from crate.db.queries import radio_library_queries
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Library Clean"})
+        clean_album_id = pg_db.upsert_album(
+            {
+                "artist": "Library Clean",
+                "name": "Library Clean Album",
+                "path": "/music/Library Clean/Library Clean Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        clean_path = "/music/Library Clean/Library Clean Album/01-clean.flac"
+        pg_db.upsert_track(
+            {
+                "album_id": clean_album_id,
+                "artist": "Library Clean",
+                "album": "Library Clean Album",
+                "filename": "01-clean.flac",
+                "title": "Library Clean Track",
+                "path": clean_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        pg_db.upsert_artist({"name": ".crate-trash"})
+        hidden_album_id = pg_db.upsert_album(
+            {
+                "artist": ".crate-trash",
+                "name": ".crate-trash",
+                "path": "/music/.crate-trash/Library Hidden",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        hidden_path = "/music/.crate-trash/Library Hidden/01-hidden.flac"
+        pg_db.upsert_track(
+            {
+                "album_id": hidden_album_id,
+                "artist": ".crate-trash",
+                "album": ".crate-trash",
+                "filename": "01-hidden.flac",
+                "title": "Library Hidden Track",
+                "path": hidden_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        pg_db.upsert_artist({"name": "Library Quarantine"})
+        quarantine_album_id = pg_db.upsert_album(
+            {
+                "artist": "Library Quarantine",
+                "name": "Library Quarantine Album",
+                "path": "/music/Library Quarantine/Library Quarantine Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        quarantine_path = (
+            "/music/Library Quarantine/Library Quarantine Album/01-skip.flac"
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": quarantine_album_id,
+                "artist": "Library Quarantine",
+                "album": "Library Quarantine Album",
+                "filename": "01-skip.flac",
+                "title": "Library Quarantine Track",
+                "path": quarantine_path,
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+
+        bliss_vec = [0.42] * 20
+        with transaction_scope() as session:
+            rows = (
+                session.execute(
+                    text(
+                        """
+                        SELECT id, path
+                        FROM library_tracks
+                        WHERE path = ANY(:paths)
+                        """
+                    ),
+                    {"paths": [clean_path, hidden_path, quarantine_path]},
+                )
+                .mappings()
+                .all()
+            )
+            ids_by_path = {row["path"]: row["id"] for row in rows}
+            session.execute(
+                text(
+                    "UPDATE library_tracks SET bliss_vector = :bv WHERE path = ANY(:paths)"
+                ),
+                {"bv": bliss_vec, "paths": [clean_path, hidden_path, quarantine_path]},
+            )
+            session.execute(
+                text("UPDATE library_albums SET quarantined_at = NOW() WHERE id = :id"),
+                {"id": quarantine_album_id},
+            )
+
+        monkeypatch.setattr(radio_library_queries.random, "randint", lambda _a, _b: 1)
+
+        seed_rows = radio_library_queries.get_random_library_seed_rows(limit=10)
+        seed_paths = {row["track_id"] for row in seed_rows}
+
+        assert ids_by_path[clean_path] in seed_paths
+        assert ids_by_path[hidden_path] not in seed_paths
+        assert ids_by_path[quarantine_path] not in seed_paths
+        assert (
+            radio_library_queries.get_track_path_by_id(ids_by_path[hidden_path]) is None
+        )
+        assert (
+            radio_library_queries.get_track_bliss_vector(ids_by_path[hidden_path])
+            is None
+        )
+
 
 class TestRadioUserQueries:
     def _setup_track(self, pg_db, artist_name, track_title, bliss_vec):
@@ -528,6 +662,59 @@ class TestRadioUserQueries:
         assert 1 in sources
         assert len(sources[1]) >= 1
 
+    def test_user_seed_sources_exclude_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.radio_user_queries import (
+            get_discovery_seed_sources,
+            get_recent_liked_seed_rows,
+        )
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        clean_id = self._setup_track(
+            pg_db, "User Seed Clean", "User Seed Clean Track", [0.91] * 20
+        )
+        hidden_id = self._setup_track(
+            pg_db, ".crate-trash", "User Seed Hidden Track", [0.92] * 20
+        )
+        quarantine_id = self._setup_track(
+            pg_db,
+            "User Seed Quarantine",
+            "User Seed Quarantine Track",
+            [0.93] * 20,
+        )
+
+        with transaction_scope() as session:
+            quarantine_album_id = session.execute(
+                text("SELECT album_id FROM library_tracks WHERE id = :id"),
+                {"id": quarantine_id},
+            ).scalar()
+            session.execute(
+                text("UPDATE library_albums SET quarantined_at = NOW() WHERE id = :id"),
+                {"id": quarantine_album_id},
+            )
+            for index, track_id in enumerate([clean_id, hidden_id, quarantine_id]):
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO user_liked_tracks (user_id, track_id, created_at)
+                        VALUES (:uid, :tid, NOW() - (:offset * INTERVAL '1 minute'))
+                        """
+                    ),
+                    {"uid": 1, "tid": track_id, "offset": index},
+                )
+
+        recent_likes = get_recent_liked_seed_rows(1, limit=10)
+        discovery_sources = get_discovery_seed_sources(1)
+        recent_ids = {row["track_id"] for row in recent_likes}
+        discovery_ids = {row["track_id"] for row in discovery_sources.get(1, [])}
+
+        assert clean_id in recent_ids
+        assert hidden_id not in recent_ids
+        assert quarantine_id not in recent_ids
+        assert clean_id in discovery_ids
+        assert hidden_id not in discovery_ids
+        assert quarantine_id not in discovery_ids
+
     def test_load_feedback_history_empty(self, pg_db):
         from crate.db.queries.radio_user_queries import load_feedback_history
 
@@ -635,6 +822,20 @@ class TestRadioSeedQueries:
         assert context["seed_artists"] == ["Seed Track Artist"]
         assert context["seed_track_ids"] == [track_id]
 
+    def test_get_track_seed_context_excludes_hidden_tracks(self, pg_db):
+        from crate.db.queries.radio_seed_queries import get_track_seed_context
+
+        track_id, track_path = self._setup_track_with_bliss(
+            pg_db,
+            ".crate-trash",
+            "Hidden Seed Track",
+            [0.11] * 20,
+            path="/music/.crate-trash/Hidden Seed/01-hidden.flac",
+        )
+
+        assert get_track_seed_context(str(track_id)) is None
+        assert get_track_seed_context(track_path) is None
+
     def test_get_track_seed_not_found(self, pg_db):
         from crate.db.queries.radio_seed_queries import get_track_seed
 
@@ -693,6 +894,29 @@ class TestRadioSeedQueries:
         assert len(vectors) >= 1
         assert vectors[0] == bliss_vec
         assert label == "PL Seed"
+
+    def test_get_album_seed_context_excludes_quarantined_album(self, pg_db):
+        from crate.db.queries.radio_seed_queries import get_album_seed_context
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        track_id, _ = self._setup_track_with_bliss(
+            pg_db,
+            "Quarantined Seed Artist",
+            "Quarantined Seed Track",
+            [0.31] * 20,
+        )
+        with transaction_scope() as session:
+            album_id = session.execute(
+                text("SELECT album_id FROM library_tracks WHERE id = :id"),
+                {"id": track_id},
+            ).scalar()
+            session.execute(
+                text("UPDATE library_albums SET quarantined_at = NOW() WHERE id = :id"),
+                {"id": album_id},
+            )
+
+        assert get_album_seed_context(str(album_id)) is None
 
     def test_get_playlist_seed_with_data(self, pg_db):
         from crate.db.queries.radio_seed_queries import get_playlist_seed

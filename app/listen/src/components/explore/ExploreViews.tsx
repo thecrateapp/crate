@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import {
@@ -25,6 +25,7 @@ import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   itemKey,
   UpcomingShowCard,
@@ -34,6 +35,8 @@ import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { startShapedRadio } from "@/lib/radio";
+import { publicShareUrl } from "@/lib/share-url";
+import { openShareSheet } from "@/lib/social-share";
 
 import {
   type DecadeArtists,
@@ -42,6 +45,10 @@ import {
   type SystemPlaylist,
   loadSystemPlaylistTracks,
 } from "./explore-model";
+import { artistPhotoApiUrl } from "@/lib/library-routes";
+
+const GENRE_SECONDARY_ACTION_CLASS =
+  "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export function ExplorePill({
   label,
@@ -212,10 +219,22 @@ export function GenreDetailView({
   );
   const genreShows = data?.shows?.slice(0, 5) ?? [];
   const nextShow = genreShows[0] ?? null;
-  const heroCoverUrl = upscaleGenreCoverUrl(
-    data?.cover_url,
-    data?.canonical_slug || data?.slug,
+  const fallbackGenreSlug = data?.canonical_slug || data?.slug;
+  const heroCoverCandidates = useMemo(
+    () =>
+      buildGenreHeroCoverCandidates(
+        data?.cover_url,
+        fallbackGenreSlug,
+        data?.artists,
+      ),
+    [data?.cover_url, fallbackGenreSlug, data?.artists],
   );
+  const heroCoverFingerprint = heroCoverCandidates.join("|");
+  const [heroCoverIndex, setHeroCoverIndex] = useState(0);
+  useEffect(() => {
+    setHeroCoverIndex(0);
+  }, [heroCoverFingerprint]);
+  const heroCoverUrl = heroCoverCandidates[heroCoverIndex] ?? null;
 
   async function handlePlayGenreRadio() {
     if (!data || startingRadio) return;
@@ -242,22 +261,15 @@ export function GenreDetailView({
     navigate(`/upcoming?${params.toString()}`);
   }
 
-  async function shareGenre() {
+  function shareGenre() {
     if (!data) return;
-    const url = `${window.location.origin}/explore?genre=${encodeURIComponent(
-      data.slug,
-    )}`;
-    const title = `${data.name} on Crate`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, url });
-      } else {
-        await navigator.clipboard?.writeText(url);
-        toast.success("Genre link copied");
-      }
-    } catch {
-      toast.error("Could not share genre");
-    }
+    openShareSheet({
+      kind: "genre",
+      title: data.name,
+      subtitle: "Genre",
+      imageUrl: heroCoverUrl,
+      url: publicShareUrl(`/explore?genre=${encodeURIComponent(data.slug)}`),
+    });
   }
 
   const genreMenuActions = useMemo<ItemActionMenuEntry[]>(() => {
@@ -283,10 +295,10 @@ export function GenreDetailView({
         onSelect: shareGenre,
       }),
     ];
-  }, [data, nextShow, startingRadio]);
+  }, [data, heroCoverUrl, nextShow, startingRadio]);
   const genreMenu = useItemActionMenu(genreMenuActions);
 
-  if (loading) return <ExploreLoadingState />;
+  if (loading) return <CrateLoader label="Loading genre." />;
   if (!data)
     return <p className="text-sm text-muted-foreground">Genre not found.</p>;
 
@@ -302,8 +314,12 @@ export function GenreDetailView({
     data.albums.reduce((total, album) => total + (album.track_count || 0), 0);
   const visibleArtists = isDesktop ? data.artists : data.artists.slice(0, 12);
   const visibleAlbums = isDesktop ? data.albums : data.albums.slice(0, 12);
+  const visibleRelatedGenres = (data.related_genres ?? []).slice(
+    0,
+    isDesktop ? 12 : 6,
+  );
   const genreMenuTrigger =
-    typeof document !== "undefined"
+    !isDesktop && typeof document !== "undefined"
       ? createPortal(
           <div
             className="fixed z-app-header"
@@ -319,8 +335,8 @@ export function GenreDetailView({
               className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
               onClick={genreMenu.openFromTrigger}
               onContextMenu={genreMenu.handleContextMenu}
-              aria-label="Genre actions"
-              title="Genre actions"
+              aria-label="More"
+              title="More"
             >
               <MoreHorizontal
                 data-testid="genre-mobile-hero-menu-icon"
@@ -361,7 +377,11 @@ export function GenreDetailView({
               alt={`${data.name} genre cover`}
               className="absolute inset-0 h-full w-full scale-[1.02] object-cover brightness-[0.66] contrast-110 opacity-[0.68] saturate-125"
               onError={(event) => {
-                event.currentTarget.style.display = "none";
+                if (heroCoverIndex + 1 < heroCoverCandidates.length) {
+                  setHeroCoverIndex((index) => index + 1);
+                } else {
+                  event.currentTarget.style.display = "none";
+                }
               }}
             />
           ) : null}
@@ -388,36 +408,121 @@ export function GenreDetailView({
                 <span className="text-white/20">/</span>
                 <span>{trackCount} tracks</span>
               </div>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  onClick={() => void handlePlayGenreRadio()}
-                  disabled={startingRadio}
-                  aria-label="Play genre radio"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-7 text-sm font-bold text-black shadow-[0_0_24px_rgba(34,211,238,0.28)] transition-[filter,transform,box-shadow] hover:-translate-y-px hover:shadow-[0_0_34px_rgba(34,211,238,0.40)] disabled:cursor-wait disabled:opacity-70"
-                >
-                  {startingRadio ? (
-                    <Loader2 size={17} className="animate-spin" />
-                  ) : (
-                    <Play size={17} />
-                  )}
-                  <span>Play</span>
-                </button>
-                {nextShow ? (
-                  <button
-                    type="button"
-                    onClick={() => openGenreRadar(nextShow)}
-                    aria-label="Open next genre show in Radar"
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-7 text-sm font-bold text-white shadow-[0_16px_36px_rgba(0,0,0,0.22)] backdrop-blur-md transition-[border-color,color,filter,transform] hover:-translate-y-px hover:border-primary/35 hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.28)]"
-                  >
-                    <Calendar size={17} />
-                    <span>Next show</span>
-                  </button>
-                ) : null}
-              </div>
             </div>
           </div>
         </section>
+
+        <div className="px-0 py-1 sm:px-0">
+          <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
+            <div
+              role="group"
+              aria-label="Primary genre actions"
+              className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
+            >
+              <button
+                type="button"
+                onClick={() => void handlePlayGenreRadio()}
+                disabled={startingRadio}
+                aria-label="Play genre radio"
+                className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
+              >
+                {startingRadio ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : (
+                  <Play size={17} fill="currentColor" />
+                )}
+                <span>Play</span>
+              </button>
+              {nextShow ? (
+                <button
+                  type="button"
+                  onClick={() => openGenreRadar(nextShow)}
+                  aria-label="Open next genre show in Radar"
+                  className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
+                >
+                  <Calendar size={17} />
+                  <span>Next show</span>
+                </button>
+              ) : null}
+            </div>
+
+            {isDesktop ? (
+              <div
+                role="group"
+                aria-label="Secondary genre actions"
+                className="ml-auto flex shrink-0 items-center gap-4"
+              >
+                <button
+                  type="button"
+                  className={GENRE_SECONDARY_ACTION_CLASS}
+                  onClick={shareGenre}
+                  aria-label="Share genre"
+                >
+                  <Share2 size={CRATE_ICON_SIZE.lg} />
+                  <span>Share</span>
+                </button>
+                <div className="relative shrink-0">
+                  <button
+                    ref={genreMenu.triggerRef}
+                    type="button"
+                    className={GENRE_SECONDARY_ACTION_CLASS}
+                    onClick={genreMenu.openFromTrigger}
+                    onContextMenu={genreMenu.handleContextMenu}
+                    aria-label="More"
+                  >
+                    <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
+                    <span>More</span>
+                  </button>
+                  <ItemActionMenu
+                    actions={genreMenuActions}
+                    header={{
+                      type: "media",
+                      title: data.name,
+                      subtitle: "Genre",
+                      detail: `${artistCount} artists · ${albumCount} albums`,
+                      imageUrl: heroCoverUrl,
+                      imageAlt: data.name,
+                      imageShape: "square",
+                      fallbackIcon: Radio,
+                    }}
+                    open={genreMenu.open}
+                    position={genreMenu.position}
+                    menuRef={genreMenu.menuRef}
+                    onClose={genreMenu.close}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {visibleRelatedGenres.length > 0 ? (
+          <section className="space-y-3">
+            <div className="flex items-end justify-between gap-3 px-1">
+              <div>
+                <h2 className="text-lg font-bold">Related scenes</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Adjacent genres with the most music in your library.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              {visibleRelatedGenres.map((genre) => (
+                <RelatedGenreCard
+                  key={`${genre.relation_type}-${genre.slug}`}
+                  genre={genre}
+                  onOpen={() =>
+                    navigate(
+                      `/explore?genre=${encodeURIComponent(
+                        genre.page_slug || genre.slug,
+                      )}`,
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {genreShows.length > 0 ? (
           <section className="space-y-3">
@@ -482,6 +587,103 @@ export function GenreDetailView({
   );
 }
 
+type RelatedGenre = NonNullable<GenreDetail["related_genres"]>[number];
+
+function RelatedGenreCard({
+  genre,
+  onOpen,
+}: {
+  genre: RelatedGenre;
+  onOpen: () => void;
+}) {
+  const imageCandidates = useMemo(
+    () => buildRelatedGenreImageCandidates(genre),
+    [genre],
+  );
+  const imageFingerprint = imageCandidates.join("|");
+  const [imageIndex, setImageIndex] = useState(0);
+  useEffect(() => {
+    setImageIndex(0);
+  }, [imageFingerprint]);
+
+  const coverUrl = imageCandidates[imageIndex] ?? null;
+  const contentLabel = [
+    genre.artist_count > 0
+      ? `${genre.artist_count} artist${genre.artist_count === 1 ? "" : "s"}`
+      : null,
+    genre.album_count > 0
+      ? `${genre.album_count} album${genre.album_count === 1 ? "" : "s"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group relative isolate min-h-[132px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.045] p-3 text-left shadow-[0_18px_46px_rgba(0,0,0,0.22)] transition-[border-color,filter,transform] hover:-translate-y-px hover:border-primary/35 hover:drop-shadow-[0_0_14px_rgba(34,211,238,0.18)]"
+    >
+      {coverUrl ? (
+        <img
+          src={coverUrl}
+          alt=""
+          className="absolute inset-0 -z-10 h-full w-full scale-[1.04] object-cover opacity-35 saturate-125 transition duration-300 group-hover:opacity-45"
+          loading="lazy"
+          onError={(event) => {
+            if (imageIndex + 1 < imageCandidates.length) {
+              setImageIndex((index) => index + 1);
+            } else {
+              event.currentTarget.style.display = "none";
+            }
+          }}
+        />
+      ) : null}
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(5,8,12,0.18)_0%,rgba(5,8,12,0.82)_100%)]" />
+      <div className="flex h-full min-h-[108px] flex-col justify-between gap-4">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/85">
+            {genre.relation_label}
+          </div>
+          <div className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+            {genre.name}
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] text-muted-foreground">
+            {contentLabel}
+          </span>
+          <ArrowRight
+            size={14}
+            className="shrink-0 text-white/35 transition group-hover:translate-x-0.5 group-hover:text-primary"
+          />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function buildRelatedGenreImageCandidates(genre: RelatedGenre) {
+  const candidates = [
+    resolveMaybeApiAssetUrl(genre.cover_url),
+    relatedGenreCoverUrl(genre.page_slug),
+    relatedGenreCoverUrl(genre.slug),
+    resolveMaybeApiAssetUrl(genre.top_artist_photo_url),
+  ].filter((url): url is string => Boolean(url));
+
+  return [...new Set(candidates)];
+}
+
+function relatedGenreCoverUrl(slug?: string | null) {
+  const normalizedSlug = slug?.trim();
+  if (!normalizedSlug) return null;
+  return resolveMaybeApiAssetUrl(
+    `/api/genres/${encodeURIComponent(
+      normalizedSlug,
+    )}/cover?size=640&format=webp`,
+  );
+}
+
 function upscaleGenreCoverUrl(
   url?: string | null,
   fallbackSlug?: string | null,
@@ -502,6 +704,52 @@ function upscaleGenreCoverUrl(
   return `${sized}${sized.includes("?") ? "&" : "?"}hero=genre-detail-v5`;
 }
 
+function buildGenreHeroCoverCandidates(
+  url?: string | null,
+  fallbackSlug?: string | null,
+  artists?: GenreDetail["artists"],
+) {
+  const primary = upscaleGenreCoverUrl(url);
+  const fallback = fallbackSlug
+    ? upscaleGenreCoverUrl(undefined, fallbackSlug)
+    : null;
+  const fallbackArtistPhoto = buildGenreHeroArtistPhotoFallback(artists);
+
+  const candidates: string[] = [];
+
+  if (primary) candidates.push(primary);
+  if (fallback) candidates.push(fallback);
+  if (fallbackArtistPhoto) candidates.push(fallbackArtistPhoto);
+
+  return [...new Set(candidates)];
+}
+
+function buildGenreHeroArtistPhotoFallback(artists?: GenreDetail["artists"]) {
+  if (!artists?.length) return null;
+  const topArtist = artists
+    .filter((artist) => artist.artist_id != null && artist.has_photo)
+    .sort((a, b) => {
+      const aListeners = a.listeners ?? -1;
+      const bListeners = b.listeners ?? -1;
+      return bListeners - aListeners;
+    })[0];
+
+  if (!topArtist?.artist_id) return null;
+
+  const resolved = artistPhotoApiUrl(
+    {
+      artistId: topArtist.artist_id,
+    },
+    {
+      size: 1280,
+      format: "webp",
+    },
+  );
+
+  if (!resolved) return null;
+  return `${resolved}${resolved.includes("?") ? "&" : "?"}hero=genre-detail-v5`;
+}
+
 export function DecadeDetailView({
   decade,
   onBack,
@@ -513,7 +761,7 @@ export function DecadeDetailView({
     `/api/artists?decade=${decade}&limit=50`,
   );
 
-  if (loading) return <ExploreLoadingState />;
+  if (loading) return <CrateLoader label="Loading decade." />;
 
   return (
     <div className="space-y-6">
@@ -594,7 +842,7 @@ export function PlaylistCategoryView({
     }
   }
 
-  if (loading) return <ExploreLoadingState />;
+  if (loading) return <CrateLoader label="Loading playlist category." />;
 
   return (
     <div className="space-y-6">
