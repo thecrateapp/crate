@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
+from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
 
 MIN_GENRE_MEMBERSHIP_SCORE = 0.45
 
@@ -122,10 +123,17 @@ def get_browse_filter_genres(
         for row in rows:
             item = dict(row)
             top_artists = item.get("top_artists") or []
+            genre_name = str(item["name"])
+            genre_slug = (
+                item.get("genre_slug")
+                or item.get("slug")
+                or resolve_genre_slug(genre_name)
+                or slugify_genre(genre_name)
+            )
             items.append(
                 {
-                    "name": item["name"],
-                    "slug": item["genre_slug"],
+                    "name": genre_name,
+                    "slug": genre_slug,
                     "cnt": item["cnt"],
                     "count": item["cnt"],
                     "description": item.get("description"),
