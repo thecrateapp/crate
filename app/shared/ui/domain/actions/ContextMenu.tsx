@@ -2,6 +2,8 @@ import {
   type CSSProperties,
   type ReactNode,
   type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useState,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -103,8 +105,14 @@ function ContextMenuMediaHeaderView({
   header: ContextMenuMediaHeader;
 }) {
   const FallbackIcon = header.fallbackIcon;
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(header.imageUrl) && !imageFailed;
   const imageShape =
     header.imageShape === "circle" ? "rounded-full" : "rounded-lg";
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [header.imageUrl]);
 
   return (
     <div className="flex items-center gap-3 border-b border-white/10 px-4 py-4">
@@ -114,14 +122,17 @@ function ContextMenuMediaHeaderView({
           imageShape,
         )}
       >
-        {header.imageUrl ? (
+        {showImage ? (
           <img
-            src={header.imageUrl}
+            src={header.imageUrl || ""}
             alt={header.imageAlt ?? header.title}
             width={48}
             height={48}
             loading="lazy"
-            onError={header.imageOnError}
+            onError={() => {
+              setImageFailed(true);
+              header.imageOnError?.();
+            }}
             className="h-full w-full object-cover"
           />
         ) : FallbackIcon ? (

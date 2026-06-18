@@ -21,7 +21,12 @@ const POPPINS_800_URL = new URL(
   import.meta.url,
 ).href;
 
-export type ShareSubjectKind = "track" | "album" | "artist" | "playlist";
+export type ShareSubjectKind =
+  | "track"
+  | "album"
+  | "artist"
+  | "playlist"
+  | "genre";
 
 export interface SharePayload {
   kind: ShareSubjectKind;

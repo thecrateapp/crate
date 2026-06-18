@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Loader2 } from "@crate/ui/icons";
+import { ArrowLeft } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   CoreTracksPlaylistCard,
   CustomMixCard,
@@ -172,11 +173,7 @@ export function HomeSection() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={24} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader label="Loading section." />;
   }
 
   if (!data) {

@@ -3,6 +3,10 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.queries.bliss_shared import bliss_session_scope
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 
 
 def get_similar_artist_tracks_for_radio(
@@ -16,7 +20,7 @@ def get_similar_artist_tracks_for_radio(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 WITH ranked AS (
                     SELECT
                         t.id AS track_id,
@@ -43,6 +47,7 @@ def get_similar_artist_tracks_for_radio(
                     FROM library_tracks t
                     JOIN library_albums a ON t.album_id = a.id
                     WHERE t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                       AND LOWER(a.artist) = ANY(:similar_artist_keys)
                 )
                 SELECT *
@@ -51,7 +56,11 @@ def get_similar_artist_tracks_for_radio(
                 LIMIT :limit
                 """
                 ),
-                {"similar_artist_keys": similar_artist_keys[:16], "limit": limit},
+                {
+                    "similar_artist_keys": similar_artist_keys[:16],
+                    "limit": limit,
+                    **playable_media_params(),
+                },
             )
             .mappings()
             .all()
@@ -66,16 +75,17 @@ def get_album_tracks_for_radio(session=None, album_id: int | None = None) -> lis
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy, t.danceability, t.valence, t.rating
                 FROM library_tracks t
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE a.id = :album_id
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY t.disc_number, t.track_number
                 """
                 ),
-                {"album_id": album_id},
+                {"album_id": album_id, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -92,7 +102,7 @@ def get_playlist_tracks_for_radio(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     lt.id AS track_id,
                     lt.path,
@@ -138,10 +148,11 @@ def get_playlist_tracks_for_radio(
                   ON lt.id = pt.resolved_track_id
                  AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)
                 LEFT JOIN library_albums la ON la.id = lt.album_id
+                WHERE {playable_track_clause("lt", "la")}
                 ORDER BY pt.position
                 """
                 ),
-                {"playlist_id": playlist_id},
+                {"playlist_id": playlist_id, **playable_media_params()},
             )
             .mappings()
             .all()

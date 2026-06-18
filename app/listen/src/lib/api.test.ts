@@ -217,6 +217,13 @@ describe("resolveMaybeApiAssetUrl", () => {
     );
   });
 
+  it("normalizes API asset paths without a leading slash", () => {
+    localStorage.setItem("listen-auth-token", "listen token");
+    expect(resolveMaybeApiAssetUrl("api/genres/hardcore/cover")).toBe(
+      "/api/genres/hardcore/cover",
+    );
+  });
+
   it("adds token to absolute crate API asset URLs", () => {
     localStorage.setItem("listen-auth-token", "listen-token");
     expect(
@@ -954,6 +961,16 @@ describe("native (configurable server) mode", () => {
       );
       expect(result).toBe(
         "https://api.example.com/api/network/external-artist/photo?name=Slowthai&token=native-tok",
+      );
+    });
+
+    it("resolves genre cover fallbacks against the configured server", () => {
+      setupServer();
+      const result = apiMod.resolveMaybeApiAssetUrl(
+        "api/genres/hardcore/cover?size=1280&format=webp",
+      );
+      expect(result).toBe(
+        "https://api.example.com/api/genres/hardcore/cover?size=1280&format=webp&token=native-tok",
       );
     });
   });

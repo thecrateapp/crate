@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import {
   buildArtistPlayerTrack,
   topTrackToTrackRowData,
@@ -84,11 +85,7 @@ export function ArtistTopTracks() {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <CrateLoader label="Loading top tracks." />;
   }
 
   return (

@@ -41,6 +41,25 @@ describe("Shell", () => {
     expect(screen.queryByRole("button", { name: "Open queue" })).toBeNull();
   });
 
+  it("renders one unified glass backdrop for the mobile dock when a track is loaded", () => {
+    const { container } = renderWithListenProviders(<Shell />, {
+      playerActions: {
+        currentTrack: {
+          id: "track-1",
+          title: "Loaded Track",
+          artist: "Crate",
+        },
+      },
+    });
+
+    const dockBackdrop = container.querySelector(".listen-mobile-dock-glass");
+    const nav = screen.getByRole("navigation");
+
+    expect(dockBackdrop).toBeInTheDocument();
+    expect(dockBackdrop).toHaveClass("listen-glass-panel");
+    expect(nav).toHaveClass("bg-transparent");
+  });
+
   it("opens a mobile Collection sheet with all collection sections", () => {
     renderWithListenProviders(<Shell />);
 
@@ -65,6 +84,15 @@ describe("Shell", () => {
 
   it("uses the overlay mobile header on public genre pages", () => {
     renderWithListenProviders(<Shell />, { route: "/explore?genre=hardcore" });
+
+    expect(screen.getByTestId("topbar")).toHaveAttribute(
+      "data-hide-mobile-actions",
+      "true",
+    );
+  });
+
+  it("uses the overlay mobile header on playlist detail pages", () => {
+    renderWithListenProviders(<Shell />, { route: "/playlist/42" });
 
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",

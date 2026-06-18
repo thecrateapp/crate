@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.queries.playable_media_filters import (
+    playable_album_clause,
+    playable_media_params,
+    playable_track_clause,
+)
 from crate.db.tx import optional_scope
 
 _FEEDBACK_SAMPLE_PER_ACTION = 25
@@ -20,17 +25,19 @@ def get_recent_liked_seed_rows(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_liked_tracks lt
                 JOIN library_tracks t ON t.id = lt.track_id
+                LEFT JOIN library_albums a ON a.id = t.album_id
                 WHERE lt.user_id = :user_id
                   AND t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY lt.created_at DESC
                 LIMIT :limit
                 """
                 ),
-                {"user_id": user_id, "limit": limit},
+                {"user_id": user_id, "limit": limit, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -53,7 +60,7 @@ def get_followed_artist_seed_rows(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT DISTINCT ON (t.id)
                     t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_follows af
@@ -61,11 +68,12 @@ def get_followed_artist_seed_rows(
                 JOIN library_tracks t ON t.album_id = a.id
                 WHERE af.user_id = :user_id
                   AND t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY t.id
                 LIMIT :limit
                 """
                 ),
-                {"user_id": user_id, "limit": limit},
+                {"user_id": user_id, "limit": limit, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -88,16 +96,18 @@ def get_saved_album_seed_rows(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_saved_albums sa
-                JOIN library_tracks t ON t.album_id = sa.album_id
+                JOIN library_albums a ON a.id = sa.album_id
+                JOIN library_tracks t ON t.album_id = a.id
                 WHERE sa.user_id = :user_id
                   AND t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                 LIMIT :limit
                 """
                 ),
-                {"user_id": user_id, "limit": limit},
+                {"user_id": user_id, "limit": limit, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -120,19 +130,21 @@ def get_recent_play_seed_rows(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
                 FROM user_play_events pe
                 LEFT JOIN library_tracks t
                   ON t.id = pe.track_id
                   OR (pe.track_id IS NULL AND pe.track_entity_uid IS NOT NULL AND t.entity_uid = pe.track_entity_uid)
+                LEFT JOIN library_albums a ON a.id = t.album_id
                 WHERE pe.user_id = :user_id
                   AND t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY pe.ended_at DESC
                 LIMIT :limit
                 """
                 ),
-                {"user_id": user_id, "limit": limit},
+                {"user_id": user_id, "limit": limit, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -184,7 +196,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 WITH liked AS (
                     SELECT
                         t.id AS track_id,
@@ -194,8 +206,10 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                         ROW_NUMBER() OVER (ORDER BY lt.created_at DESC, t.id) AS source_rank
                     FROM user_liked_tracks lt
                     JOIN library_tracks t ON t.id = lt.track_id
+                    LEFT JOIN library_albums a ON a.id = t.album_id
                     WHERE lt.user_id = :uid
                       AND t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY lt.created_at DESC, t.id
                     LIMIT 10
                 ),
@@ -211,6 +225,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                     JOIN library_tracks t ON t.album_id = a.id
                     WHERE af.user_id = :uid
                       AND t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY t.id
                     LIMIT 30
                 ),
@@ -222,9 +237,11 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                         t.bliss_vector,
                         ROW_NUMBER() OVER (ORDER BY sa.created_at DESC, t.id) AS source_rank
                     FROM user_saved_albums sa
-                    JOIN library_tracks t ON t.album_id = sa.album_id
+                    JOIN library_albums a ON a.id = sa.album_id
+                    JOIN library_tracks t ON t.album_id = a.id
                     WHERE sa.user_id = :uid
                       AND t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY sa.created_at DESC, t.id
                     LIMIT 30
                 ),
@@ -240,8 +257,10 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                       ON t.id = pe.track_id
                       OR (pe.track_id IS NULL AND pe.track_entity_uid IS NOT NULL
                           AND t.entity_uid = pe.track_entity_uid)
+                    LEFT JOIN library_albums a ON a.id = t.album_id
                     WHERE pe.user_id = :uid
                       AND t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY pe.ended_at DESC, t.id
                     LIMIT 20
                 )
@@ -258,7 +277,7 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                 ORDER BY priority, source_rank
                 """
                 ),
-                {"uid": user_id},
+                {"uid": user_id, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -275,23 +294,27 @@ def get_discovery_excluded_artist_keys(user_id: int, *, session=None) -> list[st
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 WITH followed AS (
                     SELECT artist_name
                     FROM user_follows
                     WHERE user_id = :uid
+                      AND LOWER(COALESCE(artist_name, '')) <> '.crate-trash'
                 ),
                 liked AS (
                     SELECT t.artist AS artist_name
                     FROM user_liked_tracks lt
                     JOIN library_tracks t ON t.id = lt.track_id
+                    LEFT JOIN library_albums a ON a.id = t.album_id
                     WHERE lt.user_id = :uid
+                      AND {playable_track_clause("t", "a")}
                 ),
                 saved AS (
                     SELECT a.artist AS artist_name
                     FROM user_saved_albums sa
                     JOIN library_albums a ON a.id = sa.album_id
                     WHERE sa.user_id = :uid
+                      AND {playable_album_clause("a")}
                 ),
                 recent_plays AS (
                     SELECT COALESCE(NULLIF(TRIM(pe.artist), ''), t.artist) AS artist_name
@@ -300,7 +323,12 @@ def get_discovery_excluded_artist_keys(user_id: int, *, session=None) -> list[st
                       ON t.id = pe.track_id
                       OR (pe.track_id IS NULL AND pe.track_entity_uid IS NOT NULL
                           AND t.entity_uid = pe.track_entity_uid)
+                    LEFT JOIN library_albums a ON a.id = t.album_id
                     WHERE pe.user_id = :uid
+                      AND (
+                        t.id IS NULL
+                        OR {playable_track_clause("t", "a")}
+                      )
                       AND (
                         pe.ended_at IS NULL
                         OR pe.ended_at > now() - INTERVAL '180 days'
@@ -318,10 +346,12 @@ def get_discovery_excluded_artist_keys(user_id: int, *, session=None) -> list[st
                     UNION ALL
                     SELECT artist_name FROM recent_plays
                 ) known
-                WHERE artist_name IS NOT NULL AND TRIM(artist_name) != ''
+                WHERE artist_name IS NOT NULL
+                  AND TRIM(artist_name) != ''
+                  AND LOWER(TRIM(artist_name)) <> '.crate-trash'
                 """
                 ),
-                {"uid": user_id},
+                {"uid": user_id, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -336,25 +366,31 @@ def load_feedback_history(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 (
-                    SELECT action, bliss_vector
-                    FROM radio_feedback
-                    WHERE user_id = :user_id
-                      AND action = 'like'
-                      AND bliss_vector IS NOT NULL
-                      AND created_at > now() - (:max_age_days * INTERVAL '1 day')
+                    SELECT rf.action, rf.bliss_vector
+                    FROM radio_feedback rf
+                    JOIN library_tracks t ON t.id = rf.track_id
+                    LEFT JOIN library_albums a ON a.id = t.album_id
+                    WHERE rf.user_id = :user_id
+                      AND rf.action = 'like'
+                      AND rf.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
+                      AND rf.created_at > now() - (:max_age_days * INTERVAL '1 day')
                     ORDER BY random()
                     LIMIT :per_action_limit
                 )
                 UNION ALL
                 (
-                    SELECT action, bliss_vector
-                    FROM radio_feedback
-                    WHERE user_id = :user_id
-                      AND action = 'dislike'
-                      AND bliss_vector IS NOT NULL
-                      AND created_at > now() - (:max_age_days * INTERVAL '1 day')
+                    SELECT rf.action, rf.bliss_vector
+                    FROM radio_feedback rf
+                    JOIN library_tracks t ON t.id = rf.track_id
+                    LEFT JOIN library_albums a ON a.id = t.album_id
+                    WHERE rf.user_id = :user_id
+                      AND rf.action = 'dislike'
+                      AND rf.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
+                      AND rf.created_at > now() - (:max_age_days * INTERVAL '1 day')
                     ORDER BY random()
                     LIMIT :per_action_limit
                 )
@@ -364,6 +400,7 @@ def load_feedback_history(
                     "user_id": user_id,
                     "max_age_days": int(max_age_days),
                     "per_action_limit": _FEEDBACK_SAMPLE_PER_ACTION,
+                    **playable_media_params(),
                 },
             )
             .mappings()

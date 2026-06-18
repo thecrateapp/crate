@@ -368,6 +368,7 @@ func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
 			tn.description AS canonical_description,
 			tn.external_description,
 			tn.external_description_source,
+			tn.cover_path AS canonical_cover_path,
 			tn.musicbrainz_mbid,
 			tn.wikidata_entity_id,
 			tn.wikidata_url,
@@ -391,6 +392,7 @@ func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
 			tn.description,
 			tn.external_description,
 			tn.external_description_source,
+			tn.cover_path,
 			tn.musicbrainz_mbid,
 			tn.wikidata_entity_id,
 			tn.wikidata_url,
@@ -409,8 +411,8 @@ func (s *Store) Genres(ctx context.Context) ([]map[string]any, error) {
 	return rows, nil
 }
 
-// GenreDetail returns a single genre summary with its artists and albums.
-func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, error) {
+// GenreDetail returns a single genre summary with its artists, albums, and user-local shows.
+func (s *Store) GenreDetail(ctx context.Context, slug string, userID int64) (map[string]any, error) {
 	summary, err := s.genreSummaryBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
@@ -423,15 +425,18 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 	defer cancel()
 
 	artists, err := rowsToMaps(s.pool.Query(queryCtx, `
-		WITH ranked_artist_genres AS (
+		WITH target_genres AS (
+			SELECT $1::BIGINT AS id
+		),
+		artist_memberships AS (
 			SELECT
-				ag.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY ag.artist_name
-					ORDER BY ag.weight DESC NULLS LAST, g.name ASC
-				) AS genre_rank
+				ag.artist_name,
+				ag.genre_id,
+				ag.weight::DOUBLE PRECISION AS weight,
+				ag.weight::DOUBLE PRECISION AS membership_score,
+				ag.source
 			FROM artist_genres ag
-			JOIN genres g ON g.id = ag.genre_id
+			WHERE ag.genre_id IN (SELECT id FROM target_genres)
 		)
 		SELECT
 			ag.artist_name,
@@ -443,56 +448,115 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 			la.track_count,
 			la.has_photo,
 			la.spotify_popularity,
-			la.listeners
-		FROM ranked_artist_genres ag
+			la.listeners,
+			ag.membership_score
+		FROM artist_memberships ag
 		JOIN library_artists la ON ag.artist_name = la.name
-		WHERE ag.genre_rank = 1
-		  AND ag.genre_id = $1
-		ORDER BY ag.weight DESC, la.listeners DESC NULLS LAST
-	`, genreID))
+		WHERE ag.membership_score >= $2
+		ORDER BY
+			CASE
+				WHEN ag.membership_score >= 0.90 THEN 3
+				WHEN ag.membership_score >= 0.70 THEN 2
+				WHEN ag.membership_score >= $2 THEN 1
+				ELSE 0
+			END DESC,
+			ag.weight DESC NULLS LAST,
+			la.listeners DESC NULLS LAST,
+			la.spotify_popularity DESC NULLS LAST,
+			la.album_count DESC NULLS LAST,
+			ag.artist_name ASC
+	`, genreID, minGenreMembershipScore))
 	if err != nil {
 		return nil, err
 	}
+	annotateGenreMembershipRows(artists)
 	albums, err := rowsToMaps(s.pool.Query(queryCtx, `
-		WITH ranked_artist_genres AS (
-			SELECT
-				ag.*,
-				ROW_NUMBER() OVER (
-					PARTITION BY ag.artist_name
-					ORDER BY ag.weight DESC NULLS LAST, g.name ASC
-				) AS genre_rank
-			FROM artist_genres ag
-			JOIN genres g ON g.id = ag.genre_id
+		WITH target_genres AS (
+			SELECT $1::BIGINT AS id
 		),
-		primary_artists AS (
-			SELECT artist_name, weight
-			FROM ranked_artist_genres
-			WHERE genre_rank = 1
-			  AND genre_id = $1
+		artist_memberships AS (
+			SELECT
+				ag.artist_name,
+				ag.genre_id,
+				ag.weight::DOUBLE PRECISION AS weight,
+				ag.weight::DOUBLE PRECISION AS membership_score,
+				ag.source
+			FROM artist_genres ag
+			WHERE ag.genre_id IN (SELECT id FROM target_genres)
 		),
 		album_genre_weights AS (
-			SELECT album_id, MAX(weight) AS weight
+			SELECT album_id, MAX(weight)::DOUBLE PRECISION AS weight
 			FROM album_genres
-			WHERE genre_id = $1
+			WHERE genre_id IN (SELECT id FROM target_genres)
 			GROUP BY album_id
-		)
-		SELECT DISTINCT ON (a.id)
-			a.id AS album_id,
-			a.slug AS album_slug,
-			a.artist,
-			ar.id AS artist_id,
-			ar.slug AS artist_slug,
-			a.name,
-			a.year,
+		),
+		album_memberships AS (
+			SELECT
+				a.id AS album_id,
+				a.slug AS album_slug,
+				a.artist,
+				ar.id AS artist_id,
+				ar.slug AS artist_slug,
+				a.name,
+				a.year,
 				a.track_count,
 				a.has_cover,
-				COALESCE(alg.weight, pa.weight, 0.5) AS weight
+				a.popularity,
+				a.lastfm_playcount,
+				ar.listeners,
+				ar.spotify_popularity,
+				GREATEST(
+					COALESCE(alg.weight, 0.0),
+					COALESCE(pa.membership_score, 0.0) * $3
+				)::DOUBLE PRECISION AS membership_score,
+				(alg.album_id IS NOT NULL) AS direct_genre_match
 			FROM library_albums a
-			JOIN primary_artists pa ON pa.artist_name = a.artist
+			LEFT JOIN artist_memberships pa ON pa.artist_name = a.artist
 			LEFT JOIN library_artists ar ON ar.name = a.artist
 			LEFT JOIN album_genre_weights alg ON alg.album_id = a.id
-			ORDER BY a.id, a.year DESC NULLS LAST
-		`, genreID))
+			WHERE alg.album_id IS NOT NULL
+			   OR pa.membership_score >= $2
+		)
+		SELECT
+			album_id,
+			album_slug,
+			artist,
+			artist_id,
+			artist_slug,
+			name,
+			year,
+			track_count,
+			has_cover,
+			membership_score AS weight,
+			membership_score,
+			direct_genre_match
+		FROM album_memberships
+		WHERE membership_score >= $2
+		ORDER BY
+			CASE
+				WHEN membership_score >= 0.90 THEN 3
+				WHEN membership_score >= 0.70 THEN 2
+				WHEN membership_score >= $2 THEN 1
+				ELSE 0
+			END DESC,
+			direct_genre_match DESC,
+			membership_score DESC NULLS LAST,
+			COALESCE(popularity, 0) DESC NULLS LAST,
+			COALESCE(lastfm_playcount, 0) DESC NULLS LAST,
+			listeners DESC NULLS LAST,
+			spotify_popularity DESC NULLS LAST,
+			year DESC NULLS LAST,
+			name ASC
+		`, genreID, minGenreMembershipScore, artistAlbumFallbackScore))
+	if err != nil {
+		return nil, err
+	}
+	annotateGenreMembershipRows(albums)
+	shows, err := s.genreUpcomingShows(ctx, genreID, userID, 5)
+	if err != nil {
+		return nil, err
+	}
+	relatedGenres, err := s.relatedGenres(ctx, stringValue(summary["canonical_slug"]), relatedGenreLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -505,8 +569,224 @@ func (s *Store) GenreDetail(ctx context.Context, slug string) (map[string]any, e
 	summary["track_count"] = trackTotal
 	summary["artists"] = artists
 	summary["albums"] = albums
+	summary["shows"] = shows
+	summary["related_genres"] = relatedGenres
 	return summary, nil
 }
+
+type genreShowLocation struct {
+	latitude  float64
+	longitude float64
+	radiusKm  int64
+}
+
+func (s *Store) genreUpcomingShows(ctx context.Context, genreID int64, userID int64, limit int) ([]map[string]any, error) {
+	if limit <= 0 {
+		return []map[string]any{}, nil
+	}
+	location, ok, err := s.genreShowLocation(ctx, userID)
+	if err != nil || !ok {
+		return []map[string]any{}, err
+	}
+	delta := float64(location.radiusKm) / 111.0
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(queryCtx, `
+		WITH target_genres AS (
+			SELECT $1::BIGINT AS id
+		),
+		artist_memberships AS (
+			SELECT
+				ag.artist_name,
+				ag.genre_id,
+				ag.weight::DOUBLE PRECISION AS membership_score
+			FROM artist_genres ag
+			WHERE ag.genre_id IN (SELECT id FROM target_genres)
+		),
+		genre_artists AS (
+			SELECT artist_name, membership_score
+			FROM artist_memberships
+			WHERE membership_score >= $2
+		),
+		candidate_shows AS (
+			SELECT
+				s.*,
+				la.id AS artist_id,
+				la.slug AS artist_slug,
+				CASE WHEN s.latitude IS NOT NULL AND s.longitude IS NOT NULL THEN
+					6371 * acos(
+						LEAST(1.0, GREATEST(-1.0,
+							cos(radians($3)) * cos(radians(s.latitude))
+							* cos(radians(s.longitude) - radians($4))
+							+ sin(radians($3)) * sin(radians(s.latitude))
+						))
+					)
+				ELSE NULL END AS distance_km,
+				ROW_NUMBER() OVER (
+					PARTITION BY s.artist_name
+					ORDER BY s.date ASC, s.local_time ASC NULLS LAST, s.id ASC
+				) AS artist_show_rank,
+				ARRAY(
+					SELECT g2.name
+					FROM artist_genres ag2
+					JOIN genres g2 ON g2.id = ag2.genre_id
+					WHERE ag2.artist_name = s.artist_name
+					ORDER BY ag2.weight DESC, g2.name ASC
+					LIMIT 3
+				) AS artist_genres
+			FROM shows s
+			JOIN genre_artists pa ON pa.artist_name = s.artist_name
+			LEFT JOIN library_artists la ON la.name = s.artist_name
+			WHERE s.date >= CURRENT_DATE
+			  AND COALESCE(s.status, '') != 'cancelled'
+			  AND s.latitude IS NOT NULL
+			  AND s.longitude IS NOT NULL
+			  AND s.latitude BETWEEN $5 AND $6
+			  AND s.longitude BETWEEN $7 AND $8
+		)
+		SELECT
+			id,
+			artist_name,
+			artist_id,
+			artist_slug,
+			date::TEXT AS date,
+			local_time::TEXT AS local_time,
+			venue,
+			address_line1,
+			city,
+			region,
+			postal_code,
+			country,
+			country_code,
+			latitude,
+			longitude,
+			url,
+			image_url,
+			lineup,
+			status,
+			source,
+			lastfm_attendance,
+			lastfm_url,
+			tickets_url,
+			artist_genres,
+			distance_km
+		FROM candidate_shows
+		WHERE artist_show_rank = 1
+		  AND distance_km <= $9
+		ORDER BY date ASC, local_time ASC NULLS LAST, id ASC
+		LIMIT $10
+	`, genreID, minGenreMembershipScore, location.latitude, location.longitude, location.latitude-delta, location.latitude+delta, location.longitude-delta*1.5, location.longitude+delta*1.5, location.radiusKm, limit))
+	if err != nil {
+		return nil, err
+	}
+	shows := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		shows = append(shows, genreShowPayload(row))
+	}
+	return shows, nil
+}
+
+func (s *Store) genreShowLocation(ctx context.Context, userID int64) (genreShowLocation, bool, error) {
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	rows, err := rowsToMaps(s.pool.Query(queryCtx, `
+		SELECT
+			latitude::DOUBLE PRECISION AS latitude,
+			longitude::DOUBLE PRECISION AS longitude,
+			COALESCE(show_radius_km, 60)::INTEGER AS show_radius_km,
+			COALESCE(show_location_mode, 'fixed') AS show_location_mode
+		FROM users
+		WHERE id = $1
+		LIMIT 1
+	`, userID))
+	if err != nil {
+		return genreShowLocation{}, false, err
+	}
+	if len(rows) == 0 {
+		return genreShowLocation{}, false, nil
+	}
+	row := rows[0]
+	if row["latitude"] == nil || row["longitude"] == nil {
+		return genreShowLocation{}, false, nil
+	}
+	if strings.EqualFold(strings.TrimSpace(stringValue(row["show_location_mode"])), "near_me") {
+		return genreShowLocation{}, false, nil
+	}
+	radiusKm := intValue(row["show_radius_km"])
+	if radiusKm <= 0 {
+		radiusKm = 60
+	}
+	return genreShowLocation{
+		latitude:  floatValue(row["latitude"]),
+		longitude: floatValue(row["longitude"]),
+		radiusKm:  radiusKm,
+	}, true, nil
+}
+
+func genreShowPayload(row map[string]any) map[string]any {
+	city := stringValue(row["city"])
+	country := stringValue(row["country"])
+	return map[string]any{
+		"id":                row["id"],
+		"type":              "show",
+		"date":              stringValue(row["date"]),
+		"time":              row["local_time"],
+		"artist":            stringValue(row["artist_name"]),
+		"artist_id":         row["artist_id"],
+		"artist_slug":       row["artist_slug"],
+		"title":             stringValue(row["venue"]),
+		"subtitle":          strings.Join(nonEmptyStrings(city, country), ", "),
+		"cover_url":         row["image_url"],
+		"status":            firstNonEmpty(stringValue(row["status"]), "onsale"),
+		"is_upcoming":       true,
+		"url":               firstNonEmpty(stringValue(row["tickets_url"]), stringValue(row["url"]), stringValue(row["lastfm_url"])),
+		"venue":             row["venue"],
+		"address_line1":     row["address_line1"],
+		"city":              row["city"],
+		"region":            row["region"],
+		"postal_code":       row["postal_code"],
+		"country":           row["country"],
+		"country_code":      row["country_code"],
+		"latitude":          row["latitude"],
+		"longitude":         row["longitude"],
+		"lineup":            row["lineup"],
+		"genres":            genreShowGenres(row["artist_genres"]),
+		"source":            row["source"],
+		"lastfm_attendance": row["lastfm_attendance"],
+		"lastfm_url":        row["lastfm_url"],
+		"tickets_url":       row["tickets_url"],
+		"distance_km":       row["distance_km"],
+	}
+}
+
+func genreShowGenres(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		if len(typed) > 3 {
+			return typed[:3]
+		}
+		return typed
+	case []any:
+		items := anyStrings(typed)
+		if len(items) > 3 {
+			return items[:3]
+		}
+		return items
+	default:
+		return []string{}
+	}
+}
+
+func nonEmptyStrings(values ...string) []string {
+	items := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			items = append(items, value)
+		}
+	}
+	return items
+}
+
 func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string]any, error) {
 	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
@@ -523,6 +803,7 @@ func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string
 			tn.description AS canonical_description,
 			tn.external_description,
 			tn.external_description_source,
+			tn.cover_path AS canonical_cover_path,
 			tn.musicbrainz_mbid,
 			tn.wikidata_entity_id,
 			tn.wikidata_url,
@@ -553,6 +834,7 @@ func (s *Store) genreSummaryBySlug(ctx context.Context, slug string) (map[string
 			tn.description,
 			tn.external_description,
 			tn.external_description_source,
+			tn.cover_path,
 			tn.musicbrainz_mbid,
 			tn.wikidata_entity_id,
 			tn.wikidata_url,

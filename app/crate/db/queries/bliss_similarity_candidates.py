@@ -4,6 +4,10 @@ from sqlalchemy import text
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.queries.bliss_shared import bliss_session_scope
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 
 
 def get_bliss_candidates(
@@ -19,7 +23,7 @@ def get_bliss_candidates(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence, t.rating,
@@ -27,6 +31,7 @@ def get_bliss_candidates(
                 FROM library_tracks t
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE t.bliss_embedding IS NOT NULL AND t.path != :exclude_path
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY bliss_dist ASC
                 LIMIT :limit
                 """
@@ -35,6 +40,7 @@ def get_bliss_candidates(
                     "probe_vector": probe_vector,
                     "exclude_path": exclude_path,
                     "limit": limit,
+                    **playable_media_params(),
                 },
             )
             .mappings()
@@ -56,7 +62,7 @@ def get_recommend_without_bliss_candidates(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 WITH ranked AS (
                     SELECT
                         t.id AS track_id,
@@ -82,6 +88,7 @@ def get_recommend_without_bliss_candidates(
                     FROM library_tracks t
                     JOIN library_albums a ON t.album_id = a.id
                     WHERE t.path <> ALL(:seed_paths)
+                      AND {playable_track_clause("t", "a")}
                       AND (
                         LOWER(a.artist) = ANY(:similar_artist_names)
                         OR t.bpm IS NOT NULL
@@ -101,6 +108,7 @@ def get_recommend_without_bliss_candidates(
                     "similar_artist_names": similar_artist_names or ["__no_similar__"],
                     "artist_pick_limit": artist_pick_limit,
                     "row_limit": row_limit,
+                    **playable_media_params(),
                 },
             )
             .mappings()
@@ -121,13 +129,16 @@ def get_multi_seed_bliss_candidates(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 WITH seeds AS (
                     SELECT
                         t.path AS seed_path,
                         t.bliss_embedding AS seed_bliss_embedding
                     FROM library_tracks t
-                    WHERE t.path = ANY(:bliss_seed_paths) AND t.bliss_embedding IS NOT NULL
+                    JOIN library_albums a ON t.album_id = a.id
+                    WHERE t.path = ANY(:bliss_seed_paths)
+                      AND t.bliss_embedding IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                 ),
                 ranked AS (
                     SELECT
@@ -158,6 +169,7 @@ def get_multi_seed_bliss_candidates(
                      AND t.path <> s.seed_path
                      AND t.path <> ALL(:all_seed_paths)
                     JOIN library_albums a ON t.album_id = a.id
+                    WHERE {playable_track_clause("t", "a")}
                 )
                 SELECT *
                 FROM ranked
@@ -168,6 +180,7 @@ def get_multi_seed_bliss_candidates(
                     "bliss_seed_paths": bliss_seed_paths,
                     "all_seed_paths": all_seed_paths,
                     "per_seed_limit": per_seed_limit,
+                    **playable_media_params(),
                 },
             )
             .mappings()

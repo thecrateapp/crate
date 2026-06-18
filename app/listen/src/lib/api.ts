@@ -139,6 +139,7 @@ export function resolveMaybeApiAssetUrl(
     return url;
   }
   if (url.startsWith("/api/")) return apiAssetUrl(url);
+  if (url.startsWith("api/")) return apiAssetUrl(`/${url}`);
 
   const base = getApiBase();
   if (base && url.startsWith(`${base}/api/`)) {

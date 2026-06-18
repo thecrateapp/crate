@@ -3,6 +3,10 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.bliss_vectors import to_pgvector_literal
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 from crate.db.queries.paths_shared import array_distance_sql
 from crate.db.tx import optional_scope, read_scope
 
@@ -36,7 +40,7 @@ def find_anchor_track_row(
             row = (
                 session.execute(
                     text(
-                        """
+                        f"""
                     SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
@@ -52,6 +56,7 @@ def find_anchor_track_row(
                         CAST(t.id AS text) = :track_ref
                         OR (t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref)
                       )
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY
                       CASE
                         WHEN CAST(t.id AS text) = :track_ref THEN 0
@@ -60,7 +65,7 @@ def find_anchor_track_row(
                     LIMIT 1
                     """
                     ),
-                    {"track_ref": endpoint_value},
+                    {"track_ref": endpoint_value, **playable_media_params()},
                 )
                 .mappings()
                 .first()
@@ -113,13 +118,14 @@ def find_anchor_track_row(
                 JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON ar.name = a.artist
                 WHERE t.bliss_embedding IS NOT NULL
+                AND {playable_track_clause("t", "a")}
                 {scope_clause}
                 {exclude_clause}
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
                 LIMIT 1
                 """
                 ),
-                params,
+                {**params, **playable_media_params()},
             )
             .mappings()
             .first()
@@ -143,13 +149,14 @@ def find_anchor_track_row(
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = a.artist
                     WHERE t.bliss_vector IS NOT NULL
+                    AND {playable_track_clause("t", "a")}
                     {scope_clause}
                     {exclude_clause}
                     ORDER BY {fallback_distance}
                     LIMIT 1
                     """
                     ),
-                    params,
+                    {**params, **playable_media_params()},
                 )
                 .mappings()
                 .first()
@@ -192,12 +199,13 @@ def find_candidate_rows(
                 JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON ar.name = a.artist
                 WHERE t.bliss_embedding IS NOT NULL
+                AND {playable_track_clause("t", "a")}
                 {exclude_clause}
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
                 LIMIT {int(limit)}
                 """
                 ),
-                params,
+                {**params, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -221,12 +229,13 @@ def find_candidate_rows(
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = a.artist
                     WHERE t.bliss_vector IS NOT NULL
+                    AND {playable_track_clause("t", "a")}
                     {exclude_clause}
                     ORDER BY {fallback_distance}
                     LIMIT {int(limit)}
                     """
                     ),
-                    params,
+                    {**params, **playable_media_params()},
                 )
                 .mappings()
                 .all()
@@ -330,6 +339,7 @@ def find_seeded_radio_candidate_rows(
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = a.artist
                     WHERE t.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("t", "a")}
                       {exclude_clause}
                       AND (
                           LOWER(a.artist) = ANY(:seed_artist_keys)
@@ -349,7 +359,7 @@ def find_seeded_radio_candidate_rows(
                 LIMIT :limit
                 """
                 ),
-                params,
+                {**params, **playable_media_params()},
             )
             .mappings()
             .all()

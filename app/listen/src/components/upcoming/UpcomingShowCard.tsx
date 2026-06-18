@@ -3,6 +3,7 @@ import { Calendar } from "@crate/ui/icons";
 
 import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
 import { useShowActionEntries } from "@/components/actions/show-actions";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import {
@@ -43,6 +44,7 @@ export function UpcomingShowCard({
     playProbableSetlist,
   });
   const actionMenu = useItemActionMenu(menuActions);
+  const menuCoverUrl = resolveMaybeApiAssetUrl(item.cover_url);
   const actionMenuSlot = useMemo(
     () => ({
       triggerRef: actionMenu.triggerRef,
@@ -119,7 +121,7 @@ export function UpcomingShowCard({
           title: item.artist,
           subtitle: item.title,
           detail: item.subtitle,
-          imageUrl: item.cover_url,
+          imageUrl: menuCoverUrl,
           imageAlt: item.artist,
           imageShape: "square",
           fallbackIcon: Calendar,

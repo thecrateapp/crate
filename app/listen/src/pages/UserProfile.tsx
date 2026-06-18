@@ -17,7 +17,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
-import { api } from "@/lib/api";
+import { CrateLoader } from "@/components/ui/CrateLoader";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
 import { albumCoverApiUrl, albumPagePath } from "@/lib/library-routes";
 import { formatTotalDuration } from "@/lib/utils";
@@ -303,11 +304,7 @@ export function UserProfile() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 size={22} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader label="Loading profile." />;
   }
 
   if (!data) {
@@ -592,42 +589,50 @@ export function UserProfile() {
                   No public playlists yet.
                 </div>
               ) : (
-                data.public_playlists.map((playlist) => (
-                  <Link
-                    key={playlist.id}
-                    to={`/playlist/${playlist.id}`}
-                    className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
-                  >
-                    {playlist.cover_data_url ? (
-                      <img
-                        src={playlist.cover_data_url}
-                        alt={playlist.name}
-                        className="h-14 w-14 rounded-xl object-cover"
-                      />
-                    ) : (
-                      <div className="h-14 w-14 rounded-xl bg-white/5 flex items-center justify-center text-lg font-semibold text-white/40">
-                        {playlist.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-foreground">
-                        {playlist.name}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {playlist.track_count} tracks
-                        {playlist.total_duration > 0
-                          ? ` · ${formatTotalDuration(playlist.total_duration)}`
-                          : ""}
-                        {playlist.is_collaborative ? " · Collaborative" : ""}
-                      </div>
-                      {playlist.description ? (
-                        <div className="mt-1 truncate text-xs text-muted-foreground">
-                          {playlist.description}
+                data.public_playlists.map((playlist) => {
+                  const coverUrl = resolveMaybeApiAssetUrl(
+                    playlist.cover_data_url,
+                  );
+
+                  return (
+                    <Link
+                      key={playlist.id}
+                      to={`/playlist/${playlist.id}`}
+                      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 hover:bg-white/[0.05] transition-colors"
+                    >
+                      {coverUrl ? (
+                        <img
+                          src={coverUrl}
+                          alt={playlist.name}
+                          className="h-14 w-14 rounded-xl object-cover"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-xl bg-white/5 flex items-center justify-center text-lg font-semibold text-white/40">
+                          {playlist.name.charAt(0).toUpperCase()}
                         </div>
-                      ) : null}
-                    </div>
-                  </Link>
-                ))
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {playlist.name}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {playlist.track_count} tracks
+                          {playlist.total_duration > 0
+                            ? ` · ${formatTotalDuration(
+                                playlist.total_duration,
+                              )}`
+                            : ""}
+                          {playlist.is_collaborative ? " · Collaborative" : ""}
+                        </div>
+                        {playlist.description ? (
+                          <div className="mt-1 truncate text-xs text-muted-foreground">
+                            {playlist.description}
+                          </div>
+                        ) : null}
+                      </div>
+                    </Link>
+                  );
+                })
               )}
             </div>
           </div>

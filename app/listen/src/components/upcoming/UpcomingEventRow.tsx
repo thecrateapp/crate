@@ -12,6 +12,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
 import {
   canOpenUpcomingRelease,
@@ -33,7 +34,7 @@ export function UpcomingEventRow({
     ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : "";
   const coverUrl =
-    item.cover_url ||
+    resolveMaybeApiAssetUrl(item.cover_url) ||
     artistPhotoApiUrl(
       {
         artistId: item.artist_id,

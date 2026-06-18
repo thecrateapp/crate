@@ -18,7 +18,7 @@ import {
   type SystemPlaylist,
 } from "@/components/explore/explore-model";
 import { useApi } from "@/hooks/use-api";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
@@ -288,6 +288,10 @@ function GenreExplorer({
   const topGenres = [...genres].sort((a, b) => b.count - a.count).slice(0, 12);
   if (!topGenres.length) return null;
 
+  function getGenreSlug(genre: (typeof topGenres)[number]) {
+    return genre.slug?.trim() || genre.name.toLowerCase().replace(/\s+/g, "-");
+  }
+
   return (
     <section className="space-y-4">
       <ExploreSectionHeader
@@ -296,6 +300,7 @@ function GenreExplorer({
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {topGenres.slice(0, 8).map((genre, index) => {
+          const resolvedCoverUrl = resolveMaybeApiAssetUrl(genre.cover_url);
           const detail =
             genre.description ||
             (genre.top_artists?.length
@@ -304,14 +309,14 @@ function GenreExplorer({
 
           return (
             <button
-              key={genre.name}
+              key={genre.slug || genre.name}
               type="button"
-              onClick={() => onOpen(genre.name)}
+              onClick={() => onOpen(getGenreSlug(genre))}
               className="group relative min-h-36 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-primary/30 hover:bg-white/[0.06]"
             >
-              {genre.cover_url ? (
+              {resolvedCoverUrl ? (
                 <img
-                  src={genre.cover_url}
+                  src={resolvedCoverUrl}
                   alt=""
                   aria-hidden="true"
                   loading="lazy"
@@ -321,7 +326,7 @@ function GenreExplorer({
               <div
                 className="absolute inset-0 opacity-80"
                 style={{
-                  background: genre.cover_url
+                  background: resolvedCoverUrl
                     ? "linear-gradient(180deg, rgba(3,6,10,0.16) 0%, rgba(3,6,10,0.82) 100%)"
                     : `radial-gradient(circle at ${
                         20 + (index % 4) * 18

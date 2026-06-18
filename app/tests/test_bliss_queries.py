@@ -133,6 +133,14 @@ def _set_bliss_embedding(track_id: int, vector: list[float]) -> None:
         )
 
 
+def _quarantine_album(album_id: int) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE library_albums SET quarantined_at = NOW() WHERE id = :id"),
+            {"id": album_id},
+        )
+
+
 def _get_bliss_embedding_distance(track_a_id: int, track_b_id: int) -> float:
     with read_scope() as session:
         return session.execute(
@@ -374,6 +382,83 @@ class TestBlissTrackLookup:
 
         assert len(result) == 1
         assert result[0]["path"] == p1
+
+    def test_track_lookup_excludes_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.bliss_track_lookup import (
+            get_same_artist_tracks,
+            get_seed_tracks_by_paths,
+            get_track_with_artist,
+        )
+
+        _insert_artist(pg_db, "Lookup Clean")
+        clean_album_id = _insert_album(
+            pg_db,
+            "Lookup Clean",
+            "Lookup Clean Album",
+            "/music/Lookup Clean/Lookup Clean Album",
+        )
+        hidden_album_id = _insert_album(
+            pg_db,
+            "Lookup Clean",
+            "Lookup Hidden Album",
+            "/music/.crate-trash/Lookup Hidden Album",
+        )
+        quarantine_album_id = _insert_album(
+            pg_db,
+            "Lookup Clean",
+            "Lookup Quarantine Album",
+            "/music/Lookup Clean/Lookup Quarantine Album",
+        )
+        clean_path = "/music/Lookup Clean/Lookup Clean Album/01-clean.flac"
+        hidden_path = "/music/.crate-trash/Lookup Hidden Album/01-hidden.flac"
+        quarantine_path = (
+            "/music/Lookup Clean/Lookup Quarantine Album/01-quarantine.flac"
+        )
+        _insert_track(
+            pg_db,
+            clean_album_id,
+            "Lookup Clean",
+            "Lookup Clean Album",
+            "Lookup Clean Track",
+            clean_path,
+        )
+        _insert_track(
+            pg_db,
+            hidden_album_id,
+            "Lookup Clean",
+            "Lookup Hidden Album",
+            "Lookup Hidden Track",
+            hidden_path,
+        )
+        _insert_track(
+            pg_db,
+            quarantine_album_id,
+            "Lookup Clean",
+            "Lookup Quarantine Album",
+            "Lookup Quarantine Track",
+            quarantine_path,
+        )
+        _quarantine_album(quarantine_album_id)
+
+        with read_scope() as session:
+            artist_id = session.execute(
+                text("SELECT id FROM library_artists WHERE LOWER(name) = LOWER(:n)"),
+                {"n": "Lookup Clean"},
+            ).scalar()
+
+        seeds = get_seed_tracks_by_paths(
+            seed_paths=[clean_path, hidden_path, quarantine_path]
+        )
+        same_artist = get_same_artist_tracks(
+            artist_id=artist_id,
+            artist_name="",
+            exclude_path="/missing.flac",
+            limit=10,
+        )
+
+        assert get_track_with_artist(track_path=hidden_path) is None
+        assert {row["path"] for row in seeds} == {clean_path}
+        assert {row["path"] for row in same_artist} == {clean_path}
 
 
 # ── bliss_storage ────────────────────────────────────────────────────
@@ -853,6 +938,73 @@ class TestBlissSimilarityCandidates:
         assert t1 in ids
 
     @pytest.mark.skipif(not PGVECTOR, reason="pgvector extension not available")
+    def test_get_bliss_candidates_excludes_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.bliss_similarity_candidates import get_bliss_candidates
+
+        _insert_artist(pg_db, "Playable Artist")
+        playable_album_id = _insert_album(
+            pg_db,
+            "Playable Artist",
+            "Playable Album",
+            "/music/Playable Artist/Playable Album",
+        )
+        playable_track_id = _insert_track(
+            pg_db,
+            playable_album_id,
+            "Playable Artist",
+            "Playable Album",
+            "Playable",
+            "/music/Playable Artist/Playable Album/01 - Playable.flac",
+        )
+        _set_bliss_embedding(playable_track_id, make_vec(0.2))
+
+        _insert_artist(pg_db, ".crate-trash")
+        hidden_album_id = _insert_album(
+            pg_db,
+            ".crate-trash",
+            ".crate-trash",
+            "/music/.crate-trash/Hidden Album",
+        )
+        hidden_track_id = _insert_track(
+            pg_db,
+            hidden_album_id,
+            ".crate-trash",
+            ".crate-trash",
+            "Hidden",
+            "/music/.crate-trash/Hidden Album/01 - Hidden.flac",
+        )
+        _set_bliss_embedding(hidden_track_id, make_vec_near(0.0))
+
+        _insert_artist(pg_db, "Quarantine Artist")
+        quarantine_album_id = _insert_album(
+            pg_db,
+            "Quarantine Artist",
+            "Quarantine Album",
+            "/music/Quarantine Artist/Quarantine Album",
+        )
+        quarantine_track_id = _insert_track(
+            pg_db,
+            quarantine_album_id,
+            "Quarantine Artist",
+            "Quarantine Album",
+            "Quarantined",
+            "/music/Quarantine Artist/Quarantine Album/01 - Quarantined.flac",
+        )
+        _set_bliss_embedding(quarantine_track_id, make_vec_near(0.0))
+        _quarantine_album(quarantine_album_id)
+
+        result = get_bliss_candidates(
+            bliss_vector=make_vec(0.0),
+            exclude_path="",
+            limit=10,
+        )
+
+        ids = {row["track_id"] for row in result}
+        assert playable_track_id in ids
+        assert hidden_track_id not in ids
+        assert quarantine_track_id not in ids
+
+    @pytest.mark.skipif(not PGVECTOR, reason="pgvector extension not available")
     def test_get_bliss_candidates_respects_limit(self, pg_db):
         from crate.db.queries.bliss_similarity_candidates import get_bliss_candidates
 
@@ -976,6 +1128,92 @@ class TestBlissSimilarityCandidates:
 
         assert len(result) <= 3
 
+    def test_get_recommend_without_bliss_excludes_hidden_and_quarantined_tracks(
+        self, pg_db
+    ):
+        from crate.db.queries.bliss_similarity_candidates import (
+            get_recommend_without_bliss_candidates,
+        )
+
+        _insert_artist(pg_db, "Fallback Playable")
+        playable_album_id = _insert_album(
+            pg_db,
+            "Fallback Playable",
+            "Fallback Album",
+            "/music/Fallback Playable/Fallback Album",
+        )
+        seed_path = "/music/Fallback Playable/Fallback Album/01 - Seed.flac"
+        playable_path = "/music/Fallback Playable/Fallback Album/02 - Keep.flac"
+        _insert_track(
+            pg_db,
+            playable_album_id,
+            "Fallback Playable",
+            "Fallback Album",
+            "Seed",
+            seed_path,
+            bpm=120.0,
+        )
+        _insert_track(
+            pg_db,
+            playable_album_id,
+            "Fallback Playable",
+            "Fallback Album",
+            "Keep",
+            playable_path,
+            bpm=125.0,
+        )
+
+        _insert_artist(pg_db, ".crate-trash")
+        hidden_album_id = _insert_album(
+            pg_db,
+            ".crate-trash",
+            ".crate-trash",
+            "/music/.crate-trash/Fallback Hidden",
+        )
+        hidden_path = "/music/.crate-trash/Fallback Hidden/01 - Hidden.flac"
+        _insert_track(
+            pg_db,
+            hidden_album_id,
+            ".crate-trash",
+            ".crate-trash",
+            "Hidden Fallback",
+            hidden_path,
+            bpm=130.0,
+        )
+
+        _insert_artist(pg_db, "Fallback Quarantine")
+        quarantine_album_id = _insert_album(
+            pg_db,
+            "Fallback Quarantine",
+            "Fallback Quarantine Album",
+            "/music/Fallback Quarantine/Fallback Quarantine Album",
+        )
+        quarantine_path = (
+            "/music/Fallback Quarantine/Fallback Quarantine Album/01 - Skip.flac"
+        )
+        _insert_track(
+            pg_db,
+            quarantine_album_id,
+            "Fallback Quarantine",
+            "Fallback Quarantine Album",
+            "Skip",
+            quarantine_path,
+            bpm=135.0,
+        )
+        _quarantine_album(quarantine_album_id)
+
+        result = get_recommend_without_bliss_candidates(
+            seed_paths=[seed_path],
+            similar_artist_names=["fallback playable", ".crate-trash"],
+            artist_pick_limit=5,
+            row_limit=10,
+        )
+
+        paths = {row["path"] for row in result}
+        assert playable_path in paths
+        assert hidden_path not in paths
+        assert quarantine_path not in paths
+
     @pytest.mark.skipif(not PGVECTOR, reason="pgvector extension not available")
     def test_get_multi_seed_bliss_candidates(self, pg_db):
         from crate.db.queries.bliss_similarity_candidates import (
@@ -1034,6 +1272,88 @@ class TestBlissSimilarityCandidates:
         seed_paths_found = {r["seed_path"] for r in result}
         assert seed_a_path in seed_paths_found
         assert seed_b_path in seed_paths_found
+
+    @pytest.mark.skipif(not PGVECTOR, reason="pgvector extension not available")
+    def test_get_multi_seed_bliss_excludes_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.bliss_similarity_candidates import (
+            get_multi_seed_bliss_candidates,
+        )
+
+        _insert_artist(pg_db, "Multi Clean")
+        album_id = _insert_album(
+            pg_db,
+            "Multi Clean",
+            "Multi Clean Album",
+            "/music/Multi Clean/Multi Clean Album",
+        )
+        seed_path = "/music/Multi Clean/Multi Clean Album/01 - Seed.flac"
+        keep_path = "/music/Multi Clean/Multi Clean Album/02 - Keep.flac"
+        seed_id = _insert_track(
+            pg_db,
+            album_id,
+            "Multi Clean",
+            "Multi Clean Album",
+            "Seed",
+            seed_path,
+        )
+        keep_id = _insert_track(
+            pg_db,
+            album_id,
+            "Multi Clean",
+            "Multi Clean Album",
+            "Keep",
+            keep_path,
+        )
+        _set_bliss_embedding(seed_id, make_vec(0.0))
+        _set_bliss_embedding(keep_id, make_vec(0.1))
+
+        hidden_album_id = _insert_album(
+            pg_db,
+            ".crate-trash",
+            ".crate-trash",
+            "/music/.crate-trash/Multi Hidden",
+        )
+        hidden_path = "/music/.crate-trash/Multi Hidden/01 - Hidden.flac"
+        hidden_id = _insert_track(
+            pg_db,
+            hidden_album_id,
+            ".crate-trash",
+            ".crate-trash",
+            "Hidden Multi",
+            hidden_path,
+        )
+        _set_bliss_embedding(hidden_id, make_vec_near(0.0))
+
+        quarantine_album_id = _insert_album(
+            pg_db,
+            "Multi Quarantine",
+            "Multi Quarantine Album",
+            "/music/Multi Quarantine/Multi Quarantine Album",
+        )
+        quarantine_path = (
+            "/music/Multi Quarantine/Multi Quarantine Album/01 - Skip.flac"
+        )
+        quarantine_id = _insert_track(
+            pg_db,
+            quarantine_album_id,
+            "Multi Quarantine",
+            "Multi Quarantine Album",
+            "Skip",
+            quarantine_path,
+        )
+        _set_bliss_embedding(quarantine_id, make_vec_near(0.0))
+        _quarantine_album(quarantine_album_id)
+
+        result = get_multi_seed_bliss_candidates(
+            bliss_seed_paths=[seed_path],
+            all_seed_paths=[seed_path],
+            per_seed_limit=10,
+        )
+
+        paths = {row["path"] for row in result}
+        assert keep_path in paths
+        assert hidden_path not in paths
+        assert quarantine_path not in paths
 
     @pytest.mark.skipif(not PGVECTOR, reason="pgvector extension not available")
     def test_get_multi_seed_bliss_candidates_empty(self, pg_db):
@@ -1226,6 +1546,109 @@ class TestBlissRadioCandidates:
 
         assert len(result) == 1
         assert result[0]["track_id"] == tid
+
+    def test_radio_candidates_exclude_hidden_and_quarantined_tracks(self, pg_db):
+        from crate.db.queries.bliss_radio_candidates import (
+            get_album_tracks_for_radio,
+            get_playlist_tracks_for_radio,
+            get_similar_artist_tracks_for_radio,
+        )
+        from crate.db.repositories.playlists_create import create_playlist
+        from crate.db.repositories.playlists_tracks import add_playlist_tracks
+
+        _insert_artist(pg_db, "Radio Filter")
+        clean_album_id = _insert_album(
+            pg_db,
+            "Radio Filter",
+            "Radio Filter Album",
+            "/music/Radio Filter/Radio Filter Album",
+        )
+        hidden_album_id = _insert_album(
+            pg_db,
+            "Radio Filter",
+            "Radio Hidden Album",
+            "/music/.crate-trash/Radio Hidden Album",
+        )
+        quarantine_album_id = _insert_album(
+            pg_db,
+            "Radio Filter",
+            "Radio Quarantine Album",
+            "/music/Radio Filter/Radio Quarantine Album",
+        )
+        clean_path = "/music/Radio Filter/Radio Filter Album/01-clean.flac"
+        hidden_path = "/music/.crate-trash/Radio Hidden Album/01-hidden.flac"
+        quarantine_path = (
+            "/music/Radio Filter/Radio Quarantine Album/01-quarantine.flac"
+        )
+        _insert_track(
+            pg_db,
+            clean_album_id,
+            "Radio Filter",
+            "Radio Filter Album",
+            "Radio Clean Track",
+            clean_path,
+            bliss_vector=make_vec(0.1),
+        )
+        _insert_track(
+            pg_db,
+            hidden_album_id,
+            "Radio Filter",
+            "Radio Hidden Album",
+            "Radio Hidden Track",
+            hidden_path,
+            bliss_vector=make_vec(0.2),
+        )
+        _insert_track(
+            pg_db,
+            quarantine_album_id,
+            "Radio Filter",
+            "Radio Quarantine Album",
+            "Radio Quarantine Track",
+            quarantine_path,
+            bliss_vector=make_vec(0.3),
+        )
+        _quarantine_album(quarantine_album_id)
+
+        with read_scope() as session:
+            rows = (
+                session.execute(
+                    text(
+                        """
+                        SELECT id, path
+                        FROM library_tracks
+                        WHERE path = ANY(:paths)
+                        """
+                    ),
+                    {"paths": [clean_path, hidden_path, quarantine_path]},
+                )
+                .mappings()
+                .all()
+            )
+        ids_by_path = {row["path"]: row["id"] for row in rows}
+
+        playlist_id = create_playlist("Radio Filter Playlist")
+        add_playlist_tracks(
+            playlist_id,
+            [
+                {"track_id": ids_by_path[clean_path]},
+                {"track_id": ids_by_path[hidden_path]},
+                {"track_id": ids_by_path[quarantine_path]},
+            ],
+        )
+
+        similar_rows = get_similar_artist_tracks_for_radio(
+            similar_artist_keys=["radio filter"],
+            limit=10,
+        )
+        playlist_rows = get_playlist_tracks_for_radio(playlist_id=playlist_id)
+
+        assert {row["path"] for row in similar_rows} == {clean_path}
+        assert {
+            row["path"] for row in get_album_tracks_for_radio(album_id=clean_album_id)
+        } == {clean_path}
+        assert get_album_tracks_for_radio(album_id=hidden_album_id) == []
+        assert get_album_tracks_for_radio(album_id=quarantine_album_id) == []
+        assert {row["path"] for row in playlist_rows} == {clean_path}
 
 
 # ── bliss_artist_profiles ────────────────────────────────────────────

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 from crate.db.tx import optional_scope
 from crate.track_versions import track_song_identity
 
@@ -50,32 +54,34 @@ def get_track_seed_context(
         row = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT
-                    id AS track_id,
-                    bliss_vector,
-                    title,
-                    artist
-                FROM library_tracks
-                WHERE bliss_vector IS NOT NULL
+                    t.id AS track_id,
+                    t.bliss_vector,
+                    t.title,
+                    t.artist
+                FROM library_tracks t
+                LEFT JOIN library_albums a ON a.id = t.album_id
+                WHERE t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                   AND (
-                    CAST(id AS text) = :track_ref
-                    OR (entity_uid IS NOT NULL AND CAST(entity_uid AS text) = :track_ref)
-                    OR (storage_id IS NOT NULL AND CAST(storage_id AS text) = :track_ref)
-                    OR path = :track_ref
+                    CAST(t.id AS text) = :track_ref
+                    OR (t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref)
+                    OR (t.storage_id IS NOT NULL AND CAST(t.storage_id AS text) = :track_ref)
+                    OR t.path = :track_ref
                   )
                 ORDER BY
                   CASE
-                    WHEN CAST(id AS text) = :track_ref THEN 0
-                    WHEN entity_uid IS NOT NULL AND CAST(entity_uid AS text) = :track_ref THEN 1
-                    WHEN storage_id IS NOT NULL AND CAST(storage_id AS text) = :track_ref THEN 2
-                    WHEN path = :track_ref THEN 3
+                    WHEN CAST(t.id AS text) = :track_ref THEN 0
+                    WHEN t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref THEN 1
+                    WHEN t.storage_id IS NOT NULL AND CAST(t.storage_id AS text) = :track_ref THEN 2
+                    WHEN t.path = :track_ref THEN 3
                     ELSE 4
                   END
                 LIMIT 1
                 """
                 ),
-                {"track_ref": track_ref},
+                {"track_ref": track_ref, **playable_media_params()},
             )
             .mappings()
             .first()
@@ -104,7 +110,7 @@ def get_album_seed_context(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     t.id AS track_id,
                     t.artist,
@@ -115,6 +121,7 @@ def get_album_seed_context(
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
                 WHERE t.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("t", "a")}
                   AND (
                     CAST(a.id AS text) = :album_ref
                     OR (a.entity_uid IS NOT NULL AND CAST(a.entity_uid AS text) = :album_ref)
@@ -122,7 +129,7 @@ def get_album_seed_context(
                 ORDER BY t.disc_number, t.track_number, t.id
                 """
                 ),
-                {"album_ref": album_ref},
+                {"album_ref": album_ref, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -161,7 +168,7 @@ def get_playlist_seed_context(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT lt.id AS track_id, lt.artist, lt.title, lt.bliss_vector
                 FROM (
                     SELECT
@@ -190,12 +197,14 @@ def get_playlist_seed_context(
                 JOIN library_tracks lt
                   ON lt.id = pt.resolved_track_id
                  AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)
+                LEFT JOIN library_albums la ON la.id = lt.album_id
                 WHERE lt.bliss_vector IS NOT NULL
+                  AND {playable_track_clause("lt", "la")}
                 ORDER BY pt.position
                 LIMIT :limit
                 """
                 ),
-                {"playlist_id": playlist_id, "limit": limit},
+                {"playlist_id": playlist_id, "limit": limit, **playable_media_params()},
             )
             .mappings()
             .all()
@@ -232,7 +241,7 @@ def _get_track_seed_contexts_batch(
         rows = (
             s.execute(
                 text(
-                    """
+                    f"""
                 SELECT ranked.id AS track_id, ranked.bliss_vector, ranked.title, ranked.artist
                 FROM (
                     SELECT
@@ -251,6 +260,7 @@ def _get_track_seed_contexts_batch(
                                 END
                         ) AS rn
                     FROM library_tracks lt
+                    LEFT JOIN library_albums la ON la.id = lt.album_id
                     JOIN unnest(:track_refs) WITH ORDINALITY AS refs(match_ref, ordinal) ON (
                         CAST(lt.id AS text) = refs.match_ref
                         OR (lt.entity_uid IS NOT NULL AND CAST(lt.entity_uid AS text) = refs.match_ref)
@@ -258,6 +268,7 @@ def _get_track_seed_contexts_batch(
                         OR lt.path = refs.match_ref
                     )
                     WHERE lt.bliss_vector IS NOT NULL
+                      AND {playable_track_clause("lt", "la")}
                       AND refs.match_ref IS NOT NULL
                       AND refs.match_ref != ''
                 ) ranked
@@ -265,7 +276,7 @@ def _get_track_seed_contexts_batch(
                 ORDER BY ordinal
                 """
                 ),
-                {"track_refs": refs},
+                {"track_refs": refs, **playable_media_params()},
             )
             .mappings()
             .all()

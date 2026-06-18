@@ -15,6 +15,7 @@ import {
   artistPagePath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
+import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
 import type {
   HomeUpcomingInsight,
@@ -54,7 +55,7 @@ export function HomeUpcomingSection({
   const isShow = nextUpcoming.type === "show";
   const nextUpcomingDate = formatUpcomingDate(nextUpcoming.date);
   const artistImage =
-    nextUpcoming.cover_url ||
+    resolveMaybeApiAssetUrl(nextUpcoming.cover_url) ||
     artistBackgroundApiUrl(
       {
         artistId: nextUpcoming.artist_id,

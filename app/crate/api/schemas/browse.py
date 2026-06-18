@@ -15,6 +15,7 @@ class BrowseGenreFilterOptionResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     name: str
+    slug: str | None = None
     cnt: int | None = None
     count: int | None = None
     description: str | None = None

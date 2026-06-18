@@ -1,14 +1,7 @@
 import { useDeferredValue, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import {
-  ArrowLeft,
-  Loader2,
-  Play,
-  Radio,
-  Share2,
-  Shuffle,
-  Sparkles,
-} from "@crate/ui/icons";
+import { useParams } from "react-router";
+import { Play, Radio, Share2, Shuffle, Sparkles } from "@crate/ui/icons";
+import type { ContextMenuEntry } from "@crate/ui/domain/actions";
 import { toast } from "sonner";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
@@ -17,9 +10,14 @@ import { MixArtwork } from "@/components/home/MixArtwork";
 import type { HomeGeneratedPlaylistDetail } from "@/components/home/home-model";
 import { PlaylistArtwork } from "@/components/playlists/PlaylistArtwork";
 import {
+  PlaylistHeroSection,
+  type PlaylistHeroSecondaryAction,
+} from "@/components/playlists/PlaylistHeroSection";
+import {
   PlaylistTrackFilterBar,
   filterPlaylistTracks,
 } from "@/components/playlists/PlaylistTrackFilterBar";
+import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
 import { useApi } from "@/hooks/use-api";
@@ -66,7 +64,6 @@ export function newArrivalsWindowLabel(
 }
 
 export function HomePlaylist() {
-  const navigate = useNavigate();
   const { playlistId } = useParams<{ playlistId: string }>();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -197,11 +194,7 @@ export function HomePlaylist() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 size={24} className="animate-spin text-primary" />
-      </div>
-    );
+    return <CrateLoader label="Loading playlist." />;
   }
 
   if (!data) {
@@ -212,132 +205,137 @@ export function HomePlaylist() {
     );
   }
 
+  const secondaryActions: PlaylistHeroSecondaryAction[] = [
+    {
+      key: "radio",
+      label: "Radio",
+      ariaLabel: "Playlist Radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onClick: () => void handleRadio(),
+    },
+    {
+      key: "share",
+      label: "Share",
+      ariaLabel: "Share",
+      icon: Share2,
+      onClick: () => void handleShare(),
+    },
+  ];
+  const playlistMenuItems: ContextMenuEntry[] = [
+    {
+      key: "play",
+      label: "Play playlist",
+      icon: Play,
+      disabled: playerTracks.length === 0,
+      onSelect: handlePlay,
+    },
+    {
+      key: "shuffle",
+      label: "Shuffle playlist",
+      icon: Shuffle,
+      disabled: playerTracks.length === 0,
+      onSelect: handleShuffle,
+    },
+    {
+      key: "radio",
+      label: "Start playlist radio",
+      icon: Radio,
+      disabled: playerTracks.length === 0,
+      onSelect: handleRadio,
+    },
+    {
+      type: "divider",
+      key: "home-playlist-share-divider",
+    },
+    {
+      key: "share",
+      label: "Share playlist",
+      icon: Share2,
+      onSelect: handleShare,
+    },
+  ];
+  const playlistMetaItems = [
+    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
+    releaseWindowLabel,
+    "Generated for you",
+  ];
+  const renderArtwork = (className: string) =>
+    data.kind === "core" ? (
+      <CoreTracksArtwork item={data} className={className} />
+    ) : data.kind === "mix" ? (
+      <MixArtwork item={data} className={className} />
+    ) : (
+      <PlaylistArtwork
+        name={data.name}
+        tracks={data.artwork_tracks}
+        className={className}
+      />
+    );
+
   return (
-    <div className="space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft size={16} />
-        Back
-      </button>
-
-      <div className="flex flex-col gap-6 md:flex-row">
-        <div className="w-[220px] max-w-full shrink-0">
-          {data.kind === "core" ? (
-            <CoreTracksArtwork
-              item={data}
-              className="aspect-square rounded-3xl shadow-2xl"
-            />
-          ) : data.kind === "mix" ? (
-            <MixArtwork
-              item={data}
-              className="aspect-square rounded-3xl shadow-2xl"
-            />
-          ) : (
-            <PlaylistArtwork
-              name={data.name}
-              tracks={data.artwork_tracks}
-              className="aspect-square rounded-3xl shadow-2xl"
-            />
-          )}
-        </div>
-
-        <div className="flex flex-col justify-end gap-3 text-left">
-          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
+    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
+      <PlaylistHeroSection
+        title={data.name}
+        subtitle="Generated playlist"
+        description={data.description}
+        metaItems={playlistMetaItems}
+        badges={
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
             <Sparkles size={12} />
             {data.badge}
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">{data.name}</h1>
-            {data.description ? (
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                {data.description}
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>{data.track_count} tracks</span>
-            {data.total_duration > 0 ? (
-              <span>{formatTotalDuration(data.total_duration)}</span>
-            ) : null}
-            {releaseWindowLabel ? <span>{releaseWindowLabel}</span> : null}
-            <span>Generated for you</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={handlePlay}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Play size={16} fill="currentColor" />
-          Play
-        </button>
-        <button
-          onClick={handleShuffle}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-50"
-        >
-          <Shuffle size={15} />
-          Shuffle
-        </button>
-        <button
-          onClick={handleShare}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5"
-        >
-          <Share2 size={15} />
-          Share
-        </button>
-        <button
-          onClick={handleRadio}
-          disabled={playerTracks.length === 0}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-50"
-        >
-          <Radio size={15} />
-          Playlist Radio
-        </button>
-      </div>
-
-      <PlaylistTrackFilterBar
-        query={filterQuery}
-        onQueryChange={setFilterQuery}
-        totalCount={data.tracks.length}
-        filteredCount={filteredTracks.length}
+          </span>
+        }
+        artwork={renderArtwork}
+        onPlay={handlePlay}
+        onShuffle={handleShuffle}
+        playDisabled={playerTracks.length === 0}
+        shuffleDisabled={playerTracks.length === 0}
+        secondaryActions={secondaryActions}
+        menuItems={playlistMenuItems}
       />
 
-      {data.tracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            This playlist has no tracks yet
-          </p>
-        </div>
-      ) : filteredTracks.length === 0 ? (
-        <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">
-            No tracks match this filter
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-1">
-          {trackRows.map((row, index) => (
-            <TrackRow
-              key={row.id ?? `${row.path}-${index}`}
-              track={row}
-              index={index + 1}
-              showArtist
-              showAlbum
-              playlistOptions={playlistOptions}
-              onAddToPlaylist={handleAddTrackToPlaylist}
-              onCreatePlaylist={handleCreatePlaylistFromTrack}
-              onActionMenuOpen={ensurePlaylistOptionsLoaded}
-              queueTracks={trackRows}
-            />
-          ))}
-        </div>
-      )}
+      <div className="mx-auto w-full max-w-[1480px] space-y-6 px-4 pb-8 sm:px-6">
+        <PlaylistTrackFilterBar
+          query={filterQuery}
+          onQueryChange={setFilterQuery}
+          totalCount={data.tracks.length}
+          filteredCount={filteredTracks.length}
+        />
+
+        {data.tracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              This playlist has no tracks yet
+            </p>
+          </div>
+        ) : filteredTracks.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <p className="text-sm text-muted-foreground">
+              No tracks match this filter
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {trackRows.map((row, index) => (
+              <TrackRow
+                key={row.id ?? `${row.path}-${index}`}
+                track={row}
+                index={index + 1}
+                showCoverThumb
+                showArtist
+                showAlbum
+                playlistOptions={playlistOptions}
+                onAddToPlaylist={handleAddTrackToPlaylist}
+                onCreatePlaylist={handleCreatePlaylistFromTrack}
+                onActionMenuOpen={ensurePlaylistOptionsLoaded}
+                queueTracks={trackRows}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

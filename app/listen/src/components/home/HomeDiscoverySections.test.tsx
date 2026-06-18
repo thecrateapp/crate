@@ -156,6 +156,59 @@ describe("HomeTasteHero", () => {
 
     expect(onDismiss).toHaveBeenCalledWith(hero);
   });
+
+  it("hides carousel arrow buttons on mobile", () => {
+    mockMobilePointer();
+
+    renderWithListenProviders(
+      <HomeTasteHero
+        heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+        isFollowing={() => false}
+        onOpenArtist={vi.fn()}
+        onPlay={vi.fn()}
+        onToggleFollow={vi.fn()}
+        onInfo={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+  });
+
+  it("moves the mobile carousel with a natural horizontal swipe", () => {
+    mockMobilePointer();
+    vi.useFakeTimers();
+
+    try {
+      vi.setSystemTime(new Date("2026-06-18T10:00:00.000Z"));
+      renderWithListenProviders(
+        <HomeTasteHero
+          heroes={[heroFixture(), heroFixture({ id: 8, name: "Botch" })]}
+          isFollowing={() => false}
+          onOpenArtist={vi.fn()}
+          onPlay={vi.fn()}
+          onToggleFollow={vi.fn()}
+          onInfo={vi.fn()}
+        />,
+      );
+
+      const activeSlide = screen.getByRole("button", { name: /Converge/i });
+
+      fireEvent.touchStart(activeSlide, {
+        touches: [{ clientX: 240, clientY: 180 }],
+      });
+      vi.setSystemTime(new Date("2026-06-18T10:00:00.720Z"));
+      fireEvent.touchEnd(activeSlide, {
+        changedTouches: [{ clientX: 132, clientY: 194 }],
+      });
+
+      expect(
+        screen.getByRole("heading", { name: "Botch" }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("RecentEntityRow", () => {

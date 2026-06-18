@@ -157,6 +157,8 @@ export function scopesForUrl(url: string): string[] {
     scopes.push("library", "shows", "upcoming");
   else if (url.startsWith("/api/genres")) scopes.push("library");
   // Radio
+  else if (url === "/api/radio/stations")
+    scopes.push("library", "follows", "history");
   else if (url.startsWith("/api/radio")) scopes.push("library");
   // Shows
   else if (url.startsWith("/api/shows")) scopes.push("shows");

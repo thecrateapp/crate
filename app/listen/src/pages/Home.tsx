@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
-import { Radio as RadioIcon, RotateCcw } from "@crate/ui/icons";
 import { toast } from "sonner";
 
 import { fetchArtistTopTracks } from "@/components/actions/shared";
@@ -17,7 +16,6 @@ import {
   FavoriteArtistsSection,
   HomeTasteHero,
   openRecentItemPath,
-  RadioStationsSection,
   RecentlyPlayedSection,
   RecommendedTracksSection,
   SuggestedAlbumsSection,
@@ -38,7 +36,6 @@ import type {
   HomeGeneratedPlaylistDetail,
   HomeGeneratedPlaylistSummary,
   HomeHeroArtist,
-  HomeRadioStation,
   HomeRecommendedTrack,
   HomeSectionId,
   HomeUpcomingInsight,
@@ -53,12 +50,7 @@ import { useApi } from "@/hooks/use-api";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { AUTH_TOKEN_EVENT, api, apiSseUrl } from "@/lib/api";
 import { fetchPlayableSetlist } from "@/lib/upcoming";
-import {
-  fetchAlbumRadio,
-  fetchArtistRadio,
-  fetchHomePlaylistRadio,
-  startShapedRadio,
-} from "@/lib/radio";
+import { fetchHomePlaylistRadio } from "@/lib/radio";
 import { albumCoverApiUrl, artistPagePath } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import {
@@ -116,7 +108,6 @@ export function Home() {
   const { play, playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const isDesktop = useIsDesktop();
-  const [startingDiscoveryRadio, setStartingDiscoveryRadio] = useState(false);
   const [dismissedHeroKeys, setDismissedHeroKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -505,46 +496,6 @@ export function Home() {
     }
   }
 
-  async function playRadioStation(station: HomeRadioStation) {
-    try {
-      if (
-        station.type === "artist" &&
-        station.artist_id != null &&
-        station.artist_name
-      ) {
-        const radio = await fetchArtistRadio(
-          station.artist_id,
-          station.artist_name,
-          50,
-        );
-        if (!radio.tracks.length) {
-          toast.info("Artist radio is not available yet");
-          return;
-        }
-        playAll(radio.tracks, 0, radio.source);
-        return;
-      }
-      if (
-        station.type === "album" &&
-        station.album_id != null &&
-        station.artist_name
-      ) {
-        const radio = await fetchAlbumRadio({
-          albumId: station.album_id,
-          artistName: station.artist_name,
-          albumName: station.album_name || station.title,
-        });
-        if (!radio.tracks.length) {
-          toast.info("Album radio is not available yet");
-          return;
-        }
-        playAll(radio.tracks, 0, radio.source);
-      }
-    } catch {
-      toast.error("Failed to start radio");
-    }
-  }
-
   async function acknowledgeInsight(insight: HomeUpcomingInsight) {
     try {
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
@@ -630,23 +581,6 @@ export function Home() {
     );
   }
 
-  async function startDiscoveryRadio() {
-    if (startingDiscoveryRadio) return;
-    setStartingDiscoveryRadio(true);
-    try {
-      const result = await startShapedRadio("discovery");
-      if (!result?.tracks.length) {
-        toast.info("Discovery Radio needs a bit more listening history");
-        return;
-      }
-      playAll(result.tracks, 0, result.source);
-    } catch {
-      toast.error("Failed to start Discovery Radio");
-    } finally {
-      setStartingDiscoveryRadio(false);
-    }
-  }
-
   if (!currentDiscovery) {
     return <CrateLoader label="Loading home." />;
   }
@@ -665,61 +599,34 @@ export function Home() {
           </p>
         </div>
 
-        {!isDesktop ? (
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => void startDiscoveryRadio()}
-              disabled={startingDiscoveryRadio}
-              className="flex min-h-14 touch-manipulation items-center gap-3 rounded-2xl border border-primary/25 bg-primary/12 px-4 text-left text-sm font-semibold text-foreground shadow-[0_0_28px_rgba(34,211,238,0.08)] transition active:scale-[0.98] disabled:opacity-60"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-black">
-                <RadioIcon size={18} />
-              </span>
-              Play Radio
-            </button>
-            <button
-              type="button"
-              onClick={playReplayMix}
-              disabled={!replay?.items?.length}
-              className="flex min-h-14 touch-manipulation items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-left text-sm font-semibold text-foreground transition active:scale-[0.98] disabled:opacity-45"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/8 text-primary">
-                <RotateCcw size={18} />
-              </span>
-              DNA
-            </button>
-          </div>
-        ) : (
-          <HomeTasteHero
-            heroes={visibleHeroes}
-            isFollowing={isFollowing}
-            onOpenArtist={(artist) => {
-              void recordHeroRecommendationAction(artist, "opened");
-              navigate(
-                artistPagePath({
-                  artistId: artist.id,
-                  artistSlug: artist.slug,
-                  artistName: artist.name,
-                }),
-              );
-            }}
-            onPlay={(artist) => void playHeroArtist(artist)}
-            onToggleFollow={(artist) => void toggleHeroFollow(artist)}
-            onInfo={(artist) => {
-              void recordHeroRecommendationAction(artist, "opened");
-              navigate(
-                artistPagePath({
-                  artistId: artist.id,
-                  artistSlug: artist.slug,
-                  artistName: artist.name,
-                }),
-              );
-            }}
-            onDismiss={(artist) => void dismissHeroArtist(artist)}
-            onExpose={(artist) => void recordHeroExposure(artist)}
-          />
-        )}
+        <HomeTasteHero
+          heroes={visibleHeroes}
+          isFollowing={isFollowing}
+          onOpenArtist={(artist) => {
+            void recordHeroRecommendationAction(artist, "opened");
+            navigate(
+              artistPagePath({
+                artistId: artist.id,
+                artistSlug: artist.slug,
+                artistName: artist.name,
+              }),
+            );
+          }}
+          onPlay={(artist) => void playHeroArtist(artist)}
+          onToggleFollow={(artist) => void toggleHeroFollow(artist)}
+          onInfo={(artist) => {
+            void recordHeroRecommendationAction(artist, "opened");
+            navigate(
+              artistPagePath({
+                artistId: artist.id,
+                artistSlug: artist.slug,
+                artistName: artist.name,
+              }),
+            );
+          }}
+          onDismiss={(artist) => void dismissHeroArtist(artist)}
+          onExpose={(artist) => void recordHeroExposure(artist)}
+        />
       </div>
 
       <RecentlyPlayedSection
@@ -745,14 +652,6 @@ export function Home() {
       {isDesktop ? (
         <RecommendedTracksSection
           tracks={recommendedTracks}
-          onViewAll={openHomeSection}
-        />
-      ) : null}
-
-      {isDesktop ? (
-        <RadioStationsSection
-          stations={currentDiscovery?.radio_stations || []}
-          onPlayStation={(station) => void playRadioStation(station)}
           onViewAll={openHomeSection}
         />
       ) : null}

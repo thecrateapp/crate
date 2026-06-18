@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import {
   Loader2,
   Music,
+  Play,
   Radio as RadioIcon,
   Sparkles,
   ThumbsDown,
@@ -9,12 +10,44 @@ import {
 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { api } from "@/lib/api";
+import {
+  SectionHeader,
+  SectionLoading,
+  SectionRail,
+} from "@/components/home/HomeSections";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import { useApi } from "@/hooks/use-api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { startShapedRadio, checkDiscoveryAvailable } from "@/lib/radio";
+import { cn } from "@/lib/utils";
 
 type EndpointType = "artist" | "genre" | "album" | "track";
+type StationSeedType = "artist" | "genre";
+
+interface PersonalizedRadioStation {
+  type: StationSeedType;
+  seed_type: StationSeedType;
+  seed_value: string;
+  seed_label: string;
+  seed_subtitle?: string | null;
+  title: string;
+  subtitle?: string | null;
+  play_count?: number;
+  minutes_listened?: number;
+  artist_id?: number | null;
+  artist_entity_uid?: string | null;
+  artist_slug?: string | null;
+  artist_name?: string | null;
+  genre_slug?: string | null;
+  genre_name?: string | null;
+  cover_url?: string | null;
+}
+
+interface PersonalizedRadioStationsResponse {
+  artist_stations: PersonalizedRadioStation[];
+  genre_stations: PersonalizedRadioStation[];
+}
 
 interface SearchResult {
   type: EndpointType;
@@ -23,8 +56,143 @@ interface SearchResult {
   imageUrl?: string;
 }
 
+function stationTypeLabel(station: PersonalizedRadioStation): string {
+  return station.seed_type === "genre" ? "Genre Radio" : "Artist Radio";
+}
+
+function stationLabel(station: PersonalizedRadioStation): string {
+  return (
+    station.seed_label ||
+    station.genre_name ||
+    station.artist_name ||
+    station.title.replace(/\s+Radio$/i, "")
+  );
+}
+
+function stationArtwork(station: PersonalizedRadioStation): string | null {
+  if (station.type === "genre") {
+    return resolveMaybeApiAssetUrl(station.cover_url) || null;
+  }
+  return (
+    artistPhotoApiUrl(
+      {
+        artistId: station.artist_id,
+        artistEntityUid: station.artist_entity_uid,
+        artistSlug: station.artist_slug,
+        artistName: station.artist_name || station.seed_label,
+      },
+      { size: 320 },
+    ) || null
+  );
+}
+
+function StationCard({
+  station,
+  disabled,
+  onStart,
+}: {
+  station: PersonalizedRadioStation;
+  disabled: boolean;
+  onStart: (station: PersonalizedRadioStation) => void;
+}) {
+  const label = stationLabel(station);
+  const imageUrl = stationArtwork(station);
+  const plays = station.play_count || 0;
+
+  return (
+    <button
+      type="button"
+      aria-label={`Start ${label} ${stationTypeLabel(station)}`}
+      disabled={disabled}
+      onClick={() => onStart(station)}
+      className="group relative aspect-square snap-start overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-left shadow-[0_18px_70px_rgba(0,0,0,0.24)] transition duration-300 hover:border-primary/30 hover:shadow-[0_18px_80px_rgba(10,209,241,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-85 transition duration-500 group-hover:scale-[1.04] group-hover:opacity-100"
+          loading="lazy"
+        />
+      ) : (
+        <div
+          className={cn(
+            "absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(10,209,241,0.24),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(255,255,255,0.01))]",
+            station.type === "genre" && "bg-primary/10",
+          )}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/10" />
+      <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
+        <span className="rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65 backdrop-blur-md">
+          {stationTypeLabel(station)}
+        </span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-black opacity-0 shadow-[0_0_24px_rgba(10,209,241,0.32)] transition duration-300 group-hover:opacity-100">
+          <Play size={14} className="translate-x-px" />
+        </span>
+      </div>
+      <div className="absolute inset-x-3 bottom-3">
+        <div className="line-clamp-2 text-base font-semibold leading-tight text-white">
+          {label}
+        </div>
+        {plays > 0 ? (
+          <div className="mt-1 text-xs text-white/52">{plays} plays</div>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+function StationRail({
+  title,
+  subtitle,
+  stations,
+  loading,
+  disabled,
+  onStart,
+}: {
+  title: string;
+  subtitle: string;
+  stations: PersonalizedRadioStation[];
+  loading: boolean;
+  disabled: boolean;
+  onStart: (station: PersonalizedRadioStation) => void;
+}) {
+  if (loading) {
+    return (
+      <section className="space-y-4">
+        <SectionHeader title={title} subtitle={subtitle} />
+        <SectionLoading />
+      </section>
+    );
+  }
+
+  if (!stations.length) return null;
+
+  return (
+    <section className="space-y-4">
+      <SectionHeader title={title} subtitle={subtitle} />
+      <SectionRail fit="square-card">
+        {stations.map((station) => (
+          <StationCard
+            key={`${station.seed_type}-${station.seed_value}`}
+            station={station}
+            disabled={disabled}
+            onStart={onStart}
+          />
+        ))}
+      </SectionRail>
+    </section>
+  );
+}
+
 export function RadioPage() {
   const { playAll } = usePlayerActions();
+  const {
+    data: stationGroups,
+    loading: stationsLoading,
+    error: stationsError,
+  } = useApi<PersonalizedRadioStationsResponse>("/api/radio/stations");
   const [discoveryAvailable, setDiscoveryAvailable] = useState(false);
   const [starting, setStarting] = useState(false);
   const [activeSession, setActiveSession] = useState<string | null>(null);
@@ -41,6 +209,9 @@ export function RadioPage() {
   useEffect(() => {
     checkDiscoveryAvailable().then(setDiscoveryAvailable);
   }, []);
+
+  const artistStations = stationGroups?.artist_stations ?? [];
+  const genreStations = stationGroups?.genre_stations ?? [];
 
   const search = useCallback(async (q: string) => {
     if (q.length < 2) {
@@ -111,6 +282,29 @@ export function RadioPage() {
     }
   }, []);
 
+  const startStation = async (station: PersonalizedRadioStation) => {
+    setStarting(true);
+    const seedValue =
+      station.seed_value ||
+      station.genre_slug ||
+      (station.artist_id != null ? String(station.artist_id) : "");
+    const result = await startShapedRadio(
+      "seeded",
+      station.seed_type,
+      seedValue,
+    );
+    if (!result) {
+      toast.error("Could not start radio");
+      setStarting(false);
+      return;
+    }
+    setActiveSession(result.sessionId);
+    setActiveMode("seeded");
+    setSeedLabel(result.seedLabel || stationLabel(station));
+    playAll(result.tracks, 0, result.source);
+    setStarting(false);
+  };
+
   const startSeeded = async (seed: SearchResult) => {
     setStarting(true);
     setQuery("");
@@ -144,63 +338,83 @@ export function RadioPage() {
   };
 
   return (
-    <div className="animate-page-in space-y-6 px-4 py-6 sm:px-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <RadioIcon size={22} className="text-primary" />
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Radio</h1>
-          <p className="text-[13px] text-white/40">
-            Infinite music, shaped by your taste
-          </p>
+    <div className="animate-page-in space-y-7 px-4 py-6 sm:px-6">
+      <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_24px_90px_rgba(0,0,0,0.28)] sm:p-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_18%,rgba(10,209,241,0.2),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),transparent_52%)]" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary text-black shadow-[0_0_34px_rgba(10,209,241,0.32)]">
+              <RadioIcon size={24} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold leading-tight text-foreground">
+                Radio
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/52">
+                Start from the artists and scenes Crate already knows you come
+                back to.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={startDiscovery}
+            disabled={starting || !discoveryAvailable}
+            className={cn(
+              "group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold text-black transition duration-300",
+              "bg-primary shadow-[0_0_28px_rgba(10,209,241,0.28)] hover:shadow-[0_0_38px_rgba(10,209,241,0.4)] disabled:opacity-40",
+            )}
+          >
+            {starting ? (
+              <Loader2 size={19} className="animate-spin" />
+            ) : (
+              <Sparkles size={19} />
+            )}
+            Discovery Radio
+          </button>
         </div>
       </div>
 
-      {/* Discovery Radio — always visible */}
-      <button
-        onClick={startDiscovery}
-        disabled={starting || !discoveryAvailable}
-        className={`group flex w-full items-center gap-4 rounded-2xl border p-5 text-left transition ${
-          activeMode === "discovery"
-            ? "border-primary/35 bg-gradient-to-r from-primary/15 via-primary/8 to-transparent"
-            : "border-primary/20 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent hover:border-primary/35 hover:from-primary/15 disabled:opacity-40"
-        }`}
-      >
-        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary shadow-[0_0_20px_rgba(6,182,212,0.2)] transition group-hover:shadow-[0_0_30px_rgba(6,182,212,0.3)]">
-          {starting ? (
-            <Loader2 size={24} className="animate-spin" />
-          ) : activeMode === "discovery" ? (
-            <div className="h-3 w-3 animate-pulse rounded-full bg-primary shadow-[0_0_12px_rgba(6,182,212,0.6)]" />
-          ) : (
-            <Sparkles size={24} />
-          )}
-        </div>
-        <div>
+      {activeMode === "discovery" ? (
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-base font-semibold text-foreground">
+            <div className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
+            <span className="text-sm font-medium text-primary">
               Discovery Radio
             </span>
-            {activeMode === "discovery" && (
-              <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                playing
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 text-[13px] text-white/45">
-            {activeMode === "discovery"
-              ? "Use thumbs up/down in the player to shape the sound."
-              : discoveryAvailable
-                ? "Based on your likes, follows, and saved albums. Like or dislike tracks to shape the sound."
-                : "Follow an artist or save an album to unlock Discovery Radio."}
+            <span className="text-[11px] text-white/35">playing</span>
           </div>
         </div>
-      </button>
+      ) : null}
 
-      {/* Seeded Radio — search to start */}
-      <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5">
+      <StationRail
+        title="Artist Stations"
+        subtitle="Artist-led stations from your listening history and follows."
+        stations={artistStations}
+        loading={stationsLoading}
+        disabled={starting}
+        onStart={startStation}
+      />
+
+      <StationRail
+        title="Genre Stations"
+        subtitle="Scene-level stations shaped by the genres you actually play."
+        stations={genreStations}
+        loading={stationsLoading}
+        disabled={starting}
+        onStart={startStation}
+      />
+
+      {stationsError ? (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-white/45">
+          Could not load personalized stations.
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <RadioIcon size={16} className="text-primary" />
-          Start a radio station
+          Start from anything
         </div>
 
         <input
@@ -211,7 +425,7 @@ export function RadioPage() {
             void search(e.target.value);
           }}
           placeholder="Search an artist, genre, or album to seed the radio..."
-          className="h-11 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/30 focus:outline-none"
+          className="h-12 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/35 focus:outline-none"
         />
 
         {searching && (
@@ -272,27 +486,6 @@ export function RadioPage() {
           </div>
         </div>
       )}
-
-      {/* How it works */}
-      <div className="rounded-xl border border-white/6 bg-white/[0.01] p-5">
-        <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-white/30">
-          How it works
-        </div>
-        <div className="space-y-3 text-[13px] leading-relaxed text-white/45">
-          <p>
-            Radio uses bliss similarity vectors, artist connections, and genre
-            overlap to find tracks that naturally flow from your seed. No fixed
-            playlist — the queue generates endlessly.
-          </p>
-          <p>
-            When you <strong className="text-white/60">like</strong> a track,
-            the radio shifts toward that sound. When you{" "}
-            <strong className="text-white/60">dislike</strong>, it steers away.
-            The more feedback you give, the more the radio learns what you want
-            to hear in this session.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

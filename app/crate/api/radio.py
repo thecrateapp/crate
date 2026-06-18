@@ -9,7 +9,10 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
-from crate.api.schemas.radio import RadioResponse
+from crate.api.schemas.radio import (
+    PersonalizedRadioStationsResponse,
+    RadioResponse,
+)
 from crate.bliss import (
     generate_album_radio,
     generate_artist_radio,
@@ -29,6 +32,7 @@ from crate.db.queries.radio import (
     get_album_for_radio,
     get_playlist_for_radio,
 )
+from crate.db.queries.radio_stations import get_user_radio_stations
 
 router = APIRouter(tags=["radio"])
 
@@ -88,6 +92,21 @@ def _resolve_track_path(
 
 
 _RADIO_CACHE_TTL = 300  # 5 minutes
+
+
+@router.get(
+    "/api/radio/stations",
+    response_model=PersonalizedRadioStationsResponse,
+    response_model_exclude_none=True,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get personalized radio station seeds",
+)
+def api_radio_stations(request: Request):
+    user = _require_auth(request)
+    user_id = user.get("id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return get_user_radio_stations(int(user_id))
 
 
 def api_artist_radio(

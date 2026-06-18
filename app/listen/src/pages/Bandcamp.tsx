@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
-import { api } from "@/lib/api";
+import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
@@ -463,6 +463,8 @@ function Cover({
   item: BandcampItem;
   compact?: boolean;
 }) {
+  const coverUrl = resolveMaybeApiAssetUrl(item.cover_url);
+
   return (
     <div
       className={cn(
@@ -472,9 +474,9 @@ function Cover({
           : "aspect-square w-full",
       )}
     >
-      {item.cover_url ? (
+      {coverUrl ? (
         <img
-          src={item.cover_url}
+          src={coverUrl}
           alt=""
           loading="lazy"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"

@@ -2,8 +2,33 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from crate.db.queries.genres_shared import get_genre_summary_by_slug
+from crate.db.queries.genres_shared import (
+    get_genre_summary_by_slug,
+    get_taxonomy_node_stats,
+)
 from crate.db.tx import read_scope
+from crate.genre_taxonomy import get_genre_catalog, resolve_genre_slug
+
+MIN_GENRE_MEMBERSHIP_SCORE = 0.45
+ARTIST_ALBUM_FALLBACK_FACTOR = 0.70
+RELATED_GENRE_LIMIT = 24
+
+_RELATION_LABELS = {
+    "child": "Subgenre",
+    "sibling": "Sibling",
+    "related": "Related",
+    "influenced_by": "Influenced by",
+    "influences": "Influences",
+    "fusion": "Fusion",
+}
+_RELATION_PRIORITY = {
+    "child": 60,
+    "related": 50,
+    "sibling": 40,
+    "influenced_by": 30,
+    "influences": 20,
+    "fusion": 10,
+}
 
 
 def _genre_target_cte() -> str:
@@ -11,17 +36,121 @@ def _genre_target_cte() -> str:
         WITH target_genres AS (
             SELECT :genre_id AS id
         ),
-        ranked_artist_genres AS (
+        artist_memberships AS (
             SELECT
-                ag.*,
-                ROW_NUMBER() OVER (
-                    PARTITION BY ag.artist_name
-                    ORDER BY ag.weight DESC NULLS LAST, g.name ASC
-                ) AS genre_rank
+                ag.artist_name,
+                ag.genre_id,
+                ag.weight::DOUBLE PRECISION AS weight,
+                ag.weight::DOUBLE PRECISION AS membership_score,
+                CASE
+                    WHEN ag.weight >= 0.90 THEN 'core'
+                    WHEN ag.weight >= 0.70 THEN 'strong'
+                    WHEN ag.weight >= :min_membership_score THEN 'adjacent'
+                    ELSE 'weak'
+                END AS membership_tier,
+                ag.source
             FROM artist_genres ag
-            JOIN genres g ON g.id = ag.genre_id
+            WHERE ag.genre_id IN (SELECT id FROM target_genres)
         )
     """
+
+
+def _related_genre_candidates(canonical_slug: str) -> dict[str, str]:
+    catalog = get_genre_catalog()
+    meta = catalog.get(canonical_slug)
+    if not meta:
+        return {}
+
+    candidates: dict[str, str] = {}
+
+    def add(slug: str, relation_type: str) -> None:
+        if not slug or slug == canonical_slug or slug not in catalog:
+            return
+        current = candidates.get(slug)
+        if (
+            current is None
+            or _RELATION_PRIORITY[relation_type] > _RELATION_PRIORITY[current]
+        ):
+            candidates[slug] = relation_type
+
+    for slug, item in catalog.items():
+        parents = item.get("parents", [])
+        if canonical_slug in parents:
+            add(slug, "child")
+
+    parent_slugs = set(meta.get("parents", []))
+    if parent_slugs:
+        for slug, item in catalog.items():
+            if slug != canonical_slug and parent_slugs.intersection(
+                item.get("parents", [])
+            ):
+                add(slug, "sibling")
+
+    for slug in meta.get("related", []):
+        add(slug, "related")
+
+    for slug in meta.get("influenced_by", []):
+        add(slug, "influenced_by")
+
+    for slug, item in catalog.items():
+        if canonical_slug in item.get("influenced_by", []):
+            add(slug, "influences")
+        if canonical_slug in item.get("fusion_of", []):
+            add(slug, "fusion")
+
+    return candidates
+
+
+def _build_related_genres(session, slug: str | None) -> list[dict]:
+    canonical_slug = resolve_genre_slug(slug or "")
+    if not canonical_slug:
+        return []
+
+    relation_by_slug = _related_genre_candidates(canonical_slug)
+    if not relation_by_slug:
+        return []
+
+    stats = get_taxonomy_node_stats(session, list(relation_by_slug))
+    items: list[dict] = []
+    for related_slug, relation_type in relation_by_slug.items():
+        item = stats.get(related_slug, {})
+        artist_count = int(item.get("artist_count") or 0)
+        album_count = int(item.get("album_count") or 0)
+        content_score = artist_count * 3 + album_count
+        if content_score <= 0:
+            continue
+        page_slug = item.get("page_slug") or related_slug
+        items.append(
+            {
+                "slug": related_slug,
+                "name": item.get("page_name") or item.get("name") or related_slug,
+                "page_slug": page_slug,
+                "relation_type": relation_type,
+                "relation_label": _RELATION_LABELS[relation_type],
+                "description": item.get("description")
+                or item.get("external_description")
+                or "",
+                "artist_count": artist_count,
+                "album_count": album_count,
+                "content_score": content_score,
+                "cover_url": item.get("cover_url"),
+                "top_artist_id": item.get("top_artist_id"),
+                "top_artist_slug": item.get("top_artist_slug"),
+                "top_artist_name": item.get("top_artist_name"),
+                "top_artist_photo_url": item.get("top_artist_photo_url"),
+            }
+        )
+
+    items.sort(
+        key=lambda item: (
+            -item["content_score"],
+            -_RELATION_PRIORITY.get(item["relation_type"], 0),
+            -item["artist_count"],
+            -item["album_count"],
+            item["name"],
+        )
+    )
+    return items[:RELATED_GENRE_LIMIT]
 
 
 def get_genre_detail(slug: str) -> dict | None:
@@ -49,19 +178,30 @@ def get_genre_detail(slug: str) -> dict | None:
                     la.track_count,
                     la.has_photo,
                     la.spotify_popularity,
-                    la.listeners
-                FROM ranked_artist_genres ag
+                    la.listeners,
+                    ag.membership_score,
+                    ag.membership_tier
+                FROM artist_memberships ag
                 JOIN library_artists la ON ag.artist_name = la.name
-                WHERE ag.genre_rank = 1
-                  AND ag.genre_id IN (SELECT id FROM target_genres)
+                WHERE ag.membership_score >= :min_membership_score
                 ORDER BY
+                    CASE ag.membership_tier
+                        WHEN 'core' THEN 3
+                        WHEN 'strong' THEN 2
+                        WHEN 'adjacent' THEN 1
+                        ELSE 0
+                    END DESC,
+                    ag.weight DESC NULLS LAST,
                     la.listeners DESC NULLS LAST,
                     la.spotify_popularity DESC NULLS LAST,
                     la.album_count DESC NULLS LAST,
                     ag.artist_name ASC
                 """
                 ),
-                {"genre_id": genre["id"]},
+                {
+                    "genre_id": genre["id"],
+                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                },
             )
             .mappings()
             .all()
@@ -74,41 +214,82 @@ def get_genre_detail(slug: str) -> dict | None:
                     _genre_target_cte()
                     + """
                 ,
-                primary_artists AS (
-                    SELECT artist_name, weight
-                    FROM ranked_artist_genres
-                    WHERE genre_rank = 1
-                      AND genre_id IN (SELECT id FROM target_genres)
-                ),
                 album_genre_weights AS (
                     SELECT album_id, MAX(weight) AS weight
                     FROM album_genres
                     WHERE genre_id IN (SELECT id FROM target_genres)
                     GROUP BY album_id
+                ),
+                album_memberships AS (
+                    SELECT
+                        a.id AS album_id,
+                        a.slug AS album_slug,
+                        a.artist,
+                        ar.id AS artist_id,
+                        ar.slug AS artist_slug,
+                        a.name,
+                        a.year,
+                        a.track_count,
+                        a.has_cover,
+                        a.popularity,
+                        a.lastfm_playcount,
+                        ar.listeners,
+                        ar.spotify_popularity,
+                        GREATEST(
+                            COALESCE(alg.weight, 0.0),
+                            COALESCE(pa.membership_score, 0.0) * :artist_album_fallback_factor
+                        )::DOUBLE PRECISION AS membership_score,
+                        (alg.album_id IS NOT NULL) AS direct_genre_match
+                    FROM library_albums a
+                    LEFT JOIN artist_memberships pa ON pa.artist_name = a.artist
+                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    LEFT JOIN album_genre_weights alg ON alg.album_id = a.id
+                    WHERE alg.album_id IS NOT NULL
+                       OR pa.membership_score >= :min_membership_score
                 )
                 SELECT
-                    a.id AS album_id,
-                    a.slug AS album_slug,
-                    a.artist,
-                    ar.id AS artist_id,
-                    ar.slug AS artist_slug,
-                    a.name,
-                    a.year,
-                    a.track_count,
-                    a.has_cover,
-                    COALESCE(alg.weight, pa.weight, 0.5) AS weight
-                FROM library_albums a
-                JOIN primary_artists pa ON pa.artist_name = a.artist
-                LEFT JOIN library_artists ar ON ar.name = a.artist
-                LEFT JOIN album_genre_weights alg ON alg.album_id = a.id
+                    album_id,
+                    album_slug,
+                    artist,
+                    artist_id,
+                    artist_slug,
+                    name,
+                    year,
+                    track_count,
+                    has_cover,
+                    membership_score AS weight,
+                    membership_score,
+                    CASE
+                        WHEN membership_score >= 0.90 THEN 'core'
+                        WHEN membership_score >= 0.70 THEN 'strong'
+                        WHEN membership_score >= :min_membership_score THEN 'adjacent'
+                        ELSE 'weak'
+                    END AS membership_tier,
+                    direct_genre_match
+                FROM album_memberships
+                WHERE membership_score >= :min_membership_score
                 ORDER BY
-                    ar.listeners DESC NULLS LAST,
-                    ar.spotify_popularity DESC NULLS LAST,
-                    a.year DESC NULLS LAST,
-                    a.name ASC
+                    CASE
+                        WHEN membership_score >= 0.90 THEN 3
+                        WHEN membership_score >= 0.70 THEN 2
+                        WHEN membership_score >= :min_membership_score THEN 1
+                        ELSE 0
+                    END DESC,
+                    direct_genre_match DESC,
+                    membership_score DESC NULLS LAST,
+                    COALESCE(popularity, 0) DESC NULLS LAST,
+                    COALESCE(lastfm_playcount, 0) DESC NULLS LAST,
+                    listeners DESC NULLS LAST,
+                    spotify_popularity DESC NULLS LAST,
+                    year DESC NULLS LAST,
+                    name ASC
                 """
                 ),
-                {"genre_id": genre["id"]},
+                {
+                    "genre_id": genre["id"],
+                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
+                    "artist_album_fallback_factor": ARTIST_ALBUM_FALLBACK_FACTOR,
+                },
             )
             .mappings()
             .all()
@@ -118,6 +299,10 @@ def get_genre_detail(slug: str) -> dict | None:
         genre["album_count"] = len(genre["albums"])
         genre["track_count"] = sum(
             int(album.get("track_count") or 0) for album in genre["albums"]
+        )
+        genre["related_genres"] = _build_related_genres(
+            session,
+            genre.get("canonical_slug") or genre.get("slug"),
         )
 
         return genre
@@ -143,11 +328,10 @@ def get_genre_upcoming_shows(
                     _genre_target_cte()
                     + """
                 ,
-                primary_artists AS (
-                    SELECT artist_name, weight
-                    FROM ranked_artist_genres
-                    WHERE genre_rank = 1
-                      AND genre_id IN (SELECT id FROM target_genres)
+                genre_artists AS (
+                    SELECT artist_name, membership_score
+                    FROM artist_memberships
+                    WHERE membership_score >= :min_membership_score
                 ),
                 candidate_shows AS (
                     SELECT
@@ -176,7 +360,7 @@ def get_genre_upcoming_shows(
                             LIMIT 3
                         ) AS artist_genres
                     FROM shows s
-                    JOIN primary_artists pa ON pa.artist_name = s.artist_name
+                    JOIN genre_artists pa ON pa.artist_name = s.artist_name
                     LEFT JOIN library_artists la ON la.name = s.artist_name
                     WHERE s.date >= CURRENT_DATE
                       AND COALESCE(s.status, '') != 'cancelled'
@@ -220,6 +404,7 @@ def get_genre_upcoming_shows(
                 ),
                 {
                     "genre_id": genre["id"],
+                    "min_membership_score": MIN_GENRE_MEMBERSHIP_SCORE,
                     "lat": latitude,
                     "lon": longitude,
                     "lat_min": latitude - delta,

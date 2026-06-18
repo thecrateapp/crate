@@ -18,6 +18,7 @@ import {
 import { useNavigate } from "react-router";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
+import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
@@ -86,6 +87,7 @@ export function TopBarSearch() {
   const navigate = useNavigate();
   const { play } = usePlayerActions();
   const canHover = useHoverCapability();
+  const isDesktop = useIsDesktop();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TopBarSearchItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -503,12 +505,17 @@ export function TopBarSearch() {
       }}
     >
       <div
+        data-state={searchOpen ? "open" : "closed"}
         className={cn(
           "relative overflow-visible rounded-xl transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
-          "focus-within:border focus-within:border-cyan-400/25 focus-within:bg-app-surface/78 focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_18px_42px_rgba(0,0,0,0.22)]",
-          searchOpen
-            ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
-            : "border border-cyan-200/16 bg-black/28 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-md md:border-0 md:bg-transparent md:shadow-none md:backdrop-blur-0",
+          isDesktop
+            ? cn(
+                "focus-within:border focus-within:border-cyan-400/25 focus-within:bg-app-surface/78 focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_18px_42px_rgba(0,0,0,0.22)]",
+                searchOpen
+                  ? "border border-white/8 bg-app-surface/68 shadow-[0_18px_42px_rgba(0,0,0,0.22)]"
+                  : "border border-cyan-200/16 bg-black/28 shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur-md md:border-0 md:bg-transparent md:shadow-none md:backdrop-blur-0",
+              )
+            : "listen-glass-panel listen-search-glass",
           searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",
         )}
       >

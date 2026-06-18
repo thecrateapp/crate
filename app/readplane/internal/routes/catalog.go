@@ -130,10 +130,11 @@ func (s *Server) genresRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 1 && !isReservedGenreRoute(parts[0]) {
-		if !s.requireCatalogAuth(w, r) {
+		user, ok := s.requireCatalogUser(w, r)
+		if !ok {
 			return
 		}
-		payload, err := s.catalog.GenreDetail(r.Context(), parts[0])
+		payload, err := s.catalog.GenreDetail(r.Context(), parts[0], user.ID)
 		s.writeCatalogPayload(w, r, payload, err, "Genre unavailable", "Genre not found")
 		return
 	}

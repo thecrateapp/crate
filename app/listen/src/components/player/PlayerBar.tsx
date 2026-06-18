@@ -1036,12 +1036,18 @@ export function PlayerBar() {
           <div
             aria-hidden="true"
             className={cn(
-              "pointer-events-none absolute inset-0 z-0 border border-white/10 md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl",
-              !isDesktop &&
-                "rounded-t-[2rem] rounded-b-none border-b-0 bg-[#181818]/95 shadow-[0_22px_60px_rgba(0,0,0,0.46)] backdrop-blur-2xl",
+              "pointer-events-none absolute inset-0 z-0",
+              isDesktop
+                ? "border border-white/10 md:rounded-2xl md:bg-app-surface/68 md:shadow-[0_24px_56px_rgba(0,0,0,0.34)] md:backdrop-blur-xl"
+                : "rounded-t-[2rem] rounded-b-none",
             )}
           />
-          <div className="relative z-10 flex h-full items-center gap-2 px-3 lg:px-4">
+          <div
+            className={cn(
+              "relative z-10 flex h-full items-center gap-2",
+              isDesktop ? "px-3 lg:px-4" : "px-4 pt-3 pb-0.5",
+            )}
+          >
             {/* ── Block 1: Track Info ── */}
             <div
               role={isDesktop ? undefined : "button"}
@@ -1429,7 +1435,7 @@ export function PlayerBar() {
             </div>
 
             {/* ── Mobile/tablet play controls (md only, no progress) ── */}
-            <div className="flex items-center gap-1 md:hidden">
+            <div className="flex items-center gap-1 self-stretch md:hidden">
               <SpectrumPlayButton
                 onClick={handlePlayPause}
                 aria-label={effectiveIsPlaying ? "Pause" : "Play"}

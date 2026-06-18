@@ -8,6 +8,10 @@ from crate.db.queries.bliss_shared import (
     bliss_session_scope,
     normalize_similarity_score,
 )
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 
 
 def get_similar_artist_rows(
@@ -198,7 +202,7 @@ def get_artist_tracks(session=None, artist_id: int | None = None) -> list[dict]:
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     t.id AS track_id,
                     t.path,
@@ -220,10 +224,11 @@ def get_artist_tracks(session=None, artist_id: int | None = None) -> list[dict]:
                 JOIN library_albums a ON t.album_id = a.id
                 JOIN library_artists ar ON LOWER(a.artist) = LOWER(ar.name)
                 WHERE ar.id = :artist_id
+                  AND {playable_track_clause("t", "a")}
                 ORDER BY COALESCE(t.lastfm_playcount, 0) DESC, t.id
                 """
                 ),
-                {"artist_id": artist_id},
+                {"artist_id": artist_id, **playable_media_params()},
             )
             .mappings()
             .all()

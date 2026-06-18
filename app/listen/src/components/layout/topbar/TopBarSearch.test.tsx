@@ -97,6 +97,30 @@ describe("TopBarSearch", () => {
     expect(searchButton).toHaveTextContent("Search");
   });
 
+  it("uses the shared glass surface for the mobile search shell", () => {
+    mockHoverPointer(false);
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+
+    expect(searchButton.closest(".listen-glass-panel")).toBeInTheDocument();
+  });
+
+  it("keeps the desktop search shell on the non-glass main style", () => {
+    mockHoverPointer(true);
+    renderWithListenProviders(<TopBarSearch />);
+
+    const searchButton = screen.getByRole("button", { name: "Search" });
+    const searchShell = searchButton.parentElement?.parentElement;
+
+    expect(searchShell).toBeInTheDocument();
+    expect(searchShell).toHaveClass("md:bg-transparent", "md:border-0");
+    expect(searchShell).not.toHaveClass(
+      "listen-glass-panel",
+      "listen-search-glass",
+    );
+  });
+
   it("opens on hover and collapses again when idle", async () => {
     const user = userEvent.setup();
     mockHoverPointer(true);

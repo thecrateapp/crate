@@ -46,7 +46,7 @@ import {
 } from "@crate/ui/primitives/AppModal";
 import { type PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
-import { api, apiAssetUrl } from "@/lib/api";
+import { api, apiAssetUrl, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { contributionSourceLabel } from "@/lib/contributions";
 import { formatTotalDuration } from "@/lib/utils";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -960,61 +960,65 @@ function BandcampTab() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {purchases.map((item) => (
-            <article
-              key={`${item.id}-${item.item_url}`}
-              className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
-            >
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
-                {item.cover_url ? (
-                  <img
-                    src={item.cover_url}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <BandcampLogo size={22} className="text-primary/70" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-black text-foreground">
-                  {bandcampItemTitle(item)}
-                </h3>
-                <p className="truncate text-xs text-muted-foreground">
-                  {item.artist_name || "Bandcamp"}
-                </p>
-              </div>
-              {item.latest_import_status === "completed" ? (
-                <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
-                  Imported
-                </span>
-              ) : item.downloadable ? (
-                <button
-                  type="button"
-                  disabled={busyItemId === item.id}
-                  onClick={() => void importItem(item)}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-black disabled:opacity-50"
-                >
-                  {busyItemId === item.id ? (
-                    <Loader2 size={14} className="animate-spin" />
+          {purchases.map((item) => {
+            const coverUrl = resolveMaybeApiAssetUrl(item.cover_url);
+
+            return (
+              <article
+                key={`${item.id}-${item.item_url}`}
+                className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] p-3"
+              >
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6">
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <Download size={14} />
+                    <BandcampLogo size={22} className="text-primary/70" />
                   )}
-                  Import
-                </button>
-              ) : null}
-              {item.item_url ? (
-                <button
-                  type="button"
-                  onClick={() => window.open(item.item_url || "", "_blank")}
-                  className="inline-flex min-h-10 items-center rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground"
-                >
-                  <ExternalLink size={14} />
-                </button>
-              ) : null}
-            </article>
-          ))}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-black text-foreground">
+                    {bandcampItemTitle(item)}
+                  </h3>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {item.artist_name || "Bandcamp"}
+                  </p>
+                </div>
+                {item.latest_import_status === "completed" ? (
+                  <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                    Imported
+                  </span>
+                ) : item.downloadable ? (
+                  <button
+                    type="button"
+                    disabled={busyItemId === item.id}
+                    onClick={() => void importItem(item)}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary px-3 text-xs font-black text-black disabled:opacity-50"
+                  >
+                    {busyItemId === item.id ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Download size={14} />
+                    )}
+                    Import
+                  </button>
+                ) : null}
+                {item.item_url ? (
+                  <button
+                    type="button"
+                    onClick={() => window.open(item.item_url || "", "_blank")}
+                    className="inline-flex min-h-10 items-center rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                ) : null}
+              </article>
+            );
+          })}
         </div>
       )}
 

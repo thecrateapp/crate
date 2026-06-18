@@ -119,6 +119,58 @@ describe("ContextMenu", () => {
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
   });
 
+  it("hides a broken media header image instead of showing browser broken-image chrome", () => {
+    render(
+      <ContextMenu
+        header={header}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    const image = screen.getByRole("img", { name: "El Cielo cover" });
+    fireEvent.error(image);
+
+    expect(
+      screen.queryByRole("img", { name: "El Cielo cover" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("El Cielo")).toBeInTheDocument();
+  });
+
+  it("retries the media header image when imageUrl changes", () => {
+    const { rerender } = render(
+      <ContextMenu
+        header={header}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: "El Cielo cover" }));
+
+    rerender(
+      <ContextMenu
+        header={{ ...header, imageUrl: "/cover-2.jpg" }}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "El Cielo cover" })).toHaveAttribute(
+      "src",
+      "/cover-2.jpg",
+    );
+  });
+
   it("uses the mobile sheet on non-desktop", () => {
     isDesktop = false;
 

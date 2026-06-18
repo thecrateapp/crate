@@ -53,3 +53,29 @@ class RadioSession(BaseModel):
 class RadioResponse(BaseModel):
     session: RadioSession
     tracks: list[RadioTrack]
+
+
+class PersonalizedRadioStation(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    type: str
+    seed_type: str
+    seed_value: str
+    seed_label: str
+    seed_subtitle: str | None = None
+    title: str
+    subtitle: str = ""
+    play_count: int = 0
+    minutes_listened: int = 0
+    artist_id: int | None = None
+    artist_entity_uid: str | None = None
+    artist_slug: str | None = None
+    artist_name: str | None = None
+    genre_slug: str | None = None
+    genre_name: str | None = None
+    cover_url: str | None = None
+
+
+class PersonalizedRadioStationsResponse(BaseModel):
+    artist_stations: list[PersonalizedRadioStation]
+    genre_stations: list[PersonalizedRadioStation]

@@ -1115,8 +1115,8 @@ export function PlaylistEditor() {
                 <ImagePlus size={16} /> Cover
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Upload a manual cover when the playlist needs a strong editorial
-                identity. Remove it to fall back to the collage.
+                Upload a clean image-only hero asset. Listen renders the
+                playlist title, description and metadata on top.
               </p>
             </CardHeader>
             <CardContent>
@@ -1139,9 +1139,8 @@ export function PlaylistEditor() {
                   </div>
 
                   <p className="text-sm text-muted-foreground">
-                    Covers help playlists feel editorially finished. Use a
-                    manual asset when this collection has a strong identity or
-                    featured placement.
+                    Keep text out of the image itself; the public playlist page
+                    composes the typography and metadata in the hero layout.
                   </p>
 
                   <div className="flex flex-wrap gap-2">

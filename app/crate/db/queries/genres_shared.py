@@ -11,6 +11,10 @@ from crate.genre_taxonomy import (
 )
 
 
+def _artist_photo_public_url(artist_id: int) -> str:
+    return f"/api/artists/{artist_id}/photo?size=640&format=webp"
+
+
 def invalid_genre_taxonomy_reason(slug: str) -> str | None:
     normalized = (slug or "").strip().lower()
     if not normalized:
@@ -161,6 +165,7 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
                 n.name,
                 n.description,
                 n.external_description,
+                n.cover_path,
                 n.is_top_level,
                 COUNT(DISTINCT ag.artist_name)::INTEGER AS artist_count,
                 COUNT(DISTINCT alg.album_id)::INTEGER AS album_count
@@ -170,7 +175,7 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
             LEFT JOIN artist_genres ag ON ag.genre_id = g.id
             LEFT JOIN album_genres alg ON alg.genre_id = g.id
             WHERE n.slug = ANY(:slugs)
-            GROUP BY n.id, n.slug, n.name, n.description, n.external_description, n.is_top_level
+            GROUP BY n.id, n.slug, n.name, n.description, n.external_description, n.cover_path, n.is_top_level
             """
             ),
             {"slugs": slugs},
@@ -178,7 +183,12 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
         .mappings()
         .all()
     )
-    stats = {row["slug"]: dict(row) for row in rows}
+    stats = {}
+    for row in rows:
+        item = dict(row)
+        cover_path = item.pop("cover_path", None)
+        item["cover_url"] = genre_cover_public_url(row["slug"]) if cover_path else None
+        stats[row["slug"]] = item
 
     rows = (
         session.execute(
@@ -220,6 +230,55 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
         bucket["page_slug"] = row["genre_slug"]
         bucket["page_name"] = row["genre_name"]
 
+    rows = (
+        session.execute(
+            text(
+                """
+            WITH top_artists AS (
+                SELECT
+                    n.slug AS taxonomy_slug,
+                    la.id AS artist_id,
+                    la.slug AS artist_slug,
+                    la.name AS artist_name,
+                    ag.weight,
+                    la.listeners,
+                    la.album_count
+                FROM genre_taxonomy_nodes n
+                JOIN genre_taxonomy_aliases gta ON gta.genre_id = n.id
+                JOIN genres g ON g.slug = gta.alias_slug
+                JOIN artist_genres ag ON ag.genre_id = g.id
+                JOIN library_artists la ON la.name = ag.artist_name
+                WHERE n.slug = ANY(:slugs)
+                  AND COALESCE(la.has_photo, 0) <> 0
+            )
+            SELECT DISTINCT ON (taxonomy_slug)
+                taxonomy_slug,
+                artist_id,
+                artist_slug,
+                artist_name
+            FROM top_artists
+            ORDER BY
+                taxonomy_slug,
+                weight DESC NULLS LAST,
+                listeners DESC NULLS LAST,
+                album_count DESC NULLS LAST,
+                artist_name ASC
+            """
+            ),
+            {"slugs": slugs},
+        )
+        .mappings()
+        .all()
+    )
+    for row in rows:
+        bucket = stats.get(row["taxonomy_slug"])
+        if not bucket:
+            continue
+        bucket["top_artist_id"] = row["artist_id"]
+        bucket["top_artist_slug"] = row["artist_slug"]
+        bucket["top_artist_name"] = row["artist_name"]
+        bucket["top_artist_photo_url"] = _artist_photo_public_url(row["artist_id"])
+
     for slug in slugs:
         bucket = stats.setdefault(
             slug,
@@ -231,10 +290,19 @@ def get_taxonomy_node_stats(session, slugs: list[str]) -> dict[str, dict]:
                 "is_top_level": False,
                 "artist_count": 0,
                 "album_count": 0,
+                "cover_url": None,
+                "top_artist_id": None,
+                "top_artist_slug": None,
+                "top_artist_name": None,
+                "top_artist_photo_url": None,
             },
         )
         bucket.setdefault("page_slug", None)
         bucket.setdefault("page_name", None)
+        bucket.setdefault("top_artist_id", None)
+        bucket.setdefault("top_artist_slug", None)
+        bucket.setdefault("top_artist_name", None)
+        bucket.setdefault("top_artist_photo_url", None)
     return stats
 
 

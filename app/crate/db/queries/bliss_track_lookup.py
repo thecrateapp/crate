@@ -3,6 +3,10 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.queries.bliss_shared import bliss_session_scope
+from crate.db.queries.playable_media_filters import (
+    playable_media_params,
+    playable_track_clause,
+)
 
 
 def get_track_with_artist(session=None, track_path: str = "") -> dict | None:
@@ -12,7 +16,7 @@ def get_track_with_artist(session=None, track_path: str = "") -> dict | None:
         row = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT t.id AS track_id, t.path, t.title, t.artist, a.artist AS album_artist, a.name AS album, a.year, t.duration,
                        t.bliss_vector, t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence, t.rating,
@@ -21,9 +25,10 @@ def get_track_with_artist(session=None, track_path: str = "") -> dict | None:
                 JOIN library_albums a ON t.album_id = a.id
                 LEFT JOIN library_artists ar ON LOWER(a.artist) = LOWER(ar.name)
                 WHERE t.path = :track_path
+                  AND {playable_track_clause("t", "a")}
                 """
                 ),
-                {"track_path": track_path},
+                {"track_path": track_path, **playable_media_params()},
             )
             .mappings()
             .first()
@@ -44,7 +49,7 @@ def get_same_artist_tracks(
             result = (
                 active_session.execute(
                     text(
-                        """
+                        f"""
                     SELECT
                         t.id AS track_id,
                         t.path,
@@ -64,7 +69,9 @@ def get_same_artist_tracks(
                     FROM library_tracks t
                     JOIN library_albums a ON t.album_id = a.id
                     JOIN library_artists ar ON LOWER(a.artist) = LOWER(ar.name)
-                    WHERE ar.id = :artist_id AND t.path != :exclude_path
+                    WHERE ar.id = :artist_id
+                      AND t.path != :exclude_path
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY COALESCE(t.lastfm_playcount, 0) DESC, t.id
                     LIMIT :limit
                     """
@@ -73,6 +80,7 @@ def get_same_artist_tracks(
                         "artist_id": artist_id,
                         "exclude_path": exclude_path,
                         "limit": limit,
+                        **playable_media_params(),
                     },
                 )
                 .mappings()
@@ -82,7 +90,7 @@ def get_same_artist_tracks(
             result = (
                 active_session.execute(
                     text(
-                        """
+                        f"""
                     SELECT
                         t.id AS track_id,
                         t.path,
@@ -101,7 +109,9 @@ def get_same_artist_tracks(
                         t.valence
                     FROM library_tracks t
                     JOIN library_albums a ON t.album_id = a.id
-                    WHERE LOWER(a.artist) = LOWER(:artist_name) AND t.path != :exclude_path
+                    WHERE LOWER(a.artist) = LOWER(:artist_name)
+                      AND t.path != :exclude_path
+                      AND {playable_track_clause("t", "a")}
                     ORDER BY COALESCE(t.lastfm_playcount, 0) DESC, t.id
                     LIMIT :limit
                     """
@@ -110,6 +120,7 @@ def get_same_artist_tracks(
                         "artist_name": artist_name,
                         "exclude_path": exclude_path,
                         "limit": limit,
+                        **playable_media_params(),
                     },
                 )
                 .mappings()
@@ -127,7 +138,7 @@ def get_seed_tracks_by_paths(
         result = (
             active_session.execute(
                 text(
-                    """
+                    f"""
                 SELECT
                     t.id AS track_id,
                     t.path,
@@ -148,9 +159,10 @@ def get_seed_tracks_by_paths(
                 FROM library_tracks t
                 JOIN library_albums a ON t.album_id = a.id
                 WHERE t.path = ANY(:seed_paths)
+                  AND {playable_track_clause("t", "a")}
                 """
                 ),
-                {"seed_paths": seed_paths},
+                {"seed_paths": seed_paths, **playable_media_params()},
             )
             .mappings()
             .all()
