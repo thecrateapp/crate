@@ -597,6 +597,35 @@ describe("JamSession active room - host", () => {
     mockUseApiData.value = makeRoom();
   });
 
+  it("localizes the active room chrome", async () => {
+    renderWithListenProviders(<JamSession />, { locale: "es" });
+
+    expect(screen.getByText("Sala Jam")).toBeInTheDocument();
+    expect(screen.getByText("Conectando con la sala...")).toBeInTheDocument();
+    expect(screen.getByText("Sala pública")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Añadir pista actual" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Miembros" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Cola compartida" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Busca pistas para añadir a esta sala"),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Editar perfil de la sala" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Perfil de la sala" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Guardar perfil")).toBeInTheDocument();
+  });
+
   it("renders room name and description", () => {
     renderWithListenProviders(<JamSession />);
 

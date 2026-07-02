@@ -28,6 +28,7 @@ import {
   Users,
   Zap,
 } from "@crate/ui/icons";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
@@ -236,26 +237,37 @@ function AvatarBubble({
   );
 }
 
-function eventActivityText(event: JamEvent, actorName?: string) {
+function eventActivityText(
+  event: JamEvent,
+  actorName: string | undefined,
+  t: TFunction,
+) {
   const actor = actorName || displayName(event);
   const payload = (event.payload_json || {}) as Record<string, unknown>;
   const track = payloadToTrack(
     payload.track as Record<string, unknown> | undefined,
   );
-  if (event.event_type === "join") return `${actor} joined the room`;
+  if (event.event_type === "join") return t("jam.activity.join", { actor });
   if (event.event_type === "queue_add")
-    return `${actor} added ${track?.title || "a track"} to the queue`;
+    return t("jam.activity.queueAdd", {
+      actor,
+      title: track?.title || t("jam.activity.aTrack"),
+    });
   if (event.event_type === "queue_remove")
-    return `${actor} removed a track from the queue`;
+    return t("jam.activity.queueRemove", { actor });
   if (event.event_type === "queue_reorder")
-    return `${actor} reordered the queue`;
-  if (event.event_type === "play") return `${actor} synced playback`;
-  if (event.event_type === "pause") return `${actor} paused the room`;
-  if (event.event_type === "seek") return `${actor} adjusted playback position`;
+    return t("jam.activity.queueReorder", { actor });
+  if (event.event_type === "play") return t("jam.activity.play", { actor });
+  if (event.event_type === "pause") return t("jam.activity.pause", { actor });
+  if (event.event_type === "seek") return t("jam.activity.seek", { actor });
   if (event.event_type === "room_updated")
-    return `${actor} updated room settings`;
-  if (event.event_type === "room_ended") return `${actor} ended the room`;
-  return `${actor} did ${event.event_type.replace("_", " ")}`;
+    return t("jam.activity.roomUpdated", { actor });
+  if (event.event_type === "room_ended")
+    return t("jam.activity.roomEnded", { actor });
+  return t("jam.activity.fallback", {
+    actor,
+    event: event.event_type.replace("_", " "),
+  });
 }
 
 function extractInviteToken(value: string) {
@@ -546,10 +558,10 @@ export function JamSession() {
         patch,
       );
       setRoom(updated);
-      toast.success("Room settings updated");
+      toast.success(t("jam.toasts.roomSettingsUpdated"));
       return true;
     } catch {
-      toast.error("Failed to update room settings");
+      toast.error(t("jam.toasts.roomSettingsUpdateFailed"));
       return false;
     } finally {
       setUpdatingRoomField(null);
@@ -586,7 +598,7 @@ export function JamSession() {
       setInviteData(invite);
       setInviteModalOpen(true);
     } catch {
-      toast.error("Failed to create invite");
+      toast.error(t("jam.toasts.createInviteFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -603,9 +615,9 @@ export function JamSession() {
       );
       setRoom(updated);
       setSyncStatus("idle");
-      toast.success("Jam room ended");
+      toast.success(t("jam.toasts.roomEnded"));
     } catch {
-      toast.error("Failed to end jam room");
+      toast.error(t("jam.toasts.roomEndFailed"));
     } finally {
       setEndingRoom(false);
     }
@@ -625,12 +637,12 @@ export function JamSession() {
         `/api/jam/rooms/${targetRoom.id}`,
         "DELETE",
       );
-      toast.success("Jam room deleted");
+      toast.success(t("jam.toasts.roomDeleted"));
       refetchRooms();
       setDeleteTargetRoom(null);
       if (roomId === targetRoom.id) navigate("/jam", { replace: true });
     } catch {
-      toast.error("Failed to delete jam room");
+      toast.error(t("jam.toasts.roomDeleteFailed"));
     } finally {
       setDeletingRoomId(null);
     }
@@ -639,19 +651,19 @@ export function JamSession() {
   async function copyInviteLink(link: string) {
     try {
       await navigator.clipboard.writeText(link);
-      toast.success("Invite link copied");
+      toast.success(t("jam.toasts.inviteLinkCopied"));
     } catch {
-      toast.error("Failed to copy invite link");
+      toast.error(t("jam.toasts.inviteLinkCopyFailed"));
     }
   }
 
   function shareCurrentTrack() {
     if (!canEditQueue) {
-      toast.error("You do not have permission to edit this room queue");
+      toast.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     if (!currentTrack) {
-      toast.info("Play something first so the room has a seed track");
+      toast.info(t("jam.toasts.playSomethingFirst"));
       return;
     }
     if (
@@ -661,13 +673,13 @@ export function JamSession() {
         source: "current_track",
       })
     ) {
-      toast.success(`Shared ${currentTrack.title} with the room`);
+      toast.success(t("jam.toasts.sharedTrack", { title: currentTrack.title }));
     }
   }
 
   function addSearchTrackToRoom(track: SearchTrack) {
     if (!canEditQueue) {
-      toast.error("You do not have permission to edit this room queue");
+      toast.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     const playable = searchTrackToTrack(track);
@@ -678,7 +690,7 @@ export function JamSession() {
         source: "search",
       })
     ) {
-      toast.success(`Added ${playable.title} to the room queue`);
+      toast.success(t("jam.toasts.addedTrack", { title: playable.title }));
       setQueueSearch("");
       setQueueSearchResults([]);
     }
@@ -686,7 +698,7 @@ export function JamSession() {
 
   function syncPlaybackState() {
     if (!currentTrack) {
-      toast.info("There is no current track to sync");
+      toast.info(t("jam.toasts.noCurrentTrackToSync"));
       return;
     }
     if (
@@ -700,27 +712,27 @@ export function JamSession() {
       setSyncStatus(isPlaying ? "synced" : "idle");
       toast.success(
         isPlaying
-          ? "Synced! Everyone is now listening together."
-          : "Pause state synced to the room",
+          ? t("jam.toasts.syncedPlayback")
+          : t("jam.toasts.syncedPause"),
       );
     }
   }
 
   function handlePlayRoomQueue() {
     if (sharedQueue.length === 0) {
-      toast.info("The room queue is empty");
+      toast.info(t("jam.toasts.roomQueueEmpty"));
       return;
     }
     playAll(sharedQueue, 0, {
       type: "queue",
-      name: `Jam: ${room?.name || "Session"}`,
+      name: `Jam: ${room?.name || t("jam.room.sessionFallback")}`,
     });
-    toast.success("Room queue loaded into your player");
+    toast.success(t("jam.toasts.roomQueueLoaded"));
   }
 
   function handleRemoveFromRoomQueue(index: number) {
     if (!canEditQueue) {
-      toast.error("You do not have permission to edit this room queue");
+      toast.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     sendEvent({ type: "queue_remove", index });
@@ -728,7 +740,7 @@ export function JamSession() {
 
   function handleMoveInRoomQueue(fromIndex: number, toIndex: number) {
     if (!canEditQueue) {
-      toast.error("You do not have permission to edit this room queue");
+      toast.error(t("jam.toasts.queuePermissionDenied"));
       return;
     }
     if (toIndex < 0 || toIndex >= sharedQueue.length) return;
@@ -865,7 +877,7 @@ export function JamSession() {
         </div>
         {latestEvent ? (
           <div className="mt-3 truncate text-xs text-muted-foreground">
-            {eventActivityText(latestEvent, latestActor?.name)}
+            {eventActivityText(latestEvent, latestActor?.name, t)}
           </div>
         ) : null}
       </div>
@@ -882,9 +894,11 @@ export function JamSession() {
     >
       <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Delete room</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {t("jam.delete.modalTitle")}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            This removes the room, members, invites, queue, and activity.
+            {t("jam.delete.modalDescription")}
           </p>
         </div>
         <ModalCloseButton
@@ -897,10 +911,10 @@ export function JamSession() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-red-500/15 bg-red-500/10 px-4 py-3">
             <div className="text-sm font-medium text-foreground">
-              {deleteTargetRoom?.name || "Room"}
+              {deleteTargetRoom?.name || t("jam.delete.roomFallback")}
             </div>
             <div className="mt-1 text-xs text-red-100/75">
-              This action cannot be undone.
+              {t("jam.delete.irreversible")}
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -910,7 +924,7 @@ export function JamSession() {
               disabled={Boolean(deletingRoomId)}
               className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-white/10 disabled:opacity-60"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -923,7 +937,7 @@ export function JamSession() {
               ) : (
                 <Trash2 size={15} />
               )}
-              Delete room
+              {t("jam.delete.confirm")}
             </button>
           </div>
         </div>
@@ -1145,16 +1159,17 @@ export function JamSession() {
   if (!room) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-lg font-medium text-foreground">Room unavailable</p>
+        <p className="text-lg font-medium text-foreground">
+          {t("jam.room.unavailableTitle")}
+        </p>
         <p className="max-w-md text-sm text-muted-foreground">
-          {error ||
-            "You may not have access to this room anymore, or the invite has expired."}
+          {error || t("jam.room.unavailableDescription")}
         </p>
         <Link
           to="/jam"
           className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
         >
-          Back to jam sessions
+          {t("jam.room.backToJam")}
         </Link>
       </div>
     );
@@ -1170,22 +1185,22 @@ export function JamSession() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="text-xs uppercase tracking-wide text-cyan-300/75">
-              Jam room
+              {t("jam.room.eyebrow")}
             </div>
             <h1 className="mt-1 text-3xl font-bold text-foreground">
               {room.name}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {room.description ||
-                `${room.members.length} member${
-                  room.members.length !== 1 ? "s" : ""
-                } in the room. Use invites to bring people in, then sync playback or shape the shared queue together.`}
+                t("jam.room.defaultDescription", {
+                  count: room.members.length,
+                })}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               {isConnected ? (
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
                   <Radio size={12} className="text-emerald-300" />
-                  Connected to room
+                  {t("jam.room.connected")}
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
@@ -1195,12 +1210,12 @@ export function JamSession() {
                   ) : (
                     <Loader2 size={12} className="animate-spin" />
                   )}
-                  {connectionProblem || "Connecting to room..."}
+                  {connectionProblem || t("jam.room.connecting")}
                 </div>
               )}
               {!roomIsActive ? (
                 <div className="inline-flex rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-200">
-                  Room ended
+                  {t("jam.room.ended")}
                 </div>
               ) : null}
               <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-muted-foreground">
@@ -1209,12 +1224,14 @@ export function JamSession() {
                 ) : (
                   <Lock size={12} />
                 )}
-                {room.visibility === "public" ? "Public room" : "Invite-only"}
+                {room.visibility === "public"
+                  ? t("jam.room.publicRoom")
+                  : t("jam.visibility.inviteOnly")}
               </div>
               {room.is_permanent ? (
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
                   <Pin size={12} />
-                  Permanent
+                  {t("jam.roomCard.permanent")}
                 </div>
               ) : null}
               {(room.tags || []).map((tag) => (
@@ -1228,7 +1245,7 @@ export function JamSession() {
               {roomCurrentTrack ? (
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
                   <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                    Now playing in room
+                    {t("jam.room.nowPlaying")}
                   </div>
                   <div className="mt-1 text-sm font-medium text-foreground">
                     {roomCurrentTrack.title}
@@ -1257,7 +1274,9 @@ export function JamSession() {
                         : "text-amber-400"
                     }
                   />
-                  {syncStatus === "synced" ? "Synced" : "Syncing..."}
+                  {syncStatus === "synced"
+                    ? t("jam.room.synced")
+                    : t("jam.room.syncing")}
                 </div>
               ) : null}
             </div>
@@ -1265,7 +1284,7 @@ export function JamSession() {
           <div className="flex flex-col gap-2 sm:items-end">
             <div className="flex flex-wrap gap-1 rounded-2xl border border-white/10 bg-black/20 p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
               <HeroActionButton
-                label="Add current track"
+                label={t("jam.room.actions.addCurrentTrack")}
                 onClick={shareCurrentTrack}
                 disabled={!roomIsActive || !isConnected}
                 className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15 hover:text-cyan-100"
@@ -1273,7 +1292,7 @@ export function JamSession() {
                 <Plus size={17} />
               </HeroActionButton>
               <HeroActionButton
-                label="Play room queue"
+                label={t("jam.room.actions.playRoomQueue")}
                 onClick={handlePlayRoomQueue}
                 disabled={sharedQueue.length === 0}
               >
@@ -1283,8 +1302,8 @@ export function JamSession() {
                 <HeroActionButton
                   label={
                     syncStatus === "synced"
-                      ? "Resync playback"
-                      : "Sync playback"
+                      ? t("jam.room.actions.resyncPlayback")
+                      : t("jam.room.actions.syncPlayback")
                   }
                   onClick={syncPlaybackState}
                   disabled={!roomIsActive || !isConnected}
@@ -1300,10 +1319,10 @@ export function JamSession() {
                 <div
                   title={
                     syncStatus === "synced"
-                      ? "Synced with host"
+                      ? t("jam.room.syncedWithHost")
                       : syncStatus === "drifting"
-                        ? "Catching up"
-                        : "Waiting for host"
+                        ? t("jam.room.catchingUp")
+                        : t("jam.room.waitingForHost")
                   }
                   className="flex h-11 w-11 items-center justify-center rounded-full border border-white/8 bg-white/[0.01] text-white/25"
                 >
@@ -1317,8 +1336,8 @@ export function JamSession() {
                 <HeroActionButton
                   label={
                     room.visibility === "public"
-                      ? "Make room invite-only"
-                      : "Make room public"
+                      ? t("jam.room.actions.makeInviteOnly")
+                      : t("jam.room.actions.makePublic")
                   }
                   onClick={() =>
                     void updateRoomSettings(
@@ -1341,8 +1360,8 @@ export function JamSession() {
                 <HeroActionButton
                   label={
                     room.is_permanent
-                      ? "Unpin permanent room"
-                      : "Make room permanent"
+                      ? t("jam.room.actions.unpinPermanent")
+                      : t("jam.room.actions.makePermanent")
                   }
                   onClick={() =>
                     void updateRoomSettings(
@@ -1356,7 +1375,7 @@ export function JamSession() {
                   <Pin size={16} />
                 </HeroActionButton>
                 <HeroActionButton
-                  label="Edit room profile"
+                  label={t("jam.room.actions.editProfile")}
                   onClick={openMetadataModal}
                   disabled={updatingRoomField !== null}
                   loading={updatingRoomField === "metadata"}
@@ -1364,7 +1383,7 @@ export function JamSession() {
                   <ListMusic size={16} />
                 </HeroActionButton>
                 <HeroActionButton
-                  label="Invite people"
+                  label={t("jam.room.actions.invitePeople")}
                   onClick={handleCreateInvite}
                   disabled={!roomIsActive}
                   loading={creatingInvite}
@@ -1372,7 +1391,7 @@ export function JamSession() {
                   <Share2 size={16} />
                 </HeroActionButton>
                 <HeroActionButton
-                  label="End room"
+                  label={t("jam.room.actions.endRoom")}
                   onClick={handleEndRoom}
                   disabled={!roomIsActive}
                   loading={endingRoom}
@@ -1382,7 +1401,7 @@ export function JamSession() {
                 </HeroActionButton>
                 {isHost ? (
                   <HeroActionButton
-                    label="Delete room"
+                    label={t("jam.delete.title")}
                     onClick={() => requestDeleteRoom(room)}
                     disabled={deletingRoomId === room.id}
                     loading={deletingRoomId === room.id}
@@ -1399,7 +1418,9 @@ export function JamSession() {
 
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.1fr_1.1fr]">
         <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-foreground">Members</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {t("jam.room.members")}
+          </h2>
           <div className="mt-4 space-y-3">
             {room.members.map((member) => (
               <UserProfileLink
@@ -1420,13 +1441,17 @@ export function JamSession() {
                       {displayName(member)}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {member.username ? `@${member.username}` : "Profile"} ·{" "}
-                      {member.role}
+                      {member.username
+                        ? `@${member.username}`
+                        : t("jam.room.profile")}{" "}
+                      · {member.role}
                     </div>
                   </div>
                 </div>
                 <div className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground">
-                  {member.user_id === room.host_user_id ? "Host" : "Collab"}
+                  {member.user_id === room.host_user_id
+                    ? t("jam.room.roles.host")
+                    : t("jam.room.roles.collab")}
                 </div>
               </UserProfileLink>
             ))}
@@ -1437,14 +1462,14 @@ export function JamSession() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-foreground">
-                Shared queue
+                {t("jam.room.sharedQueue")}
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Host and collaborators can remove tracks and reorder the flow.
+                {t("jam.room.sharedQueueSubtitle")}
               </p>
             </div>
             <div className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground">
-              {sharedQueue.length} track{sharedQueue.length === 1 ? "" : "s"}
+              {t("jam.room.queueTrackCount", { count: sharedQueue.length })}
             </div>
           </div>
 
@@ -1457,8 +1482,8 @@ export function JamSession() {
                 disabled={!canEditQueue}
                 placeholder={
                   canEditQueue
-                    ? "Search tracks to add to this room"
-                    : "Only hosts and collaborators can add tracks"
+                    ? t("jam.room.queueSearchPlaceholder")
+                    : t("jam.room.queueSearchDisabledPlaceholder")
                 }
                 className="h-8 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60"
               />
@@ -1542,7 +1567,9 @@ export function JamSession() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      aria-label={`Move ${track.title} up`}
+                      aria-label={t("jam.room.queueMoveUpAria", {
+                        title: track.title,
+                      })}
                       onClick={() => handleMoveInRoomQueue(index, index - 1)}
                       disabled={index === 0}
                       className="rounded-full border border-white/10 p-1.5 text-muted-foreground hover:bg-white/5 disabled:opacity-30"
@@ -1551,7 +1578,9 @@ export function JamSession() {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Move ${track.title} down`}
+                      aria-label={t("jam.room.queueMoveDownAria", {
+                        title: track.title,
+                      })}
                       onClick={() => handleMoveInRoomQueue(index, index + 1)}
                       disabled={index === sharedQueue.length - 1}
                       className="rounded-full border border-white/10 p-1.5 text-muted-foreground hover:bg-white/5 disabled:opacity-30"
@@ -1560,7 +1589,9 @@ export function JamSession() {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Remove ${track.title} from queue`}
+                      aria-label={t("jam.room.queueRemoveAria", {
+                        title: track.title,
+                      })}
                       onClick={() => handleRemoveFromRoomQueue(index)}
                       className="rounded-full border border-red-500/20 p-1.5 text-red-300 hover:bg-red-500/10"
                     >
@@ -1573,16 +1604,16 @@ export function JamSession() {
             {sharedQueue.length === 0 ? (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Nothing in the shared queue yet. Play something and click{" "}
-                  <b>Add current track</b> above, or browse your library to find
-                  tracks to seed the room.
+                  {t("jam.room.emptyQueuePrefix")}{" "}
+                  <b>{t("jam.room.actions.addCurrentTrack")}</b>{" "}
+                  {t("jam.room.emptyQueueSuffix")}
                 </p>
                 <Link
                   to="/search"
                   className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <Search size={15} />
-                  Browse library
+                  {t("jam.room.browseLibrary")}
                 </Link>
               </div>
             ) : null}
@@ -1591,7 +1622,7 @@ export function JamSession() {
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-foreground">
-            Recent room activity
+            {t("jam.room.recentActivity")}
           </h2>
           <div className="mt-4 space-y-3">
             {[...room.events]
@@ -1621,7 +1652,7 @@ export function JamSession() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
                           <div className="truncate text-sm font-medium text-foreground">
-                            {eventActivityText(event, actor.name)}
+                            {eventActivityText(event, actor.name, t)}
                           </div>
                           <div className="shrink-0 text-[11px] text-muted-foreground">
                             {new Date(event.created_at).toLocaleTimeString([], {
@@ -1660,7 +1691,7 @@ export function JamSession() {
               })}
             {room.events.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No room events yet.
+                {t("jam.room.noEvents")}
               </p>
             ) : null}
           </div>
@@ -1677,11 +1708,10 @@ export function JamSession() {
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Room profile
+              {t("jam.room.profileModalTitle")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Describe the vibe so public and permanent rooms are easier to
-              discover.
+              {t("jam.room.profileModalDescription")}
             </p>
           </div>
           <ModalCloseButton onClick={() => setMetadataModalOpen(false)} />
@@ -1690,24 +1720,24 @@ export function JamSession() {
           <div className="space-y-4">
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">
-                Description
+                {t("jam.room.descriptionLabel")}
               </span>
               <textarea
                 value={metadataDescription}
                 onChange={(event) => setMetadataDescription(event.target.value)}
                 rows={4}
-                placeholder="Post-punk, cold wave and angular guitars. Mostly 80s and 90s."
+                placeholder={t("jam.room.descriptionPlaceholder")}
                 className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
               />
             </label>
             <label className="block">
               <span className="text-xs font-medium text-muted-foreground">
-                Tags / genres
+                {t("jam.room.tagsLabel")}
               </span>
               <input
                 value={metadataTagsInput}
                 onChange={(event) => setMetadataTagsInput(event.target.value)}
-                placeholder="post-punk, 90s, gothic rock"
+                placeholder={t("jam.room.tagsPlaceholder")}
                 className="mt-2 h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
               />
             </label>
@@ -1717,7 +1747,7 @@ export function JamSession() {
                 onClick={() => setMetadataModalOpen(false)}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -1730,7 +1760,7 @@ export function JamSession() {
                 ) : (
                   <ListMusic size={15} />
                 )}
-                Save profile
+                {t("jam.room.saveProfile")}
               </button>
             </div>
           </div>
@@ -1745,10 +1775,10 @@ export function JamSession() {
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Invite to room
+              {t("jam.room.inviteModalTitle")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Share this link or scan the QR to join.
+              {t("jam.room.inviteModalDescription")}
             </p>
           </div>
           <ModalCloseButton onClick={() => setInviteModalOpen(false)} />
@@ -1773,7 +1803,7 @@ export function JamSession() {
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                 >
                   <Copy size={15} />
-                  Copy link
+                  {t("jam.room.copyLink")}
                 </button>
                 <button
                   type="button"
@@ -1784,7 +1814,7 @@ export function JamSession() {
                   className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                 >
                   <QrCode size={15} />
-                  Done
+                  {t("jam.room.done")}
                 </button>
               </div>
             </div>
