@@ -167,6 +167,17 @@ describe("Library", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("localizes the collection landing on mobile", () => {
+    renderLibrary("/library", "/library", "es");
+
+    expect(
+      screen.getByRole("heading", { name: "Colección" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Nueva playlist" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders dedicated mobile artist section with sort options", () => {
     renderLibrary("/collection/artists", "/collection/:section");
 
@@ -242,9 +253,10 @@ describe("Library", () => {
   });
 });
 
-function renderLibrary(route = "/library", path = "/library") {
+function renderLibrary(route = "/library", path = "/library", locale?: "es") {
   return renderWithListenProviders(<Library />, {
     path,
     route,
+    locale,
   });
 }

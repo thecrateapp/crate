@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Loader2,
   Music,
@@ -136,6 +137,7 @@ function uploadErrorMessage(error: unknown): string {
 }
 
 export function Upload() {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastUpload, setLastUpload] = useState<UploadResponse | null>(null);
@@ -162,9 +164,7 @@ export function Upload() {
         onProgress: setUploadProgress,
       });
       setLastUpload(response);
-      toast.success(
-        "Upload queued. Crate is importing your music in the background.",
-      );
+      toast.success(t("upload.toasts.queued"));
       setFiles([]);
     } catch (error) {
       toast.error(uploadErrorMessage(error));
@@ -179,15 +179,13 @@ export function Upload() {
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
           <UploadIcon size={12} />
-          Upload music
+          {t("upload.badge")}
         </div>
         <h1 className="text-3xl font-bold text-foreground">
-          Add music to your library
+          {t("upload.title")}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Upload individual tracks or zipped albums. Crate will import them into
-          the shared library, run the usual enrichment pipeline, and add what
-          you uploaded to your collection automatically.
+          {t("upload.subtitle")}
         </p>
       </div>
 
@@ -199,7 +197,7 @@ export function Upload() {
                 <UploadIcon size={24} />
               </div>
               <div className="text-base font-semibold text-foreground">
-                Drop files here or choose files
+                {t("upload.dropzone.title")}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">
                 FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
@@ -218,7 +216,7 @@ export function Upload() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-foreground">
-                      Ready to import
+                      {t("upload.ready.title")}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {files.length} file{files.length === 1 ? "" : "s"} ·{" "}
@@ -229,7 +227,7 @@ export function Upload() {
                     onClick={() => setFiles([])}
                     className="text-xs text-muted-foreground transition-colors hover:text-white/70"
                   >
-                    Clear
+                    {t("common.clear")}
                   </button>
                 </div>
                 <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
@@ -258,17 +256,14 @@ export function Upload() {
 
           <div className="space-y-4 rounded-[24px] border border-white/10 bg-[var(--gradient-bg-50)] p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              What happens next
+              {t("upload.next.title")}
             </h2>
             <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <li>Crate imports the files into the shared library.</li>
-              <li>Library sync and enrichment run in the background.</li>
-              <li>Uploaded tracks are liked for you automatically.</li>
-              <li>Uploaded albums are saved and artists are followed.</li>
-              <li>
-                Your upload is attributed to you, with export and withdrawal
-                controls in Library.
-              </li>
+              <li>{t("upload.next.import")}</li>
+              <li>{t("upload.next.enrichment")}</li>
+              <li>{t("upload.next.liked")}</li>
+              <li>{t("upload.next.saved")}</li>
+              <li>{t("upload.next.attributed")}</li>
             </ul>
             <button
               onClick={handleSubmit}
@@ -281,19 +276,23 @@ export function Upload() {
                 <UploadIcon size={16} />
               )}
               {uploadProgress
-                ? `Uploading ${uploadProgress.done}/${uploadProgress.total}`
-                : "Import to library"}
+                ? t("upload.progress", {
+                    done: uploadProgress.done,
+                    total: uploadProgress.total,
+                  })
+                : t("upload.import")}
             </button>
             {lastUpload ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
                 <div className="flex items-center gap-2 font-medium">
                   <CheckCircle2 size={15} />
-                  Upload queued
+                  {t("upload.status.queued")}
                 </div>
                 <div className="mt-1 text-xs text-emerald-100/80">
-                  Task `{lastUpload.task_id}` is processing{" "}
-                  {lastUpload.file_count} file
-                  {lastUpload.file_count === 1 ? "" : "s"}.
+                  {t("upload.status.processing", {
+                    taskId: lastUpload.task_id,
+                    count: lastUpload.file_count,
+                  })}
                 </div>
               </div>
             ) : null}

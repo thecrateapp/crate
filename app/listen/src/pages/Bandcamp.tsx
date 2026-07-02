@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Download,
   ExternalLink,
@@ -61,6 +62,7 @@ interface BandcampRadarItem extends BandcampItem {
 }
 
 export function Bandcamp() {
+  const { t } = useTranslation();
   const status = useApi<BandcampConnectionStatus>("/api/bandcamp/me/status");
   const collection = useApi<BandcampCollectionResponse>(
     "/api/bandcamp/me/collection",
@@ -82,13 +84,24 @@ export function Bandcamp() {
     () => [
       {
         label: "Owned",
+        labelText: t("bandcamp.stats.owned"),
         value: collection.data?.total ?? 0,
         icon: BandcampLogo,
       },
-      { label: "Wishlist", value: wishlist.data?.total ?? 0, icon: Heart },
-      { label: "Radar", value: radar.data?.total ?? 0, icon: Radar },
+      {
+        label: "Wishlist",
+        labelText: t("bandcamp.stats.wishlist"),
+        value: wishlist.data?.total ?? 0,
+        icon: Heart,
+      },
+      {
+        label: "Radar",
+        labelText: t("bandcamp.stats.radar"),
+        value: radar.data?.total ?? 0,
+        icon: Radar,
+      },
     ],
-    [collection.data, radar.data, wishlist.data],
+    [collection.data, radar.data, t, wishlist.data],
   );
 
   async function queueTask(path: string, label: string) {
@@ -141,11 +154,10 @@ export function Bandcamp() {
               Bandcamp
             </div>
             <h1 className="mt-5 text-4xl font-black tracking-tight text-white md:text-6xl">
-              Support what you keep
+              {t("bandcamp.title")}
             </h1>
             <p className="mt-3 max-w-2xl text-base text-slate-400 md:text-lg">
-              Your purchases, wishlist and Bandcamp Radar, connected to the
-              Crate library without turning discovery into clutter.
+              {t("bandcamp.subtitle")}
             </p>
             <ConnectionLine
               connected={connected}
@@ -168,7 +180,7 @@ export function Bandcamp() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              Sync
+              {t("bandcamp.actions.sync")}
             </button>
             <button
               type="button"
@@ -179,7 +191,7 @@ export function Bandcamp() {
               className="inline-flex h-11 items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50"
             >
               <Radar className="h-4 w-4" />
-              Refresh Radar
+              {t("bandcamp.actions.refreshRadar")}
             </button>
           </div>
         </div>
@@ -187,41 +199,44 @@ export function Bandcamp() {
 
       <section className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
+          <StatCard key={stat.label} {...stat} label={stat.labelText} />
         ))}
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Rail
-          title="Bandcamp Radar"
-          subtitle="Wishlist and support signals worth revisiting."
+          title={t("bandcamp.rails.radar.title")}
+          subtitle={t("bandcamp.rails.radar.subtitle")}
         >
           <ItemGrid
             items={radarItems}
             busyAction={busyAction}
             onImport={importItem}
-            empty="No Radar candidates yet."
+            empty={t("bandcamp.empty.radar")}
           />
         </Rail>
         <Rail
-          title="Owned purchases"
-          subtitle="Recently synced collection items."
+          title={t("bandcamp.rails.owned.title")}
+          subtitle={t("bandcamp.rails.owned.subtitle")}
         >
           <ItemList
             items={recentOwned}
             busyAction={busyAction}
             onImport={importItem}
-            empty="No synced Bandcamp purchases yet."
+            empty={t("bandcamp.empty.owned")}
           />
         </Rail>
       </section>
 
-      <Rail title="Wishlist" subtitle="Things you might want to support next.">
+      <Rail
+        title={t("bandcamp.rails.wishlist.title")}
+        subtitle={t("bandcamp.rails.wishlist.subtitle")}
+      >
         <ItemGrid
           items={wishlistItems}
           busyAction={busyAction}
           onImport={importItem}
-          empty="No wishlist items synced yet."
+          empty={t("bandcamp.empty.wishlist")}
         />
       </Rail>
     </div>
@@ -239,23 +254,30 @@ function ConnectionLine({
   profileName: string;
   error?: string | null;
 }) {
+  const { t } = useTranslation();
   if (loading && !connected) {
     return (
-      <p className="mt-5 text-sm text-slate-500">Checking connection...</p>
+      <p className="mt-5 text-sm text-slate-500">
+        {t("bandcamp.connection.checking")}
+      </p>
     );
   }
   if (!connected) {
     return (
       <p className="mt-5 text-sm text-amber-200">
-        Not connected. Open Settings to connect Bandcamp first.
+        {t("bandcamp.connection.notConnected")}
       </p>
     );
   }
   return (
     <p className="mt-5 text-sm text-slate-400">
-      Connected as <span className="font-bold text-white">{profileName}</span>
+      {t("bandcamp.connection.connectedAs")}{" "}
+      <span className="font-bold text-white">{profileName}</span>
       {error ? (
-        <span className="text-red-300"> · Last error: {error}</span>
+        <span className="text-red-300">
+          {" · "}
+          {t("bandcamp.connection.lastError", { error })}
+        </span>
       ) : null}
     </p>
   );
@@ -421,6 +443,7 @@ function ItemActions({
   onImport: (item: BandcampItem) => void;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const canImport =
     item.owned === true &&
     item.downloadable === true &&
@@ -439,7 +462,7 @@ function ItemActions({
           ) : (
             <Download className="h-3.5 w-3.5" />
           )}
-          {!compact ? "Import" : null}
+          {!compact ? t("common.import") : null}
         </button>
       ) : null}
       {item.item_url ? (
@@ -449,7 +472,7 @@ function ItemActions({
           className="inline-flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-black text-white transition hover:bg-white/10"
         >
           <ExternalLink className="h-3.5 w-3.5" />
-          {!compact ? "Open" : null}
+          {!compact ? t("common.open") : null}
         </button>
       ) : null}
     </div>

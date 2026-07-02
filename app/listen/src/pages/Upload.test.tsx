@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { screen } from "@testing-library/react";
 
 import { api } from "@/lib/api";
-import { uploadMusicFiles } from "@/pages/Upload";
+import { Upload, uploadMusicFiles } from "@/pages/Upload";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -88,5 +90,22 @@ describe("uploadMusicFiles", () => {
       "POST",
     );
     expect(onProgress).toHaveBeenLastCalledWith({ done: 2, total: 2 });
+  });
+});
+
+describe("Upload", () => {
+  it("localizes the upload page chrome", () => {
+    renderWithListenProviders(<Upload />, { locale: "es" });
+
+    expect(screen.getByText("Subir música")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Añade música a tu biblioteca" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Arrastra archivos aquí o elige archivos"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Importar a la biblioteca" }),
+    ).toBeInTheDocument();
   });
 });

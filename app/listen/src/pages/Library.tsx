@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Plus,
   Heart,
@@ -212,22 +213,26 @@ interface LibraryContribution {
   has_cover?: boolean | null;
 }
 
-const tabs: { key: Tab; label: string; icon: TabIcon }[] = [
-  { key: "playlists", label: "Playlists", icon: ListMusic },
-  { key: "artists", label: "Artists", icon: Users },
-  { key: "albums", label: "Albums", icon: Disc },
-  { key: "liked", label: "Liked", icon: Heart },
-  { key: "bandcamp", label: "Bandcamp", icon: BandcampLogo },
-  { key: "contributions", label: "Contributions", icon: Plus },
+const tabs: { key: Tab; labelKey: string; icon: TabIcon }[] = [
+  { key: "playlists", labelKey: "nav.collection.playlists", icon: ListMusic },
+  { key: "artists", labelKey: "nav.collection.artists", icon: Users },
+  { key: "albums", labelKey: "nav.collection.albums", icon: Disc },
+  { key: "liked", labelKey: "library.tabs.liked", icon: Heart },
+  { key: "bandcamp", labelKey: "nav.collection.bandcamp", icon: BandcampLogo },
+  {
+    key: "contributions",
+    labelKey: "nav.collection.contributions",
+    icon: Plus,
+  },
 ];
 
-const tabTitles: Record<Tab, string> = {
-  playlists: "Collection",
-  artists: "Artists",
-  albums: "Albums",
-  liked: "Liked tracks",
-  bandcamp: "Bandcamp",
-  contributions: "Contributions",
+const tabTitleKeys: Record<Tab, string> = {
+  playlists: "nav.collection",
+  artists: "nav.collection.artists",
+  albums: "nav.collection.albums",
+  liked: "nav.collection.likedTracks",
+  bandcamp: "nav.collection.bandcamp",
+  contributions: "nav.collection.contributions",
 };
 
 const artistSortOptions: { value: ArtistSort; label: string }[] = [
@@ -370,6 +375,7 @@ function CollectionSortDropdown<T extends string>({
 }
 
 function PlaylistsTab() {
+  const { t } = useTranslation();
   const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>(
     "/api/me/playlists-page",
   );
@@ -498,13 +504,13 @@ function PlaylistsTab() {
         className="flex items-center gap-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors px-4 py-2.5 text-sm font-medium text-foreground w-full"
       >
         <Plus size={16} className="text-primary" />
-        New Playlist
+        {t("library.playlists.new")}
       </button>
 
       {followedCurated && followedCurated.length > 0 ? (
         <div className="space-y-1">
           <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
-            From Crate
+            {t("explore.fromCrate.title")}
           </div>
           {followedCurated.map((playlist) => (
             <PlaylistListRow
@@ -538,12 +544,12 @@ function PlaylistsTab() {
 
       {!playlists || playlists.length === 0 ? (
         !followedCurated || followedCurated.length === 0 ? (
-          <EmptyState message="No playlists yet. Create one to get started." />
+          <EmptyState message={t("library.playlists.empty")} />
         ) : null
       ) : (
         <div className="space-y-1">
           <div className="px-1 pb-1 text-[11px] font-bold uppercase tracking-wider text-white/40">
-            Your Playlists
+            {t("library.playlists.yours")}
           </div>
           {playlists.map((pl) => (
             <PlaylistListRow
@@ -1399,6 +1405,7 @@ function LikedTab() {
 }
 
 export function Library() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { section } = useParams<{ section?: string }>();
   const isDesktop = useIsDesktop();
@@ -1429,17 +1436,26 @@ export function Library() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">
-          {isDesktop ? "Your Library" : tabTitles[tab]}
+          {isDesktop ? t("library.title.desktop") : t(tabTitleKeys[tab])}
         </h1>
       </div>
 
       {/* Stats */}
       {stats && (
         <div className="hidden gap-2 md:flex">
-          <StatBox value={stats.followed_artists} label="Artists" />
-          <StatBox value={stats.saved_albums} label="Albums" />
-          <StatBox value={stats.liked_tracks} label="Tracks" />
-          <StatBox value={stats.playlists} label="Playlists" />
+          <StatBox
+            value={stats.followed_artists}
+            label={t("nav.collection.artists")}
+          />
+          <StatBox
+            value={stats.saved_albums}
+            label={t("nav.collection.albums")}
+          />
+          <StatBox value={stats.liked_tracks} label={t("common.tracks")} />
+          <StatBox
+            value={stats.playlists}
+            label={t("nav.collection.playlists")}
+          />
         </div>
       )}
 
@@ -1447,7 +1463,7 @@ export function Library() {
       {isDesktop ? (
         <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex scroll-px-4 gap-2 overflow-x-auto pr-8 transform-gpu will-change-scroll [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] sm:pr-0">
-            {tabs.map(({ key, label, icon: Icon }) => (
+            {tabs.map(({ key, labelKey, icon: Icon }) => (
               <button
                 key={key}
                 onClick={() => setTab(key)}
@@ -1458,7 +1474,7 @@ export function Library() {
                 }`}
               >
                 <Icon size={14} />
-                {label}
+                {t(labelKey)}
               </button>
             ))}
           </div>

@@ -17,6 +17,7 @@ import {
 } from "@/lib/player-playback-prefs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   BarChart3,
@@ -246,6 +247,7 @@ const PLAYBACK_DELIVERY_OPTIONS: {
 ];
 
 export function Settings() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const {
     supported: offlineSupported,
@@ -280,30 +282,31 @@ export function Settings() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {t("settings.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Fine-tune playback behavior for this device.
+          {t("settings.subtitle")}
         </p>
       </div>
 
       <Section
-        title="Playback"
-        description="These preferences shape how the player behaves between tracks."
+        title={t("settings.playback.title")}
+        description={t("settings.playback.subtitle")}
       >
         <div className="space-y-3">
           <div>
             <div className="text-sm font-medium text-foreground">
-              Stream quality
+              {t("settings.playback.streamQuality")}
             </div>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Choose whether this device asks the server for the original file
-              or a lighter cached playback variant.
+              {t("settings.playback.streamQualityDescription")}
             </p>
           </div>
           <div
             className="grid gap-2 sm:grid-cols-3"
             role="radiogroup"
-            aria-label="Stream quality"
+            aria-label={t("settings.playback.streamQuality")}
           >
             {PLAYBACK_DELIVERY_OPTIONS.map((option) => {
               const selected = playbackDeliveryPolicy === option.value;
@@ -407,13 +410,13 @@ export function Settings() {
       </Section>
 
       <Section
-        title="Offline mirror"
-        description="Keep a transparent local mirror of tracks, albums, and static playlists so playback can continue when the network drops."
+        title={t("settings.offline.title")}
+        description={t("settings.offline.subtitle")}
       >
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
-              Items
+              {t("settings.offline.items")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {offlineSummary.itemCount}
@@ -427,7 +430,7 @@ export function Settings() {
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
-              Tracks
+              {t("common.tracks")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
@@ -438,7 +441,7 @@ export function Settings() {
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
-              Storage
+              {t("settings.offline.storage")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {formatBytes(offlineSummary.totalBytes)}
@@ -527,44 +530,48 @@ export function Settings() {
 
       <BandcampSection />
 
-      <Section title="Quick links">
+      <Section title={t("settings.links.title")}>
         <div className="flex flex-col gap-2">
           <Link
             to={publicProfilePath}
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
           >
-            <Users size={18} className="text-muted-foreground" /> Public profile
+            <Users size={18} className="text-muted-foreground" />{" "}
+            {t("settings.links.profile")}
           </Link>
           <Link
             to="/people"
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
           >
-            <Users size={18} className="text-muted-foreground" /> Find people
+            <Users size={18} className="text-muted-foreground" />{" "}
+            {t("settings.links.people")}
           </Link>
           <Link
             to="/jam"
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
           >
-            <Radio size={18} className="text-muted-foreground" /> Jam sessions
+            <Radio size={18} className="text-muted-foreground" />{" "}
+            {t("settings.links.jam")}
           </Link>
           <Link
             to="/upload"
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground hover:bg-white/5 transition-colors"
           >
-            <Upload size={18} className="text-muted-foreground" /> Upload music
+            <Upload size={18} className="text-muted-foreground" />{" "}
+            {t("upload.badge")}
           </Link>
           <Link
             to="/stats"
             className="hidden items-center gap-3 rounded-xl px-3 py-3 text-sm text-foreground transition-colors hover:bg-white/5 md:flex"
           >
-            <BarChart3 size={18} className="text-muted-foreground" /> Listening
-            stats
+            <BarChart3 size={18} className="text-muted-foreground" />{" "}
+            {t("settings.links.stats")}
           </Link>
           <button
             onClick={logout}
             className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-red-400 hover:bg-white/5 transition-colors w-full text-left"
           >
-            <LogOut size={18} /> Sign out
+            <LogOut size={18} /> {t("auth.logout")}
           </button>
         </div>
       </Section>
@@ -581,6 +588,7 @@ const SLEEP_MODES: { mode: SleepTimerMode; label: string }[] = [
 ];
 
 function SleepTimerSection() {
+  const { t } = useTranslation();
   const { pause } = usePlayerActions();
   const [timer, setTimer] = useState<SleepTimerState>({
     active: false,
@@ -591,8 +599,8 @@ function SleepTimerSection() {
 
   return (
     <Section
-      title="Sleep Timer"
-      description="Automatically pause playback after a set duration."
+      title={t("settings.sleep.title")}
+      description={t("settings.sleep.subtitle")}
     >
       <div className="flex flex-wrap gap-2">
         {SLEEP_MODES.map(({ mode, label }) => (
