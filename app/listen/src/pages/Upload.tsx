@@ -8,7 +8,7 @@ import {
 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 
 interface UploadResponse {
   task_id: string;
@@ -16,6 +16,24 @@ interface UploadResponse {
   file_count: number;
   total_bytes: number;
 }
+
+interface ChunkedUploadInitResponse {
+  upload_id: string;
+  file_count: number;
+  chunk_size: number;
+}
+
+interface UploadProgress {
+  done: number;
+  total: number;
+}
+
+interface UploadMusicFilesOptions {
+  chunkedThresholdBytes?: number;
+  onProgress?: (progress: UploadProgress) => void;
+}
+
+const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
 
 function formatBytes(bytes: number): string {
   if (!bytes) return "0 B";
@@ -31,10 +49,99 @@ function formatBytes(bytes: number): string {
   }`;
 }
 
+function totalFileBytes(files: File[]): number {
+  return files.reduce((sum, file) => sum + file.size, 0);
+}
+
+function directUpload(files: File[]): Promise<UploadResponse> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  return api<UploadResponse>("/api/acquisition/upload", "POST", formData);
+}
+
+async function chunkedUpload(
+  files: File[],
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<UploadResponse> {
+  const init = await api<ChunkedUploadInitResponse>(
+    "/api/acquisition/upload/chunked",
+    "POST",
+    {
+      files: files.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || null,
+      })),
+    },
+  );
+
+  const totalChunks = files.reduce(
+    (sum, file) => sum + Math.max(1, Math.ceil(file.size / init.chunk_size)),
+    0,
+  );
+  let done = 0;
+
+  for (const [fileIndex, file] of files.entries()) {
+    const chunkCount = Math.max(1, Math.ceil(file.size / init.chunk_size));
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+      const start = chunkIndex * init.chunk_size;
+      const end = Math.min(file.size, start + init.chunk_size);
+      const formData = new FormData();
+      formData.append("file_index", String(fileIndex));
+      formData.append("chunk_index", String(chunkIndex));
+      formData.append(
+        "chunk",
+        file.slice(start, end),
+        `${file.name}.part-${chunkIndex}`,
+      );
+
+      await api(
+        `/api/acquisition/upload/chunked/${init.upload_id}/chunk`,
+        "POST",
+        formData,
+      );
+      done += 1;
+      onProgress?.({ done, total: totalChunks });
+    }
+  }
+
+  return api<UploadResponse>(
+    `/api/acquisition/upload/chunked/${init.upload_id}/complete`,
+    "POST",
+  );
+}
+
+export function uploadMusicFiles(
+  files: File[],
+  options: UploadMusicFilesOptions = {},
+): Promise<UploadResponse> {
+  const threshold =
+    options.chunkedThresholdBytes ?? CHUNKED_UPLOAD_THRESHOLD_BYTES;
+  if (totalFileBytes(files) > threshold) {
+    return chunkedUpload(files, options.onProgress);
+  }
+  return directUpload(files);
+}
+
+function uploadErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 413) {
+    return "Upload is too large for a single request. Try again so Crate can split it into chunks.";
+  }
+  if (error instanceof ApiError && error.message) {
+    return "Failed to queue upload: " + error.message;
+  }
+  return "Failed to queue upload";
+}
+
 export function Upload() {
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastUpload, setLastUpload] = useState<UploadResponse | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  );
 
   const totalBytes = useMemo(
     () => files.reduce((sum, file) => sum + file.size, 0),
@@ -48,27 +155,22 @@ export function Upload() {
   async function handleSubmit() {
     if (files.length === 0) return;
 
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("files", file);
-    }
-
     setSubmitting(true);
+    setUploadProgress(null);
     try {
-      const response = await api<UploadResponse>(
-        "/api/acquisition/upload",
-        "POST",
-        formData,
-      );
+      const response = await uploadMusicFiles(files, {
+        onProgress: setUploadProgress,
+      });
       setLastUpload(response);
       toast.success(
         "Upload queued. Crate is importing your music in the background.",
       );
       setFiles([]);
-    } catch {
-      toast.error("Failed to queue upload");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error));
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -178,7 +280,9 @@ export function Upload() {
               ) : (
                 <UploadIcon size={16} />
               )}
-              Import to library
+              {uploadProgress
+                ? `Uploading ${uploadProgress.done}/${uploadProgress.total}`
+                : "Import to library"}
             </button>
             {lastUpload ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">

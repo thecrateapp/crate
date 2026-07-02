@@ -98,6 +98,22 @@ class AcquisitionUploadResponse(BaseModel):
     total_bytes: int
 
 
+class AcquisitionUploadChunkedFileRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=500)
+    size: int = Field(ge=0)
+    type: str | None = None
+
+
+class AcquisitionUploadChunkedInitRequest(BaseModel):
+    files: list[AcquisitionUploadChunkedFileRequest] = Field(min_length=1)
+
+
+class AcquisitionUploadChunkedInitResponse(BaseModel):
+    upload_id: str
+    file_count: int
+    chunk_size: int
+
+
 class NewReleaseResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 

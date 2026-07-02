@@ -1,6 +1,7 @@
 """Unified music acquisition API — Tidal + Soulseek + uploads."""
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -8,7 +9,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from starlette.responses import StreamingResponse
 
 from crate import soulseek, tidal
@@ -32,6 +33,8 @@ from crate.api.schemas.acquisition import (
     AcquisitionQueueResponse,
     AcquisitionStatusResponse,
     AcquisitionSurfaceResponse,
+    AcquisitionUploadChunkedInitRequest,
+    AcquisitionUploadChunkedInitResponse,
     AcquisitionUploadResponse,
     ArtistSuggestionResponse,
     ArtistSuggestionsResponse,
@@ -86,6 +89,10 @@ ALLOWED_UPLOAD_EXTENSIONS = {
     ".alac",
     ".zip",
 }
+UPLOAD_CHUNK_BYTES = int(os.environ.get("CRATE_UPLOAD_CHUNK_BYTES", 24 * 1024 * 1024))
+MAX_UPLOAD_CHUNK_BYTES = int(
+    os.environ.get("CRATE_MAX_UPLOAD_CHUNK_BYTES", 32 * 1024 * 1024)
+)
 
 
 def _require_acquisition_manager(request: Request) -> dict:
@@ -200,12 +207,63 @@ def _upload_staging_root() -> Path:
     return Path(os.environ.get("DATA_DIR", "/data")) / "uploads"
 
 
+def _upload_manifest_path(staging_dir: Path) -> Path:
+    return staging_dir / "manifest.json"
+
+
+def _load_upload_manifest(staging_dir: Path) -> dict:
+    manifest_path = _upload_manifest_path(staging_dir)
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Upload session not found")
+    try:
+        return json.loads(manifest_path.read_text())
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid upload session") from exc
+
+
+def _write_upload_manifest(staging_dir: Path, manifest: dict) -> None:
+    _upload_manifest_path(staging_dir).write_text(json.dumps(manifest, sort_keys=True))
+
+
+def _chunk_count(size: int) -> int:
+    if size <= 0:
+        return 1
+    return max(1, (size + UPLOAD_CHUNK_BYTES - 1) // UPLOAD_CHUNK_BYTES)
+
+
+def _chunked_staging_dir(upload_id: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{12}", upload_id or ""):
+        raise HTTPException(status_code=404, detail="Upload session not found")
+    return _upload_staging_root() / upload_id
+
+
 def _safe_upload_name(filename: str, index: int) -> str:
     raw_name = Path(filename or f"upload-{index}").name
     cleaned = re.sub(r"[^A-Za-z0-9._ ()-]+", "_", raw_name).strip(" .")
     if not cleaned:
         cleaned = f"upload-{index}"
     return f"{index:03d}_{cleaned}"
+
+
+def _queue_library_upload(
+    *,
+    user: dict,
+    upload_id: str,
+    staging_dir: Path,
+    saved_files: list[dict],
+) -> tuple[str, int]:
+    total_bytes = sum(int(file.get("size") or 0) for file in saved_files)
+    task_id = create_task(
+        "library_upload",
+        {
+            "upload_id": upload_id,
+            "staging_dir": str(staging_dir),
+            "uploader_user_id": user["id"],
+            "files": saved_files,
+            "source": "upload",
+        },
+    )
+    return task_id, total_bytes
 
 
 @router.get(
@@ -571,16 +629,203 @@ async def acquisition_upload(request: Request, files: list[UploadFile] = File(..
             except Exception:
                 pass
 
-    task_id = create_task(
-        "library_upload",
+    task_id, total_bytes = _queue_library_upload(
+        user=user,
+        upload_id=upload_id,
+        staging_dir=staging_dir,
+        saved_files=saved_files,
+    )
+    return {
+        "task_id": task_id,
+        "upload_id": upload_id,
+        "file_count": len(saved_files),
+        "total_bytes": total_bytes,
+    }
+
+
+@router.post(
+    "/upload/chunked",
+    response_model=AcquisitionUploadChunkedInitResponse,
+    responses=_ACQUISITION_RESPONSES,
+    summary="Create a chunked music upload session",
+)
+def acquisition_upload_chunked_init(
+    request: Request, payload: AcquisitionUploadChunkedInitRequest
+):
+    """Create a resumable-ish upload staging area for large browser uploads."""
+    user = _require_auth(request)
+
+    invalid_name = next(
+        (
+            file.name or "unknown"
+            for file in payload.files
+            if Path(file.name or "").suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS
+        ),
+        None,
+    )
+    if invalid_name:
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported file type: {invalid_name}"
+        )
+
+    upload_id = uuid.uuid4().hex[:12]
+    staging_dir = _upload_staging_root() / upload_id
+    (staging_dir / "chunks").mkdir(parents=True, exist_ok=True)
+    (staging_dir / "raw").mkdir(parents=True, exist_ok=True)
+
+    manifest_files = []
+    for index, file in enumerate(payload.files, start=1):
+        manifest_files.append(
+            {
+                "index": index - 1,
+                "original_name": file.name,
+                "stored_name": _safe_upload_name(file.name, index),
+                "size": file.size,
+                "chunk_count": _chunk_count(file.size),
+                "received_chunks": [],
+            }
+        )
+
+    _write_upload_manifest(
+        staging_dir,
         {
             "upload_id": upload_id,
-            "staging_dir": str(staging_dir),
             "uploader_user_id": user["id"],
-            "files": saved_files,
-            "source": "upload",
+            "files": manifest_files,
         },
     )
+    return {
+        "upload_id": upload_id,
+        "file_count": len(manifest_files),
+        "chunk_size": UPLOAD_CHUNK_BYTES,
+    }
+
+
+@router.post(
+    "/upload/chunked/{upload_id}/chunk",
+    response_model=OkResponse,
+    responses=_ACQUISITION_RESPONSES,
+    summary="Upload one chunk for a chunked music upload session",
+)
+async def acquisition_upload_chunked_chunk(
+    request: Request,
+    upload_id: str,
+    file_index: int = Form(...),
+    chunk_index: int = Form(...),
+    chunk: UploadFile = File(...),
+):
+    user = _require_auth(request)
+    staging_dir = _chunked_staging_dir(upload_id)
+    manifest = _load_upload_manifest(staging_dir)
+    if manifest.get("uploader_user_id") != user["id"]:
+        raise HTTPException(status_code=404, detail="Upload session not found")
+
+    files = manifest.get("files") or []
+    if file_index < 0 or file_index >= len(files):
+        raise HTTPException(status_code=400, detail="Invalid upload file index")
+
+    file_manifest = files[file_index]
+    chunk_count = int(file_manifest.get("chunk_count") or 0)
+    if chunk_index < 0 or chunk_index >= chunk_count:
+        raise HTTPException(status_code=400, detail="Invalid upload chunk index")
+
+    chunk_dir = staging_dir / "chunks" / str(file_index)
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    dest = chunk_dir / f"{chunk_index:06d}.part"
+    written = 0
+    try:
+        with dest.open("wb") as fh:
+            while True:
+                data = await chunk.read(1024 * 1024)
+                if not data:
+                    break
+                written += len(data)
+                if written > MAX_UPLOAD_CHUNK_BYTES:
+                    raise HTTPException(
+                        status_code=413, detail="Upload chunk is too large"
+                    )
+                fh.write(data)
+    except Exception:
+        dest.unlink(missing_ok=True)
+        raise
+    finally:
+        try:
+            await chunk.close()
+        except Exception:
+            pass
+
+    received = set(int(value) for value in file_manifest.get("received_chunks") or [])
+    received.add(chunk_index)
+    file_manifest["received_chunks"] = sorted(received)
+    _write_upload_manifest(staging_dir, manifest)
+    return {"ok": True}
+
+
+@router.post(
+    "/upload/chunked/{upload_id}/complete",
+    response_model=AcquisitionUploadResponse,
+    responses=_ACQUISITION_RESPONSES,
+    summary="Complete a chunked music upload and queue library import",
+)
+def acquisition_upload_chunked_complete(request: Request, upload_id: str):
+    user = _require_auth(request)
+    staging_dir = _chunked_staging_dir(upload_id)
+    manifest = _load_upload_manifest(staging_dir)
+    if manifest.get("uploader_user_id") != user["id"]:
+        raise HTTPException(status_code=404, detail="Upload session not found")
+
+    raw_dir = staging_dir / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    saved_files: list[dict] = []
+    for file_manifest in manifest.get("files") or []:
+        file_index = int(file_manifest["index"])
+        chunk_count = int(file_manifest["chunk_count"])
+        received = set(
+            int(value) for value in file_manifest.get("received_chunks") or []
+        )
+        missing = [index for index in range(chunk_count) if index not in received]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing upload chunks for {file_manifest['original_name']}",
+            )
+
+        dest = raw_dir / file_manifest["stored_name"]
+        with dest.open("wb") as fh:
+            for chunk_index in range(chunk_count):
+                chunk_path = (
+                    staging_dir / "chunks" / str(file_index) / f"{chunk_index:06d}.part"
+                )
+                if not chunk_path.exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Missing upload chunks for {file_manifest['original_name']}",
+                    )
+                with chunk_path.open("rb") as chunk_fh:
+                    shutil.copyfileobj(chunk_fh, fh)
+
+        size = dest.stat().st_size
+        if size != int(file_manifest.get("size") or 0):
+            dest.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Uploaded file size mismatch for {file_manifest['original_name']}",
+            )
+        saved_files.append(
+            {
+                "original_name": file_manifest["original_name"],
+                "stored_name": file_manifest["stored_name"],
+                "size": size,
+            }
+        )
+
+    task_id, total_bytes = _queue_library_upload(
+        user=user,
+        upload_id=upload_id,
+        staging_dir=staging_dir,
+        saved_files=saved_files,
+    )
+    shutil.rmtree(staging_dir / "chunks", ignore_errors=True)
     return {
         "task_id": task_id,
         "upload_id": upload_id,

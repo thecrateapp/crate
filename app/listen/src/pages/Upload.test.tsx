@@ -1,0 +1,92 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { api } from "@/lib/api";
+import { uploadMusicFiles } from "@/pages/Upload";
+
+vi.mock("@/lib/api", () => ({
+  ApiError: class ApiError extends Error {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
+      super(message);
+    }
+  },
+  api: vi.fn(),
+}));
+
+describe("uploadMusicFiles", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses the existing multipart upload for small batches", async () => {
+    vi.mocked(api).mockResolvedValueOnce({
+      task_id: "task-1",
+      upload_id: "upload-1",
+      file_count: 1,
+      total_bytes: 3,
+    });
+
+    const response = await uploadMusicFiles(
+      [new File(["abc"], "track.mp3", { type: "audio/mpeg" })],
+      { chunkedThresholdBytes: 10 },
+    );
+
+    expect(response.task_id).toBe("task-1");
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith(
+      "/api/acquisition/upload",
+      "POST",
+      expect.any(FormData),
+    );
+  });
+
+  it("splits large batches into chunked upload requests", async () => {
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        upload_id: "abc123abc123",
+        file_count: 1,
+        chunk_size: 4,
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({
+        task_id: "task-chunked",
+        upload_id: "abc123abc123",
+        file_count: 1,
+        total_bytes: 7,
+      });
+    const onProgress = vi.fn();
+
+    const response = await uploadMusicFiles(
+      [new File(["abcdefg"], "album.zip", { type: "application/zip" })],
+      { chunkedThresholdBytes: 4, onProgress },
+    );
+
+    expect(response.task_id).toBe("task-chunked");
+    expect(api).toHaveBeenNthCalledWith(
+      1,
+      "/api/acquisition/upload/chunked",
+      "POST",
+      {
+        files: [{ name: "album.zip", size: 7, type: "application/zip" }],
+      },
+    );
+
+    const firstChunk = vi.mocked(api).mock.calls[1]?.[2] as FormData;
+    expect(firstChunk.get("file_index")).toBe("0");
+    expect(firstChunk.get("chunk_index")).toBe("0");
+
+    const secondChunk = vi.mocked(api).mock.calls[2]?.[2] as FormData;
+    expect(secondChunk.get("file_index")).toBe("0");
+    expect(secondChunk.get("chunk_index")).toBe("1");
+
+    expect(api).toHaveBeenNthCalledWith(
+      4,
+      "/api/acquisition/upload/chunked/abc123abc123/complete",
+      "POST",
+    );
+    expect(onProgress).toHaveBeenLastCalledWith({ done: 2, total: 2 });
+  });
+});

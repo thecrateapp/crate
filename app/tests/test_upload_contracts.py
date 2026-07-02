@@ -60,6 +60,105 @@ class TestUploadApiContract:
         assert resp.status_code == 400
         assert "Unsupported file type" in resp.text
 
+    def test_chunked_upload_reassembles_files_and_queues_library_upload(
+        self, test_app, tmp_path
+    ):
+        uploads_root = tmp_path / "uploads"
+
+        with (
+            patch(
+                "crate.api.acquisition._upload_staging_root", return_value=uploads_root
+            ),
+            patch("crate.api.acquisition.UPLOAD_CHUNK_BYTES", 4),
+            patch(
+                "crate.api.acquisition.create_task", return_value="task-upload-chunked"
+            ) as mock_create_task,
+        ):
+            init_resp = test_app.post(
+                "/api/acquisition/upload/chunked",
+                json={
+                    "files": [
+                        {"name": "album.zip", "size": 7, "type": "application/zip"},
+                        {"name": "track.mp3", "size": 5, "type": "audio/mpeg"},
+                    ]
+                },
+            )
+
+            assert init_resp.status_code == 200
+            upload_id = init_resp.json()["upload_id"]
+            assert init_resp.json()["chunk_size"] == 4
+
+            for file_index, chunks in enumerate(([b"abcd", b"efg"], [b"12", b"345"])):
+                for chunk_index, chunk in enumerate(chunks):
+                    chunk_resp = test_app.post(
+                        f"/api/acquisition/upload/chunked/{upload_id}/chunk",
+                        data={
+                            "file_index": str(file_index),
+                            "chunk_index": str(chunk_index),
+                        },
+                        files={
+                            "chunk": (
+                                f"{file_index}-{chunk_index}.part",
+                                chunk,
+                                "application/octet-stream",
+                            )
+                        },
+                    )
+                    assert chunk_resp.status_code == 200
+
+            complete_resp = test_app.post(
+                f"/api/acquisition/upload/chunked/{upload_id}/complete"
+            )
+
+        assert complete_resp.status_code == 200
+        data = complete_resp.json()
+        assert data["task_id"] == "task-upload-chunked"
+        assert data["file_count"] == 2
+        assert data["total_bytes"] == 12
+
+        params = mock_create_task.call_args[0][1]
+        assert params["uploader_user_id"] == 1
+        assert params["source"] == "upload"
+        raw_dir = Path(params["staging_dir"]) / "raw"
+        assert (raw_dir / "001_album.zip").read_bytes() == b"abcdefg"
+        assert (raw_dir / "002_track.mp3").read_bytes() == b"12345"
+
+    def test_chunked_upload_complete_rejects_missing_chunks(self, test_app, tmp_path):
+        uploads_root = tmp_path / "uploads"
+
+        with (
+            patch(
+                "crate.api.acquisition._upload_staging_root", return_value=uploads_root
+            ),
+            patch("crate.api.acquisition.UPLOAD_CHUNK_BYTES", 4),
+            patch("crate.api.acquisition.create_task") as mock_create_task,
+        ):
+            init_resp = test_app.post(
+                "/api/acquisition/upload/chunked",
+                json={"files": [{"name": "track.mp3", "size": 5}]},
+            )
+            upload_id = init_resp.json()["upload_id"]
+
+            chunk_resp = test_app.post(
+                f"/api/acquisition/upload/chunked/{upload_id}/chunk",
+                data={"file_index": "0", "chunk_index": "0"},
+                files={
+                    "chunk": (
+                        "0.part",
+                        b"1234",
+                        "application/octet-stream",
+                    )
+                },
+            )
+            complete_resp = test_app.post(
+                f"/api/acquisition/upload/chunked/{upload_id}/complete"
+            )
+
+        assert chunk_resp.status_code == 200
+        assert complete_resp.status_code == 400
+        assert "Missing upload chunks" in complete_resp.text
+        mock_create_task.assert_not_called()
+
 
 class TestUploadWorkerHelpers:
     def test_group_loose_audio_files_uses_audio_tags_for_destination(
