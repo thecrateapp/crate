@@ -1,0 +1,16 @@
+{
+  "app.name": "Crate",
+  "common.loading": "Chargement de Crate...",
+  "common.retry": "Réessayer",
+  "common.cancel": "Annuler",
+  "player.play": "Lire",
+  "player.pause": "Pause",
+  "player.shuffle": "Aléatoire",
+  "player.queue": "File",
+  "nav.home": "Accueil",
+  "nav.explore": "Explorer",
+  "nav.collection": "Collection",
+  "nav.radar": "Radar",
+  "auth.login": "Se connecter",
+  "auth.register": "Créer un compte"
+}

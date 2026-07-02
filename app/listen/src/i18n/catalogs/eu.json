@@ -1,0 +1,16 @@
+{
+  "app.name": "Crate",
+  "common.loading": "Crate kargatzen...",
+  "common.retry": "Saiatu berriro",
+  "common.cancel": "Utzi",
+  "player.play": "Erreproduzitu",
+  "player.pause": "Pausatu",
+  "player.shuffle": "Ausaz",
+  "player.queue": "Ilara",
+  "nav.home": "Hasiera",
+  "nav.explore": "Arakatu",
+  "nav.collection": "Bilduma",
+  "nav.radar": "Radar",
+  "auth.login": "Hasi saioa",
+  "auth.register": "Sortu kontua"
+}

@@ -1,0 +1,16 @@
+{
+  "app.name": "Crate",
+  "common.loading": "S'està carregant Crate...",
+  "common.retry": "Torna-ho a provar",
+  "common.cancel": "Cancel·la",
+  "player.play": "Reprodueix",
+  "player.pause": "Pausa",
+  "player.shuffle": "Aleatori",
+  "player.queue": "Cua",
+  "nav.home": "Inici",
+  "nav.explore": "Explora",
+  "nav.collection": "Col·lecció",
+  "nav.radar": "Radar",
+  "auth.login": "Inicia sessió",
+  "auth.register": "Crea un compte"
+}

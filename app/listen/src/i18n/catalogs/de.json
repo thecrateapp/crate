@@ -1,0 +1,16 @@
+{
+  "app.name": "Crate",
+  "common.loading": "Crate wird geladen...",
+  "common.retry": "Erneut versuchen",
+  "common.cancel": "Abbrechen",
+  "player.play": "Abspielen",
+  "player.pause": "Pause",
+  "player.shuffle": "Zufällig",
+  "player.queue": "Warteschlange",
+  "nav.home": "Start",
+  "nav.explore": "Entdecken",
+  "nav.collection": "Sammlung",
+  "nav.radar": "Radar",
+  "auth.login": "Einloggen",
+  "auth.register": "Konto erstellen"
+}
