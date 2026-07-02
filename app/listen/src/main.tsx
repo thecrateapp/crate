@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
 import { App } from "./App";
+import { I18nProvider } from "./i18n";
 import { initCapacitor } from "./lib/capacitor";
 import { primeOfflineRuntimeProfile } from "./lib/offline";
 import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
@@ -61,7 +62,9 @@ if (
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
     <Toaster
       theme="dark"
       position="bottom-center"
