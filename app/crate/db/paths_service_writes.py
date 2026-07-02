@@ -28,6 +28,7 @@ def create_music_path(
         dest_value,
         waypoints=waypoints,
         step_count=step_count,
+        user_id=user_id,
     )
     if not plan:
         return None
@@ -76,6 +77,7 @@ def regenerate_music_path(path_id: int, user_id: int) -> dict | None:
         path["destination"]["value"],
         waypoints=path["waypoints"],
         step_count=path["step_count"],
+        user_id=user_id,
     )
     if not plan:
         return None
@@ -94,6 +96,7 @@ def preview_music_path(
     dest_value: str,
     waypoints: list[dict] | None = None,
     step_count: int = 20,
+    user_id: int | None = None,
 ) -> dict | None:
     plan = build_music_path_plan(
         origin_type,
@@ -102,6 +105,7 @@ def preview_music_path(
         dest_value,
         waypoints=waypoints,
         step_count=step_count,
+        user_id=user_id,
     )
     if not plan:
         return None

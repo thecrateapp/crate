@@ -7,6 +7,7 @@ from crate.db.paths_compute import (
     resolve_bliss_centroid,
     resolve_endpoint_label,
 )
+from crate.db.paths_scene import compute_scene_path
 
 
 def resolve_waypoints(
@@ -37,9 +38,27 @@ def build_music_path_plan(
     *,
     waypoints: list[dict] | None = None,
     step_count: int = 20,
+    user_id: int | None = None,
 ) -> dict | None:
     origin_label = resolve_endpoint_label(origin_type, origin_value)
     dest_label = resolve_endpoint_label(dest_type, dest_value)
+
+    if not waypoints:
+        scene_tracks = compute_scene_path(
+            origin_type=origin_type,
+            origin_value=origin_value,
+            dest_type=dest_type,
+            dest_value=dest_value,
+            step_count=step_count,
+            user_id=user_id,
+        )
+        if scene_tracks:
+            return {
+                "origin_label": origin_label,
+                "dest_label": dest_label,
+                "resolved_waypoints": [],
+                "tracks": scene_tracks,
+            }
 
     origin_vec = resolve_bliss_centroid(origin_type, origin_value)
     dest_vec = resolve_bliss_centroid(dest_type, dest_value)

@@ -140,7 +140,7 @@ def api_regenerate_path(request: Request, path_id: int):
     summary="Preview a path without saving",
 )
 def api_preview_path(request: Request, body: PreviewPathRequest):
-    _require_auth(request)
+    user = _require_auth(request)
     from crate.db.paths import preview_music_path
 
     result = preview_music_path(
@@ -150,6 +150,7 @@ def api_preview_path(request: Request, body: PreviewPathRequest):
         dest_value=body.destination.value,
         waypoints=[wp.model_dump() for wp in body.waypoints],
         step_count=body.step_count,
+        user_id=user["id"],
     )
     if not result:
         return JSONResponse(
