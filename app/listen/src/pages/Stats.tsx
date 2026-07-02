@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
   BarChart3,
@@ -42,13 +43,14 @@ import {
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
-const WINDOW_COPY: Record<StatsWindow, { title: string; label: string }> = {
-  "7d": { title: "Last 7 days", label: "Week" },
-  "30d": { title: "Last 30 days", label: "Month" },
-  "90d": { title: "Last 90 days", label: "Season" },
-  "365d": { title: "Last year", label: "Year" },
-  all_time: { title: "All-time", label: "Archive" },
-};
+const WINDOW_COPY_KEYS: Record<StatsWindow, { title: string; label: string }> =
+  {
+    "7d": { title: "stats.window.7d", label: "stats.window.week" },
+    "30d": { title: "stats.window.30d", label: "stats.window.month" },
+    "90d": { title: "stats.window.90d", label: "stats.window.season" },
+    "365d": { title: "stats.window.365d", label: "stats.window.year" },
+    all_time: { title: "stats.window.allTime", label: "stats.window.archive" },
+  };
 
 const STATS_WINDOWS: StatsWindow[] = ["7d", "30d", "90d", "365d", "all_time"];
 
@@ -62,16 +64,17 @@ function normalizeMonthParam(value: string | null): string | null {
   return value && /^\d{4}-\d{2}$/.test(value) ? value : null;
 }
 
-function formatMonthTitle(month: string): string {
+function formatMonthTitle(month: string, locale: string): string {
   const date = new Date(`${month}-01T12:00:00`);
   if (Number.isNaN(date.getTime())) return month;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
 }
 
 export function Stats() {
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,9 +87,25 @@ export function Stats() {
   const statsPeriodQuery = selectedMonth
     ? `month=${selectedMonth}`
     : `window=${selectedWindow}`;
+  const windowCopy = useMemo(
+    () =>
+      Object.fromEntries(
+        STATS_WINDOWS.map((window) => {
+          const copy = WINDOW_COPY_KEYS[window];
+          return [
+            window,
+            { title: t(copy.title), label: t(copy.label) },
+          ] as const;
+        }),
+      ) as Record<StatsWindow, { title: string; label: string }>,
+    [t],
+  );
   const period = selectedMonth
-    ? { title: formatMonthTitle(selectedMonth), label: "Month" }
-    : WINDOW_COPY[selectedWindow];
+    ? {
+        title: formatMonthTitle(selectedMonth, i18n.language),
+        label: t("stats.window.month"),
+      }
+    : windowCopy[selectedWindow];
 
   const { play, playAll } = usePlayerActions();
   const statsEndpoint = isGlobalStats
@@ -149,15 +168,15 @@ export function Stats() {
     username ||
     null;
   const heroTitle = isGlobalStats
-    ? "Crate pulse"
+    ? t("stats.hero.globalTitle")
     : isUserStats && subjectName
-      ? `${subjectName}'s sound`
-      : "Your sound";
+      ? t("stats.hero.userTitle", { name: subjectName })
+      : t("stats.hero.yourTitle");
   const heroBody = isGlobalStats
-    ? "A replay-style read on the whole instance: shared obsessions, global momentum, sound profile, and the records shaping Crate."
+    ? t("stats.hero.globalBody")
     : isUserStats
-      ? "A replay-style read on this listener: obsessions, momentum, sound profile, and the records that owned this window."
-      : "A replay-style read on what you actually lived with: obsessions, momentum, sound profile, and the records that owned this window.";
+      ? t("stats.hero.userBody")
+      : t("stats.hero.yourBody");
 
   const playTopTrack = (item: StatsTrack) => {
     const track = toPlayerTrack(item);
@@ -172,7 +191,7 @@ export function Stats() {
     if (!replayItems.length) return;
     playAll(replayItems.map(toPlayerTrack), 0, {
       type: "playlist",
-      name: replay?.title || "Replay",
+      name: replay?.title || t("stats.replay.title"),
     });
   };
 
@@ -185,11 +204,13 @@ export function Stats() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-primary shadow-[0_0_30px_rgba(34,211,238,0.14)]">
             <BarChart3 size={12} />
-            Listening DNA
+            {t("stats.hero.badge")}
           </div>
           <h1 className="mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em] text-foreground">
             {heroTitle}
-            <span className="block text-primary">decoded</span>
+            <span className="block text-primary">
+              {t("stats.hero.decoded")}
+            </span>
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             {heroBody}
@@ -200,15 +221,15 @@ export function Stats() {
             {!isUserStats ? (
               <>
                 <ScopeLink active={!isGlobalStats} to="/stats">
-                  Your DNA
+                  {t("stats.scope.yourDna")}
                 </ScopeLink>
                 <ScopeLink active={isGlobalStats} to="/stats/global">
-                  Crate Pulse
+                  {t("stats.scope.cratePulse")}
                 </ScopeLink>
               </>
             ) : username ? (
               <ScopeLink active={false} to={`/users/${username}`}>
-                Back to profile
+                {t("stats.scope.backToProfile")}
               </ScopeLink>
             ) : null}
           </div>
@@ -239,17 +260,17 @@ export function Stats() {
               </div>
               <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
                 <HeroMetric
-                  label="Minutes"
+                  label={t("stats.metrics.minutes")}
                   value={formatStatsMinutes(overview?.minutes_listened ?? 0)}
                 />
                 <HeroMetric
-                  label="Plays"
+                  label={t("stats.metrics.plays")}
                   value={
                     overview?.play_count ? String(overview.play_count) : "0"
                   }
                 />
                 <HeroMetric
-                  label="Active days"
+                  label={t("stats.metrics.activeDays")}
                   value={
                     overview?.active_days ? String(overview.active_days) : "0"
                   }
@@ -270,30 +291,42 @@ export function Stats() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <SignalCard
               icon={Flame}
-              label="Obsession"
-              title={leadTrack?.title || "No dominant track yet"}
+              label={t("stats.signals.obsession")}
+              title={leadTrack?.title || t("stats.signals.noDominantTrack")}
               body={
                 leadTrack
-                  ? `${leadTrack.artist} kept surfacing with ${leadTrack.play_count} plays.`
-                  : "Start listening and Crate will find the track that keeps pulling you back."
+                  ? t("stats.signals.dominantTrackBody", {
+                      artist: leadTrack.artist,
+                      count: leadTrack.play_count,
+                    })
+                  : t("stats.signals.noDominantTrackBody")
               }
             />
             <SignalCard
               icon={Search}
-              label={topDiscovery ? "Discovery" : "Gravity"}
+              label={
+                topDiscovery
+                  ? t("stats.signals.discovery")
+                  : t("stats.signals.gravity")
+              }
               title={
                 topDiscovery?.artist_name ||
                 leadArtist?.artist_name ||
-                "No leading artist yet"
+                t("stats.signals.noLeadingArtist")
               }
               body={
                 topDiscovery
-                  ? `${topDiscovery.play_count} first-window plays. New signal, not old habit.`
+                  ? t("stats.signals.discoveryBody", {
+                      count: topDiscovery.play_count,
+                    })
                   : leadArtist
-                    ? `${formatStatsMinutes(
-                        leadArtist.minutes_listened,
-                      )} with ${leadArtist.play_count} plays.`
-                    : "Your strongest artist signal will appear here."
+                    ? t("stats.signals.gravityBody", {
+                        minutes: formatStatsMinutes(
+                          leadArtist.minutes_listened,
+                        ),
+                        count: leadArtist.play_count,
+                      })
+                    : t("stats.signals.noLeadingArtistBody")
               }
             />
           </div>
@@ -307,7 +340,7 @@ export function Stats() {
           ))
         ) : (
           <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-muted-foreground lg:col-span-3">
-            Keep listening and this page will start writing your recap.
+            {t("stats.empty.recap")}
           </div>
         )}
       </section>
@@ -351,11 +384,10 @@ export function Stats() {
       {!dashboardLoading && !hasStats ? (
         <div className="mt-8 rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
           <h2 className="text-xl font-black text-foreground">
-            Your stats are waiting for signal
+            {t("stats.empty.title")}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Play a few albums and this turns into your personal listening
-            dossier.
+            {t("stats.empty.body")}
           </p>
         </div>
       ) : null}

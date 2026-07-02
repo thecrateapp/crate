@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
   ArrowRight,
@@ -86,6 +87,7 @@ function EndpointPanel({
   selected: SearchResult | null;
   onSelect: (result: SearchResult | null) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -196,7 +198,8 @@ function EndpointPanel({
   }, []);
 
   const coverUrl = selected?.imageUrl;
-  const label = side === "origin" ? "From" : "To";
+  const label =
+    side === "origin" ? t("paths.endpoint.from") : t("paths.endpoint.to");
 
   return (
     <div
@@ -249,7 +252,7 @@ function EndpointPanel({
               }}
               className="mt-3 text-[11px] text-white/40 underline-offset-2 hover:text-white/60 hover:underline"
             >
-              Change
+              {t("common.change")}
             </button>
           </div>
         ) : (
@@ -261,7 +264,7 @@ function EndpointPanel({
                 setQuery(e.target.value);
                 void search(e.target.value);
               }}
-              placeholder="Search genre, artist, album..."
+              placeholder={t("paths.endpoint.placeholder")}
               className="h-11 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/30 focus:outline-none"
             />
             {searching && (
@@ -318,6 +321,7 @@ function PathCard({
   onPlay: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <div
@@ -333,7 +337,7 @@ function PathCard({
             {path.name}
           </div>
           <div className="mt-0.5 text-[11px] text-white/40">
-            {path.track_count} tracks ·{" "}
+            {t("common.trackCountLabel", { count: path.track_count })} ·{" "}
             {new Date(path.created_at).toLocaleDateString()}
           </div>
         </div>
@@ -363,6 +367,7 @@ function PathCard({
 // ── Main page ─────────────────────────────────────────────────────
 
 export function Paths() {
+  const { t } = useTranslation();
   const { data: paths, refetch } = useApi<PathSummary[]>("/api/paths");
   const { playAll } = usePlayerActions();
   const navigate = useNavigate();
@@ -382,11 +387,11 @@ export function Paths() {
         destination: { type: destination.type, value: destination.value },
         step_count: steps,
       });
-      toast.success(`Created "${result.name}"`);
+      toast.success(t("paths.toasts.created", { name: result.name }));
       refetch();
       navigate(`/paths/${result.id}`);
     } catch {
-      toast.error("Could not compute path — endpoints may lack audio analysis");
+      toast.error(t("paths.toasts.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -413,17 +418,17 @@ export function Paths() {
         id: detail.id,
       });
     } catch {
-      toast.error("Failed to load path");
+      toast.error(t("paths.toasts.loadFailed"));
     }
   };
 
   const deletePath = async (pathId: number) => {
     try {
       await api(`/api/paths/${pathId}`, "DELETE");
-      toast.success("Path deleted");
+      toast.success(t("paths.toasts.deleted"));
       refetch();
     } catch {
-      toast.error("Failed to delete");
+      toast.error(t("paths.toasts.deleteFailed"));
     }
   };
 
@@ -433,10 +438,10 @@ export function Paths() {
       <div className="flex items-center gap-3">
         <Route size={22} className="text-primary" />
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Music Paths</h1>
-          <p className="text-[13px] text-white/40">
-            Trace a route through acoustic space
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("paths.title")}
+          </h1>
+          <p className="text-[13px] text-white/40">{t("paths.subtitle")}</p>
         </div>
       </div>
 
@@ -463,7 +468,7 @@ export function Paths() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
         <div className="flex-1">
           <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">
-            Path length
+            {t("paths.length")}
           </div>
           <div className="flex items-center gap-3">
             <input
@@ -475,7 +480,7 @@ export function Paths() {
               className="flex-1 accent-primary"
             />
             <span className="w-16 text-right font-mono text-[12px] tabular-nums text-white/50">
-              {steps} tracks
+              {t("common.trackCountLabel", { count: steps })}
             </span>
           </div>
         </div>
@@ -489,7 +494,7 @@ export function Paths() {
           ) : (
             <Route size={15} />
           )}
-          Compute Path
+          {t("paths.compute")}
         </button>
       </div>
 
@@ -497,7 +502,7 @@ export function Paths() {
       {paths && paths.length > 0 && (
         <div className="space-y-2 pt-4">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-white/30">
-            Your paths
+            {t("paths.saved")}
           </div>
           {paths.map((p) => (
             <PathCard

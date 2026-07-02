@@ -119,6 +119,25 @@ describe("Shows page", () => {
     ).toBeInTheDocument();
   });
 
+  it("localizes the Radar chrome", () => {
+    renderWithListenProviders(<Shows />, { locale: "es" });
+
+    expect(
+      screen.getByText(
+        /Conciertos, lanzamientos y señales de artistas que sigues/i,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Artistas seguidos")).toBeInTheDocument();
+    expect(screen.getByText("Próximo concierto")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Todo" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Conciertos" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Filtra por artista, sala o ciudad..."),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the summary metrics out of the default mobile flow", () => {
     renderWithListenProviders(<Shows />);
 

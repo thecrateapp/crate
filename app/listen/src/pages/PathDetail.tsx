@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -69,6 +70,7 @@ function mapToPlayerTrack(t: PathTrack): Track {
 }
 
 export function PathDetail() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: path, loading, refetch } = useApi<PathData>(`/api/paths/${id}`);
@@ -99,10 +101,10 @@ export function PathDetail() {
     setRegenerating(true);
     try {
       await api(`/api/paths/${path.id}/regenerate`, "POST");
-      toast.success("Path regenerated");
+      toast.success(t("paths.toasts.regenerated"));
       refetch();
     } catch {
-      toast.error("Failed to regenerate");
+      toast.error(t("paths.toasts.regenerateFailed"));
     } finally {
       setRegenerating(false);
     }
@@ -121,7 +123,7 @@ export function PathDetail() {
   }, []);
 
   if (loading || !path) {
-    return <CrateLoader label="Loading music path." />;
+    return <CrateLoader label={t("paths.loadingDetail")} />;
   }
 
   const nodeCount = path.tracks.length;
@@ -133,7 +135,7 @@ export function PathDetail() {
         onClick={() => navigate("/paths")}
         className="mb-5 flex items-center gap-1.5 text-sm text-white/40 transition hover:text-white"
       >
-        <ArrowLeft size={14} /> Paths
+        <ArrowLeft size={14} /> {t("paths.back")}
       </button>
 
       {/* Header */}
@@ -149,7 +151,9 @@ export function PathDetail() {
               {path.destination.label}
             </span>
             <span className="text-white/15">·</span>
-            <span>{path.tracks.length} tracks</span>
+            <span>
+              {t("common.trackCountLabel", { count: path.tracks.length })}
+            </span>
           </div>
         </div>
         <button
@@ -269,17 +273,17 @@ export function PathDetail() {
           ) : (
             <RefreshCw size={11} />
           )}
-          Regenerate
+          {t("paths.regenerate")}
         </button>
         <button
           onClick={async () => {
             await api(`/api/paths/${path.id}`, "DELETE");
-            toast.success("Path deleted");
+            toast.success(t("paths.toasts.deleted"));
             navigate("/paths");
           }}
           className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-medium text-white/60 transition hover:border-red-400/30 hover:text-red-300"
         >
-          <Trash2 size={11} /> Delete
+          <Trash2 size={11} /> {t("common.delete")}
         </button>
       </div>
 

@@ -1,4 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router";
 import { Calendar, Loader2, Sparkles } from "@crate/ui/icons";
 
@@ -32,6 +33,7 @@ interface GenreShowsResponse {
 type Filter = "all" | "shows" | "releases";
 
 export function Shows() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const genreSlug = searchParams.get("genre");
   const focusShowId = searchParams.get("show");
@@ -107,10 +109,8 @@ export function Shows() {
   const hasFollowedArtists =
     isGenreRadar || (summary?.followed_artists ?? 0) > 0;
   const headingCopy = isGenreRadar
-    ? `Upcoming ${
-        genreData?.name || genreSlug
-      } shows near your concert location.`
-    : "Shows, releases, and signals from artists you follow, with the latest releases you might have missed.";
+    ? t("radar.genreIntro", { genre: genreData?.name || genreSlug })
+    : t("radar.intro");
 
   return (
     <div className="space-y-6">
@@ -124,34 +124,34 @@ export function Shows() {
 
         <div
           role="list"
-          aria-label="Radar summary"
+          aria-label={t("radar.summaryAria")}
           className="hidden flex-wrap items-center gap-2 md:flex"
         >
           {summary && !isGenreRadar ? (
             <>
               <SummaryPill
-                label="Followed artists"
+                label={t("radar.summary.followedArtists")}
                 value={summary.followed_artists}
               />
               <SummaryPill
-                label="Shows"
+                label={t("radar.summary.shows")}
                 value={summary.show_count}
                 accent="cyan"
               />
               <SummaryPill
-                label="Releases"
+                label={t("radar.summary.releases")}
                 value={summary.release_count}
                 accent="cyan"
               />
               <SummaryPill
-                label="Attending"
+                label={t("radar.summary.attending")}
                 value={attendingShows.length}
                 accent="cyan"
               />
             </>
           ) : summary ? (
             <SummaryPill
-              label="Shows"
+              label={t("radar.summary.shows")}
               value={summary.show_count}
               accent="cyan"
             />
@@ -164,7 +164,7 @@ export function Shows() {
           <div className="flex items-center gap-2">
             <Calendar size={15} className="text-primary" />
             <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-              Next show
+              {t("radar.sections.nextShow")}
             </h2>
           </div>
           <UpcomingShowCard
@@ -191,10 +191,10 @@ export function Shows() {
               )}
             >
               {value === "all"
-                ? "All"
+                ? t("radar.filters.all")
                 : value === "shows"
-                  ? "Shows"
-                  : "Releases"}
+                  ? t("radar.filters.shows")
+                  : t("radar.filters.releases")}
             </button>
           ))}
         </div>
@@ -204,7 +204,7 @@ export function Shows() {
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filter by artist, venue, city..."
+            placeholder={t("radar.searchPlaceholder")}
             className="h-11 w-full rounded-2xl border border-white/10 bg-input px-4 text-sm text-foreground placeholder:text-white/40 focus:border-primary/40 focus:outline-none"
           />
         </div>
@@ -219,16 +219,16 @@ export function Shows() {
       {!loading && isGenreRadar && items.length === 0 ? (
         <EmptyState
           icon={<Calendar size={22} className="text-primary" />}
-          title="No genre shows near your show location"
-          body="Crate will show upcoming shows here when this genre has nearby artists on your Radar."
+          title={t("radar.empty.genreTitle")}
+          body={t("radar.empty.genreBody")}
         />
       ) : null}
 
       {!loading && !isGenreRadar && !hasFollowedArtists ? (
         <EmptyState
           icon={<Sparkles size={22} className="text-primary" />}
-          title="Follow some artists to unlock Radar"
-          body="As soon as you follow artists, Radar will show their upcoming shows and new releases here."
+          title={t("radar.empty.followTitle")}
+          body={t("radar.empty.followBody")}
         />
       ) : null}
 
@@ -238,8 +238,8 @@ export function Shows() {
       filtered.length === 0 ? (
         <EmptyState
           icon={<Calendar size={22} className="text-primary" />}
-          title="Nothing matches your filters"
-          body="Try another search or switch between shows and releases."
+          title={t("radar.empty.filteredTitle")}
+          body={t("radar.empty.filteredBody")}
         />
       ) : null}
 
@@ -250,7 +250,7 @@ export function Shows() {
               <div className="flex items-center gap-2">
                 <Sparkles size={15} className="text-primary" />
                 <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                  Coming up
+                  {t("radar.sections.comingUp")}
                 </h2>
               </div>
               <div className="space-y-8">
@@ -272,7 +272,7 @@ export function Shows() {
               <div className="flex items-center gap-2">
                 <Calendar size={15} className="text-muted-foreground" />
                 <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Recently released
+                  {t("radar.sections.recentlyReleased")}
                 </h2>
               </div>
               <div className="space-y-8">
