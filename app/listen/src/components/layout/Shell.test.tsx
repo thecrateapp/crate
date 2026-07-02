@@ -41,6 +41,15 @@ describe("Shell", () => {
     expect(screen.queryByRole("button", { name: "Open queue" })).toBeNull();
   });
 
+  it("localizes the mobile navigation labels", () => {
+    renderWithListenProviders(<Shell />, { locale: "es" });
+
+    expect(screen.getByText("Inicio")).toBeInTheDocument();
+    expect(screen.getByText("Explorar")).toBeInTheDocument();
+    expect(screen.getByText("Colección")).toBeInTheDocument();
+    expect(screen.getByText("Radar")).toBeInTheDocument();
+  });
+
   it("renders one unified glass backdrop for the mobile dock when a track is loaded", () => {
     const { container } = renderWithListenProviders(<Shell />, {
       playerActions: {

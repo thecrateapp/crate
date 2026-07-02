@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
@@ -182,6 +183,7 @@ function FullscreenQueueRow({
 }
 
 export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
+  const { t } = useTranslation();
   const {
     currentTrack,
     queue,
@@ -560,9 +562,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     "var(--listen-mobile-fullscreen-scroll-clearance)";
 
   const PANEL_SWITCHES: { id: FSPanel; icon: typeof Disc3; label: string }[] = [
-    { id: "queue", icon: ListMusic, label: "Queue" },
-    { id: "lyrics", icon: Mic3, label: "Lyrics" },
-    { id: "info", icon: Info, label: "Info" },
+    { id: "queue", icon: ListMusic, label: t("player.queue") },
+    { id: "lyrics", icon: Mic3, label: t("player.lyrics") },
+    { id: "info", icon: Info, label: t("player.info") },
   ];
 
   return (
@@ -595,7 +597,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
       <div className="flex items-center gap-2 px-4 pb-3">
         <button
           onClick={closeWithFeedback}
-          aria-label="Close player"
+          aria-label={t("player.close")}
           className="flex h-12 w-12 shrink-0 touch-manipulation items-center justify-center -ml-2 text-white/60 active:text-white"
         >
           <ChevronDown size={28} />
@@ -759,7 +761,11 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             <div className="mx-auto mt-5 flex w-full max-w-[360px] items-center justify-center gap-3">
               <button
                 onClick={toggleShuffleWithFeedback}
-                aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
+                aria-label={
+                  shuffle
+                    ? t("player.disableShuffle")
+                    : t("player.enableShuffle")
+                }
                 className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
                   shuffle
                     ? "text-primary"
@@ -770,14 +776,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               </button>
               <button
                 onClick={goPrevWithFeedback}
-                aria-label="Previous track"
+                aria-label={t("player.previous")}
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
               >
                 <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
               <SpectrumPlayButton
                 onClick={togglePlaybackWithFeedback}
-                aria-label={isPlaying ? "Pause" : "Play"}
+                aria-label={isPlaying ? t("player.pause") : t("player.play")}
                 size="lg"
                 active={isPlaying}
                 className="touch-manipulation"
@@ -799,14 +805,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
               </SpectrumPlayButton>
               <button
                 onClick={goNextWithFeedback}
-                aria-label="Next track"
+                aria-label={t("player.next")}
                 className="flex h-12 w-12 touch-manipulation items-center justify-center rounded-full text-white/70 transition-colors active:bg-white/8 active:text-white"
               >
                 <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
               </button>
               <button
                 onClick={cycleRepeatWithFeedback}
-                aria-label={`Repeat: ${repeat}`}
+                aria-label={t("player.repeat", { mode: repeat })}
                 className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-white/8 ${
                   repeat !== "off"
                     ? "text-primary"
@@ -845,7 +851,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
                     triggerHaptic("selection");
                     setShowEqualizer((v) => !v);
                   }}
-                  aria-label="Equalizer"
+                  aria-label={t("player.equalizer")}
                   className={`flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition-colors active:bg-white/8 ${
                     showEqualizer
                       ? "text-primary"

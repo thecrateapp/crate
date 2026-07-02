@@ -67,7 +67,7 @@ describe("UpcomingShowExpandedView", () => {
     );
 
     expect(screen.queryByRole("button", { name: /close/i })).toBeNull();
-    expect(screen.getByText(/days to go/i)).toBeInTheDocument();
+    expect(screen.getByText(/\d+ days? to go/i)).toBeInTheDocument();
     expect(screen.getByTitle("hardcore")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
       "href",

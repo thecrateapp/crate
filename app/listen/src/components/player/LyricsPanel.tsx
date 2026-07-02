@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { CRATE_ICON_SIZE, X, Loader2 } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
 import { api } from "@/lib/api";
 
@@ -35,6 +36,7 @@ interface LyricsPanelProps {
 }
 
 export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
+  const { t } = useTranslation();
   const { currentTime } = usePlayerProgress();
   const { currentTrack, seek } = usePlayerActions();
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
@@ -97,10 +99,10 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
       />
       {/* Header */}
       <div className="relative flex items-center justify-between border-b border-white/5 px-4 py-3">
-        <h2 className="text-sm font-bold text-white">Lyrics</h2>
+        <h2 className="text-sm font-bold text-white">{t("player.lyrics")}</h2>
         <button
           onClick={onClose}
-          aria-label="Close lyrics"
+          aria-label={t("player.lyrics.close")}
           className="flex size-10 items-center justify-center text-white/40 transition-colors hover:text-white"
         >
           <X size={CRATE_ICON_SIZE.xl} />
@@ -132,7 +134,7 @@ export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
 
         {!loading && !lyrics?.synced && !lyrics?.plain && (
           <div className="px-4 py-16 text-center text-white/20 text-sm">
-            No lyrics found
+            {t("player.lyrics.empty")}
           </div>
         )}
 

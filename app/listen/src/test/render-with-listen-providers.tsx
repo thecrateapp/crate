@@ -21,6 +21,7 @@ import {
   type PlayerProgressValue,
   type PlayerStateValue,
 } from "@/contexts/player-context";
+import { I18nProvider, type ListenLocale } from "@/i18n";
 import type { Track } from "@/contexts/player-types";
 import type { OfflineItemState } from "@/lib/offline";
 import { SERVER_STORE_EVENT, type ServerConfig } from "@/lib/server-store";
@@ -31,6 +32,7 @@ export interface ListenRenderOptions extends Omit<RenderOptions, "wrapper"> {
   playerActions?: Partial<PlayerActionsValue>;
   playerProgress?: Partial<PlayerProgressValue>;
   playerState?: Partial<PlayerStateValue>;
+  locale?: ListenLocale;
   path?: string;
   route?: string;
 }
@@ -218,6 +220,7 @@ export function renderWithListenProviders(
     playerActions,
     playerProgress,
     playerState,
+    locale,
     path,
     route = "/",
     ...renderOptions
@@ -237,17 +240,19 @@ export function renderWithListenProviders(
     offlineValue,
     ...render(
       <MemoryRouter initialEntries={[route]}>
-        <AuthContext.Provider value={authValue}>
-          <PlayerStateContext.Provider value={playerStateValue}>
-            <PlayerProgressContext.Provider value={playerProgressValue}>
-              <PlayerActionsContext.Provider value={playerActionsValue}>
-                <OfflineContext.Provider value={offlineValue}>
-                  {withOptionalRoute(ui, path)}
-                </OfflineContext.Provider>
-              </PlayerActionsContext.Provider>
-            </PlayerProgressContext.Provider>
-          </PlayerStateContext.Provider>
-        </AuthContext.Provider>
+        <I18nProvider initialLocale={locale}>
+          <AuthContext.Provider value={authValue}>
+            <PlayerStateContext.Provider value={playerStateValue}>
+              <PlayerProgressContext.Provider value={playerProgressValue}>
+                <PlayerActionsContext.Provider value={playerActionsValue}>
+                  <OfflineContext.Provider value={offlineValue}>
+                    {withOptionalRoute(ui, path)}
+                  </OfflineContext.Provider>
+                </PlayerActionsContext.Provider>
+              </PlayerProgressContext.Provider>
+            </PlayerStateContext.Provider>
+          </AuthContext.Provider>
+        </I18nProvider>
       </MemoryRouter>,
       renderOptions,
     ),
