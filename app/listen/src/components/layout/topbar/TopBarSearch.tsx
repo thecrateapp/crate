@@ -16,6 +16,7 @@ import {
   X,
 } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
@@ -73,17 +74,21 @@ function SearchResultThumb({ item }: { item: TopBarSearchItem }) {
   );
 }
 
-function searchErrorHint(error: unknown): string {
+function searchErrorHint(
+  error: unknown,
+  messages: { session: string; generic: string },
+): string {
   if (
     error instanceof ApiError &&
     (error.status === 401 || error.status === 403)
   ) {
-    return "Your session needs a refresh. Try reloading or signing in again.";
+    return messages.session;
   }
-  return "Try again in a moment.";
+  return messages.generic;
 }
 
 export function TopBarSearch() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { play } = usePlayerActions();
   const canHover = useHoverCapability();
@@ -236,7 +241,12 @@ export function TopBarSearch() {
           setResults([]);
           setActiveIdx(-1);
           setCompletedQuery(requestQuery);
-          setSearchError(searchErrorHint(error));
+          setSearchError(
+            searchErrorHint(error, {
+              session: t("search.errors.sessionRefresh"),
+              generic: t("search.errors.tryAgain"),
+            }),
+          );
         })
         .finally(() => {
           if (queryRef.current.trim() === requestQuery) {
@@ -248,7 +258,7 @@ export function TopBarSearch() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, t]);
 
   useEffect(() => {
     if (query.trim()) {
@@ -412,7 +422,7 @@ export function TopBarSearch() {
                       ) : null}
                     </div>
                     <span className="shrink-0 text-[10px] capitalize text-white/20">
-                      {item.type}
+                      {t(`search.resultType.${item.type}`)}
                     </span>
                   </button>
                 ))}
@@ -422,7 +432,7 @@ export function TopBarSearch() {
                       <Search size={CRATE_ICON_SIZE.md} />
                     </div>
                     <p className="mt-3 text-sm font-semibold text-white/86">
-                      Search unavailable
+                      {t("search.unavailableTitle")}
                     </p>
                     <p className="mt-1 text-xs text-white/45">{searchError}</p>
                   </div>
@@ -433,10 +443,10 @@ export function TopBarSearch() {
                       <Search size={CRATE_ICON_SIZE.md} />
                     </div>
                     <p className="mt-3 text-sm font-semibold text-white/86">
-                      No music found
+                      {t("search.noMusicTitle")}
                     </p>
                     <p className="mt-1 text-xs text-white/45">
-                      Try another artist, album, or track.
+                      {t("search.noMusicSubtitle")}
                     </p>
                   </div>
                 ) : null}
@@ -452,7 +462,7 @@ export function TopBarSearch() {
                     }}
                     className="mt-1 w-full border-t border-white/5 px-3 py-2 text-center text-xs text-primary transition-colors hover:bg-white/5"
                   >
-                    See all results for "{trimmedQuery}"
+                    {t("search.seeAllResults", { query: trimmedQuery })}
                   </button>
                 )}
               </>
@@ -461,7 +471,7 @@ export function TopBarSearch() {
             {showRecents ? (
               <>
                 <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
-                  Recent
+                  {t("search.recent")}
                 </p>
                 {recents.map((recent, index) => (
                   <button
@@ -522,7 +532,7 @@ export function TopBarSearch() {
         <div className="relative flex items-center overflow-hidden rounded-xl">
           <button
             type="button"
-            aria-label="Search"
+            aria-label={t("search.label")}
             aria-expanded={searchOpen}
             data-state={searchOpen ? "open" : "closed"}
             onFocus={() => openSearch(true)}
@@ -546,7 +556,7 @@ export function TopBarSearch() {
                   : "translate-x-0 opacity-100",
               )}
             >
-              Search
+              {t("search.label")}
             </span>
           </button>
           {loading && searchOpen ? (
@@ -567,7 +577,7 @@ export function TopBarSearch() {
                 focusInputSoon();
               }}
               className="absolute right-3 z-20 flex size-9 touch-manipulation items-center justify-center text-white/30 hover:text-white/65"
-              aria-label="Clear search"
+              aria-label={t("search.clear")}
             >
               <X size={CRATE_ICON_SIZE.lg} />
             </button>
@@ -589,7 +599,7 @@ export function TopBarSearch() {
               scheduleCollapseIfIdle();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Search artists, albums, tracks..."
+            placeholder={t("search.placeholder")}
             className={cn(
               "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-white outline-none md:h-11 md:pl-11 md:text-[15px]",
               "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",

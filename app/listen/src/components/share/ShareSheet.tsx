@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Copy, Loader2, MessageCircle, Send, X } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";
@@ -17,6 +18,7 @@ import { openExternalUrl } from "@/lib/external-links";
 import { cn } from "@/lib/utils";
 
 export function ShareSheetHost() {
+  const { t } = useTranslation();
   const [payload, setPayload] = useState<SharePayload | null>(null);
   const [instagramAvailable, setInstagramAvailable] = useState(false);
   const [instagramBusy, setInstagramBusy] = useState(false);
@@ -51,10 +53,10 @@ export function ShareSheetHost() {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(payload.url);
-      toast.success("Link copied");
+      toast.success(t("share.toasts.linkCopied"));
       setPayload(null);
     } catch {
-      toast.error("Failed to copy link");
+      toast.error(t("share.toasts.copyFailed"));
     }
   };
 
@@ -63,7 +65,7 @@ export function ShareSheetHost() {
       await openExternalUrl(url);
       setPayload(null);
     } catch {
-      toast.error("Failed to open share target");
+      toast.error(t("share.toasts.targetFailed"));
     }
   };
 
@@ -74,7 +76,7 @@ export function ShareSheetHost() {
       setPayload(null);
     } catch (error) {
       toast.error(
-        (error as Error).message || "Failed to share to Instagram Stories",
+        (error as Error).message || t("share.toasts.instagramFailed"),
       );
     } finally {
       setInstagramBusy(false);
@@ -95,7 +97,9 @@ export function ShareSheetHost() {
           <SharePreviewImage payload={payload} />
           <div className="min-w-0 flex-1 pt-0.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-              Share {payload.kind}
+              {t("share.title", {
+                kind: t(`share.kind.${payload.kind}`),
+              })}
             </p>
             <h2 className="mt-1 truncate text-lg font-black text-foreground">
               {payload.title}
@@ -108,7 +112,7 @@ export function ShareSheetHost() {
           </div>
           <button
             type="button"
-            aria-label="Close share menu"
+            aria-label={t("share.closeMenu")}
             onClick={() => setPayload(null)}
             className="rounded-full border border-white/10 bg-white/[0.04] p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
           >
@@ -120,23 +124,23 @@ export function ShareSheetHost() {
           <ShareAction
             icon={MessageCircle}
             title="WhatsApp"
-            subtitle="Send a Crate link with rich preview"
+            subtitle={t("share.whatsappSubtitle")}
             onClick={() => void openTarget(buildWhatsAppShareUrl(payload))}
           />
           <ShareAction
             icon={Send}
             title="Telegram"
-            subtitle="Share in a chat or channel"
+            subtitle={t("share.telegramSubtitle")}
             onClick={() => void openTarget(buildTelegramShareUrl(payload))}
           />
           {isNative ? (
             <ShareAction
               icon={instagramBusy ? Loader2 : Camera}
-              title="Instagram Story"
+              title={t("share.instagramStory")}
               subtitle={
                 instagramAvailable
-                  ? "Create a Crate story card"
-                  : "Instagram is not available on this device"
+                  ? t("share.instagramAvailable")
+                  : t("share.instagramUnavailable")
               }
               disabled={!instagramAvailable || instagramBusy}
               spinning={instagramBusy}
@@ -145,7 +149,7 @@ export function ShareSheetHost() {
           ) : null}
           <ShareAction
             icon={Copy}
-            title="Copy link"
+            title={t("share.copyLink")}
             subtitle={shareText}
             onClick={() => void copyLink()}
           />
