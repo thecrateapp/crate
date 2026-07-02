@@ -35,6 +35,27 @@ describe("SearchResults", () => {
     ).toBeInTheDocument();
   });
 
+  it("localizes the empty search state", async () => {
+    vi.mocked(api).mockResolvedValue({
+      artists: [],
+      albums: [],
+      tracks: [],
+    });
+
+    renderWithListenProviders(<SearchResults />, {
+      path: "/search",
+      route: "/search?q=banda-imaginaria",
+      locale: "es",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("No se encontró música")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("Prueba con otro artista, álbum o canción."),
+    ).toBeInTheDocument();
+  });
+
   it("shows an error state instead of no results when search fails", async () => {
     vi.mocked(api).mockRejectedValue(new ApiError(401, "Not authenticated"));
 

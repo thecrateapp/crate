@@ -5,6 +5,7 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Play,
   Sparkles,
@@ -213,12 +214,20 @@ function radioArtwork(station: HomeRadioStation): string | null {
   );
 }
 
-function radioSeedTypeLabel(station: HomeRadioStation): string {
+function radioSeedTypeLabel(
+  station: HomeRadioStation,
+  labels: {
+    track: string;
+    album: string;
+    genre: string;
+    artist: string;
+  },
+): string {
   const seedType = station.seed_type ?? station.type;
-  if (seedType === "track") return "Track Radio";
-  if (seedType === "album") return "Album Radio";
-  if (seedType === "genre") return "Genre Radio";
-  return "Artist Radio";
+  if (seedType === "track") return labels.track;
+  if (seedType === "album") return labels.album;
+  if (seedType === "genre") return labels.genre;
+  return labels.artist;
 }
 
 function radioSeedLabel(station: HomeRadioStation): string {
@@ -633,6 +642,7 @@ function HeroSlide({
   onInfo: () => void;
   onDismiss?: () => void;
 }) {
+  const { t } = useTranslation();
   const genres =
     hero.genres?.map((name) => ({ name })).filter((item) => item.name) ?? [];
 
@@ -671,7 +681,7 @@ function HeroSlide({
           }}
         >
           <X size={13} />
-          Not interested
+          {t("home.hero.notInterested")}
         </button>
       ) : null}
 
@@ -714,7 +724,7 @@ function HeroSlide({
             }}
           >
             <Play size={15} fill="currentColor" />
-            Play
+            {t("player.play")}
           </button>
           <button
             className={cn(
@@ -726,7 +736,7 @@ function HeroSlide({
               onToggleFollow();
             }}
           >
-            {following ? "Following" : "Follow"}
+            {following ? t("common.following") : t("common.follow")}
           </button>
           <button
             className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.12] hover:text-white sm:min-h-0 sm:py-2.5 sm:text-sm"
@@ -736,7 +746,7 @@ function HeroSlide({
             }}
           >
             <Info size={14} />
-            About
+            {t("common.about")}
           </button>
         </div>
       </div>
@@ -965,6 +975,7 @@ export function RecentlyPlayedSection({
   onOpenItem: (item: HomeRecentItem) => void;
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const visibleItems = isDesktop ? items : items.slice(0, 4);
   const pages = chunkItems(visibleItems, 9);
@@ -974,9 +985,9 @@ export function RecentlyPlayedSection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Recently played"
-        subtitle="Albums, artists and playlists you touched most recently."
-        actionLabel="View all"
+        title={t("home.sections.recentlyPlayed.title")}
+        subtitle={t("home.sections.recentlyPlayed.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recently-played")}
         railControls={rail}
       />
@@ -1017,15 +1028,16 @@ export function CustomMixesSection({
   onStartRadio: (mix: HomeGeneratedPlaylistSummary) => void;
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const rail = useSectionRail(mixes.length);
   if (!mixes.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Custom mixes"
-        subtitle="Dynamic playlists shaped around your own listening profile."
-        actionLabel="View all"
+        title={t("home.sections.customMixes.title")}
+        subtitle={t("home.sections.customMixes.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("custom-mixes")}
         railControls={rail}
       />
@@ -1060,6 +1072,7 @@ export function CustomMixCard({
   onStartRadio: (mix: HomeGeneratedPlaylistSummary) => void;
   layout?: "rail" | "grid";
 }) {
+  const { t } = useTranslation();
   const href = `/home/playlist/${encodeURIComponent(item.id)}`;
   const actions = usePlaylistActionEntries({
     name: item.name,
@@ -1117,7 +1130,7 @@ export function CustomMixCard({
         {mixArtistSummary(item)}
       </div>
       <div className="mt-2 text-[11px] uppercase tracking-[0.18em] text-white/40">
-        {item.track_count} tracks
+        {t("common.trackCount", { count: item.track_count })}
       </div>
       <ItemActionMenu
         actions={actions}
@@ -1125,7 +1138,7 @@ export function CustomMixCard({
           type: "media",
           title: item.name,
           subtitle: mixArtistSummary(item),
-          detail: `${item.track_count} tracks`,
+          detail: t("common.trackCount", { count: item.track_count }),
           imageShape: "square",
           fallbackIcon: Sparkles,
         }}
@@ -1145,15 +1158,16 @@ export function ListeningHistorySection({
   items: HomeListeningHistoryCard[];
   onOpenHistory: (item?: HomeListeningHistoryCard) => void;
 }) {
+  const { t } = useTranslation();
   if (!items.length) return null;
   const featured = items.slice(0, 4);
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Your Listening DNA"
-        subtitle="All-time and monthly snapshots from your real listening signal."
-        actionLabel="Open DNA"
+        title={t("home.sections.listeningDna.title")}
+        subtitle={t("home.sections.listeningDna.subtitle")}
+        actionLabel={t("home.sections.listeningDna.action")}
         onAction={() => onOpenHistory()}
       />
       <div className="flex flex-wrap gap-5">
@@ -1179,7 +1193,9 @@ function ListeningHistoryCard({
   index: number;
   onOpen: (item: HomeListeningHistoryCard) => void;
 }) {
-  const artists = item.subtitle || "Your most played music from this period.";
+  const { t } = useTranslation();
+  const artists =
+    item.subtitle || t("home.sections.listeningDna.defaultSubtitle");
 
   return (
     <button
@@ -1210,7 +1226,7 @@ function ListeningHistoryCard({
           {artists}
         </p>
         <div className="mt-auto text-[10px] font-bold uppercase tracking-[0.14em] text-white/35">
-          {item.play_count} plays ·{" "}
+          {t("common.playCount", { count: item.play_count })} ·{" "}
           {formatHistoryMinutes(item.minutes_listened)}
         </div>
       </div>
@@ -1225,15 +1241,16 @@ export function SuggestedAlbumsSection({
   albums: HomeSuggestedAlbum[];
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const rail = useSectionRail(albums.length);
   if (!albums.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Suggested new albums for you"
-        subtitle="Recent releases from the artists you already care about."
-        actionLabel="View all"
+        title={t("home.sections.suggestedAlbums.title")}
+        subtitle={t("home.sections.suggestedAlbums.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("suggested-albums")}
         railControls={rail}
       />
@@ -1265,6 +1282,7 @@ export function RecommendedTracksSection({
   tracks: TrackRowData[];
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const pages = chunkItems(tracks, 9);
   const rail = useSectionRail(pages.length);
   if (!tracks.length) return null;
@@ -1272,9 +1290,9 @@ export function RecommendedTracksSection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Recommended new tracks"
-        subtitle="Fresh cuts from artists and albums that line up with your taste."
-        actionLabel="View all"
+        title={t("home.sections.recommendedTracks.title")}
+        subtitle={t("home.sections.recommendedTracks.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("recommended-tracks")}
         railControls={rail}
       />
@@ -1314,8 +1332,14 @@ export function RadioStationCard({
   onPlay: () => void;
   layout?: "rail" | "grid";
 }) {
+  const { t } = useTranslation();
   const artworkUrl = radioArtwork(station);
-  const seedTypeLabel = radioSeedTypeLabel(station);
+  const seedTypeLabel = radioSeedTypeLabel(station, {
+    track: t("home.radio.track"),
+    album: t("home.radio.album"),
+    genre: t("home.radio.genre"),
+    artist: t("home.radio.artist"),
+  });
   const seedLabel = radioSeedLabel(station);
   const seedSubtitle = radioSeedSubtitle(station);
 
@@ -1360,15 +1384,16 @@ export function RadioStationsSection({
   onPlayStation: (station: HomeRadioStation) => void;
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const rail = useSectionRail(stations.length);
   if (!stations.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Radio stations"
-        subtitle="Artist and album radios seeded from the things you replay the most."
-        actionLabel="View all"
+        title={t("home.sections.radioStations.title")}
+        subtitle={t("home.sections.radioStations.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("radio-stations")}
         railControls={rail}
       />
@@ -1394,15 +1419,16 @@ export function FavoriteArtistsSection({
   artists: HomeDiscoveryPayload["favorite_artists"];
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const rail = useSectionRail(artists.length);
   if (!artists.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Favorite artists"
-        subtitle="Your most played names over the last few months."
-        actionLabel="View all"
+        title={t("home.sections.favoriteArtists.title")}
+        subtitle={t("home.sections.favoriteArtists.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("favorite-artists")}
         railControls={rail}
       />
@@ -1414,7 +1440,7 @@ export function FavoriteArtistsSection({
             artistId={artist.artist_id}
             artistEntityUid={artist.artist_entity_uid}
             artistSlug={artist.artist_slug}
-            subtitle={`${artist.play_count} plays`}
+            subtitle={t("common.playCount", { count: artist.play_count })}
             layout="grid"
             fillGrid
           />
@@ -1439,6 +1465,7 @@ export function CoreTracksPlaylistCard({
   onStartRadio: (item: HomeGeneratedPlaylistSummary) => void;
   layout?: "rail" | "grid";
 }) {
+  const { t } = useTranslation();
   const href = `/home/playlist/${encodeURIComponent(item.id)}`;
   const actions = usePlaylistActionEntries({
     name: item.name,
@@ -1494,7 +1521,7 @@ export function CoreTracksPlaylistCard({
         header={{
           type: "media",
           title: item.name,
-          subtitle: `${item.track_count} tracks`,
+          subtitle: t("common.trackCount", { count: item.track_count }),
           imageShape: "square",
           fallbackIcon: Sparkles,
         }}
@@ -1522,15 +1549,16 @@ export function EssentialsSection({
   onStartRadio: (item: HomeGeneratedPlaylistSummary) => void;
   onViewAll: (sectionId: HomeSectionId) => void;
 }) {
+  const { t } = useTranslation();
   const rail = useSectionRail(items.length);
   if (!items.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Artist Sets"
-        subtitle="Discovery-forward artist sets, ending with familiar anchors."
-        actionLabel="View all"
+        title={t("home.sections.artistSets.title")}
+        subtitle={t("home.sections.artistSets.subtitle")}
+        actionLabel={t("common.viewAll")}
         onAction={() => onViewAll("core-tracks")}
         railControls={rail}
       />

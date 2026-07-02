@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Play, Search } from "@crate/ui/icons";
 import { api, ApiError } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
@@ -49,17 +50,21 @@ interface SearchData {
   }[];
 }
 
-function searchErrorHint(error: unknown): string {
+function searchErrorHint(
+  error: unknown,
+  messages: { sessionRefresh: string; tryAgain: string },
+): string {
   if (
     error instanceof ApiError &&
     (error.status === 401 || error.status === 403)
   ) {
-    return "Your session needs a refresh. Try reloading or signing in again.";
+    return messages.sessionRefresh;
   }
-  return "Try again in a moment.";
+  return messages.tryAgain;
 }
 
 export function SearchResults() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
   const [data, setData] = useState<SearchData | null>(null);
@@ -89,13 +94,18 @@ export function SearchResults() {
       .catch((e) => {
         if (controller.signal.aborted) return;
         setData(null);
-        setSearchError(searchErrorHint(e));
+        setSearchError(
+          searchErrorHint(e, {
+            sessionRefresh: t("search.sessionRefresh"),
+            tryAgain: t("search.tryAgain"),
+          }),
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query]);
+  }, [query, t]);
 
   const trackRowData = useMemo(
     () =>
@@ -110,18 +120,21 @@ export function SearchResults() {
   );
 
   if (!query)
-    return <p className="text-muted-foreground">Enter a search term</p>;
-  if (loading && !data) return <CrateLoader label="Loading search results." />;
+    return <p className="text-muted-foreground">{t("search.emptyPrompt")}</p>;
+  if (loading && !data)
+    return <CrateLoader label={t("search.loadingResults")} />;
   if (searchError)
     return (
       <div className="space-y-8">
-        <h1 className="text-2xl font-bold">Results for "{query}"</h1>
+        <h1 className="text-2xl font-bold">
+          {t("search.resultsFor", { query })}
+        </h1>
         <div className="mx-auto max-w-sm rounded-3xl border border-amber-200/12 bg-white/[0.035] px-6 py-10 text-center shadow-[0_22px_70px_rgba(0,0,0,0.24)]">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/15 bg-amber-300/8 text-amber-100">
             <Search size={18} />
           </div>
           <p className="mt-4 text-base font-semibold text-foreground">
-            Search unavailable
+            {t("search.unavailable")}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">{searchError}</p>
         </div>
@@ -155,12 +168,14 @@ export function SearchResults() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Results for "{query}"</h1>
+      <h1 className="text-2xl font-bold">
+        {t("search.resultsFor", { query })}
+      </h1>
 
       {data.artists.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-3">
-            Artists ({data.artists.length})
+            {t("search.artistsCount", { count: data.artists.length })}
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-4">
             {data.artists.map((a) => (
@@ -180,7 +195,7 @@ export function SearchResults() {
       {data.albums.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-3">
-            Albums ({data.albums.length})
+            {t("search.albumsCount", { count: data.albums.length })}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {data.albums.map((a) => (
@@ -212,18 +227,18 @@ export function SearchResults() {
         <section>
           <div className="flex items-center gap-3 mb-3">
             <h2 className="text-lg font-semibold">
-              Tracks ({data.tracks.length})
+              {t("search.tracksCount", { count: data.tracks.length })}
             </h2>
             <button
               onClick={() =>
                 playAll(data.tracks.map(trackToPlayer), 0, {
                   type: "queue",
-                  name: `Search: ${query}`,
+                  name: t("search.playSource", { query }),
                 })
               }
               className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white"
             >
-              <Play size={12} fill="currentColor" /> Play all
+              <Play size={12} fill="currentColor" /> {t("search.playAll")}
             </button>
           </div>
           <div>
@@ -247,10 +262,10 @@ export function SearchResults() {
             <Search size={18} />
           </div>
           <p className="mt-4 text-base font-semibold text-foreground">
-            No music found
+            {t("search.noMusicFound")}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Try another artist, album, or track.
+            {t("search.noMusicHint")}
           </p>
         </div>
       ) : null}

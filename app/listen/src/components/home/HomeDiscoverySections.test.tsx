@@ -246,6 +246,37 @@ describe("RecentEntityRow", () => {
     expect(onViewAll).toHaveBeenCalledWith("recently-played");
   });
 
+  it("localizes the recently played section chrome", () => {
+    mockMobilePointer();
+    const items: HomeRecentItem[] = [
+      {
+        type: "album",
+        album_id: 1,
+        album_name: "El Cielo",
+        artist_name: "Dredg",
+      },
+    ];
+
+    renderWithListenProviders(
+      <RecentlyPlayedSection
+        items={items}
+        onOpenItem={vi.fn()}
+        onViewAll={vi.fn()}
+      />,
+      { locale: "es" },
+    );
+
+    expect(screen.getByText("Reproducido recientemente")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Álbumes, artistas y playlists que has tocado últimamente.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Ver todo/i }),
+    ).toBeInTheDocument();
+  });
+
   it("does not render type badges on recently played rows", () => {
     const items: HomeRecentItem[] = [
       {
