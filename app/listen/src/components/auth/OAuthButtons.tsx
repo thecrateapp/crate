@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 import { api, getApiBase } from "@/lib/api";
 import { isNative, platform } from "@/lib/capacitor";
@@ -99,6 +100,7 @@ export function OAuthButtons({
   returnTo = "/",
   inviteToken,
 }: OAuthButtonsProps) {
+  const { t } = useTranslation();
   const handleNavigate = useCallback(
     (loginUrl: string, rt: string | null, invite?: string) => {
       const base = getApiBase() || window.location.origin;
@@ -137,6 +139,12 @@ export function OAuthButtons({
       fetchProviders={fetchProviders}
       onOAuthNavigate={handleNavigate}
       buttonClassName="rounded-full"
+      labels={{
+        separator: t("auth.oauth.separator"),
+        google: t("auth.oauth.google"),
+        apple: t("auth.oauth.apple"),
+        appleUnavailable: t("auth.oauth.appleUnavailable"),
+      }}
     />
   );
 }

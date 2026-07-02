@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { I18nProvider } from "@/i18n";
 import { CRATE_LOADING_PHRASES, CrateLoader } from "./CrateLoader";
+
+function renderCrateLoader(ui = <CrateLoader />) {
+  return render(<I18nProvider initialLocale="en">{ui}</I18nProvider>);
+}
 
 describe("CrateLoader", () => {
   afterEach(() => {
@@ -10,7 +15,7 @@ describe("CrateLoader", () => {
 
   it("renders the Crate logo loader with the play glow language", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
-    const { container } = render(<CrateLoader />);
+    const { container } = renderCrateLoader();
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading Music.");
     expect(screen.getByRole("status")).toHaveTextContent("Feeding your soul");
@@ -39,7 +44,7 @@ describe("CrateLoader", () => {
   });
 
   it("renders animated ellipsis dots separately from the phrase", () => {
-    render(<CrateLoader />);
+    renderCrateLoader();
 
     const dots = screen.getAllByTestId("crate-loader-dot");
     expect(dots).toHaveLength(3);
@@ -51,11 +56,15 @@ describe("CrateLoader", () => {
 
   it("keeps the selected phrase stable for one mounted loader", () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.99);
-    const { rerender } = render(<CrateLoader />);
+    const { rerender } = renderCrateLoader();
 
     expect(screen.getByRole("status")).toHaveTextContent("Syncing the signal");
     randomSpy.mockReturnValue(0);
-    rerender(<CrateLoader />);
+    rerender(
+      <I18nProvider initialLocale="en">
+        <CrateLoader />
+      </I18nProvider>,
+    );
 
     expect(screen.getByRole("status")).toHaveTextContent("Syncing the signal");
     expect(screen.getByRole("status")).not.toHaveTextContent(
@@ -65,9 +74,21 @@ describe("CrateLoader", () => {
 
   it("supports custom loading labels for screen readers", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
-    render(<CrateLoader label="Loading artist." />);
+    renderCrateLoader(<CrateLoader label="Loading artist." />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading artist.");
     expect(screen.getByRole("status")).toHaveTextContent("Feeding your soul");
+  });
+
+  it("renders the loading phrase in the active locale", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    render(
+      <I18nProvider initialLocale="es">
+        <CrateLoader />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Cargando Música.");
+    expect(screen.getByRole("status")).toHaveTextContent("Alimentando tu alma");
   });
 });

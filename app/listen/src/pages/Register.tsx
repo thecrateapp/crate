@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
@@ -7,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export function Register() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user, loading: authLoading, refetch } = useAuth();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("invite") || undefined;
@@ -24,7 +26,7 @@ export function Register() {
   }, []);
 
   if (authLoading) {
-    return <CrateLoader variant="screen" label="Loading Crate." />;
+    return <CrateLoader variant="screen" label={t("common.loading")} />;
   }
 
   if (user) {
@@ -59,12 +61,12 @@ export function Register() {
       if (err instanceof ApiError) {
         try {
           const parsed = JSON.parse(err.message);
-          setError(parsed.detail || "Registration failed");
+          setError(parsed.detail || t("auth.register.failed"));
         } catch {
-          setError(err.message || "Registration failed");
+          setError(err.message || t("auth.register.failed"));
         }
       } else {
-        setError("Registration failed");
+        setError(t("auth.register.failed"));
       }
     } finally {
       setLoading(false);
@@ -76,8 +78,10 @@ export function Register() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
         <div className="flex flex-col items-center pb-4">
           <img src="/icons/logo.svg" alt="Crate" className="h-16 w-16 mb-2" />
-          <h1 className="text-2xl font-bold text-white">Create Account</h1>
-          <p className="text-sm text-white/40 -mt-0.5">Own your music</p>
+          <h1 className="text-2xl font-bold text-white">
+            {t("auth.register.title")}
+          </h1>
+          <p className="text-sm text-white/40 -mt-0.5">{t("auth.tagline")}</p>
         </div>
 
         {inviteOnly ? (
@@ -89,8 +93,8 @@ export function Register() {
             }`}
           >
             {inviteToken
-              ? "This invite will be applied when your account is created."
-              : "This instance is invite-only right now. Open a valid invite link to continue."}
+              ? t("auth.register.inviteApplied")
+              : t("auth.register.inviteOnly")}
           </div>
         ) : null}
 
@@ -101,7 +105,7 @@ export function Register() {
             htmlFor="reg-name"
             className="block text-sm text-white/60 mb-1"
           >
-            Name
+            {t("common.name")}
           </label>
           <input
             id="reg-name"
@@ -110,7 +114,7 @@ export function Register() {
             onChange={(e) => setName(e.target.value)}
             required
             className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50"
-            placeholder="Your name"
+            placeholder={t("auth.register.namePlaceholder")}
           />
         </div>
         <div>
@@ -118,7 +122,7 @@ export function Register() {
             htmlFor="reg-email"
             className="block text-sm text-white/60 mb-1"
           >
-            Email
+            {t("common.email")}
           </label>
           <input
             id="reg-email"
@@ -135,7 +139,7 @@ export function Register() {
             htmlFor="reg-password"
             className="block text-sm text-white/60 mb-1"
           >
-            Password
+            {t("common.password")}
           </label>
           <input
             id="reg-password"
@@ -145,7 +149,7 @@ export function Register() {
             required
             minLength={8}
             className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50"
-            placeholder="Min 8 characters"
+            placeholder={t("auth.register.passwordPlaceholder")}
           />
         </div>
 
@@ -154,18 +158,18 @@ export function Register() {
           disabled={loading || (inviteOnly && !inviteToken)}
           className="w-full h-10 rounded-lg bg-cyan-400 text-black font-medium text-sm hover:bg-cyan-300 transition-colors disabled:opacity-50"
         >
-          {loading ? "Creating..." : "Create Account"}
+          {loading ? t("auth.register.submitting") : t("auth.register.submit")}
         </button>
 
         <OAuthButtons returnTo={returnTo} inviteToken={inviteToken} />
 
         <p className="text-center text-sm text-white/40">
-          Already have an account?{" "}
+          {t("auth.register.hasAccount")}{" "}
           <Link
             to={`/login?return_to=${encodeURIComponent(returnTo)}`}
             className="text-primary hover:underline"
           >
-            Sign in
+            {t("auth.login.submit")}
           </Link>
         </p>
       </form>
