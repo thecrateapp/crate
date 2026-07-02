@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import {
@@ -230,6 +231,7 @@ function VirtualizedCuratedTrackList(props: CuratedTrackListProps) {
 }
 
 export function CuratedPlaylist() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -318,12 +320,12 @@ export function CuratedPlaylist() {
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
+        toast.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start playlist radio");
+      toast.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -353,9 +355,9 @@ export function CuratedPlaylist() {
           }),
         ],
       });
-      toast.success("Track added to playlist");
+      toast.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error("Failed to add track to playlist");
+      toast.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -371,27 +373,29 @@ export function CuratedPlaylist() {
     try {
       if (data.is_followed) {
         await api(`/api/curation/playlists/${id}/follow`, "DELETE");
-        toast.success("Removed from your library");
+        toast.success(t("playlist.toasts.removedLibrary"));
       } else {
         await api(`/api/curation/playlists/${id}/follow`, "POST");
-        toast.success("Added to your library");
+        toast.success(t("playlist.toasts.addedLibrary"));
       }
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("playlist.toasts.updateFailed"));
     } finally {
       setTogglingFollow(false);
     }
   }
 
   if (loading) {
-    return <CrateLoader label="Loading playlist." />;
+    return <CrateLoader label={t("playlist.loading")} />;
   }
 
   if (!data) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-muted-foreground">Playlist not found</p>
+        <p className="text-sm text-muted-foreground">
+          {t("playlist.notFound")}
+        </p>
       </div>
     );
   }
@@ -406,30 +410,35 @@ export function CuratedPlaylist() {
       )}/${offlineRecord.trackCount}`
     : null;
   const offlineButtonLabel = data.is_smart
-    ? "Static only"
+    ? t("playlist.offline.staticOnly")
     : offlineState === "ready"
-      ? "Available offline"
+      ? t("playlist.offline.available")
       : offlineState === "error"
-        ? "Retry offline"
+        ? t("playlist.offline.retry")
         : offlineState === "syncing"
-          ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
+          ? t("playlist.offline.syncing", { progress: offlineProgress || "" })
           : offlineBusy
-            ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
-            : "Make available offline";
+            ? t("playlist.offline.downloading", {
+                progress: offlineProgress || "",
+              })
+            : t("playlist.offline.makeAvailable");
   const offlineStatusDetail = data.is_smart
-    ? "Offline mirror is only available for static playlists."
+    ? t("playlist.offline.staticOnlyDetail")
     : offlineState === "ready"
       ? offlineRecord?.trackCount
-        ? `${offlineRecord.trackCount} track${
-            offlineRecord.trackCount === 1 ? "" : "s"
-          } available offline`
-        : "Available offline"
+        ? t("playlist.offline.tracksAvailable", {
+            count: offlineRecord.trackCount,
+          })
+        : t("playlist.offline.available")
       : offlineBusy && offlineProgress
-        ? `${offlineProgress} tracks saved for offline`
+        ? t("playlist.offline.progressSaved", { progress: offlineProgress })
         : offlineState === "error"
           ? offlineRecord?.readyTrackCount
-            ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
-            : "Offline copy failed. Retry to finish the playlist mirror."
+            ? t("playlist.offline.partialError", {
+                ready: offlineRecord.readyTrackCount,
+                total: offlineRecord.trackCount,
+              })
+            : t("playlist.offline.failed")
           : null;
   async function handleToggleOffline() {
     if (!data) return;
@@ -441,11 +450,13 @@ export function CuratedPlaylist() {
       });
       toast.success(
         result === "removed"
-          ? "Offline copy removed"
-          : "Playlist available offline",
+          ? t("playlist.toasts.offlineRemoved")
+          : t("playlist.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error((error as Error).message || "Failed to update offline copy");
+      toast.error(
+        (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
+      );
     }
   }
 
@@ -461,18 +472,18 @@ export function CuratedPlaylist() {
     {
       key: "radio",
       label: "Radio",
-      ariaLabel: "Playlist Radio",
+      ariaLabel: t("playlist.actions.radio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onClick: () => void handlePlaylistRadio(),
     },
     {
       key: "offline",
-      label: "Offline",
+      label: t("common.offline"),
       ariaLabel:
         offlineState === "ready"
-          ? "Remove offline copy"
-          : "Make available offline",
+          ? t("playlist.offline.removeCopy")
+          : t("playlist.offline.makeAvailable"),
       icon: offlineIcon,
       iconClassName: offlineBusy ? "animate-spin" : undefined,
       className:
@@ -489,8 +500,10 @@ export function CuratedPlaylist() {
     },
     {
       key: "follow",
-      label: data.is_followed ? "Following" : "Follow",
-      ariaLabel: data.is_followed ? "Remove from your library" : "Follow",
+      label: data.is_followed ? t("common.following") : t("common.follow"),
+      ariaLabel: data.is_followed
+        ? t("playlist.actions.removeFromLibrary")
+        : t("common.follow"),
       icon: togglingFollow ? Loader2 : data.is_followed ? HeartBold : Heart,
       iconClassName: togglingFollow ? "animate-spin" : undefined,
       active: data.is_followed,
@@ -500,8 +513,8 @@ export function CuratedPlaylist() {
     },
     {
       key: "share",
-      label: "Share",
-      ariaLabel: "Share",
+      label: t("common.share"),
+      ariaLabel: t("common.share"),
       icon: Share2,
       onClick: () => void handleShare(),
     },
@@ -509,21 +522,21 @@ export function CuratedPlaylist() {
   const playlistMenuItems: ContextMenuEntry[] = [
     {
       key: "play",
-      label: "Play playlist",
+      label: t("playlist.actions.playPlaylist"),
       icon: Play,
       disabled: playerTracks.length === 0,
       onSelect: handlePlay,
     },
     {
       key: "shuffle",
-      label: "Shuffle playlist",
+      label: t("playlist.actions.shufflePlaylist"),
       icon: Shuffle,
       disabled: playerTracks.length === 0,
       onSelect: handleShuffle,
     },
     {
       key: "radio",
-      label: "Start playlist radio",
+      label: t("playlist.actions.startRadio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onSelect: handlePlaylistRadio,
@@ -535,8 +548,8 @@ export function CuratedPlaylist() {
     {
       key: "follow",
       label: data.is_followed
-        ? "Remove from your library"
-        : "Add to your library",
+        ? t("playlist.actions.removeFromLibrary")
+        : t("playlist.actions.addToLibrary"),
       icon: data.is_followed ? HeartBold : Heart,
       active: data.is_followed,
       disabled: togglingFollow,
@@ -556,15 +569,15 @@ export function CuratedPlaylist() {
     },
     {
       key: "share",
-      label: "Share playlist",
+      label: t("playlist.actions.sharePlaylist"),
       icon: Share2,
       onSelect: handleShare,
     },
   ];
   const playlistMetaItems = [
-    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    t("common.trackCountLabel", { count: data.track_count }),
     data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
-    `${data.follower_count} follower${data.follower_count !== 1 ? "s" : ""}`,
+    t("common.followerCountLabel", { count: data.follower_count }),
     data.category,
   ];
 
@@ -572,7 +585,7 @@ export function CuratedPlaylist() {
     <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
       <PlaylistHeroSection
         title={data.name}
-        subtitle="Crate playlist"
+        subtitle={t("playlist.subtitle.crate")}
         description={data.description}
         metaItems={playlistMetaItems}
         badges={<OfflineBadge state={offlineState} />}
@@ -609,13 +622,13 @@ export function CuratedPlaylist() {
         {data.tracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              This playlist has no tracks yet
+              {t("playlist.empty.noTracks")}
             </p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              No tracks match this filter
+              {t("playlist.empty.noFilter")}
             </p>
           </div>
         ) : (

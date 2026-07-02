@@ -301,6 +301,40 @@ describe("Album page", () => {
     ).toHaveTextContent("More");
   });
 
+  it("localizes the album action chrome", () => {
+    renderWithListenProviders(<Album />, {
+      locale: "es",
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    const primary = screen.getByRole("group", {
+      name: "Acciones principales de álbum",
+    });
+    expect(
+      within(primary).getByRole("button", { name: "Reproducir" }),
+    ).toHaveTextContent("Reproducir");
+    expect(
+      within(primary).getByRole("button", { name: "Aleatorio" }),
+    ).toHaveTextContent("Aleatorio");
+
+    const secondary = screen.getByRole("group", {
+      name: "Acciones secundarias de álbum",
+    });
+    expect(
+      within(secondary).getByRole("button", { name: "Radio de álbum" }),
+    ).toHaveTextContent("Radio");
+    expect(
+      within(secondary).getByRole("button", { name: "Añadir a colección" }),
+    ).toHaveTextContent("Añadir");
+    expect(
+      within(secondary).getByRole("button", { name: "Compartir" }),
+    ).toHaveTextContent("Compartir");
+    expect(
+      within(secondary).getByRole("button", { name: "Más" }),
+    ).toHaveTextContent("Más");
+  });
+
   it("renders the desktop more menu outside the horizontally scrolling action row", async () => {
     renderWithListenProviders(<Album />, {
       route: "/artists/crossed/morir",

@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Play, Radio, Share2, Shuffle } from "@crate/ui/icons";
+
+import { I18nProvider } from "@/i18n";
 
 import { PlaylistHeroSection } from "./PlaylistHeroSection";
 
@@ -50,6 +53,10 @@ function renderArtwork(className: string) {
   );
 }
 
+function renderWithI18n(ui: ReactNode, locale: "en" | "es" = "en") {
+  return render(<I18nProvider initialLocale={locale}>{ui}</I18nProvider>);
+}
+
 beforeAll(() => {
   Object.defineProperty(navigator, "maxTouchPoints", {
     configurable: true,
@@ -67,7 +74,7 @@ beforeEach(() => {
 
 describe("PlaylistHeroSection", () => {
   it("keeps the hero background in the artist/album language without blur", () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
         metaItems={["12 tracks"]}
@@ -90,7 +97,7 @@ describe("PlaylistHeroSection", () => {
   });
 
   it("uses an explicit mobile hero height so copy sits directly above CTAs", () => {
-    const { container } = render(
+    const { container } = renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
         metaItems={["12 tracks"]}
@@ -115,7 +122,7 @@ describe("PlaylistHeroSection", () => {
   });
 
   it("uses artist/album-style primary pills and secondary icon labels", () => {
-    render(
+    renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
         description="A playlist for badly lit rooms."
@@ -180,8 +187,66 @@ describe("PlaylistHeroSection", () => {
     ).toHaveTextContent("More");
   });
 
+  it("localizes the shared playlist hero chrome", () => {
+    renderWithI18n(
+      <PlaylistHeroSection
+        title="Friday Damage"
+        description="A playlist for badly lit rooms."
+        metaItems={["12 tracks", "42 min"]}
+        artwork={renderArtwork}
+        onPlay={vi.fn()}
+        onShuffle={vi.fn()}
+        secondaryActions={[
+          {
+            key: "radio",
+            label: "Radio",
+            ariaLabel: "Radio de playlist",
+            icon: Radio,
+            onClick: vi.fn(),
+          },
+          {
+            key: "share",
+            label: "Compartir",
+            ariaLabel: "Compartir",
+            icon: Share2,
+            onClick: vi.fn(),
+          },
+        ]}
+        menuItems={[
+          {
+            key: "play",
+            label: "Reproducir playlist",
+            icon: Play,
+            onSelect: vi.fn(),
+          },
+        ]}
+      />,
+      "es",
+    );
+
+    const primary = screen.getByRole("group", {
+      name: "Acciones principales de playlist",
+    });
+    expect(
+      within(primary).getByRole("button", { name: "Reproducir" }),
+    ).toHaveTextContent("Reproducir");
+    expect(
+      within(primary).getByRole("button", { name: "Aleatorio" }),
+    ).toHaveTextContent("Aleatorio");
+
+    const secondary = screen.getByRole("group", {
+      name: "Acciones secundarias de playlist",
+    });
+    expect(
+      within(secondary).getByRole("button", { name: "Compartir" }),
+    ).toHaveTextContent("Compartir");
+    expect(
+      within(secondary).getByRole("button", { name: "Más" }),
+    ).toHaveTextContent("Más");
+  });
+
   it("opens the normalized glass context menu with playlist media header", async () => {
-    render(
+    renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
         subtitle="Public playlist"
@@ -219,7 +284,7 @@ describe("PlaylistHeroSection", () => {
   it("moves More to the fixed mobile hero corner", async () => {
     mockMobilePointer();
 
-    render(
+    renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
         metaItems={["12 tracks"]}

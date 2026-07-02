@@ -68,13 +68,41 @@ vi.mock("@/components/playlists/EditorialPlaylistArtwork", () => ({
 vi.mock("@/components/playlists/PlaylistHeroSection", () => ({
   PlaylistHeroSection: ({
     title,
+    subtitle,
+    metaItems,
+    secondaryActions,
+    menuItems,
     artwork,
   }: {
     title: string;
+    subtitle?: string;
+    metaItems?: Array<string | null | undefined | false>;
+    secondaryActions?: Array<{ label: string; ariaLabel?: string }>;
+    menuItems?: Array<{ type?: string; label?: string }>;
     artwork: (className: string) => ReactNode;
   }) => (
     <section data-testid="playlist-hero">
       <h1>{title}</h1>
+      {subtitle ? <p>{subtitle}</p> : null}
+      {metaItems
+        ?.filter(Boolean)
+        .map((item) => <span key={String(item)}>{item}</span>)}
+      <div role="group" aria-label="Secondary playlist actions">
+        {secondaryActions?.map((action) => (
+          <button
+            key={action.ariaLabel || action.label}
+            type="button"
+            aria-label={action.ariaLabel || action.label}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+      <div>
+        {menuItems
+          ?.filter((item) => item.type !== "divider" && item.label)
+          .map((item) => <span key={item.label}>{item.label}</span>)}
+      </div>
       {artwork("hero-artwork")}
     </section>
   ),
@@ -218,6 +246,51 @@ describe("playlist pages", () => {
     expect(screen.getByTestId("track-row")).toHaveAttribute(
       "data-show-cover-thumb",
       "true",
+    );
+  });
+
+  it("localizes playlist page chrome", () => {
+    renderWithListenProviders(<Playlist />, {
+      locale: "es",
+      route: "/playlists/42",
+      path: "/playlists/:id",
+    });
+
+    const hero = screen.getByTestId("playlist-hero");
+    expect(hero).toHaveTextContent("Playlist pública");
+    expect(hero).toHaveTextContent("1 canción");
+    expect(hero).toHaveTextContent("Compartir");
+    expect(hero).toHaveTextContent("Reproducir playlist");
+    expect(
+      screen.getByPlaceholderText("Filtrar por título, artista o álbum"),
+    ).toBeInTheDocument();
+  });
+
+  it("localizes curated and generated playlist chrome", () => {
+    renderWithListenProviders(<CuratedPlaylist />, {
+      locale: "es",
+      route: "/playlists/curated/42",
+      path: "/playlists/curated/:id",
+    });
+
+    expect(screen.getByTestId("playlist-hero")).toHaveTextContent(
+      "Playlist de Crate",
+    );
+    expect(screen.getByTestId("playlist-hero")).toHaveTextContent(
+      "3 seguidores",
+    );
+
+    renderWithListenProviders(<HomePlaylist />, {
+      locale: "es",
+      route: "/home/playlist/screamo",
+      path: "/home/playlist/:playlistId",
+    });
+
+    expect(screen.getAllByTestId("playlist-hero")[1]).toHaveTextContent(
+      "Playlist generada",
+    );
+    expect(screen.getAllByTestId("playlist-hero")[1]).toHaveTextContent(
+      "Generada para ti",
     );
   });
 });

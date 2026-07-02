@@ -1,5 +1,6 @@
 import { ListMusic, Play, Save, X } from "@crate/ui/icons";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { AppModal } from "@crate/ui/primitives/AppModal";
@@ -29,6 +30,7 @@ export function ArtistSetlistModal({
   onClose,
   onPlay,
 }: ArtistSetlistModalProps) {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
@@ -38,9 +40,9 @@ export function ArtistSetlistModal({
     setSaving(true);
     try {
       await api(`/api/artists/${artistId}/setlist-playlist`, "POST");
-      toast.success("Setlist exported as playlist");
+      toast.success(t("artist.setlist.toasts.exported"));
     } catch {
-      toast.error("Failed to export setlist");
+      toast.error(t("artist.setlist.toasts.exportFailed"));
     } finally {
       setSaving(false);
     }
@@ -67,10 +69,11 @@ export function ArtistSetlistModal({
             <ListMusic size={18} className="text-primary" />
             <div>
               <h3 className="text-sm font-semibold text-foreground">
-                Probable Setlist
+                {t("artist.setlist.title")}
               </h3>
               <p className="text-[11px] text-muted-foreground">
-                {artistName} · {setlist.length} songs
+                {artistName} ·{" "}
+                {t("artist.setlist.songCount", { count: setlist.length })}
               </p>
             </div>
           </div>
@@ -108,7 +111,7 @@ export function ArtistSetlistModal({
                   </span>
                   {track.play_count > 0 && (
                     <span className="text-[10px] text-white/20">
-                      {track.play_count} plays
+                      {t("common.playCount", { count: track.play_count })}
                     </span>
                   )}
                 </div>
@@ -124,7 +127,7 @@ export function ArtistSetlistModal({
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary/15 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25"
           >
             <Play size={14} fill="currentColor" />
-            Play Setlist
+            {t("artist.setlist.play")}
           </button>
           <button
             onClick={handleExport}
@@ -132,7 +135,7 @@ export function ArtistSetlistModal({
             className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-white/5 disabled:opacity-40"
           >
             <Save size={14} />
-            {saving ? "Saving..." : "Export"}
+            {saving ? t("common.saving") : t("artist.setlist.export")}
           </button>
         </div>
       </div>
