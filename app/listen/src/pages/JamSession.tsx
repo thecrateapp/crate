@@ -28,6 +28,7 @@ import {
   Users,
   Zap,
 } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
@@ -269,6 +270,7 @@ function extractInviteToken(value: string) {
 }
 
 export function JamSession() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { roomId } = useParams<{ roomId: string }>();
   const { user } = useAuth();
@@ -485,7 +487,7 @@ export function JamSession() {
   async function handleCreateRoom() {
     const name = roomName.trim();
     if (!name) {
-      toast.error("Room name is required");
+      toast.error(t("jam.toasts.roomNameRequired"));
       return;
     }
     setCreating(true);
@@ -499,7 +501,7 @@ export function JamSession() {
       });
       navigate(`/jam/rooms/${created.id}`);
     } catch {
-      toast.error("Failed to create jam room");
+      toast.error(t("jam.toasts.createRoomFailed"));
     } finally {
       setCreating(false);
     }
@@ -520,7 +522,7 @@ export function JamSession() {
       refetchRooms();
       navigate(`/jam/rooms/${joined.room.id}`);
     } catch {
-      toast.error("Failed to join jam room");
+      toast.error(t("jam.toasts.joinRoomFailed"));
     } finally {
       setJoiningRoomId(null);
     }
@@ -748,7 +750,11 @@ export function JamSession() {
         key={listedRoom.id}
         role="button"
         tabIndex={0}
-        aria-label={`${isMember ? "Open" : "Join"} ${listedRoom.name}`}
+        aria-label={
+          isMember
+            ? t("jam.roomCard.openAria", { name: listedRoom.name })
+            : t("jam.roomCard.joinAria", { name: listedRoom.name })
+        }
         onClick={() => void handleJoinRoom(listedRoom)}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
@@ -776,17 +782,19 @@ export function JamSession() {
                 ) : (
                   <Lock size={11} />
                 )}
-                {mode === "member" ? "Your room" : "Public"}
+                {mode === "member"
+                  ? t("jam.roomCard.yourRoom")
+                  : t("jam.visibility.public")}
               </span>
               {listedRoom.is_permanent ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2 py-0.5 text-cyan-200">
                   <Pin size={11} />
-                  Permanent
+                  {t("jam.roomCard.permanent")}
                 </span>
               ) : null}
               {listedRoom.status !== "active" ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-amber-200">
-                  Paused
+                  {t("jam.roomCard.paused")}
                 </span>
               ) : null}
               {(listedRoom.tags || []).slice(0, 5).map((tag) => (
@@ -820,8 +828,8 @@ export function JamSession() {
                   type="button"
                   onClick={() => requestDeleteRoom(listedRoom)}
                   disabled={deletingRoomId === listedRoom.id}
-                  title="Delete room"
-                  aria-label={`Delete ${listedRoom.name}`}
+                  title={t("jam.delete.title")}
+                  aria-label={t("jam.delete.aria", { name: listedRoom.name })}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10 text-red-200 transition-colors hover:bg-red-500/15 disabled:opacity-50"
                 >
                   {deletingRoomId === listedRoom.id ? (
@@ -850,10 +858,9 @@ export function JamSession() {
             })}
           </div>
           <div className="text-xs text-muted-foreground">
-            {listedRoom.member_count || listedRoom.members.length} member
-            {(listedRoom.member_count || listedRoom.members.length) === 1
-              ? ""
-              : "s"}
+            {t("jam.roomCard.memberCount", {
+              count: listedRoom.member_count || listedRoom.members.length,
+            })}
           </div>
         </div>
         {latestEvent ? (
@@ -929,40 +936,40 @@ export function JamSession() {
       <>
         <div className="space-y-6">
           <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
-            <h1 className="text-3xl font-bold text-foreground">Jam sessions</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {t("jam.lobby.title")}
+            </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Create invite-only rooms, open public listening rooms, or keep
-              permanent spaces around for recurring sessions.
+              {t("jam.lobby.subtitle")}
             </p>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
             <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-foreground">
-                Start a room
+                {t("jam.lobby.startTitle")}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Good for listening parties, queue handoffs, or testing new
-                shared flows with a small group.
+                {t("jam.lobby.startSubtitle")}
               </p>
               <div className="mt-4 space-y-3">
                 <input
                   value={roomName}
                   onChange={(event) => setRoomName(event.target.value)}
-                  placeholder="Friday night queue"
+                  placeholder={t("jam.lobby.namePlaceholder")}
                   className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
                 />
                 <textarea
                   value={roomDescription}
                   onChange={(event) => setRoomDescription(event.target.value)}
-                  placeholder="Optional description: what is this room for?"
+                  placeholder={t("jam.lobby.descriptionPlaceholder")}
                   rows={3}
                   className="w-full resize-none rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
                 />
                 <input
                   value={roomTagsInput}
                   onChange={(event) => setRoomTagsInput(event.target.value)}
-                  placeholder="Tags or genres: post-punk, 90s, shoegaze"
+                  placeholder={t("jam.lobby.tagsPlaceholder")}
                   className="h-11 w-full rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-cyan-400/40"
                 />
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -976,7 +983,7 @@ export function JamSession() {
                     }`}
                   >
                     <Lock size={15} />
-                    Invite-only
+                    {t("jam.visibility.inviteOnly")}
                   </button>
                   <button
                     type="button"
@@ -988,13 +995,13 @@ export function JamSession() {
                     }`}
                   >
                     <Globe2 size={15} />
-                    Public
+                    {t("jam.visibility.public")}
                   </button>
                 </div>
                 <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-foreground">
                   <span className="inline-flex items-center gap-2">
                     <Pin size={15} className="text-cyan-300" />
-                    Permanent room
+                    {t("jam.lobby.permanentRoom")}
                   </span>
                   <input
                     type="checkbox"
@@ -1014,7 +1021,7 @@ export function JamSession() {
                   ) : (
                     <Radio size={15} />
                   )}
-                  Create room
+                  {t("jam.lobby.createRoom")}
                 </button>
               </div>
             </section>
@@ -1023,11 +1030,10 @@ export function JamSession() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-foreground">
-                    Open rooms
+                    {t("jam.lobby.openRoomsTitle")}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Your rooms are separate from public rooms you can discover
-                    and join.
+                    {t("jam.lobby.openRoomsSubtitle")}
                   </p>
                 </div>
                 {roomsLoading ? (
@@ -1040,7 +1046,7 @@ export function JamSession() {
                 <input
                   value={roomSearch}
                   onChange={(event) => setRoomSearch(event.target.value)}
-                  placeholder="Search public and permanent rooms by genre, tag, decade..."
+                  placeholder={t("jam.lobby.searchPlaceholder")}
                   className="h-8 min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 />
               </div>
@@ -1049,7 +1055,7 @@ export function JamSession() {
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Your rooms
+                      {t("jam.lobby.yourRooms")}
                     </h3>
                     <span className="text-xs text-muted-foreground">
                       {memberRooms.length}
@@ -1061,7 +1067,7 @@ export function JamSession() {
                     )}
                     {!roomsLoading && memberRooms.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
-                        No rooms where you are a member match this search.
+                        {t("jam.lobby.emptyMemberRooms")}
                       </div>
                     ) : null}
                   </div>
@@ -1070,7 +1076,7 @@ export function JamSession() {
                 <div>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Public rooms to discover
+                      {t("jam.lobby.publicRooms")}
                     </h3>
                     <span className="text-xs text-muted-foreground">
                       {publicRooms.length}
@@ -1082,7 +1088,7 @@ export function JamSession() {
                     )}
                     {!roomsLoading && publicRooms.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-muted-foreground">
-                        No public rooms match this search yet.
+                        {t("jam.lobby.emptyPublicRooms")}
                       </div>
                     ) : null}
                   </div>
@@ -1093,16 +1099,16 @@ export function JamSession() {
 
           <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-foreground">
-              Join from invite
+              {t("jam.lobby.joinInviteTitle")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Paste a full invite link or just the token.
+              {t("jam.lobby.joinInviteSubtitle")}
             </p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <input
                 value={inviteInput}
                 onChange={(event) => setInviteInput(event.target.value)}
-                placeholder="https://…/jam/invite/abc123"
+                placeholder={t("jam.lobby.invitePlaceholder")}
                 className="h-11 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-cyan-400/40"
               />
               <button
@@ -1110,7 +1116,7 @@ export function JamSession() {
                 onClick={() => {
                   const token = extractInviteToken(inviteInput);
                   if (!token) {
-                    toast.error("Paste a valid invite link or token");
+                    toast.error(t("jam.toasts.invalidInvite"));
                     return;
                   }
                   navigate(`/jam/invite/${token}`);
@@ -1118,7 +1124,7 @@ export function JamSession() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
               >
                 <Users size={15} />
-                Join room
+                {t("jam.lobby.joinRoom")}
               </button>
             </div>
           </section>
