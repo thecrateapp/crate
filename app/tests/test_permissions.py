@@ -350,6 +350,57 @@ def test_settings_requires_settings_manage():
     assert exc.value.status_code == 403
 
 
+def test_paths_settings_requires_settings_manage():
+    from crate.api.settings import update_paths_settings
+    from crate.api.schemas.settings import PathsSettingsUpdateRequest
+
+    with pytest.raises(HTTPException) as exc:
+        update_paths_settings(  # type: ignore[arg-type]
+            _request_for("ops"),
+            PathsSettingsUpdateRequest(llm_refinement_enabled=True),
+        )
+
+    assert exc.value.status_code == 403
+
+
+def test_paths_settings_update_persists_toggle(monkeypatch):
+    from crate.api.settings import update_paths_settings
+    from crate.api.schemas.settings import PathsSettingsUpdateRequest
+
+    writes: dict[str, str] = {}
+    monkeypatch.setattr(
+        "crate.api.settings.set_setting",
+        lambda key, value: writes.__setitem__(key, value),
+    )
+
+    result = update_paths_settings(  # type: ignore[arg-type]
+        _request_for("admin"),
+        PathsSettingsUpdateRequest(llm_refinement_enabled=False),
+    )
+
+    assert result == {"ok": True}
+    assert writes["paths_llm_refinement_enabled"] == "false"
+
+
+def test_music_paths_llm_cache_clear_deletes_refinement_prefix(monkeypatch):
+    from crate.api.settings import clear_cache
+    from crate.api.schemas.settings import CacheClearRequest
+
+    deleted_prefixes: list[str] = []
+    monkeypatch.setattr(
+        "crate.api.settings.delete_cache_prefix",
+        lambda prefix: deleted_prefixes.append(prefix),
+    )
+
+    result = clear_cache(  # type: ignore[arg-type]
+        _request_for("admin"),
+        CacheClearRequest(type="paths_llm"),
+    )
+
+    assert result == {"ok": True, "type": "paths_llm"}
+    assert deleted_prefixes == ["paths:llm_refinement:"]
+
+
 def test_admin_update_user_role_requires_roles_manage():
     from crate.api.auth import admin_update_user_role
     from crate.api.schemas.auth import UpdateUserRoleRequest
