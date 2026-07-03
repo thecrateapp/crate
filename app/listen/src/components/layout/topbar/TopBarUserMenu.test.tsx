@@ -71,6 +71,25 @@ function renderMenu() {
   });
 }
 
+function renderMenuInSpanish() {
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 0,
+    top: 16,
+    left: 320,
+    right: 368,
+    bottom: 64,
+    width: 48,
+    height: 48,
+    toJSON: () => ({}),
+  });
+
+  return renderWithListenProviders(<TopBarUserMenu />, {
+    auth: { user },
+    locale: "es",
+  });
+}
+
 describe("TopBarUserMenu", () => {
   beforeEach(() => {
     isDesktop = true;
@@ -109,5 +128,57 @@ describe("TopBarUserMenu", () => {
     expect(
       screen.getByRole("menuitem", { name: /Settings/i }),
     ).toBeInTheDocument();
+  });
+
+  it("localizes the user menu", () => {
+    renderMenuInSpanish();
+
+    fireEvent.click(screen.getByRole("button", { name: "Menú de usuario" }));
+
+    expect(
+      screen.getByRole("menuitem", { name: /Perfil/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /Subir música/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /Sugerir artista/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: /Cerrar sesión/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("localizes the artist suggestion modal", () => {
+    renderMenuInSpanish();
+
+    fireEvent.click(screen.getByRole("button", { name: "Menú de usuario" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Sugerir artista/i }));
+
+    expect(screen.getByText("Adquisición")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Sugerir artista" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Envía una petición a los admins de Crate para que puedan buscarlo y adquirirlo.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Artista")).toBeInTheDocument();
+    expect(screen.getByText("Enlace, si tienes uno")).toBeInTheDocument();
+    expect(screen.getByText("Nota")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("High Vis, Denzel Curry, ..."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Bandcamp, Tidal, Spotify, YouTube..."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("¿Por qué debería estar en Crate?"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Enviar sugerencia" }),
+    ).toBeVisible();
   });
 });
