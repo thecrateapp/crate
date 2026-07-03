@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
 
@@ -28,6 +29,7 @@ export function PlayerSeekBar({
   const [draftTime, setDraftTime] = useState(0);
   const [hoverPercent, setHoverPercent] = useState<number | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isScrubbing) {
@@ -143,7 +145,7 @@ export function PlayerSeekBar({
             step={0.1}
             value={safeDuration > 0 ? Math.min(displayedTime, safeDuration) : 0}
             disabled={safeDuration <= 0}
-            aria-label="Seek track position"
+            aria-label={t("player.seek")}
             className="absolute inset-x-0 top-1/2 h-8 -translate-y-1/2 cursor-pointer opacity-0 disabled:cursor-default"
             onPointerDown={(event) => {
               stopPropagation(event);
@@ -204,7 +206,7 @@ export function PlayerSeekBar({
           step={0.1}
           value={safeDuration > 0 ? Math.min(displayedTime, safeDuration) : 0}
           disabled={safeDuration <= 0}
-          aria-label="Seek track position"
+          aria-label={t("player.seek")}
           className={`block w-full appearance-none rounded-full border-0 outline-none ${
             thin ? "h-1" : compact ? "h-1.5" : "h-2"
           } cursor-pointer disabled:cursor-default disabled:opacity-50`}

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -35,6 +35,7 @@ vi.mock("@/lib/native-output-router", () => ({
 }));
 
 import { PlaybackTargetMenu } from "@/components/player/PlaybackTargetMenu";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 describe("PlaybackTargetMenu", () => {
   beforeEach(() => {
@@ -90,7 +91,7 @@ describe("PlaybackTargetMenu", () => {
   });
 
   it("opens the unified output menu with local and Crate targets", async () => {
-    render(<PlaybackTargetMenu />);
+    renderWithListenProviders(<PlaybackTargetMenu />);
 
     const outputButton = screen.getByRole("button", { name: "Output" });
     expect(outputButton.className).not.toContain("hover:bg");
@@ -149,7 +150,7 @@ describe("PlaybackTargetMenu", () => {
       },
     ]);
 
-    render(<PlaybackTargetMenu />);
+    renderWithListenProviders(<PlaybackTargetMenu />);
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
 
@@ -169,7 +170,9 @@ describe("PlaybackTargetMenu", () => {
       currentTime: 4,
     };
 
-    render(<PlaybackTargetMenu targetContext={targetContext} />);
+    renderWithListenProviders(
+      <PlaybackTargetMenu targetContext={targetContext} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Output" }));
     const localRow = (await screen.findByText("Crate on Chrome")).closest(
@@ -193,5 +196,18 @@ describe("PlaybackTargetMenu", () => {
     expect(toastInfoMock).toHaveBeenCalledWith(
       "Crate Connect transfer is coming later.",
     );
+  });
+
+  it("localizes the output menu chrome", async () => {
+    renderWithListenProviders(<PlaybackTargetMenu />, { locale: "es" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salida" }));
+
+    expect(
+      await screen.findByRole("menu", { name: "Salidas de audio" }),
+    ).toBeVisible();
+    expect(screen.getByText("Salida")).toBeVisible();
+    expect(screen.getByText("Activo")).toBeVisible();
+    expect(screen.getByText("No disponible")).toBeVisible();
   });
 });

@@ -117,6 +117,49 @@ describe("ContinuePlaybackPrompt", () => {
     expect(screen.queryByText("Playing on Desktop")).not.toBeInTheDocument();
   });
 
+  it("localizes the remote playback prompt", async () => {
+    fetchResumeCandidateMock.mockResolvedValueOnce({
+      candidate: {
+        device_id: "desktop",
+        device_label: "Desktop",
+        status: "paused",
+        title: "Remote Track",
+        artist: "Remote Artist",
+        album: "Remote Album",
+        position_ms: 42000,
+        duration_ms: 180000,
+        current_index: 0,
+        queue: [
+          {
+            track_id: 44,
+            title: "Remote Track",
+            artist: "Remote Artist",
+            album: "Remote Album",
+            duration: 180,
+          },
+        ],
+        play_source: { type: "album", name: "Remote Album", id: 9 },
+        repeat_mode: "off",
+        shuffle: false,
+        updated_at: "2026-05-25T10:00:30.000Z",
+      },
+    });
+
+    renderWithListenProviders(<ContinuePlaybackPrompt />, {
+      locale: "es",
+      playerActions: { playAll: vi.fn(), seek: vi.fn() },
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("Continuar desde Desktop")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Continuar" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Ahora no" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Descartar" })).toBeVisible();
+  });
+
   it("requests a Crate Connect v2 takeover without calling legacy device transfer", async () => {
     const requestTransfer = vi.fn(() => true);
 

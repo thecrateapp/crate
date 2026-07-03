@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ThumbsDown, ThumbsUp } from "@crate/ui/icons";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import { sendRadioFeedback } from "@/lib/radio";
 
@@ -19,6 +20,7 @@ export function RadioFeedback({
 }: RadioFeedbackProps) {
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     setLiked(false);
@@ -35,7 +37,7 @@ export function RadioFeedback({
     setLiked(true);
     setDisliked(false);
     await sendRadioFeedback(sessionId, trackId, "like");
-    toast.success("More like this", { duration: 1500 });
+    toast.success(t("player.radio.moreLikeThis"), { duration: 1500 });
   };
 
   const handleDislike = async () => {
@@ -44,7 +46,7 @@ export function RadioFeedback({
     setLiked(false);
     void sendRadioFeedback(sessionId, trackId, "dislike");
     onDislike?.();
-    toast("Less like this", { duration: 1500 });
+    toast(t("player.radio.lessLikeThis"), { duration: 1500 });
   };
 
   return (
@@ -56,8 +58,8 @@ export function RadioFeedback({
             ? "bg-primary/15 text-primary"
             : "text-white/30 hover:bg-white/5 hover:text-white/60"
         }`}
-        title="More like this"
-        aria-label="More like this"
+        title={t("player.radio.moreLikeThis")}
+        aria-label={t("player.radio.moreLikeThis")}
       >
         <ThumbsUp size={iconSize} className={liked ? "fill-current" : ""} />
       </button>
@@ -68,8 +70,8 @@ export function RadioFeedback({
             ? "bg-red-500/15 text-red-400"
             : "text-white/30 hover:bg-white/5 hover:text-white/60"
         }`}
-        title="Less like this"
-        aria-label="Less like this"
+        title={t("player.radio.lessLikeThis")}
+        aria-label={t("player.radio.lessLikeThis")}
       >
         <ThumbsDown
           size={iconSize}

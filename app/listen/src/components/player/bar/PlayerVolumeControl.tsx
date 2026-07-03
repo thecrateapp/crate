@@ -5,6 +5,7 @@ import { CRATE_ICON_SIZE, Volume2, VolumeX } from "@crate/ui/icons";
 import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { useHoverCapability } from "@/hooks/use-hover-capability";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
+import { useTranslation } from "react-i18next";
 
 interface PlayerVolumeControlProps {
   volume: number;
@@ -23,6 +24,7 @@ export function PlayerVolumeControl({
     bottom: number;
   } | null>(null);
   const canUseWheel = useHoverCapability();
+  const { t } = useTranslation();
   const trackRef = useRef<HTMLDivElement>(null);
   const volumeRef = useRef<HTMLDivElement>(null);
   const volumeButtonRef = useRef<HTMLButtonElement>(null);
@@ -115,7 +117,9 @@ export function PlayerVolumeControl({
           setShowVolume(nextOpen);
           onOverlayChange(nextOpen);
         }}
-        aria-label={volume === 0 ? "Unmute" : "Volume"}
+        aria-label={
+          volume === 0 ? t("player.volume.unmute") : t("player.volume.label")
+        }
         className="rounded-md p-1.5 text-white/30 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
       >
         <span ref={volumeIconRef} className="block">
@@ -140,7 +144,7 @@ export function PlayerVolumeControl({
               <div
                 ref={trackRef}
                 role="slider"
-                aria-label="Volume"
+                aria-label={t("player.volume.label")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(volumePct)}
