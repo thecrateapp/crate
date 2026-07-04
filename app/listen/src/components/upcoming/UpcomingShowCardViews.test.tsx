@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { UpcomingItem } from "./upcoming-model";
+import { I18nProvider } from "@/i18n";
 import {
   formatShowTimeRemaining,
   showDirectionsUrl,
@@ -51,20 +52,29 @@ describe("UpcomingShowExpandedView", () => {
   });
 
   it("renders directions and genre pills in the expanded card", () => {
-    render(
-      <MemoryRouter>
-        <UpcomingShowExpandedView
-          item={showItem}
-          attending
-          savingAttendance={false}
-          playingSetlist={false}
-          onToggleAttendance={vi.fn()}
-          onPlaySetlist={vi.fn()}
-          onClose={vi.fn()}
-          showClose={false}
-        />
-      </MemoryRouter>,
-    );
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T10:00:00"));
+
+    try {
+      render(
+        <MemoryRouter>
+          <I18nProvider initialLocale="en">
+            <UpcomingShowExpandedView
+              item={showItem}
+              attending
+              savingAttendance={false}
+              playingSetlist={false}
+              onToggleAttendance={vi.fn()}
+              onPlaySetlist={vi.fn()}
+              onClose={vi.fn()}
+              showClose={false}
+            />
+          </I18nProvider>
+        </MemoryRouter>,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(screen.queryByRole("button", { name: /close/i })).toBeNull();
     expect(screen.getByText(/\d+ days? to go/i)).toBeInTheDocument();

@@ -144,7 +144,9 @@ export function buildTrackMenuPlayerTrack(
 export function sharePath(
   path: string,
   label: string,
-  options: Partial<Omit<SharePayload, "title" | "url">> = {},
+  options: Partial<Omit<SharePayload, "title" | "url">> & {
+    copiedToast?: string;
+  } = {},
 ) {
   return async () => {
     const url = publicShareUrl(path);
@@ -157,7 +159,7 @@ export function sharePath(
     });
     if (!opened) {
       await navigator.clipboard.writeText(url);
-      toast.success("Link copied");
+      toast.success(options.copiedToast ?? "Link copied");
     }
   };
 }

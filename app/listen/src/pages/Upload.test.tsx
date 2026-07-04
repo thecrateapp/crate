@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 
-import { api } from "@/lib/api";
+const toastErrorMock = vi.hoisted(() => vi.fn());
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: toastErrorMock,
+    success: vi.fn(),
+  },
+}));
+
+import { ApiError, api } from "@/lib/api";
 import { Upload, uploadMusicFiles } from "@/pages/Upload";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -94,6 +103,10 @@ describe("uploadMusicFiles", () => {
 });
 
 describe("Upload", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("localizes the upload page chrome", () => {
     renderWithListenProviders(<Upload />, { locale: "es" });
 
@@ -107,5 +120,32 @@ describe("Upload", () => {
     expect(
       screen.getByRole("button", { name: "Importar a la biblioteca" }),
     ).toBeInTheDocument();
+  });
+
+  it("localizes upload queue errors", async () => {
+    vi.mocked(api).mockRejectedValueOnce(new ApiError(413, "Too large"));
+    const { container } = renderWithListenProviders(<Upload />, {
+      locale: "es",
+    });
+
+    const input = container.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("Upload input missing");
+    }
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["abc"], "album.zip", { type: "application/zip" })],
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Importar a la biblioteca" }),
+    );
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "La subida es demasiado grande para una sola petición. Inténtalo de nuevo para que Crate pueda dividirla en fragmentos.",
+      );
+    });
   });
 });

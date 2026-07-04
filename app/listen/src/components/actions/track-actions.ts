@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
@@ -35,7 +36,7 @@ import {
   trackDownloadApiPath,
   trackSharePath,
 } from "@/lib/library-routes";
-import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
+import { isOfflineBusy } from "@/lib/offline";
 import {
   hasPlayableTrackReference,
   isUuidLikeTrackId,
@@ -63,6 +64,7 @@ export function useTrackActionEntries(
   input: UseTrackActionEntriesInput,
 ): ItemActionMenuEntry[] {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { play, playAll, addToQueue, playNext } = usePlayerActions();
   const { isLiked, toggleTrackLike } = useLikedTracks();
   const {
@@ -88,6 +90,22 @@ export function useTrackActionEntries(
   };
   const offlineState = getTrackState(offlineRef);
 
+  const offlineActionLabel = (() => {
+    switch (offlineState) {
+      case "ready":
+        return t("actions.offline.removeCopy");
+      case "error":
+        return t("actions.offline.retryCopy");
+      case "queued":
+      case "downloading":
+        return t("actions.offline.downloading");
+      case "syncing":
+        return t("actions.offline.syncing");
+      default:
+        return t("actions.offline.makeAvailable");
+    }
+  })();
+
   return useMemo<ItemActionMenuEntry[]>(() => {
     const playerTrack = buildTrackMenuPlayerTrack(
       input.track,
@@ -104,7 +122,7 @@ export function useTrackActionEntries(
     const entries: ItemActionMenuEntry[] = [
       action({
         key: "play",
-        label: "Play now",
+        label: t("actions.track.playNow"),
         icon: Play,
         onSelect: () =>
           input.onPlayNowOverride
@@ -113,20 +131,20 @@ export function useTrackActionEntries(
       }),
       action({
         key: "play-next",
-        label: "Play next",
+        label: t("actions.track.playNext"),
         icon: ListPlus,
         onSelect: () => playNext(playerTrack),
       }),
       action({
         key: "queue",
-        label: "Add to queue",
+        label: t("actions.track.addToQueue"),
         icon: Plus,
         onSelect: () => addToQueue(playerTrack),
       }),
       { type: "divider", key: "divider-playback" },
       action({
         key: "like",
-        label: liked ? "Unlike track" : "Like track",
+        label: liked ? t("actions.track.unlike") : t("actions.track.like"),
         icon: liked ? HeartBold : Heart,
         active: liked,
         disabled: !hasTrackRef,
@@ -137,13 +155,15 @@ export function useTrackActionEntries(
             input.track.path,
           );
           toast.success(
-            liked ? "Removed from liked tracks" : "Added to liked tracks",
+            liked
+              ? t("actions.track.toasts.unliked")
+              : t("actions.track.toasts.liked"),
           );
         },
       }),
       action({
         key: "radio",
-        label: "Start track radio",
+        label: t("actions.track.radio"),
         icon: Radio,
         disabled: !hasTrackRef,
         onSelect: async () => {
@@ -155,29 +175,30 @@ export function useTrackActionEntries(
               title: input.track.title,
             });
             if (!radio.tracks.length) {
-              toast.info("Track radio is not available yet");
+              toast.info(t("actions.track.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error("Failed to start track radio");
+            toast.error(t("actions.track.toasts.radioFailed"));
           }
         },
       }),
       action({
         key: "share",
-        label: "Share track",
+        label: t("actions.track.share"),
         icon: Share2,
         disabled: trackShare === "/share",
         onSelect: sharePath(trackShare, input.track.title, {
           kind: "track",
           subtitle: input.track.artist,
           imageUrl: input.albumCover,
+          copiedToast: t("share.toasts.linkCopied"),
         }),
       }),
       action({
         key: "offline",
-        label: getOfflineActionLabel(offlineState),
+        label: offlineActionLabel,
         icon: isOfflineBusy(offlineState)
           ? Loader2
           : offlineState === "ready"
@@ -196,19 +217,20 @@ export function useTrackActionEntries(
             });
             toast.success(
               result === "removed"
-                ? "Offline copy removed"
-                : "Track available offline",
+                ? t("actions.offline.toasts.removed")
+                : t("actions.track.toasts.offlineReady"),
             );
           } catch (error) {
             toast.error(
-              (error as Error).message || "Failed to update offline copy",
+              (error as Error).message ||
+                t("actions.offline.toasts.updateFailed"),
             );
           }
         },
       }),
       action({
         key: "download",
-        label: "Download track",
+        label: t("actions.track.download"),
         icon: Download,
         disabled: !hasTrackRef,
         onSelect: async () => {
@@ -228,13 +250,13 @@ export function useTrackActionEntries(
       entries.push({
         type: "label",
         key: "playlists-label",
-        label: "Playlists",
+        label: t("actions.track.playlists"),
       });
       if (input.onCreatePlaylist) {
         entries.push(
           action({
             key: "playlist-create",
-            label: "Add to new playlist",
+            label: t("actions.track.addToNewPlaylist"),
             icon: ListMusic,
             onSelect: async () => {
               await input.onCreatePlaylist?.(input.track);
@@ -246,11 +268,11 @@ export function useTrackActionEntries(
         entries.push(
           action({
             key: `playlist-${playlist.id}`,
-            label: `Add to ${playlist.name}`,
+            label: t("actions.track.addToPlaylist", { name: playlist.name }),
             icon: ListMusic,
             onSelect: async () => {
               await input.onAddToPlaylist?.(playlist.id, input.track);
-              toast.success("Track added to playlist");
+              toast.success(t("actions.track.toasts.addedToPlaylist"));
             },
           }),
         );
@@ -265,7 +287,7 @@ export function useTrackActionEntries(
       entries.push(
         action({
           key: "artist",
-          label: "Go to artist",
+          label: t("actions.track.goToArtist"),
           icon: UserRound,
           onSelect: () =>
             navigate(
@@ -283,7 +305,7 @@ export function useTrackActionEntries(
       entries.push(
         action({
           key: "album",
-          label: "Go to album",
+          label: t("actions.track.goToAlbum"),
           icon: Disc3,
           onSelect: () =>
             navigate(
@@ -310,6 +332,7 @@ export function useTrackActionEntries(
     liked,
     libraryTrackId,
     hasTrackRef,
+    offlineActionLabel,
     offlineState,
     offlineSupported,
     trackEntityUid,
@@ -317,6 +340,7 @@ export function useTrackActionEntries(
     play,
     playAll,
     playNext,
+    t,
     toggleTrackOffline,
     toggleTrackLike,
   ]);

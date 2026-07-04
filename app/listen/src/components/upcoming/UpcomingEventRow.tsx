@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Calendar,
   ChevronDown,
@@ -14,11 +15,7 @@ import {
 } from "@/lib/library-routes";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
-import {
-  canOpenUpcomingRelease,
-  upcomingReleaseBadgeLabel,
-  type UpcomingItem,
-} from "./upcoming-model";
+import { canOpenUpcomingRelease, type UpcomingItem } from "./upcoming-model";
 
 export function UpcomingEventRow({
   item,
@@ -29,9 +26,13 @@ export function UpcomingEventRow({
   expanded?: boolean;
   onToggle?: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const dateObj = item.date ? new Date(`${item.date}T12:00:00`) : null;
   const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    ? dateObj.toLocaleDateString(i18n.language, {
+        month: "short",
+        day: "numeric",
+      })
     : "";
   const coverUrl =
     resolveMaybeApiAssetUrl(item.cover_url) ||
@@ -60,7 +61,9 @@ export function UpcomingEventRow({
           artistName: item.artist,
         })
       : null;
-  const badgeLabel = upcomingReleaseBadgeLabel(item);
+  const badgeLabel = item.is_upcoming
+    ? t("radar.release.preRelease")
+    : t("radar.release.released");
   const artistPath = artistPagePath({
     artistId: item.artist_id,
     artistSlug: item.artist_slug,
@@ -158,7 +161,7 @@ export function UpcomingEventRow({
               className="inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Play size={14} className="fill-current" />
-              Open
+              {t("common.open")}
             </Link>
           ) : null}
           {item.tidal_url ? (
@@ -170,7 +173,7 @@ export function UpcomingEventRow({
               className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
             >
               <ExternalLink size={14} />
-              Source
+              {t("common.source")}
             </a>
           ) : null}
           {onToggle ? (
@@ -182,7 +185,9 @@ export function UpcomingEventRow({
               }}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/[0.06] text-foreground transition-colors hover:bg-white/[0.1]"
               aria-label={
-                expanded ? "Hide release details" : "Show release details"
+                expanded
+                  ? t("radar.release.hideDetails")
+                  : t("radar.release.showDetails")
               }
             >
               <ChevronDown
@@ -200,12 +205,12 @@ export function UpcomingEventRow({
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-                Discography radar
+                {t("radar.release.detailTitle")}
               </div>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-white/68">
                 {item.is_upcoming
-                  ? "This release is tracked as a pre-release album. Open it to see the full planned tracklist; tracks become playable as soon as Crate has downloaded or matched them locally."
-                  : "This release has landed recently. Open it if Crate has matched it to the local library, or jump to the source to inspect the original release."}
+                  ? t("radar.release.preReleaseDetail")
+                  : t("radar.release.releasedDetail")}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -216,7 +221,7 @@ export function UpcomingEventRow({
                   className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <Play size={14} className="fill-current" />
-                  Open album view
+                  {t("home.radar.openAlbum")}
                 </Link>
               ) : null}
               <Link
@@ -224,7 +229,7 @@ export function UpcomingEventRow({
                 onClick={(event) => event.stopPropagation()}
                 className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
               >
-                Artist
+                {t("common.artist")}
               </Link>
             </div>
           </div>

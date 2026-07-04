@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, Mic2, Music2, Ticket } from "@crate/ui/icons";
 import { useNavigate } from "react-router";
 
@@ -18,12 +19,15 @@ export function useShowActionEntries(
   input: UseShowActionEntriesInput,
 ): ItemActionMenuEntry[] {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return useMemo<ItemActionMenuEntry[]>(
     () => [
       action({
         key: "attendance",
-        label: input.attending ? "Remove attendance" : "Mark as attending",
+        label: input.attending
+          ? t("actions.show.removeAttendance")
+          : t("actions.show.markAttending"),
         icon: Check,
         active: input.attending,
         disabled: input.item.id == null,
@@ -31,7 +35,7 @@ export function useShowActionEntries(
       }),
       action({
         key: "setlist",
-        label: "Play probable setlist",
+        label: t("actions.show.playProbableSetlist"),
         icon: Music2,
         disabled:
           !input.item.probable_setlist?.length || input.item.artist_id == null,
@@ -39,7 +43,7 @@ export function useShowActionEntries(
       }),
       action({
         key: "artist",
-        label: "Open artist",
+        label: t("actions.show.openArtist"),
         icon: Mic2,
         disabled: input.item.artist_id == null,
         onSelect: () => {
@@ -54,7 +58,7 @@ export function useShowActionEntries(
       }),
       action({
         key: "tickets",
-        label: "Open tickets",
+        label: t("actions.show.openTickets"),
         icon: Ticket,
         disabled: !input.item.url,
         onSelect: () => {
@@ -69,6 +73,7 @@ export function useShowActionEntries(
       input.playProbableSetlist,
       input.toggleAttendance,
       navigate,
+      t,
     ],
   );
 }

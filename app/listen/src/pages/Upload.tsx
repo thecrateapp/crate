@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   Loader2,
@@ -126,14 +127,14 @@ export function uploadMusicFiles(
   return directUpload(files);
 }
 
-function uploadErrorMessage(error: unknown): string {
+function uploadErrorMessage(error: unknown, t: TFunction): string {
   if (error instanceof ApiError && error.status === 413) {
-    return "Upload is too large for a single request. Try again so Crate can split it into chunks.";
+    return t("upload.errors.tooLarge");
   }
   if (error instanceof ApiError && error.message) {
-    return "Failed to queue upload: " + error.message;
+    return t("upload.errors.queueWithMessage", { message: error.message });
   }
-  return "Failed to queue upload";
+  return t("upload.errors.queue");
 }
 
 export function Upload() {
@@ -167,7 +168,7 @@ export function Upload() {
       toast.success(t("upload.toasts.queued"));
       setFiles([]);
     } catch (error) {
-      toast.error(uploadErrorMessage(error));
+      toast.error(uploadErrorMessage(error, t));
     } finally {
       setSubmitting(false);
       setUploadProgress(null);
@@ -200,7 +201,7 @@ export function Upload() {
                 {t("upload.dropzone.title")}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">
-                FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
+                {t("upload.dropzone.formats")}
               </div>
               <input
                 type="file"
@@ -219,8 +220,10 @@ export function Upload() {
                       {t("upload.ready.title")}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {files.length} file{files.length === 1 ? "" : "s"} ·{" "}
-                      {formatBytes(totalBytes)}
+                      {t("upload.selectedFiles", {
+                        count: files.length,
+                        size: formatBytes(totalBytes),
+                      })}
                     </div>
                   </div>
                   <button

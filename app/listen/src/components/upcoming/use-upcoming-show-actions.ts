@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -11,6 +12,7 @@ export function useUpcomingShowActions(
   item: UpcomingItem,
   onAttendanceChange?: (attending: boolean) => void,
 ) {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const [attending, setAttending] = useState(Boolean(item.user_attending));
   const [savingAttendance, setSavingAttendance] = useState(false);
@@ -28,15 +30,15 @@ export function useUpcomingShowActions(
         await api(`/api/me/shows/${item.id}/attendance`, "DELETE");
         setAttending(false);
         onAttendanceChange?.(false);
-        toast.success("Removed from your concert plan");
+        toast.success(t("radar.show.toasts.removedAttendance"));
       } else {
         await api(`/api/me/shows/${item.id}/attendance`, "POST");
         setAttending(true);
         onAttendanceChange?.(true);
-        toast.success("Marked as attending");
+        toast.success(t("radar.show.toasts.markedAttending"));
       }
     } catch {
-      toast.error("Failed to update attendance");
+      toast.error(t("radar.show.toasts.attendanceFailed"));
     } finally {
       setSavingAttendance(false);
     }
@@ -44,11 +46,11 @@ export function useUpcomingShowActions(
 
   async function playProbableSetlist() {
     if (!item.probable_setlist?.length) {
-      toast.info("No probable setlist available for this show");
+      toast.info(t("radar.show.toasts.noSetlist"));
       return;
     }
     if (!item.artist_id) {
-      toast.info("Artist not linked to library");
+      toast.info(t("radar.show.toasts.artistNotLinked"));
       return;
     }
     try {
@@ -59,17 +61,21 @@ export function useUpcomingShowActions(
       });
       if (!queue.length) {
         toast.info(
-          `None of the ${item.probable_setlist.length} setlist tracks were found in your library`,
+          t("radar.show.toasts.setlistTracksMissing", {
+            count: item.probable_setlist.length,
+          }),
         );
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
-        name: `${item.artist} Probable Setlist`,
+        name: t("radar.show.probableSetlistSource", { name: item.artist }),
       });
-      toast.success(`Playing probable setlist: ${queue.length} tracks`);
+      toast.success(
+        t("radar.show.toasts.playingSetlist", { count: queue.length }),
+      );
     } catch {
-      toast.error("Failed to load probable setlist");
+      toast.error(t("radar.show.toasts.loadSetlistFailed"));
     } finally {
       setPlayingSetlist(false);
     }

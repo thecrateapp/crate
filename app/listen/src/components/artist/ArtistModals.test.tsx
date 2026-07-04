@@ -1,9 +1,11 @@
 import { MemoryRouter } from "react-router";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { ReactElement } from "react";
 
 import { ArtistBioModal } from "./ArtistBioModal";
 import { ArtistSetlistModal } from "./ArtistSetlistSection";
+import { I18nProvider } from "@/i18n";
 
 vi.mock("@/lib/api", () => ({
   api: vi.fn(() => Promise.reject(new Error("skip enrichment in modal tests"))),
@@ -11,7 +13,7 @@ vi.mock("@/lib/api", () => ({
 
 describe("artist mobile modals", () => {
   it("renders probable setlist as a native bottom sheet instead of a floating panel", () => {
-    render(
+    renderWithProviders(
       <ArtistSetlistModal
         artistName="Kneecap"
         artistId={7}
@@ -39,34 +41,32 @@ describe("artist mobile modals", () => {
   });
 
   it("renders artist bio as a native bottom sheet instead of a floating panel", () => {
-    render(
-      <MemoryRouter>
-        <ArtistBioModal
-          open
-          onClose={() => {}}
-          photoUrl="/artist.jpg"
-          tags={["hip-hop"]}
-          artist={{
-            id: 7,
-            name: "Kneecap",
-            albums: [],
-            total_tracks: 0,
-            total_size_mb: 0,
-            primary_format: null,
-            genres: ["hip-hop"],
-            issue_count: 0,
-          }}
-          artistInfo={{
-            bio: "Belfast trio.",
-            tags: ["hip-hop"],
-            similar: [],
-            listeners: 1000,
-            playcount: 2000,
-            image_url: null,
-            url: "",
-          }}
-        />
-      </MemoryRouter>,
+    renderWithProviders(
+      <ArtistBioModal
+        open
+        onClose={() => {}}
+        photoUrl="/artist.jpg"
+        tags={["hip-hop"]}
+        artist={{
+          id: 7,
+          name: "Kneecap",
+          albums: [],
+          total_tracks: 0,
+          total_size_mb: 0,
+          primary_format: null,
+          genres: ["hip-hop"],
+          issue_count: 0,
+        }}
+        artistInfo={{
+          bio: "Belfast trio.",
+          tags: ["hip-hop"],
+          similar: [],
+          listeners: 1000,
+          playcount: 2000,
+          image_url: null,
+          url: "",
+        }}
+      />,
     );
 
     const panel = screen.getByText("Kneecap").closest(".listen-glass-panel");
@@ -78,40 +78,38 @@ describe("artist mobile modals", () => {
   });
 
   it("renders artist genres in the bio sheet with genre pill styling and clean sheet chrome", () => {
-    render(
-      <MemoryRouter>
-        <ArtistBioModal
-          open
-          onClose={() => {}}
-          photoUrl="/artist.jpg"
-          tags={["hardcore", "mathcore", "metalcore", "noise"]}
-          artist={{
-            id: 7,
-            name: "Converge",
-            albums: [],
-            total_tracks: 0,
-            total_size_mb: 0,
-            primary_format: null,
-            genres: ["hardcore", "mathcore", "metalcore", "noise"],
-            genre_profile: [
-              { name: "Hardcore", slug: "hardcore", source: "lastfm" },
-              { name: "Mathcore", slug: "mathcore", source: "lastfm" },
-              { name: "Metalcore", slug: "metalcore", source: "lastfm" },
-              { name: "Noise", slug: "noise", source: "lastfm" },
-            ],
-            issue_count: 0,
-          }}
-          artistInfo={{
-            bio: "Converge bio.",
-            tags: ["hardcore", "mathcore", "metalcore", "noise"],
-            similar: [],
-            listeners: 1000,
-            playcount: 2000,
-            image_url: null,
-            url: "",
-          }}
-        />
-      </MemoryRouter>,
+    renderWithProviders(
+      <ArtistBioModal
+        open
+        onClose={() => {}}
+        photoUrl="/artist.jpg"
+        tags={["hardcore", "mathcore", "metalcore", "noise"]}
+        artist={{
+          id: 7,
+          name: "Converge",
+          albums: [],
+          total_tracks: 0,
+          total_size_mb: 0,
+          primary_format: null,
+          genres: ["hardcore", "mathcore", "metalcore", "noise"],
+          genre_profile: [
+            { name: "Hardcore", slug: "hardcore", source: "lastfm" },
+            { name: "Mathcore", slug: "mathcore", source: "lastfm" },
+            { name: "Metalcore", slug: "metalcore", source: "lastfm" },
+            { name: "Noise", slug: "noise", source: "lastfm" },
+          ],
+          issue_count: 0,
+        }}
+        artistInfo={{
+          bio: "Converge bio.",
+          tags: ["hardcore", "mathcore", "metalcore", "noise"],
+          similar: [],
+          listeners: 1000,
+          playcount: 2000,
+          image_url: null,
+          url: "",
+        }}
+      />,
     );
 
     const panel = screen.getByText("Converge").closest(".listen-glass-panel");
@@ -132,3 +130,11 @@ describe("artist mobile modals", () => {
     expect(close.className).not.toContain("border-white/10");
   });
 });
+
+function renderWithProviders(ui: ReactElement) {
+  return render(
+    <MemoryRouter>
+      <I18nProvider initialLocale="en">{ui}</I18nProvider>
+    </MemoryRouter>,
+  );
+}
