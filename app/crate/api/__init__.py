@@ -144,6 +144,7 @@ def create_app() -> FastAPI:
                 "curation",
                 "analytics",
                 "lyrics",
+                "i18n",
             },
             title="Crate App & Listening API",
             summary="Authentication, personal library, browsing, playlists, radio, and listening surfaces.",
@@ -194,6 +195,7 @@ def create_app() -> FastAPI:
                 "setup",
                 "admin",
                 "admin-auth",
+                "i18n",
             },
             title="Crate Admin & System API",
             summary="Setup, administration, health, task orchestration, and system control.",
@@ -307,6 +309,7 @@ def create_app() -> FastAPI:
     from crate.api.cache_events import router as cache_events_router
     from crate.api.social import router as social_router
     from crate.api.jam import router as jam_router
+    from crate.api.i18n import router as i18n_router, admin_router as admin_i18n_router
     from crate.api.subsonic import router as subsonic_router
     from crate.api.paths import router as paths_router
     from crate.api.admin_ops import router as admin_ops_router
@@ -325,6 +328,8 @@ def create_app() -> FastAPI:
     app.include_router(offline_router)
     app.include_router(social_router)
     app.include_router(jam_router)
+    app.include_router(i18n_router)
+    app.include_router(admin_i18n_router)
     app.include_router(radio_router)
     app.include_router(lyrics_router)
     app.include_router(management_router)
