@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   BarChart3,
+  Globe,
   Loader2,
   LogOut,
   Lock,
@@ -40,6 +41,17 @@ import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
+import {
+  clearLocalListenLocalePreference,
+  getLocalListenLocalePreference,
+  setLocalListenLocalePreference,
+} from "@/i18n/language-preference";
+import { detectPreferredLocale } from "@/i18n/language-detector";
+import {
+  LISTEN_SUPPORTED_LOCALES,
+  type ListenLocale,
+  toSupportedListenLocale,
+} from "@/i18n/locales";
 import { ServersSection } from "@/components/settings/ServersSection";
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import { api } from "@/lib/api";
@@ -254,8 +266,27 @@ const PLAYBACK_DELIVERY_OPTIONS: {
   },
 ];
 
+type LanguageSelection = "auto" | ListenLocale;
+
+const LANGUAGE_OPTIONS: { value: ListenLocale; labelKey: string }[] =
+  LISTEN_SUPPORTED_LOCALES.map((locale) => ({
+    value: locale,
+    labelKey: `settings.language.options.${locale}`,
+  }));
+
+function getBrowserLanguages(): readonly string[] {
+  if (typeof navigator === "undefined") return [];
+  return navigator.languages;
+}
+
+function getAutomaticListenLocale(): ListenLocale {
+  return detectPreferredLocale({
+    browserLanguages: getBrowserLanguages(),
+  });
+}
+
 export function Settings() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const {
     supported: offlineSupported,
@@ -297,6 +328,8 @@ export function Settings() {
           {t("settings.subtitle")}
         </p>
       </div>
+
+      <LanguageSection i18n={i18n} />
 
       <Section
         title={t("settings.playback.title")}
@@ -597,6 +630,102 @@ export function Settings() {
         </div>
       </Section>
     </div>
+  );
+}
+
+function LanguageSection({
+  i18n,
+}: {
+  i18n: ReturnType<typeof useTranslation>["i18n"];
+}) {
+  const { t } = useTranslation();
+  const [selection, setSelection] = useState<LanguageSelection>(
+    () => getLocalListenLocalePreference() ?? "auto",
+  );
+  const activeLocale =
+    selection === "auto"
+      ? toSupportedListenLocale(i18n.resolvedLanguage) ??
+        getAutomaticListenLocale()
+      : selection;
+
+  const changeLanguage = (nextSelection: LanguageSelection) => {
+    setSelection(nextSelection);
+    const nextLocale =
+      nextSelection === "auto" ? getAutomaticListenLocale() : nextSelection;
+
+    if (nextSelection === "auto") {
+      clearLocalListenLocalePreference();
+    } else {
+      setLocalListenLocalePreference(nextSelection);
+    }
+
+    void i18n.changeLanguage(nextLocale);
+  };
+
+  return (
+    <Section
+      title={t("settings.language.title")}
+      description={t("settings.language.description")}
+    >
+      <div
+        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+        role="radiogroup"
+        aria-label={t("settings.language.title")}
+      >
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selection === "auto"}
+          onClick={() => changeLanguage("auto")}
+          className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+            selection === "auto"
+              ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
+              : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+          }`}
+        >
+          <span className="block text-sm font-semibold">
+            {t("settings.language.auto")}
+          </span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {t("settings.language.autoDescription")}
+          </span>
+        </button>
+
+        {LANGUAGE_OPTIONS.map((option) => {
+          const selected = selection === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => changeLanguage(option.value)}
+              className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
+                selected
+                  ? "border-cyan-400/50 bg-cyan-400/15 text-cyan-50"
+                  : "border-white/10 bg-white/[0.03] text-white/70 hover:bg-white/[0.06]"
+              }`}
+            >
+              <span className="block text-sm font-semibold">
+                {t(option.labelKey)}
+              </span>
+              <span className="mt-1 block text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                {option.value}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
+        <Globe size={16} className="mt-0.5 text-cyan-300/80" />
+        <span>
+          {t("settings.language.current", {
+            language: t(`settings.language.options.${activeLocale}`),
+          })}
+        </span>
+      </div>
+    </Section>
   );
 }
 

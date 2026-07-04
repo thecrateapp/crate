@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Settings } from "@/pages/Settings";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
@@ -30,6 +31,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 describe("Settings", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("localizes the settings page chrome", () => {
     renderWithListenProviders(<Settings />, { locale: "es" });
 
@@ -39,5 +44,20 @@ describe("Settings", () => {
     expect(screen.getByText("Reproducción")).toBeInTheDocument();
     expect(screen.getByText("Temporizador")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
+  });
+
+  it("changes and stores the selected Listen language", async () => {
+    const user = userEvent.setup();
+
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    expect(screen.getByText("Language")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /Español/i }));
+
+    expect(localStorage.getItem("crate-listen-locale")).toBe("es");
+    expect(
+      await screen.findByRole("heading", { name: "Ajustes" }),
+    ).toBeInTheDocument();
   });
 });

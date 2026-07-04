@@ -12,6 +12,7 @@ import eu from "@/i18n/catalogs/eu.json";
 import fr from "@/i18n/catalogs/fr.json";
 import it from "@/i18n/catalogs/it.json";
 import { detectPreferredLocale } from "@/i18n/language-detector";
+import { getLocalListenLocalePreference } from "@/i18n/language-preference";
 import { LISTEN_FALLBACK_LOCALE, type ListenLocale } from "@/i18n/locales";
 
 const resources = {
@@ -39,6 +40,7 @@ export function createListenI18n(initialLocale?: ListenLocale) {
       lng:
         initialLocale ??
         detectPreferredLocale({
+          devicePreference: getLocalListenLocalePreference(),
           browserLanguages: browserLanguages(),
         }),
       fallbackLng: LISTEN_FALLBACK_LOCALE,

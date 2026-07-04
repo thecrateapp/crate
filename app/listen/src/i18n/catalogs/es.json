@@ -1330,5 +1330,17 @@
   "settings.account.currentPassword": "Contrasena actual",
   "settings.account.newPassword": "Nueva contrasena",
   "settings.account.confirmPassword": "Confirmar nueva contrasena",
-  "settings.account.changePasswordAction": "Cambiar"
+  "settings.account.changePasswordAction": "Cambiar",
+  "settings.language.title": "Idioma",
+  "settings.language.description": "Elige el idioma que usa Listen en este dispositivo.",
+  "settings.language.auto": "Automático",
+  "settings.language.autoDescription": "Usa la preferencia del navegador o del dispositivo.",
+  "settings.language.current": "Idioma actual: {language}",
+  "settings.language.options.en": "English",
+  "settings.language.options.es": "Español",
+  "settings.language.options.fr": "Français",
+  "settings.language.options.de": "Deutsch",
+  "settings.language.options.it": "Italiano",
+  "settings.language.options.ca": "Català",
+  "settings.language.options.eu": "Euskara"
 }

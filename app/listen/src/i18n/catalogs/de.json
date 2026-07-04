@@ -1330,5 +1330,17 @@
   "settings.account.currentPassword": "Current password",
   "settings.account.newPassword": "New password",
   "settings.account.confirmPassword": "Confirm new password",
-  "settings.account.changePasswordAction": "Change"
+  "settings.account.changePasswordAction": "Change",
+  "settings.language.title": "Sprache",
+  "settings.language.description": "Wähle die Sprache, die Listen auf diesem Gerät verwendet.",
+  "settings.language.auto": "Automatisch",
+  "settings.language.autoDescription": "Nutzt die Browser- oder Geräteeinstellung.",
+  "settings.language.current": "Aktuelle Sprache: {language}",
+  "settings.language.options.en": "English",
+  "settings.language.options.es": "Español",
+  "settings.language.options.fr": "Français",
+  "settings.language.options.de": "Deutsch",
+  "settings.language.options.it": "Italiano",
+  "settings.language.options.ca": "Català",
+  "settings.language.options.eu": "Euskara"
 }

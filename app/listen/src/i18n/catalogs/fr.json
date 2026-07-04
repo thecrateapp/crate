@@ -1330,5 +1330,17 @@
   "settings.account.currentPassword": "Current password",
   "settings.account.newPassword": "New password",
   "settings.account.confirmPassword": "Confirm new password",
-  "settings.account.changePasswordAction": "Change"
+  "settings.account.changePasswordAction": "Change",
+  "settings.language.title": "Langue",
+  "settings.language.description": "Choisissez la langue utilisée par Listen sur cet appareil.",
+  "settings.language.auto": "Automatique",
+  "settings.language.autoDescription": "Utilise la préférence du navigateur ou de l’appareil.",
+  "settings.language.current": "Langue actuelle : {language}",
+  "settings.language.options.en": "English",
+  "settings.language.options.es": "Español",
+  "settings.language.options.fr": "Français",
+  "settings.language.options.de": "Deutsch",
+  "settings.language.options.it": "Italiano",
+  "settings.language.options.ca": "Català",
+  "settings.language.options.eu": "Euskara"
 }
