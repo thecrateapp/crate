@@ -235,24 +235,24 @@ const tabTitleKeys: Record<Tab, string> = {
   contributions: "nav.collection.contributions",
 };
 
-const artistSortOptions: { value: ArtistSort; label: string }[] = [
-  { value: "recent", label: "Recently added" },
-  { value: "name", label: "Name" },
-  { value: "popularity", label: "Popularity" },
+const artistSortOptions: { value: ArtistSort; labelKey: string }[] = [
+  { value: "recent", labelKey: "library.sort.recent" },
+  { value: "name", labelKey: "common.name" },
+  { value: "popularity", labelKey: "library.sort.popularity" },
 ];
 
-const albumSortOptions: { value: AlbumSort; label: string }[] = [
-  { value: "recent", label: "Recently added" },
-  { value: "name", label: "Name" },
-  { value: "artist", label: "Artist" },
-  { value: "year", label: "Year" },
+const albumSortOptions: { value: AlbumSort; labelKey: string }[] = [
+  { value: "recent", labelKey: "library.sort.recent" },
+  { value: "name", labelKey: "common.name" },
+  { value: "artist", labelKey: "common.artist" },
+  { value: "year", labelKey: "library.sort.year" },
 ];
 
-const likedSortOptions: { value: LikedSort; label: string }[] = [
-  { value: "recent", label: "Recently added" },
-  { value: "title", label: "Title" },
-  { value: "artist", label: "Artist" },
-  { value: "album", label: "Album" },
+const likedSortOptions: { value: LikedSort; labelKey: string }[] = [
+  { value: "recent", labelKey: "library.sort.recent" },
+  { value: "title", labelKey: "library.sort.title" },
+  { value: "artist", labelKey: "common.artist" },
+  { value: "album", labelKey: "common.album" },
 ];
 
 function parseTab(value: string | null): Tab {
@@ -300,9 +300,10 @@ function CollectionSortDropdown<T extends string>({
 }: {
   label: string;
   value: T;
-  options: { value: T; label: string }[];
+  options: { value: T; labelKey: string }[];
   onChange: (value: T) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selected =
@@ -315,12 +316,16 @@ function CollectionSortDropdown<T extends string>({
   });
 
   if (!selected) return null;
+  const selectedLabel = t(selected.labelKey);
 
   return (
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        aria-label={`${label}: ${selected.label}`}
+        aria-label={t("library.sort.selectedAria", {
+          label,
+          value: selectedLabel,
+        })}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
@@ -330,7 +335,7 @@ function CollectionSortDropdown<T extends string>({
             : "border-white/10"
         }`}
       >
-        <span className="truncate">{selected.label}</span>
+        <span className="truncate">{selectedLabel}</span>
         <ChevronDown
           size={16}
           className={`shrink-0 text-white/55 transition-transform ${
@@ -363,7 +368,7 @@ function CollectionSortDropdown<T extends string>({
                     : "text-foreground hover:bg-white/7 hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.18)]"
                 }`}
               >
-                <span>{option.label}</span>
+                <span>{t(option.labelKey)}</span>
                 {selected ? <Check size={16} className="shrink-0" /> : null}
               </button>
             );
@@ -397,10 +402,12 @@ function PlaylistsTab() {
     try {
       const method = "DELETE";
       await api(`/api/curation/playlists/${playlist.id}/follow`, method);
-      toast.success(`Removed ${playlist.name} from your library`);
+      toast.success(
+        t("playlist.toasts.removedNamedLibrary", { name: playlist.name }),
+      );
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("playlist.toasts.updateFailed"));
     }
   }
 
@@ -409,7 +416,7 @@ function PlaylistsTab() {
       const detail = await api<PlaylistDetail>(`/api/playlists/${playlistId}`);
       setEditingPlaylist(detail);
     } catch {
-      toast.error("Failed to load playlist");
+      toast.error(t("playlist.toasts.loadFailed"));
     }
   }
 
@@ -472,11 +479,11 @@ function PlaylistsTab() {
         });
       }
 
-      toast.success("Playlist updated");
+      toast.success(t("playlist.toasts.updated"));
       setEditingPlaylist(null);
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("playlist.toasts.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -487,11 +494,11 @@ function PlaylistsTab() {
     setDeleting(true);
     try {
       await api(`/api/playlists/${deletingPlaylist.id}`, "DELETE");
-      toast.success("Playlist deleted");
+      toast.success(t("playlist.toasts.deleted"));
       setDeletingPlaylist(null);
       refetch();
     } catch {
-      toast.error("Failed to delete playlist");
+      toast.error(t("playlist.toasts.deleteFailed"));
     } finally {
       setDeleting(false);
     }
@@ -573,13 +580,13 @@ function PlaylistsTab() {
                 {
                   key: "edit",
                   icon: Pencil,
-                  title: "Edit",
+                  title: t("common.edit"),
                   onClick: async () => openPlaylistEditor(pl.id),
                 },
                 {
                   key: "delete",
                   icon: Trash2,
-                  title: "Delete",
+                  title: t("common.delete"),
                   onClick: async () => setDeletingPlaylist(pl),
                   tone: "danger",
                 },
@@ -611,10 +618,10 @@ function PlaylistsTab() {
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Delete playlist
+              {t("playlist.delete.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              This action cannot be undone.
+              {t("playlist.delete.subtitle")}
             </p>
           </div>
           <ModalCloseButton
@@ -624,11 +631,11 @@ function PlaylistsTab() {
         </ModalHeader>
         <ModalBody className="px-5 py-5">
           <p className="text-sm text-muted-foreground">
-            Delete{" "}
+            {t("playlist.delete.confirmPrefix")}{" "}
             <span className="font-medium text-foreground">
               {deletingPlaylist?.name}
             </span>{" "}
-            and remove all its track entries?
+            {t("playlist.delete.confirmSuffix")}
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
@@ -638,7 +645,7 @@ function PlaylistsTab() {
             onClick={() => setDeletingPlaylist(null)}
             disabled={deleting}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -647,7 +654,7 @@ function PlaylistsTab() {
             disabled={deleting}
           >
             {deleting ? <Loader2 size={15} className="animate-spin" /> : null}
-            Delete playlist
+            {t("playlist.delete.title")}
           </button>
         </ModalFooter>
       </AppModal>
@@ -664,6 +671,7 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 }
 
 function ArtistsTab() {
+  const { t } = useTranslation();
   const { data: artists, loading } =
     useApi<FollowedArtist[]>("/api/me/follows");
   const isDesktop = useIsDesktop();
@@ -688,9 +696,7 @@ function ArtistsTab() {
 
   if (loading) return <Spinner />;
   if (!artists || artists.length === 0) {
-    return (
-      <EmptyState message="You haven't followed any artists yet. Explore the library to find artists you love." />
-    );
+    return <EmptyState message={t("library.artists.empty")} />;
   }
 
   return (
@@ -698,10 +704,10 @@ function ArtistsTab() {
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
-            Sort
+            {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
-            label="Sort artists"
+            label={t("library.sort.artists")}
             value={sort}
             options={artistSortOptions}
             onChange={setSort}
@@ -716,7 +722,7 @@ function ArtistsTab() {
             artistId={a.artist_id}
             artistEntityUid={a.artist_entity_uid}
             artistSlug={a.artist_slug}
-            subtitle={`${a.album_count} album${a.album_count !== 1 ? "s" : ""}`}
+            subtitle={t("common.albumCountLabel", { count: a.album_count })}
             layout="grid"
           />
         ))}
@@ -726,6 +732,7 @@ function ArtistsTab() {
 }
 
 function AlbumsTab() {
+  const { t } = useTranslation();
   const { data: albums, loading } = useApi<SavedAlbum[]>("/api/me/albums");
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<AlbumSort>("recent");
@@ -751,7 +758,7 @@ function AlbumsTab() {
 
   if (loading) return <Spinner />;
   if (!albums || albums.length === 0) {
-    return <EmptyState message="No saved albums yet." />;
+    return <EmptyState message={t("library.albums.empty")} />;
   }
 
   return (
@@ -759,10 +766,10 @@ function AlbumsTab() {
       {!isDesktop ? (
         <div className="flex items-center justify-between gap-3">
           <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/40">
-            Sort
+            {t("library.sort.label")}
           </span>
           <CollectionSortDropdown
-            label="Sort albums"
+            label={t("library.sort.albums")}
             value={sort}
             options={albumSortOptions}
             onChange={setSort}
@@ -789,6 +796,7 @@ function AlbumsTab() {
 }
 
 function BandcampTab() {
+  const { t } = useTranslation();
   const {
     data: collection,
     loading: collectionLoading,
@@ -816,11 +824,15 @@ function BandcampTab() {
         "POST",
         { bandcamp_item_id: itemId, format: "flac" },
       );
-      toast.success(`Bandcamp import queued (${response.task_id})`);
+      toast.success(
+        t("bandcamp.toasts.importQueued", { taskId: response.task_id }),
+      );
       refetchCollection();
       refetchContributions();
     } catch (error) {
-      toast.error((error as Error).message || "Failed to import Bandcamp item");
+      toast.error(
+        (error as Error).message || t("bandcamp.toasts.importFailed"),
+      );
     } finally {
       setBusyItemId(null);
     }
@@ -842,13 +854,17 @@ function BandcampTab() {
         `/api/me/contributions/${withdrawTarget.id}/withdraw`,
         "POST",
       );
-      toast.success(`Bandcamp removal queued (${response.task_id})`);
+      toast.success(
+        t("library.bandcamp.toasts.removalQueued", {
+          taskId: response.task_id,
+        }),
+      );
       setWithdrawTarget(null);
       refetchCollection();
       refetchContributions();
     } catch (error) {
       toast.error(
-        (error as Error).message || "Failed to remove Bandcamp contribution",
+        (error as Error).message || t("library.bandcamp.toasts.removeFailed"),
       );
     } finally {
       setWithdrawing(false);
@@ -872,17 +888,25 @@ function BandcampTab() {
               Bandcamp
             </div>
             <h2 className="mt-3 text-xl font-black text-foreground">
-              Synced purchases
+              {t("library.bandcamp.title")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Sync keeps your Bandcamp purchases here. Import downloads the
-              audio and adds it to your Crate library.
+              {t("library.bandcamp.description")}
             </p>
           </div>
           <div className="flex gap-2">
-            <StatBox value={purchases.length} label="Purchases" />
-            <StatBox value={importedContributions.length} label="In Crate" />
-            <StatBox value={wishlistCount} label="Wishlist" />
+            <StatBox
+              value={purchases.length}
+              label={t("library.bandcamp.stats.purchases")}
+            />
+            <StatBox
+              value={importedContributions.length}
+              label={t("library.bandcamp.stats.inCrate")}
+            />
+            <StatBox
+              value={wishlistCount}
+              label={t("bandcamp.stats.wishlist")}
+            />
           </div>
         </div>
       </div>
@@ -891,12 +915,10 @@ function BandcampTab() {
         <section className="space-y-3">
           <div>
             <h3 className="text-sm font-black uppercase tracking-[0.18em] text-primary">
-              Imported into Crate
+              {t("library.bandcamp.imported.title")}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Portable exports are generated with Crate metadata. Removing a
-              contribution only deletes the album when nobody else owns that
-              library copy.
+              {t("library.bandcamp.imported.description")}
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
@@ -939,7 +961,7 @@ function BandcampTab() {
                   className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
                 >
                   <Download size={14} />
-                  Export
+                  {t("common.export")}
                 </button>
                 <button
                   type="button"
@@ -956,12 +978,12 @@ function BandcampTab() {
 
       {!purchases.length ? (
         <div className="space-y-3">
-          <EmptyState message="No Bandcamp purchases synced yet. Connect and sync Bandcamp from Settings." />
+          <EmptyState message={t("library.bandcamp.emptyPurchases")} />
           <Link
             to="/settings"
             className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 text-sm font-bold text-black"
           >
-            Open settings
+            {t("library.bandcamp.openSettings")}
           </Link>
         </div>
       ) : (
@@ -988,15 +1010,15 @@ function BandcampTab() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3 className="truncate text-sm font-black text-foreground">
-                    {bandcampItemTitle(item)}
+                    {bandcampItemTitle(item, t("bandcamp.itemFallback"))}
                   </h3>
                   <p className="truncate text-xs text-muted-foreground">
-                    {item.artist_name || "Bandcamp"}
+                    {item.artist_name || t("bandcamp.titleLabel")}
                   </p>
                 </div>
                 {item.latest_import_status === "completed" ? (
                   <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">
-                    Imported
+                    {t("library.bandcamp.imported.badge")}
                   </span>
                 ) : item.downloadable ? (
                   <button
@@ -1010,7 +1032,7 @@ function BandcampTab() {
                     ) : (
                       <Download size={14} />
                     )}
-                    Import
+                    {t("common.import")}
                   </button>
                 ) : null}
                 {item.item_url ? (
@@ -1036,7 +1058,7 @@ function BandcampTab() {
       >
         <ModalHeader>
           <h2 className="text-lg font-black text-foreground">
-            Remove Bandcamp contribution?
+            {t("library.bandcamp.withdraw.title")}
           </h2>
           <ModalCloseButton
             disabled={withdrawing}
@@ -1045,12 +1067,9 @@ function BandcampTab() {
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-muted-foreground">
-            This withdraws your Bandcamp copy of{" "}
-            <span className="font-bold text-foreground">
-              {withdrawTarget?.album_name}
-            </span>
-            . If no other user owns this library copy, Crate will permanently
-            remove the album files and database rows in a worker task.
+            {t("library.bandcamp.withdraw.description", {
+              album: withdrawTarget?.album_name,
+            })}
           </p>
         </ModalBody>
         <ModalFooter>
@@ -1060,7 +1079,7 @@ function BandcampTab() {
             onClick={() => setWithdrawTarget(null)}
             className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
-            Keep it
+            {t("common.keepIt")}
           </button>
           <button
             type="button"
@@ -1071,7 +1090,7 @@ function BandcampTab() {
             {withdrawing ? (
               <Loader2 size={16} className="animate-spin" />
             ) : null}
-            Remove contribution
+            {t("library.contributions.withdraw.confirm")}
           </button>
         </ModalFooter>
       </AppModal>
@@ -1112,6 +1131,7 @@ function ContributionArtwork({
 }
 
 function ContributionsTab() {
+  const { t } = useTranslation();
   const {
     data,
     loading,
@@ -1141,11 +1161,18 @@ function ContributionsTab() {
         `/api/me/contributions/${withdrawTarget.id}/withdraw`,
         "POST",
       );
-      toast.success(`Removal queued (${response.task_id})`);
+      toast.success(
+        t("library.contributions.toasts.removalQueued", {
+          taskId: response.task_id,
+        }),
+      );
       setWithdrawTarget(null);
       refetchContributions();
     } catch (error) {
-      toast.error((error as Error).message || "Failed to remove contribution");
+      toast.error(
+        (error as Error).message ||
+          t("library.contributions.toasts.removeFailed"),
+      );
     } finally {
       setWithdrawing(false);
     }
@@ -1155,17 +1182,15 @@ function ContributionsTab() {
     <div className="space-y-5">
       <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <h2 className="text-xl font-black text-foreground">
-          Your contributions
+          {t("library.contributions.title")}
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Albums you brought into this Crate instance. You can download a
-          portable export or withdraw your contribution; the shared library copy
-          is deleted only when nobody else has contributed it.
+          {t("library.contributions.description")}
         </p>
       </div>
 
       {!contributions.length ? (
-        <EmptyState message="You have not contributed any albums yet." />
+        <EmptyState message={t("library.contributions.empty")} />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contributions.map((contribution) => (
@@ -1192,7 +1217,7 @@ function ContributionsTab() {
                 className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-bold text-muted-foreground disabled:opacity-40"
               >
                 <Download size={14} />
-                Export
+                {t("common.export")}
               </button>
               <button
                 type="button"
@@ -1214,7 +1239,7 @@ function ContributionsTab() {
       >
         <ModalHeader>
           <h2 className="text-lg font-black text-foreground">
-            Remove contribution?
+            {t("library.contributions.withdraw.title")}
           </h2>
           <ModalCloseButton
             disabled={withdrawing}
@@ -1223,13 +1248,9 @@ function ContributionsTab() {
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-muted-foreground">
-            This withdraws your contribution of{" "}
-            <span className="font-bold text-foreground">
-              {withdrawTarget?.album_name}
-            </span>
-            . If no other user contributed this library copy, Crate will
-            permanently remove the album files and database rows in a worker
-            task.
+            {t("library.contributions.withdraw.description", {
+              album: withdrawTarget?.album_name,
+            })}
           </p>
         </ModalBody>
         <ModalFooter>
@@ -1239,7 +1260,7 @@ function ContributionsTab() {
             onClick={() => setWithdrawTarget(null)}
             className="inline-flex min-h-11 items-center rounded-full border border-white/10 px-4 text-sm font-bold text-muted-foreground disabled:opacity-50"
           >
-            Keep it
+            {t("common.keepIt")}
           </button>
           <button
             type="button"
@@ -1250,7 +1271,7 @@ function ContributionsTab() {
             {withdrawing ? (
               <Loader2 size={16} className="animate-spin" />
             ) : null}
-            Remove contribution
+            {t("library.contributions.withdraw.confirm")}
           </button>
         </ModalFooter>
       </AppModal>
@@ -1258,13 +1279,12 @@ function ContributionsTab() {
   );
 }
 
-function bandcampItemTitle(item: BandcampItem): string {
-  return (
-    item.album_title || item.track_title || item.artist_name || "Bandcamp item"
-  );
+function bandcampItemTitle(item: BandcampItem, fallback: string): string {
+  return item.album_title || item.track_title || item.artist_name || fallback;
 }
 
 function LikedTab() {
+  const { t } = useTranslation();
   const { likedTracks: tracks, loading } = useLikedTracks();
   const { playAll } = usePlayerActions();
   const [search, setSearch] = useState("");
@@ -1306,9 +1326,7 @@ function LikedTab() {
 
   if (loading) return <Spinner />;
   if (!tracks || tracks.length === 0) {
-    return (
-      <EmptyState message="No liked tracks yet. Tap the heart on any track to save it here." />
-    );
+    return <EmptyState message={t("library.liked.empty")} />;
   }
 
   function handlePlayAll() {
@@ -1347,7 +1365,9 @@ function LikedTab() {
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <Play size={16} fill="currentColor" />
-          Play {filtered.length < tracks.length ? `${filtered.length}` : "All"}
+          {filtered.length < tracks.length
+            ? t("library.liked.playFiltered", { count: filtered.length })
+            : t("library.liked.playAll")}
         </button>
         <div className="relative min-w-[180px] flex-1">
           <Search
@@ -1358,12 +1378,12 @@ function LikedTab() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter liked tracks..."
+            placeholder={t("library.liked.filterPlaceholder")}
             className="w-full h-10 pl-9 pr-3 rounded-lg bg-white/5 text-sm text-white placeholder:text-white/40 outline-none focus:bg-white/8"
           />
         </div>
         <CollectionSortDropdown
-          label="Sort liked tracks"
+          label={t("library.sort.likedTracks")}
           value={sort}
           options={likedSortOptions}
           onChange={setSort}

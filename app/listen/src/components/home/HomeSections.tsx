@@ -6,6 +6,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Clock3, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
@@ -22,15 +23,15 @@ import { cn } from "@/lib/utils";
 
 import type { HomeUpcomingItem } from "./home-model";
 
-export function getHomeGreeting(): string {
+export function getHomeGreeting(t: TFunction): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return t("home.greeting.morning");
+  if (hour < 18) return t("home.greeting.afternoon");
+  return t("home.greeting.evening");
 }
 
-export function getHomeDateString(): string {
-  return new Date().toLocaleDateString("en-US", {
+export function getHomeDateString(locale: string): string {
+  return new Date().toLocaleDateString(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",

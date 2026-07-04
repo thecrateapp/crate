@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2 } from "@crate/ui/icons";
 import { api } from "@/lib/api";
 
@@ -31,6 +32,7 @@ function parseSyncedLyrics(lrc: string): LyricLine[] {
 
 export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   void useAlbumPalette;
+  const { t } = useTranslation();
   const { currentTime } = usePlayerProgress();
   const { currentTrack, seek } = usePlayerActions();
   const [lyrics, setLyrics] = useState<LyricsData | null>(null);
@@ -99,7 +101,7 @@ export function LyricsTab({ useAlbumPalette }: { useAlbumPalette: boolean }) {
   if (!lyrics?.synced && !lyrics?.plain) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-white/20">
-        No lyrics found
+        {t("player.lyrics.empty")}
       </div>
     );
   }

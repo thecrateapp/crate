@@ -83,19 +83,19 @@ export function Bandcamp() {
   const stats = useMemo(
     () => [
       {
-        label: "Owned",
+        label: "owned",
         labelText: t("bandcamp.stats.owned"),
         value: collection.data?.total ?? 0,
         icon: BandcampLogo,
       },
       {
-        label: "Wishlist",
+        label: "wishlist",
         labelText: t("bandcamp.stats.wishlist"),
         value: wishlist.data?.total ?? 0,
         icon: Heart,
       },
       {
-        label: "Radar",
+        label: "radar",
         labelText: t("bandcamp.stats.radar"),
         value: radar.data?.total ?? 0,
         icon: Radar,
@@ -104,14 +104,19 @@ export function Bandcamp() {
     [collection.data, radar.data, t, wishlist.data],
   );
 
-  async function queueTask(path: string, label: string) {
-    setBusyAction(label);
+  async function queueTask(path: string, busyKey: string, taskLabel: string) {
+    setBusyAction(busyKey);
     try {
       const response = await api<BandcampTaskResponse>(path, "POST");
-      toast.success(`${label} queued (${response.task_id})`);
+      toast.success(
+        t("bandcamp.toasts.taskQueued", {
+          task: taskLabel,
+          taskId: response.task_id,
+        }),
+      );
       refreshAll();
     } catch (error) {
-      toast.error((error as Error).message || `Failed to queue ${label}`);
+      toast.error((error as Error).message || t("bandcamp.toasts.queueFailed"));
     } finally {
       setBusyAction(null);
     }
@@ -127,10 +132,14 @@ export function Bandcamp() {
         "POST",
         { bandcamp_item_id: itemId, format: "flac" },
       );
-      toast.success(`Bandcamp import queued (${response.task_id})`);
+      toast.success(
+        t("bandcamp.toasts.importQueued", { taskId: response.task_id }),
+      );
       refreshAll();
     } catch (error) {
-      toast.error((error as Error).message || "Failed to import Bandcamp item");
+      toast.error(
+        (error as Error).message || t("bandcamp.toasts.importFailed"),
+      );
     } finally {
       setBusyAction(null);
     }
@@ -141,7 +150,9 @@ export function Bandcamp() {
   const radarItems = radar.data?.items.slice(0, 8) ?? [];
   const wishlistItems = wishlist.data?.items.slice(0, 6) ?? [];
   const profileName =
-    status.data?.display_name || status.data?.username || "Bandcamp account";
+    status.data?.display_name ||
+    status.data?.username ||
+    t("bandcamp.connection.accountFallback");
 
   return (
     <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-8 px-4 py-6 md:px-8">
@@ -171,11 +182,15 @@ export function Bandcamp() {
               type="button"
               disabled={!connected || busyAction !== null}
               onClick={() =>
-                queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
+                queueTask(
+                  "/api/bandcamp/me/sync",
+                  "sync",
+                  t("bandcamp.tasks.sync"),
+                )
               }
               className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-black text-black transition hover:bg-primary/90 disabled:opacity-50"
             >
-              {busyAction === "Bandcamp sync" ? (
+              {busyAction === "sync" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <RefreshCw className="h-4 w-4" />
@@ -186,7 +201,11 @@ export function Bandcamp() {
               type="button"
               disabled={!connected || busyAction !== null}
               onClick={() =>
-                queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
+                queueTask(
+                  "/api/bandcamp/me/radar/refresh",
+                  "radar",
+                  t("bandcamp.tasks.radar"),
+                )
               }
               className="inline-flex h-11 items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 text-sm font-black text-white transition hover:bg-white/10 disabled:opacity-50"
             >
@@ -388,13 +407,14 @@ function BandcampCard({
   busyAction: string | null;
   onImport: (item: BandcampItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <article className="group overflow-hidden rounded-3xl border border-white/8 bg-black/18">
       <Cover item={item} />
       <div className="space-y-3 p-4">
         <div className="min-w-0">
           <h3 className="truncate text-base font-black text-white">
-            {itemTitle(item)}
+            {itemTitle(item, t("bandcamp.itemFallback"))}
           </h3>
           <p className="truncate text-sm text-slate-500">{item.artist_name}</p>
         </div>
@@ -413,12 +433,13 @@ function BandcampListItem({
   busyAction: string | null;
   onImport: (item: BandcampItem) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <article className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/18 p-3">
       <Cover item={item} compact />
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-sm font-black text-white">
-          {itemTitle(item)}
+          {itemTitle(item, t("bandcamp.itemFallback"))}
         </h3>
         <p className="truncate text-xs text-slate-500">{item.artist_name}</p>
       </div>
@@ -486,7 +507,9 @@ function Cover({
   item: BandcampItem;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const coverUrl = resolveMaybeApiAssetUrl(item.cover_url);
+  const title = itemTitle(item, t("bandcamp.itemFallback"));
 
   return (
     <div
@@ -506,7 +529,7 @@ function Cover({
         />
       ) : (
         <span className="text-xl font-black text-slate-600">
-          {itemTitle(item).slice(0, 2).toUpperCase()}
+          {title.slice(0, 2).toUpperCase()}
         </span>
       )}
     </div>
@@ -521,8 +544,6 @@ function Empty({ label }: { label: string }) {
   );
 }
 
-function itemTitle(item: BandcampItem) {
-  return (
-    item.album_title || item.track_title || item.artist_name || "Bandcamp item"
-  );
+function itemTitle(item: BandcampItem, fallback: string) {
+  return item.album_title || item.track_title || item.artist_name || fallback;
 }

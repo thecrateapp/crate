@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   GripVertical,
   ImagePlus,
@@ -180,6 +181,7 @@ export function PlaylistCreateModal({
   onClose,
   onSubmit,
 }: PlaylistCreateModalProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription);
   const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
@@ -283,11 +285,15 @@ export function PlaylistCreateModal({
   if (!open) return null;
 
   const isEditMode = mode === "edit";
-  const modalTitle = isEditMode ? "Edit playlist" : "Create playlist";
+  const modalTitle = isEditMode
+    ? t("playlistComposer.editTitle")
+    : t("playlistComposer.createTitle");
   const modalSubtitle = isEditMode
-    ? "Update details, cover and tracks."
-    : "Add cover, description and tracks before saving.";
-  const submitLabel = isEditMode ? "Save changes" : "Create playlist";
+    ? t("playlistComposer.editSubtitle")
+    : t("playlistComposer.createSubtitle");
+  const submitLabel = isEditMode
+    ? t("playlistComposer.saveChanges")
+    : t("playlistComposer.createPlaylist");
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -353,7 +359,7 @@ export function PlaylistCreateModal({
           <div className="flex items-start gap-4">
             <div className="relative flex-shrink-0">
               <PlaylistArtwork
-                name={name || "New Playlist"}
+                name={name || t("playlistComposer.newPlaylist")}
                 coverDataUrl={coverDataUrl}
                 tracks={tracks}
                 className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl shadow-2xl"
@@ -364,7 +370,7 @@ export function PlaylistCreateModal({
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload size={12} />
-                Edit cover
+                {t("playlistComposer.editCover")}
               </button>
               <input
                 ref={fileInputRef}
@@ -378,13 +384,13 @@ export function PlaylistCreateModal({
             <div className="min-w-0 flex-1 space-y-3 pt-1">
               <div className="space-y-1">
                 <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">
-                  Playlist
+                  {t("playlistComposer.playlistLabel")}
                 </div>
                 {titleEditing ? (
                   <input
                     ref={titleInputRef}
                     type="text"
-                    placeholder="My next obsession"
+                    placeholder={t("playlistComposer.namePlaceholder")}
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     onBlur={() => setTitleEditing(false)}
@@ -396,20 +402,20 @@ export function PlaylistCreateModal({
                     className="w-full text-left text-xl font-semibold text-foreground hover:text-white transition-colors"
                     onClick={() => setTitleEditing(true)}
                   >
-                    {name || "Add a title"}
+                    {name || t("playlistComposer.addTitle")}
                   </button>
                 )}
               </div>
 
               <div className="space-y-1">
                 <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/40">
-                  Description
+                  {t("playlistComposer.descriptionLabel")}
                 </div>
                 {descriptionEditing ? (
                   <textarea
                     ref={descriptionInputRef}
                     rows={3}
-                    placeholder="Write something about this playlist"
+                    placeholder={t("playlistComposer.descriptionPlaceholder")}
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     onBlur={() => setDescriptionEditing(false)}
@@ -421,7 +427,7 @@ export function PlaylistCreateModal({
                     className="w-full text-left text-sm leading-6 text-muted-foreground hover:text-foreground transition-colors"
                     onClick={() => setDescriptionEditing(true)}
                   >
-                    {description || "Add a description"}
+                    {description || t("playlistComposer.addDescription")}
                   </button>
                 )}
               </div>
@@ -480,7 +486,7 @@ export function PlaylistCreateModal({
               <Search size={15} className="text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search tracks to add"
+                placeholder={t("playlistComposer.searchPlaceholder")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
@@ -509,13 +515,15 @@ export function PlaylistCreateModal({
                             {track.artist} · {track.album}
                           </div>
                         </div>
-                        <span className="text-xs text-primary">Add</span>
+                        <span className="text-xs text-primary">
+                          {t("common.add")}
+                        </span>
                       </button>
                     ))}
                   </div>
                 ) : (
                   <div className="px-3 py-4 text-sm text-muted-foreground">
-                    No tracks found
+                    {t("playlistComposer.noTracksFound")}
                   </div>
                 )}
               </div>
@@ -526,12 +534,14 @@ export function PlaylistCreateModal({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">
-                  Tracks
+                  {t("common.tracks")}
                 </h3>
                 <p className="text-xs text-muted-foreground">
                   {tracks.length > 0
-                    ? `${tracks.length} selected`
-                    : "Add tracks now or later."}
+                    ? t("playlistComposer.selectedCount", {
+                        count: tracks.length,
+                      })
+                    : t("playlistComposer.addTracksLater")}
                 </p>
               </div>
             </div>

@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
@@ -27,11 +29,12 @@ export function FromCrateSection({
   onPlayPlaylist: (playlistId: number, playlistName: string) => void;
   onToggleFollow: (playlistId: number, isFollowed: boolean) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="From Crate"
-        subtitle="Global smart and curated playlists published from admin."
+        title={t("home.library.fromCrate.title")}
+        subtitle={t("home.library.fromCrate.subtitle")}
       />
       {loading ? (
         <SectionLoading />
@@ -46,9 +49,9 @@ export function FromCrateSection({
               description={playlist.description}
               coverDataUrl={playlist.cover_data_url}
               tracks={playlist.artwork_tracks}
-              meta={`${playlist.track_count} tracks${
-                playlist.category ? ` · ${playlist.category}` : ""
-              }`}
+              meta={`${t("common.trackCountLabel", {
+                count: playlist.track_count,
+              })}${playlist.category ? ` · ${playlist.category}` : ""}`}
               href={`/curation/playlist/${playlist.id}`}
               isFollowed={playlist.is_followed}
               onPlay={() => onPlayPlaylist(playlist.id, playlist.name)}
@@ -61,7 +64,7 @@ export function FromCrateSection({
         </SectionRail>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
-          No system playlists are available yet.
+          {t("home.library.fromCrate.empty")}
         </div>
       )}
     </section>
@@ -89,12 +92,13 @@ export function HomeLibrarySection({
   onOpenPlaylist: (playlistId: number) => void;
   onOpenSystemPlaylist: (playlistId: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="In Your Library"
-        subtitle="Your latest playlists and saved albums in one place."
-        actionLabel="Go to Library"
+        title={t("home.library.inYourLibrary.title")}
+        subtitle={t("home.library.inYourLibrary.subtitle")}
+        actionLabel={t("home.library.inYourLibrary.action")}
         onAction={onOpenLibrary}
       />
 
@@ -110,12 +114,18 @@ export function HomeLibrarySection({
             ) {
               const isSystem = item.type === "system_playlist";
               const playlistMeta = isSystem
-                ? `${item.playlist_track_count || 0} tracks${
+                ? `${t("common.trackCountLabel", {
+                    count: item.playlist_track_count || 0,
+                  })}${
                     item.playlist_follower_count != null
-                      ? ` · ${item.playlist_follower_count} followers`
+                      ? ` · ${t("common.followerCountLabel", {
+                          count: item.playlist_follower_count,
+                        })}`
                       : ""
                   }`
-                : `${item.playlist_track_count || 0} tracks`;
+                : t("common.trackCountLabel", {
+                    count: item.playlist_track_count || 0,
+                  });
               return (
                 <PlaylistCard
                   key={`${item.type}-${item.playlist_id}-${item.added_at}`}
@@ -176,7 +186,7 @@ export function HomeLibrarySection({
         </SectionRail>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
-          Start saving albums or creating playlists and they will show up here.
+          {t("home.library.inYourLibrary.empty")}
         </div>
       )}
     </section>
@@ -192,12 +202,13 @@ export function JustLandedSection({
   loading: boolean;
   onOpenExplore: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Just landed"
-        subtitle="Fresh additions arriving in the shared Crate library."
-        actionLabel="Explore"
+        title={t("home.library.justLanded.title")}
+        subtitle={t("home.library.justLanded.subtitle")}
+        actionLabel={t("nav.explore")}
         onAction={onOpenExplore}
       />
       {loading ? (
@@ -216,9 +227,11 @@ export function JustLandedSection({
                     artistId={artist.id}
                     artistEntityUid={artist.entity_uid}
                     artistSlug={artist.slug}
-                    subtitle={`${albumCount} album${
-                      albumCount === 1 ? "" : "s"
-                    } · ${trackCount} tracks`}
+                    subtitle={`${t("common.albumCountLabel", {
+                      count: albumCount,
+                    })} · ${t("common.trackCountLabel", {
+                      count: trackCount,
+                    })}`}
                     layout="grid"
                     fillGrid
                   />
@@ -237,9 +250,11 @@ export function JustLandedSection({
                   artistId={artist.id}
                   artistEntityUid={artist.entity_uid}
                   artistSlug={artist.slug}
-                  subtitle={`${albumCount} album${
-                    albumCount === 1 ? "" : "s"
-                  } · ${trackCount} tracks`}
+                  subtitle={`${t("common.albumCountLabel", {
+                    count: albumCount,
+                  })} · ${t("common.trackCountLabel", {
+                    count: trackCount,
+                  })}`}
                   layout="grid"
                   fillGrid
                 />
@@ -249,7 +264,7 @@ export function JustLandedSection({
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
-          No recent global additions yet.
+          {t("home.library.justLanded.empty")}
         </div>
       )}
     </section>

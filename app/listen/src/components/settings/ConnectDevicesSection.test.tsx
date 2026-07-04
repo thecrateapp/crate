@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -64,6 +65,11 @@ vi.mock("sonner", () => ({
 }));
 
 import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
+import { I18nProvider } from "@/i18n/I18nProvider";
+
+function renderWithI18n(ui: ReactElement) {
+  return render(<I18nProvider initialLocale="en">{ui}</I18nProvider>);
+}
 
 describe("ConnectDevicesSection", () => {
   beforeEach(() => {
@@ -109,7 +115,7 @@ describe("ConnectDevicesSection", () => {
   });
 
   it("lists current, active, and recent Connect devices", async () => {
-    render(<ConnectDevicesSection />);
+    renderWithI18n(<ConnectDevicesSection />);
 
     expect(
       await screen.findByText("Crate on Mobile Chrome (Android)"),
@@ -129,7 +135,7 @@ describe("ConnectDevicesSection", () => {
 
   it("revokes a non-current device", async () => {
     apiMock.mockResolvedValueOnce({ ok: true });
-    render(<ConnectDevicesSection />);
+    renderWithI18n(<ConnectDevicesSection />);
 
     await screen.findByText("Crate Desktop");
     fireEvent.click(
@@ -144,7 +150,7 @@ describe("ConnectDevicesSection", () => {
   });
 
   it("lets the user disable Crate Connect globally", async () => {
-    render(<ConnectDevicesSection />);
+    renderWithI18n(<ConnectDevicesSection />);
 
     await screen.findByText("Crate on Mobile Chrome (Android)");
     fireEvent.click(screen.getByRole("switch", { name: "Enabled" }));

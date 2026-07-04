@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Play } from "@crate/ui/icons";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ function toPlayerTracks(tracks: ArtistTopTrack[]): Track[] {
 }
 
 export function ArtistTopTracks() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { artistSlug: routeArtistSlug } = useParams<{ artistSlug?: string }>();
@@ -73,10 +75,13 @@ export function ArtistTopTracks() {
   function handlePlayAll() {
     const queue = toPlayerTracks(topTracks || []);
     if (!queue.length) {
-      toast.info("No top tracks available for this artist yet");
+      toast.info(t("actions.artist.toasts.noTopTracks"));
       return;
     }
-    playAll(queue, 0, { type: "queue", name: `${artistName} Top Tracks` });
+    playAll(queue, 0, {
+      type: "queue",
+      name: t("actions.artist.topTracksSource", { name: artistName }),
+    });
   }
 
   const trackRows = useMemo<TrackRowData[]>(
@@ -85,7 +90,7 @@ export function ArtistTopTracks() {
   );
 
   if (loading) {
-    return <CrateLoader label="Loading top tracks." />;
+    return <CrateLoader label={t("artist.topTracks.loading")} />;
   }
 
   return (
@@ -108,7 +113,9 @@ export function ArtistTopTracks() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">{artistName}</h1>
-            <p className="text-sm text-muted-foreground">Top Tracks</p>
+            <p className="text-sm text-muted-foreground">
+              {t("artist.sections.topTracks")}
+            </p>
           </div>
         </div>
 
@@ -117,7 +124,7 @@ export function ArtistTopTracks() {
           onClick={handlePlayAll}
         >
           <Play size={15} fill="currentColor" />
-          Play
+          {t("player.play")}
         </button>
       </div>
 

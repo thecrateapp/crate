@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
   Heart,
@@ -129,6 +130,7 @@ export function PlaylistListRow({
   followState,
   extraActions,
 }: PlaylistListRowProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { getPlaylistState, getPlaylistRecord } = useOffline();
@@ -157,7 +159,7 @@ export function PlaylistListRow({
         const response = await api<PlaylistDetailResponse>(detailEndpoint);
         const tracks = toPlayerTracks(response.tracks || []);
         if (tracks.length === 0) {
-          toast.message("This playlist has no playable tracks yet");
+          toast.message(t("playlist.toasts.noPlayableTracks"));
           return;
         }
         const queue = mode === "shuffle" ? shuffleArray(tracks) : tracks;
@@ -170,12 +172,12 @@ export function PlaylistListRow({
               : undefined,
         });
       } catch {
-        toast.error("Failed to load playlist");
+        toast.error(t("home.playlists.loadFailed"));
       } finally {
         setPlayingMode(null);
       }
     },
-    [detailEndpoint, name, playAll, playlistId],
+    [detailEndpoint, name, playAll, playlistId, t],
   );
 
   const baseActions = usePlaylistActionEntries({

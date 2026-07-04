@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { Loader2, UserPlus, UserRoundCheck } from "@crate/ui/icons";
 
@@ -136,6 +137,7 @@ function ProfileCardBody({
   busy: boolean;
   onFollowToggle: () => void;
 }) {
+  const { t } = useTranslation();
   const username = card.username || "";
   const profilePath = username
     ? `/users/${encodeURIComponent(username)}`
@@ -143,7 +145,7 @@ function ProfileCardBody({
   const statsPath = username
     ? `/users/${encodeURIComponent(username)}/stats`
     : "/stats";
-  const topGenre = card.top_genre?.name || "Still finding their sound";
+  const topGenre = card.top_genre?.name || t("profileHover.topGenreFallback");
   const following = card.relationship_state.following;
 
   return (
@@ -162,12 +164,12 @@ function ProfileCardBody({
                 {cardLabel(card)}
               </div>
               <div className="truncate text-xs text-white/45">
-                {username ? `@${username}` : "No username"}
+                {username ? `@${username}` : t("profileHover.noUsername")}
               </div>
             </div>
             {card.relationship_state.is_friend ? (
               <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
-                Friend
+                {t("profileHover.friend")}
               </span>
             ) : null}
           </div>
@@ -279,10 +281,11 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 function LoadingCard() {
+  const { t } = useTranslation();
   return (
     <div
       role="status"
-      aria-label="Loading profile card"
+      aria-label={t("profileHover.loading")}
       className="flex h-40 w-[360px] items-center justify-center rounded-[24px] border border-white/10 bg-[#080a10]/95"
     >
       <Loader2 size={18} className="animate-spin text-cyan-200" />
@@ -291,9 +294,10 @@ function LoadingCard() {
 }
 
 function ErrorCard() {
+  const { t } = useTranslation();
   return (
     <div className="w-[320px] rounded-[20px] border border-white/10 bg-[#080a10]/95 p-4 text-sm text-white/60">
-      Could not load this profile right now.
+      {t("profileHover.loadFailed")}
     </div>
   );
 }

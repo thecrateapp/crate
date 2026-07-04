@@ -111,6 +111,7 @@ function PlayerSurfaceFallback({
 }: {
   fullscreen?: boolean;
 }) {
+  const { t } = useTranslation();
   if (!fullscreen) {
     return (
       <div
@@ -124,7 +125,7 @@ function PlayerSurfaceFallback({
             size={CRATE_ICON_SIZE.sm}
             className="animate-spin text-primary"
           />
-          Loading player…
+          {t("player.loading")}
         </div>
       </div>
     );

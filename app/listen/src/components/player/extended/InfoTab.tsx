@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
   AudioLines,
@@ -195,6 +196,7 @@ function formatKey(
 }
 
 export function InfoTab({ className }: { className?: string }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { currentTrack } = usePlayerActions();
   const { info, loading } = useTrackInfo(currentTrack);
@@ -283,7 +285,7 @@ export function InfoTab({ className }: { className?: string }) {
           className,
         )}
       >
-        No track info available
+        {t("player.info.empty")}
       </div>
     );
   }
@@ -330,9 +332,10 @@ export function InfoTab({ className }: { className?: string }) {
               {currentTrack.albumCover ? (
                 <img
                   src={currentTrack.albumCover}
-                  alt={`Album cover for ${
-                    info.album || currentTrack.album || currentTrack.title
-                  }`}
+                  alt={t("player.info.albumCoverAlt", {
+                    name:
+                      info.album || currentTrack.album || currentTrack.title,
+                  })}
                   width={112}
                   height={112}
                   loading="lazy"
@@ -347,7 +350,7 @@ export function InfoTab({ className }: { className?: string }) {
 
             <div className="min-w-0 flex-1 pt-1">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
-                Now Inspecting
+                {t("player.info.nowInspecting")}
               </p>
               <h3 className="mt-1 text-xl font-semibold leading-tight text-white text-balance">
                 {info.title || currentTrack.title}
@@ -357,9 +360,9 @@ export function InfoTab({ className }: { className?: string }) {
                 {currentTrack.artistId ? (
                   <button
                     type="button"
-                    aria-label={`Open artist ${
-                      info.artist || currentTrack.artist
-                    }`}
+                    aria-label={t("player.info.openArtist", {
+                      name: info.artist || currentTrack.artist,
+                    })}
                     onClick={() =>
                       navigate(
                         artistPagePath({
@@ -384,9 +387,9 @@ export function InfoTab({ className }: { className?: string }) {
                 {(info.album || currentTrack.album) && currentTrack.albumId ? (
                   <button
                     type="button"
-                    aria-label={`Open album ${
-                      info.album || currentTrack.album
-                    }`}
+                    aria-label={t("player.info.openAlbum", {
+                      name: info.album || currentTrack.album,
+                    })}
                     onClick={() =>
                       navigate(
                         albumPagePath({
@@ -427,7 +430,7 @@ export function InfoTab({ className }: { className?: string }) {
             {info.rating != null && info.rating > 0 ? (
               <div className="hidden shrink-0 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 sm:block">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
-                  Rating
+                  {t("player.info.rating")}
                 </p>
                 <div className="mt-2">
                   <StarRating rating={Math.round(info.rating)} />
@@ -439,30 +442,33 @@ export function InfoTab({ className }: { className?: string }) {
           <div className="relative mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {info.bpm ? (
               <StatCard
-                label="Tempo"
+                label={t("player.info.metric.tempo")}
                 value={String(Math.round(info.bpm))}
                 helper="BPM"
               />
             ) : null}
             {formatKey(info.audio_key, info.audio_scale) ? (
               <StatCard
-                label="Key"
+                label={t("player.info.metric.key")}
                 value={formatKey(info.audio_key, info.audio_scale) ?? "—"}
-                helper="Harmonic center"
+                helper={t("player.info.helper.harmonicCenter")}
               />
             ) : null}
             {info.popularity != null && info.popularity > 0 ? (
               <StatCard
-                label="Popularity"
+                label={t("player.info.metric.popularity")}
                 value={`${Math.round(info.popularity)}%`}
-                helper="Crate score"
+                helper={t("player.info.helper.crateScore")}
               />
             ) : null}
             {qualityPills.length > 0 ? (
               <StatCard
-                label="Source"
+                label={t("player.info.metric.source")}
                 value={qualityPills[0]!}
-                helper={qualityPills.slice(1).join(" · ") || "Library file"}
+                helper={
+                  qualityPills.slice(1).join(" · ") ||
+                  t("player.info.helper.libraryFile")
+                }
               />
             ) : null}
           </div>
@@ -471,7 +477,7 @@ export function InfoTab({ className }: { className?: string }) {
             <div className="relative mt-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 sm:hidden">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
-                  Rating
+                  {t("player.info.rating")}
                 </p>
                 <StarRating rating={Math.round(info.rating)} />
               </div>
@@ -481,37 +487,44 @@ export function InfoTab({ className }: { className?: string }) {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <SectionCard
-            title="Audio Profile"
+            title={t("player.info.sections.audioProfile.title")}
             subtitle={
               hasAnalysis
-                ? "Analysis-driven feel of the track."
-                : "No analysis available for this track yet."
+                ? t("player.info.sections.audioProfile.subtitle")
+                : t("player.info.sections.audioProfile.emptySubtitle")
             }
             icon={AudioLines}
           >
             {hasAnalysis ? (
               <>
-                <MetricBar label="Energy" value={info.energy} />
                 <MetricBar
-                  label="Danceability"
+                  label={t("player.info.metric.energy")}
+                  value={info.energy}
+                />
+                <MetricBar
+                  label={t("player.info.metric.danceability")}
                   value={info.danceability}
                   tone="accent"
                 />
-                <MetricBar label="Valence" value={info.valence} tone="warm" />
+                <MetricBar
+                  label={t("player.info.metric.valence")}
+                  value={info.valence}
+                  tone="warm"
+                />
               </>
             ) : (
               <p className="text-sm text-white/40">
-                Analyze more of the library to populate this section.
+                {t("player.info.sections.audioProfile.empty")}
               </p>
             )}
           </SectionCard>
 
           <SectionCard
-            title="Mood & Feel"
+            title={t("player.info.sections.mood.title")}
             subtitle={
               topMoods.length
-                ? "Dominant mood vectors inferred from the audio."
-                : "No mood profile found yet."
+                ? t("player.info.sections.mood.subtitle")
+                : t("player.info.sections.mood.emptySubtitle")
             }
             icon={Sparkles}
           >
@@ -527,18 +540,24 @@ export function InfoTab({ className }: { className?: string }) {
                     </span>
                   ))}
                 </div>
-                <MetricBar label="Acousticness" value={info.acousticness} />
                 <MetricBar
-                  label="Instrumentalness"
+                  label={t("player.info.metric.acousticness")}
+                  value={info.acousticness}
+                />
+                <MetricBar
+                  label={t("player.info.metric.instrumentalness")}
                   value={info.instrumentalness}
                   tone="accent"
                 />
               </>
             ) : (
               <>
-                <MetricBar label="Acousticness" value={info.acousticness} />
                 <MetricBar
-                  label="Instrumentalness"
+                  label={t("player.info.metric.acousticness")}
+                  value={info.acousticness}
+                />
+                <MetricBar
+                  label={t("player.info.metric.instrumentalness")}
                   value={info.instrumentalness}
                   tone="accent"
                 />
@@ -547,59 +566,63 @@ export function InfoTab({ className }: { className?: string }) {
           </SectionCard>
 
           <SectionCard
-            title="Bliss Fingerprint"
+            title={t("player.info.sections.bliss.title")}
             subtitle={
               info.bliss_signature
-                ? "Texture, motion & density derived from the similarity vector."
-                : "Fingerprint not available yet."
+                ? t("player.info.sections.bliss.subtitle")
+                : t("player.info.sections.bliss.emptySubtitle")
             }
             icon={Activity}
           >
             {info.bliss_signature ? (
               <>
                 <MetricBar
-                  label="Texture"
+                  label={t("player.info.metric.texture")}
                   value={info.bliss_signature.texture}
                 />
                 <MetricBar
-                  label="Motion"
+                  label={t("player.info.metric.motion")}
                   value={info.bliss_signature.motion}
                   tone="accent"
                 />
                 <MetricBar
-                  label="Density"
+                  label={t("player.info.metric.density")}
                   value={info.bliss_signature.density}
                   tone="warm"
                 />
               </>
             ) : (
               <p className="text-sm text-white/40">
-                Bliss analysis has not been computed for this track yet.
+                {t("player.info.sections.bliss.empty")}
               </p>
             )}
           </SectionCard>
 
           <SectionCard
-            title="Source & Dynamics"
-            subtitle="File quality plus loudness and dynamic range where available."
+            title={t("player.info.sections.source.title")}
+            subtitle={t("player.info.sections.source.subtitle")}
             icon={HardDrive}
           >
             <div className="grid grid-cols-2 gap-3">
               {qualityPills.map((pill) => (
-                <StatCard key={pill} label="File" value={pill} />
+                <StatCard
+                  key={pill}
+                  label={t("player.info.metric.file")}
+                  value={pill}
+                />
               ))}
               {info.loudness != null ? (
                 <StatCard
-                  label="Loudness"
+                  label={t("player.info.metric.loudness")}
                   value={`${info.loudness.toFixed(1)} dB`}
-                  helper="Integrated level"
+                  helper={t("player.info.helper.integratedLevel")}
                 />
               ) : null}
               {info.dynamic_range != null ? (
                 <StatCard
-                  label="Dynamics"
+                  label={t("player.info.metric.dynamics")}
                   value={`${info.dynamic_range.toFixed(1)} dB`}
-                  helper="Dynamic range"
+                  helper={t("player.info.helper.dynamicRange")}
                 />
               ) : null}
             </div>
@@ -607,37 +630,37 @@ export function InfoTab({ className }: { className?: string }) {
             info.loudness == null &&
             info.dynamic_range == null ? (
               <p className="text-sm text-white/40">
-                No format or dynamics data available.
+                {t("player.info.sections.source.empty")}
               </p>
             ) : null}
           </SectionCard>
         </div>
 
         <SectionCard
-          title="Reach"
-          subtitle="Signals collected from Last.fm and Crate popularity scoring."
+          title={t("player.info.sections.reach.title")}
+          subtitle={t("player.info.sections.reach.subtitle")}
           icon={Users}
         >
           <div className="grid gap-3 sm:grid-cols-3">
             {info.lastfm_listeners != null && info.lastfm_listeners > 0 ? (
               <StatCard
-                label="Listeners"
+                label={t("player.info.metric.listeners")}
                 value={formatCompact(info.lastfm_listeners)}
-                helper="Last.fm audience"
+                helper={t("player.info.helper.lastfmAudience")}
               />
             ) : null}
             {info.lastfm_playcount != null && info.lastfm_playcount > 0 ? (
               <StatCard
-                label="Plays"
+                label={t("player.info.metric.plays")}
                 value={formatCompact(info.lastfm_playcount)}
-                helper="Last.fm scrobbles"
+                helper={t("player.info.helper.lastfmScrobbles")}
               />
             ) : null}
             {info.popularity != null && info.popularity > 0 ? (
               <StatCard
-                label="Popularity"
+                label={t("player.info.metric.popularity")}
                 value={`${Math.round(info.popularity)}%`}
-                helper="Normalized score"
+                helper={t("player.info.helper.normalizedScore")}
               />
             ) : null}
           </div>
@@ -647,7 +670,7 @@ export function InfoTab({ className }: { className?: string }) {
             info.popularity
           ) ? (
             <p className="text-sm text-white/40">
-              No popularity signals are available for this track yet.
+              {t("player.info.sections.reach.empty")}
             </p>
           ) : null}
         </SectionCard>
@@ -659,7 +682,7 @@ export function InfoTab({ className }: { className?: string }) {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
-                      Loudness
+                      {t("player.info.metric.loudness")}
                     </p>
                     <p className="mt-1 text-lg font-semibold tabular-nums text-white">
                       {info.loudness.toFixed(1)} dB
@@ -675,7 +698,7 @@ export function InfoTab({ className }: { className?: string }) {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
-                      Dynamic Range
+                      {t("player.info.metric.dynamicRange")}
                     </p>
                     <p className="mt-1 text-lg font-semibold tabular-nums text-white">
                       {info.dynamic_range.toFixed(1)} dB

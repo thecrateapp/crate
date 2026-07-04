@@ -29,17 +29,20 @@ vi.mock("@dnd-kit/utilities", () => ({
 }));
 
 import { PlaylistCreateModal } from "@/components/playlists/PlaylistCreateModal";
+import { I18nProvider } from "@/i18n/I18nProvider";
 
 describe("PlaylistCreateModal", () => {
   it("uses the Listen glass panel surface", () => {
     render(
-      <PlaylistCreateModal
-        open
-        initialTracks={[]}
-        submitting={false}
-        onClose={vi.fn()}
-        onSubmit={vi.fn(async () => {})}
-      />,
+      <I18nProvider initialLocale="en">
+        <PlaylistCreateModal
+          open
+          initialTracks={[]}
+          submitting={false}
+          onClose={vi.fn()}
+          onSubmit={vi.fn(async () => {})}
+        />
+      </I18nProvider>,
     );
 
     expect(

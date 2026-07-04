@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, LogOut, MonitorSpeaker } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -35,10 +36,13 @@ interface ConnectDeviceListResponse {
 
 const RECENT_DEVICE_WINDOW_MS = 5 * 60 * 1000;
 
-function formatSeenAt(value?: string | null): string {
-  if (!value) return "recently";
+function formatSeenAt(
+  value: string | null | undefined,
+  fallback: string,
+): string {
+  if (!value) return fallback;
   const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return "recently";
+  if (!Number.isFinite(timestamp)) return fallback;
   return new Date(timestamp).toLocaleString();
 }
 
@@ -78,6 +82,7 @@ export function ConnectDevicesSection() {
 }
 
 function ConnectDevicesSectionContent() {
+  const { t } = useTranslation();
   const currentDeviceId = useMemo(() => getListenDeviceId(), []);
   const connectEnabled = useCrateConnectEnabled();
   const [devices, setDevices] = useState<ConnectDevice[]>([]);
@@ -108,7 +113,7 @@ function ConnectDevicesSectionContent() {
         if (requestId !== devicesRequestIdRef.current) return;
         if (error instanceof DOMException && error.name === "AbortError")
           return;
-        toast.error("Failed to load Crate Connect devices");
+        toast.error(t("settings.connectDevices.toasts.loadFailed"));
       })
       .finally(() => {
         if (
@@ -133,9 +138,9 @@ function ConnectDevicesSectionContent() {
       setDevices((current) =>
         current.filter((item) => item.device_id !== device.device_id),
       );
-      toast.success("Device revoked");
+      toast.success(t("settings.connectDevices.toasts.revoked"));
     } catch {
-      toast.error("Failed to revoke device");
+      toast.error(t("settings.connectDevices.toasts.revokeFailed"));
     } finally {
       setForgettingDeviceId(null);
     }
@@ -150,10 +155,12 @@ function ConnectDevicesSectionContent() {
         void registerCurrentConnectDevice().catch(() => {});
       }
       toast.success(
-        nextEnabled ? "Crate Connect enabled" : "Crate Connect disabled",
+        nextEnabled
+          ? t("settings.connectDevices.toasts.enabled")
+          : t("settings.connectDevices.toasts.disabled"),
       );
     } catch {
-      toast.error("Failed to update Crate Connect");
+      toast.error(t("settings.connectDevices.toasts.updateFailed"));
     } finally {
       setUpdatingPreference(false);
     }
@@ -164,10 +171,10 @@ function ConnectDevicesSectionContent() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-medium text-foreground">
-            Crate Connect devices
+            {t("settings.connectDevices.title")}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Keep playback ownership explicit across your active devices.
+            {t("settings.connectDevices.description")}
           </p>
         </div>
         <button
@@ -191,14 +198,14 @@ function ConnectDevicesSectionContent() {
               }`}
             />
           )}
-          {connectEnabled ? "Enabled" : "Disabled"}
+          {connectEnabled ? t("common.enabled") : t("common.disabled")}
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 size={14} className="animate-spin" />
-          Loading devices...
+          {t("settings.connectDevices.loading")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -225,7 +232,7 @@ function ConnectDevicesSectionContent() {
                     </div>
                     {isCurrent ? (
                       <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-medium text-cyan-300">
-                        Current
+                        {t("common.current")}
                       </span>
                     ) : null}
                     <span
@@ -235,11 +242,13 @@ function ConnectDevicesSectionContent() {
                           : "border-white/10 bg-white/5 text-white/50"
                       }`}
                     >
-                      {device.active ? "Active" : "Recent"}
+                      {device.active ? t("common.active") : t("common.recent")}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Last seen {formatSeenAt(lastSeen)}
+                    {t("settings.connectDevices.lastSeen", {
+                      value: formatSeenAt(lastSeen, t("common.recently")),
+                    })}
                   </div>
                   {meta ? (
                     <div className="mt-1 text-[11px] text-white/40">{meta}</div>
@@ -247,7 +256,9 @@ function ConnectDevicesSectionContent() {
                 </div>
                 <button
                   type="button"
-                  aria-label={`Revoke ${label}`}
+                  aria-label={t("settings.connectDevices.revokeNamed", {
+                    name: label,
+                  })}
                   disabled={busy || isCurrent}
                   onClick={() => void revokeDevice(device)}
                   className="inline-flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
@@ -257,14 +268,14 @@ function ConnectDevicesSectionContent() {
                   ) : (
                     <LogOut size={13} />
                   )}
-                  Revoke device
+                  {t("settings.connectDevices.revoke")}
                 </button>
               </div>
             );
           })}
           {devices.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              No active Crate Connect devices right now.
+              {t("settings.connectDevices.empty")}
             </div>
           ) : null}
         </div>

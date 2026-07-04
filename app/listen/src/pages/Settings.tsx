@@ -234,15 +234,23 @@ function ToggleRow({
 
 const PLAYBACK_DELIVERY_OPTIONS: {
   value: PlaybackDeliveryPolicy;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
 }[] = [
-  { value: "balanced", label: "Balanced", description: "AAC 192 when useful" },
-  { value: "original", label: "Original", description: "Library file" },
+  {
+    value: "balanced",
+    labelKey: "settings.playback.delivery.balanced",
+    descriptionKey: "settings.playback.delivery.balancedDescription",
+  },
+  {
+    value: "original",
+    labelKey: "settings.playback.delivery.original",
+    descriptionKey: "settings.playback.delivery.originalDescription",
+  },
   {
     value: "data_saver",
-    label: "Data Saver",
-    description: "AAC 128 when useful",
+    labelKey: "settings.playback.delivery.dataSaver",
+    descriptionKey: "settings.playback.delivery.dataSaverDescription",
   },
 ];
 
@@ -327,10 +335,10 @@ export function Settings() {
                   }`}
                 >
                   <span className="block text-sm font-semibold">
-                    {option.label}
+                    {t(option.labelKey)}
                   </span>
                   <span className="mt-1 block text-xs text-muted-foreground">
-                    {option.description}
+                    {t(option.descriptionKey)}
                   </span>
                 </button>
               );
@@ -339,23 +347,23 @@ export function Settings() {
         </div>
         {isMobileAudioRuntime ? (
           <ToggleRow
-            label="Enhanced mobile audio (EQ)"
-            description="Off by default on iOS/Android for steadier background playback. Turn it on to enable EQ through WebAudio; Safari/PWA background playback can become less reliable. Restart Listen after changing this."
+            label={t("settings.playback.enhancedMobileAudio")}
+            description={t("settings.playback.enhancedMobileAudioDescription")}
             checked={mobileEnhancedAudioEnabled}
             onChange={(value) => {
               setMobileEnhancedAudioEnabled(value);
               setMobileEnhancedAudioPreference(value);
               toast.info(
                 value
-                  ? "Enhanced mobile audio will be enabled after restarting Listen."
-                  : "Stable mobile playback will be restored after restarting Listen.",
+                  ? t("settings.playback.toasts.enhancedMobileEnabled")
+                  : t("settings.playback.toasts.enhancedMobileDisabled"),
               );
             }}
           />
         ) : null}
         <ToggleRow
-          label="Infinite playback"
-          description="When an album or playlist ends, keep the session going with context-aware continuation."
+          label={t("settings.playback.infinitePlayback")}
+          description={t("settings.playback.infinitePlaybackDescription")}
           checked={infinitePlaybackEnabled}
           onChange={(value) => {
             setInfinitePlaybackEnabled(value);
@@ -363,8 +371,8 @@ export function Settings() {
           }}
         />
         <ToggleRow
-          label="Smart transitions"
-          description="Adapt crossfade length for playlists, radio, and mixed queues using audio analysis when available, while keeping album sequencing gapless when shuffle is off."
+          label={t("settings.playback.smartTransitions")}
+          description={t("settings.playback.smartTransitionsDescription")}
           checked={smartCrossfadeEnabled}
           onChange={(value) => {
             setSmartCrossfadeEnabled(value);
@@ -372,21 +380,27 @@ export function Settings() {
           }}
         />
         <RangeRow
-          label="Crossfade"
-          description="Set the preferred crossfade length for transitions that are allowed to blend."
+          label={t("settings.playback.crossfade")}
+          description={t("settings.playback.crossfadeDescription")}
           value={crossfadeSeconds}
           min={0}
           max={12}
           step={1}
-          displayValue={crossfadeSeconds === 0 ? "Off" : `${crossfadeSeconds}s`}
+          displayValue={
+            crossfadeSeconds === 0
+              ? t("common.off")
+              : t("common.secondsShort", { count: crossfadeSeconds })
+          }
           onChange={(value) => {
             setCrossfadeSeconds(value);
             setCrossfadeDurationPreference(value);
           }}
         />
         <ToggleRow
-          label="Smart playlist suggestions"
-          description="While listening to a playlist, occasionally slip in one contextual recommendation without changing the playlist itself."
+          label={t("settings.playback.smartPlaylistSuggestions")}
+          description={t(
+            "settings.playback.smartPlaylistSuggestionsDescription",
+          )}
           checked={smartPlaylistSuggestionsEnabled}
           onChange={(value) => {
             setSmartPlaylistSuggestionsEnabled(value);
@@ -394,13 +408,15 @@ export function Settings() {
           }}
         />
         <RangeRow
-          label="Suggestion cadence"
-          description="How many original playlist tracks should play before a suggested track can be inserted."
+          label={t("settings.playback.suggestionCadence")}
+          description={t("settings.playback.suggestionCadenceDescription")}
           value={smartPlaylistSuggestionsCadence}
           min={2}
           max={10}
           step={1}
-          displayValue={`Every ${smartPlaylistSuggestionsCadence} tracks`}
+          displayValue={t("settings.playback.suggestionCadenceValue", {
+            count: smartPlaylistSuggestionsCadence,
+          })}
           disabled={!smartPlaylistSuggestionsEnabled}
           onChange={(value) => {
             setSmartPlaylistSuggestionsCadence(value);
@@ -422,9 +438,13 @@ export function Settings() {
               {offlineSummary.itemCount}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {offlineSummary.readyItemCount} ready
+              {t("settings.offline.readyItems", {
+                count: offlineSummary.readyItemCount,
+              })}
               {offlineSummary.errorItemCount
-                ? ` · ${offlineSummary.errorItemCount} need attention`
+                ? ` · ${t("settings.offline.needsAttention", {
+                    count: offlineSummary.errorItemCount,
+                  })}`
                 : ""}
             </p>
           </div>
@@ -436,7 +456,7 @@ export function Settings() {
               {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Mirrored on this device
+              {t("settings.offline.mirrored")}
             </p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -447,7 +467,7 @@ export function Settings() {
               {formatBytes(offlineSummary.totalBytes)}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Approximate offline footprint
+              {t("settings.offline.footprint")}
             </p>
           </div>
         </div>
@@ -463,11 +483,12 @@ export function Settings() {
             onClick={() => {
               void syncAll()
                 .then(() => {
-                  toast.success("Offline copies synced");
+                  toast.success(t("settings.offline.toasts.synced"));
                 })
                 .catch((error) => {
                   toast.error(
-                    (error as Error).message || "Failed to sync offline copies",
+                    (error as Error).message ||
+                      t("settings.offline.toasts.syncFailed"),
                   );
                 });
             }}
@@ -478,7 +499,7 @@ export function Settings() {
             ) : (
               <RefreshCw size={16} />
             )}
-            Sync offline copy now
+            {t("settings.offline.syncNow")}
           </button>
           <button
             type="button"
@@ -490,19 +511,19 @@ export function Settings() {
             onClick={() => {
               void clearActiveProfile()
                 .then(() => {
-                  toast.success("Offline copies removed from this device");
+                  toast.success(t("settings.offline.toasts.removed"));
                 })
                 .catch((error) => {
                   toast.error(
                     (error as Error).message ||
-                      "Failed to clear offline copies",
+                      t("settings.offline.toasts.clearFailed"),
                   );
                 });
             }}
             className="inline-flex items-center gap-2 rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-400/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 size={16} />
-            Remove offline copies
+            {t("settings.offline.removeCopies")}
           </button>
         </div>
 
@@ -511,8 +532,8 @@ export function Settings() {
             <ArrowDownToLine size={16} className="mt-0.5 text-white/50" />
             <div>
               {offlineSupported
-                ? "Marked items keep a local mirror on this device. The player will transparently prefer the mirrored copy when it is available."
-                : "Offline mirror is not available in this environment."}
+                ? t("settings.offline.localMirrorDescription")
+                : t("settings.offline.unavailable")}
             </div>
           </div>
         </div>
@@ -641,6 +662,7 @@ function SleepTimerSection() {
 }
 
 function BandcampSection() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<BandcampStatus | null>(null);
   const [counts, setCounts] = useState({
     collection: 0,
@@ -682,7 +704,7 @@ function BandcampSection() {
     ) => {
       const trimmedCookie = cookie.trim();
       if (!trimmedCookie) {
-        toast.error("Paste the Bandcamp identity cookie first");
+        toast.error(t("settings.bandcamp.toasts.cookieRequired"));
         return;
       }
       setBusy(
@@ -695,11 +717,14 @@ function BandcampSection() {
           cookie: trimmedCookie,
           connection_method: connectionMethod,
         });
-        toast.success("Bandcamp connected");
+        toast.success(t("settings.bandcamp.toasts.connected"));
         setBandcampCookie("");
         await loadBandcamp();
       } catch (error) {
-        toast.error((error as Error).message || "Failed to connect Bandcamp");
+        toast.error(
+          (error as Error).message ||
+            t("settings.bandcamp.toasts.connectFailed"),
+        );
       } finally {
         setBusy(null);
       }
@@ -728,13 +753,13 @@ function BandcampSection() {
 
   const openTauriBandcampInterceptor = async () => {
     if (!window.__crateTauriInvoke) {
-      toast.error("Bandcamp desktop connector is not available");
+      toast.error(t("settings.bandcamp.toasts.desktopUnavailable"));
       return;
     }
     setBusy("tauri-connect");
     try {
       await window.__crateTauriInvoke("open_bandcamp_cookie_interceptor");
-      toast.info("Finish Bandcamp login in the opened window");
+      toast.info(t("settings.bandcamp.toasts.finishLogin"));
       window.setTimeout(
         () => {
           setBusy((current) => (current === "tauri-connect" ? null : current));
@@ -743,7 +768,8 @@ function BandcampSection() {
       );
     } catch (error) {
       toast.error(
-        (error as Error).message || "Failed to open Bandcamp login window",
+        (error as Error).message ||
+          t("settings.bandcamp.toasts.openLoginFailed"),
       );
       setBusy(null);
     }
@@ -756,7 +782,7 @@ function BandcampSection() {
         "/api/bandcamp/me/sync",
         "POST",
       );
-      toast.success("Bandcamp sync started");
+      toast.success(t("settings.bandcamp.toasts.syncStarted"));
       const deadline = Date.now() + 5 * 60 * 1000;
       while (Date.now() < deadline) {
         await delay(1500);
@@ -769,27 +795,41 @@ function BandcampSection() {
           const importsQueued = task.result?.imports_queued ?? 0;
           const skippedExisting = task.result?.imports_skipped_existing ?? 0;
           const suffix = [
-            synced != null ? `${synced} synced` : null,
-            importsQueued ? `${importsQueued} imports queued` : null,
-            skippedExisting ? `${skippedExisting} already in Crate` : null,
+            synced != null
+              ? t("settings.bandcamp.syncSummary.synced", { count: synced })
+              : null,
+            importsQueued
+              ? t("settings.bandcamp.syncSummary.importsQueued", {
+                  count: importsQueued,
+                })
+              : null,
+            skippedExisting
+              ? t("settings.bandcamp.syncSummary.alreadyInCrate", {
+                  count: skippedExisting,
+                })
+              : null,
           ]
             .filter(Boolean)
             .join(", ");
           toast.success(
             suffix
-              ? `Bandcamp sync complete (${suffix})`
-              : "Bandcamp sync complete",
+              ? t("settings.bandcamp.toasts.syncCompleteWithSummary", {
+                  summary: suffix,
+                })
+              : t("settings.bandcamp.toasts.syncComplete"),
           );
           return;
         }
         if (task.status === "failed" || task.status === "cancelled") {
-          toast.error(task.error || "Bandcamp sync failed");
+          toast.error(task.error || t("settings.bandcamp.toasts.syncFailed"));
           return;
         }
       }
-      toast.info("Bandcamp sync is still running in the background");
+      toast.info(t("settings.bandcamp.toasts.syncBackground"));
     } catch (error) {
-      toast.error((error as Error).message || "Failed to sync Bandcamp");
+      toast.error(
+        (error as Error).message || t("settings.bandcamp.toasts.syncFailed"),
+      );
     } finally {
       setBusy(null);
     }
@@ -799,23 +839,25 @@ function BandcampSection() {
     setBusy("disconnect");
     try {
       await api("/api/bandcamp/me/disconnect", "POST");
-      toast.success("Bandcamp disconnected");
+      toast.success(t("settings.bandcamp.toasts.disconnected"));
       await loadBandcamp();
     } catch (error) {
-      toast.error((error as Error).message || "Failed to disconnect Bandcamp");
+      toast.error(
+        (error as Error).message ||
+          t("settings.bandcamp.toasts.disconnectFailed"),
+      );
     } finally {
       setBusy(null);
     }
   };
 
   const connectedName =
-    status?.display_name || status?.username || "Bandcamp account";
+    status?.display_name ||
+    status?.username ||
+    t("bandcamp.connection.accountFallback");
 
   return (
-    <Section
-      title="Bandcamp"
-      description="Sync purchases, wishlist and follows so Crate can help you support artists and import music you own."
-    >
+    <Section title="Bandcamp" description={t("settings.bandcamp.description")}>
       <div className="rounded-2xl border border-[#1da0c3]/20 bg-[#1da0c3]/10 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
@@ -832,14 +874,18 @@ function BandcampSection() {
             )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-foreground">
-                {status?.connected ? connectedName : "Not connected"}
+                {status?.connected ? connectedName : t("common.notConnected")}
               </p>
               <p className="text-xs text-muted-foreground">
                 {status?.connected
-                  ? `Collection ${counts.collection} · Wishlist ${counts.wishlist} · Following ${counts.following}`
+                  ? t("settings.bandcamp.summary", {
+                      collection: counts.collection,
+                      wishlist: counts.wishlist,
+                      following: counts.following,
+                    })
                   : isTauriRuntime
-                    ? "Connect in a dedicated Bandcamp desktop window"
-                    : "Paste your Bandcamp identity cookie to attach your collection"}
+                    ? t("settings.bandcamp.connectDesktopHint")
+                    : t("settings.bandcamp.connectCookieHint")}
               </p>
             </div>
           </div>
@@ -850,7 +896,7 @@ function BandcampSection() {
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-white/10"
               >
                 <BandcampLogo size={14} />
-                View purchases
+                {t("settings.bandcamp.viewPurchases")}
               </Link>
               <button
                 onClick={syncBandcamp}
@@ -862,14 +908,14 @@ function BandcampSection() {
                 ) : (
                   <RefreshCw size={14} />
                 )}
-                Sync
+                {t("bandcamp.actions.sync")}
               </button>
               <button
                 onClick={disconnectBandcamp}
                 disabled={busy !== null}
                 className="rounded-full border border-red-400/25 px-4 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-400/10 disabled:opacity-50"
               >
-                Disconnect
+                {t("common.disconnect")}
               </button>
             </div>
           ) : null}
@@ -888,11 +934,7 @@ function BandcampSection() {
                   size={16}
                   className="mt-0.5 shrink-0 text-yellow-300"
                 />
-                <p>
-                  Crate Desktop opens Bandcamp in a controlled window and reads
-                  the resulting session cookie from the native webview. Your
-                  password stays on Bandcamp.
-                </p>
+                <p>{t("settings.bandcamp.desktopConnectorDescription")}</p>
               </div>
               <button
                 onClick={openTauriBandcampInterceptor}
@@ -904,7 +946,7 @@ function BandcampSection() {
                 ) : (
                   <BandcampLogo size={14} />
                 )}
-                Connect in Bandcamp window
+                {t("settings.bandcamp.connectWindow")}
               </button>
             </div>
           ) : null}
@@ -913,13 +955,12 @@ function BandcampSection() {
             <div className="flex items-start gap-3 text-xs leading-5 text-yellow-100/80">
               <Lock size={16} className="mt-0.5 shrink-0 text-yellow-300" />
               <p>
-                On web or mobile, open Bandcamp in your browser and copy the
-                cookie named{" "}
+                {t("settings.bandcamp.cookieInstructionsPrefix")}{" "}
                 <span className="font-mono text-yellow-50">identity</span> from{" "}
                 <span className="font-mono text-yellow-50">bandcamp.com</span>.
-                You can also paste the full{" "}
+                {t("settings.bandcamp.cookieInstructionsSuffix")}{" "}
                 <span className="font-mono text-yellow-50">Cookie</span> header
-                if you have it.
+                {t("settings.bandcamp.cookieInstructionsEnd")}
               </p>
             </div>
             <textarea
@@ -927,7 +968,7 @@ function BandcampSection() {
               onChange={(event) => setBandcampCookie(event.target.value)}
               rows={3}
               spellCheck={false}
-              placeholder="identity=... or just the identity cookie value"
+              placeholder={t("settings.bandcamp.cookiePlaceholder")}
               className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs leading-5 text-foreground outline-none transition-colors placeholder:text-white/25 focus:border-primary/50"
             />
             <button
@@ -940,7 +981,7 @@ function BandcampSection() {
               ) : (
                 <BandcampLogo size={14} />
               )}
-              Connect with cookie
+              {t("settings.bandcamp.connectWithCookie")}
             </button>
           </div>
         </div>
@@ -950,6 +991,7 @@ function BandcampSection() {
 }
 
 function ScrobbleSection() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<
     Record<string, { connected: boolean; username?: string }>
   >({});
@@ -975,7 +1017,7 @@ function ScrobbleSection() {
       );
       window.location.href = `https://www.last.fm/api/auth/?api_key=${api_key}&cb=${cb}`;
     } catch {
-      toast.error("Last.fm is not configured on this server");
+      toast.error(t("settings.scrobbling.toasts.lastfmNotConfigured"));
       setConnecting(null);
     }
   };
@@ -984,13 +1026,13 @@ function ScrobbleSection() {
     setConnecting("lastfm");
     try {
       await api("/api/me/scrobble/lastfm", "POST", { token });
-      toast.success("Last.fm connected");
+      toast.success(t("settings.scrobbling.toasts.lastfmConnected"));
       const updated = await api<
         Record<string, { connected: boolean; username?: string }>
       >("/api/me/scrobble/status");
       setStatus(updated);
     } catch {
-      toast.error("Failed to connect Last.fm — token may have expired");
+      toast.error(t("settings.scrobbling.toasts.lastfmConnectFailed"));
     } finally {
       setConnecting(null);
     }
@@ -1005,14 +1047,18 @@ function ScrobbleSection() {
         "POST",
         { token: lbToken.trim() },
       );
-      toast.success(`ListenBrainz connected as ${result.username}`);
+      toast.success(
+        t("settings.scrobbling.toasts.listenbrainzConnected", {
+          username: result.username,
+        }),
+      );
       setLbToken("");
       const updated = await api<
         Record<string, { connected: boolean; username?: string }>
       >("/api/me/scrobble/status");
       setStatus(updated);
     } catch {
-      toast.error("Invalid ListenBrainz token");
+      toast.error(t("settings.scrobbling.toasts.invalidListenbrainzToken"));
     } finally {
       setConnecting(null);
     }
@@ -1023,10 +1069,12 @@ function ScrobbleSection() {
       await api(`/api/me/scrobble/${provider}`, "DELETE");
       setStatus((prev) => ({ ...prev, [provider]: { connected: false } }));
       toast.success(
-        `${provider === "lastfm" ? "Last.fm" : "ListenBrainz"} disconnected`,
+        t("settings.scrobbling.toasts.disconnected", {
+          provider: provider === "lastfm" ? "Last.fm" : "ListenBrainz",
+        }),
       );
     } catch {
-      toast.error("Failed to disconnect");
+      toast.error(t("common.toasts.disconnectFailed"));
     }
   };
 
@@ -1045,8 +1093,8 @@ function ScrobbleSection() {
 
   return (
     <Section
-      title="Scrobbling"
-      description="Sync your listening activity to external services."
+      title={t("settings.scrobbling.title")}
+      description={t("settings.scrobbling.description")}
     >
       {/* Last.fm */}
       <div className="flex items-center justify-between">
@@ -1054,10 +1102,16 @@ function ScrobbleSection() {
           <p className="text-sm font-medium text-foreground">Last.fm</p>
           {lastfm?.connected ? (
             <p className="text-xs text-green-400">
-              Connected{lastfm.username ? ` as ${lastfm.username}` : ""}
+              {lastfm.username
+                ? t("settings.scrobbling.connectedAs", {
+                    username: lastfm.username,
+                  })
+                : t("common.connected")}
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">Not connected</p>
+            <p className="text-xs text-muted-foreground">
+              {t("common.notConnected")}
+            </p>
           )}
         </div>
         {lastfm?.connected ? (
@@ -1065,7 +1119,7 @@ function ScrobbleSection() {
             onClick={() => handleDisconnect("lastfm")}
             className="rounded-full px-4 py-2 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
           >
-            Disconnect
+            {t("common.disconnect")}
           </button>
         ) : (
           <button
@@ -1073,7 +1127,9 @@ function ScrobbleSection() {
             disabled={connecting === "lastfm"}
             className="rounded-full px-4 py-2 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-50"
           >
-            {connecting === "lastfm" ? "Connecting..." : "Connect"}
+            {connecting === "lastfm"
+              ? t("common.connecting")
+              : t("common.connect")}
           </button>
         )}
       </div>
@@ -1084,11 +1140,16 @@ function ScrobbleSection() {
           <p className="text-sm font-medium text-foreground">ListenBrainz</p>
           {listenbrainz?.connected ? (
             <p className="text-xs text-green-400">
-              Connected
-              {listenbrainz.username ? ` as ${listenbrainz.username}` : ""}
+              {listenbrainz.username
+                ? t("settings.scrobbling.connectedAs", {
+                    username: listenbrainz.username,
+                  })
+                : t("common.connected")}
             </p>
           ) : (
-            <p className="text-xs text-muted-foreground">Not connected</p>
+            <p className="text-xs text-muted-foreground">
+              {t("common.notConnected")}
+            </p>
           )}
         </div>
         {listenbrainz?.connected ? (
@@ -1096,7 +1157,7 @@ function ScrobbleSection() {
             onClick={() => handleDisconnect("listenbrainz")}
             className="rounded-full px-4 py-2 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
           >
-            Disconnect
+            {t("common.disconnect")}
           </button>
         ) : (
           <div className="flex items-center gap-2">
@@ -1104,7 +1165,7 @@ function ScrobbleSection() {
               type="text"
               value={lbToken}
               onChange={(e) => setLbToken(e.target.value)}
-              placeholder="API token"
+              placeholder={t("settings.scrobbling.apiToken")}
               className="w-36 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-foreground placeholder:text-white/40 focus:outline-none focus:border-primary/50"
               onKeyDown={(e) =>
                 e.key === "Enter" && handleListenBrainzConnect()
@@ -1115,7 +1176,7 @@ function ScrobbleSection() {
               disabled={connecting === "listenbrainz" || !lbToken.trim()}
               className="rounded-full px-4 py-2 text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25 transition-colors disabled:opacity-50"
             >
-              {connecting === "listenbrainz" ? "..." : "Connect"}
+              {connecting === "listenbrainz" ? "..." : t("common.connect")}
             </button>
           </div>
         )}
@@ -1125,6 +1186,7 @@ function ScrobbleSection() {
 }
 
 function AccountSection() {
+  const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const [name, setName] = useState(user?.name || "");
   const [username, setUsername] = useState(user?.username || "");
@@ -1167,14 +1229,14 @@ function AccountSection() {
         username: username.trim() || null,
         bio: bio.trim() || null,
       });
-      toast.success("Profile updated");
+      toast.success(t("settings.account.toasts.profileUpdated"));
       await refetch();
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message.includes("Username is already taken")) {
-        toast.error("That username is already taken");
+        toast.error(t("settings.account.toasts.usernameTaken"));
       } else {
-        toast.error("Failed to update profile");
+        toast.error(t("settings.account.toasts.profileUpdateFailed"));
       }
     } finally {
       setSaving(false);
@@ -1183,11 +1245,11 @@ function AccountSection() {
 
   async function handleChangePassword() {
     if (!newPassword || newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error(t("settings.account.toasts.passwordTooShort"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error("Passwords don't match");
+      toast.error(t("settings.account.toasts.passwordMismatch"));
       return;
     }
     setSaving(true);
@@ -1196,13 +1258,13 @@ function AccountSection() {
         current_password: currentPassword,
         new_password: newPassword,
       });
-      toast.success("Password changed");
+      toast.success(t("settings.account.toasts.passwordChanged"));
       setShowPassword(false);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch {
-      toast.error("Failed to change password — check your current password");
+      toast.error(t("settings.account.toasts.passwordChangeFailed"));
     } finally {
       setSaving(false);
     }
@@ -1220,7 +1282,7 @@ function AccountSection() {
       );
       window.location.href = response.login_url;
     } catch {
-      toast.error(`Failed to start ${provider} link flow`);
+      toast.error(t("settings.account.toasts.linkFailed", { provider }));
       setLinkingProvider(null);
     }
   }
@@ -1229,10 +1291,10 @@ function AccountSection() {
     setUnlinkingProvider(provider);
     try {
       await api(`/api/auth/oauth/${provider}/unlink`, "POST");
-      toast.success(`${provider} account unlinked`);
+      toast.success(t("settings.account.toasts.unlinked", { provider }));
       await refetch();
     } catch {
-      toast.error(`Failed to unlink ${provider}`);
+      toast.error(t("settings.account.toasts.unlinkFailed", { provider }));
     } finally {
       setUnlinkingProvider(null);
     }
@@ -1251,25 +1313,29 @@ function AccountSection() {
 
   return (
     <Section
-      title="Account"
-      description="Manage your profile, social identity, and credentials."
+      title={t("settings.account.title")}
+      description={t("settings.account.description")}
     >
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">Display name</label>
+          <label className="text-xs text-muted-foreground">
+            {t("settings.account.displayName")}
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="flex-1 h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
-              placeholder="Your name"
+              placeholder={t("auth.register.namePlaceholder")}
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">Username</label>
+          <label className="text-xs text-muted-foreground">
+            {t("settings.account.username")}
+          </label>
           <input
             type="text"
             value={username}
@@ -1278,17 +1344,19 @@ function AccountSection() {
             placeholder="your-handle"
           />
           <p className="text-xs text-muted-foreground">
-            This powers your public profile URL and social discovery.
+            {t("settings.account.usernameDescription")}
           </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">Bio</label>
+          <label className="text-xs text-muted-foreground">
+            {t("settings.account.bio")}
+          </label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             className="min-h-24 w-full rounded-lg bg-white/5 px-3 py-3 text-sm text-white outline-none focus:bg-white/8"
-            placeholder="A short note about what you listen to"
+            placeholder={t("settings.account.bioPlaceholder")}
           />
         </div>
 
@@ -1303,12 +1371,14 @@ function AccountSection() {
             }
             className="h-10 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40 transition-opacity"
           >
-            {saving ? "Saving..." : "Save profile"}
+            {saving ? t("common.saving") : t("settings.account.saveProfile")}
           </button>
         </div>
 
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">Email</label>
+          <label className="text-xs text-muted-foreground">
+            {t("common.email")}
+          </label>
           <p className="text-sm text-white/60 px-1">{user?.email || "—"}</p>
         </div>
 
@@ -1316,11 +1386,10 @@ function AccountSection() {
           <div className="space-y-3 rounded-xl bg-white/5 p-4">
             <div>
               <div className="text-sm font-medium text-foreground">
-                Connected accounts
+                {t("settings.account.connectedAccounts")}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Link Google or Apple so this profile can use social sign-in
-                directly from Listen.
+                {t("settings.account.connectedAccountsDescription")}
               </p>
             </div>
             {socialProviders.map(([provider]) => {
@@ -1337,7 +1406,9 @@ function AccountSection() {
                       {provider}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {linked ? "Linked to this account" : "Not linked yet"}
+                      {linked
+                        ? t("settings.account.linked")
+                        : t("settings.account.notLinked")}
                     </div>
                   </div>
                   <button
@@ -1350,7 +1421,11 @@ function AccountSection() {
                     }
                     className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-foreground hover:bg-white/10 transition-colors disabled:opacity-50"
                   >
-                    {busy ? "Working..." : linked ? "Unlink" : "Link"}
+                    {busy
+                      ? t("common.working")
+                      : linked
+                        ? t("settings.account.unlink")
+                        : t("settings.account.link")}
                   </button>
                 </div>
               );
@@ -1363,10 +1438,7 @@ function AccountSection() {
         {authConfig.invite_only ? (
           <div className="flex items-start gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
             <Shield size={16} className="mt-0.5 flex-shrink-0" />
-            <div>
-              This instance is currently invite-only for new accounts. Existing
-              accounts can still sign in normally.
-            </div>
+            <div>{t("settings.account.inviteOnlyNotice")}</div>
           </div>
         ) : null}
 
@@ -1375,7 +1447,7 @@ function AccountSection() {
             onClick={() => setShowPassword(true)}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            <Lock size={14} /> Change password
+            <Lock size={14} /> {t("settings.account.changePassword")}
           </button>
         ) : (
           <div className="space-y-2 rounded-xl bg-white/5 p-4">
@@ -1383,7 +1455,7 @@ function AccountSection() {
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Current password"
+              placeholder={t("settings.account.currentPassword")}
               className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
               autoComplete="current-password"
             />
@@ -1391,7 +1463,7 @@ function AccountSection() {
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="New password"
+              placeholder={t("settings.account.newPassword")}
               className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
               autoComplete="new-password"
             />
@@ -1399,7 +1471,7 @@ function AccountSection() {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              placeholder={t("settings.account.confirmPassword")}
               className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
               autoComplete="new-password"
             />
@@ -1409,7 +1481,7 @@ function AccountSection() {
                 disabled={saving}
                 className="h-9 px-4 rounded-lg bg-primary text-sm font-medium text-white disabled:opacity-40"
               >
-                Change
+                {t("settings.account.changePasswordAction")}
               </button>
               <button
                 onClick={() => {
@@ -1420,7 +1492,7 @@ function AccountSection() {
                 }}
                 className="h-9 px-4 rounded-lg bg-white/5 text-sm text-white/60"
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             </div>
           </div>
@@ -1452,6 +1524,7 @@ interface CityResult {
 }
 
 function ShowsLocationSection() {
+  const { t } = useTranslation();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [mode, setMode] = useState<"fixed" | "near_me">("fixed");
   const [city, setCity] = useState("");
@@ -1516,9 +1589,16 @@ function ShowsLocationSection() {
         longitude: geo.longitude,
       });
       setLocation((prev) => (prev ? { ...prev, ...geo } : null));
-      if (!silent) toast.success(`Detected: ${geo.city}, ${geo.country}`);
+      if (!silent) {
+        toast.success(
+          t("settings.shows.toasts.detected", {
+            city: geo.city,
+            country: geo.country,
+          }),
+        );
+      }
     } catch {
-      if (!silent) toast.error("Could not detect your location");
+      if (!silent) toast.error(t("settings.shows.toasts.detectFailed"));
     } finally {
       setDetecting(false);
     }
@@ -1549,9 +1629,11 @@ function ShowsLocationSection() {
               }
             : null,
         );
-        toast.success(`City set to ${result.display_name}`);
+        toast.success(
+          t("settings.shows.toasts.citySet", { city: result.display_name }),
+        );
       })
-      .catch(() => toast.error("Failed to save city"));
+      .catch(() => toast.error(t("settings.shows.toasts.saveCityFailed")));
   }
 
   async function saveMode(newMode: "fixed" | "near_me") {
@@ -1559,7 +1641,7 @@ function ShowsLocationSection() {
     try {
       await api("/api/me/location", "PUT", { show_location_mode: newMode });
     } catch {
-      toast.error("Failed to save");
+      toast.error(t("common.toasts.saveFailed"));
     }
   }
 
@@ -1568,7 +1650,7 @@ function ShowsLocationSection() {
     try {
       await api("/api/me/location", "PUT", { show_radius_km: newRadius });
     } catch {
-      toast.error("Failed to save");
+      toast.error(t("common.toasts.saveFailed"));
     }
   }
 
@@ -1577,12 +1659,12 @@ function ShowsLocationSection() {
 
   return (
     <Section
-      title="Shows"
-      description="Configure how upcoming shows are found near you."
+      title={t("settings.shows.title")}
+      description={t("settings.shows.description")}
     >
       <div className="space-y-3">
         <div className="text-sm font-medium text-foreground">
-          Location for shows
+          {t("settings.shows.location")}
         </div>
         <div className="flex flex-col gap-2">
           <button
@@ -1603,14 +1685,14 @@ function ShowsLocationSection() {
                   mode === "fixed" ? "text-primary" : "text-foreground"
                 }`}
               >
-                Fixed city
+                {t("settings.shows.fixedCity")}
               </div>
               <div className="text-xs text-muted-foreground">
                 {displayCity
                   ? `${displayCity}${
                       displayCountry ? `, ${displayCountry}` : ""
                     }`
-                  : "Not set yet"}
+                  : t("settings.shows.notSet")}
               </div>
             </div>
             <div
@@ -1643,10 +1725,10 @@ function ShowsLocationSection() {
                   mode === "near_me" ? "text-primary" : "text-foreground"
                 }`}
               >
-                Near me
+                {t("settings.shows.nearMe")}
               </div>
               <div className="text-xs text-muted-foreground">
-                Detect automatically from your connection
+                {t("settings.shows.nearMeDescription")}
               </div>
             </div>
             <div
@@ -1667,7 +1749,9 @@ function ShowsLocationSection() {
       {mode === "fixed" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-muted-foreground">City</label>
+            <label className="text-xs text-muted-foreground">
+              {t("settings.shows.city")}
+            </label>
             <button
               onClick={() => detectFromIp()}
               disabled={detecting}
@@ -1678,7 +1762,7 @@ function ShowsLocationSection() {
               ) : (
                 <Navigation size={10} />
               )}
-              Detect from IP
+              {t("settings.shows.detectFromIp")}
             </button>
           </div>
           <div className="relative">
@@ -1691,7 +1775,7 @@ function ShowsLocationSection() {
               }}
               onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-              placeholder="Search for a city..."
+              placeholder={t("settings.shows.cityPlaceholder")}
               className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white outline-none focus:border-primary/40 placeholder:text-white/40"
             />
             {searching && (
@@ -1724,7 +1808,7 @@ function ShowsLocationSection() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium text-foreground">
-            Search radius
+            {t("settings.shows.searchRadius")}
           </div>
           <div className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70">
             {radius} km

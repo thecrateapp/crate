@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Loader2, Star } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ interface SimilarTrack {
 }
 
 export function SuggestedTab() {
+  const { t } = useTranslation();
   const { currentTrack, play, playAll } = usePlayerActions();
   const [tracks, setTracks] = useState<SimilarTrack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,12 +81,12 @@ export function SuggestedTab() {
         title: currentTrack.title,
       });
       if (!radio.tracks.length) {
-        toast.info("Track radio is not available yet");
+        toast.info(t("actions.track.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start track radio");
+      toast.error(t("actions.track.toasts.radioFailed"));
     } finally {
       setStartingRadio(false);
     }
@@ -101,7 +103,7 @@ export function SuggestedTab() {
   if (tracks.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-white/20">
-        No similar tracks found
+        {t("player.suggested.empty")}
       </div>
     );
   }
@@ -123,7 +125,7 @@ export function SuggestedTab() {
           ) : (
             <Star size={12} />
           )}
-          Start track radio
+          {t("actions.track.radio")}
         </button>
       </div>
       {tracks.map((track, index) => (
@@ -136,7 +138,12 @@ export function SuggestedTab() {
                 id: track.track_id ?? track.path,
                 library_track_id: track.track_id,
               }),
-              { type: "radio", name: `Similar to ${currentTrack?.title}` },
+              {
+                type: "radio",
+                name: t("player.suggested.playSource", {
+                  title: currentTrack?.title ?? "",
+                }),
+              },
             )
           }
           className="group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5"

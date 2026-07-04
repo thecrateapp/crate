@@ -1,4 +1,5 @@
 import { Children, type ReactNode, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ResponsiveLine } from "@nivo/line";
 
 import type { StatsTrendPoint, StatsWindow } from "./stats-model";
@@ -119,6 +120,7 @@ export function TrendChart({
   points: StatsTrendPoint[];
   loading?: boolean;
 }) {
+  const { t } = useTranslation();
   const data = useMemo(
     () => [
       {
@@ -135,7 +137,7 @@ export function TrendChart({
   if (loading) {
     return (
       <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
-        Loading trend data...
+        {t("stats.trend.loading")}
       </div>
     );
   }
@@ -143,7 +145,7 @@ export function TrendChart({
   if (points.length === 0) {
     return (
       <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
-        Start listening and your daily curve will appear here.
+        {t("stats.trend.empty")}
       </div>
     );
   }

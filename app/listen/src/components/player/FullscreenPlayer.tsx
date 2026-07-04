@@ -284,10 +284,12 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.path || currentTrack.id,
       );
       toast.success(
-        nextLiked ? "Added to liked tracks" : "Removed from liked tracks",
+        nextLiked
+          ? t("actions.track.toasts.liked")
+          : t("actions.track.toasts.unliked"),
       );
     } catch {
-      toast.error("Failed to update liked tracks");
+      toast.error(t("player.toasts.updateLikedTracksFailed"));
     }
   }
 
@@ -910,10 +912,14 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         >
           <div className="px-4 py-3">
             <p className="text-xs text-white/40 uppercase tracking-wider font-medium mb-2">
-              Up Next · {upcomingTracks.length} tracks
+              {t("player.queue.upNextTracks", {
+                count: upcomingTracks.length,
+              })}
             </p>
             {upcomingTracks.length === 0 && (
-              <p className="text-sm text-white/20 py-2">Nothing queued</p>
+              <p className="text-sm text-white/20 py-2">
+                {t("player.queue.nothingQueued")}
+              </p>
             )}
             {upcomingTracks.map((track, i) => {
               const queueIndex = currentIndex + 1 + i;
@@ -942,7 +948,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
           />
           {!lyrics ? (
             <p className="relative z-10 mt-20 text-center text-sm text-white/40">
-              Loading lyrics...
+              {t("player.lyrics.loading")}
             </p>
           ) : lyrics.synced ? (
             <div className="relative z-10 mx-auto flex w-full max-w-[560px] flex-col items-start gap-3 py-8">
@@ -978,7 +984,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
             </pre>
           ) : (
             <p className="relative z-10 mt-20 text-center text-sm text-white/40">
-              No lyrics available
+              {t("player.lyrics.unavailable")}
             </p>
           )}
         </div>
