@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from crate.api.schemas.i18n import (
@@ -8,7 +10,11 @@ from crate.api.schemas.i18n import (
     I18nTranslationRequestResponse,
 )
 from crate.db.queries.i18n import get_published_bundle, list_published_bundles
-from crate.db.repositories.i18n import upsert_translation_request
+from crate.db.repositories.i18n import (
+    update_translation_request_status,
+    upsert_translation_request,
+)
+from crate.db.repositories.tasks import create_task
 
 
 router = APIRouter(prefix="/api/i18n", tags=["i18n"])
@@ -20,6 +26,71 @@ _LISTEN_FALLBACK_LOCALE = "en"
 def _require_supported_app(app: str) -> None:
     if app != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="unsupported i18n app")
+
+
+def listen_i18n_ai_is_configured() -> bool:
+    try:
+        from crate.llm import get_config, get_provider_api_key
+
+        config = get_config()
+    except Exception:
+        return False
+
+    provider = str(config.get("provider") or "").strip()
+    if not provider:
+        return False
+    if provider == "ollama":
+        return _ollama_i18n_ai_is_explicitly_enabled()
+    return bool(get_provider_api_key(provider))
+
+
+def _ollama_i18n_ai_is_explicitly_enabled() -> bool:
+    if os.environ.get("CRATE_ENABLE_LISTEN_I18N_AI_DRAFTS", "").strip() == "1":
+        return True
+    if os.environ.get("LLM_PROVIDER", "").strip().startswith("ollama/"):
+        return True
+    try:
+        from crate.db.cache_settings import get_setting
+
+        return bool(str(get_setting("llm_model", "") or "").strip())
+    except Exception:
+        return False
+
+
+def _queue_translation_draft_if_needed(request: dict) -> dict:
+    current_status = str(request.get("status") or "").strip()
+    if current_status in {"drafting_ai", "needs_review", "published"}:
+        return request
+
+    app = str(request["app"])
+    locale = str(request["locale"])
+    source_version = str(request["source_version"])
+
+    if not listen_i18n_ai_is_configured():
+        return (
+            update_translation_request_status(
+                app=app,
+                locale=locale,
+                source_version=source_version,
+                status="manual_required",
+            )
+            or request
+        )
+
+    task_id = create_task(
+        "draft_i18n_translation",
+        {"app": app, "locale": locale, "source_version": source_version},
+    )
+    return (
+        update_translation_request_status(
+            app=app,
+            locale=locale,
+            source_version=source_version,
+            status="drafting_ai",
+            task_id=task_id,
+        )
+        or request
+    )
 
 
 @router.get(
@@ -98,6 +169,7 @@ def create_i18n_translation_request(
         client=payload.client,
         reason=payload.reason,
     )
+    request = _queue_translation_draft_if_needed(request)
     return I18nTranslationRequestResponse(
         requestId=str(request["id"]),
         status=request["status"],
