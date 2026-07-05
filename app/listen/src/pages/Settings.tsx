@@ -729,12 +729,12 @@ function LanguageSection({
   );
 }
 
-const SLEEP_MODES: { mode: SleepTimerMode; label: string }[] = [
-  { mode: "15min", label: "15 min" },
-  { mode: "30min", label: "30 min" },
-  { mode: "45min", label: "45 min" },
-  { mode: "1hr", label: "1 hour" },
-  { mode: "end_of_track", label: "End of track" },
+const SLEEP_MODES: { mode: SleepTimerMode; labelKey: string }[] = [
+  { mode: "15min", labelKey: "settings.sleep.modes.15min" },
+  { mode: "30min", labelKey: "settings.sleep.modes.30min" },
+  { mode: "45min", labelKey: "settings.sleep.modes.45min" },
+  { mode: "1hr", labelKey: "settings.sleep.modes.1hr" },
+  { mode: "end_of_track", labelKey: "settings.sleep.modes.endOfTrack" },
 ];
 
 function SleepTimerSection() {
@@ -753,7 +753,7 @@ function SleepTimerSection() {
       description={t("settings.sleep.subtitle")}
     >
       <div className="flex flex-wrap gap-2">
-        {SLEEP_MODES.map(({ mode, label }) => (
+        {SLEEP_MODES.map(({ mode, labelKey }) => (
           <button
             key={mode}
             onClick={() => startSleepTimer(mode, pause)}
@@ -763,7 +763,7 @@ function SleepTimerSection() {
                 : "bg-white/5 text-white/60 hover:bg-white/10"
             }`}
           >
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>
@@ -772,7 +772,7 @@ function SleepTimerSection() {
           <div className="flex items-center gap-2">
             <Moon size={16} className="text-primary" />
             <span className="text-sm text-foreground">
-              Pausing in{" "}
+              {t("settings.sleep.pausingIn")}{" "}
               <span className="font-mono font-semibold text-primary">
                 {formatRemaining(timer.remainingSeconds)}
               </span>
@@ -782,7 +782,7 @@ function SleepTimerSection() {
             onClick={cancelSleepTimer}
             className="rounded-full px-3 py-1.5 text-xs font-medium bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       ) : null}
@@ -1085,10 +1085,12 @@ function BandcampSection() {
               <Lock size={16} className="mt-0.5 shrink-0 text-yellow-300" />
               <p>
                 {t("settings.bandcamp.cookieInstructionsPrefix")}{" "}
-                <span className="font-mono text-yellow-50">identity</span> from{" "}
+                <span className="font-mono text-yellow-50">identity</span>{" "}
+                {t("settings.bandcamp.cookieInstructionsFrom")}{" "}
                 <span className="font-mono text-yellow-50">bandcamp.com</span>.
                 {t("settings.bandcamp.cookieInstructionsSuffix")}{" "}
-                <span className="font-mono text-yellow-50">Cookie</span> header
+                <span className="font-mono text-yellow-50">Cookie</span>{" "}
+                {t("settings.bandcamp.cookieInstructionsHeader")}{" "}
                 {t("settings.bandcamp.cookieInstructionsEnd")}
               </p>
             </div>
@@ -1470,7 +1472,7 @@ function AccountSection() {
             value={username}
             onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
             className="w-full h-10 px-3 rounded-lg bg-white/5 text-sm text-white outline-none focus:bg-white/8"
-            placeholder="your-handle"
+            placeholder={t("settings.account.usernamePlaceholder")}
           />
           <p className="text-xs text-muted-foreground">
             {t("settings.account.usernameDescription")}

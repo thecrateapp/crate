@@ -43,6 +43,11 @@ describe("Settings", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Reproducción")).toBeInTheDocument();
     expect(screen.getByText("Temporizador")).toBeInTheDocument();
+    expect(screen.getByText("Idioma de la app")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Español/i })).toBeInTheDocument();
+    expect(screen.getByText("1 h")).toBeInTheDocument();
+    expect(screen.getByText("Al terminar la pista")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("tu-handle")).toBeInTheDocument();
     expect(screen.getByText("Enlaces rápidos")).toBeInTheDocument();
   });
 
@@ -51,7 +56,7 @@ describe("Settings", () => {
 
     renderWithListenProviders(<Settings />, { locale: "en" });
 
-    expect(screen.getByText("Language")).toBeInTheDocument();
+    expect(screen.getByText("App language")).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: /Español/i }));
 

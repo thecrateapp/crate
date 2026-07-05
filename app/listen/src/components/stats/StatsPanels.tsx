@@ -95,6 +95,7 @@ export function TopList({
   loading?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const hasVisibleItems = Children.count(children) > 0;
 
   return (
@@ -102,7 +103,9 @@ export function TopList({
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 space-y-2">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">
+            {t("common.loadingShort")}
+          </p>
         ) : hasVisibleItems ? (
           children
         ) : (
@@ -120,18 +123,18 @@ export function TrendChart({
   points: StatsTrendPoint[];
   loading?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const data = useMemo(
     () => [
       {
-        id: "Minutes",
+        id: t("stats.metrics.minutes"),
         data: points.map((point) => ({
           x: point.day,
           y: Number(point.minutes_listened.toFixed(2)),
         })),
       },
     ],
-    [points],
+    [points, t],
   );
 
   if (loading) {
@@ -200,7 +203,7 @@ export function TrendChart({
           tickRotation: points.length > 14 ? -45 : 0,
           format: (value) => {
             const date = new Date(`${String(value)}T12:00:00`);
-            return date.toLocaleDateString("en-US", {
+            return date.toLocaleDateString(i18n.language, {
               month: "short",
               day: "numeric",
             });
@@ -215,7 +218,9 @@ export function TrendChart({
               {String(point.data.xFormatted)}
             </div>
             <div className="mt-1 text-sm text-cyan-300">
-              {point.data.yFormatted} minutes
+              {t("stats.trend.minutesValue", {
+                value: point.data.yFormatted,
+              })}
             </div>
           </div>
         )}

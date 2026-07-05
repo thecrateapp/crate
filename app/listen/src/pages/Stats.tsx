@@ -137,8 +137,9 @@ export function Stats() {
         replay ?? undefined,
         topArtistItems,
         topTrackItems,
+        t,
       ),
-    [overview, replay, topArtistItems, topTrackItems],
+    [overview, replay, topArtistItems, topTrackItems, t],
   );
 
   const soundProfile = useMemo(
@@ -426,9 +427,12 @@ function AffinityCard({
   affinity?: StatsAffinity | null;
   subject?: string | null;
 }) {
+  const { t } = useTranslation();
   if (!affinity) return null;
 
   const reasons = affinity.affinity_reasons ?? [];
+  const bandKey = `stats.affinity.band.${affinity.affinity_band}`;
+  const bandFallback = affinity.affinity_band.replace("_", " ");
   return (
     <section className="mt-8 overflow-hidden rounded-[1.75rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(255,255,255,0.035)_45%,rgba(244,114,182,0.1))] p-5 shadow-2xl shadow-black/20 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
@@ -438,20 +442,22 @@ function AffinityCard({
           </div>
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              Listener match
+              {t("stats.affinity.title")}
             </div>
             <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-[-0.06em] text-foreground">
-              {affinity.affinity_score}% affinity
+              {t("stats.affinity.score", {
+                score: affinity.affinity_score,
+              })}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {subject
-                ? `Your listening overlaps with ${subject} across the signals below.`
-                : "Your listening overlaps with this listener across the signals below."}
+                ? t("stats.affinity.subjectBody", { subject })
+                : t("stats.affinity.listenerBody")}
             </p>
           </div>
         </div>
         <div className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/65">
-          {affinity.affinity_band.replace("_", " ")}
+          {t(bandKey, { defaultValue: bandFallback })}
         </div>
       </div>
       {reasons.length ? (
@@ -481,7 +487,7 @@ function StatsStorySection({
   fallbackDiscovery?: StatsStoryArtistSignal;
   fallbackComeback?: StatsStoryArtistSignal;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   if (!story) return null;
   const mover = fallbackMover ?? story.movers[0];
   const discovery = fallbackDiscovery ?? story.discoveries[0];
@@ -535,7 +541,7 @@ function StatsStorySection({
         body={
           rhythm.peak_weekday
             ? t("stats.story.rhythmBody", {
-                weekday: rhythm.peak_weekday,
+                weekday: formatWeekdayLabel(rhythm.peak_weekday, i18n.language),
                 hour: rhythm.peak_hour_label ?? t("stats.story.peakHour"),
               })
             : t("stats.story.rhythmFallback")
@@ -699,7 +705,7 @@ function ReplayCard({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
-            Your replay will appear after a little more listening.
+            {t("stats.replay.empty")}
           </div>
         )}
       </div>
@@ -752,6 +758,7 @@ function NarrativeTile({
   body: string;
   index: number;
 }) {
+  const { t } = useTranslation();
   const tones = [
     "from-cyan-400/18 via-white/[0.035] to-transparent",
     "from-rose-400/16 via-white/[0.035] to-transparent",
@@ -766,7 +773,9 @@ function NarrativeTile({
       )}
     >
       <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
-        Signal 0{index + 1}
+        {t("stats.narrative.signal", {
+          number: String(index + 1).padStart(2, "0"),
+        })}
       </div>
       <div className="mt-3 text-xl font-black tracking-[-0.05em] text-foreground">
         {title}
@@ -785,6 +794,7 @@ function SoundProfileCard({
   genres: StatsGenre[];
   skipRate: number;
 }) {
+  const { t } = useTranslation();
   const genreLabels = normalizeGenreLabels(genres);
 
   return (
@@ -792,27 +802,39 @@ function SoundProfileCard({
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
-            Your sound profile
+            {t("stats.soundProfile.title")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Built from the tracks that dominated this window.
+            {t("stats.soundProfile.subtitle")}
           </p>
         </div>
         <Activity className="text-primary" size={22} />
       </div>
 
       <div className="space-y-4">
-        <ProfileBar label="Energy" value={profile.energy} />
-        <ProfileBar label="Movement" value={profile.danceability} />
-        <ProfileBar label="Brightness" value={profile.valence} />
+        <ProfileBar
+          label={t("stats.soundProfile.energy")}
+          value={profile.energy}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.movement")}
+          value={profile.danceability}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.brightness")}
+          value={profile.valence}
+        />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <MiniStat
-          label="Avg BPM"
+          label={t("stats.soundProfile.avgBpm")}
           value={profile.bpm ? String(profile.bpm) : "—"}
         />
-        <MiniStat label="Skip rate" value={formatStatsPercent(skipRate)} />
+        <MiniStat
+          label={t("stats.soundProfile.skipRate")}
+          value={formatStatsPercent(skipRate)}
+        />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
@@ -826,7 +848,7 @@ function SoundProfileCard({
         ))}
         {!genreLabels.length ? (
           <span className="text-sm text-muted-foreground">
-            Genre signal will appear here.
+            {t("stats.soundProfile.genreEmpty")}
           </span>
         ) : null}
       </div>
@@ -843,7 +865,7 @@ function ListeningPulseCard({
   points: StatsTrendPoint[];
   loading: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const activePoints = points.filter(
     (point) => point.play_count > 0 || point.minutes_listened > 0,
   );
@@ -885,7 +907,11 @@ function ListeningPulseCard({
           <div className="grid gap-3 sm:grid-cols-3">
             <MiniStat
               label={t("stats.rhythm.strongestDay")}
-              value={strongestDay ? formatTrendDay(strongestDay.day) : "—"}
+              value={
+                strongestDay
+                  ? formatTrendDay(strongestDay.day, i18n.language)
+                  : "—"
+              }
             />
             <MiniStat
               label={t("stats.rhythm.peakHour")}
@@ -909,7 +935,10 @@ function ListeningPulseCard({
               })}
               {rhythm?.peak_weekday
                 ? ` ${t("stats.rhythm.strongestWeekday", {
-                    weekday: rhythm.peak_weekday,
+                    weekday: formatWeekdayLabel(
+                      rhythm.peak_weekday,
+                      i18n.language,
+                    ),
                   })}`
                 : ""}
             </p>
@@ -923,7 +952,7 @@ function ListeningPulseCard({
 }
 
 function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const visible = points.slice(-18);
   const maxMinutes = Math.max(
     ...visible.map((point) => point.minutes_listened),
@@ -998,9 +1027,13 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                     ? "text-primary hover:scale-110"
                     : "text-white/18 hover:text-white/35",
                 )}
-                aria-label={`${formatTrendDay(point.day)}: ${formatStatsMinutes(
-                  point.minutes_listened,
-                )}, ${t("common.playCount", { count: point.play_count })}`}
+                aria-label={`${formatTrendDay(
+                  point.day,
+                  i18n.language,
+                )}: ${formatStatsMinutes(point.minutes_listened)}, ${t(
+                  "common.playCount",
+                  { count: point.play_count },
+                )}`}
               >
                 <span
                   className={cn(
@@ -1036,10 +1069,10 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-black text-white">
-                      {formatTrendDay(point.day)}
+                      {formatTrendDay(point.day, i18n.language)}
                     </div>
                     <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                      {formatShortWeekday(point.day)}
+                      {formatShortWeekday(point.day, i18n.language)}
                     </div>
                   </div>
                   <div className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">
@@ -1151,19 +1184,38 @@ function normalizeGenreLabels(genres: StatsGenre[]): string[] {
   return labels.slice(0, 8);
 }
 
-function formatTrendDay(day: string): string {
+function formatTrendDay(day: string, locale: string): string {
   const date = new Date(`${day}T12:00:00`);
   if (Number.isNaN(date.getTime())) return day;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
   });
 }
 
-function formatShortWeekday(day: string): string {
+function formatShortWeekday(day: string, locale: string): string {
   const date = new Date(`${day}T12:00:00`);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { weekday: "long" });
+  return date.toLocaleDateString(locale, { weekday: "long" });
+}
+
+const WEEKDAY_INDEX_BY_ENGLISH = new Map(
+  [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ].map((weekday, index) => [weekday, index] as const),
+);
+
+function formatWeekdayLabel(weekday: string, locale: string): string {
+  const weekdayIndex = WEEKDAY_INDEX_BY_ENGLISH.get(weekday.toLowerCase());
+  if (weekdayIndex == null) return weekday;
+  const date = new Date(Date.UTC(2026, 0, 4 + weekdayIndex, 12));
+  return date.toLocaleDateString(locale, { weekday: "long" });
 }
 
 function TopTracksPanel({
@@ -1440,9 +1492,10 @@ function TrackCover({
 }
 
 function PanelLoading() {
+  const { t } = useTranslation();
   return (
     <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
-      Loading...
+      {t("common.loadingShort")}
     </div>
   );
 }

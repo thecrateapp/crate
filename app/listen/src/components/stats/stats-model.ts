@@ -201,6 +201,11 @@ export interface RecapHighlight {
   body: string;
 }
 
+type RecapTranslate = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
 export const STATS_WINDOW_OPTIONS: { value: StatsWindow; label: string }[] = [
   { value: "7d", label: "7D" },
   { value: "30d", label: "30D" },
@@ -235,46 +240,58 @@ export function buildRecapHighlights(
   replay: ReplayMix | undefined,
   topArtists: StatsArtist[],
   topTracks: StatsTrack[],
+  t: RecapTranslate,
 ): RecapHighlight[] {
   const highlights: RecapHighlight[] = [];
 
   if (overview?.top_artist?.artist_name) {
     highlights.push({
-      title: `${overview.top_artist.artist_name} led this window`,
-      body: `${overview.top_artist.play_count} plays and ${formatStatsMinutes(
-        overview.top_artist.minutes_listened,
-      )} listened.`,
+      title: t("stats.recap.topArtistTitle", {
+        artist: overview.top_artist.artist_name,
+      }),
+      body: t("stats.recap.topArtistBody", {
+        count: overview.top_artist.play_count,
+        minutes: formatStatsMinutes(overview.top_artist.minutes_listened),
+      }),
     });
   }
 
   if (topTracks[0] && topTracks[0].play_count > 0) {
     highlights.push({
-      title: `"${topTracks[0].title}" kept coming back`,
-      body: `${topTracks[0].artist} · ${topTracks[0].play_count} plays in this window.`,
+      title: t("stats.recap.topTrackTitle", { track: topTracks[0].title }),
+      body: t("stats.recap.topTrackBody", {
+        artist: topTracks[0].artist,
+        count: topTracks[0].play_count,
+      }),
     });
   }
 
   if (overview && overview.play_count > 0) {
     const cadence =
       overview.active_days >= 20
-        ? "You've been listening almost every day."
+        ? t("stats.recap.cadenceDaily")
         : overview.active_days >= 10
-          ? "This window has had a steady rhythm."
-          : "This window is still taking shape.";
+          ? t("stats.recap.cadenceSteady")
+          : t("stats.recap.cadenceTakingShape");
     highlights.push({
-      title: `${formatStatsMinutes(overview.minutes_listened)} listened`,
-      body: `${cadence} ${overview.complete_play_count} completed plays so far.`,
+      title: t("stats.recap.minutesTitle", {
+        minutes: formatStatsMinutes(overview.minutes_listened),
+      }),
+      body: t("stats.recap.minutesBody", {
+        cadence,
+        count: overview.complete_play_count,
+      }),
     });
   }
 
   if (replay?.track_count && replay.track_count > 0) {
     highlights.push({
-      title: `${replay.track_count} tracks define this replay`,
-      body: `${
-        topArtists.length
-          ? `Spread across ${Math.min(topArtists.length, 8)} key artists.`
-          : "A first replay object is ready to play."
-      }`,
+      title: t("stats.recap.replayTitle", { count: replay.track_count }),
+      body: topArtists.length
+        ? t("stats.recap.replayArtistsBody", {
+            count: Math.min(topArtists.length, 8),
+          })
+        : t("stats.recap.replayReadyBody"),
     });
   }
 
