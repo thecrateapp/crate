@@ -304,6 +304,7 @@ def create_app() -> FastAPI:
     from crate.api.share import router as share_router
     from crate.api.radio import router as radio_router
     from crate.api.lyrics import router as lyrics_router
+    from crate.api.i18n import router as i18n_router
     from crate.api.cache_events import router as cache_events_router
     from crate.api.social import router as social_router
     from crate.api.jam import router as jam_router
@@ -327,6 +328,7 @@ def create_app() -> FastAPI:
     app.include_router(jam_router)
     app.include_router(radio_router)
     app.include_router(lyrics_router)
+    app.include_router(i18n_router)
     app.include_router(management_router)
     app.include_router(management_admin_router)
     app.include_router(settings_router)
