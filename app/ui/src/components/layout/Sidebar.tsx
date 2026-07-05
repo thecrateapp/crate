@@ -26,6 +26,7 @@ import {
   PanelLeftOpen,
   Trash2,
   HandHeart,
+  Languages,
 } from "lucide-react";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -189,6 +190,12 @@ const navItems = [
     icon: ShieldCheck,
     label: "Roles",
     capabilities: ["roles.view"],
+  },
+  {
+    to: "/i18n",
+    icon: Languages,
+    label: "Translations",
+    capabilities: ["admin.access"],
   },
   {
     to: "/settings",

@@ -14,6 +14,7 @@ from crate.db.queries.i18n import (
     get_published_bundle,
     get_translation_bundle,
     list_published_bundles,
+    list_translation_bundles,
     list_translation_requests,
 )
 from crate.db.repositories.i18n import (
@@ -30,6 +31,7 @@ admin_router = APIRouter(prefix="/api/admin/i18n", tags=["admin-i18n"])
 
 _LISTEN_APP = "listen"
 _LISTEN_FALLBACK_LOCALE = "en"
+_BUNDLE_STATUSES = {"needs_review", "published", "rejected", "superseded"}
 
 
 def _require_supported_app(app: str) -> None:
@@ -52,8 +54,8 @@ def _serialize_translation_request(row: dict) -> dict:
     }
 
 
-def _serialize_translation_bundle(row: dict) -> dict:
-    return {
+def _serialize_translation_bundle(row: dict, *, include_messages: bool) -> dict:
+    data = {
         "id": str(row["id"]),
         "app": row["app"],
         "locale": row["locale"],
@@ -61,12 +63,17 @@ def _serialize_translation_bundle(row: dict) -> dict:
         "sourceVersion": row["source_version"],
         "bundleVersion": row["bundle_version"],
         "status": row["status"],
-        "messages": row["messages_json"],
+        "messageCount": row.get("message_count")
+        if row.get("message_count") is not None
+        else len(row.get("messages_json") or {}),
         "createdAt": row["created_at"].isoformat(),
         "publishedAt": row["published_at"].isoformat()
         if row.get("published_at")
         else None,
     }
+    if include_messages:
+        data["messages"] = row["messages_json"]
+    return data
 
 
 def listen_i18n_ai_is_configured() -> bool:
@@ -157,7 +164,29 @@ def admin_get_listen_i18n_bundle(request: Request, bundle_id: str):
     bundle = get_translation_bundle(bundle_id)
     if bundle is None or bundle["app"] != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="i18n bundle not found")
-    return _serialize_translation_bundle(bundle)
+    return _serialize_translation_bundle(bundle, include_messages=True)
+
+
+@admin_router.get(
+    "/listen/bundles",
+    summary="List Listen i18n translation bundles",
+)
+def admin_list_listen_i18n_bundles(
+    request: Request,
+    status_filter: str | None = Query(default=None, alias="status"),
+):
+    _require_admin(request)
+    if status_filter is not None and status_filter not in _BUNDLE_STATUSES:
+        raise HTTPException(status_code=400, detail="unsupported i18n bundle status")
+    return {
+        "bundles": [
+            _serialize_translation_bundle(row, include_messages=False)
+            for row in list_translation_bundles(
+                app=_LISTEN_APP,
+                status=status_filter,
+            )
+        ]
+    }
 
 
 @admin_router.post(
@@ -169,7 +198,7 @@ def admin_publish_listen_i18n_bundle(request: Request, bundle_id: str):
     bundle = publish_translation_bundle(bundle_id)
     if bundle is None or bundle["app"] != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="i18n bundle not found")
-    return _serialize_translation_bundle(bundle)
+    return _serialize_translation_bundle(bundle, include_messages=True)
 
 
 @admin_router.post(
@@ -181,7 +210,7 @@ def admin_reject_listen_i18n_bundle(request: Request, bundle_id: str):
     bundle = reject_translation_bundle(bundle_id)
     if bundle is None or bundle["app"] != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="i18n bundle not found")
-    return _serialize_translation_bundle(bundle)
+    return _serialize_translation_bundle(bundle, include_messages=True)
 
 
 @router.get(

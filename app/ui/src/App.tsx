@@ -65,6 +65,9 @@ const DownloadPage = lazy(() =>
 const Settings = lazy(() =>
   import("@/pages/Settings").then((m) => ({ default: m.Settings })),
 );
+const I18nReview = lazy(() =>
+  import("@/pages/I18nReview").then((m) => ({ default: m.I18nReview })),
+);
 const Discover = lazy(() =>
   import("@/pages/Discover").then((m) => ({ default: m.Discover })),
 );
@@ -166,6 +169,7 @@ const SETTINGS_MANAGE = ["settings.manage"] as const;
 const LIBRARY_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const USERS_VIEW = ["users.view"] as const;
 const ROLES_VIEW = ["roles.view"] as const;
+const ADMIN_ACCESS = ["admin.access"] as const;
 const RELEASE_CURATION = [
   "curation.releases.write",
   "library.tidal.manage",
@@ -383,6 +387,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
                       <Discover />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="i18n"
+                  element={
+                    <RequireCapabilities anyOf={ADMIN_ACCESS}>
+                      <I18nReview />
                     </RequireCapabilities>
                   }
                 />

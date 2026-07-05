@@ -78,6 +78,51 @@ def test_admin_i18n_gets_and_publishes_bundle(pg_db, test_app):
     ]
 
 
+def test_admin_i18n_lists_reviewable_bundles(pg_db, test_app):
+    from crate.db.repositories.i18n import insert_translation_bundle_draft
+
+    draft = insert_translation_bundle_draft(
+        app="listen",
+        locale="es",
+        source_locale="en",
+        source_version="sha256:test",
+        bundle_version="2026.07.05.1",
+        messages={"player.play": "Reproducir"},
+    )
+    published = insert_translation_bundle_draft(
+        app="listen",
+        locale="fr",
+        source_locale="en",
+        source_version="sha256:test",
+        bundle_version="2026.07.05.2",
+        messages={"player.play": "Lire"},
+    )
+    assert (
+        test_app.post(
+            f"/api/admin/i18n/listen/bundles/{published['id']}/publish"
+        ).status_code
+        == 200
+    )
+
+    response = test_app.get("/api/admin/i18n/listen/bundles?status=needs_review")
+
+    assert response.status_code == 200
+    assert response.json()["bundles"] == [
+        {
+            "id": str(draft["id"]),
+            "app": "listen",
+            "locale": "es",
+            "sourceLocale": "en",
+            "sourceVersion": "sha256:test",
+            "bundleVersion": "2026.07.05.1",
+            "status": "needs_review",
+            "messageCount": 1,
+            "createdAt": draft["created_at"].isoformat(),
+            "publishedAt": None,
+        }
+    ]
+
+
 def test_admin_i18n_publish_supersedes_previous_bundle(pg_db, test_app):
     from crate.db.repositories.i18n import insert_translation_bundle_draft
 

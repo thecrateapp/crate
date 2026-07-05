@@ -65,6 +65,42 @@ def list_translation_requests(*, app: str) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def list_translation_bundles(
+    *, app: str, status: str | None = None
+) -> list[dict[str, Any]]:
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        id,
+                        app,
+                        locale,
+                        source_locale,
+                        source_version,
+                        bundle_version,
+                        status,
+                        (
+                            SELECT COUNT(*)
+                            FROM jsonb_object_keys(messages_json)
+                        ) AS message_count,
+                        created_at,
+                        published_at
+                    FROM i18n_bundles
+                    WHERE app = :app
+                      AND (:status IS NULL OR status = :status)
+                    ORDER BY published_at DESC NULLS LAST, created_at DESC
+                    """
+                ),
+                {"app": app, "status": status},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
 def get_published_bundle(
     *, app: str, locale: str, source_version: str
 ) -> dict[str, Any] | None:
