@@ -50,7 +50,7 @@ def upgrade() -> None:
             client TEXT NULL,
             reason TEXT NOT NULL,
             status TEXT NOT NULL,
-            task_id UUID NULL,
+            task_id TEXT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE (app, locale, source_version)

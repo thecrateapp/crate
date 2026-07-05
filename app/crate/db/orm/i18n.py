@@ -43,7 +43,7 @@ class I18nTranslationRequest(Base):
     client: Mapped[str | None] = mapped_column(Text)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
-    task_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    task_id: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

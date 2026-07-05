@@ -613,6 +613,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "generate_system_playlist",
             "refresh_system_smart_playlists",
             "persist_playlist_cover",
+            "draft_i18n_translation",
             "write_portable_metadata",
             "rehydrate_portable_metadata",
             "export_rich_metadata",

@@ -2515,6 +2515,95 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
     }
 
 
+def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> dict:
+    from crate.db.repositories.i18n import (
+        insert_translation_bundle_draft,
+        update_translation_request_status,
+    )
+    from crate.llm.prompts.i18n_translation import (
+        generate_i18n_translation_draft,
+        load_listen_source_messages,
+        validate_i18n_translation_draft,
+    )
+
+    app = str(params.get("app") or "listen").strip().lower()
+    locale = str(params.get("locale") or "").strip().lower()
+    source_version = str(params.get("source_version") or "").strip()
+    if app != "listen":
+        raise ValueError(f"unsupported i18n app: {app}")
+    if not locale:
+        raise ValueError("locale is required")
+    if not source_version:
+        raise ValueError("source_version is required")
+
+    source_messages = load_listen_source_messages()
+    try:
+        draft = generate_i18n_translation_draft(
+            target_locale=locale,
+            source_messages=source_messages,
+        )
+        translations = validate_i18n_translation_draft(
+            draft,
+            expected_keys=set(source_messages),
+            target_locale=locale,
+        )
+    except Exception as exc:
+        update_translation_request_status(
+            app=app,
+            locale=locale,
+            source_version=source_version,
+            status="manual_required",
+            task_id=task_id,
+        )
+        emit_task_event(
+            task_id,
+            "warning",
+            {
+                "message": "Listen translation draft requires manual translation",
+                "locale": locale,
+                "error": str(exc)[:500],
+            },
+        )
+        return {
+            "status": "manual_required",
+            "locale": locale,
+            "source_version": source_version,
+            "reason": str(exc)[:500],
+        }
+
+    bundle = insert_translation_bundle_draft(
+        app=app,
+        locale=locale,
+        source_locale="en",
+        source_version=source_version,
+        messages=translations,
+    )
+    update_translation_request_status(
+        app=app,
+        locale=locale,
+        source_version=source_version,
+        status="needs_review",
+        task_id=task_id,
+    )
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": "Listen translation draft created",
+            "locale": locale,
+            "message_count": len(translations),
+            "bundle_id": str(bundle["id"]),
+        },
+    )
+    return {
+        "status": "needs_review",
+        "locale": locale,
+        "source_version": source_version,
+        "bundle_id": str(bundle["id"]),
+        "message_count": len(translations),
+    }
+
+
 MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "health_check": _handle_health_check,
     "repair": _handle_repair,
@@ -2544,6 +2633,7 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "generate_system_playlist": _handle_generate_system_playlist,
     "refresh_system_smart_playlists": _handle_refresh_system_smart_playlists,
     "persist_playlist_cover": _handle_persist_playlist_cover,
+    "draft_i18n_translation": _handle_draft_i18n_translation,
     "write_portable_metadata": _handle_write_portable_metadata,
     "rehydrate_portable_metadata": _handle_rehydrate_portable_metadata,
     "export_rich_metadata": _handle_export_rich_metadata,
