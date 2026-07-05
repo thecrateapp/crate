@@ -192,3 +192,102 @@ def insert_translation_bundle_draft(
             .one()
         )
     return dict(row)
+
+
+def publish_translation_bundle(bundle_id: str) -> dict[str, Any] | None:
+    with transaction_scope() as session:
+        target = (
+            session.execute(
+                text(
+                    """
+                    SELECT id, app, locale, source_version
+                    FROM i18n_bundles
+                    WHERE id = CAST(:bundle_id AS UUID)
+                    FOR UPDATE
+                    """
+                ),
+                {"bundle_id": bundle_id},
+            )
+            .mappings()
+            .first()
+        )
+        if target is None:
+            return None
+
+        session.execute(
+            text(
+                """
+                UPDATE i18n_bundles
+                SET status = 'superseded'
+                WHERE app = :app
+                  AND locale = :locale
+                  AND source_version = :source_version
+                  AND status = 'published'
+                  AND id <> :id
+                """
+            ),
+            {
+                "app": target["app"],
+                "locale": target["locale"],
+                "source_version": target["source_version"],
+                "id": target["id"],
+            },
+        )
+        row = (
+            session.execute(
+                text(
+                    """
+                    UPDATE i18n_bundles
+                    SET status = 'published',
+                        published_at = NOW()
+                    WHERE id = :id
+                    RETURNING
+                        id,
+                        app,
+                        locale,
+                        source_locale,
+                        source_version,
+                        bundle_version,
+                        status,
+                        messages_json,
+                        created_at,
+                        published_at
+                    """
+                ),
+                {"id": target["id"]},
+            )
+            .mappings()
+            .one()
+        )
+    return dict(row)
+
+
+def reject_translation_bundle(bundle_id: str) -> dict[str, Any] | None:
+    with transaction_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    UPDATE i18n_bundles
+                    SET status = 'rejected',
+                        published_at = NULL
+                    WHERE id = CAST(:bundle_id AS UUID)
+                    RETURNING
+                        id,
+                        app,
+                        locale,
+                        source_locale,
+                        source_version,
+                        bundle_version,
+                        status,
+                        messages_json,
+                        created_at,
+                        published_at
+                    """
+                ),
+                {"bundle_id": bundle_id},
+            )
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None
