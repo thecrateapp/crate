@@ -24,6 +24,10 @@ import {
   readCachedBundle,
   refreshCachedRemoteBundle,
 } from "@/i18n/remote-bundles";
+import {
+  findUnsupportedLocaleRequestCandidate,
+  requestUnsupportedLocaleTranslation,
+} from "@/i18n/translation-request";
 
 const resources = {
   en: { translation: en },
@@ -87,6 +91,15 @@ interface I18nProviderProps {
 
 export function I18nProvider({ children, initialLocale }: I18nProviderProps) {
   const i18n = useMemo(() => createListenI18n(initialLocale), [initialLocale]);
+
+  useEffect(() => {
+    if (initialLocale || getLocalListenLocalePreference()) return;
+
+    const candidate = findUnsupportedLocaleRequestCandidate(browserLanguages());
+    if (!candidate) return;
+
+    void requestUnsupportedLocaleTranslation(candidate.detectedLocale);
+  }, [initialLocale]);
 
   useEffect(() => {
     let cancelled = false;

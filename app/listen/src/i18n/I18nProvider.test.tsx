@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { useTranslation } from "react-i18next";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "@/i18n/I18nProvider";
 import {
@@ -16,6 +16,11 @@ function Probe() {
 describe("I18nProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.unstubAllGlobals();
+    Object.defineProperty(navigator, "languages", {
+      value: ["en-US"],
+      configurable: true,
+    });
   });
 
   it("renders with the initial locale", async () => {
@@ -52,5 +57,32 @@ describe("I18nProvider", () => {
     );
 
     expect(await screen.findByText("Dale")).toBeInTheDocument();
+  });
+
+  it("requests translation once when every browser language is unsupported", async () => {
+    Object.defineProperty(navigator, "languages", {
+      value: ["pl-PL"],
+      configurable: true,
+    });
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: url.includes("/translation-requests"),
+      status: url.includes("/translation-requests") ? 202 : 404,
+      json: async () => ({}),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <I18nProvider>
+        <Probe />
+      </I18nProvider>,
+    );
+
+    expect(await screen.findByText("Play")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/i18n/listen/translation-requests"),
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
   });
 });
