@@ -589,6 +589,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "health_check",
             "repair",
+            "repair_duplicate_tracks",
             "library_pipeline",
             "delete_artist",
             "delete_album",

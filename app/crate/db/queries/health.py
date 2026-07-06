@@ -205,7 +205,7 @@ def get_all_albums_for_covers() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_duplicate_tracks() -> list[dict]:
+def get_duplicate_tracks(album_id: int | None = None) -> list[dict]:
     """Find real duplicate tracks inside the same album.
 
     Rows with broken metadata (empty title, track number 0, duration 0) are
@@ -266,6 +266,7 @@ def get_duplicate_tracks() -> list[dict]:
                 FROM library_tracks lt
                 JOIN library_albums la ON la.id = lt.album_id
                 WHERE lt.album_id IS NOT NULL
+                  AND (:album_id IS NULL OR lt.album_id = :album_id)
                   AND NULLIF(BTRIM(lt.title), '') IS NOT NULL
                   AND COALESCE(lt.track_number, 0) > 0
                   AND COALESCE(lt.duration, 0) > 1
@@ -300,7 +301,8 @@ def get_duplicate_tracks() -> list[dict]:
               )
               AND db_identity_mismatches = 0
             ORDER BY artist, album, disc_number, track_number, title
-        """)
+        """),
+                {"album_id": album_id},
             )
             .mappings()
             .all()

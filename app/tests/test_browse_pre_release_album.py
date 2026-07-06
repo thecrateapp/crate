@@ -2,6 +2,7 @@ from typing import Any, cast
 
 from crate.api import browse_artist
 from crate.api.browse_album import (
+    _guard_album_tracks_for_listen,
     _pre_release_album_payload,
     api_album_by_artist_slug,
     api_album_by_id,
@@ -82,6 +83,154 @@ def test_pre_release_album_payload_keeps_full_tracklist_with_availability(
     assert payload["tracks"][1]["tags"]["title"] == "Regenerate"
     assert payload["tracks"][1]["is_available"] is False
     assert payload["tracks"][1]["source_url"] == "https://tidal.com/track/2"
+
+
+def test_pre_release_album_payload_deduplicates_planned_tracks(monkeypatch):
+    monkeypatch.setattr("crate.api.browse_album._require_auth", lambda _request: {})
+    monkeypatch.setattr(
+        "crate.api.browse_album.get_artist_release_track_matches",
+        lambda _artist: {},
+    )
+
+    payload = _pre_release_album_payload(
+        cast(Any, object()),
+        {
+            "id": 12,
+            "entity_uid": "artist-entity",
+            "slug": "gurriers",
+            "name": "Gurriers",
+        },
+        {
+            "id": 46,
+            "artist_name": "Gurriers",
+            "album_title": "Come and See",
+            "release_date": "2026-07-17",
+            "tracks": 2,
+            "tracklist_json": [
+                {"position": 1, "title": "Nausea", "duration": 164},
+                {"position": 1, "title": "Nausea", "duration": 164},
+                {"position": 2, "title": "Top Of The Bill", "duration": 180},
+            ],
+            "preview_tracks_json": [
+                {
+                    "position": 1,
+                    "title": "Nausea",
+                    "source_url": "https://tidal.com/track/1",
+                },
+                {
+                    "position": 1,
+                    "title": "Nausea",
+                    "source_url": "https://tidal.com/track/1",
+                },
+            ],
+        },
+    )
+
+    assert [track["tags"]["title"] for track in payload["tracks"]] == [
+        "Nausea",
+        "Top Of The Bill",
+    ]
+    assert payload["track_count"] == 2
+
+
+def test_guard_album_tracks_filters_high_confidence_duplicates_and_queues_repair(
+    monkeypatch,
+):
+    queued: list[dict] = []
+    duplicate_rows = [
+        {
+            "album_id": 55,
+            "artist": "Gurriers",
+            "album": "Come and See",
+            "title": "Nausea",
+            "track_number": 1,
+            "disc_number": 1,
+            "cnt": 2,
+            "paths": ["/music/Gurriers/01-low.mp3", "/music/Gurriers/01-hi.flac"],
+            "track_ids": [101, 102],
+            "tracks": [
+                {
+                    "id": 101,
+                    "path": "/music/Gurriers/01-low.mp3",
+                    "format": "mp3",
+                    "bitrate": 192000,
+                    "sample_rate": 44100,
+                    "bit_depth": 0,
+                    "duration": 164,
+                    "size": 4_000_000,
+                },
+                {
+                    "id": 102,
+                    "path": "/music/Gurriers/01-hi.flac",
+                    "format": "flac",
+                    "bitrate": 1411000,
+                    "sample_rate": 44100,
+                    "bit_depth": 16,
+                    "duration": 164,
+                    "size": 22_000_000,
+                },
+            ],
+            "fingerprinted_count": 2,
+            "missing_fingerprint_count": 0,
+        }
+    ]
+
+    monkeypatch.setattr(
+        "crate.api.browse_album.get_duplicate_tracks",
+        lambda album_id=None: duplicate_rows if album_id == 55 else [],
+    )
+    monkeypatch.setattr(
+        "crate.api.browse_album.create_task_dedup",
+        lambda task_type, params=None, dedup_key="": (
+            queued.append(
+                {"task_type": task_type, "params": params, "dedup_key": dedup_key}
+            )
+            or "repair-task"
+        ),
+    )
+
+    tracks = [
+        {"id": 101, "title": "Nausea"},
+        {"id": 102, "title": "Nausea"},
+        {"id": 103, "title": "Top Of The Bill"},
+    ]
+
+    filtered = _guard_album_tracks_for_listen(55, tracks)
+
+    assert [track["id"] for track in filtered] == [102, 103]
+    assert queued == [
+        {
+            "task_type": "repair",
+            "params": {
+                "dry_run": False,
+                "auto_only": True,
+                "issues": [
+                    {
+                        "check": "duplicate_tracks",
+                        "severity": "medium",
+                        "details": {
+                            "album_id": 55,
+                            "artist": "Gurriers",
+                            "album": "Come and See",
+                            "title": "Nausea",
+                            "track_number": 1,
+                            "disc_number": 1,
+                            "count": 2,
+                            "paths": [
+                                "/music/Gurriers/01-low.mp3",
+                                "/music/Gurriers/01-hi.flac",
+                            ],
+                            "track_ids": [101, 102],
+                            "tracks": duplicate_rows[0]["tracks"],
+                            "fingerprinted_count": 2,
+                            "missing_fingerprint_count": 0,
+                        },
+                    }
+                ],
+            },
+            "dedup_key": "listen-album-duplicate-tracks:55:101,102",
+        }
+    ]
 
 
 def test_album_slug_route_prefers_pre_release_payload_over_local_partial_album(

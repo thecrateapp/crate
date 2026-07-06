@@ -22,6 +22,7 @@ from crate.db.jobs.repair import (
     merge_artist_into_artist,
     update_album_artist_and_path,
 )
+from crate.db.queries.health import get_duplicate_tracks
 from crate.db.repositories.library import (
     delete_album as db_delete_album,
     delete_artist as db_delete_artist,
@@ -504,6 +505,55 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         if not dry_run:
             for artist in affected_artists:
                 _unmark_processing(artist)
+
+
+def _duplicate_track_repair_issue(row: Mapping[str, Any]) -> dict:
+    return {
+        "check": "duplicate_tracks",
+        "severity": "medium",
+        "details": {
+            "album_id": row["album_id"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "title": row["title"],
+            "track_number": row.get("track_number"),
+            "disc_number": row.get("disc_number"),
+            "count": row["cnt"],
+            "paths": row.get("paths", []),
+            "track_ids": row.get("track_ids", []),
+            "tracks": row.get("tracks", []),
+            "fingerprinted_count": row.get("fingerprinted_count", 0),
+            "missing_fingerprint_count": row.get("missing_fingerprint_count", 0),
+        },
+    }
+
+
+def _handle_repair_duplicate_tracks(task_id: str, params: dict, config: dict) -> dict:
+    rows = get_duplicate_tracks()
+    issues = [_duplicate_track_repair_issue(row) for row in rows]
+    if not issues:
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "category": "repair",
+                "message": "No high-confidence duplicate tracks found",
+            },
+        )
+        return {
+            "issue_count": 0,
+            "summary": {"applied": 0, "skipped": 0, "failed": 0, "unsupported": 0},
+        }
+
+    repair_params = dict(params)
+    repair_params.update(
+        {
+            "dry_run": False,
+            "auto_only": True,
+            "issues": issues,
+        }
+    )
+    return _handle_repair(task_id, repair_params, config)
 
 
 def _handle_library_pipeline(task_id: str, params: dict, config: dict) -> dict:
@@ -2607,6 +2657,7 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
 MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "health_check": _handle_health_check,
     "repair": _handle_repair,
+    "repair_duplicate_tracks": _handle_repair_duplicate_tracks,
     "library_pipeline": _handle_library_pipeline,
     "delete_artist": _handle_delete_artist,
     "delete_album": _handle_delete_album,
