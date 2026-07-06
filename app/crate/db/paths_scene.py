@@ -9,6 +9,7 @@ import re
 import uuid
 from collections import defaultdict
 from collections.abc import Mapping
+from typing import TypedDict
 
 from crate.db.home_taste_guardrails import track_version_penalty
 from crate.db.paths_llm_refinement import refine_music_path_with_llm
@@ -50,6 +51,13 @@ _BROAD_SCENE_SLUGS = {
     "punk",
     "rock",
 }
+
+
+class ArtistProfileGenre(TypedDict):
+    slug: str
+    weight: float
+
+
 _COUNTRY_ALIASES = {
     "america": "US",
     "england": "GB",
@@ -581,8 +589,8 @@ def _select_artist_scene_route(
     return best[1] if best else []
 
 
-def _profile_genres(profile: Mapping) -> list[dict[str, float | str]]:
-    genres: list[dict[str, float | str]] = []
+def _profile_genres(profile: Mapping) -> list[ArtistProfileGenre]:
+    genres: list[ArtistProfileGenre] = []
     for item in list(profile.get("genres") or [])[:_ARTIST_PROFILE_GENRE_LIMIT]:
         slug = _canonical_slug(str(item.get("slug") or item.get("name") or ""))
         if not slug:

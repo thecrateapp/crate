@@ -344,7 +344,11 @@ def _compatible_genre(target: Mapping, candidate: Mapping) -> bool:
 
 
 def _track_id(track: Mapping) -> int | None:
-    value = track.get("id") or track.get("track_id")
+    value = track.get("id")
+    if value is None:
+        value = track.get("track_id")
+    if value is None:
+        return None
     try:
         return int(value)
     except (TypeError, ValueError):

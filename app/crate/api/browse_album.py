@@ -1,6 +1,7 @@
 import logging
 import re
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -274,8 +275,8 @@ def _queue_duplicate_track_repair(album_id: int, rows: list[dict]) -> None:
 
 
 def _guard_album_tracks_for_listen(
-    album_id: int, tracks_data: list[dict]
-) -> list[dict]:
+    album_id: int, tracks_data: Sequence[Mapping[str, Any]]
+) -> list[Mapping[str, Any]]:
     try:
         duplicate_rows = get_duplicate_tracks(album_id=album_id)
     except Exception:
@@ -284,9 +285,9 @@ def _guard_album_tracks_for_listen(
             album_id,
             exc_info=True,
         )
-        return tracks_data
+        return list(tracks_data)
     if not duplicate_rows:
-        return tracks_data
+        return list(tracks_data)
 
     hidden_ids: set[int] = set()
     actionable_rows: list[dict] = []
@@ -301,7 +302,7 @@ def _guard_album_tracks_for_listen(
     if actionable_rows:
         _queue_duplicate_track_repair(album_id, actionable_rows)
     if not hidden_ids:
-        return tracks_data
+        return list(tracks_data)
     return [
         track for track in tracks_data if int(track.get("id") or 0) not in hidden_ids
     ]

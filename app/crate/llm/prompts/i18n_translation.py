@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from pydantic import BaseModel, Field
 
 
-class I18nSourceMessage(TypedDict, total=False):
+class I18nSourceMessage(TypedDict):
     key: str
     source: str
-    description: str
+    description: NotRequired[str]
 
 
 class I18nTranslatedMessage(BaseModel):
@@ -37,18 +37,13 @@ def build_i18n_translation_prompt(
     target_locale: str,
     messages: list[I18nSourceMessage],
 ) -> str:
-    payload = [
-        {
-            "key": message["key"],
-            "source": message["source"],
-            **(
-                {"description": message["description"]}
-                if message.get("description")
-                else {}
-            ),
-        }
-        for message in messages
-    ]
+    payload = []
+    for message in messages:
+        entry = {"key": message["key"], "source": message["source"]}
+        description = message.get("description")
+        if description:
+            entry["description"] = description
+        payload.append(entry)
     return "\n".join(
         [
             f"Translate these Crate Listen UI strings to locale '{target_locale}'.",

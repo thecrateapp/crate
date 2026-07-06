@@ -97,7 +97,7 @@ describe("UserProfile", () => {
     expect(screen.getByText("Jane Band")).toBeVisible();
     expect(screen.getByText("via upload")).toBeVisible();
     expect(
-      screen.getByRole("link", { name: /View Listening DNA/i }),
+      screen.getByRole("link", { name: /View Crate DNA/i }),
     ).toHaveAttribute("href", "/users/jane/stats");
   });
 
@@ -156,7 +156,7 @@ describe("UserProfile", () => {
     expect(screen.getAllByText("Amigos")).toHaveLength(2);
     expect(screen.getByText(/Se unió en/)).toBeVisible();
     expect(
-      screen.getByRole("link", { name: /Ver ADN de escucha/i }),
+      screen.getByRole("link", { name: /Ver Crate DNA/i }),
     ).toHaveAttribute("href", "/users/jane/stats");
     expect(screen.getByRole("button", { name: "Siguiendo" })).toBeVisible();
     expect(screen.getByText("Afinidad")).toBeVisible();

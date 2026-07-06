@@ -30,11 +30,11 @@ describe("Stats page", () => {
       locale: "es",
     });
 
-    expect(screen.getByText("ADN de escucha")).toBeInTheDocument();
+    expect(screen.getByText("Crate DNA")).toBeInTheDocument();
     expect(screen.getByText("Tu sonido")).toBeInTheDocument();
     expect(screen.getByText("descifrado")).toBeInTheDocument();
-    expect(screen.getByText("Tu ADN")).toBeInTheDocument();
-    expect(screen.getByText("Pulso Crate")).toBeInTheDocument();
+    expect(screen.getByText("Tu Crate DNA")).toBeInTheDocument();
+    expect(screen.getByText("Crate Pulse")).toBeInTheDocument();
     expect(
       screen.getByText("Tus estadísticas esperan una señal"),
     ).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe("Stats page", () => {
 
     expect(screen.getByText("Coincidencia de oyente")).toBeInTheDocument();
     expect(screen.getByText("82% de afinidad")).toBeInTheDocument();
-    expect(screen.getByText("Fugazi lideró esta ventana")).toBeInTheDocument();
+    expect(screen.getByText("Fugazi lideró este periodo")).toBeInTheDocument();
     expect(screen.getAllByText(/1 jul/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Señal 01")).toBeInTheDocument();
     expect(screen.getByText("Tu perfil sonoro")).toBeInTheDocument();
