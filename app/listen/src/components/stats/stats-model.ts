@@ -207,11 +207,11 @@ type RecapTranslate = (
 ) => string;
 
 export const STATS_WINDOW_OPTIONS: { value: StatsWindow; label: string }[] = [
-  { value: "7d", label: "7D" },
-  { value: "30d", label: "30D" },
-  { value: "90d", label: "90D" },
-  { value: "365d", label: "1Y" },
-  { value: "all_time", label: "All time" },
+  { value: "7d", label: "stats.window.short.7d" },
+  { value: "30d", label: "stats.window.short.30d" },
+  { value: "90d", label: "stats.window.short.90d" },
+  { value: "365d", label: "stats.window.short.365d" },
+  { value: "all_time", label: "stats.window.short.allTime" },
 ];
 
 export function formatStatsMinutes(minutes: number): string {

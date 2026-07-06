@@ -65,6 +65,8 @@ export function WindowPicker({
   value: StatsWindow | null;
   onChange: (value: StatsWindow) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="inline-flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-black/25 p-1 shadow-2xl shadow-black/20 backdrop-blur">
       {STATS_WINDOW_OPTIONS.map((option) => (
@@ -77,7 +79,7 @@ export function WindowPicker({
               : "text-muted-foreground hover:bg-white/5 hover:text-white"
           }`}
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>
