@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
@@ -55,6 +56,7 @@ export function ArtistCard({
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
+  const canUseInlineHoverActions = useHoverCapability();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
@@ -112,7 +114,7 @@ export function ArtistCard({
             }}
           />
         ) : null}
-        {!external && artistId != null ? (
+        {!external && artistId != null && canUseInlineHoverActions ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">

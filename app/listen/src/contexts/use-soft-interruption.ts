@@ -303,7 +303,9 @@ export function useSoftInterruption({
       settleAfterAppLifecycle();
     };
     const handleVisibilityChange = () => {
-      settleAfterAppLifecycle();
+      if (document.visibilityState === "visible") {
+        settleAfterAppLifecycle();
+      }
     };
 
     window.addEventListener("offline", handleOffline);

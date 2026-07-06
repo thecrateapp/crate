@@ -79,6 +79,10 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllTimers();
   vi.useRealTimers();
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
   global.fetch = globalFetch;
   // Clear call histories first, then restore default behavior for
   // stateful mocks so each test starts with a clean slate.
@@ -337,5 +341,30 @@ describe("useSoftInterruption", () => {
 
     expect(refs.commitIsBuffering).not.toHaveBeenCalledWith(true);
     expect(mockFadeOutAndPause).not.toHaveBeenCalled();
+  });
+
+  it("keeps stream recovery armed when the page is merely hidden", async () => {
+    const refs = createRefs({ isPlaying: true });
+    const { result } = renderHook(() => useSoftInterruption(refs));
+
+    act(() => {
+      result.current.beginSoftInterruption("stream");
+    });
+    expect(result.current.isSoftInterrupted()).toBe(true);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_100);
+    });
+
+    expect(global.fetch).toHaveBeenCalled();
+    expect(gaplessPlayer.fadeInAndPlay).toHaveBeenCalled();
   });
 });
