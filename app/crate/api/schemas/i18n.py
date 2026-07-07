@@ -1,4 +1,19 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+I18nQualityIssueCode = Literal[
+    "missing_key",
+    "extra_key",
+    "empty_value",
+    "stale_translation",
+    "placeholder_mismatch",
+    "icu_parse_error",
+    "protected_term_changed",
+    "english_fallback",
+    "hardcoded_copy",
+]
 
 
 class I18nManifestBundle(BaseModel):
@@ -48,3 +63,30 @@ class I18nTranslationRequestResponse(BaseModel):
 
     request_id: str = Field(alias="requestId")
     status: str
+
+
+class I18nQualityIssueResponse(BaseModel):
+    severity: Literal["error", "warning"]
+    code: I18nQualityIssueCode
+    locale: str
+    key: str | None = None
+    message: str
+    source: str | None = None
+    value: str | None = None
+    file: str | None = None
+
+
+class I18nQualityReportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_: Literal["crate.listen.i18n.quality.v1"] = Field(
+        default="crate.listen.i18n.quality.v1",
+        alias="schema",
+    )
+    source_version: str = Field(alias="sourceVersion")
+    generated_at: str = Field(alias="generatedAt")
+    locales: list[str]
+    issue_count: int = Field(alias="issueCount")
+    error_count: int = Field(alias="errorCount")
+    warning_count: int = Field(alias="warningCount")
+    issues: list[I18nQualityIssueResponse] = Field(default_factory=list)

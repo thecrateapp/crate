@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
@@ -7,6 +8,8 @@ from crate.api.schemas.i18n import (
     I18nBundleResponse,
     I18nManifestBundle,
     I18nManifestResponse,
+    I18nQualityIssueResponse,
+    I18nQualityReportResponse,
     I18nTranslationRequestCreate,
     I18nTranslationRequestResponse,
 )
@@ -74,6 +77,60 @@ def _serialize_translation_bundle(row: dict, *, include_messages: bool) -> dict:
     if include_messages:
         data["messages"] = row["messages_json"]
     return data
+
+
+def _latest_translation_bundle_for_quality(
+    *, locale: str, source_version: str
+) -> dict | None:
+    for status_filter in ("needs_review", None):
+        for row in list_translation_bundles(
+            app=_LISTEN_APP,
+            status=status_filter,
+        ):
+            if row["locale"] != locale or row["source_version"] != source_version:
+                continue
+            return get_translation_bundle(str(row["id"]))
+    return None
+
+
+def _build_quality_report(
+    *, locale: str, source_version: str, bundle: dict | None
+) -> I18nQualityReportResponse:
+    issues: list[I18nQualityIssueResponse] = []
+    if bundle is None:
+        issues.append(
+            I18nQualityIssueResponse(
+                severity="warning",
+                code="missing_key",
+                locale=locale,
+                message=(
+                    "No translation bundle exists for this locale and source version."
+                ),
+            )
+        )
+    else:
+        for key, value in sorted((bundle.get("messages_json") or {}).items()):
+            if not isinstance(value, str) or not value.strip():
+                issues.append(
+                    I18nQualityIssueResponse(
+                        severity="error",
+                        code="empty_value",
+                        locale=locale,
+                        key=key,
+                        message="Translation value is empty.",
+                        value=value if isinstance(value, str) else None,
+                    )
+                )
+
+    return I18nQualityReportResponse(
+        sourceVersion=source_version,
+        generatedAt=datetime.now(UTC).isoformat(),
+        locales=[locale],
+        issueCount=len(issues),
+        errorCount=sum(1 for issue in issues if issue.severity == "error"),
+        warningCount=sum(1 for issue in issues if issue.severity == "warning"),
+        issues=issues,
+    )
 
 
 def listen_i18n_ai_is_configured() -> bool:
@@ -187,6 +244,29 @@ def admin_list_listen_i18n_bundles(
             )
         ]
     }
+
+
+@admin_router.get(
+    "/listen/quality",
+    response_model=I18nQualityReportResponse,
+    summary="Get a Listen i18n bundle quality report",
+)
+def admin_get_listen_i18n_quality_report(
+    request: Request,
+    locale: str = Query(..., min_length=2, max_length=16),
+    source_version: str = Query(..., min_length=1, max_length=128),
+):
+    _require_admin(request)
+    normalized_locale = locale.strip().lower()
+    bundle = _latest_translation_bundle_for_quality(
+        locale=normalized_locale,
+        source_version=source_version,
+    )
+    return _build_quality_report(
+        locale=normalized_locale,
+        source_version=source_version,
+        bundle=bundle,
+    )
 
 
 @admin_router.post(
