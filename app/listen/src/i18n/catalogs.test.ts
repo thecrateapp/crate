@@ -12,6 +12,7 @@ import {
   EXACT_PRODUCT_TERM_KEYS,
   PRODUCT_TERMS,
 } from "@/i18n/product-terms";
+import { validateCatalogs } from "@/i18n/quality/catalog-quality";
 
 type CatalogMessages = Record<string, string>;
 
@@ -219,12 +220,18 @@ const completedComposerEnglishFallbackAllowlist = new Set<string>([
 
 describe("listen i18n catalogs", () => {
   it("keeps every local catalog aligned with English keys", () => {
-    const englishKeys = Object.keys(en).sort();
+    const report = validateCatalogs({
+      sourceVersion: "test",
+      source: enMessages,
+      catalogs,
+      protectedExactTerms: EXACT_PRODUCT_TERM_KEYS,
+      protectedContainedTerms: CONTAINED_PRODUCT_TERM_KEYS,
+      englishFallbackAllowlist: new Set(Object.keys(enMessages)),
+      staleMetadata: {},
+    });
 
-    for (const [locale, messages] of Object.entries(catalogs)) {
-      expect(Object.keys(messages).sort()).toEqual(englishKeys);
-      expect(locale).toBeTruthy();
-    }
+    expect(report.issues).toEqual([]);
+    expect(report.locales).toEqual(["ca", "de", "es", "eu", "fr", "it"]);
   });
 
   it("keeps product feature names untranslated across every locale", () => {
