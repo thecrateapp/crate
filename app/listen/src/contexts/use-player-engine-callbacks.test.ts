@@ -107,6 +107,17 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.commitCurrentTime).toHaveBeenCalledWith(12);
   });
 
+  it("marks playback active as soon as the engine accepts a play request", () => {
+    const options = createOptions();
+    options.isPlayingRef.current = false;
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+
+    expect(options.bufferingIntentRef.current).toBe(true);
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(true);
+  });
+
   it("applies a deferred seek when the active track finishes loading", () => {
     const options = createOptions();
     options.pendingRestoreTimeRef.current = 42;

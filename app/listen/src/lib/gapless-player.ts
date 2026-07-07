@@ -255,7 +255,6 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onpause = (path) => {
-    tauriPlaybackWasActive = false;
     currentCallbacks.onPause?.(path);
   };
 
@@ -455,16 +454,10 @@ function installAudioLifecycleRecovery(): void {
 
   const wake = (reason: string) => {
     if (!isTauriDesktopRuntime()) return;
-    const shouldResumeAfterRecovery = tauriPlaybackWasActive;
-    tauriAudioOutputMayBeStale = true;
-    void prepareAudioForPlayback(reason, {
-      rebuildIfTauriOutputMayBeStale: shouldResumeAfterRecovery,
-    }).then(() => {
-      if (shouldResumeAfterRecovery) {
-        tauriPlaybackWasActive = true;
-        instance?.play();
-      }
-    });
+    if (!tauriPlaybackWasActive || reason === "devicechange") {
+      tauriAudioOutputMayBeStale = true;
+    }
+    void prepareAudioForPlayback(reason);
   };
 
   document.addEventListener("visibilitychange", () => {

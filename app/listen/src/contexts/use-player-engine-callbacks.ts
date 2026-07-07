@@ -143,6 +143,9 @@ export function usePlayerEngineCallbacks({
     },
     onPlayRequest: () => {
       bufferingIntentRef.current = true;
+      if (!isPlayingRef.current) {
+        commitIsPlaying(true);
+      }
     },
     onPlay: () => {
       resumeAfterReloadRef.current = false;

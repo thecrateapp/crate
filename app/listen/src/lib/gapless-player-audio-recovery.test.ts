@@ -274,7 +274,7 @@ describe("gapless player audio recovery", () => {
     expect(recovered.playCalls).toBe(1);
   });
 
-  it("rebuilds and resumes stale Tauri audio output when foregrounded during playback", async () => {
+  it("does not rebuild or restart active Tauri playback when foregrounded", async () => {
     const staleContext = gaplessMock.createContext("running");
     const freshContext = gaplessMock.createContext("running");
     gaplessMock.contextQueue.push(staleContext, freshContext);
@@ -290,17 +290,20 @@ describe("gapless player audio recovery", () => {
       value: "visible",
     });
     document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("pageshow"));
 
     await flushMicrotasks();
-    expect(gaplessMock.instances).toHaveLength(2);
-    expect(gaplessMock.instances[0]!.stopCalls).toBe(1);
-
-    const recovered = gaplessMock.instances[1]!;
-    expect(recovered.context).toBe(freshContext);
-    expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
-    expect(recovered.index).toBe(1);
-    expect(recovered.position).toBe(32_000);
-    expect(recovered.playCalls).toBe(1);
+    expect(gaplessMock.instances).toHaveLength(1);
+    expect(gaplessMock.instances[0]!.context).toBe(staleContext);
+    expect(gaplessMock.instances[0]!.stopCalls).toBe(0);
+    expect(gaplessMock.instances[0]!.tracks).toEqual([
+      "/tracks/a.flac",
+      "/tracks/b.flac",
+    ]);
+    expect(gaplessMock.instances[0]!.index).toBe(1);
+    expect(gaplessMock.instances[0]!.position).toBe(32_000);
+    expect(gaplessMock.instances[0]!.playCalls).toBe(1);
   });
 
   it("upgrades an in-flight Tauri foreground wake before play after pause", async () => {
