@@ -46,6 +46,34 @@ class I18nBundleResponse(BaseModel):
     messages: dict[str, str]
 
 
+class I18nBundleImportRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    locale: str = Field(min_length=2, max_length=16)
+    source_locale: str = Field(default="en", alias="sourceLocale", max_length=16)
+    source_version: str = Field(alias="sourceVersion", min_length=1, max_length=128)
+    bundle_version: str | None = Field(
+        default=None,
+        alias="bundleVersion",
+        max_length=128,
+    )
+    messages: dict[str, str]
+
+
+class I18nBundleMessagePatchRequest(BaseModel):
+    value: str
+
+
+class I18nBundleExportResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    schema_: str = Field(default="crate.i18n.bundle.export.v1", alias="schema")
+    locale: str
+    source_version: str = Field(alias="sourceVersion")
+    bundle_version: str = Field(alias="bundleVersion")
+    messages: dict[str, str]
+
+
 class I18nTranslationRequestCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 

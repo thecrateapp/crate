@@ -194,6 +194,61 @@ def insert_translation_bundle_draft(
     return dict(row)
 
 
+def update_translation_bundle_message(
+    *, bundle_id: str, key: str, value: str
+) -> dict[str, Any] | None:
+    with transaction_scope() as session:
+        target = (
+            session.execute(
+                text(
+                    """
+                    SELECT messages_json
+                    FROM i18n_bundles
+                    WHERE id = CAST(:bundle_id AS UUID)
+                    FOR UPDATE
+                    """
+                ),
+                {"bundle_id": bundle_id},
+            )
+            .mappings()
+            .first()
+        )
+        if target is None:
+            return None
+
+        messages = dict(target["messages_json"] or {})
+        messages[key] = value
+        row = (
+            session.execute(
+                text(
+                    """
+                    UPDATE i18n_bundles
+                    SET messages_json = CAST(:messages_json AS JSONB)
+                    WHERE id = CAST(:bundle_id AS UUID)
+                    RETURNING
+                        id,
+                        app,
+                        locale,
+                        source_locale,
+                        source_version,
+                        bundle_version,
+                        status,
+                        messages_json,
+                        created_at,
+                        published_at
+                    """
+                ),
+                {
+                    "bundle_id": bundle_id,
+                    "messages_json": json.dumps(messages),
+                },
+            )
+            .mappings()
+            .one()
+        )
+    return dict(row)
+
+
 def publish_translation_bundle(bundle_id: str) -> dict[str, Any] | None:
     with transaction_scope() as session:
         target = (

@@ -89,6 +89,17 @@ const qualityReport = {
   ],
 };
 
+const exportedBundle = {
+  schema: "crate.i18n.bundle.export.v1",
+  locale: "es",
+  sourceVersion: "sha256:test",
+  bundleVersion: "2026.07.05.1",
+  messages: {
+    "player.play": "Dale",
+    "nav.collection": "Coleccion",
+  },
+};
+
 describe("I18nReview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,6 +136,22 @@ describe("I18nReview", () => {
         method === "POST"
       ) {
         return Promise.resolve({ ...bundleDetail, status: "rejected" });
+      }
+      if (
+        url ===
+          "/api/admin/i18n/listen/bundles/bundle-es/messages/player.play" &&
+        method === "PATCH"
+      ) {
+        return Promise.resolve({
+          ...bundleDetail,
+          messages: {
+            ...bundleDetail.messages,
+            "player.play": "Dale",
+          },
+        });
+      }
+      if (url === "/api/admin/i18n/listen/bundles/bundle-es/export") {
+        return Promise.resolve(exportedBundle);
       }
       return Promise.reject(new Error(`Unexpected request: ${method} ${url}`));
     });
@@ -214,5 +241,42 @@ describe("I18nReview", () => {
     expect(mockToast.success).toHaveBeenCalledWith(
       "Translation bundle rejected",
     );
+  });
+
+  it("edits a bundle row and exports JSON", async () => {
+    const user = userEvent.setup();
+
+    render(<I18nReview />);
+
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    await user.click(await screen.findByRole("button", { name: /Review es/i }));
+
+    const playTranslation = await screen.findByLabelText(
+      "Translation for player.play",
+    );
+    await user.clear(playTranslation);
+    await user.type(playTranslation, "Dale");
+    await user.click(screen.getByRole("button", { name: "Save player.play" }));
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith(
+        "/api/admin/i18n/listen/bundles/bundle-es/messages/player.play",
+        "PATCH",
+        { value: "Dale" },
+      );
+    });
+    expect(mockToast.success).toHaveBeenCalledWith("Translation key saved");
+
+    await user.click(screen.getByRole("button", { name: "Export JSON" }));
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith(
+        "/api/admin/i18n/listen/bundles/bundle-es/export",
+      );
+    });
+    expect(
+      screen.getByText(/crate\.i18n\.bundle\.export\.v1/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/"player.play": "Dale"/)).toBeInTheDocument();
   });
 });

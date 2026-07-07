@@ -67,6 +67,14 @@ interface TranslationQualityReport {
   issues: TranslationQualityIssue[];
 }
 
+interface TranslationBundleExport {
+  schema: "crate.i18n.bundle.export.v1";
+  locale: string;
+  sourceVersion: string;
+  bundleVersion: string;
+  messages: Record<string, string>;
+}
+
 interface TranslationRequestsResponse {
   requests: TranslationRequest[];
 }
@@ -139,8 +147,12 @@ export function I18nReview() {
   const [bundles, setBundles] = useState<TranslationBundleSummary[]>([]);
   const [selectedBundle, setSelectedBundle] =
     useState<TranslationBundleDetail | null>(null);
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const [qualityReport, setQualityReport] =
     useState<TranslationQualityReport | null>(null);
+  const [exportedJson, setExportedJson] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ManagerTab>("overview");
   const [localeFilter, setLocaleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -150,6 +162,8 @@ export function I18nReview() {
   const [actionBusy, setActionBusy] = useState<"publish" | "reject" | null>(
     null,
   );
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const requestsByBundle = useMemo(() => {
@@ -245,6 +259,7 @@ export function I18nReview() {
   const selectBundle = useCallback(async (bundle: TranslationBundleSummary) => {
     setDetailLoading(true);
     setQualityReport(null);
+    setExportedJson(null);
     setActiveTab("editor");
     try {
       const [detail, quality] = await Promise.all([
@@ -258,6 +273,7 @@ export function I18nReview() {
         ),
       ]);
       setSelectedBundle(detail);
+      setMessageDrafts(detail.messages);
       setQualityReport(quality);
     } catch (nextError) {
       toast.error("Failed to load translation bundle");
@@ -297,10 +313,58 @@ export function I18nReview() {
     [loadReviewData, selectedBundle],
   );
 
+  const saveBundleMessage = useCallback(
+    async (key: string) => {
+      if (!selectedBundle) return;
+      setSavingKey(key);
+      try {
+        const next = await api<TranslationBundleDetail>(
+          `/api/admin/i18n/listen/bundles/${
+            selectedBundle.id
+          }/messages/${encodeURIComponent(key)}`,
+          "PATCH",
+          { value: messageDrafts[key] ?? "" },
+        );
+        setSelectedBundle(next);
+        setMessageDrafts(next.messages);
+        toast.success("Translation key saved");
+      } catch (nextError) {
+        toast.error("Failed to save translation key");
+        console.error(nextError);
+      } finally {
+        setSavingKey(null);
+      }
+    },
+    [messageDrafts, selectedBundle],
+  );
+
+  const exportSelectedBundle = useCallback(async () => {
+    if (!selectedBundle) return;
+    setExportBusy(true);
+    try {
+      const exported = await api<TranslationBundleExport>(
+        `/api/admin/i18n/listen/bundles/${selectedBundle.id}/export`,
+      );
+      setExportedJson(JSON.stringify(exported, null, 2));
+      toast.success("Translation bundle exported");
+    } catch (nextError) {
+      toast.error("Failed to export translation bundle");
+      console.error(nextError);
+    } finally {
+      setExportBusy(false);
+    }
+  }, [selectedBundle]);
+
   const messageRows = selectedBundle
-    ? Object.entries(selectedBundle.messages).sort(([left], [right]) =>
-        left.localeCompare(right),
-      )
+    ? Object.keys(selectedBundle.messages)
+        .sort((left, right) => left.localeCompare(right))
+        .map(
+          (key) =>
+            [key, messageDrafts[key] ?? selectedBundle.messages[key] ?? ""] as [
+              string,
+              string,
+            ],
+        )
     : [];
 
   return (
@@ -393,8 +457,16 @@ export function I18nReview() {
           selectedBundle={selectedBundle}
           detailLoading={detailLoading}
           actionBusy={actionBusy}
+          savingKey={savingKey}
+          exportBusy={exportBusy}
           qualityReport={qualityReport}
+          exportedJson={exportedJson}
           messageRows={messageRows}
+          onDraftChange={(key, value) =>
+            setMessageDrafts((current) => ({ ...current, [key]: value }))
+          }
+          onSaveMessage={saveBundleMessage}
+          onExportBundle={exportSelectedBundle}
           onReviewAction={reviewAction}
         />
       ) : null}
@@ -632,15 +704,27 @@ function EditorSection({
   selectedBundle,
   detailLoading,
   actionBusy,
+  savingKey,
+  exportBusy,
   qualityReport,
+  exportedJson,
   messageRows,
+  onDraftChange,
+  onSaveMessage,
+  onExportBundle,
   onReviewAction,
 }: {
   selectedBundle: TranslationBundleDetail | null;
   detailLoading: boolean;
   actionBusy: "publish" | "reject" | null;
+  savingKey: string | null;
+  exportBusy: boolean;
   qualityReport: TranslationQualityReport | null;
+  exportedJson: string | null;
   messageRows: Array<[string, string]>;
+  onDraftChange: (key: string, value: string) => void;
+  onSaveMessage: (key: string) => Promise<void>;
+  onExportBundle: () => Promise<void>;
   onReviewAction: (action: "publish" | "reject") => Promise<void>;
 }) {
   return (
@@ -655,6 +739,17 @@ function EditorSection({
           </div>
           {selectedBundle ? (
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void onExportBundle()}
+                disabled={exportBusy}
+              >
+                {exportBusy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : null}
+                Export JSON
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -703,24 +798,67 @@ function EditorSection({
           <QualityIssues report={qualityReport} />
 
           <div className="overflow-hidden rounded-md border border-white/8">
-            <div className="grid grid-cols-[minmax(0,0.48fr)_minmax(0,0.52fr)] border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
+            <div className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
               <span>Key</span>
+              <span>English source</span>
               <span>Translation</span>
+              <span>Status</span>
             </div>
             <div className="max-h-[520px] divide-y divide-white/6 overflow-y-auto">
               {messageRows.map(([key, value]) => (
                 <div
                   key={key}
-                  className="grid grid-cols-[minmax(0,0.48fr)_minmax(0,0.52fr)] gap-4 px-4 py-3 text-sm"
+                  className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
                 >
                   <code className="break-words font-mono text-xs text-cyan-100/80">
                     {key}
                   </code>
-                  <span className="break-words text-white/82">{value}</span>
+                  <span className="break-words text-white/38">
+                    Source unavailable
+                  </span>
+                  <div className="space-y-2">
+                    <textarea
+                      aria-label={`Translation for ${key}`}
+                      value={value}
+                      onChange={(event) =>
+                        onDraftChange(key, event.target.value)
+                      }
+                      className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-cyan-400/45"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Save ${key}`}
+                      onClick={() => void onSaveMessage(key)}
+                      disabled={savingKey === key}
+                    >
+                      {savingKey === key ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : null}
+                      Save
+                    </Button>
+                  </div>
+                  <MessageStatusBadge
+                    qualityReport={qualityReport}
+                    keyName={key}
+                  />
                 </div>
               ))}
             </div>
           </div>
+
+          {exportedJson ? (
+            <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
+              <div className="border-b border-white/8 px-4 py-3">
+                <h3 className="text-sm font-semibold text-white">
+                  Exported JSON
+                </h3>
+              </div>
+              <pre className="max-h-72 overflow-auto p-4 text-xs text-cyan-50/82">
+                {exportedJson}
+              </pre>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center">
@@ -802,6 +940,44 @@ function QualityIssues({
         </div>
       )}
     </div>
+  );
+}
+
+function MessageStatusBadge({
+  qualityReport,
+  keyName,
+}: {
+  qualityReport: TranslationQualityReport | null;
+  keyName: string;
+}) {
+  const issue = qualityReport?.issues.find((item) => item.key === keyName);
+  if (!issue) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
+      >
+        ok
+      </Badge>
+    );
+  }
+  const status =
+    issue.code === "stale_translation"
+      ? "stale"
+      : issue.code === "missing_key"
+        ? "missing"
+        : "error";
+  return (
+    <Badge
+      variant="outline"
+      className={
+        status === "stale" || status === "missing"
+          ? "border-amber-400/25 bg-amber-400/10 text-amber-200"
+          : "border-red-400/25 bg-red-400/10 text-red-200"
+      }
+    >
+      {status}
+    </Badge>
   );
 }
 

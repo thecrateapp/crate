@@ -5,6 +5,9 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from crate.api.auth import _require_admin
 from crate.api.schemas.i18n import (
+    I18nBundleExportResponse,
+    I18nBundleImportRequest,
+    I18nBundleMessagePatchRequest,
     I18nBundleResponse,
     I18nManifestBundle,
     I18nManifestResponse,
@@ -21,8 +24,10 @@ from crate.db.queries.i18n import (
     list_translation_requests,
 )
 from crate.db.repositories.i18n import (
+    insert_translation_bundle_draft,
     publish_translation_bundle,
     reject_translation_bundle,
+    update_translation_bundle_message,
     update_translation_request_status,
     upsert_translation_request,
 )
@@ -213,18 +218,6 @@ def admin_list_listen_i18n_requests(request: Request):
 
 
 @admin_router.get(
-    "/listen/bundles/{bundle_id}",
-    summary="Get a Listen i18n translation bundle",
-)
-def admin_get_listen_i18n_bundle(request: Request, bundle_id: str):
-    _require_admin(request)
-    bundle = get_translation_bundle(bundle_id)
-    if bundle is None or bundle["app"] != _LISTEN_APP:
-        raise HTTPException(status_code=404, detail="i18n bundle not found")
-    return _serialize_translation_bundle(bundle, include_messages=True)
-
-
-@admin_router.get(
     "/listen/bundles",
     summary="List Listen i18n translation bundles",
 )
@@ -244,6 +237,39 @@ def admin_list_listen_i18n_bundles(
             )
         ]
     }
+
+
+@admin_router.post(
+    "/listen/bundles/import",
+    status_code=status.HTTP_201_CREATED,
+    summary="Import a Listen i18n JSON bundle as a review draft",
+)
+def admin_import_listen_i18n_bundle(
+    request: Request,
+    payload: I18nBundleImportRequest,
+):
+    _require_admin(request)
+    bundle = insert_translation_bundle_draft(
+        app=_LISTEN_APP,
+        locale=payload.locale.strip().lower(),
+        source_locale=payload.source_locale.strip().lower() or "en",
+        source_version=payload.source_version,
+        bundle_version=payload.bundle_version,
+        messages=payload.messages,
+    )
+    return _serialize_translation_bundle(bundle, include_messages=True)
+
+
+@admin_router.get(
+    "/listen/bundles/{bundle_id}",
+    summary="Get a Listen i18n translation bundle",
+)
+def admin_get_listen_i18n_bundle(request: Request, bundle_id: str):
+    _require_admin(request)
+    bundle = get_translation_bundle(bundle_id)
+    if bundle is None or bundle["app"] != _LISTEN_APP:
+        raise HTTPException(status_code=404, detail="i18n bundle not found")
+    return _serialize_translation_bundle(bundle, include_messages=True)
 
 
 @admin_router.get(
@@ -275,9 +301,20 @@ def admin_get_listen_i18n_quality_report(
 )
 def admin_publish_listen_i18n_bundle(request: Request, bundle_id: str):
     _require_admin(request)
-    bundle = publish_translation_bundle(bundle_id)
-    if bundle is None or bundle["app"] != _LISTEN_APP:
+    current = get_translation_bundle(bundle_id)
+    if current is None or current["app"] != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="i18n bundle not found")
+    report = _build_quality_report(
+        locale=current["locale"],
+        source_version=current["source_version"],
+        bundle=current,
+    )
+    if report.error_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="i18n bundle has quality errors",
+        )
+    bundle = publish_translation_bundle(bundle_id)
     return _serialize_translation_bundle(bundle, include_messages=True)
 
 
@@ -291,6 +328,45 @@ def admin_reject_listen_i18n_bundle(request: Request, bundle_id: str):
     if bundle is None or bundle["app"] != _LISTEN_APP:
         raise HTTPException(status_code=404, detail="i18n bundle not found")
     return _serialize_translation_bundle(bundle, include_messages=True)
+
+
+@admin_router.patch(
+    "/listen/bundles/{bundle_id}/messages/{key:path}",
+    summary="Update a single Listen i18n bundle message",
+)
+def admin_patch_listen_i18n_bundle_message(
+    request: Request,
+    bundle_id: str,
+    key: str,
+    payload: I18nBundleMessagePatchRequest,
+):
+    _require_admin(request)
+    bundle = update_translation_bundle_message(
+        bundle_id=bundle_id,
+        key=key,
+        value=payload.value,
+    )
+    if bundle is None or bundle["app"] != _LISTEN_APP:
+        raise HTTPException(status_code=404, detail="i18n bundle not found")
+    return _serialize_translation_bundle(bundle, include_messages=True)
+
+
+@admin_router.get(
+    "/listen/bundles/{bundle_id}/export",
+    response_model=I18nBundleExportResponse,
+    summary="Export Listen i18n bundle messages as JSON",
+)
+def admin_export_listen_i18n_bundle(request: Request, bundle_id: str):
+    _require_admin(request)
+    bundle = get_translation_bundle(bundle_id)
+    if bundle is None or bundle["app"] != _LISTEN_APP:
+        raise HTTPException(status_code=404, detail="i18n bundle not found")
+    return I18nBundleExportResponse(
+        locale=bundle["locale"],
+        sourceVersion=bundle["source_version"],
+        bundleVersion=bundle["bundle_version"],
+        messages=bundle["messages_json"],
+    )
 
 
 @router.get(
