@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { validateCatalogs } from "@/i18n/quality/catalog-quality";
+import {
+  assertNoI18nQualityErrors,
+  validateCatalogs,
+} from "@/i18n/quality/catalog-quality";
 
 function issueCodesFor(report: ReturnType<typeof validateCatalogs>) {
   return report.issues.map((issue) => issue.code);
@@ -134,5 +137,21 @@ describe("validateCatalogs", () => {
     });
 
     expect(issueCodesFor(report)).toContain("stale_translation");
+  });
+
+  it("throws when a report contains quality errors", () => {
+    const report = validateCatalogs({
+      sourceVersion: "test",
+      source: { hello: "Hello" },
+      catalogs: { es: {} },
+      protectedExactTerms: [],
+      protectedContainedTerms: [],
+      englishFallbackAllowlist: new Set(),
+      staleMetadata: {},
+    });
+
+    expect(() => assertNoI18nQualityErrors(report)).toThrow(
+      "1 i18n quality errors",
+    );
   });
 });
