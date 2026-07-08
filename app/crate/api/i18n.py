@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
@@ -191,7 +192,11 @@ def _queue_translation_draft_if_needed(
             or request
         )
 
-    params = {"app": app, "locale": locale, "source_version": source_version}
+    params: dict[str, Any] = {
+        "app": app,
+        "locale": locale,
+        "source_version": source_version,
+    }
     if keys:
         params["keys"] = keys
     task_id = create_task("draft_i18n_translation", params)
@@ -411,6 +416,8 @@ def admin_publish_listen_i18n_bundle(request: Request, bundle_id: str):
             detail="i18n bundle has quality errors",
         )
     bundle = publish_translation_bundle(bundle_id)
+    if bundle is None or bundle["app"] != _LISTEN_APP:
+        raise HTTPException(status_code=404, detail="i18n bundle not found")
     return _serialize_translation_bundle(bundle, include_messages=True)
 
 
