@@ -111,6 +111,14 @@ const STATUS_FILTERS = [
   "rejected",
   "superseded",
 ];
+const DEFAULT_LISTEN_DEV_ORIGIN = "http://127.0.0.1:5174";
+const LOCAL_CATALOGS_PATH = "/__crate_i18n/catalogs";
+
+function listenDevOrigin() {
+  return (
+    import.meta.env.VITE_LISTEN_DEV_ORIGIN ?? DEFAULT_LISTEN_DEV_ORIGIN
+  ).replace(/\/$/, "");
+}
 
 function statusLabel(status: string) {
   return STATUS_LABELS[status] ?? status;
@@ -163,6 +171,12 @@ export function I18nReview() {
     null,
   );
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [workspaceSavingKey, setWorkspaceSavingKey] = useState<string | null>(
+    null,
+  );
+  const [localCatalogOrigin, setLocalCatalogOrigin] = useState<string | null>(
+    null,
+  );
   const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -256,6 +270,32 @@ export function I18nReview() {
     void loadReviewData();
   }, [loadReviewData]);
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      setLocalCatalogOrigin(null);
+      return;
+    }
+
+    let cancelled = false;
+    const origin = listenDevOrigin();
+
+    fetch(`${origin}${LOCAL_CATALOGS_PATH}`, { method: "GET" })
+      .then((response) => {
+        if (!cancelled) {
+          setLocalCatalogOrigin(response.ok ? origin : null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocalCatalogOrigin(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectBundle = useCallback(async (bundle: TranslationBundleSummary) => {
     setDetailLoading(true);
     setQualityReport(null);
@@ -336,6 +376,43 @@ export function I18nReview() {
       }
     },
     [messageDrafts, selectedBundle],
+  );
+
+  const saveWorkspaceMessage = useCallback(
+    async (key: string) => {
+      if (!selectedBundle || !localCatalogOrigin) return;
+      setWorkspaceSavingKey(key);
+      try {
+        const response = await fetch(
+          `${localCatalogOrigin}${LOCAL_CATALOGS_PATH}/${encodeURIComponent(
+            selectedBundle.locale,
+          )}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              key,
+              value: messageDrafts[key] ?? "",
+              markReviewed: true,
+            }),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Listen dev catalog write failed: ${response.status}`,
+          );
+        }
+
+        toast.success("Translation key saved to workspace JSON");
+      } catch (nextError) {
+        toast.error("Failed to save translation key to workspace JSON");
+        console.error(nextError);
+      } finally {
+        setWorkspaceSavingKey(null);
+      }
+    },
+    [localCatalogOrigin, messageDrafts, selectedBundle],
   );
 
   const exportSelectedBundle = useCallback(async () => {
@@ -458,6 +535,8 @@ export function I18nReview() {
           detailLoading={detailLoading}
           actionBusy={actionBusy}
           savingKey={savingKey}
+          workspaceSavingKey={workspaceSavingKey}
+          canSaveWorkspaceJson={localCatalogOrigin !== null}
           exportBusy={exportBusy}
           qualityReport={qualityReport}
           exportedJson={exportedJson}
@@ -466,6 +545,7 @@ export function I18nReview() {
             setMessageDrafts((current) => ({ ...current, [key]: value }))
           }
           onSaveMessage={saveBundleMessage}
+          onSaveWorkspaceMessage={saveWorkspaceMessage}
           onExportBundle={exportSelectedBundle}
           onReviewAction={reviewAction}
         />
@@ -705,12 +785,15 @@ function EditorSection({
   detailLoading,
   actionBusy,
   savingKey,
+  workspaceSavingKey,
+  canSaveWorkspaceJson,
   exportBusy,
   qualityReport,
   exportedJson,
   messageRows,
   onDraftChange,
   onSaveMessage,
+  onSaveWorkspaceMessage,
   onExportBundle,
   onReviewAction,
 }: {
@@ -718,12 +801,15 @@ function EditorSection({
   detailLoading: boolean;
   actionBusy: "publish" | "reject" | null;
   savingKey: string | null;
+  workspaceSavingKey: string | null;
+  canSaveWorkspaceJson: boolean;
   exportBusy: boolean;
   qualityReport: TranslationQualityReport | null;
   exportedJson: string | null;
   messageRows: Array<[string, string]>;
   onDraftChange: (key: string, value: string) => void;
   onSaveMessage: (key: string) => Promise<void>;
+  onSaveWorkspaceMessage: (key: string) => Promise<void>;
   onExportBundle: () => Promise<void>;
   onReviewAction: (action: "publish" | "reject") => Promise<void>;
 }) {
@@ -825,18 +911,34 @@ function EditorSection({
                       }
                       className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-cyan-400/45"
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Save ${key}`}
-                      onClick={() => void onSaveMessage(key)}
-                      disabled={savingKey === key}
-                    >
-                      {savingKey === key ? (
-                        <Loader2 size={15} className="animate-spin" />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Save ${key}`}
+                        onClick={() => void onSaveMessage(key)}
+                        disabled={savingKey === key}
+                      >
+                        {savingKey === key ? (
+                          <Loader2 size={15} className="animate-spin" />
+                        ) : null}
+                        Save
+                      </Button>
+                      {canSaveWorkspaceJson ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Save ${key} to workspace JSON`}
+                          onClick={() => void onSaveWorkspaceMessage(key)}
+                          disabled={workspaceSavingKey === key}
+                        >
+                          {workspaceSavingKey === key ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : null}
+                          Save to workspace JSON
+                        </Button>
                       ) : null}
-                      Save
-                    </Button>
+                    </div>
                   </div>
                   <MessageStatusBadge
                     qualityReport={qualityReport}

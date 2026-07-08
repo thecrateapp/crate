@@ -103,6 +103,11 @@ const exportedBundle = {
 describe("I18nReview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("fetch disabled in tests"))),
+    );
     mockApi.mockImplementation((url: string, method = "GET") => {
       if (url === "/api/admin/i18n/listen/requests") {
         return Promise.resolve({ requests: [request] });
@@ -278,5 +283,122 @@ describe("I18nReview", () => {
       screen.getByText(/crate\.i18n\.bundle\.export\.v1/),
     ).toBeInTheDocument();
     expect(screen.getByText(/"player.play": "Dale"/)).toBeInTheDocument();
+  });
+
+  it("saves a bundle row to workspace JSON when Listen dev catalogs are available", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "http://127.0.0.1:5174/__crate_i18n/catalogs") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ locales: ["es"] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      if (
+        url === "http://127.0.0.1:5174/__crate_i18n/catalogs/es" &&
+        init?.method === "PATCH"
+      ) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ reviewed: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<I18nReview />);
+
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    await user.click(await screen.findByRole("button", { name: /Review es/i }));
+
+    const playTranslation = await screen.findByLabelText(
+      "Translation for player.play",
+    );
+    await user.clear(playTranslation);
+    await user.type(playTranslation, "Dale");
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Save player.play to workspace JSON",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "http://127.0.0.1:5174/__crate_i18n/catalogs/es",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+    const patchCall = fetchSpy.mock.calls.find(
+      ([url, init]) =>
+        String(url) === "http://127.0.0.1:5174/__crate_i18n/catalogs/es" &&
+        init?.method === "PATCH",
+    );
+    expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({
+      key: "player.play",
+      value: "Dale",
+      markReviewed: true,
+    });
+    expect(mockToast.success).toHaveBeenCalledWith(
+      "Translation key saved to workspace JSON",
+    );
+  });
+
+  it("hides workspace JSON actions when Listen dev catalogs are unavailable", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn(() =>
+      Promise.reject(new Error("Listen dev server unavailable")),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<I18nReview />);
+
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    await user.click(await screen.findByRole("button", { name: /Review es/i }));
+    await screen.findByLabelText("Translation for player.play");
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "http://127.0.0.1:5174/__crate_i18n/catalogs",
+        expect.objectContaining({ method: "GET" }),
+      );
+    });
+    expect(
+      screen.queryByRole("button", {
+        name: "Save player.play to workspace JSON",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not probe workspace JSON actions outside dev mode", async () => {
+    vi.stubEnv("DEV", false);
+    const user = userEvent.setup();
+    const fetchSpy = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ locales: ["es"] }), { status: 200 }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    render(<I18nReview />);
+
+    await user.click(await screen.findByRole("tab", { name: "Bundles" }));
+    await user.click(await screen.findByRole("button", { name: /Review es/i }));
+    await screen.findByLabelText("Translation for player.play");
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", {
+        name: "Save player.play to workspace JSON",
+      }),
+    ).not.toBeInTheDocument();
   });
 });
