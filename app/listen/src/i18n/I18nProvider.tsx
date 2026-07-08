@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo } from "react";
 import i18next from "i18next";
+import type { PostProcessorModule } from "i18next";
 import ICU from "i18next-icu";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 
@@ -28,6 +29,28 @@ import {
   findUnsupportedLocaleRequestCandidate,
   requestUnsupportedLocaleTranslation,
 } from "@/i18n/translation-request";
+import { withTranslationMarker } from "@/i18n/translation-mode/markers";
+
+const TRANSLATION_MARKER_POST_PROCESSOR = "crateTranslationMarker";
+
+const translationMarkerPostProcessor: PostProcessorModule = {
+  name: TRANSLATION_MARKER_POST_PROCESSOR,
+  type: "postProcessor",
+  process(value, key, options, translator) {
+    const keyName = Array.isArray(key) ? key[0] : key;
+    if (!keyName) {
+      return value;
+    }
+    const locale =
+      typeof options.lng === "string"
+        ? options.lng
+        : typeof translator?.language === "string"
+          ? translator.language
+          : undefined;
+
+    return withTranslationMarker(value, keyName, locale);
+  },
+};
 
 const resources = {
   en: { translation: en },
@@ -65,22 +88,28 @@ function browserLanguages(): readonly string[] {
 
 export function createListenI18n(initialLocale?: ListenLocale) {
   const instance = i18next.createInstance();
+  const translationModeEnabled =
+    import.meta.env.DEV && import.meta.env.VITE_TRANSLATION_MODE === "1";
   const locale =
     initialLocale ??
     detectPreferredLocale({
       devicePreference: getLocalListenLocalePreference(),
       browserLanguages: browserLanguages(),
     });
-  void instance
-    .use(ICU)
-    .use(initReactI18next)
-    .init({
-      resources: withCachedRemoteBundle(locale),
-      lng: locale,
-      fallbackLng: LISTEN_FALLBACK_LOCALE,
-      keySeparator: false,
-      interpolation: { escapeValue: false },
-    });
+  instance.use(ICU);
+  if (translationModeEnabled) {
+    instance.use(translationMarkerPostProcessor);
+  }
+  void instance.use(initReactI18next).init({
+    resources: withCachedRemoteBundle(locale),
+    lng: locale,
+    fallbackLng: LISTEN_FALLBACK_LOCALE,
+    keySeparator: false,
+    interpolation: { escapeValue: false },
+    postProcess: translationModeEnabled
+      ? [TRANSLATION_MARKER_POST_PROCESSOR]
+      : undefined,
+  });
   return instance;
 }
 

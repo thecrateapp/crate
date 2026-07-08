@@ -7,6 +7,10 @@ import {
   LISTEN_I18N_SOURCE_VERSION,
   writeCachedBundle,
 } from "@/i18n/remote-bundles";
+import {
+  extractTranslationMarker,
+  stripTranslationMarker,
+} from "@/i18n/translation-mode/markers";
 
 function Probe() {
   const { t } = useTranslation();
@@ -16,6 +20,7 @@ function Probe() {
 describe("I18nProvider", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     Object.defineProperty(navigator, "languages", {
       value: ["en-US"],
@@ -84,5 +89,23 @@ describe("I18nProvider", () => {
         expect.objectContaining({ method: "POST" }),
       ),
     );
+  });
+
+  it("appends invisible translation markers in translation mode", async () => {
+    vi.stubEnv("VITE_TRANSLATION_MODE", "1");
+
+    render(
+      <I18nProvider initialLocale="es">
+        <Probe />
+      </I18nProvider>,
+    );
+
+    const node = await screen.findByText((content) => {
+      return stripTranslationMarker(content) === "Reproducir";
+    });
+    expect(extractTranslationMarker(node.textContent ?? "")).toEqual({
+      key: "player.play",
+      locale: "es",
+    });
   });
 });
