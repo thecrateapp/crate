@@ -164,3 +164,43 @@ def get_translation_bundle(bundle_id: str) -> dict[str, Any] | None:
             .first()
         )
     return dict(row) if row else None
+
+
+def get_latest_reviewable_translation_bundle(
+    *, app: str, locale: str, source_version: str
+) -> dict[str, Any] | None:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        id,
+                        app,
+                        locale,
+                        source_locale,
+                        source_version,
+                        bundle_version,
+                        status,
+                        messages_json,
+                        created_at,
+                        published_at
+                    FROM i18n_bundles
+                    WHERE app = :app
+                      AND locale = :locale
+                      AND source_version = :source_version
+                      AND status IN ('needs_review', 'published')
+                    ORDER BY created_at DESC, published_at DESC NULLS LAST
+                    LIMIT 1
+                    """
+                ),
+                {
+                    "app": app,
+                    "locale": locale,
+                    "source_version": source_version,
+                },
+            )
+            .mappings()
+            .first()
+        )
+    return dict(row) if row else None

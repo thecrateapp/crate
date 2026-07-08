@@ -110,7 +110,7 @@ describe("I18nReview", () => {
     );
     mockApi.mockImplementation((url: string, method = "GET") => {
       if (url === "/api/admin/i18n/listen/requests") {
-        return Promise.resolve({ requests: [request] });
+        return Promise.resolve({ aiConfigured: true, requests: [request] });
       }
       if (url === "/api/admin/i18n/listen/bundles") {
         return Promise.resolve({
@@ -158,6 +158,15 @@ describe("I18nReview", () => {
       if (url === "/api/admin/i18n/listen/bundles/bundle-es/export") {
         return Promise.resolve(exportedBundle);
       }
+      if (
+        url === "/api/admin/i18n/listen/locales/es/draft-missing" &&
+        method === "POST"
+      ) {
+        return Promise.resolve({
+          requestId: "request-es",
+          status: "drafting_ai",
+        });
+      }
       return Promise.reject(new Error(`Unexpected request: ${method} ${url}`));
     });
   });
@@ -190,6 +199,29 @@ describe("I18nReview", () => {
     expect(
       screen.getByRole("article", { name: "de locale health" }),
     ).toHaveTextContent("No bundle yet");
+  });
+
+  it("queues an AI draft for missing or stale locale keys", async () => {
+    const user = userEvent.setup();
+
+    render(<I18nReview />);
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Draft missing/stale with AI for es",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith(
+        "/api/admin/i18n/listen/locales/es/draft-missing",
+        "POST",
+        { sourceVersion: "sha256:test" },
+      );
+    });
+    expect(mockToast.success).toHaveBeenCalledWith(
+      "AI translation draft queued",
+    );
   });
 
   it("reviews and publishes a Listen translation bundle", async () => {

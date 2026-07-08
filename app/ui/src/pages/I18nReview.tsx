@@ -76,11 +76,17 @@ interface TranslationBundleExport {
 }
 
 interface TranslationRequestsResponse {
+  aiConfigured?: boolean;
   requests: TranslationRequest[];
 }
 
 interface TranslationBundlesResponse {
   bundles: TranslationBundleSummary[];
+}
+
+interface TranslationDraftResponse {
+  requestId: string;
+  status: string;
 }
 
 type ManagerTab = "overview" | "bundles" | "editor" | "import-export";
@@ -174,6 +180,8 @@ export function I18nReview() {
   const [workspaceSavingKey, setWorkspaceSavingKey] = useState<string | null>(
     null,
   );
+  const [draftBusyLocale, setDraftBusyLocale] = useState<string | null>(null);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [localCatalogOrigin, setLocalCatalogOrigin] = useState<string | null>(
     null,
   );
@@ -225,6 +233,11 @@ export function I18nReview() {
           requestCount: requests.filter((request) => request.locale === locale)
             .length,
           bundleCount: localeBundles.length,
+          sourceVersion:
+            localeBundles[0]?.sourceVersion ??
+            requests.find((request) => request.locale === locale)
+              ?.sourceVersion ??
+            null,
         };
       }),
     [bundles, localeOptions, requests],
@@ -256,6 +269,7 @@ export function I18nReview() {
         api<TranslationBundlesResponse>("/api/admin/i18n/listen/bundles"),
       ]);
       setRequests(requestData.requests ?? []);
+      setAiConfigured(Boolean(requestData.aiConfigured));
       setBundles(bundleData.bundles ?? []);
     } catch (nextError) {
       setError("Failed to load Listen translation manager");
@@ -415,6 +429,29 @@ export function I18nReview() {
     [localCatalogOrigin, messageDrafts, selectedBundle],
   );
 
+  const draftMissingForLocale = useCallback(
+    async (locale: string, sourceVersion: string) => {
+      setDraftBusyLocale(locale);
+      try {
+        await api<TranslationDraftResponse>(
+          `/api/admin/i18n/listen/locales/${encodeURIComponent(
+            locale,
+          )}/draft-missing`,
+          "POST",
+          { sourceVersion },
+        );
+        toast.success("AI translation draft queued");
+        await loadReviewData();
+      } catch (nextError) {
+        toast.error("Failed to queue AI translation draft");
+        console.error(nextError);
+      } finally {
+        setDraftBusyLocale(null);
+      }
+    },
+    [loadReviewData],
+  );
+
   const exportSelectedBundle = useCallback(async () => {
     if (!selectedBundle) return;
     setExportBusy(true);
@@ -507,6 +544,9 @@ export function I18nReview() {
           localeHealth={localeHealth}
           needsReviewCount={needsReviewCount}
           requestCount={requests.length}
+          aiConfigured={aiConfigured}
+          draftBusyLocale={draftBusyLocale}
+          onDraftMissing={draftMissingForLocale}
         />
       ) : null}
 
@@ -562,6 +602,9 @@ function OverviewSection({
   localeHealth,
   needsReviewCount,
   requestCount,
+  aiConfigured,
+  draftBusyLocale,
+  onDraftMissing,
 }: {
   loading: boolean;
   error: string | null;
@@ -571,9 +614,13 @@ function OverviewSection({
     publishedCount: number;
     requestCount: number;
     bundleCount: number;
+    sourceVersion: string | null;
   }>;
   needsReviewCount: number;
   requestCount: number;
+  aiConfigured: boolean;
+  draftBusyLocale: string | null;
+  onDraftMissing: (locale: string, sourceVersion: string) => Promise<void>;
 }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
@@ -627,6 +674,26 @@ function OverviewSection({
                 <HealthMetric label="published" value={health.publishedCount} />
                 <HealthMetric label="request" value={health.requestCount} />
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 w-full"
+                aria-label={`Draft missing/stale with AI for ${health.locale}`}
+                disabled={
+                  !aiConfigured ||
+                  !health.sourceVersion ||
+                  draftBusyLocale === health.locale
+                }
+                onClick={() => {
+                  if (!health.sourceVersion) return;
+                  void onDraftMissing(health.locale, health.sourceVersion);
+                }}
+              >
+                {draftBusyLocale === health.locale ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : null}
+                Draft missing/stale with AI
+              </Button>
             </article>
           ))}
         </div>

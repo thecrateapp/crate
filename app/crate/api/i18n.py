@@ -9,6 +9,7 @@ from crate.api.schemas.i18n import (
     I18nBundleImportRequest,
     I18nBundleMessagePatchRequest,
     I18nBundleResponse,
+    I18nDraftMissingRequest,
     I18nManifestBundle,
     I18nManifestResponse,
     I18nQualityIssueResponse,
@@ -18,6 +19,7 @@ from crate.api.schemas.i18n import (
 )
 from crate.db.queries.i18n import (
     get_published_bundle,
+    get_latest_reviewable_translation_bundle,
     get_translation_bundle,
     list_published_bundles,
     list_translation_bundles,
@@ -167,7 +169,9 @@ def _ollama_i18n_ai_is_explicitly_enabled() -> bool:
         return False
 
 
-def _queue_translation_draft_if_needed(request: dict) -> dict:
+def _queue_translation_draft_if_needed(
+    request: dict, *, keys: list[str] | None = None
+) -> dict:
     current_status = str(request.get("status") or "").strip()
     if current_status in {"drafting_ai", "needs_review", "published"}:
         return request
@@ -187,10 +191,10 @@ def _queue_translation_draft_if_needed(request: dict) -> dict:
             or request
         )
 
-    task_id = create_task(
-        "draft_i18n_translation",
-        {"app": app, "locale": locale, "source_version": source_version},
-    )
+    params = {"app": app, "locale": locale, "source_version": source_version}
+    if keys:
+        params["keys"] = keys
+    task_id = create_task("draft_i18n_translation", params)
     return (
         update_translation_request_status(
             app=app,
@@ -210,10 +214,11 @@ def _queue_translation_draft_if_needed(request: dict) -> dict:
 def admin_list_listen_i18n_requests(request: Request):
     _require_admin(request)
     return {
+        "aiConfigured": listen_i18n_ai_is_configured(),
         "requests": [
             _serialize_translation_request(row)
             for row in list_translation_requests(app=_LISTEN_APP)
-        ]
+        ],
     }
 
 
@@ -292,6 +297,97 @@ def admin_get_listen_i18n_quality_report(
         locale=normalized_locale,
         source_version=source_version,
         bundle=bundle,
+    )
+
+
+def _normalized_unique_keys(keys: list[str]) -> list[str]:
+    normalized = [str(key).strip() for key in keys if str(key).strip()]
+    return sorted(set(normalized), key=normalized.index)
+
+
+def _draftable_i18n_keys(
+    *, locale: str, source_version: str, report: I18nQualityReportResponse
+) -> set[str]:
+    draftable = {
+        issue.key
+        for issue in report.issues
+        if issue.key and issue.code in {"missing_key", "stale_translation"}
+    }
+
+    try:
+        from crate.llm.prompts.i18n_translation import load_listen_source_messages
+
+        source_keys = set(load_listen_source_messages())
+    except Exception:
+        source_keys = set()
+
+    if source_keys:
+        latest = get_latest_reviewable_translation_bundle(
+            app=_LISTEN_APP,
+            locale=locale,
+            source_version=source_version,
+        )
+        existing_keys = set((latest or {}).get("messages_json") or {})
+        draftable.update(source_keys - existing_keys)
+
+    return draftable
+
+
+@admin_router.post(
+    "/listen/locales/{locale}/draft-missing",
+    response_model=I18nTranslationRequestResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Draft missing or stale Listen i18n keys with AI",
+)
+def admin_draft_missing_listen_i18n_keys(
+    request: Request,
+    locale: str,
+    payload: I18nDraftMissingRequest,
+):
+    _require_admin(request)
+    normalized_locale = locale.strip().lower()
+    latest = _latest_translation_bundle_for_quality(
+        locale=normalized_locale,
+        source_version=payload.source_version,
+    )
+    report = _build_quality_report(
+        locale=normalized_locale,
+        source_version=payload.source_version,
+        bundle=latest,
+    )
+    draftable_keys = _draftable_i18n_keys(
+        locale=normalized_locale,
+        source_version=payload.source_version,
+        report=report,
+    )
+    requested_keys = _normalized_unique_keys(payload.keys or sorted(draftable_keys))
+    if not requested_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="no missing or stale keys to draft",
+        )
+
+    invalid_keys = sorted(set(requested_keys) - draftable_keys)
+    if invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="keys are not missing or stale",
+        )
+
+    translation_request = upsert_translation_request(
+        app=_LISTEN_APP,
+        locale=normalized_locale,
+        source_version=payload.source_version,
+        client="admin",
+        reason="missing-stale-keys",
+    )
+    translation_request = _queue_translation_draft_if_needed(
+        translation_request,
+        keys=requested_keys,
+    )
+    return I18nTranslationRequestResponse(
+        requestId=str(translation_request["id"]),
+        status=translation_request["status"],
     )
 
 

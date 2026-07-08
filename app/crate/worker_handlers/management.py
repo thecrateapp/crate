@@ -2566,6 +2566,7 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
 
 
 def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> dict:
+    from crate.db.queries.i18n import get_latest_reviewable_translation_bundle
     from crate.db.repositories.i18n import (
         insert_translation_bundle_draft,
         update_translation_request_status,
@@ -2587,6 +2588,24 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
         raise ValueError("source_version is required")
 
     source_messages = load_listen_source_messages()
+    requested_keys = [
+        str(key).strip() for key in params.get("keys", []) if str(key).strip()
+    ]
+    if requested_keys:
+        missing_source_keys = sorted(set(requested_keys) - set(source_messages))
+        if missing_source_keys:
+            raise ValueError(f"unknown source keys: {missing_source_keys}")
+        source_messages = {key: source_messages[key] for key in requested_keys}
+
+    base_messages: dict[str, str] = {}
+    if requested_keys:
+        latest = get_latest_reviewable_translation_bundle(
+            app=app,
+            locale=locale,
+            source_version=source_version,
+        )
+        base_messages = dict((latest or {}).get("messages_json") or {})
+
     try:
         draft = generate_i18n_translation_draft(
             target_locale=locale,
@@ -2626,7 +2645,7 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
         locale=locale,
         source_locale="en",
         source_version=source_version,
-        messages=translations,
+        messages={**base_messages, **translations},
     )
     update_translation_request_status(
         app=app,
@@ -2650,7 +2669,7 @@ def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> 
         "locale": locale,
         "source_version": source_version,
         "bundle_id": str(bundle["id"]),
-        "message_count": len(translations),
+        "message_count": len(bundle["messages_json"]),
     }
 
 

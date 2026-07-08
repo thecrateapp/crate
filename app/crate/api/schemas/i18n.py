@@ -64,6 +64,13 @@ class I18nBundleMessagePatchRequest(BaseModel):
     value: str
 
 
+class I18nDraftMissingRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    source_version: str = Field(alias="sourceVersion", min_length=1, max_length=128)
+    keys: list[str] | None = Field(default=None, min_length=1)
+
+
 class I18nBundleExportResponse(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
