@@ -98,6 +98,11 @@ class TestGetSetSchedules:
             schedules = get_schedules()
             assert schedules == DEFAULT_SCHEDULES
 
+    def test_default_schedules_include_duplicate_track_repair_twice_daily(self):
+        from crate.scheduler import DEFAULT_SCHEDULES
+
+        assert DEFAULT_SCHEDULES["repair_duplicate_tracks"] == 43200
+
     def test_get_schedules_custom(self):
         import json
 

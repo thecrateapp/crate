@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 
@@ -42,6 +43,7 @@ import {
 import { CrateLoader } from "@/components/ui/CrateLoader";
 
 export function Artist() {
+  const { t } = useTranslation();
   const { artistSlug: routeArtistSlug } = useParams<{ artistSlug?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,10 +95,12 @@ export function Artist() {
       const following = isFollowing(data.id);
       await toggleArtistFollow(data.id);
       toast.success(
-        following ? `Unfollowed ${data.name}` : `Following ${data.name}`,
+        following
+          ? t("artist.toasts.unfollowed", { name: data.name })
+          : t("artist.toasts.following", { name: data.name }),
       );
     } catch {
-      toast.error("Failed to update follow status");
+      toast.error(t("artist.toasts.followFailed"));
     }
   }
 
@@ -147,7 +151,7 @@ export function Artist() {
     try {
       const radio = await fetchArtistRadio(currentArtistId, data.name);
       if (!radio.tracks.length) {
-        toast.info("Artist radio is not available yet");
+        toast.info(t("artist.toasts.radioUnavailable"));
         return;
       }
 
@@ -158,20 +162,22 @@ export function Artist() {
 
       playAll(queue, 0, radio.source);
     } catch {
-      toast.error("Failed to start artist radio");
+      toast.error(t("artist.toasts.radioFailed"));
     }
   }
 
   function handlePlayTopTracks(startIndex = 0, shuffle = false) {
     if (!playerTracks.length) {
-      toast.info("No top tracks available for this artist yet");
+      toast.info(t("artist.toasts.noTopTracks"));
       return;
     }
 
     const queue = shuffle ? shuffleArray(playerTracks) : playerTracks;
     playAll(queue, shuffle ? 0 : startIndex, {
       type: "queue",
-      name: `${data?.name || "Artist"} Top Tracks`,
+      name: t("artist.playSource.topTracks", {
+        name: data?.name || t("artist.fallbackName"),
+      }),
     });
   }
 
@@ -194,27 +200,27 @@ export function Artist() {
         artistName: data.name,
       });
       if (!queue.length) {
-        toast.info("No probable setlist tracks matched your library");
+        toast.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
-        name: `${data.name} Probable Setlist`,
+        name: t("artist.playSource.probableSetlist", { name: data.name }),
       });
-      toast.success(`Playing probable setlist: ${queue.length} tracks`);
+      toast.success(t("artist.toasts.playingSetlist", { count: queue.length }));
     } catch {
-      toast.error("Failed to load probable setlist");
+      toast.error(t("artist.toasts.setlistFailed"));
     }
   }
 
   if (loading) {
-    return <CrateLoader label="Loading artist." />;
+    return <CrateLoader label={t("artist.loading")} />;
   }
 
   if (error || !data) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Artist not found</p>
+        <p className="text-muted-foreground">{t("artist.notFound")}</p>
       </div>
     );
   }

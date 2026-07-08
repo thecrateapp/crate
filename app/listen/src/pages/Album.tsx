@@ -7,6 +7,7 @@ import {
   type MouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, useLocation } from "react-router";
 import {
   AlertCircle,
@@ -181,6 +182,7 @@ interface AlbumContributor {
 }
 
 export function Album() {
+  const { t } = useTranslation();
   const {
     albumId: albumIdParam,
     artistSlug: routeArtistSlug,
@@ -373,13 +375,13 @@ export function Album() {
   }, [data?.id, hasTracks, sharedTrackUid]);
 
   if (loading) {
-    return <CrateLoader label="Loading album." />;
+    return <CrateLoader label={t("album.loading")} />;
   }
 
   if (error || !data) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Album not found</p>
+        <p className="text-muted-foreground">{t("album.notFound")}</p>
       </div>
     );
   }
@@ -444,27 +446,32 @@ export function Album() {
     : null;
   const offlineButtonLabel =
     offlineState === "ready"
-      ? "Available offline"
+      ? t("playlist.offline.available")
       : offlineState === "error"
-        ? "Retry offline"
+        ? t("playlist.offline.retry")
         : offlineState === "syncing"
-          ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
+          ? t("playlist.offline.syncing", { progress: offlineProgress || "" })
           : offlineBusy
-            ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
-            : "Make available offline";
+            ? t("playlist.offline.downloading", {
+                progress: offlineProgress || "",
+              })
+            : t("playlist.offline.makeAvailable");
   const offlineStatusDetail = canPersistAlbum
     ? offlineState === "ready"
       ? offlineRecord?.trackCount
-        ? `${offlineRecord.trackCount} track${
-            offlineRecord.trackCount === 1 ? "" : "s"
-          } available offline`
-        : "Available offline"
+        ? t("playlist.offline.tracksAvailable", {
+            count: offlineRecord.trackCount,
+          })
+        : t("playlist.offline.available")
       : offlineBusy && offlineProgress
-        ? `${offlineProgress} tracks saved for offline`
+        ? t("playlist.offline.progressSaved", { progress: offlineProgress })
         : offlineState === "error"
           ? offlineRecord?.readyTrackCount
-            ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
-            : "Offline copy failed. Retry to finish the album mirror."
+            ? t("playlist.offline.partialError", {
+                ready: offlineRecord.readyTrackCount,
+                total: offlineRecord.trackCount,
+              })
+            : t("album.offline.failed")
           : null
     : null;
 
@@ -529,7 +536,7 @@ export function Album() {
 
   async function handleAlbumRadio() {
     if (isPreRelease) {
-      toast.info("Album radio will be available when the release lands");
+      toast.info(t("album.toasts.radioPrerelease"));
       return;
     }
     try {
@@ -539,18 +546,18 @@ export function Album() {
         albumName: displayName,
       });
       if (!radio.tracks.length) {
-        toast.info("Album radio is not available yet");
+        toast.info(t("album.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start album radio");
+      toast.error(t("album.toasts.radioFailed"));
     }
   }
 
   const handlePlayNextAlbum = () => {
     [...playerTracks].reverse().forEach((track) => playNext(track));
-    toast.success("Album queued to play next");
+    toast.success(t("album.toasts.queuedNext"));
     setMenuOpen(false);
   };
 
@@ -623,13 +630,13 @@ export function Album() {
     try {
       if (saved) {
         await unsaveAlbum(albumId);
-        toast.success("Removed from your collection");
+        toast.success(t("album.toasts.removedCollection"));
       } else {
         await saveAlbum(albumId);
-        toast.success("Added to your collection");
+        toast.success(t("album.toasts.addedCollection"));
       }
     } catch {
-      toast.error("Failed to update collection");
+      toast.error(t("album.toasts.updateCollectionFailed"));
     }
   }
 
@@ -639,11 +646,13 @@ export function Album() {
       const result = await toggleAlbumOffline({ albumId, title: displayName });
       toast.success(
         result === "removed"
-          ? "Offline copy removed"
-          : "Album available offline",
+          ? t("playlist.toasts.offlineRemoved")
+          : t("album.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error((error as Error).message || "Failed to update offline copy");
+      toast.error(
+        (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
+      );
     }
   }
 
@@ -698,11 +707,11 @@ export function Album() {
       await api(`/api/playlists/${playlistId}/tracks`, "POST", {
         tracks: playlistTracksPayload,
       });
-      toast.success("Album added to playlist");
+      toast.success(t("album.toasts.addedToPlaylist"));
       setMenuOpen(false);
       setPlaylistPickerOpen(false);
     } catch {
-      toast.error("Failed to add album to playlist");
+      toast.error(t("album.toasts.addToPlaylistFailed"));
     }
   }
 
@@ -713,15 +722,15 @@ export function Album() {
         tracks: selectedPlaylistTracksPayload,
       });
       toast.success(
-        `${selectedPlaylistTracksPayload.length} track${
-          selectedPlaylistTracksPayload.length === 1 ? "" : "s"
-        } added to playlist`,
+        t("album.toasts.selectedAddedToPlaylist", {
+          count: selectedPlaylistTracksPayload.length,
+        }),
       );
       clearTrackSelection();
       setSelectionPlaylistPickerOpen(false);
       handleCloseSelectionMenu();
     } catch {
-      toast.error("Failed to add selected tracks");
+      toast.error(t("album.toasts.addSelectedFailed"));
     }
   }
 
@@ -734,9 +743,9 @@ export function Album() {
     if (!selectedPlayerTracks.length) return;
     [...selectedPlayerTracks].reverse().forEach((track) => playNext(track));
     toast.success(
-      `${selectedPlayerTracks.length} track${
-        selectedPlayerTracks.length === 1 ? "" : "s"
-      } queued to play next`,
+      t("album.toasts.selectedQueuedNext", {
+        count: selectedPlayerTracks.length,
+      }),
     );
     handleCloseSelectionMenu();
   }
@@ -745,9 +754,9 @@ export function Album() {
     if (!selectedPlayerTracks.length) return;
     selectedPlayerTracks.forEach((track) => addToQueue(track));
     toast.success(
-      `${selectedPlayerTracks.length} track${
-        selectedPlayerTracks.length === 1 ? "" : "s"
-      } added to queue`,
+      t("album.toasts.selectedAddedToQueue", {
+        count: selectedPlayerTracks.length,
+      }),
     );
     handleCloseSelectionMenu();
   }
@@ -757,7 +766,7 @@ export function Album() {
       (track) => !isLiked(track.id, track.entity_uid, track.path),
     );
     if (!missing.length) {
-      toast.info("Selected tracks are already in your collection");
+      toast.info(t("album.toasts.selectedAlreadyCollection"));
       handleCloseSelectionMenu();
       return;
     }
@@ -769,13 +778,11 @@ export function Album() {
         ),
       );
       toast.success(
-        `${missing.length} track${
-          missing.length === 1 ? "" : "s"
-        } added to your collection`,
+        t("album.toasts.selectedAddedCollection", { count: missing.length }),
       );
       handleCloseSelectionMenu();
     } catch {
-      toast.error("Failed to update your collection");
+      toast.error(t("album.toasts.updateCollectionFailed"));
     }
   }
 
@@ -793,9 +800,11 @@ export function Album() {
           }),
         ],
       });
-      toast.success(`Added "${track.title}" to playlist`);
+      toast.success(
+        t("album.toasts.trackAddedToPlaylist", { title: track.title }),
+      );
     } catch {
-      toast.error("Failed to add track to playlist");
+      toast.error(t("album.toasts.addTrackToPlaylistFailed"));
     }
   }
 
@@ -961,27 +970,27 @@ export function Album() {
   const albumMenuItems: ContextMenuEntry[] = [
     {
       key: "play",
-      label: "Play now",
+      label: t("album.actions.playNow"),
       icon: Play,
       onSelect: () => handlePlay(),
     },
     {
       key: "play-next",
-      label: "Play next",
+      label: t("album.actions.playNext"),
       icon: ListPlus,
       onSelect: handlePlayNextAlbum,
     },
     {
       type: "disclosure",
       key: "playlist",
-      label: "Add to playlist",
+      label: t("playlist.actions.addToPlaylist"),
       icon: ListPlus,
       expanded: playlistPickerOpen,
       onToggle: handleTogglePlaylistPicker,
       items: [
         {
           key: "playlist-create",
-          label: "Add new playlist",
+          label: t("playlist.actions.addNew"),
           onSelect: handleCreatePlaylistFromAlbum,
         },
         ...playlists.map((playlist) => ({
@@ -995,7 +1004,9 @@ export function Album() {
       ? [
           {
             key: "save",
-            label: saved ? "Remove from collection" : "Add to collection",
+            label: saved
+              ? t("album.actions.removeFromCollection")
+              : t("album.actions.addToCollection"),
             icon: Heart,
             active: saved,
             onSelect: handleToggleSaved,
@@ -1019,7 +1030,7 @@ export function Album() {
       : []),
     {
       key: "artist",
-      label: "Go to artist",
+      label: t("album.actions.goToArtist"),
       icon: User,
       onSelect: () =>
         navigate(
@@ -1031,7 +1042,7 @@ export function Album() {
     },
     {
       key: "share",
-      label: "Share",
+      label: t("common.share"),
       icon: Share2,
       onSelect: handleShare,
     },
@@ -1041,24 +1052,24 @@ export function Album() {
     {
       type: "label",
       key: "selected-count",
-      label: `${selectedAlbumTracks.length} selected`,
+      label: t("common.selectedCount", { count: selectedAlbumTracks.length }),
     },
     {
       key: "play-next",
-      label: "Play next",
+      label: t("album.actions.playNext"),
       icon: ListPlus,
       onSelect: handlePlaySelectedNext,
     },
     {
       key: "queue",
-      label: "Add to queue",
+      label: t("album.actions.addToQueue"),
       icon: Plus,
       onSelect: handleAddSelectedToQueue,
     },
     {
       type: "disclosure",
       key: "playlist",
-      label: "Add to playlist",
+      label: t("playlist.actions.addToPlaylist"),
       icon: ListPlus,
       expanded: selectionMenuPlaylistOpen,
       onToggle: () => {
@@ -1068,7 +1079,7 @@ export function Album() {
       items: [
         {
           key: "playlist-create",
-          label: "Add new playlist",
+          label: t("playlist.actions.addNew"),
           onSelect: handleCreatePlaylistFromSelection,
         },
         ...playlists.map((playlist) => ({
@@ -1084,7 +1095,7 @@ export function Album() {
     },
     {
       key: "collection",
-      label: "Add to my collection",
+      label: t("album.actions.addToMyCollection"),
       icon: Heart,
       onSelect: handleAddSelectedToCollection,
     },
@@ -1103,7 +1114,7 @@ export function Album() {
           data-testid="album-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleAlbumMenu}
-          aria-label="More"
+          aria-label={t("common.more")}
         >
           <MoreHorizontal
             data-testid="album-mobile-hero-menu-icon"
@@ -1262,7 +1273,13 @@ export function Album() {
                 {!data.genre_profile?.length && genre ? (
                   <span className="hidden sm:inline">{genre}</span>
                 ) : null}
-                {data.track_count > 0 && <span>{data.track_count} tracks</span>}
+                {data.track_count > 0 && (
+                  <span>
+                    {t("common.trackCountLabel", {
+                      count: data.track_count,
+                    })}
+                  </span>
+                )}
                 {isPreRelease ? (
                   <span>{playerTracks.length} available now</span>
                 ) : null}
@@ -1350,39 +1367,39 @@ export function Album() {
             ref={albumPrimaryActionsRef}
             data-testid="album-primary-actions"
             role="group"
-            aria-label="Primary album actions"
+            aria-label={t("album.actions.primaryGroup")}
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-[15px]"
               onClick={() => handlePlay()}
               disabled={playerTracks.length === 0}
-              aria-label="Play"
+              aria-label={t("player.play")}
             >
               <Play size={17} fill="currentColor" />
-              <span>Play</span>
+              <span>{t("player.play")}</span>
             </button>
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
               onClick={handleShuffle}
               disabled={playerTracks.length === 0}
-              aria-label="Shuffle"
+              aria-label={t("player.shuffle")}
             >
               <Shuffle size={17} />
-              <span>Shuffle</span>
+              <span>{t("player.shuffle")}</span>
             </button>
           </div>
 
           <div
             role="group"
-            aria-label="Secondary album actions"
+            aria-label={t("album.actions.secondaryGroup")}
             className="grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4"
           >
             {!isPreRelease ? (
               <button
                 className={SECONDARY_ACTION_CLASS}
                 onClick={handleAlbumRadio}
-                aria-label="Album Radio"
+                aria-label={t("album.actions.radio")}
               >
                 <Radio size={CRATE_ICON_SIZE.lg} />
                 <span>Radio</span>
@@ -1403,8 +1420,8 @@ export function Album() {
                 disabled={!offlineSupported || offlineBusy}
                 aria-label={
                   offlineState === "ready"
-                    ? "Remove offline copy"
-                    : "Make available offline"
+                    ? t("playlist.offline.removeCopy")
+                    : t("playlist.offline.makeAvailable")
                 }
                 title={offlineButtonLabel}
               >
@@ -1417,7 +1434,7 @@ export function Album() {
                 ) : (
                   <ArrowDownToLine size={CRATE_ICON_SIZE.lg} />
                 )}
-                <span>Offline</span>
+                <span>{t("common.offline")}</span>
               </button>
             ) : null}
             {canPersistAlbum ? (
@@ -1429,7 +1446,9 @@ export function Album() {
                 }`}
                 onClick={handleToggleSaved}
                 aria-label={
-                  saved ? "Remove from collection" : "Add to collection"
+                  saved
+                    ? t("album.actions.removeFromCollection")
+                    : t("album.actions.addToCollection")
                 }
               >
                 {saved ? (
@@ -1440,16 +1459,16 @@ export function Album() {
                 ) : (
                   <Heart size={CRATE_ICON_SIZE.lg} />
                 )}
-                <span>{saved ? "Added" : "Add"}</span>
+                <span>{saved ? t("common.added") : t("common.add")}</span>
               </button>
             ) : null}
             <button
               className={SECONDARY_ACTION_CLASS}
               onClick={handleShare}
-              aria-label="Share"
+              aria-label={t("common.share")}
             >
               <Share2 size={CRATE_ICON_SIZE.lg} />
-              <span>Share</span>
+              <span>{t("common.share")}</span>
             </button>
             <BandcampSupportButton
               entityType="album"
@@ -1462,10 +1481,10 @@ export function Album() {
                 <button
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleAlbumMenu}
-                  aria-label="More"
+                  aria-label={t("common.more")}
                 >
                   <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
-                  <span>More</span>
+                  <span>{t("common.more")}</span>
                 </button>
                 <ContextMenu
                   header={{
@@ -1502,8 +1521,7 @@ export function Album() {
       {isPreRelease ? (
         <div className="px-4 sm:px-6 pb-4">
           <div className="mx-auto w-full max-w-[1480px] rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-primary/90">
-            This pre-release is already part of the discography. Tracks become
-            playable here as soon as Crate has them in the library.
+            {t("album.prereleaseNotice")}
           </div>
         </div>
       ) : null}
@@ -1517,10 +1535,12 @@ export function Album() {
           >
             <div className="mr-auto min-w-0 px-1">
               <p className="text-sm font-semibold text-foreground">
-                {selectedAlbumTracks.length} selected
+                {t("common.selectedCount", {
+                  count: selectedAlbumTracks.length,
+                })}
               </p>
               <p className="text-xs text-muted-foreground">
-                Double-click any track to play it.
+                {t("album.selection.doubleClickHint")}
               </p>
             </div>
             <div className="relative">
@@ -1529,7 +1549,7 @@ export function Album() {
                 onClick={handleToggleSelectionPlaylistPicker}
               >
                 <ListPlus size={14} />
-                Add to playlist
+                {t("playlist.actions.addToPlaylist")}
               </button>
               {selectionPlaylistPickerOpen ? (
                 <AppPopover className="absolute top-full right-0 z-app-popover mt-2 w-64 overflow-hidden rounded-2xl">
@@ -1538,7 +1558,7 @@ export function Album() {
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-white/5"
                       onClick={handleCreatePlaylistFromSelection}
                     >
-                      Add new playlist
+                      {t("playlist.actions.addNew")}
                     </button>
                     {playlists.length > 0 ? (
                       <AppPopoverDivider className="mx-1" />
@@ -1562,12 +1582,12 @@ export function Album() {
               className="inline-flex h-9 items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 text-xs font-medium text-foreground transition-colors hover:bg-white/10"
               onClick={handleCreatePlaylistFromSelection}
             >
-              Create playlist
+              {t("playlist.actions.create")}
             </button>
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/12 bg-white/6 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
               onClick={clearTrackSelection}
-              aria-label="Clear selected tracks"
+              aria-label={t("album.selection.clear")}
             >
               <X size={14} />
             </button>
@@ -1589,7 +1609,7 @@ export function Album() {
                 <div key={disc} className="mb-4">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
                     <Disc size={12} />
-                    Disc {disc}
+                    {t("album.disc", { disc })}
                   </div>
                   {tracks.map((t, idx) => {
                     const rowTrack = albumTrackRowData(t, idx);

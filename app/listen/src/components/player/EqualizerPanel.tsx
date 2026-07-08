@@ -14,6 +14,7 @@ import {
   Zap,
 } from "@crate/ui/icons";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import type { EffectiveEq } from "@/hooks/use-effective-eq";
@@ -66,10 +67,11 @@ function SmartEqReadout({
   eq: EffectiveEq | null;
   status: "idle" | "loading" | "ready" | "unavailable";
 }) {
+  const { t } = useTranslation();
   if (status === "loading") {
     return (
       <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.07] px-3 py-2 text-[11px] text-cyan-100/80">
-        Resolving Smart EQ…
+        {t("player.equalizer.smart.resolving")}
       </div>
     );
   }
@@ -77,7 +79,7 @@ function SmartEqReadout({
   if (status === "unavailable" || !eq) {
     return (
       <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-muted-foreground">
-        Smart EQ is waiting for a resolvable library track.
+        {t("player.equalizer.smart.waiting")}
       </div>
     );
   }
@@ -143,17 +145,18 @@ function AdaptiveFeatureChips({
   features: EqFeatures | null;
   status: "idle" | "loading" | "ready" | "unavailable";
 }) {
+  const { t } = useTranslation();
   if (status === "loading") {
     return (
       <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        Loading analysis…
+        {t("player.equalizer.adaptive.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !features) {
     return (
       <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        No analysis for this track — adaptive is holding flat.
+        {t("player.equalizer.adaptive.unavailable")}
       </div>
     );
   }
@@ -234,7 +237,7 @@ function AdaptiveFeatureChips({
   if (chips.length === 0) {
     return (
       <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        No analysis data for this track.
+        {t("player.equalizer.adaptive.empty")}
       </div>
     );
   }
@@ -242,7 +245,7 @@ function AdaptiveFeatureChips({
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-[9px] uppercase tracking-wider text-white/40">
-        Track
+        {t("player.equalizer.track")}
       </span>
       {chips}
     </div>
@@ -263,17 +266,18 @@ function GenreResolutionChip({
   genre: TrackGenre | null;
   status: "idle" | "loading" | "ready" | "unavailable";
 }) {
+  const { t } = useTranslation();
   if (status === "loading") {
     return (
       <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        Loading genre…
+        {t("player.equalizer.genre.loading")}
       </div>
     );
   }
   if (status === "unavailable" || !genre?.primary) {
     return (
       <div className="rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        No genre data for this track — holding flat.
+        {t("player.equalizer.genre.unavailable")}
       </div>
     );
   }
@@ -289,7 +293,9 @@ function GenreResolutionChip({
         <span className="font-medium capitalize text-white/80">
           {primaryName}
         </span>
-        <span className="opacity-50">— unmapped tag, holding flat.</span>
+        <span className="opacity-50">
+          {t("player.equalizer.genre.unmapped")}
+        </span>
       </div>
     );
   }
@@ -302,7 +308,7 @@ function GenreResolutionChip({
           {primaryName}
         </span>
         <span className="opacity-50">
-          — no preset in taxonomy, holding flat.
+          {t("player.equalizer.genre.noPreset")}
         </span>
       </div>
     );
@@ -314,11 +320,15 @@ function GenreResolutionChip({
       <Tag size={10} />
       <span className="font-medium capitalize">{primaryName}</span>
       <span className="opacity-70">
-        {isInherited ? "→ inherited" : "→ preset"}
+        {isInherited
+          ? t("player.equalizer.genre.inherited")
+          : t("player.equalizer.genre.preset")}
       </span>
       {isInherited && preset.inheritedFrom ? (
         <span className="font-medium capitalize opacity-80">
-          from {preset.inheritedFrom.name}
+          {t("player.equalizer.genre.from", {
+            name: preset.inheritedFrom.name,
+          })}
         </span>
       ) : null}
     </div>
@@ -336,6 +346,7 @@ interface EqualizerPanelProps {
  * component is pure presentation.
  */
 export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
+  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   const {
     enabled,
@@ -371,11 +382,11 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
     setSaving(true);
     try {
       const result = await saveForCurrentTrack();
-      if (result) toast.success("EQ preset saved for this track");
-      else toast.error("This track cannot store an EQ preset yet");
+      if (result) toast.success(t("player.equalizer.toasts.saved"));
+      else toast.error(t("player.equalizer.toasts.cannotSave"));
     } catch (error) {
       console.error("[eq] failed to save track preset", error);
-      toast.error("Could not save the EQ preset");
+      toast.error(t("player.equalizer.toasts.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -385,10 +396,10 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
     setSaving(true);
     try {
       await clearCurrentTrackPreset();
-      toast.success("Track EQ preset cleared");
+      toast.success(t("player.equalizer.toasts.cleared"));
     } catch (error) {
       console.error("[eq] failed to clear track preset", error);
-      toast.error("Could not clear the track EQ preset");
+      toast.error(t("player.equalizer.toasts.clearFailed"));
     } finally {
       setSaving(false);
     }
@@ -403,7 +414,9 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             size={CRATE_ICON_SIZE.md}
             className="text-cyan-400"
           />
-          <h2 className="text-sm font-semibold text-foreground">Equalizer</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            {t("player.equalizer")}
+          </h2>
         </div>
         <div className="flex items-center gap-2">
           <CratePill
@@ -412,7 +425,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             onClick={() => toggleSmart(!smart)}
             icon={Brain}
           >
-            Smart
+            {t("player.equalizer.smart.label")}
             {smart && smartStatus === "loading" ? (
               <span className="ml-1 text-[9px] opacity-60">…</span>
             ) : null}
@@ -424,13 +437,13 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               onChange={(event) => toggleEnabled(event.target.checked)}
               className="h-3.5 w-3.5 accent-cyan-400"
             />
-            On
+            {t("common.on")}
           </label>
           {onClose ? (
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close equalizer"
+              aria-label={t("player.equalizer.close")}
               className="flex size-9 items-center justify-center text-white/50 hover:text-white"
             >
               <X size={CRATE_ICON_SIZE.lg} />
@@ -444,7 +457,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
       ) : (
         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.025] px-2.5 py-2">
           <span className="mr-1 text-[9px] uppercase tracking-[0.18em] text-white/35">
-            Manual helpers
+            {t("player.equalizer.manualHelpers")}
           </span>
           <CratePill
             active={genreAdaptive}
@@ -452,7 +465,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             onClick={() => toggleGenreAdaptive(!genreAdaptive)}
             icon={Tag}
           >
-            Genre
+            {t("player.equalizer.genre.label")}
             {genreAdaptive && genreAdaptiveStatus === "loading" ? (
               <span className="ml-1 text-[9px] opacity-60">…</span>
             ) : null}
@@ -463,7 +476,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             onClick={() => toggleAdaptive(!adaptive)}
             icon={Sparkles}
           >
-            Adaptive
+            {t("player.equalizer.adaptive.label")}
             {adaptive && adaptiveStatus === "loading" ? (
               <span className="ml-1 text-[9px] opacity-60">…</span>
             ) : null}
@@ -489,21 +502,21 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
         {smart ? (
           <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
             <Brain size={9} />
-            Smart curve
+            {t("player.equalizer.smartCurve")}
           </span>
         ) : adaptive ? (
           <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
             <Sparkles size={9} />
-            Adaptive active
+            {t("player.equalizer.adaptiveActive")}
           </span>
         ) : genreAdaptive ? (
           <span className="flex items-center gap-1 rounded-full border border-cyan-400/40 bg-cyan-400/10 px-2 py-0.5 text-[10px] text-cyan-300">
             <Tag size={9} />
-            Genre active
+            {t("player.equalizer.genreActive")}
           </span>
         ) : preset === "custom" ? (
           <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[10px] text-white/60">
-            Custom
+            {t("player.equalizer.custom")}
           </span>
         ) : (
           <span />
@@ -517,7 +530,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-400/[0.06] px-2.5 py-0.5 text-[10px] text-red-100/80 hover:border-red-400/35 hover:text-red-100 disabled:cursor-wait disabled:opacity-50"
             >
               <Trash2 size={9} />
-              Clear track preset
+              {t("player.equalizer.clearTrackPreset")}
             </button>
           ) : (
             <button
@@ -527,7 +540,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
               className="inline-flex items-center gap-1 rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-2.5 py-0.5 text-[10px] text-cyan-100/80 hover:border-cyan-400/35 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Save size={9} />
-              Save for track
+              {t("player.equalizer.saveForTrack")}
             </button>
           )}
           <button
@@ -539,7 +552,7 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
             }`}
           >
             <RotateCcw size={9} />
-            Reset
+            {t("player.equalizer.reset")}
           </button>
         </div>
       </div>

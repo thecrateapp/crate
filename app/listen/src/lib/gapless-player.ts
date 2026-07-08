@@ -94,6 +94,7 @@ let lastPlaybackRate = 1.0;
 let lifecycleRecoveryInstalled = false;
 let contextWakeInFlight: Promise<void> | null = null;
 let tauriAudioOutputMayBeStale = false;
+let tauriPlaybackWasActive = false;
 
 const DEFAULT_FADE_MS = 220;
 
@@ -244,6 +245,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onplay = (path, analyser) => {
+    tauriPlaybackWasActive = true;
     // analyser is only emitted when WebAudio is the live source.
     // Presence here means the track's buffer is already decoded in RAM
     // (the "switched" case where onplay replaces onswitchtowebaudio).
@@ -265,6 +267,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onfinishedall = () => {
+    tauriPlaybackWasActive = false;
     currentCallbacks.onAllFinished?.();
   };
 
@@ -333,6 +336,7 @@ export function destroyPlayer(): void {
     instance = null;
     currentAnalyser = null;
   }
+  tauriPlaybackWasActive = false;
 }
 
 // ── Convenience methods ──────────────────────────────────────────
@@ -450,7 +454,9 @@ function installAudioLifecycleRecovery(): void {
 
   const wake = (reason: string) => {
     if (!isTauriDesktopRuntime()) return;
-    tauriAudioOutputMayBeStale = true;
+    if (!tauriPlaybackWasActive || reason === "devicechange") {
+      tauriAudioOutputMayBeStale = true;
+    }
     void prepareAudioForPlayback(reason);
   };
 
@@ -563,13 +569,33 @@ async function prepareAudioForPlayback(
   reason: string,
   options: { rebuildIfTauriOutputMayBeStale?: boolean } = {},
 ): Promise<void> {
-  if (contextWakeInFlight) return contextWakeInFlight;
-  contextWakeInFlight = prepareAudioForPlaybackInner(reason, options).finally(
-    () => {
-      contextWakeInFlight = null;
-    },
-  );
-  return contextWakeInFlight;
+  const wantsStaleTauriRebuild =
+    options.rebuildIfTauriOutputMayBeStale &&
+    isTauriDesktopRuntime() &&
+    tauriAudioOutputMayBeStale;
+
+  const trackWake = (wake: Promise<void>) => {
+    const tracked = wake.finally(() => {
+      if (contextWakeInFlight === tracked) {
+        contextWakeInFlight = null;
+      }
+    });
+    contextWakeInFlight = tracked;
+    return tracked;
+  };
+
+  if (contextWakeInFlight) {
+    if (!wantsStaleTauriRebuild) return contextWakeInFlight;
+    const currentWake = contextWakeInFlight;
+    return trackWake(
+      currentWake.then(
+        () => prepareAudioForPlaybackInner(reason, options),
+        () => prepareAudioForPlaybackInner(reason, options),
+      ),
+    );
+  }
+
+  return trackWake(prepareAudioForPlaybackInner(reason, options));
 }
 
 async function prepareAudioForPlaybackInner(
@@ -624,16 +650,19 @@ export async function play(): Promise<void> {
   await prepareAudioForPlayback("play", {
     rebuildIfTauriOutputMayBeStale: true,
   });
+  tauriPlaybackWasActive = true;
   instance?.play();
 }
 
 export function pause(): void {
   stopFade();
+  tauriPlaybackWasActive = false;
   instance?.pause();
 }
 
 export function stop(): void {
   stopFade();
+  tauriPlaybackWasActive = false;
   instance?.stop();
 }
 
@@ -645,6 +674,7 @@ export function next(): void {
   void prepareAudioForPlayback("next", {
     rebuildIfTauriOutputMayBeStale: true,
   }).then(() => {
+    tauriPlaybackWasActive = true;
     instance?.next(undefined, true, true);
   });
 }
@@ -672,6 +702,7 @@ export function gotoTrack(
   void prepareAudioForPlayback("gotoTrack", {
     rebuildIfTauriOutputMayBeStale: true,
   }).then(() => {
+    tauriPlaybackWasActive = true;
     instance?.gotoTrack(indexOrUrl, forcePlay);
   });
 }
@@ -740,6 +771,7 @@ export function fadeOutAndPause(durationMs = DEFAULT_FADE_MS): Promise<void> {
   return new Promise((resolve) => {
     animateVolume(startVolume, 0, durationMs, () => {
       instance?.pause();
+      tauriPlaybackWasActive = false;
       applyVolume(lastVolume);
       resolve();
     });
@@ -755,6 +787,7 @@ export async function fadeInAndPlay(
     rebuildIfTauriOutputMayBeStale: true,
   });
   applyVolume(0);
+  tauriPlaybackWasActive = true;
   instance?.play();
   return new Promise((resolve) => {
     animateVolume(0, lastVolume, durationMs, resolve);

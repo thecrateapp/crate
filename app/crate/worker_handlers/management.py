@@ -22,6 +22,7 @@ from crate.db.jobs.repair import (
     merge_artist_into_artist,
     update_album_artist_and_path,
 )
+from crate.db.queries.health import get_duplicate_tracks
 from crate.db.repositories.library import (
     delete_album as db_delete_album,
     delete_artist as db_delete_artist,
@@ -504,6 +505,55 @@ def _handle_repair(task_id: str, params: dict, config: dict) -> dict:
         if not dry_run:
             for artist in affected_artists:
                 _unmark_processing(artist)
+
+
+def _duplicate_track_repair_issue(row: Mapping[str, Any]) -> dict:
+    return {
+        "check": "duplicate_tracks",
+        "severity": "medium",
+        "details": {
+            "album_id": row["album_id"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "title": row["title"],
+            "track_number": row.get("track_number"),
+            "disc_number": row.get("disc_number"),
+            "count": row["cnt"],
+            "paths": row.get("paths", []),
+            "track_ids": row.get("track_ids", []),
+            "tracks": row.get("tracks", []),
+            "fingerprinted_count": row.get("fingerprinted_count", 0),
+            "missing_fingerprint_count": row.get("missing_fingerprint_count", 0),
+        },
+    }
+
+
+def _handle_repair_duplicate_tracks(task_id: str, params: dict, config: dict) -> dict:
+    rows = get_duplicate_tracks()
+    issues = [_duplicate_track_repair_issue(row) for row in rows]
+    if not issues:
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "category": "repair",
+                "message": "No high-confidence duplicate tracks found",
+            },
+        )
+        return {
+            "issue_count": 0,
+            "summary": {"applied": 0, "skipped": 0, "failed": 0, "unsupported": 0},
+        }
+
+    repair_params = dict(params)
+    repair_params.update(
+        {
+            "dry_run": False,
+            "auto_only": True,
+            "issues": issues,
+        }
+    )
+    return _handle_repair(task_id, repair_params, config)
 
 
 def _handle_library_pipeline(task_id: str, params: dict, config: dict) -> dict:
@@ -2515,9 +2565,118 @@ def _handle_export_rich_metadata(task_id: str, params: dict, config: dict) -> di
     }
 
 
+def _handle_draft_i18n_translation(task_id: str, params: dict, config: dict) -> dict:
+    from crate.db.queries.i18n import get_latest_reviewable_translation_bundle
+    from crate.db.repositories.i18n import (
+        insert_translation_bundle_draft,
+        update_translation_request_status,
+    )
+    from crate.llm.prompts.i18n_translation import (
+        generate_i18n_translation_draft,
+        load_listen_source_messages,
+        validate_i18n_translation_draft,
+    )
+
+    app = str(params.get("app") or "listen").strip().lower()
+    locale = str(params.get("locale") or "").strip().lower()
+    source_version = str(params.get("source_version") or "").strip()
+    if app != "listen":
+        raise ValueError(f"unsupported i18n app: {app}")
+    if not locale:
+        raise ValueError("locale is required")
+    if not source_version:
+        raise ValueError("source_version is required")
+
+    source_messages = load_listen_source_messages()
+    requested_keys = [
+        str(key).strip() for key in params.get("keys", []) if str(key).strip()
+    ]
+    if requested_keys:
+        missing_source_keys = sorted(set(requested_keys) - set(source_messages))
+        if missing_source_keys:
+            raise ValueError(f"unknown source keys: {missing_source_keys}")
+        source_messages = {key: source_messages[key] for key in requested_keys}
+
+    base_messages: dict[str, str] = {}
+    if requested_keys:
+        latest = get_latest_reviewable_translation_bundle(
+            app=app,
+            locale=locale,
+            source_version=source_version,
+        )
+        base_messages = dict((latest or {}).get("messages_json") or {})
+
+    try:
+        draft = generate_i18n_translation_draft(
+            target_locale=locale,
+            source_messages=source_messages,
+        )
+        translations = validate_i18n_translation_draft(
+            draft,
+            expected_keys=set(source_messages),
+            target_locale=locale,
+        )
+    except Exception as exc:
+        update_translation_request_status(
+            app=app,
+            locale=locale,
+            source_version=source_version,
+            status="manual_required",
+            task_id=task_id,
+        )
+        emit_task_event(
+            task_id,
+            "warning",
+            {
+                "message": "Listen translation draft requires manual translation",
+                "locale": locale,
+                "error": str(exc)[:500],
+            },
+        )
+        return {
+            "status": "manual_required",
+            "locale": locale,
+            "source_version": source_version,
+            "reason": str(exc)[:500],
+        }
+
+    bundle = insert_translation_bundle_draft(
+        app=app,
+        locale=locale,
+        source_locale="en",
+        source_version=source_version,
+        messages={**base_messages, **translations},
+    )
+    update_translation_request_status(
+        app=app,
+        locale=locale,
+        source_version=source_version,
+        status="needs_review",
+        task_id=task_id,
+    )
+    emit_task_event(
+        task_id,
+        "info",
+        {
+            "message": "Listen translation draft created",
+            "locale": locale,
+            "message_count": len(translations),
+            "bundle_id": str(bundle["id"]),
+        },
+    )
+    return {
+        "status": "needs_review",
+        "locale": locale,
+        "source_version": source_version,
+        "bundle_id": str(bundle["id"]),
+        "message_count": len(bundle["messages_json"]),
+    }
+
+
 MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "health_check": _handle_health_check,
     "repair": _handle_repair,
+    "repair_duplicate_tracks": _handle_repair_duplicate_tracks,
     "library_pipeline": _handle_library_pipeline,
     "delete_artist": _handle_delete_artist,
     "delete_album": _handle_delete_album,
@@ -2544,6 +2703,7 @@ MANAGEMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "generate_system_playlist": _handle_generate_system_playlist,
     "refresh_system_smart_playlists": _handle_refresh_system_smart_playlists,
     "persist_playlist_cover": _handle_persist_playlist_cover,
+    "draft_i18n_translation": _handle_draft_i18n_translation,
     "write_portable_metadata": _handle_write_portable_metadata,
     "rehydrate_portable_metadata": _handle_rehydrate_portable_metadata,
     "export_rich_metadata": _handle_export_rich_metadata,

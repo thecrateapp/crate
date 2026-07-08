@@ -118,6 +118,48 @@ describe("Explore", () => {
     expect(screen.queryByText("12 artists indexed")).toBeNull();
   });
 
+  it("localizes the Explore landing sections", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        playlists: [],
+        moods: [],
+        filters: {
+          genres: [
+            {
+              name: "Mathcore",
+              count: 12,
+              description: "Angular hardcore, odd meters and controlled chaos.",
+              top_artists: ["Converge"],
+              cover_url: "/api/genres/mathcore/cover",
+            },
+          ],
+          decades: ["1990s"],
+          formats: [],
+          moods: [],
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore",
+      path: "/explore",
+      locale: "es",
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "Explorar" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Empieza desde una canción, artista, álbum o género."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Salas de género")).toBeInTheDocument();
+    expect(screen.getByText("Túneles temporales")).toBeInTheDocument();
+    expect(screen.getByText("Sala de género")).toBeInTheDocument();
+  });
+
   it("opens genre detail using backend-provided genre slug", () => {
     vi.mocked(useApi).mockImplementation((url: string | null) => {
       if (url === "/api/browse/explore-page") {

@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TopBar } from "./TopBar";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 vi.mock("@/components/layout/topbar/TopBarSearch", () => ({
   TopBarSearch: () => <div data-testid="topbar-search" />,
@@ -14,11 +14,7 @@ vi.mock("@/components/layout/topbar/TopBarUserMenu", () => ({
 
 describe("TopBar", () => {
   it("keeps search and user menu visible by default", () => {
-    render(
-      <MemoryRouter>
-        <TopBar />
-      </MemoryRouter>,
-    );
+    renderWithListenProviders(<TopBar />);
 
     expect(screen.getByTestId("topbar-actions")).toHaveClass("flex");
     expect(screen.getByTestId("topbar-search")).toBeInTheDocument();
@@ -26,14 +22,23 @@ describe("TopBar", () => {
   });
 
   it("removes search, user menu, and their action container on overlay pages", () => {
-    render(
-      <MemoryRouter>
-        <TopBar hideMobileActions />
-      </MemoryRouter>,
-    );
+    renderWithListenProviders(<TopBar hideMobileActions />);
 
     expect(screen.queryByTestId("topbar-actions")).toBeNull();
     expect(screen.queryByTestId("topbar-search")).toBeNull();
     expect(screen.queryByTestId("topbar-user-menu")).toBeNull();
+  });
+
+  it("localizes navigation controls", () => {
+    renderWithListenProviders(<TopBar />, { locale: "es" });
+
+    expect(screen.getByRole("button", { name: "Volver" })).toHaveAttribute(
+      "title",
+      "Volver",
+    );
+    expect(screen.getByRole("button", { name: "Avanzar" })).toHaveAttribute(
+      "title",
+      "Avanzar",
+    );
   });
 });

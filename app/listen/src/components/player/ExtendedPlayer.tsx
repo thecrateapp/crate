@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, Settings, SlidersHorizontal } from "@crate/ui/icons";
 
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
@@ -37,14 +38,15 @@ interface ExtendedPlayerProps {
   onClose: () => void;
 }
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "queue", label: "Queue" },
-  { id: "suggested", label: "Suggested" },
-  { id: "lyrics", label: "Lyrics" },
-  { id: "info", label: "Info" },
+const TABS: { id: TabId; labelKey: string }[] = [
+  { id: "queue", labelKey: "player.queue" },
+  { id: "suggested", labelKey: "player.suggested" },
+  { id: "lyrics", labelKey: "player.lyrics" },
+  { id: "info", labelKey: "player.info" },
 ];
 
 export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const {
@@ -212,7 +214,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         <div className="z-app-header absolute top-4 right-4 left-4 flex justify-between">
           <button
             onClick={closeWithFeedback}
-            aria-label="Close player"
+            aria-label={t("player.close")}
             className="rounded-full bg-black/30 p-2 text-white/60 backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
           >
             <ChevronDown size={20} />
@@ -231,7 +233,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                 setShowEqualizer((value) => !value);
                 setShowVizSettings(false);
               }}
-              aria-label="Equalizer"
+              aria-label={t("player.equalizer")}
               className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
                 showEqualizer
                   ? "bg-primary/20 text-primary"
@@ -243,7 +245,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
             <button
               ref={vizSettingsButtonRef}
               onClick={() => setShowVizSettings(!showVizSettings)}
-              aria-label="Visualizer settings"
+              aria-label={t("player.visualizerSettings")}
               disabled={!isVisualizerMode}
               className={`rounded-full p-2 backdrop-blur-sm transition-colors ${
                 !isVisualizerMode
@@ -416,7 +418,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
                   : "text-white/40 hover:text-white/60"
               }`}
             >
-              {item.label}
+              {t(item.labelKey)}
             </button>
           ))}
         </div>

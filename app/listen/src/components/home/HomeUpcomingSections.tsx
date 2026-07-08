@@ -1,4 +1,6 @@
 import { Link } from "react-router";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   Calendar,
   Disc3,
@@ -24,18 +26,21 @@ import type {
 } from "./home-model";
 import { SectionHeader, UpcomingPreviewRow } from "./HomeSections";
 
-function formatUpcomingDate(date?: string): string | null {
+function formatUpcomingDate(
+  date: string | undefined,
+  locale: string,
+): string | null {
   if (!date) return null;
-  return new Date(`${date}T12:00:00`).toLocaleDateString("en-US", {
+  return new Date(`${date}T12:00:00`).toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
   });
 }
 
-function insightLabel(type: HomeUpcomingInsight["type"]): string {
-  if (type === "show_prep") return "Show prep";
-  if (type === "one_week") return "This week";
-  return "One month";
+function insightLabel(type: HomeUpcomingInsight["type"], t: TFunction): string {
+  if (type === "show_prep") return t("home.radar.insight.showPrep");
+  if (type === "one_week") return t("home.radar.insight.thisWeek");
+  return t("home.radar.insight.oneMonth");
 }
 
 export function HomeUpcomingSection({
@@ -49,11 +54,12 @@ export function HomeUpcomingSection({
   onOpenUpcoming: () => void;
   onPlaySetlist?: (item: HomeUpcomingItem) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const nextUpcoming = previewItems[0] || null;
   if (!nextUpcoming) return null;
 
   const isShow = nextUpcoming.type === "show";
-  const nextUpcomingDate = formatUpcomingDate(nextUpcoming.date);
+  const nextUpcomingDate = formatUpcomingDate(nextUpcoming.date, i18n.language);
   const artistImage =
     resolveMaybeApiAssetUrl(nextUpcoming.cover_url) ||
     artistBackgroundApiUrl(
@@ -102,9 +108,9 @@ export function HomeUpcomingSection({
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Radar"
-        subtitle="Next shows and releases from the artists you follow."
-        actionLabel="Open Radar"
+        title={t("home.radar.title")}
+        subtitle={t("home.radar.subtitle")}
+        actionLabel={t("home.radar.open")}
         onAction={onOpenUpcoming}
       />
 
@@ -128,7 +134,9 @@ export function HomeUpcomingSection({
             <div>
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/12 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
                 {isShow ? <RadioTower size={12} /> : <Disc3 size={12} />}
-                {isShow ? "Next show" : "Next release"}
+                {isShow
+                  ? t("home.radar.badge.nextShow")
+                  : t("home.radar.badge.nextRelease")}
               </div>
 
               <h2 className="max-w-3xl text-3xl font-extrabold leading-none tracking-tight text-foreground sm:text-4xl">
@@ -146,7 +154,7 @@ export function HomeUpcomingSection({
                 {nextUpcomingDate ? (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                      Date
+                      {t("home.radar.meta.date")}
                     </div>
                     <div className="mt-1 text-sm font-semibold text-foreground">
                       {nextUpcomingDate}
@@ -156,7 +164,7 @@ export function HomeUpcomingSection({
                 {isShow && nextUpcoming.venue ? (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                      Venue
+                      {t("home.radar.meta.venue")}
                     </div>
                     <div className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-foreground">
                       <MapPin size={12} className="text-primary" />
@@ -167,7 +175,7 @@ export function HomeUpcomingSection({
                 {!isShow && nextUpcoming.status ? (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2 backdrop-blur">
                     <div className="text-[10px] uppercase tracking-[0.16em] text-white/40">
-                      State
+                      {t("home.radar.meta.state")}
                     </div>
                     <div className="mt-1 text-sm font-semibold capitalize text-foreground">
                       {nextUpcoming.status}
@@ -176,7 +184,7 @@ export function HomeUpcomingSection({
                 ) : null}
                 {nextUpcoming.user_attending && isShow ? (
                   <div className="rounded-2xl border border-primary/20 bg-primary/12 px-3 py-2 text-sm font-semibold text-primary backdrop-blur">
-                    Going
+                    {t("radar.show.going")}
                   </div>
                 ) : null}
               </div>
@@ -189,7 +197,7 @@ export function HomeUpcomingSection({
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Play size={15} className="fill-current" />
-                    Play probable setlist
+                    {t("radar.show.playSetlist")}
                   </button>
                 ) : null}
                 {!isShow && releasePath ? (
@@ -198,7 +206,7 @@ export function HomeUpcomingSection({
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     <Play size={15} className="fill-current" />
-                    Open album
+                    {t("home.radar.openAlbum")}
                   </Link>
                 ) : null}
                 <button
@@ -206,7 +214,7 @@ export function HomeUpcomingSection({
                   className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
                 >
                   <Calendar size={15} />
-                  View Radar
+                  {t("home.radar.viewRadar")}
                 </button>
                 {!isShow && nextUpcoming.tidal_url ? (
                   <a
@@ -216,7 +224,7 @@ export function HomeUpcomingSection({
                     className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
                   >
                     <ExternalLink size={15} />
-                    Open source
+                    {t("home.radar.openSource")}
                   </a>
                 ) : null}
                 {isShow && artistPath ? (
@@ -224,7 +232,7 @@ export function HomeUpcomingSection({
                     to={artistPath}
                     className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.1]"
                   >
-                    Artist
+                    {t("common.artist")}
                   </Link>
                 ) : null}
               </div>
@@ -236,11 +244,13 @@ export function HomeUpcomingSection({
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
               <Calendar size={12} />
-              Next up
+              {t("home.radar.nextUp")}
             </div>
             <div className="text-[10px] uppercase tracking-[0.16em] text-primary">
-              {summary?.show_count ?? 0} shows · {summary?.release_count ?? 0}{" "}
-              releases
+              {t("home.radar.summary", {
+                shows: summary?.show_count ?? 0,
+                releases: summary?.release_count ?? 0,
+              })}
             </div>
           </div>
           <div className="space-y-1">
@@ -269,14 +279,15 @@ export function HomeShowPrepSection({
   onPlaySetlist: (insight: HomeUpcomingInsight) => void;
   onSaveReminder: (insight: HomeUpcomingInsight) => void;
 }) {
+  const { t } = useTranslation();
   if (!insights.length) return null;
 
   return (
     <section className="space-y-4">
       <SectionHeader
-        title="Show prep"
-        subtitle="A couple of timely prompts from the shows you're planning to attend."
-        actionLabel="Open Radar"
+        title={t("home.radar.showPrep.title")}
+        subtitle={t("home.radar.showPrep.subtitle")}
+        actionLabel={t("home.radar.open")}
         onAction={onOpenUpcoming}
       />
 
@@ -290,7 +301,7 @@ export function HomeShowPrepSection({
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
                   <Sparkles size={12} />
-                  {insightLabel(insight.type)}
+                  {insightLabel(insight.type, t)}
                 </div>
                 <h3 className="mt-3 text-lg font-bold text-foreground">
                   {insight.title}
@@ -299,7 +310,7 @@ export function HomeShowPrepSection({
               </div>
               {insight.weight === "high" ? (
                 <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-primary">
-                  Heavy rotation
+                  {t("home.radar.showPrep.heavyRotation")}
                 </div>
               ) : null}
             </div>
@@ -315,7 +326,7 @@ export function HomeShowPrepSection({
                   className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <Play size={14} fill="currentColor" />
-                  Play probable setlist
+                  {t("radar.show.playSetlist")}
                 </button>
               ) : null}
               <button
@@ -323,7 +334,7 @@ export function HomeShowPrepSection({
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:text-foreground"
               >
                 <Calendar size={14} />
-                Save for later
+                {t("home.radar.showPrep.saveForLater")}
               </button>
             </div>
           </div>

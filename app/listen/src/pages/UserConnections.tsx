@@ -1,5 +1,6 @@
 import { Link, useLocation, useParams } from "react-router";
 import { ArrowLeft, Loader2, UserPlus, Users } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import { useApi } from "@/hooks/use-api";
 import { useUserAvatarUrl } from "@/hooks/use-user-avatar-url";
@@ -46,11 +47,14 @@ function UserAvatar({
 }
 
 export function UserConnections() {
+  const { t } = useTranslation();
   const { username } = useParams<{ username: string }>();
   const location = useLocation();
   const mode = location.pathname.endsWith("/following")
     ? "following"
     : "followers";
+  const title =
+    mode === "following" ? t("people.following") : t("people.followers");
   const { data, loading } = useApi<UserListItem[]>(
     username
       ? `/api/users/${encodeURIComponent(username)}/${mode}?limit=200`
@@ -65,16 +69,14 @@ export function UserConnections() {
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={14} />
-          Back to profile
+          {t("userConnections.backToProfile")}
         </Link>
         <div className="mt-4 flex items-center gap-3">
           <Users size={18} className="text-cyan-300" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground capitalize">
-              {mode}
-            </h1>
+            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Public connections for @{username}.
+              {t("userConnections.subtitle", { username })}
             </p>
           </div>
         </div>
@@ -89,7 +91,7 @@ export function UserConnections() {
           <div className="space-y-3">
             {data.map((item) => {
               const label =
-                item.display_name || item.username || "Unknown user";
+                item.display_name || item.username || t("people.unknownUser");
               return (
                 <UserProfileLink
                   key={`${mode}-${item.id}`}
@@ -107,12 +109,14 @@ export function UserConnections() {
                       {label}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {item.username ? `@${item.username}` : "No username yet"}
+                      {item.username
+                        ? `@${item.username}`
+                        : t("people.noUsername")}
                     </div>
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/65">
                     <UserPlus size={13} />
-                    View profile
+                    {t("people.viewProfile")}
                   </div>
                 </UserProfileLink>
               );
@@ -120,7 +124,9 @@ export function UserConnections() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-muted-foreground">
-            No {mode} yet.
+            {mode === "following"
+              ? t("userConnections.empty.following")
+              : t("userConnections.empty.followers")}
           </div>
         )}
       </section>

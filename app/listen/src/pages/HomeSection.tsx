@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft } from "@crate/ui/icons";
 import { toast } from "sonner";
@@ -56,6 +57,7 @@ function homePlaylistPath(playlistId: string): string {
 }
 
 export function HomeSection() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { sectionId } = useParams<{ sectionId: HomeSectionId }>();
@@ -85,7 +87,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info("This playlist is still warming up");
+        toast.info(t("home.playlists.warming"));
         return;
       }
       playAll(queue, 0, {
@@ -94,7 +96,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error("Failed to load playlist");
+      toast.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -103,7 +105,7 @@ export function HomeSection() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info("This playlist is still warming up");
+        toast.info(t("home.playlists.warming"));
         return;
       }
       playAll(shuffleArray(queue), 0, {
@@ -112,7 +114,7 @@ export function HomeSection() {
         id: playlist.id,
       });
     } catch {
-      toast.error("Failed to load playlist");
+      toast.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -123,12 +125,12 @@ export function HomeSection() {
         playlistName: item.name,
       });
       if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
+        toast.info(t("actions.playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start playlist radio");
+      toast.error(t("actions.playlist.toasts.radioFailed"));
     }
   }
 
@@ -145,7 +147,7 @@ export function HomeSection() {
           50,
         );
         if (!radio.tracks.length) {
-          toast.info("Artist radio is not available yet");
+          toast.info(t("actions.artist.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
@@ -162,24 +164,26 @@ export function HomeSection() {
           albumName: station.album_name || station.title,
         });
         if (!radio.tracks.length) {
-          toast.info("Album radio is not available yet");
+          toast.info(t("actions.album.toasts.radioUnavailable"));
           return;
         }
         playAll(radio.tracks, 0, radio.source);
       }
     } catch {
-      toast.error("Failed to start radio");
+      toast.error(t("home.radio.toasts.startFailed"));
     }
   }
 
   if (loading) {
-    return <CrateLoader label="Loading section." />;
+    return <CrateLoader label={t("home.section.loading")} />;
   }
 
   if (!data) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-muted-foreground">Section not found</p>
+        <p className="text-sm text-muted-foreground">
+          {t("home.section.notFound")}
+        </p>
       </div>
     );
   }
@@ -191,7 +195,7 @@ export function HomeSection() {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft size={16} />
-        Back
+        {t("common.back")}
       </button>
 
       <div>
@@ -202,11 +206,10 @@ export function HomeSection() {
       {!data.items.length ? (
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-12 text-center">
           <p className="text-sm font-medium text-foreground">
-            Nothing ready here yet
+            {t("home.section.empty.title")}
           </p>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Crate could not find enough playable, non-duplicated tracks for this
-            section right now.
+            {t("home.section.empty.description")}
           </p>
         </div>
       ) : null}
@@ -298,7 +301,7 @@ export function HomeSection() {
               artistId={artist.artist_id}
               artistEntityUid={artist.artist_entity_uid}
               artistSlug={artist.artist_slug}
-              subtitle={`${artist.play_count} plays`}
+              subtitle={t("common.playCount", { count: artist.play_count })}
               layout="grid"
               fillGrid
             />

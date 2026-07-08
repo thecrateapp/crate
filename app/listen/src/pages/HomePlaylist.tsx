@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router";
 import { Play, Radio, Share2, Shuffle, Sparkles } from "@crate/ui/icons";
 import type { ContextMenuEntry } from "@crate/ui/domain/actions";
@@ -64,6 +65,7 @@ export function newArrivalsWindowLabel(
 }
 
 export function HomePlaylist() {
+  const { t } = useTranslation();
   const { playlistId } = useParams<{ playlistId: string }>();
   const { playAll } = usePlayerActions();
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -157,12 +159,12 @@ export function HomePlaylist() {
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
+        toast.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start playlist radio");
+      toast.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -181,9 +183,9 @@ export function HomePlaylist() {
           }),
         ],
       });
-      toast.success("Track added to playlist");
+      toast.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error("Failed to add track to playlist");
+      toast.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -194,13 +196,15 @@ export function HomePlaylist() {
   }
 
   if (loading) {
-    return <CrateLoader label="Loading playlist." />;
+    return <CrateLoader label={t("playlist.loading")} />;
   }
 
   if (!data) {
     return (
       <div className="space-y-4 py-16 text-center">
-        <p className="text-sm text-muted-foreground">Playlist not found</p>
+        <p className="text-sm text-muted-foreground">
+          {t("playlist.notFound")}
+        </p>
       </div>
     );
   }
@@ -209,15 +213,15 @@ export function HomePlaylist() {
     {
       key: "radio",
       label: "Radio",
-      ariaLabel: "Playlist Radio",
+      ariaLabel: t("playlist.actions.radio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onClick: () => void handleRadio(),
     },
     {
       key: "share",
-      label: "Share",
-      ariaLabel: "Share",
+      label: t("common.share"),
+      ariaLabel: t("common.share"),
       icon: Share2,
       onClick: () => void handleShare(),
     },
@@ -225,21 +229,21 @@ export function HomePlaylist() {
   const playlistMenuItems: ContextMenuEntry[] = [
     {
       key: "play",
-      label: "Play playlist",
+      label: t("playlist.actions.playPlaylist"),
       icon: Play,
       disabled: playerTracks.length === 0,
       onSelect: handlePlay,
     },
     {
       key: "shuffle",
-      label: "Shuffle playlist",
+      label: t("playlist.actions.shufflePlaylist"),
       icon: Shuffle,
       disabled: playerTracks.length === 0,
       onSelect: handleShuffle,
     },
     {
       key: "radio",
-      label: "Start playlist radio",
+      label: t("playlist.actions.startRadio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onSelect: handleRadio,
@@ -250,16 +254,16 @@ export function HomePlaylist() {
     },
     {
       key: "share",
-      label: "Share playlist",
+      label: t("playlist.actions.sharePlaylist"),
       icon: Share2,
       onSelect: handleShare,
     },
   ];
   const playlistMetaItems = [
-    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    t("common.trackCountLabel", { count: data.track_count }),
     data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
     releaseWindowLabel,
-    "Generated for you",
+    t("playlist.generatedForYou"),
   ];
   const renderArtwork = (className: string) =>
     data.kind === "core" ? (
@@ -278,7 +282,7 @@ export function HomePlaylist() {
     <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6">
       <PlaylistHeroSection
         title={data.name}
-        subtitle="Generated playlist"
+        subtitle={t("playlist.subtitle.generated")}
         description={data.description}
         metaItems={playlistMetaItems}
         badges={
@@ -307,13 +311,13 @@ export function HomePlaylist() {
         {data.tracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              This playlist has no tracks yet
+              {t("playlist.empty.noTracks")}
             </p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              No tracks match this filter
+              {t("playlist.empty.noFilter")}
             </p>
           </div>
         ) : (

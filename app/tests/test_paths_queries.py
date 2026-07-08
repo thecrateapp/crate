@@ -590,3 +590,488 @@ class TestPathsBlissCandidateQueries:
             )
             is None
         )
+
+
+class TestPathsSceneCandidateQueries:
+    def test_get_artist_scene_profile_resolves_by_id_and_sorts_genres(self, pg_db):
+        from crate.db.queries.paths_scene_queries import get_artist_scene_profile
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Profile Artist"})
+        pg_db.set_artist_genres(
+            "Profile Artist",
+            [
+                ("rock", 0.64, "test"),
+                ("classic rock", 1.0, "test"),
+                ("british", 0.76, "test"),
+            ],
+        )
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET country = 'GB', area = 'Liverpool', formed = '1960'
+                    WHERE name = 'Profile Artist'
+                    """
+                )
+            )
+            row = (
+                session.execute(
+                    text("SELECT id FROM library_artists WHERE name = 'Profile Artist'")
+                )
+                .mappings()
+                .first()
+            )
+
+        profile = get_artist_scene_profile(str(row["id"]))
+
+        assert profile is not None
+        assert profile["name"] == "Profile Artist"
+        assert [genre["slug"] for genre in profile["genres"]] == [
+            "rock",
+            "british",
+        ]
+        assert profile["country"] == "GB"
+        assert profile["area"] == "Liverpool"
+        assert profile["formed"] == "1960"
+        assert profile["genres"][0]["raw_slug"] == "classic-rock"
+
+    def test_list_artist_scene_anchor_candidates_uses_artist_scope_and_user_signal(
+        self, pg_db
+    ):
+        from crate.db.queries.paths_scene_queries import (
+            list_artist_scene_anchor_candidates,
+        )
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "Anchor Artist"})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "Anchor Artist",
+                "name": "Anchor Album",
+                "path": "/music/Anchor Artist/Anchor Album",
+                "track_count": 2,
+                "total_size": 2000,
+                "total_duration": 360.0,
+                "formats": ["flac"],
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "Anchor Artist",
+                "album": "Anchor Album",
+                "filename": "01-canonical.flac",
+                "title": "Canonical Song",
+                "path": "/music/Anchor Artist/Anchor Album/01-canonical.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "Anchor Artist",
+                "album": "Anchor Album",
+                "filename": "02-personal.flac",
+                "title": "Personal Deep Cut",
+                "path": "/music/Anchor Artist/Anchor Album/02-personal.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.set_artist_genres("Anchor Artist", [("punk", 0.98, "test")])
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET listeners = 1000000, popularity_score = 0.75
+                    WHERE name = 'Anchor Artist'
+                    """
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET bliss_vector = CAST(:vector AS DOUBLE PRECISION[]),
+                        popularity_score = CASE
+                            WHEN title = 'Canonical Song' THEN 0.95
+                            ELSE 0.45
+                        END
+                    WHERE album_id = :album_id
+                    """
+                ),
+                {"album_id": album_id, "vector": [0.1] * 20},
+            )
+            personal = (
+                session.execute(
+                    text(
+                        "SELECT id FROM library_tracks WHERE title = 'Personal Deep Cut'"
+                    )
+                )
+                .mappings()
+                .first()
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id, title, artist,
+                        album, play_count, complete_play_count, minutes_listened
+                    )
+                    VALUES (
+                        1, 'all_time', 'track:' || CAST(:track_id AS text),
+                        :track_id, 'Personal Deep Cut', 'Anchor Artist',
+                        'Anchor Album', 18, 18, 54
+                    )
+                    ON CONFLICT (user_id, stat_window, entity_key) DO UPDATE
+                    SET play_count = EXCLUDED.play_count
+                    """
+                ),
+                {"track_id": personal["id"]},
+            )
+
+        rows = list_artist_scene_anchor_candidates("Anchor Artist", user_id=1)
+
+        assert [row["artist"] for row in rows] == ["Anchor Artist", "Anchor Artist"]
+        assert rows[0]["title"] == "Personal Deep Cut"
+        assert rows[0]["user_play_count"] == 18
+        assert rows[0]["membership_score"] == 1.0
+
+    def test_list_scene_path_candidates_downweights_taxonomy_alias_membership(
+        self, pg_db
+    ):
+        from crate.db.queries.paths_scene_queries import list_scene_path_candidates
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        direct_artist = "Canonical Punk Artist"
+        alias_artist = "Ska Adjacent Punk Artist"
+        pg_db.upsert_artist({"name": direct_artist})
+        pg_db.upsert_artist({"name": alias_artist})
+        direct_album_id = pg_db.upsert_album(
+            {
+                "artist": direct_artist,
+                "name": "Direct Album",
+                "path": f"/music/{direct_artist}/Direct Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        alias_album_id = pg_db.upsert_album(
+            {
+                "artist": alias_artist,
+                "name": "Alias Album",
+                "path": f"/music/{alias_artist}/Alias Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": direct_album_id,
+                "artist": direct_artist,
+                "album": "Direct Album",
+                "filename": "01-direct.flac",
+                "title": "Direct Song",
+                "path": f"/music/{direct_artist}/Direct Album/01-direct.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": alias_album_id,
+                "artist": alias_artist,
+                "album": "Alias Album",
+                "filename": "01-alias.flac",
+                "title": "Alias Song",
+                "path": f"/music/{alias_artist}/Alias Album/01-alias.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.set_artist_genres(direct_artist, [("punk", 1.0, "test")])
+        pg_db.set_artist_genres(
+            alias_artist,
+            [("ska", 1.0, "test"), ("punk", 0.76, "test")],
+        )
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO genre_taxonomy_nodes (slug, name)
+                    VALUES ('punk', 'punk')
+                    ON CONFLICT (slug) DO NOTHING
+                    """
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO genre_taxonomy_aliases (alias_slug, alias_name, genre_id)
+                    SELECT 'ska', 'ska', id
+                    FROM genre_taxonomy_nodes
+                    WHERE slug = 'punk'
+                    ON CONFLICT (alias_slug) DO UPDATE
+                    SET alias_name = EXCLUDED.alias_name,
+                        genre_id = EXCLUDED.genre_id
+                    """
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET bliss_vector = CAST(:vector AS DOUBLE PRECISION[]),
+                        popularity_score = 0.8
+                    WHERE album_id IN (:direct_album_id, :alias_album_id)
+                    """
+                ),
+                {
+                    "direct_album_id": direct_album_id,
+                    "alias_album_id": alias_album_id,
+                    "vector": [0.1] * 20,
+                },
+            )
+
+        rows_by_genre = list_scene_path_candidates(["punk"], limit_per_genre=20)
+        rows_by_artist = {
+            row["artist"]: row for row in rows_by_genre["punk"]
+        }
+
+        assert rows_by_artist[direct_artist]["membership_score"] == 1.0
+        assert rows_by_artist[alias_artist]["membership_score"] == 0.76
+
+    def test_list_scene_path_candidates_limits_tracks_per_artist(self, pg_db):
+        from crate.db.queries.paths_scene_queries import list_scene_path_candidates
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        dominant_artist = "Dominant Punk Artist"
+        other_artist = "Other Punk Artist"
+        pg_db.upsert_artist({"name": dominant_artist})
+        pg_db.upsert_artist({"name": other_artist})
+        dominant_album_id = pg_db.upsert_album(
+            {
+                "artist": dominant_artist,
+                "name": "Dominant Album",
+                "path": f"/music/{dominant_artist}/Dominant Album",
+                "track_count": 8,
+                "total_size": 8000,
+                "total_duration": 1440.0,
+                "formats": ["flac"],
+            }
+        )
+        other_album_id = pg_db.upsert_album(
+            {
+                "artist": other_artist,
+                "name": "Other Album",
+                "path": f"/music/{other_artist}/Other Album",
+                "track_count": 1,
+                "total_size": 1000,
+                "total_duration": 180.0,
+                "formats": ["flac"],
+            }
+        )
+        for index in range(8):
+            pg_db.upsert_track(
+                {
+                    "album_id": dominant_album_id,
+                    "artist": dominant_artist,
+                    "album": "Dominant Album",
+                    "filename": f"{index + 1:02d}-dominant.flac",
+                    "title": f"Dominant Song {index + 1}",
+                    "path": f"/music/{dominant_artist}/Dominant Album/{index + 1:02d}.flac",
+                    "duration": 180.0,
+                    "size": 1000,
+                    "format": "flac",
+                }
+            )
+        pg_db.upsert_track(
+            {
+                "album_id": other_album_id,
+                "artist": other_artist,
+                "album": "Other Album",
+                "filename": "01-other.flac",
+                "title": "Other Song",
+                "path": f"/music/{other_artist}/Other Album/01-other.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.set_artist_genres(
+            dominant_artist,
+            [("punk", 0.98, "test")],
+        )
+        pg_db.set_artist_genres(other_artist, [("punk", 0.9, "test")])
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET popularity_score = CASE
+                            WHEN name = :dominant_artist THEN 0.95
+                            ELSE 0.2
+                        END,
+                        listeners = CASE
+                            WHEN name = :dominant_artist THEN 5000000
+                            ELSE 50000
+                        END
+                    WHERE name IN (:dominant_artist, :other_artist)
+                    """
+                ),
+                {
+                    "dominant_artist": dominant_artist,
+                    "other_artist": other_artist,
+                },
+            )
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET bliss_vector = CAST(:vector AS DOUBLE PRECISION[]),
+                        popularity_score = 0.8,
+                        lastfm_playcount = 100000
+                    WHERE album_id IN (:dominant_album_id, :other_album_id)
+                    """
+                ),
+                {
+                    "dominant_album_id": dominant_album_id,
+                    "other_album_id": other_album_id,
+                    "vector": [0.1] * 20,
+                },
+            )
+
+        rows_by_genre = list_scene_path_candidates(["punk"], limit_per_genre=4)
+        artists = {row["artist"] for row in rows_by_genre["punk"]}
+
+        assert dominant_artist in artists
+        assert other_artist in artists
+
+    def test_list_scene_path_candidates_includes_genre_and_user_signals(self, pg_db):
+        from crate.db.queries.paths_scene_queries import list_scene_path_candidates
+        from crate.db.tx import transaction_scope
+        from sqlalchemy import text
+
+        pg_db.upsert_artist({"name": "The Clash"})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "The Clash",
+                "name": "London Calling",
+                "path": "/music/The Clash/London Calling",
+                "track_count": 2,
+                "total_size": 1000,
+                "total_duration": 360.0,
+                "formats": ["flac"],
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "The Clash",
+                "album": "London Calling",
+                "filename": "01-london-calling.flac",
+                "title": "London Calling",
+                "path": "/music/The Clash/London Calling/01-london-calling.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": "The Clash",
+                "album": "London Calling",
+                "filename": "02-stay-free.flac",
+                "title": "Stay Free",
+                "path": "/music/The Clash/London Calling/02-stay-free.flac",
+                "duration": 180.0,
+                "size": 1000,
+                "format": "flac",
+            }
+        )
+        pg_db.set_artist_genres("The Clash", [("punk", 0.98, "test")])
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    UPDATE library_artists
+                    SET listeners = 5000000, popularity_score = 0.8
+                    WHERE name = 'The Clash'
+                    """
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    UPDATE library_tracks
+                    SET bliss_vector = CAST(:vector AS DOUBLE PRECISION[]),
+                        popularity_score = CASE
+                            WHEN title = 'London Calling' THEN 0.95
+                            ELSE 0.55
+                        END,
+                        lastfm_playcount = CASE
+                            WHEN title = 'London Calling' THEN 5000000
+                            ELSE 250000
+                        END
+                    WHERE album_id = :album_id
+                    """
+                ),
+                {"album_id": album_id, "vector": [0.1] * 20},
+            )
+            stay_free = (
+                session.execute(
+                    text("SELECT id FROM library_tracks WHERE title = 'Stay Free'")
+                )
+                .mappings()
+                .first()
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id, title, artist,
+                        album, play_count, complete_play_count, minutes_listened
+                    )
+                    VALUES (
+                        1, 'all_time', 'track:' || CAST(:track_id AS text),
+                        :track_id, 'Stay Free', 'The Clash', 'London Calling',
+                        20, 20, 60
+                    )
+                    ON CONFLICT (user_id, stat_window, entity_key) DO UPDATE
+                    SET play_count = EXCLUDED.play_count
+                    """
+                ),
+                {"track_id": stay_free["id"]},
+            )
+
+        rows_by_genre = list_scene_path_candidates(["punk"], user_id=1)
+        rows = rows_by_genre["punk"]
+        stay_free_row = next(row for row in rows if row["title"] == "Stay Free")
+
+        assert stay_free_row["membership_score"] == 0.98
+        assert stay_free_row["artist_popularity_score"] == 0.8
+        assert stay_free_row["track_popularity_score"] == 0.55
+        assert stay_free_row["user_play_count"] == 20
+        assert stay_free_row["artist_genre_slugs"] == ["punk"]

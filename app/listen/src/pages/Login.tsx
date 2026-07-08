@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
@@ -13,6 +14,7 @@ import {
 
 export function Login() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user, loading: authLoading, refetch } = useAuth();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get("return_to") || "/";
@@ -45,7 +47,7 @@ export function Login() {
   }, []);
 
   if (authLoading) {
-    return <CrateLoader variant="screen" label="Loading Crate." />;
+    return <CrateLoader variant="screen" label={t("common.loading")} />;
   }
 
   if (user) {
@@ -76,12 +78,12 @@ export function Login() {
       if (err instanceof ApiError) {
         try {
           const parsed = JSON.parse(err.message);
-          setError(parsed.detail || "Invalid credentials");
+          setError(parsed.detail || t("auth.login.invalidCredentials"));
         } catch {
-          setError(err.message || "Invalid credentials");
+          setError(err.message || t("auth.login.invalidCredentials"));
         }
       } else {
-        setError("Connection error");
+        setError(t("auth.login.connectionError"));
       }
     } finally {
       setSubmitting(false);
@@ -94,13 +96,12 @@ export function Login() {
         <div className="flex flex-col items-center pb-4">
           <img src="/icons/logo.svg" alt="Crate" className="h-16 w-16 mb-2" />
           <h1 className="text-2xl font-bold text-white">Crate</h1>
-          <p className="text-sm text-white/40 -mt-0.5">Own your music</p>
+          <p className="text-sm text-white/40 -mt-0.5">{t("auth.tagline")}</p>
         </div>
 
         {authConfig.invite_only ? (
           <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
-            New accounts are invite-only right now. If you are joining a private
-            beta, open your invite link to register.
+            {t("auth.login.inviteOnly")}
           </div>
         ) : null}
 
@@ -108,7 +109,7 @@ export function Login() {
 
         <div>
           <label htmlFor="email" className="block text-sm text-white/60 mb-1">
-            Email
+            {t("common.email")}
           </label>
           <input
             id="email"
@@ -125,7 +126,7 @@ export function Login() {
             htmlFor="password"
             className="block text-sm text-white/60 mb-1"
           >
-            Password
+            {t("common.password")}
           </label>
           <input
             id="password"
@@ -142,7 +143,7 @@ export function Login() {
           disabled={submitting}
           className="w-full h-10 rounded-lg bg-cyan-400 text-black font-medium text-sm hover:bg-cyan-300 transition-colors disabled:opacity-50"
         >
-          {submitting ? "Signing in..." : "Sign in"}
+          {submitting ? t("auth.login.submitting") : t("auth.login.submit")}
         </button>
 
         <OAuthButtons returnTo={returnTo} />
@@ -158,12 +159,12 @@ export function Login() {
         ) : null}
 
         <p className="text-center text-sm text-white/40">
-          No account?{" "}
+          {t("auth.login.noAccount")}{" "}
           <Link
             to={`/register?return_to=${encodeURIComponent(returnTo)}`}
             className="text-primary hover:underline"
           >
-            Create one
+            {t("auth.login.createOne")}
           </Link>
         </p>
       </form>

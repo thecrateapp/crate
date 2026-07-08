@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   AppMenuButton,
   AppPopoverDivider,
@@ -45,6 +46,7 @@ function getStoredExpanded(): boolean {
 // ── Sidebar ─────────────────────────────────────────────────────
 
 function Sidebar() {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(getStoredExpanded);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const collectionRef = useRef<HTMLDivElement>(null);
@@ -156,7 +158,7 @@ function Sidebar() {
             </span>
             <button
               onClick={toggleExpanded}
-              aria-label="Collapse sidebar"
+              aria-label={t("nav.sidebar.collapse")}
               className="text-white/30 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
             >
               <PanelLeftClose size={CRATE_ICON_SIZE.nav} />
@@ -169,7 +171,7 @@ function Sidebar() {
               navigate("/");
             }}
             className="relative flex h-10 w-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.28)]"
-            aria-label="Expand sidebar"
+            aria-label={t("nav.sidebar.expand")}
           >
             <span
               aria-hidden="true"
@@ -209,7 +211,7 @@ function Sidebar() {
         <NavLink
           to="/"
           end
-          title="Music"
+          title={t("nav.music")}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg transition-colors ${
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
@@ -217,13 +219,15 @@ function Sidebar() {
           }
         >
           <Music size={CRATE_ICON_SIZE.nav} />
-          {expanded && <span className="text-[13px] font-medium">Music</span>}
+          {expanded && (
+            <span className="text-[13px] font-medium">{t("nav.music")}</span>
+          )}
         </NavLink>
 
         {/* Explore */}
         <NavLink
           to="/explore"
-          title="Explore"
+          title={t("nav.explore")}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg transition-colors ${
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
@@ -231,13 +235,15 @@ function Sidebar() {
           }
         >
           <Search size={CRATE_ICON_SIZE.nav} />
-          {expanded && <span className="text-[13px] font-medium">Explore</span>}
+          {expanded && (
+            <span className="text-[13px] font-medium">{t("nav.explore")}</span>
+          )}
         </NavLink>
 
         {/* Radar */}
         <NavLink
           to="/upcoming"
-          title="Radar"
+          title={t("nav.radar")}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg transition-colors ${
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
@@ -245,12 +251,14 @@ function Sidebar() {
           }
         >
           <Radar size={CRATE_ICON_SIZE.nav} />
-          {expanded && <span className="text-[13px] font-medium">Radar</span>}
+          {expanded && (
+            <span className="text-[13px] font-medium">{t("nav.radar")}</span>
+          )}
         </NavLink>
 
         <NavLink
           to="/stats"
-          title="Stats"
+          title={t("nav.stats")}
           className={({ isActive }) =>
             `flex items-center gap-3 rounded-lg transition-colors ${
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
@@ -258,14 +266,16 @@ function Sidebar() {
           }
         >
           <Activity size={CRATE_ICON_SIZE.nav} />
-          {expanded && <span className="text-[13px] font-medium">Stats</span>}
+          {expanded && (
+            <span className="text-[13px] font-medium">{t("nav.stats")}</span>
+          )}
         </NavLink>
 
         {/* Collection with popup */}
         <div className="relative" ref={collectionRef}>
           <button
             onClick={() => setCollectionOpen(!collectionOpen)}
-            title="Collection"
+            title={t("nav.collection")}
             className={`flex items-center gap-3 rounded-lg transition-colors w-full ${
               expanded ? "px-3 py-2" : "w-10 h-10 justify-center"
             } ${
@@ -278,7 +288,7 @@ function Sidebar() {
             {expanded && (
               <>
                 <span className="text-[13px] font-medium flex-1 text-left">
-                  Collection
+                  {t("nav.collection")}
                 </span>
                 <ChevronRight
                   size={CRATE_ICON_SIZE.sm}
@@ -302,16 +312,28 @@ function Sidebar() {
                 {
                   to: "/library?tab=playlists",
                   icon: ListMusic,
-                  label: "Playlists",
+                  label: t("nav.collection.playlists"),
                 },
-                { to: "/library?tab=albums", icon: Disc, label: "Albums" },
+                {
+                  to: "/library?tab=albums",
+                  icon: Disc,
+                  label: t("nav.collection.albums"),
+                },
                 {
                   to: "/library?tab=liked",
                   icon: Heart,
-                  label: "Liked Tracks",
+                  label: t("nav.collection.likedTracks"),
                 },
-                { to: "/library?tab=artists", icon: Users, label: "Artists" },
-                { to: "/bandcamp", icon: BandcampLogo, label: "Bandcamp" },
+                {
+                  to: "/library?tab=artists",
+                  icon: Users,
+                  label: t("nav.collection.artists"),
+                },
+                {
+                  to: "/bandcamp",
+                  icon: BandcampLogo,
+                  label: t("nav.collection.bandcamp"),
+                },
               ].map(({ to, icon: Icon, label }) => (
                 <button
                   key={label}
@@ -337,7 +359,7 @@ function Sidebar() {
         <div className="mt-auto flex justify-center pb-4">
           <button
             onClick={toggleExpanded}
-            aria-label="Expand sidebar"
+            aria-label={t("nav.sidebar.expand")}
             className="text-white/20 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)]"
           >
             <PanelLeftOpen size={CRATE_ICON_SIZE.nav} />
@@ -351,18 +373,38 @@ function Sidebar() {
 // ── Mobile Bottom Nav ───────────────────────────────────────────
 
 const MOBILE_NAV = [
-  { to: "/", icon: Home, label: "Home" },
-  { to: "/explore", icon: Search, label: "Explore" },
-  { to: "/upcoming", icon: Radar, label: "Radar" },
+  { to: "/", icon: Home, labelKey: "nav.home" },
+  { to: "/explore", icon: Search, labelKey: "nav.explore" },
+  { to: "/upcoming", icon: Radar, labelKey: "nav.radar" },
 ] as const;
 
 const COLLECTION_SECTIONS = [
-  { to: "/collection/playlists", icon: ListMusic, label: "Playlists" },
-  { to: "/collection/artists", icon: Users, label: "Artists" },
-  { to: "/collection/albums", icon: Disc, label: "Albums" },
-  { to: "/collection/liked", icon: Heart, label: "Liked tracks" },
-  { to: "/collection/bandcamp", icon: BandcampLogo, label: "Bandcamp" },
-  { to: "/collection/contributions", icon: Upload, label: "Contributions" },
+  {
+    to: "/collection/playlists",
+    icon: ListMusic,
+    labelKey: "nav.collection.playlists",
+  },
+  {
+    to: "/collection/artists",
+    icon: Users,
+    labelKey: "nav.collection.artists",
+  },
+  { to: "/collection/albums", icon: Disc, labelKey: "nav.collection.albums" },
+  {
+    to: "/collection/liked",
+    icon: Heart,
+    labelKey: "nav.collection.likedTracks",
+  },
+  {
+    to: "/collection/bandcamp",
+    icon: BandcampLogo,
+    labelKey: "nav.collection.bandcamp",
+  },
+  {
+    to: "/collection/contributions",
+    icon: Upload,
+    labelKey: "nav.collection.contributions",
+  },
 ] as const;
 
 function hasOverlayHeader(pathname: string, search = "") {
@@ -387,6 +429,7 @@ function hasOverlayHeader(pathname: string, search = "") {
 // ── Shell ───────────────────────────────────────────────────────
 
 export function Shell() {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const location = useLocation();
   const navigate = useNavigate();
@@ -513,7 +556,7 @@ export function Shell() {
           height: "var(--listen-mobile-bottom-nav-content-height)",
         }}
       >
-        {MOBILE_NAV.slice(0, 2).map(({ to, icon: Icon, label }) => (
+        {MOBILE_NAV.slice(0, 2).map(({ to, icon: Icon, labelKey }) => (
           <NavLink
             key={to}
             to={to}
@@ -528,13 +571,13 @@ export function Shell() {
           >
             <Icon size={CRATE_ICON_SIZE.navMobile} />
             <span className="max-w-full truncate text-[9.5px] leading-none">
-              {label}
+              {t(labelKey)}
             </span>
           </NavLink>
         ))}
         <button
           type="button"
-          aria-label="Collection"
+          aria-label={t("nav.collection")}
           onClick={() => setCollectionSheetOpen(true)}
           className={`flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1.5 transition-[color,filter,transform] active:scale-[0.97] ${
             collectionActive
@@ -544,10 +587,10 @@ export function Shell() {
         >
           <Collection size={CRATE_ICON_SIZE.navMobile} />
           <span className="max-w-full truncate text-[9.5px] leading-none">
-            Collection
+            {t("nav.collection")}
           </span>
         </button>
-        {MOBILE_NAV.slice(2).map(({ to, icon: Icon, label }) => (
+        {MOBILE_NAV.slice(2).map(({ to, icon: Icon, labelKey }) => (
           <NavLink
             key={to}
             to={to}
@@ -562,7 +605,7 @@ export function Shell() {
           >
             <Icon size={CRATE_ICON_SIZE.navMobile} />
             <span className="max-w-full truncate text-[9.5px] leading-none">
-              {label}
+              {t(labelKey)}
             </span>
           </NavLink>
         ))}
@@ -578,12 +621,12 @@ export function Shell() {
         >
           <div className="px-4 pb-2 pt-2">
             <h2 className="text-base font-semibold text-foreground">
-              Collection
+              {t("nav.collection")}
             </h2>
           </div>
           <AppPopoverDivider className="mx-2" />
           <div className="p-1.5">
-            {COLLECTION_SECTIONS.map(({ to, icon: Icon, label }) => (
+            {COLLECTION_SECTIONS.map(({ to, icon: Icon, labelKey }) => (
               <AppMenuButton
                 key={to}
                 role="menuitem"
@@ -597,7 +640,7 @@ export function Shell() {
                   size={CRATE_ICON_SIZE.md}
                   className="text-white/55 transition-colors group-hover:text-primary"
                 />
-                <span className="text-sm font-semibold">{label}</span>
+                <span className="text-sm font-semibold">{t(labelKey)}</span>
               </AppMenuButton>
             ))}
           </div>

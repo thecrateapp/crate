@@ -44,6 +44,7 @@ const gaplessMock = vi.hoisted(() => {
     loop = false;
     masterOut: ReturnType<ReturnType<typeof createContext>["createGain"]>;
     playbackRate = 1;
+    pauseCalls = 0;
     playlist = { shuffledIndices: [] as number[], sources: [] as string[] };
     position = 0;
     singleMode = false;
@@ -108,6 +109,10 @@ const gaplessMock = vi.hoisted(() => {
       this.playCalls += 1;
     }
 
+    pause(): void {
+      this.pauseCalls += 1;
+    }
+
     removeAllTracks(): void {
       this.tracks = [];
       this.playlist.sources = [];
@@ -164,6 +169,7 @@ import {
   destroyPlayer,
   initPlayer,
   loadQueue,
+  pause,
   play,
   seekTo,
   setCrossfadeDuration,
@@ -172,6 +178,12 @@ import {
   setSingleMode,
   setVolume,
 } from "@/lib/gapless-player";
+
+async function flushMicrotasks(times = 4): Promise<void> {
+  for (let i = 0; i < times; i += 1) {
+    await Promise.resolve();
+  }
+}
 
 describe("gapless player audio recovery", () => {
   beforeEach(() => {
@@ -259,6 +271,69 @@ describe("gapless player audio recovery", () => {
     expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
     expect(recovered.index).toBe(0);
     expect(recovered.position).toBe(12_000);
+    expect(recovered.playCalls).toBe(1);
+  });
+
+  it("does not rebuild or restart active Tauri playback when foregrounded", async () => {
+    const staleContext = gaplessMock.createContext("running");
+    const freshContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(staleContext, freshContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 1);
+    seekTo(32_000);
+    await play();
+    expect(gaplessMock.instances[0]!.playCalls).toBe(1);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    window.dispatchEvent(new Event("focus"));
+    window.dispatchEvent(new Event("pageshow"));
+
+    await flushMicrotasks();
+    expect(gaplessMock.instances).toHaveLength(1);
+    expect(gaplessMock.instances[0]!.context).toBe(staleContext);
+    expect(gaplessMock.instances[0]!.stopCalls).toBe(0);
+    expect(gaplessMock.instances[0]!.tracks).toEqual([
+      "/tracks/a.flac",
+      "/tracks/b.flac",
+    ]);
+    expect(gaplessMock.instances[0]!.index).toBe(1);
+    expect(gaplessMock.instances[0]!.position).toBe(32_000);
+    expect(gaplessMock.instances[0]!.playCalls).toBe(1);
+  });
+
+  it("upgrades an in-flight Tauri foreground wake before play after pause", async () => {
+    const staleContext = gaplessMock.createContext("running");
+    const freshContext = gaplessMock.createContext("running");
+    gaplessMock.contextQueue.push(staleContext, freshContext);
+
+    initPlayer();
+    loadQueue(["/tracks/a.flac", "/tracks/b.flac"], 0);
+    seekTo(18_000);
+    await play();
+    pause();
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    await play();
+    await flushMicrotasks();
+
+    expect(gaplessMock.instances).toHaveLength(2);
+    expect(gaplessMock.instances[0]!.stopCalls).toBe(1);
+
+    const recovered = gaplessMock.instances[1]!;
+    expect(recovered.context).toBe(freshContext);
+    expect(recovered.tracks).toEqual(["/tracks/a.flac", "/tracks/b.flac"]);
+    expect(recovered.index).toBe(0);
+    expect(recovered.position).toBe(18_000);
     expect(recovered.playCalls).toBe(1);
   });
 });

@@ -9,6 +9,7 @@ from crate.worker_handlers.acquisition import (
     _handle_tidal_download,
     _handle_library_upload,
     _locate_soulseek_download_file,
+    _queue_release_preview_download,
     _register_new_release,
     _select_soulseek_task_downloads,
 )
@@ -501,6 +502,108 @@ def test_new_release_upsert_preserves_manual_cover_and_existing_previews(pg_db):
 
     assert row["source_url"] is None
     assert row["source_name"] is None
+
+
+def test_new_release_upsert_deduplicates_tracklists_and_preview_tracks(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.releases import upsert_new_release
+    from crate.db.tx import read_scope
+
+    release_id = upsert_new_release(
+        artist_name="Gurriers",
+        album_title="Come and See",
+        release_date="2026-07-17",
+        tracks=2,
+        tracklist=[
+            {"position": 1, "title": "Nausea", "duration": 164},
+            {"position": 1, "title": "Nausea", "duration": 164},
+            {"position": 2, "title": "Top Of The Bill", "duration": 180},
+        ],
+        preview_tracks=[
+            {
+                "id": "tidal-1",
+                "title": "Nausea",
+                "url": "https://tidal.com/track/1",
+                "source_url": "https://tidal.com/album/1",
+            },
+            {
+                "title": "Nausea",
+                "url": "https://tidal.com/track/1",
+                "source_url": "https://tidal.com/album/1",
+            },
+        ],
+    )
+
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT tracklist_json, preview_tracks_json
+                    FROM new_releases
+                    WHERE id = :id
+                    """
+                ),
+                {"id": release_id},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert row["tracklist_json"] == [
+        {"position": 1, "title": "Nausea", "duration": 164},
+        {"position": 2, "title": "Top Of The Bill", "duration": 180},
+    ]
+    assert row["preview_tracks_json"] == [
+        {
+            "id": "tidal-1",
+            "title": "Nausea",
+            "url": "https://tidal.com/track/1",
+            "source_url": "https://tidal.com/album/1",
+        }
+    ]
+
+
+def test_queue_release_preview_download_skips_completed_preview(pg_db, monkeypatch):
+    from crate.db.tidal import add_tidal_download
+
+    queued: list[dict] = []
+
+    add_tidal_download(
+        tidal_url="https://tidal.com/album/515052476",
+        tidal_id="515052476",
+        content_type="album",
+        title="Gurriers - Come and See",
+        artist="Gurriers",
+        status="completed",
+        source="new_release_preview",
+        metadata={"preview_for_new_release_id": 91, "preview_album": "Come and See"},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.get_setting",
+        lambda _key, default=None: default or "max",
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.acquisition.create_task_dedup",
+        lambda task_type, params, dedup_key="": (
+            queued.append(
+                {"task_type": task_type, "params": params, "dedup_key": dedup_key}
+            )
+            or "task-preview"
+        ),
+    )
+
+    task_id = _queue_release_preview_download(
+        91,
+        artist_name="Gurriers",
+        source_album="Come and See",
+        source_url="https://tidal.com/album/515052476",
+        cover_url="",
+    )
+
+    assert task_id == ""
+    assert queued == []
 
 
 def test_upcoming_pre_release_queries_use_strict_future_filter(monkeypatch):

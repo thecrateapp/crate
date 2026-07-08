@@ -1,4 +1,6 @@
 import { useMemo, useState, type ChangeEvent } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   Loader2,
   Music,
@@ -8,7 +10,7 @@ import {
 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 
 interface UploadResponse {
   task_id: string;
@@ -16,6 +18,24 @@ interface UploadResponse {
   file_count: number;
   total_bytes: number;
 }
+
+interface ChunkedUploadInitResponse {
+  upload_id: string;
+  file_count: number;
+  chunk_size: number;
+}
+
+interface UploadProgress {
+  done: number;
+  total: number;
+}
+
+interface UploadMusicFilesOptions {
+  chunkedThresholdBytes?: number;
+  onProgress?: (progress: UploadProgress) => void;
+}
+
+const CHUNKED_UPLOAD_THRESHOLD_BYTES = 80 * 1024 * 1024;
 
 function formatBytes(bytes: number): string {
   if (!bytes) return "0 B";
@@ -31,10 +51,100 @@ function formatBytes(bytes: number): string {
   }`;
 }
 
+function totalFileBytes(files: File[]): number {
+  return files.reduce((sum, file) => sum + file.size, 0);
+}
+
+function directUpload(files: File[]): Promise<UploadResponse> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file);
+  }
+  return api<UploadResponse>("/api/acquisition/upload", "POST", formData);
+}
+
+async function chunkedUpload(
+  files: File[],
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<UploadResponse> {
+  const init = await api<ChunkedUploadInitResponse>(
+    "/api/acquisition/upload/chunked",
+    "POST",
+    {
+      files: files.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || null,
+      })),
+    },
+  );
+
+  const totalChunks = files.reduce(
+    (sum, file) => sum + Math.max(1, Math.ceil(file.size / init.chunk_size)),
+    0,
+  );
+  let done = 0;
+
+  for (const [fileIndex, file] of files.entries()) {
+    const chunkCount = Math.max(1, Math.ceil(file.size / init.chunk_size));
+    for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+      const start = chunkIndex * init.chunk_size;
+      const end = Math.min(file.size, start + init.chunk_size);
+      const formData = new FormData();
+      formData.append("file_index", String(fileIndex));
+      formData.append("chunk_index", String(chunkIndex));
+      formData.append(
+        "chunk",
+        file.slice(start, end),
+        `${file.name}.part-${chunkIndex}`,
+      );
+
+      await api(
+        `/api/acquisition/upload/chunked/${init.upload_id}/chunk`,
+        "POST",
+        formData,
+      );
+      done += 1;
+      onProgress?.({ done, total: totalChunks });
+    }
+  }
+
+  return api<UploadResponse>(
+    `/api/acquisition/upload/chunked/${init.upload_id}/complete`,
+    "POST",
+  );
+}
+
+export function uploadMusicFiles(
+  files: File[],
+  options: UploadMusicFilesOptions = {},
+): Promise<UploadResponse> {
+  const threshold =
+    options.chunkedThresholdBytes ?? CHUNKED_UPLOAD_THRESHOLD_BYTES;
+  if (totalFileBytes(files) > threshold) {
+    return chunkedUpload(files, options.onProgress);
+  }
+  return directUpload(files);
+}
+
+function uploadErrorMessage(error: unknown, t: TFunction): string {
+  if (error instanceof ApiError && error.status === 413) {
+    return t("upload.errors.tooLarge");
+  }
+  if (error instanceof ApiError && error.message) {
+    return t("upload.errors.queueWithMessage", { message: error.message });
+  }
+  return t("upload.errors.queue");
+}
+
 export function Upload() {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [lastUpload, setLastUpload] = useState<UploadResponse | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(
+    null,
+  );
 
   const totalBytes = useMemo(
     () => files.reduce((sum, file) => sum + file.size, 0),
@@ -48,27 +158,20 @@ export function Upload() {
   async function handleSubmit() {
     if (files.length === 0) return;
 
-    const formData = new FormData();
-    for (const file of files) {
-      formData.append("files", file);
-    }
-
     setSubmitting(true);
+    setUploadProgress(null);
     try {
-      const response = await api<UploadResponse>(
-        "/api/acquisition/upload",
-        "POST",
-        formData,
-      );
+      const response = await uploadMusicFiles(files, {
+        onProgress: setUploadProgress,
+      });
       setLastUpload(response);
-      toast.success(
-        "Upload queued. Crate is importing your music in the background.",
-      );
+      toast.success(t("upload.toasts.queued"));
       setFiles([]);
-    } catch {
-      toast.error("Failed to queue upload");
+    } catch (error) {
+      toast.error(uploadErrorMessage(error, t));
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -77,15 +180,13 @@ export function Upload() {
       <div className="space-y-2">
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-wider text-muted-foreground">
           <UploadIcon size={12} />
-          Upload music
+          {t("upload.badge")}
         </div>
         <h1 className="text-3xl font-bold text-foreground">
-          Add music to your library
+          {t("upload.title")}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Upload individual tracks or zipped albums. Crate will import them into
-          the shared library, run the usual enrichment pipeline, and add what
-          you uploaded to your collection automatically.
+          {t("upload.subtitle")}
         </p>
       </div>
 
@@ -97,10 +198,10 @@ export function Upload() {
                 <UploadIcon size={24} />
               </div>
               <div className="text-base font-semibold text-foreground">
-                Drop files here or choose files
+                {t("upload.dropzone.title")}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">
-                FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
+                {t("upload.dropzone.formats")}
               </div>
               <input
                 type="file"
@@ -116,18 +217,20 @@ export function Upload() {
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-foreground">
-                      Ready to import
+                      {t("upload.ready.title")}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {files.length} file{files.length === 1 ? "" : "s"} ·{" "}
-                      {formatBytes(totalBytes)}
+                      {t("upload.selectedFiles", {
+                        count: files.length,
+                        size: formatBytes(totalBytes),
+                      })}
                     </div>
                   </div>
                   <button
                     onClick={() => setFiles([])}
                     className="text-xs text-muted-foreground transition-colors hover:text-white/70"
                   >
-                    Clear
+                    {t("common.clear")}
                   </button>
                 </div>
                 <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
@@ -156,17 +259,14 @@ export function Upload() {
 
           <div className="space-y-4 rounded-[24px] border border-white/10 bg-[var(--gradient-bg-50)] p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              What happens next
+              {t("upload.next.title")}
             </h2>
             <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <li>Crate imports the files into the shared library.</li>
-              <li>Library sync and enrichment run in the background.</li>
-              <li>Uploaded tracks are liked for you automatically.</li>
-              <li>Uploaded albums are saved and artists are followed.</li>
-              <li>
-                Your upload is attributed to you, with export and withdrawal
-                controls in Library.
-              </li>
+              <li>{t("upload.next.import")}</li>
+              <li>{t("upload.next.enrichment")}</li>
+              <li>{t("upload.next.liked")}</li>
+              <li>{t("upload.next.saved")}</li>
+              <li>{t("upload.next.attributed")}</li>
             </ul>
             <button
               onClick={handleSubmit}
@@ -178,18 +278,24 @@ export function Upload() {
               ) : (
                 <UploadIcon size={16} />
               )}
-              Import to library
+              {uploadProgress
+                ? t("upload.progress", {
+                    done: uploadProgress.done,
+                    total: uploadProgress.total,
+                  })
+                : t("upload.import")}
             </button>
             {lastUpload ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
                 <div className="flex items-center gap-2 font-medium">
                   <CheckCircle2 size={15} />
-                  Upload queued
+                  {t("upload.status.queued")}
                 </div>
                 <div className="mt-1 text-xs text-emerald-100/80">
-                  Task `{lastUpload.task_id}` is processing{" "}
-                  {lastUpload.file_count} file
-                  {lastUpload.file_count === 1 ? "" : "s"}.
+                  {t("upload.status.processing", {
+                    taskId: lastUpload.task_id,
+                    count: lastUpload.file_count,
+                  })}
                 </div>
               </div>
             ) : null}

@@ -8,6 +8,7 @@ import {
   type AppRouteDefinition,
 } from "@/app-shell/route-table";
 import { Shell } from "@/components/layout/Shell";
+import { TranslationOverlay } from "@/i18n/translation-mode/TranslationOverlay";
 
 function renderRoute(route: AppRouteDefinition) {
   if (route.index) {
@@ -33,6 +34,7 @@ export function AppRouter() {
           {protectedAppRoutes.map(renderRoute)}
         </Route>
       </Routes>
+      <TranslationOverlay />
     </ServerGate>
   );
 }

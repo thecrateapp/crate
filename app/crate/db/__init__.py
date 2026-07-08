@@ -104,6 +104,8 @@ from crate.db.library import (
 
 from crate.db.releases import (
     clear_new_release_preview_source_url,
+    dedupe_release_preview_tracks,
+    dedupe_release_tracklist,
     get_release_by_virtual_album_id,
     merge_new_release_preview_tracks,
     update_new_release_cover,
@@ -197,6 +199,7 @@ from crate.db.tidal import (
     update_tidal_download,
     delete_tidal_download,
     get_next_queued_download,
+    has_new_release_preview_download,
     set_monitored_artist,
     get_monitored_artists,
     is_artist_monitored,

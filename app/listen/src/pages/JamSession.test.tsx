@@ -152,6 +152,21 @@ describe("JamSession lobby (no roomId)", () => {
     expect(screen.getByText("Join from invite")).toBeInTheDocument();
   });
 
+  it("localizes the lobby chrome", () => {
+    mockUseApiData.value = makeRoomsResponse([]);
+    renderWithListenProviders(<JamSession />, { locale: "es" });
+
+    expect(
+      screen.getByRole("heading", { name: "Sesiones Jam" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Empezar una sala")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Cola de viernes noche"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Salas abiertas")).toBeInTheDocument();
+    expect(screen.getByText("Entrar con invitación")).toBeInTheDocument();
+  });
+
   it("shows room name input with create button", () => {
     mockUseApiData.value = makeRoomsResponse([]);
     renderWithListenProviders(<JamSession />);
@@ -582,6 +597,35 @@ describe("JamSession active room - host", () => {
     mockUseApiData.value = makeRoom();
   });
 
+  it("localizes the active room chrome", async () => {
+    renderWithListenProviders(<JamSession />, { locale: "es" });
+
+    expect(screen.getByText("Sala Jam")).toBeInTheDocument();
+    expect(screen.getByText("Conectando con la sala...")).toBeInTheDocument();
+    expect(screen.getByText("Sala pública")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Añadir pista actual" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Miembros" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Cola compartida" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Busca pistas para añadir a esta sala"),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Editar perfil de la sala" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Perfil de la sala" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Guardar perfil")).toBeInTheDocument();
+  });
+
   it("renders room name and description", () => {
     renderWithListenProviders(<JamSession />);
 
@@ -736,12 +780,13 @@ describe("JamSession active room - host", () => {
     const descInput = screen.getByPlaceholderText(
       "Post-punk, cold wave and angular guitars. Mostly 80s and 90s.",
     );
-    await userEvent.clear(descInput);
-    await userEvent.type(descInput, "Updated desc");
-
     const tagsInput = screen.getByPlaceholderText(
       "post-punk, 90s, gothic rock",
     );
+
+    await userEvent.clear(descInput);
+    await userEvent.type(descInput, "Updated desc");
+
     await userEvent.clear(tagsInput);
     await userEvent.type(tagsInput, "new-tag");
 

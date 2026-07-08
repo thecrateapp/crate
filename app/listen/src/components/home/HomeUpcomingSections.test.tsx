@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HomeUpcomingSection } from "@/components/home/HomeUpcomingSections";
 import type { HomeUpcomingItem } from "@/components/home/home-model";
+import { I18nProvider } from "@/i18n";
 
 const PREVIEW_ITEMS: HomeUpcomingItem[] = [
   {
@@ -46,5 +47,9 @@ describe("HomeUpcomingSection", () => {
 });
 
 function renderWithRouter(ui: ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter>
+      <I18nProvider initialLocale="en">{ui}</I18nProvider>
+    </MemoryRouter>,
+  );
 }

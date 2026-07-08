@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -76,6 +77,7 @@ export function BandcampSupportButton({
   iconOnly = false,
   presentation = "default",
 }: BandcampSupportButtonProps) {
+  const { t } = useTranslation();
   const [resolved, setResolved] = useState<ResolvedBandcampLink | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -134,14 +136,14 @@ export function BandcampSupportButton({
     latestImportStatus !== "completed" &&
     !importInProgress;
   const ownedLabel = importInProgress
-    ? "Importing from Bandcamp"
-    : "Owned on Bandcamp";
+    ? t("bandcamp.support.importing")
+    : t("bandcamp.support.owned");
   const label =
     resolvedEntityType === "artist"
-      ? "Support on Bandcamp"
+      ? t("bandcamp.support.artist")
       : canImport
-        ? "Import from Bandcamp"
-        : "Buy this album on Bandcamp";
+        ? t("bandcamp.support.import")
+        : t("bandcamp.support.album");
   const handleClick = async () => {
     if (canImport && link.bandcamp_item_id) {
       setBusy(true);
@@ -151,10 +153,12 @@ export function BandcampSupportButton({
           "POST",
           { bandcamp_item_id: link.bandcamp_item_id, format: "flac" },
         );
-        toast.success(`Bandcamp import queued (${result.task_id})`);
+        toast.success(
+          t("bandcamp.toasts.importQueued", { taskId: result.task_id }),
+        );
       } catch (error) {
         toast.error(
-          (error as Error).message || "Failed to import from Bandcamp",
+          (error as Error).message || t("bandcamp.toasts.importFailed"),
         );
       } finally {
         setBusy(false);
@@ -212,7 +216,9 @@ export function BandcampSupportButton({
         ) : (
           <>
             <span className="hidden sm:inline">{ownedLabel}</span>
-            <span className="sm:hidden">Owned</span>
+            <span className="sm:hidden">
+              {t("bandcamp.support.ownedShort")}
+            </span>
           </>
         )}
       </span>

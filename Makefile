@@ -299,11 +299,16 @@ dev-test-frontend: ## Run frontend lint, typecheck, tests, and builds
 	@echo "$(YELLOW)Frontend: listen lint + typecheck + test + build$(NC)"
 	@npm run --workspace=app/listen lint
 	@npm run --workspace=app/listen typecheck
+	@npm run --workspace=app/listen i18n:check
 	@npm run --workspace=app/listen test
 	@npm run --workspace=app/listen build
 	@echo "$(YELLOW)Frontend: desktop typecheck + build$(NC)"
 	@npm run --workspace=app/listen-desktop typecheck
 	@npm run --workspace=app/listen-desktop build
+
+.PHONY: i18n-check
+i18n-check: ## Validate Listen translation catalogs
+	@npm run --workspace=app/listen i18n:check
 
 .PHONY: regression-api
 regression-api: ## Critical backend contracts (Explore/search/system playlists)

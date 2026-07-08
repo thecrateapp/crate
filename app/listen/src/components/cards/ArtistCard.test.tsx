@@ -19,10 +19,14 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+const { toggleArtistFollowMock } = vi.hoisted(() => ({
+  toggleArtistFollowMock: vi.fn(async () => true),
+}));
+
 vi.mock("@/contexts/ArtistFollowsContext", () => ({
   useArtistFollows: () => ({
     isFollowing: () => false,
-    toggleArtistFollow: vi.fn(async () => true),
+    toggleArtistFollow: toggleArtistFollowMock,
   }),
 }));
 
@@ -52,6 +56,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   mockPointerEnvironment(false);
+  toggleArtistFollowMock.mockClear();
   resolveMaybeApiAssetUrlMock.mockImplementation(
     (url: string | null | undefined) => url ?? null,
   );
@@ -126,6 +131,26 @@ describe("ArtistCard", () => {
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(
       await within(menu).findByRole("menuitem", { name: "Share artist" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps follow/unfollow out of the mobile avatar tap target", async () => {
+    renderWithListenProviders(
+      <ArtistCard name="Dredg" artistId={1} artistSlug="dredg" />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Follow Dredg" }),
+    ).not.toBeInTheDocument();
+
+    const card = screen.getByText("Dredg").closest('[role="button"]');
+    expect(card).not.toBeNull();
+
+    fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
+
+    const menu = await screen.findByRole("menu");
+    expect(
+      await within(menu).findByRole("menuitem", { name: "Follow artist" }),
     ).toBeInTheDocument();
   });
 });

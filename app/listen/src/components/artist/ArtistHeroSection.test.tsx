@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { I18nProvider } from "@/i18n";
 
 import { ArtistHeroSection } from "./ArtistHeroSection";
 
@@ -71,9 +74,13 @@ beforeEach(() => {
   mockDesktopPointer();
 });
 
+function renderWithI18n(ui: ReactNode, locale: "en" | "es" = "en") {
+  return render(<I18nProvider initialLocale={locale}>{ui}</I18nProvider>);
+}
+
 describe("ArtistHeroSection", () => {
   it("keeps artist genres out of the hero surface", () => {
-    render(
+    renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -115,7 +122,7 @@ describe("ArtistHeroSection", () => {
   });
 
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
-    render(
+    renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -179,8 +186,74 @@ describe("ArtistHeroSection", () => {
     ).toHaveTextContent("More");
   });
 
+  it("localizes the hero action chrome", () => {
+    renderWithI18n(
+      <MemoryRouter>
+        <ArtistHeroSection
+          artist={{
+            id: 7,
+            entity_uid: "artist-entity-7",
+            slug: "crossed",
+            name: "Crossed",
+            albums: [],
+            total_tracks: 10,
+            total_size_mb: 120,
+            primary_format: "flac",
+            genres: ["hardcore"],
+            issue_count: 0,
+          }}
+          artistInfo={{
+            bio: "",
+            tags: [],
+            similar: [],
+            listeners: 1000,
+            playcount: 2000,
+            image_url: null,
+            url: "",
+          }}
+          photoUrl="/artist.jpg"
+          tags={["hardcore"]}
+          following={false}
+          onPlay={vi.fn()}
+          onShuffle={vi.fn()}
+          onArtistRadio={vi.fn()}
+          onToggleFollow={vi.fn()}
+          onShare={vi.fn()}
+          onOpenBio={vi.fn()}
+        />
+      </MemoryRouter>,
+      "es",
+    );
+
+    const primary = screen.getByRole("group", {
+      name: "Acciones principales de artista",
+    });
+    expect(
+      within(primary).getByRole("button", { name: "Reproducir" }),
+    ).toHaveTextContent("Reproducir");
+    expect(
+      within(primary).getByRole("button", { name: "Aleatorio" }),
+    ).toHaveTextContent("Aleatorio");
+
+    const secondary = screen.getByRole("group", {
+      name: "Acciones secundarias de artista",
+    });
+    expect(
+      within(secondary).getByRole("button", { name: "Radio de artista" }),
+    ).toHaveTextContent("Radio");
+    expect(
+      within(secondary).getByRole("button", { name: "Seguir" }),
+    ).toHaveTextContent("Seguir");
+    expect(
+      within(secondary).getByRole("button", { name: "Compartir" }),
+    ).toHaveTextContent("Compartir");
+    expect(
+      within(secondary).getByRole("button", { name: "Más" }),
+    ).toHaveTextContent("Más");
+  });
+
   it("keeps the circular artist picture in the desktop hero", () => {
-    render(
+    renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -229,7 +302,7 @@ describe("ArtistHeroSection", () => {
   });
 
   it("renders the desktop more menu outside the horizontally scrolling action row", async () => {
-    render(
+    renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{
@@ -285,7 +358,7 @@ describe("ArtistHeroSection", () => {
   it("uses the mobile Tidal-style artist action layout", async () => {
     mockMobilePointer();
 
-    render(
+    renderWithI18n(
       <MemoryRouter>
         <ArtistHeroSection
           artist={{

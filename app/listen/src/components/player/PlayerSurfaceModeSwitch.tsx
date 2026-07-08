@@ -1,13 +1,19 @@
 import { Disc3, Square, WandSparkles } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import { cn } from "@crate/ui/lib/cn";
 
-const MODES: { id: PlayerSurfaceMode; icon: typeof Disc3; label: string }[] = [
-  { id: "cd", icon: Disc3, label: "CD mode" },
-  { id: "cover", icon: Square, label: "Cover mode" },
-  { id: "visualizer", icon: WandSparkles, label: "Visualizer mode" },
-];
+const MODES: { id: PlayerSurfaceMode; icon: typeof Disc3; labelKey: string }[] =
+  [
+    { id: "cd", icon: Disc3, labelKey: "player.surface.cd" },
+    { id: "cover", icon: Square, labelKey: "player.surface.cover" },
+    {
+      id: "visualizer",
+      icon: WandSparkles,
+      labelKey: "player.surface.visualizer",
+    },
+  ];
 
 interface PlayerSurfaceModeSwitchProps {
   allowVisualizer?: boolean;
@@ -26,6 +32,7 @@ export function PlayerSurfaceModeSwitch({
   size = "sm",
   variant = "boxed",
 }: PlayerSurfaceModeSwitchProps) {
+  const { t } = useTranslation();
   const buttonClass = size === "md" ? "h-10 w-10" : "h-9 w-9";
   const iconSize = size === "md" ? 17 : 15;
   const modes = allowVisualizer
@@ -41,10 +48,11 @@ export function PlayerSurfaceModeSwitch({
         className,
       )}
       role="tablist"
-      aria-label="Player display mode"
+      aria-label={t("player.surface.label")}
     >
-      {modes.map(({ id, icon: Icon, label }) => {
+      {modes.map(({ id, icon: Icon, labelKey }) => {
         const active = mode === id;
+        const label = t(labelKey);
         return (
           <button
             key={id}

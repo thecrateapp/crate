@@ -45,7 +45,12 @@ from crate.db.repositories.tasks import (
     create_task_dedup,
     find_active_task_by_type_params,
 )
-from crate.db.tidal import add_tidal_download, get_tidal_download, update_tidal_download
+from crate.db.tidal import (
+    add_tidal_download,
+    get_tidal_download,
+    has_new_release_preview_download,
+    update_tidal_download,
+)
 from crate.db.repositories.user_library import follow_artist, like_track, save_album
 from crate.task_progress import (
     TaskProgress,
@@ -1230,6 +1235,9 @@ def _queue_release_preview_download(
 
     clean_url = _normalize_tidal_url(source_url)
     tidal_id = clean_url.rstrip("/").split("/")[-1]
+    if has_new_release_preview_download(release_id, tidal_id):
+        return ""
+
     quality = get_setting("tidal_quality", "max")
     download_id = add_tidal_download(
         tidal_url=clean_url,

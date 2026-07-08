@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
@@ -20,12 +21,13 @@ import {
 } from "@/components/actions/shared";
 import { useOffline } from "@/contexts/OfflineContext";
 import { usePlayerActions } from "@/contexts/PlayerContext";
-import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
+import { isOfflineBusy } from "@/lib/offline";
 import { fetchPlaylistRadio } from "@/lib/radio";
 
 export function usePlaylistActionEntries(
   input: PlaylistMenuData,
 ): ItemActionMenuEntry[] {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const {
     supported: offlineSupported,
@@ -33,6 +35,21 @@ export function usePlaylistActionEntries(
     togglePlaylistOffline,
   } = useOffline();
   const offlineState = getPlaylistState(input.playlistId);
+  const offlineActionLabel = (() => {
+    switch (offlineState) {
+      case "ready":
+        return t("actions.offline.removeCopy");
+      case "error":
+        return t("actions.offline.retryCopy");
+      case "queued":
+      case "downloading":
+        return t("actions.offline.downloading");
+      case "syncing":
+        return t("actions.offline.syncing");
+      default:
+        return t("actions.offline.makeAvailable");
+    }
+  })();
 
   return useMemo<ItemActionMenuEntry[]>(() => {
     const entries: ItemActionMenuEntry[] = [];
@@ -41,7 +58,7 @@ export function usePlaylistActionEntries(
       entries.push(
         action({
           key: "play",
-          label: "Play playlist",
+          label: t("actions.playlist.play"),
           icon: Play,
           onSelect: async () => {
             await input.onPlay?.();
@@ -54,7 +71,7 @@ export function usePlaylistActionEntries(
       entries.push(
         action({
           key: "shuffle",
-          label: "Shuffle playlist",
+          label: t("actions.playlist.shuffle"),
           icon: Shuffle,
           onSelect: async () => {
             await input.onShuffle?.();
@@ -67,7 +84,7 @@ export function usePlaylistActionEntries(
       entries.push(
         action({
           key: "radio",
-          label: "Start playlist radio",
+          label: t("actions.playlist.radio"),
           icon: Radio,
           onSelect: async () => {
             await input.onStartRadio?.();
@@ -79,7 +96,7 @@ export function usePlaylistActionEntries(
       entries.push(
         action({
           key: "radio",
-          label: "Start playlist radio",
+          label: t("actions.playlist.radio"),
           icon: Radio,
           onSelect: async () => {
             try {
@@ -88,12 +105,12 @@ export function usePlaylistActionEntries(
                 playlistName: input.name,
               });
               if (!radio.tracks.length) {
-                toast.info("Playlist radio is not available yet");
+                toast.info(t("actions.playlist.toasts.radioUnavailable"));
                 return;
               }
               playAll(radio.tracks, 0, radio.source);
             } catch {
-              toast.error("Failed to start playlist radio");
+              toast.error(t("actions.playlist.toasts.radioFailed"));
             }
           },
         }),
@@ -106,8 +123,8 @@ export function usePlaylistActionEntries(
         action({
           key: "follow",
           label: input.isFollowed
-            ? "Remove from your library"
-            : "Add to your library",
+            ? t("actions.playlist.removeFromLibrary")
+            : t("actions.playlist.addToLibrary"),
           icon: input.isFollowed ? HeartBold : Heart,
           active: input.isFollowed,
           onSelect: async () => {
@@ -122,8 +139,8 @@ export function usePlaylistActionEntries(
       action({
         key: "offline",
         label: input.isSmart
-          ? "Offline is only available for static playlists"
-          : getOfflineActionLabel(offlineState),
+          ? t("actions.playlist.offlineStaticOnly")
+          : offlineActionLabel,
         icon: isOfflineBusy(offlineState)
           ? Loader2
           : offlineState === "ready"
@@ -144,12 +161,13 @@ export function usePlaylistActionEntries(
             });
             toast.success(
               result === "removed"
-                ? "Offline copy removed"
-                : "Playlist available offline",
+                ? t("actions.offline.toasts.removed")
+                : t("actions.playlist.toasts.offlineReady"),
             );
           } catch (error) {
             toast.error(
-              (error as Error).message || "Failed to update offline copy",
+              (error as Error).message ||
+                t("actions.offline.toasts.updateFailed"),
             );
           }
         },
@@ -161,13 +179,24 @@ export function usePlaylistActionEntries(
       entries.push(
         action({
           key: "share",
-          label: "Share playlist",
+          label: t("actions.playlist.share"),
           icon: Share2,
-          onSelect: sharePath(input.href, input.name),
+          onSelect: sharePath(input.href, input.name, {
+            kind: "playlist",
+            copiedToast: t("share.toasts.linkCopied"),
+          }),
         }),
       );
     }
 
     return entries;
-  }, [input, offlineState, offlineSupported, playAll, togglePlaylistOffline]);
+  }, [
+    input,
+    offlineActionLabel,
+    offlineState,
+    offlineSupported,
+    playAll,
+    t,
+    togglePlaylistOffline,
+  ]);
 }

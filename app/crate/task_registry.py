@@ -53,6 +53,7 @@ TASK_TYPE_LABELS: dict[str, str] = {
     "generate_system_playlist": "Playlist Generation",
     "refresh_system_smart_playlists": "Refresh Smart Playlists",
     "persist_playlist_cover": "Save Playlist Cover",
+    "draft_i18n_translation": "Listen Translation Draft",
 }
 
 TASK_TYPE_ICONS: dict[str, str] = {

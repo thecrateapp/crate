@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Loader2, Search, UserRoundPlus, Users } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -63,6 +64,7 @@ function UserAvatar({
 }
 
 export function People() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { data, loading } = useApi<SocialSummary>("/api/me/social");
   const [query, setQuery] = useState("");
@@ -116,10 +118,11 @@ export function People() {
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">People</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {t("people.title")}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Find other listeners, compare taste, and jump into shared
-              sessions.
+              {t("people.subtitle")}
             </p>
           </div>
           <Link
@@ -127,7 +130,7 @@ export function People() {
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
           >
             <Users size={16} />
-            Jam sessions
+            {t("people.jamSessions")}
           </Link>
         </div>
 
@@ -137,15 +140,18 @@ export function People() {
             className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4 hover:bg-cyan-400/10 transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-cyan-300/70">
-              Your profile
+              {t("people.summary.yourProfile")}
             </div>
             <div className="mt-2 text-lg font-semibold text-foreground">
-              {data?.profile.display_name || user?.name || user?.email || "You"}
+              {data?.profile.display_name ||
+                user?.name ||
+                user?.email ||
+                t("people.fallback.you")}
             </div>
             <div className="mt-1 text-sm text-muted-foreground">
               {data?.profile.username
                 ? `@${data.profile.username}`
-                : "Set a username from settings/admin"}
+                : t("people.summary.setUsername")}
             </div>
           </Link>
           <Link
@@ -153,7 +159,7 @@ export function People() {
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Followers
+              {t("people.followers")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {data?.followers_count ?? "—"}
@@ -164,7 +170,7 @@ export function People() {
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:bg-white/[0.05] transition-colors"
           >
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Following
+              {t("people.following")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {data?.following_count ?? "—"}
@@ -172,7 +178,7 @@ export function People() {
           </Link>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">
-              Friends
+              {t("people.friends")}
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">
               {data?.friends_count ?? "—"}
@@ -187,7 +193,7 @@ export function People() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by username or display name"
+            placeholder={t("people.search.placeholder")}
             className="h-7 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-white/40"
           />
         </div>
@@ -196,24 +202,25 @@ export function People() {
           {query.trim() && searching ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 size={15} className="animate-spin" />
-              Searching people…
+              {t("people.search.loading")}
             </div>
           ) : null}
 
           {!query.trim() ? (
             <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
-              Search by username to open public profiles and compare affinity.
+              {t("people.search.emptyPrompt")}
             </div>
           ) : null}
 
           {query.trim() && !searching && results.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-muted-foreground">
-              No users matched “{query.trim()}”.
+              {t("people.search.noMatches", { query: query.trim() })}
             </div>
           ) : null}
 
           {results.map((item) => {
-            const label = item.display_name || item.username || "Unknown user";
+            const label =
+              item.display_name || item.username || t("people.unknownUser");
             return (
               <UserProfileLink
                 key={item.id}
@@ -231,7 +238,9 @@ export function People() {
                     {label}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
-                    {item.username ? `@${item.username}` : "No username yet"}
+                    {item.username
+                      ? `@${item.username}`
+                      : t("people.noUsername")}
                   </div>
                   {item.bio ? (
                     <div className="mt-1 truncate text-xs text-muted-foreground">
@@ -241,7 +250,7 @@ export function People() {
                 </div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/65">
                   <UserRoundPlus size={13} />
-                  View profile
+                  {t("people.viewProfile")}
                 </div>
               </UserProfileLink>
             );

@@ -97,7 +97,71 @@ describe("UserProfile", () => {
     expect(screen.getByText("Jane Band")).toBeVisible();
     expect(screen.getByText("via upload")).toBeVisible();
     expect(
-      screen.getByRole("link", { name: /View Listening DNA/i }),
+      screen.getByRole("link", { name: /View Crate DNA/i }),
     ).toHaveAttribute("href", "/users/jane/stats");
+  });
+
+  it("localizes public profile chrome", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        id: 7,
+        username: "jane",
+        display_name: "Jane Doe",
+        avatar: null,
+        bio: null,
+        joined_at: "2026-01-01T00:00:00Z",
+        followers_count: 12,
+        following_count: 9,
+        friends_count: 3,
+        public_playlists: [],
+        relationship_state: {
+          following: true,
+          followed_by: false,
+          is_friend: true,
+        },
+        affinity_score: 87,
+        affinity_band: "high",
+        affinity_reasons: [],
+        followers_preview: [],
+        following_preview: [],
+        top_genre: null,
+        stats: {
+          plays_30d: 35,
+          minutes_30d: 140,
+          contributions: 0,
+          public_playlists: 0,
+        },
+        badges: [],
+        contributions_preview: [],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<UserProfile />, {
+      locale: "es",
+      route: "/users/jane",
+      path: "/users/:username",
+      auth: {
+        user: {
+          id: 1,
+          email: "viewer@example.test",
+          name: "Viewer",
+          role: "user",
+        },
+      },
+    });
+
+    expect(screen.getAllByText("Amigos")).toHaveLength(2);
+    expect(screen.getByText(/Se unió en/)).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: /Ver Crate DNA/i }),
+    ).toHaveAttribute("href", "/users/jane/stats");
+    expect(screen.getByRole("button", { name: "Siguiendo" })).toBeVisible();
+    expect(screen.getByText("Afinidad")).toBeVisible();
+    expect(screen.getByText("Aún mapeando")).toBeVisible();
+    expect(screen.getByText("Contribuciones a la biblioteca")).toBeVisible();
+    expect(screen.getByText("Aún no hay playlists públicas.")).toBeVisible();
   });
 });

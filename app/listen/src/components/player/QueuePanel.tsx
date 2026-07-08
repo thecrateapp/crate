@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { CRATE_ICON_SIZE, Disc3, X } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 
 import {
   ItemActionMenu,
@@ -142,6 +143,7 @@ function QueuePanelRow({
 }
 
 export function QueuePanel({ open, onClose }: QueuePanelProps) {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const { isPlaying } = usePlayerState();
   const { queue, currentIndex, jumpTo, removeFromQueue, currentTrack } =
@@ -156,10 +158,10 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
     <>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <h2 className="text-sm font-bold text-white">Queue</h2>
+        <h2 className="text-sm font-bold text-white">{t("player.queue")}</h2>
         <button
           onClick={onClose}
-          aria-label="Close queue"
+          aria-label={t("player.queue.close")}
           className="flex size-10 items-center justify-center text-white/40 transition-colors hover:text-white"
         >
           <X size={CRATE_ICON_SIZE.xl} />
@@ -170,7 +172,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
       {currentTrack && (
         <div className="px-4 py-3 border-b border-white/5">
           <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-            Now Playing
+            {t("player.queue.nowPlaying")}
           </p>
           <div className="flex items-center gap-3">
             {currentTrack.albumCover ? (
@@ -215,7 +217,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
         {upcoming.length > 0 && (
           <div className="px-4 pt-3">
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-              Next up ({upcoming.length})
+              {t("player.queue.nextUp", { count: upcoming.length })}
             </p>
           </div>
         )}
@@ -234,7 +236,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
 
         {upcoming.length === 0 && (
           <div className="px-4 py-8 text-center text-white/20 text-sm">
-            Queue is empty
+            {t("player.queue.empty")}
           </div>
         )}
 
@@ -243,7 +245,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           <>
             <div className="px-4 pt-4">
               <p className="text-[10px] font-bold text-white/20 uppercase tracking-wider mb-2">
-                Previously played
+                {t("player.queue.previous")}
               </p>
             </div>
             {played.map((track, i) => (

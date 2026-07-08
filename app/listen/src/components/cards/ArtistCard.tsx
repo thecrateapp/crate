@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import {
   CRATE_ICON_SIZE,
@@ -11,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
+import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
 import { fetchArtistTopTracks } from "@/components/actions/shared";
 import { useArtistActionEntries } from "@/components/actions/artist-actions";
 import { useArtistFollows } from "@/contexts/ArtistFollowsContext";
@@ -50,9 +52,11 @@ export function ArtistCard({
   layout = "rail",
   fillGrid = false,
 }: ArtistCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
+  const canUseInlineHoverActions = useHoverCapability();
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
@@ -110,7 +114,7 @@ export function ArtistCard({
             }}
           />
         ) : null}
-        {!external && artistId != null ? (
+        {!external && artistId != null && canUseInlineHoverActions ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
@@ -128,23 +132,23 @@ export function ArtistCard({
                         name,
                       });
                       if (!tracks.length) {
-                        toast.info(
-                          "No top tracks available for this artist yet",
-                        );
+                        toast.info(t("actions.artist.toasts.noTopTracks"));
                         return;
                       }
                       playAll(tracks, 0, {
                         type: "queue",
-                        name: `${name} Top Tracks`,
+                        name: t("actions.artist.topTracksSource", { name }),
                       });
                     } catch {
-                      toast.error("Failed to load top tracks");
+                      toast.error(
+                        t("actions.artist.toasts.loadTopTracksFailed"),
+                      );
                     } finally {
                       setPlayingTopTracks(false);
                     }
                   }}
-                  aria-label={`Play top tracks from ${name}`}
-                  title="Play top tracks"
+                  aria-label={t("actions.artist.playTopTracksFrom", { name })}
+                  title={t("actions.artist.playTopTracks")}
                 >
                   {playingTopTracks ? (
                     <Loader2
@@ -169,16 +173,22 @@ export function ArtistCard({
                     try {
                       await toggleArtistFollow(artistId);
                       toast.success(
-                        following ? `Unfollowed ${name}` : `Following ${name}`,
+                        following
+                          ? t("actions.artist.toasts.unfollowed", { name })
+                          : t("actions.artist.toasts.following", { name }),
                       );
                     } catch {
-                      toast.error("Failed to update follow status");
+                      toast.error(t("home.toasts.updateFollowFailed"));
                     } finally {
                       setTogglingFollow(false);
                     }
                   }}
-                  aria-label={following ? `Unfollow ${name}` : `Follow ${name}`}
-                  title={following ? "Following" : "Follow"}
+                  aria-label={
+                    following
+                      ? t("actions.artist.unfollowNamed", { name })
+                      : t("actions.artist.followNamed", { name })
+                  }
+                  title={following ? t("common.following") : t("common.follow")}
                 >
                   {togglingFollow ? (
                     <Loader2

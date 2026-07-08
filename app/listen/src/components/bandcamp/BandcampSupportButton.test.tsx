@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
+import { I18nProvider } from "@/i18n/I18nProvider";
 import { api } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
 
@@ -16,6 +18,10 @@ vi.mock("@/lib/external-links", () => ({
 
 const mockApi = vi.mocked(api);
 const mockOpenExternalUrl = vi.mocked(openExternalUrl);
+
+function renderWithI18n(ui: ReactElement) {
+  return render(<I18nProvider initialLocale="en">{ui}</I18nProvider>);
+}
 
 describe("BandcampSupportButton", () => {
   beforeEach(() => {
@@ -33,7 +39,9 @@ describe("BandcampSupportButton", () => {
       latest_import_status: "completed",
     });
 
-    render(<BandcampSupportButton entityType="album" entityUid="album-1" />);
+    renderWithI18n(
+      <BandcampSupportButton entityType="album" entityUid="album-1" />,
+    );
 
     expect(await screen.findByText("Owned on Bandcamp")).toBeInTheDocument();
     expect(
@@ -52,7 +60,9 @@ describe("BandcampSupportButton", () => {
       latest_import_status: null,
     });
 
-    render(<BandcampSupportButton entityType="album" entityUid="album-2" />);
+    renderWithI18n(
+      <BandcampSupportButton entityType="album" entityUid="album-2" />,
+    );
 
     expect(await screen.findByText("Import from Bandcamp")).toBeInTheDocument();
     expect(
@@ -70,7 +80,9 @@ describe("BandcampSupportButton", () => {
       latest_import_status: null,
     });
 
-    render(<BandcampSupportButton entityType="album" entityUid="album-3" />);
+    renderWithI18n(
+      <BandcampSupportButton entityType="album" entityUid="album-3" />,
+    );
 
     expect(
       await screen.findByText("Buy this album on Bandcamp"),
@@ -90,7 +102,9 @@ describe("BandcampSupportButton", () => {
       latest_import_status: null,
     });
 
-    render(<BandcampSupportButton entityType="artist" entityUid="artist-1" />);
+    renderWithI18n(
+      <BandcampSupportButton entityType="artist" entityUid="artist-1" />,
+    );
 
     await userEvent.click(await screen.findByText("Support on Bandcamp"));
 
@@ -117,7 +131,7 @@ describe("BandcampSupportButton", () => {
         latest_import_status: null,
       });
 
-    render(
+    renderWithI18n(
       <BandcampSupportButton
         entityType="album"
         entityUid="album-1"
@@ -140,7 +154,9 @@ describe("BandcampSupportButton", () => {
       latest_import_status: null,
     });
 
-    render(<BandcampSupportButton entityType="album" entityUid="album-4" />);
+    renderWithI18n(
+      <BandcampSupportButton entityType="album" entityUid="album-4" />,
+    );
 
     await userEvent.click(await screen.findByText("Support on Bandcamp"));
 
@@ -159,7 +175,7 @@ describe("BandcampSupportButton", () => {
       latest_import_status: null,
     });
 
-    render(
+    renderWithI18n(
       <BandcampSupportButton
         entityType="artist"
         entityUid="artist-2"

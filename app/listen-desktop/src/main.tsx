@@ -7,6 +7,7 @@ import { HashRouter } from "react-router";
 import { Toaster } from "sonner";
 
 import { App } from "@/App";
+import { I18nProvider } from "@/i18n";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
 
 import { initTauriRuntime } from "./lib/tauri-init";
@@ -16,7 +17,9 @@ void primeOfflineRuntimeProfile();
 
 createRoot(document.getElementById("root")!).render(
   <HashRouter>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
     <Toaster theme="dark" position="bottom-center" richColors />
   </HashRouter>,
 );

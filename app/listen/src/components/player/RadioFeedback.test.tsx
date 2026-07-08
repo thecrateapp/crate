@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,7 @@ vi.mock("@/lib/radio", () => ({
 
 import { sendRadioFeedback } from "@/lib/radio";
 import { RadioFeedback } from "@/components/player/RadioFeedback";
+import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const mockSendRadioFeedback = vi.mocked(sendRadioFeedback);
 
@@ -23,7 +24,7 @@ describe("RadioFeedback", () => {
   it("skips to the next track immediately on dislike", async () => {
     const onDislike = vi.fn();
 
-    render(
+    renderWithListenProviders(
       <RadioFeedback sessionId="sess-1" trackId={42} onDislike={onDislike} />,
     );
 
@@ -32,5 +33,19 @@ describe("RadioFeedback", () => {
 
     expect(mockSendRadioFeedback).toHaveBeenCalledWith("sess-1", 42, "dislike");
     expect(onDislike).toHaveBeenCalledTimes(1);
+  });
+
+  it("localizes radio feedback actions", () => {
+    renderWithListenProviders(
+      <RadioFeedback sessionId="sess-1" trackId={42} />,
+      {
+        locale: "es",
+      },
+    );
+
+    expect(screen.getByRole("button", { name: "Más como esto" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Menos como esto" }),
+    ).toBeVisible();
   });
 });

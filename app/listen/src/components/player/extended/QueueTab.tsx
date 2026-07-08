@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Disc3, Save, X } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ function QueueTabRow({
   onRemove?: () => void;
   faded?: boolean;
 }) {
+  const { t } = useTranslation();
   const menuTrack = useMemo(() => trackToMenuData(track), [track]);
   const baseActions = useTrackActionEntries({
     track: menuTrack,
@@ -47,13 +49,13 @@ function QueueTabRow({
       },
       {
         key: `queue-tab-remove-${track.id}-${indexLabel}`,
-        label: "Remove from queue",
+        label: t("player.queue.remove"),
         icon: X,
         danger: true,
         onSelect: onRemove,
       },
     ];
-  }, [baseActions, indexLabel, onRemove, track.id]);
+  }, [baseActions, indexLabel, onRemove, t, track.id]);
   const actionMenu = useItemActionMenu(actions);
 
   return (
@@ -90,7 +92,7 @@ function QueueTabRow({
           </p>
           {track.isSuggested ? (
             <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
-              Suggested
+              {t("player.queue.suggested")}
             </span>
           ) : null}
         </div>
@@ -116,7 +118,9 @@ function QueueTabRow({
           subtitle: track.artist,
           detail: track.album,
           imageUrl: track.albumCover,
-          imageAlt: track.album ? `${track.title} cover` : track.title,
+          imageAlt: track.album
+            ? t("player.queue.trackCoverAlt", { title: track.title })
+            : track.title,
           imageShape: "square",
           fallbackIcon: Disc3,
         }}
@@ -130,6 +134,7 @@ function QueueTabRow({
 }
 
 export function QueueTab() {
+  const { t } = useTranslation();
   const { isPlaying } = usePlayerState();
   const {
     queue,
@@ -142,17 +147,17 @@ export function QueueTab() {
 
   const history = queue.slice(0, currentIndex).reverse();
   const upcoming = queue.slice(currentIndex + 1);
-  const sourceName = getPlaySourceLabel(playSource) || "Queue";
+  const sourceName = getPlaySourceLabel(playSource) || t("player.queue");
 
   async function handleSaveAsPlaylist() {
     const validTracks = queue.filter((t) => t.path && t.path.includes("/"));
     if (!validTracks.length) {
-      toast.error("No local tracks in queue to save");
+      toast.error(t("player.queue.toasts.noLocalTracks"));
       return;
     }
     try {
       await api("/api/playlists", "POST", {
-        name: getPlaySourceLabel(playSource) || "Queue",
+        name: getPlaySourceLabel(playSource) || t("player.queue"),
         tracks: validTracks.map((t) => ({
           path: t.path,
           title: t.title,
@@ -160,9 +165,11 @@ export function QueueTab() {
           album: t.album || "",
         })),
       });
-      toast.success(`Playlist saved (${validTracks.length} tracks)`);
+      toast.success(
+        t("player.queue.toasts.saved", { count: validTracks.length }),
+      );
     } catch {
-      toast.error("Failed to save playlist");
+      toast.error(t("player.queue.toasts.saveFailed"));
     }
   }
 
@@ -171,7 +178,7 @@ export function QueueTab() {
       {history.length > 0 && (
         <div className="mb-4">
           <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
-            History
+            {t("player.queue.history")}
           </p>
           {history.map((track, i) => {
             const realIdx = currentIndex - 1 - i;
@@ -192,16 +199,16 @@ export function QueueTab() {
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between px-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
-              Now playing from: {sourceName}
+              {t("player.queue.nowPlayingFrom", { source: sourceName })}
             </p>
             {queue.length > 0 && (
               <button
                 className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-white/40 transition-colors hover:bg-white/5 hover:text-muted-foreground"
                 onClick={() => void handleSaveAsPlaylist()}
-                title="Save as Playlist"
+                title={t("player.queue.saveAsPlaylist")}
               >
                 <Save size={10} />
-                Save
+                {t("common.save")}
               </button>
             )}
           </div>
@@ -250,7 +257,10 @@ export function QueueTab() {
       {upcoming.length > 0 && (
         <div>
           <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
-            Next up from: {sourceName} ({upcoming.length})
+            {t("player.queue.nextUpFrom", {
+              source: sourceName,
+              count: upcoming.length,
+            })}
           </p>
           {upcoming.map((track, i) => {
             const idx = currentIndex + 1 + i;
@@ -269,7 +279,7 @@ export function QueueTab() {
 
       {upcoming.length === 0 && !currentTrack ? (
         <div className="py-12 text-center text-sm text-white/20">
-          Queue is empty
+          {t("player.queue.empty")}
         </div>
       ) : null}
     </div>

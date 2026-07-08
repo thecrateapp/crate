@@ -115,6 +115,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
     "repair": TaskPoolConfig("maintenance", 2, 3600, 0),
+    "repair_duplicate_tracks": TaskPoolConfig("maintenance", 2, 3600, 0),
     "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
@@ -177,6 +178,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
+    # Listen i18n
+    "draft_i18n_translation": TaskPoolConfig("maintenance", 3, 900, 0),
 }
 
 # DB-heavy tasks — only one at a time via Redis mutex
@@ -187,6 +190,7 @@ DB_HEAVY_TASK_TYPES = frozenset(
         "wipe_library",
         "rebuild_library",
         "repair",
+        "repair_duplicate_tracks",
         "migrate_storage_v2",
         "fix_artist",
     }

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 
 # ── Tidal Downloads ──────────────────────────────────────────────
 
@@ -79,6 +79,47 @@ def add_tidal_download(
         .first()
     )
     return row["id"]
+
+
+def has_new_release_preview_download(
+    release_id: int,
+    tidal_id: str,
+    *,
+    session=None,
+) -> bool:
+    if not tidal_id:
+        return False
+    if session is None:
+        with read_scope() as s:
+            return has_new_release_preview_download(
+                release_id,
+                tidal_id,
+                session=s,
+            )
+
+    row = (
+        session.execute(
+            text("""
+            SELECT id
+            FROM tidal_downloads
+            WHERE tidal_id = :tidal_id
+              AND source = 'new_release_preview'
+              AND status NOT IN ('failed')
+              AND COALESCE(metadata_json, '{}'::jsonb)
+                  @> CAST(:metadata_json AS jsonb)
+            LIMIT 1
+            """),
+            {
+                "tidal_id": tidal_id,
+                "metadata_json": json.dumps(
+                    {"preview_for_new_release_id": int(release_id)}
+                ),
+            },
+        )
+        .mappings()
+        .first()
+    )
+    return bool(row)
 
 
 def get_tidal_downloads(status: str | None = None, limit: int = 100) -> list[dict]:

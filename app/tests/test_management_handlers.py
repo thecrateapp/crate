@@ -1,4 +1,78 @@
-from crate.worker_handlers.management import _handle_repair
+from crate.worker_handlers.management import (
+    _handle_repair,
+    _handle_repair_duplicate_tracks,
+)
+
+
+def test_handle_repair_duplicate_tracks_delegates_high_confidence_rows(monkeypatch):
+    captured: dict = {}
+    duplicate_rows = [
+        {
+            "album_id": 55,
+            "artist": "Gurriers",
+            "album": "Come and See",
+            "title": "Nausea",
+            "track_number": 1,
+            "disc_number": 1,
+            "cnt": 2,
+            "paths": ["/music/Gurriers/01-low.mp3", "/music/Gurriers/01-hi.flac"],
+            "track_ids": [101, 102],
+            "tracks": [{"id": 101}, {"id": 102}],
+            "fingerprinted_count": 2,
+            "missing_fingerprint_count": 0,
+        }
+    ]
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_duplicate_tracks",
+        lambda: duplicate_rows,
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.management._handle_repair",
+        lambda task_id, params, config: (
+            captured.update({"task_id": task_id, "params": params, "config": config})
+            or {"summary": {"applied": 1}}
+        ),
+    )
+
+    result = _handle_repair_duplicate_tracks(
+        "repair-duplicates-1",
+        {},
+        {"library_path": "/tmp/fake"},
+    )
+
+    assert result == {"summary": {"applied": 1}}
+    assert captured == {
+        "task_id": "repair-duplicates-1",
+        "config": {"library_path": "/tmp/fake"},
+        "params": {
+            "dry_run": False,
+            "auto_only": True,
+            "issues": [
+                {
+                    "check": "duplicate_tracks",
+                    "severity": "medium",
+                    "details": {
+                        "album_id": 55,
+                        "artist": "Gurriers",
+                        "album": "Come and See",
+                        "title": "Nausea",
+                        "track_number": 1,
+                        "disc_number": 1,
+                        "count": 2,
+                        "paths": [
+                            "/music/Gurriers/01-low.mp3",
+                            "/music/Gurriers/01-hi.flac",
+                        ],
+                        "track_ids": [101, 102],
+                        "tracks": duplicate_rows[0]["tracks"],
+                        "fingerprinted_count": 2,
+                        "missing_fingerprint_count": 0,
+                    },
+                }
+            ],
+        },
+    }
 
 
 def test_handle_repair_revalidates_applied_checks(monkeypatch):

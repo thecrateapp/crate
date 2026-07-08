@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Loader2,
   Music,
@@ -56,8 +57,10 @@ interface SearchResult {
   imageUrl?: string;
 }
 
-function stationTypeLabel(station: PersonalizedRadioStation): string {
-  return station.seed_type === "genre" ? "Genre Radio" : "Artist Radio";
+function stationTypeLabelKey(station: PersonalizedRadioStation): string {
+  return station.seed_type === "genre"
+    ? "radio.stationType.genre"
+    : "radio.stationType.artist";
 }
 
 function stationLabel(station: PersonalizedRadioStation): string {
@@ -95,14 +98,16 @@ function StationCard({
   disabled: boolean;
   onStart: (station: PersonalizedRadioStation) => void;
 }) {
+  const { t } = useTranslation();
   const label = stationLabel(station);
   const imageUrl = stationArtwork(station);
   const plays = station.play_count || 0;
+  const typeLabel = t(stationTypeLabelKey(station));
 
   return (
     <button
       type="button"
-      aria-label={`Start ${label} ${stationTypeLabel(station)}`}
+      aria-label={t("radio.station.startAria", { label, type: typeLabel })}
       disabled={disabled}
       onClick={() => onStart(station)}
       className="group relative aspect-square snap-start overflow-hidden rounded-xl border border-white/8 bg-white/[0.03] text-left shadow-[0_18px_70px_rgba(0,0,0,0.24)] transition duration-300 hover:border-primary/30 hover:shadow-[0_18px_80px_rgba(10,209,241,0.12)] disabled:cursor-not-allowed disabled:opacity-50"
@@ -125,7 +130,7 @@ function StationCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/10" />
       <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
         <span className="rounded-full border border-white/12 bg-black/35 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/65 backdrop-blur-md">
-          {stationTypeLabel(station)}
+          {typeLabel}
         </span>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-black opacity-0 shadow-[0_0_24px_rgba(10,209,241,0.32)] transition duration-300 group-hover:opacity-100">
           <Play size={14} className="translate-x-px" />
@@ -136,7 +141,9 @@ function StationCard({
           {label}
         </div>
         {plays > 0 ? (
-          <div className="mt-1 text-xs text-white/52">{plays} plays</div>
+          <div className="mt-1 text-xs text-white/52">
+            {t("common.playCount", { count: plays })}
+          </div>
         ) : null}
       </div>
     </button>
@@ -187,6 +194,7 @@ function StationRail({
 }
 
 export function RadioPage() {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const {
     data: stationGroups,
@@ -294,7 +302,7 @@ export function RadioPage() {
       seedValue,
     );
     if (!result) {
-      toast.error("Could not start radio");
+      toast.error(t("radio.toasts.startFailed"));
       setStarting(false);
       return;
     }
@@ -311,7 +319,7 @@ export function RadioPage() {
     setResults([]);
     const result = await startShapedRadio("seeded", seed.type, seed.value);
     if (!result) {
-      toast.error("Could not start radio");
+      toast.error(t("radio.toasts.startFailed"));
       setStarting(false);
       return;
     }
@@ -326,13 +334,13 @@ export function RadioPage() {
     setStarting(true);
     const result = await startShapedRadio("discovery");
     if (!result) {
-      toast.error("Not enough data for Discovery Radio yet");
+      toast.error(t("radio.toasts.discoveryUnavailable"));
       setStarting(false);
       return;
     }
     setActiveSession(result.sessionId);
     setActiveMode("discovery");
-    setSeedLabel("Discovery Radio");
+    setSeedLabel(t("radio.discovery"));
     playAll(result.tracks, 0, result.source);
     setStarting(false);
   };
@@ -348,11 +356,10 @@ export function RadioPage() {
             </div>
             <div className="min-w-0">
               <h1 className="text-3xl font-bold leading-tight text-foreground">
-                Radio
+                {t("radio.title")}
               </h1>
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/52">
-                Start from the artists and scenes Crate already knows you come
-                back to.
+                {t("radio.intro")}
               </p>
             </div>
           </div>
@@ -370,7 +377,7 @@ export function RadioPage() {
             ) : (
               <Sparkles size={19} />
             )}
-            Discovery Radio
+            {t("radio.discovery")}
           </button>
         </div>
       </div>
@@ -380,16 +387,18 @@ export function RadioPage() {
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 animate-pulse rounded-full bg-primary shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
             <span className="text-sm font-medium text-primary">
-              Discovery Radio
+              {t("radio.discovery")}
             </span>
-            <span className="text-[11px] text-white/35">playing</span>
+            <span className="text-[11px] text-white/35">
+              {t("common.playing")}
+            </span>
           </div>
         </div>
       ) : null}
 
       <StationRail
-        title="Artist Stations"
-        subtitle="Artist-led stations from your listening history and follows."
+        title={t("radio.artistStations.title")}
+        subtitle={t("radio.artistStations.subtitle")}
         stations={artistStations}
         loading={stationsLoading}
         disabled={starting}
@@ -397,8 +406,8 @@ export function RadioPage() {
       />
 
       <StationRail
-        title="Genre Stations"
-        subtitle="Scene-level stations shaped by the genres you actually play."
+        title={t("radio.genreStations.title")}
+        subtitle={t("radio.genreStations.subtitle")}
         stations={genreStations}
         loading={stationsLoading}
         disabled={starting}
@@ -407,14 +416,14 @@ export function RadioPage() {
 
       {stationsError ? (
         <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-white/45">
-          Could not load personalized stations.
+          {t("radio.errors.stations")}
         </div>
       ) : null}
 
       <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.22)]">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <RadioIcon size={16} className="text-primary" />
-          Start from anything
+          {t("radio.seed.title")}
         </div>
 
         <input
@@ -424,7 +433,7 @@ export function RadioPage() {
             setQuery(e.target.value);
             void search(e.target.value);
           }}
-          placeholder="Search an artist, genre, or album to seed the radio..."
+          placeholder={t("radio.seed.placeholder")}
           className="h-12 w-full rounded-xl border border-white/10 bg-black/30 px-4 text-sm text-foreground placeholder:text-white/25 focus:border-primary/35 focus:outline-none"
         />
 
@@ -457,7 +466,7 @@ export function RadioPage() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{r.label}</div>
                   <div className="text-[10px] text-white/30">
-                    {r.type} radio
+                    {t("radio.seed.resultType", { type: r.type })}
                   </div>
                 </div>
                 <RadioIcon
@@ -478,11 +487,13 @@ export function RadioPage() {
             <span className="text-sm font-medium text-primary">
               {seedLabel} Radio
             </span>
-            <span className="text-[11px] text-white/30">playing</span>
+            <span className="text-[11px] text-white/30">
+              {t("common.playing")}
+            </span>
           </div>
           <div className="mt-1.5 flex items-center gap-1 text-[11px] text-white/40">
-            <ThumbsUp size={10} /> Like and <ThumbsDown size={10} /> dislike
-            tracks in the player to shape the radio
+            <ThumbsUp size={10} /> {t("radio.feedback.likePrefix")}{" "}
+            <ThumbsDown size={10} /> {t("radio.feedback.dislikeSuffix")}
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import logging
 import re
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -36,9 +37,12 @@ from crate.db.queries.browse import (
     get_album_genre_profile,
     get_related_albums,
 )
+from crate.db.queries.health import get_duplicate_tracks
 from crate.db.queries.lyrics import get_album_track_lyrics_status
 from crate.db.queries.streaming_admin import get_track_variant_summaries
 from crate.db.releases import (
+    dedupe_release_preview_tracks,
+    dedupe_release_tracklist,
     find_upcoming_release_by_artist_album_slug,
     get_artist_release_track_matches,
     get_release_by_virtual_album_id,
@@ -52,7 +56,7 @@ from crate.db.repositories.library import (
     get_library_tracks,
 )
 from crate.db.repositories.library_contributions import list_album_contributors
-from crate.db.repositories.tasks import create_task
+from crate.db.repositories.tasks import create_task, create_task_dedup
 from crate.release_covers import release_cover_abspath
 from crate.slugs import build_public_album_slug
 from crate.storage_layout import resolve_album_dir
@@ -180,6 +184,128 @@ def _relative_track_path(path: str | None) -> str:
         return str(Path(path).relative_to(library_path()))
     except Exception:
         return str(path)
+
+
+_DUPLICATE_TRACK_FORMAT_SCORE = {
+    "flac": 60,
+    "alac": 58,
+    "wav": 56,
+    "aiff": 54,
+    "aif": 54,
+    "m4a": 42,
+    "mp4": 40,
+    "ogg": 38,
+    "opus": 36,
+    "mp3": 20,
+}
+
+
+def _duplicate_track_quality_score(track: Mapping[str, Any]) -> tuple:
+    fmt = str(track.get("format") or "").lower()
+    return (
+        _DUPLICATE_TRACK_FORMAT_SCORE.get(fmt, 0),
+        int(track.get("bit_depth") or 0),
+        int(track.get("sample_rate") or 0),
+        int(track.get("bitrate") or 0),
+        int(track.get("size") or 0),
+        int(track.get("id") or 0),
+    )
+
+
+def _duplicate_track_keep_id(row: Mapping[str, Any]) -> int | None:
+    tracks = [track for track in row.get("tracks", []) if isinstance(track, dict)]
+    if tracks:
+        best = max(tracks, key=_duplicate_track_quality_score)
+        best_id = int(best.get("id") or 0)
+        if best_id:
+            return best_id
+    track_ids = [int(track_id) for track_id in row.get("track_ids", []) if track_id]
+    return max(track_ids) if track_ids else None
+
+
+def _duplicate_track_issue(row: Mapping[str, Any]) -> dict:
+    return {
+        "check": "duplicate_tracks",
+        "severity": "medium",
+        "details": {
+            "album_id": row["album_id"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "title": row["title"],
+            "track_number": row.get("track_number"),
+            "disc_number": row.get("disc_number"),
+            "count": row["cnt"],
+            "paths": row.get("paths", []),
+            "track_ids": row.get("track_ids", []),
+            "tracks": row.get("tracks", []),
+            "fingerprinted_count": row.get("fingerprinted_count", 0),
+            "missing_fingerprint_count": row.get("missing_fingerprint_count", 0),
+        },
+    }
+
+
+def _queue_duplicate_track_repair(album_id: int, rows: list[dict]) -> None:
+    issues = [_duplicate_track_issue(row) for row in rows]
+    track_ids = sorted(
+        {
+            int(track_id)
+            for row in rows
+            for track_id in row.get("track_ids", [])
+            if track_id
+        }
+    )
+    if not issues or not track_ids:
+        return
+
+    try:
+        create_task_dedup(
+            "repair",
+            {"dry_run": False, "auto_only": True, "issues": issues},
+            dedup_key=(
+                f"listen-album-duplicate-tracks:{album_id}:"
+                f"{','.join(str(track_id) for track_id in track_ids)}"
+            ),
+        )
+    except Exception:
+        log.debug(
+            "Failed to enqueue duplicate-track repair for album %s",
+            album_id,
+            exc_info=True,
+        )
+
+
+def _guard_album_tracks_for_listen(
+    album_id: int, tracks_data: Sequence[Mapping[str, Any]]
+) -> list[Mapping[str, Any]]:
+    try:
+        duplicate_rows = get_duplicate_tracks(album_id=album_id)
+    except Exception:
+        log.debug(
+            "Failed to inspect duplicate tracks for album %s",
+            album_id,
+            exc_info=True,
+        )
+        return list(tracks_data)
+    if not duplicate_rows:
+        return list(tracks_data)
+
+    hidden_ids: set[int] = set()
+    actionable_rows: list[dict] = []
+    for row in duplicate_rows:
+        keep_id = _duplicate_track_keep_id(row)
+        track_ids = [int(track_id) for track_id in row.get("track_ids", []) if track_id]
+        if not keep_id or not track_ids:
+            continue
+        hidden_ids.update(track_id for track_id in track_ids if track_id != keep_id)
+        actionable_rows.append(row)
+
+    if actionable_rows:
+        _queue_duplicate_track_repair(album_id, actionable_rows)
+    if not hidden_ids:
+        return list(tracks_data)
+    return [
+        track for track in tracks_data if int(track.get("id") or 0) not in hidden_ids
+    ]
 
 
 def _take_release_track_match(
@@ -403,12 +529,18 @@ def _pre_release_album_payload(
 ) -> dict:
     _require_auth(request)
     release_id = int(release["id"])
-    tracklist = _json_list(release.get("tracklist_json"))
-    preview_tracks = _json_list(release.get("preview_tracks_json"))
+    tracklist = dedupe_release_tracklist(_json_list(release.get("tracklist_json")))
+    preview_tracks = dedupe_release_preview_tracks(
+        _json_list(release.get("preview_tracks_json"))
+    )
     if not tracklist:
-        tracklist = _release_tracklist_from_musicbrainz_source(release)
+        tracklist = dedupe_release_tracklist(
+            _release_tracklist_from_musicbrainz_source(release)
+        )
     if not tracklist:
-        tracklist = _release_tracklist_from_tidal_source(release)
+        tracklist = dedupe_release_tracklist(
+            _release_tracklist_from_tidal_source(release)
+        )
     if not tracklist:
         tracklist = preview_tracks
 
@@ -562,12 +694,14 @@ def api_album(request: Request, artist: str, album: str):
             return JSONResponse({"error": "Not found"}, status_code=404)
         return result
 
-    cache_key = f"listen:album_detail:v2:{album_data['id']}"
+    cache_key = f"listen:album_detail:v3:{album_data['id']}"
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
 
-    tracks_data = get_library_tracks(album_data["id"])
+    tracks_data = _guard_album_tracks_for_listen(
+        int(album_data["id"]), get_library_tracks(album_data["id"])
+    )
     lib = library_path()
     album_dir = find_album_dir(lib, artist, album)
     has_cover = album_data.get("has_cover", False)

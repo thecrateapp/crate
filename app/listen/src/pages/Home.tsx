@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -104,6 +105,7 @@ const HOME_DISCOVERY_DEGRADE_AFTER_MS = 75_000;
 const HOME_DISCOVERY_DEGRADED_REFRESH_MS = 60_000;
 
 export function Home() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { play, playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
@@ -396,7 +398,7 @@ export function Home() {
         next.delete(key);
         return next;
       });
-      toast.error("Failed to update recommendation");
+      toast.error(t("home.toasts.updateRecommendationFailed"));
     }
   }
 
@@ -409,16 +411,16 @@ export function Home() {
         name: artist.name,
       });
       if (!queue.length) {
-        toast.info("No top tracks available yet");
+        toast.info(t("actions.artist.toasts.noTopTracks"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
-        name: `${artist.name} Top Tracks`,
+        name: t("actions.artist.topTracksSource", { name: artist.name }),
         radio: { seedType: "artist", seedId: artist.id },
       });
     } catch {
-      toast.error("Failed to load artist tracks");
+      toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
     }
   }
 
@@ -430,11 +432,11 @@ export function Home() {
       refetchDiscovery();
       toast.success(
         isFollowing(artist.id)
-          ? `Unfollowed ${artist.name}`
-          : `Following ${artist.name}`,
+          ? t("actions.artist.toasts.unfollowed", { name: artist.name })
+          : t("actions.artist.toasts.following", { name: artist.name }),
       );
     } catch {
-      toast.error("Failed to update follow status");
+      toast.error(t("home.toasts.updateFollowFailed"));
     }
   }
 
@@ -449,7 +451,7 @@ export function Home() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info("This playlist is still warming up");
+        toast.info(t("home.playlists.warming"));
         return;
       }
       playAll(queue, 0, {
@@ -458,7 +460,7 @@ export function Home() {
         id: playlist.id,
       });
     } catch {
-      toast.error("Failed to load playlist");
+      toast.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -467,7 +469,7 @@ export function Home() {
       const playlist = await loadHomePlaylist(item.id);
       const queue = (playlist.tracks || []).map(toPlayerTrack);
       if (!queue.length) {
-        toast.info("This playlist is still warming up");
+        toast.info(t("home.playlists.warming"));
         return;
       }
       playAll(shuffleArray(queue), 0, {
@@ -476,7 +478,7 @@ export function Home() {
         id: playlist.id,
       });
     } catch {
-      toast.error("Failed to load playlist");
+      toast.error(t("home.playlists.loadFailed"));
     }
   }
 
@@ -487,12 +489,12 @@ export function Home() {
         playlistName: item.name,
       });
       if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
+        toast.info(t("actions.playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start playlist radio");
+      toast.error(t("actions.playlist.toasts.radioFailed"));
     }
   }
 
@@ -501,10 +503,10 @@ export function Home() {
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
         reminder_type: insight.type,
       });
-      toast.success("Saved for later");
+      toast.success(t("home.radar.toasts.savedForLater"));
       navigate("/upcoming");
     } catch {
-      toast.error("Failed to save reminder");
+      toast.error(t("home.radar.toasts.saveReminderFailed"));
     }
   }
 
@@ -516,19 +518,23 @@ export function Home() {
         artistName: insight.artist,
       });
       if (!queue.length) {
-        toast.info("No probable setlist tracks matched your library");
+        toast.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
-        name: `${insight.artist} Probable Setlist`,
+        name: t("radar.show.probableSetlistSource", {
+          name: insight.artist,
+        }),
       });
       await api(`/api/me/shows/${insight.show_id}/reminders`, "POST", {
         reminder_type: insight.type,
       });
-      toast.success(`Playing probable setlist: ${queue.length} tracks`);
+      toast.success(
+        t("radar.show.toasts.playingSetlist", { count: queue.length }),
+      );
     } catch {
-      toast.error("Failed to load probable setlist");
+      toast.error(t("radar.show.toasts.loadSetlistFailed"));
     }
   }
 
@@ -540,16 +546,18 @@ export function Home() {
         artistName: item.artist,
       });
       if (!queue.length) {
-        toast.info("No probable setlist tracks matched your library");
+        toast.info(t("artist.toasts.noSetlistMatches"));
         return;
       }
       playAll(queue, 0, {
         type: "playlist",
-        name: `${item.artist} Probable Setlist`,
+        name: t("radar.show.probableSetlistSource", { name: item.artist }),
       });
-      toast.success(`Playing probable setlist: ${queue.length} tracks`);
+      toast.success(
+        t("radar.show.toasts.playingSetlist", { count: queue.length }),
+      );
     } catch {
-      toast.error("Failed to load probable setlist");
+      toast.error(t("radar.show.toasts.loadSetlistFailed"));
     }
   }
 
@@ -582,7 +590,7 @@ export function Home() {
   }
 
   if (!currentDiscovery) {
-    return <CrateLoader label="Loading home." />;
+    return <CrateLoader label={t("home.loading")} />;
   }
 
   return (
@@ -592,10 +600,10 @@ export function Home() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">
-            {getHomeGreeting()}
+            {getHomeGreeting(t)}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {getHomeDateString()}
+            {getHomeDateString(i18n.language)}
           </p>
         </div>
 

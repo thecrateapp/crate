@@ -6,6 +6,8 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { ArrowRight, Clock3, Loader2, Play, Sparkles } from "@crate/ui/icons";
 
 import { ItemActionMenu, useItemActionMenu } from "@crate/ui/domain/actions";
@@ -21,15 +23,15 @@ import { cn } from "@/lib/utils";
 
 import type { HomeUpcomingItem } from "./home-model";
 
-export function getHomeGreeting(): string {
+export function getHomeGreeting(t: TFunction): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return t("home.greeting.morning");
+  if (hour < 18) return t("home.greeting.afternoon");
+  return t("home.greeting.evening");
 }
 
-export function getHomeDateString(): string {
-  return new Date().toLocaleDateString("en-US", {
+export function getHomeDateString(locale: string): string {
+  return new Date().toLocaleDateString(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -166,12 +168,13 @@ export function UpcomingPreviewRow({
   item: HomeUpcomingItem;
   onClick: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const dateLabel = item.date
-    ? new Date(`${item.date}T12:00:00`).toLocaleDateString("en-US", {
+    ? new Date(`${item.date}T12:00:00`).toLocaleDateString(i18n.language, {
         month: "short",
         day: "numeric",
       })
-    : "Soon";
+    : t("home.radar.soon");
 
   return (
     <button
@@ -193,7 +196,7 @@ export function UpcomingPreviewRow({
           </span>
           {item.user_attending && item.type === "show" ? (
             <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-              Going
+              {t("radar.show.going")}
             </span>
           ) : null}
         </div>
@@ -204,7 +207,9 @@ export function UpcomingPreviewRow({
         </div>
       </div>
       <div className="shrink-0 rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
-        {item.type === "show" ? "Show" : "Release"}
+        {item.type === "show"
+          ? t("home.radar.itemType.show")
+          : t("home.radar.itemType.release")}
       </div>
     </button>
   );

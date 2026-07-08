@@ -330,6 +330,9 @@ class TestPlaylistTrackEntityRefs:
             False,
             True,
         ]
+        filtered_rows = get_duplicate_tracks(album_id=safe_album_id)
+        assert [row["album_id"] for row in filtered_rows] == [safe_album_id]
+        assert filtered_rows[0]["title"] == "Safe Duplicate"
         assert "Featured Duplicate" not in by_title
         assert "Unsafe Duplicate" not in by_title
 

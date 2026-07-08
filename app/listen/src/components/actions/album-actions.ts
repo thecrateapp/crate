@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
   ArrowDownToLineBold,
@@ -29,7 +30,7 @@ import {
   albumSharePath,
   downloadApiUrl,
 } from "@/lib/library-routes";
-import { getOfflineActionLabel, isOfflineBusy } from "@/lib/offline";
+import { isOfflineBusy } from "@/lib/offline";
 import { fetchAlbumRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 
@@ -47,6 +48,7 @@ function albumPlaySource(data: AlbumMenuData): PlaySource {
 export function useAlbumActionEntries(
   input: AlbumMenuData,
 ): ItemActionMenuEntry[] {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const { isSaved, toggleAlbumSaved } = useSavedAlbums();
   const {
@@ -56,6 +58,21 @@ export function useAlbumActionEntries(
   } = useOffline();
   const saved = isSaved(input.albumId);
   const offlineState = getAlbumState(input.albumId);
+  const offlineActionLabel = (() => {
+    switch (offlineState) {
+      case "ready":
+        return t("actions.offline.removeCopy");
+      case "error":
+        return t("actions.offline.retryCopy");
+      case "queued":
+      case "downloading":
+        return t("actions.offline.downloading");
+      case "syncing":
+        return t("actions.offline.syncing");
+      default:
+        return t("actions.offline.makeAvailable");
+    }
+  })();
 
   return useMemo<ItemActionMenuEntry[]>(() => {
     const albumPath = albumPagePath({
@@ -79,53 +96,57 @@ export function useAlbumActionEntries(
     return [
       action({
         key: "play",
-        label: "Play album",
+        label: t("actions.album.play"),
         icon: Play,
         onSelect: async () => {
           try {
             const tracks = await fetchAlbumTracks(input);
             if (!tracks.length) {
-              toast.info("This album has no playable tracks yet");
+              toast.info(t("actions.album.toasts.noTracks"));
               return;
             }
             playAll(tracks, 0, albumPlaySource(input));
           } catch {
-            toast.error("Failed to load album");
+            toast.error(t("actions.album.toasts.loadFailed"));
           }
         },
       }),
       action({
         key: "shuffle",
-        label: "Shuffle album",
+        label: t("actions.album.shuffle"),
         icon: Shuffle,
         onSelect: async () => {
           try {
             const tracks = await fetchAlbumTracks(input);
             if (!tracks.length) {
-              toast.info("This album has no playable tracks yet");
+              toast.info(t("actions.album.toasts.noTracks"));
               return;
             }
             playAll(shuffleArray(tracks), 0, albumPlaySource(input));
           } catch {
-            toast.error("Failed to load album");
+            toast.error(t("actions.album.toasts.loadFailed"));
           }
         },
       }),
       { type: "divider", key: "divider-album-main" },
       action({
         key: "save",
-        label: saved ? "Remove from saved albums" : "Save album",
+        label: saved ? t("actions.album.unsave") : t("actions.album.save"),
         icon: saved ? HeartBold : Heart,
         active: saved,
         disabled: input.albumId == null,
         onSelect: async () => {
           await toggleAlbumSaved(input.albumId ?? null);
-          toast.success(saved ? "Removed from saved albums" : "Album saved");
+          toast.success(
+            saved
+              ? t("actions.album.toasts.unsaved")
+              : t("actions.album.toasts.saved"),
+          );
         },
       }),
       action({
         key: "radio",
-        label: "Start album radio",
+        label: t("actions.album.radio"),
         icon: Radio,
         disabled: input.albumId == null,
         onSelect: async () => {
@@ -137,18 +158,18 @@ export function useAlbumActionEntries(
               albumName: input.album,
             });
             if (!radio.tracks.length) {
-              toast.info("Album radio is not available yet");
+              toast.info(t("actions.album.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error("Failed to start album radio");
+            toast.error(t("actions.album.toasts.radioFailed"));
           }
         },
       }),
       action({
         key: "offline",
-        label: getOfflineActionLabel(offlineState),
+        label: offlineActionLabel,
         icon: isOfflineBusy(offlineState)
           ? Loader2
           : offlineState === "ready"
@@ -167,19 +188,20 @@ export function useAlbumActionEntries(
             });
             toast.success(
               result === "removed"
-                ? "Offline copy removed"
-                : "Album available offline",
+                ? t("actions.offline.toasts.removed")
+                : t("actions.album.toasts.offlineReady"),
             );
           } catch (error) {
             toast.error(
-              (error as Error).message || "Failed to update offline copy",
+              (error as Error).message ||
+                t("actions.offline.toasts.updateFailed"),
             );
           }
         },
       }),
       action({
         key: "download",
-        label: "Download album ZIP",
+        label: t("actions.album.downloadZip"),
         icon: Download,
         disabled: input.albumId == null && !input.albumEntityUid,
         onSelect: async () => {
@@ -195,21 +217,24 @@ export function useAlbumActionEntries(
       }),
       action({
         key: "share",
-        label: "Share album",
+        label: t("actions.album.share"),
         icon: Share2,
         onSelect: sharePath(albumShare || albumPath, input.album, {
           kind: "album",
           subtitle: input.artist,
           imageUrl: input.cover,
+          copiedToast: t("share.toasts.linkCopied"),
         }),
       }),
     ];
   }, [
     input,
+    offlineActionLabel,
     offlineState,
     offlineSupported,
     playAll,
     saved,
+    t,
     toggleAlbumOffline,
     toggleAlbumSaved,
   ]);

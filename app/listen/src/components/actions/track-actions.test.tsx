@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const navigateMock = vi.hoisted(() => vi.fn());
@@ -40,7 +41,14 @@ vi.mock("@/lib/radio", () => ({
 }));
 
 import { useTrackActionEntries } from "@/components/actions/track-actions";
+import { I18nProvider, type ListenLocale } from "@/i18n";
 import { SHARE_REQUEST_EVENT, type SharePayload } from "@/lib/social-share";
+
+function i18nWrapper(locale: ListenLocale = "es") {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <I18nProvider initialLocale={locale}>{children}</I18nProvider>;
+  };
+}
 
 describe("useTrackActionEntries", () => {
   beforeEach(() => {
@@ -128,5 +136,42 @@ describe("useTrackActionEntries", () => {
       }
       expect(action.disabled).toBe(false);
     }
+  });
+
+  it("localizes track action labels", () => {
+    const { result } = renderHook(
+      () =>
+        useTrackActionEntries({
+          track: {
+            id: 12,
+            entity_uid: "track-entity-12",
+            title: "Talk for Hours",
+            artist: "High Vis",
+          },
+          playlistOptions: [{ id: 1, name: "Favorites" }],
+          onCreatePlaylist: vi.fn(),
+          onAddToPlaylist: vi.fn(),
+        }),
+      { wrapper: i18nWrapper("es") },
+    );
+
+    const labels = result.current
+      .filter((entry) => entry.type !== "divider")
+      .map((entry) => entry.label);
+
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "Reproducir ahora",
+        "Reproducir a continuación",
+        "Añadir a la cola",
+        "Me gusta",
+        "Iniciar radio de canción",
+        "Compartir canción",
+        "Descargar canción",
+        "Playlists",
+        "Añadir a una playlist nueva",
+        "Añadir a Favorites",
+      ]),
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 import {
   AlertCircle,
@@ -133,6 +134,7 @@ interface PlaylistInvite {
 }
 
 export function Playlist() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { id } = useParams<{ id: string }>();
@@ -203,36 +205,41 @@ export function Playlist() {
       )}/${offlineRecord.trackCount}`
     : null;
   const offlineButtonLabel = data?.is_smart
-    ? "Static only"
+    ? t("playlist.offline.staticOnly")
     : offlineState === "ready"
-      ? "Available offline"
+      ? t("playlist.offline.available")
       : offlineState === "error"
-        ? "Retry offline"
+        ? t("playlist.offline.retry")
         : offlineState === "syncing"
-          ? `Syncing...${offlineProgress ? ` ${offlineProgress}` : ""}`
+          ? t("playlist.offline.syncing", { progress: offlineProgress || "" })
           : offlineBusy
-            ? `Downloading...${offlineProgress ? ` ${offlineProgress}` : ""}`
-            : "Make available offline";
+            ? t("playlist.offline.downloading", {
+                progress: offlineProgress || "",
+              })
+            : t("playlist.offline.makeAvailable");
   const offlineStatusDetail = data?.is_smart
-    ? "Offline mirror is only available for static playlists."
+    ? t("playlist.offline.staticOnlyDetail")
     : offlineState === "ready"
       ? offlineRecord?.trackCount
-        ? `${offlineRecord.trackCount} track${
-            offlineRecord.trackCount === 1 ? "" : "s"
-          } available offline`
-        : "Available offline"
+        ? t("playlist.offline.tracksAvailable", {
+            count: offlineRecord.trackCount,
+          })
+        : t("playlist.offline.available")
       : offlineBusy && offlineProgress
-        ? `${offlineProgress} tracks saved for offline`
+        ? t("playlist.offline.progressSaved", { progress: offlineProgress })
         : offlineState === "error"
           ? offlineRecord?.readyTrackCount
-            ? `${offlineRecord.readyTrackCount}/${offlineRecord.trackCount} tracks saved. Retry to finish the offline copy.`
-            : "Offline copy failed. Retry to finish the playlist mirror."
+            ? t("playlist.offline.partialError", {
+                ready: offlineRecord.readyTrackCount,
+                total: offlineRecord.trackCount,
+              })
+            : t("playlist.offline.failed")
           : null;
 
   const editableTracks = useMemo<PlaylistComposerTrack[]>(() => {
     if (!data?.tracks?.length) return [];
     return data.tracks.map((track) => ({
-      title: track.title || "Unknown",
+      title: track.title || t("common.unknown"),
       artist: track.artist || "",
       album: track.album,
       duration: track.duration,
@@ -294,12 +301,12 @@ export function Playlist() {
         playlistName: data.name,
       });
       if (!radio.tracks.length) {
-        toast.info("Playlist radio is not available yet");
+        toast.info(t("playlist.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start playlist radio");
+      toast.error(t("playlist.toasts.radioFailed"));
     }
   }
 
@@ -324,11 +331,13 @@ export function Playlist() {
       });
       toast.success(
         result === "removed"
-          ? "Offline copy removed"
-          : "Playlist available offline",
+          ? t("playlist.toasts.offlineRemoved")
+          : t("playlist.toasts.availableOffline"),
       );
     } catch (error) {
-      toast.error((error as Error).message || "Failed to update offline copy");
+      toast.error(
+        (error as Error).message || t("playlist.toasts.offlineUpdateFailed"),
+      );
     }
   }
 
@@ -347,9 +356,9 @@ export function Playlist() {
           }),
         ],
       });
-      toast.success("Track added to playlist");
+      toast.success(t("playlist.toasts.trackAdded"));
     } catch {
-      toast.error("Failed to add track to playlist");
+      toast.error(t("playlist.toasts.trackAddFailed"));
     }
   }
 
@@ -363,10 +372,10 @@ export function Playlist() {
     if (!id) return;
     try {
       await api(`/api/playlists/${id}/generate`, "POST");
-      toast.success("Playlist regenerated");
+      toast.success(t("playlist.toasts.regenerated"));
       refetch();
     } catch {
-      toast.error("Failed to regenerate playlist");
+      toast.error(t("playlist.toasts.regenerateFailed"));
     }
   }
 
@@ -429,11 +438,11 @@ export function Playlist() {
         });
       }
 
-      toast.success("Playlist updated");
+      toast.success(t("playlist.toasts.updated"));
       setEditorOpen(false);
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("playlist.toasts.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -444,10 +453,10 @@ export function Playlist() {
     setDeleting(true);
     try {
       await api(`/api/playlists/${id}`, "DELETE");
-      toast.success("Playlist deleted");
+      toast.success(t("playlist.toasts.deleted"));
       navigate("/library?tab=playlists");
     } catch {
-      toast.error("Failed to delete playlist");
+      toast.error(t("playlist.toasts.deleteFailed"));
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -464,9 +473,9 @@ export function Playlist() {
         {},
       );
       setInviteData(invite);
-      toast.success("Collaborator invite created");
+      toast.success(t("playlist.toasts.inviteCreated"));
     } catch {
-      toast.error("Failed to create playlist invite");
+      toast.error(t("playlist.toasts.inviteCreateFailed"));
     } finally {
       setCreatingInvite(false);
     }
@@ -476,9 +485,9 @@ export function Playlist() {
     if (!inviteLink) return;
     try {
       await navigator.clipboard.writeText(inviteLink);
-      toast.success("Invite link copied");
+      toast.success(t("playlist.toasts.inviteCopied"));
     } catch {
-      toast.error("Failed to copy invite link");
+      toast.error(t("playlist.toasts.inviteCopyFailed"));
     }
   }
 
@@ -487,30 +496,32 @@ export function Playlist() {
     setRemovingMemberId(memberUserId);
     try {
       await api(`/api/playlists/${data.id}/members/${memberUserId}`, "DELETE");
-      toast.success("Collaborator removed");
+      toast.success(t("playlist.toasts.collaboratorRemoved"));
       refetch();
     } catch {
-      toast.error("Failed to remove collaborator");
+      toast.error(t("playlist.toasts.collaboratorRemoveFailed"));
     } finally {
       setRemovingMemberId(null);
     }
   }
 
   if (loading) {
-    return <CrateLoader label="Loading playlist." />;
+    return <CrateLoader label={t("playlist.loading")} />;
   }
 
   if (!data) {
     return (
       <div className="flex items-center justify-center py-16">
-        <p className="text-sm text-muted-foreground">Playlist not found</p>
+        <p className="text-sm text-muted-foreground">
+          {t("playlist.notFound")}
+        </p>
       </div>
     );
   }
 
   const playlistArtworkTracks = data.artwork_tracks ?? data.tracks;
   const playlistMetaItems = [
-    `${data.track_count} track${data.track_count !== 1 ? "s" : ""}`,
+    t("common.trackCountLabel", { count: data.track_count }),
     data.total_duration > 0 ? formatTotalDuration(data.total_duration) : null,
   ];
   const offlineIcon =
@@ -525,18 +536,18 @@ export function Playlist() {
     {
       key: "radio",
       label: "Radio",
-      ariaLabel: "Playlist Radio",
+      ariaLabel: t("playlist.actions.radio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onClick: () => void handlePlaylistRadio(),
     },
     {
       key: "offline",
-      label: "Offline",
+      label: t("common.offline"),
       ariaLabel:
         offlineState === "ready"
-          ? "Remove offline copy"
-          : "Make available offline",
+          ? t("playlist.offline.removeCopy")
+          : t("playlist.offline.makeAvailable"),
       icon: offlineIcon,
       iconClassName: offlineBusy ? "animate-spin" : undefined,
       className:
@@ -555,8 +566,8 @@ export function Playlist() {
       ? [
           {
             key: "collaborators",
-            label: "Collabs",
-            ariaLabel: "Collaborators",
+            label: t("playlist.actions.collabs"),
+            ariaLabel: t("playlist.actions.collaborators"),
             icon: Users,
             onClick: () => setMembersOpen(true),
           } satisfies PlaylistHeroSecondaryAction,
@@ -564,15 +575,15 @@ export function Playlist() {
       : []),
     {
       key: "edit",
-      label: "Edit",
-      ariaLabel: "Edit",
+      label: t("common.edit"),
+      ariaLabel: t("common.edit"),
       icon: Pencil,
       onClick: () => setEditorOpen(true),
     },
     {
       key: "share",
-      label: "Share",
-      ariaLabel: "Share",
+      label: t("common.share"),
+      ariaLabel: t("common.share"),
       icon: Share2,
       onClick: () => void handleShare(),
     },
@@ -580,21 +591,21 @@ export function Playlist() {
   const playlistMenuItems: ContextMenuEntry[] = [
     {
       key: "play",
-      label: "Play playlist",
+      label: t("playlist.actions.playPlaylist"),
       icon: Play,
       disabled: playerTracks.length === 0,
       onSelect: handlePlay,
     },
     {
       key: "shuffle",
-      label: "Shuffle playlist",
+      label: t("playlist.actions.shufflePlaylist"),
       icon: Shuffle,
       disabled: playerTracks.length === 0,
       onSelect: handleShuffle,
     },
     {
       key: "radio",
-      label: "Start playlist radio",
+      label: t("playlist.actions.startRadio"),
       icon: Radio,
       disabled: playerTracks.length === 0,
       onSelect: handlePlaylistRadio,
@@ -615,7 +626,7 @@ export function Playlist() {
       ? [
           {
             key: "collaborators",
-            label: "Collaborators",
+            label: t("playlist.actions.collaborators"),
             icon: Users,
             onSelect: () => setMembersOpen(true),
           } satisfies ContextMenuEntry,
@@ -623,7 +634,7 @@ export function Playlist() {
       : []),
     {
       key: "edit",
-      label: "Edit playlist",
+      label: t("playlist.actions.editPlaylist"),
       icon: Pencil,
       onSelect: () => setEditorOpen(true),
     },
@@ -631,7 +642,7 @@ export function Playlist() {
       ? [
           {
             key: "regenerate",
-            label: "Regenerate playlist",
+            label: t("playlist.actions.regenerate"),
             icon: RefreshCw,
             onSelect: handleRegenerate,
           } satisfies ContextMenuEntry,
@@ -639,7 +650,7 @@ export function Playlist() {
       : []),
     {
       key: "share",
-      label: "Share playlist",
+      label: t("playlist.actions.sharePlaylist"),
       icon: Share2,
       onSelect: handleShare,
     },
@@ -649,7 +660,7 @@ export function Playlist() {
     },
     {
       key: "delete",
-      label: "Delete playlist",
+      label: t("playlist.actions.deletePlaylist"),
       icon: Trash2,
       danger: true,
       onSelect: () => setDeleteOpen(true),
@@ -661,7 +672,9 @@ export function Playlist() {
       <PlaylistHeroSection
         title={data.name}
         subtitle={
-          data.visibility === "public" ? "Public playlist" : "Private playlist"
+          data.visibility === "public"
+            ? t("playlist.visibility.publicPlaylist")
+            : t("playlist.visibility.privatePlaylist")
         }
         description={data.description}
         metaItems={playlistMetaItems}
@@ -671,15 +684,17 @@ export function Playlist() {
             {data.is_smart ? (
               <span className="inline-flex items-center rounded-md border border-primary/30 px-1.5 py-0 text-[10px] font-medium text-primary">
                 <Sparkles size={10} className="mr-0.5" />
-                Smart
+                {t("playlist.badges.smart")}
               </span>
             ) : null}
             <span className="inline-flex items-center rounded-md border border-white/10 px-1.5 py-0 text-[10px] font-medium text-white/60">
-              {data.visibility === "public" ? "Public" : "Private"}
+              {data.visibility === "public"
+                ? t("playlist.visibility.public")
+                : t("playlist.visibility.private")}
             </span>
             {data.is_collaborative ? (
               <span className="inline-flex items-center rounded-md border border-cyan-400/20 bg-cyan-400/10 px-1.5 py-0 text-[10px] font-medium text-cyan-300">
-                Collaborative
+                {t("playlist.badges.collaborative")}
               </span>
             ) : null}
           </>
@@ -718,13 +733,13 @@ export function Playlist() {
         {data.tracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              This playlist has no tracks yet
+              {t("playlist.empty.noTracks")}
             </p>
           </div>
         ) : filteredTracks.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <p className="text-sm text-muted-foreground">
-              No tracks match this filter
+              {t("playlist.empty.noFilter")}
             </p>
           </div>
         ) : (
@@ -776,10 +791,10 @@ export function Playlist() {
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Delete playlist
+              {t("playlist.delete.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              This action cannot be undone.
+              {t("playlist.delete.subtitle")}
             </p>
           </div>
           <ModalCloseButton
@@ -789,9 +804,9 @@ export function Playlist() {
         </ModalHeader>
         <ModalBody className="px-5 py-5">
           <p className="text-sm text-muted-foreground">
-            Delete{" "}
-            <span className="text-foreground font-medium">{data.name}</span> and
-            remove all its track entries?
+            {t("playlist.delete.confirmPrefix")}{" "}
+            <span className="text-foreground font-medium">{data.name}</span>{" "}
+            {t("playlist.delete.confirmSuffix")}
           </p>
         </ModalBody>
         <ModalFooter className="flex items-center justify-end gap-3 px-5 py-4">
@@ -801,7 +816,7 @@ export function Playlist() {
             onClick={() => setDeleteOpen(false)}
             disabled={deleting}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -810,7 +825,7 @@ export function Playlist() {
             disabled={deleting}
           >
             {deleting ? <Loader2 size={15} className="animate-spin" /> : null}
-            Delete playlist
+            {t("playlist.actions.deletePlaylist")}
           </button>
         </ModalFooter>
       </AppModal>
@@ -823,12 +838,12 @@ export function Playlist() {
         <ModalHeader className="flex items-center justify-between gap-4 px-5 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
-              Collaborators
+              {t("playlist.collaborators.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
               {data.is_collaborative
-                ? "Share a private invite link and manage the people who can edit this playlist."
-                : "This playlist is not collaborative yet."}
+                ? t("playlist.collaborators.subtitle")
+                : t("playlist.collaborators.notCollaborative")}
             </p>
           </div>
           <ModalCloseButton onClick={() => setMembersOpen(false)} />
@@ -839,11 +854,10 @@ export function Playlist() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">
-                    Invite a collaborator
+                    {t("playlist.collaborators.inviteTitle")}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Owners can create share links and QR codes for private
-                    beta-style collaboration.
+                    {t("playlist.collaborators.inviteSubtitle")}
                   </div>
                 </div>
                 <button
@@ -857,7 +871,7 @@ export function Playlist() {
                   ) : (
                     <Users size={15} />
                   )}
-                  Create invite
+                  {t("playlist.collaborators.createInvite")}
                 </button>
               </div>
               {inviteLink ? (
@@ -879,7 +893,7 @@ export function Playlist() {
                       className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/10 transition-colors"
                     >
                       <Copy size={15} />
-                      Copy invite link
+                      {t("playlist.collaborators.copyInvite")}
                     </button>
                   </div>
                 </div>
@@ -914,13 +928,17 @@ export function Playlist() {
                       </div>
                     )}
                     <div className="truncate text-xs text-muted-foreground">
-                      {member.username ? `@${member.username}` : "Profile"} ·{" "}
-                      {member.role}
+                      {member.username
+                        ? `@${member.username}`
+                        : t("playlist.collaborators.profile")}{" "}
+                      · {member.role}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground">
-                      {member.role === "owner" ? "Owner" : "Collab"}
+                      {member.role === "owner"
+                        ? t("playlist.collaborators.owner")
+                        : t("playlist.collaborators.collab")}
                     </div>
                     {isOwner && member.role !== "owner" && !isCurrentUser ? (
                       <button
@@ -934,7 +952,7 @@ export function Playlist() {
                         ) : (
                           <UserMinus size={12} />
                         )}
-                        Remove
+                        {t("common.remove")}
                       </button>
                     ) : null}
                   </div>

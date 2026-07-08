@@ -4,11 +4,19 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
+import { translationDevPlugin } from "./src/i18n/dev/translation-dev-plugin";
+
 const require = createRequire(import.meta.url);
 const lodashEsRoot = path.dirname(require.resolve("lodash-es/package.json"));
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    translationDevPlugin({
+      catalogsDir: path.resolve(__dirname, "src/i18n/catalogs"),
+    }),
+  ],
   build: {
     rollupOptions: {
       output: {

@@ -33,6 +33,10 @@ class ProcessingSettingsUpdateRequest(BaseModel):
     max_track_popularity: int | None = None
 
 
+class PathsSettingsUpdateRequest(BaseModel):
+    llm_refinement_enabled: bool | None = None
+
+
 class TelegramSettingsUpdateRequest(BaseModel):
     bot_token: str | None = None
     enabled: bool | None = None
@@ -61,6 +65,11 @@ class ProcessingSettingsResponse(BaseModel):
     mb_auto_apply_threshold: int
     enrichment_min_age_hours: int
     max_track_popularity: int
+
+
+class PathsSettingsResponse(BaseModel):
+    llm_refinement_enabled: bool
+    llm_refinement_cache_ttl_hours: int
 
 
 class ShowsActiveCityResponse(BaseModel):
@@ -109,6 +118,7 @@ class SettingsResponse(BaseModel):
     db_stats: Any
     library: LibrarySettingsResponse
     processing: ProcessingSettingsResponse
+    paths: PathsSettingsResponse
     shows: ShowsSettingsResponse
     soulseek: SoulseekSettingsResponse
     telegram: TelegramSettingsResponse

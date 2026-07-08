@@ -95,6 +95,27 @@ describe("RadioPage", () => {
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
   });
 
+  it("localizes radio chrome", async () => {
+    renderWithListenProviders(<RadioPage />, {
+      route: "/radio",
+      path: "/radio",
+      locale: "es",
+    });
+
+    expect(await screen.findByText("Converge")).toBeInTheDocument();
+    expect(screen.getByText("Radios de artistas")).toBeInTheDocument();
+    expect(screen.getByText("Radios de géneros")).toBeInTheDocument();
+    expect(
+      screen.getByText("Empezar desde cualquier cosa"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(
+        "Busca un artista, género o álbum para iniciar la radio...",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Radio de artista")).toBeInTheDocument();
+  });
+
   it("starts seeded genre radio from a genre station", async () => {
     const playAll = vi.fn();
 

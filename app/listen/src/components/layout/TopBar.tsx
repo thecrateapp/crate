@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { TopBarSearch } from "@/components/layout/topbar/TopBarSearch";
@@ -9,7 +10,10 @@ interface TopBarProps {
 }
 
 export function TopBar({ hideMobileActions = false }: TopBarProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const backLabel = t("topbar.back");
+  const forwardLabel = t("topbar.forward");
 
   return (
     <div className="flex h-16 w-full items-center gap-2 px-3 pointer-events-none sm:gap-4 sm:px-4">
@@ -17,8 +21,8 @@ export function TopBar({ hideMobileActions = false }: TopBarProps) {
         <button
           onClick={() => navigate(-1)}
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/60 transition-colors hover:text-white md:h-10 md:w-10"
-          aria-label="Go back"
-          title="Go back"
+          aria-label={backLabel}
+          title={backLabel}
         >
           <ChevronLeft
             size={CRATE_ICON_SIZE.navMobile}
@@ -28,8 +32,8 @@ export function TopBar({ hideMobileActions = false }: TopBarProps) {
         <button
           onClick={() => navigate(1)}
           className="hidden h-10 w-10 items-center justify-center text-white/60 transition-colors hover:text-white md:flex"
-          aria-label="Go forward"
-          title="Go forward"
+          aria-label={forwardLabel}
+          title={forwardLabel}
         >
           <ChevronRight size={CRATE_ICON_SIZE.nav} />
         </button>

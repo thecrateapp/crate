@@ -1,5 +1,7 @@
 import type { MouseEvent as ReactMouseEvent, RefObject } from "react";
 import { Link } from "react-router";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   CalendarCheck,
   CalendarPlus,
@@ -62,25 +64,44 @@ const HOUR_MS = 60 * 60 * 1000;
 
 export function formatShowTimeRemaining(
   item: UpcomingItem,
-  now = new Date(),
+  tOrNow?: TFunction | Date,
+  nowArg = new Date(),
 ): string | null {
   if (!item.date) return null;
+
+  const t = typeof tOrNow === "function" ? tOrNow : null;
+  const now = tOrNow instanceof Date ? tOrNow : nowArg;
 
   const showDate = new Date(`${item.date}T${item.time || "12:00:00"}`);
   if (Number.isNaN(showDate.getTime())) return null;
 
   const diff = showDate.getTime() - now.getTime();
-  if (diff <= 0) return "Show time";
+  if (diff <= 0) return t ? t("radar.show.time.showTime") : "Show time";
 
   const days = Math.floor(diff / DAY_MS);
-  if (days >= 60) return `${Math.round(days / 30)} months to go`;
-  if (days >= 30) return "1 month to go";
-  if (days >= 1) return `${days} ${days === 1 ? "day" : "days"} to go`;
+  if (days >= 60) {
+    const count = Math.round(days / 30);
+    return t
+      ? t("radar.show.time.monthsToGo", { count })
+      : `${count} months to go`;
+  }
+  if (days >= 30) {
+    return t ? t("radar.show.time.oneMonthToGo") : "1 month to go";
+  }
+  if (days >= 1) {
+    return t
+      ? t("radar.show.time.daysToGo", { count: days })
+      : `${days} ${days === 1 ? "day" : "days"} to go`;
+  }
 
   const hours = Math.floor(diff / HOUR_MS);
-  if (hours >= 1) return `${hours} ${hours === 1 ? "hour" : "hours"} to go`;
+  if (hours >= 1) {
+    return t
+      ? t("radar.show.time.hoursToGo", { count: hours })
+      : `${hours} ${hours === 1 ? "hour" : "hours"} to go`;
+  }
 
-  return "Starting soon";
+  return t ? t("radar.show.time.startingSoon") : "Starting soon";
 }
 
 function showDestination(item: UpcomingItem): string | null {
@@ -132,6 +153,7 @@ export function UpcomingShowCollapsedView({
   actionMenu,
   onToggleAttendance,
 }: CollapsedViewProps) {
+  const { t, i18n } = useTranslation();
   const artistImageUrl =
     artistPhotoApiUrl({
       artistId: item.artist_id,
@@ -143,11 +165,11 @@ export function UpcomingShowCollapsedView({
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;
   const monthStr = d
-    ? d.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+    ? d.toLocaleDateString(i18n.language, { month: "short" }).toUpperCase()
     : "";
   const dayStr = d ? String(d.getDate()) : "";
   const dowStr = d
-    ? d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+    ? d.toLocaleDateString(i18n.language, { weekday: "short" }).toUpperCase()
     : "";
   const support = (item.lineup || []).slice(1);
 
@@ -179,7 +201,7 @@ export function UpcomingShowCollapsedView({
           {attending && (
             <span
               className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-primary"
-              title="Attending"
+              title={t("radar.show.attending")}
             />
           )}
         </div>
@@ -195,7 +217,7 @@ export function UpcomingShowCollapsedView({
         </div>
         {support.length > 0 && (
           <div className="mt-0.5 truncate text-[10px] text-white/40">
-            w/ {support.slice(0, 3).join(", ")}
+            {t("radar.show.withSupportPrefix")} {support.slice(0, 3).join(", ")}
             {support.length > 3 && ` +${support.length - 3}`}
           </div>
         )}
@@ -222,7 +244,11 @@ export function UpcomingShowCollapsedView({
             void onToggleAttendance();
           }}
           disabled={!item.id || savingAttendance}
-          title={attending ? "Attending" : "Mark as attending"}
+          title={
+            attending
+              ? t("radar.show.attending")
+              : t("actions.show.markAttending")
+          }
           className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/8 hover:text-white/60 disabled:opacity-30"
         >
           {savingAttendance ? (
@@ -256,6 +282,7 @@ export function UpcomingShowExpandedView({
   onClose,
   showClose = true,
 }: ExpandedViewProps) {
+  const { t, i18n } = useTranslation();
   const backgroundUrl = artistBackgroundApiUrl({
     artistId: item.artist_id,
     artistSlug: item.artist_slug,
@@ -272,7 +299,7 @@ export function UpcomingShowExpandedView({
 
   const d = item.date ? new Date(`${item.date}T12:00:00`) : null;
   const dateLabel = d
-    ? d.toLocaleDateString("en-US", {
+    ? d.toLocaleDateString(i18n.language, {
         weekday: "short",
         month: "short",
         day: "numeric",
@@ -287,7 +314,7 @@ export function UpcomingShowExpandedView({
   const addressLabel = [item.address_line1, item.postal_code]
     .filter(Boolean)
     .join(" · ");
-  const timeRemaining = formatShowTimeRemaining(item);
+  const timeRemaining = formatShowTimeRemaining(item, t);
   const directionsUrl = showDirectionsUrl(item);
   const genreItems = (item.genres || []).slice(0, 3).map((name) => ({ name }));
 
@@ -314,7 +341,7 @@ export function UpcomingShowExpandedView({
         {showClose ? (
           <button
             onClick={onClose}
-            aria-label="Close show details"
+            aria-label={t("radar.show.closeDetails")}
             className="absolute top-2.5 left-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
           >
             <X size={14} />
@@ -361,7 +388,8 @@ export function UpcomingShowExpandedView({
               </Link>
               {support.length > 0 && (
                 <div className="truncate text-[10px] text-white/40">
-                  w/ {support.slice(0, 4).join(" · ")}
+                  {t("radar.show.withSupportPrefix")}{" "}
+                  {support.slice(0, 4).join(" · ")}
                   {support.length > 4 && ` +${support.length - 4}`}
                 </div>
               )}
@@ -413,7 +441,7 @@ export function UpcomingShowExpandedView({
             ) : (
               <CalendarPlus size={13} />
             )}
-            {attending ? "Going" : "Attend"}
+            {attending ? t("radar.show.going") : t("radar.show.attend")}
           </button>
           <button
             onClick={() => void onPlaySetlist()}
@@ -425,7 +453,7 @@ export function UpcomingShowExpandedView({
             ) : (
               <Play size={13} className="fill-current" />
             )}
-            Play Setlist
+            {t("radar.show.playSetlist")}
           </button>
           {directionsUrl ? (
             <a
@@ -435,7 +463,7 @@ export function UpcomingShowExpandedView({
               className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:text-primary"
             >
               <MapPin size={13} />
-              Directions
+              {t("radar.show.directions")}
             </a>
           ) : null}
           <a
@@ -448,7 +476,7 @@ export function UpcomingShowExpandedView({
             className="flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2.5 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/18"
           >
             <ExternalLink size={13} />
-            Get Tickets
+            {t("radar.show.getTickets")}
             {item.status === "onsale" && (
               <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
             )}

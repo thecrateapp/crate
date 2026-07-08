@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { I18nProvider, type ListenLocale } from "@/i18n";
+
 const { mockNavigate, mockRefetch, mockSetAuthTokens } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
   mockRefetch: vi.fn<() => Promise<{ id: number } | null>>(),
@@ -35,6 +37,14 @@ vi.mock("@/lib/api", () => ({
 
 import { AuthCallback } from "@/pages/AuthCallback";
 
+function renderWithI18n(locale: ListenLocale = "en") {
+  return render(
+    <I18nProvider initialLocale={locale}>
+      <AuthCallback />
+    </I18nProvider>,
+  );
+}
+
 describe("AuthCallback", () => {
   beforeEach(() => {
     mockNavigate.mockReset();
@@ -57,7 +67,7 @@ describe("AuthCallback", () => {
   it("hydrates auth before navigating to the next route", async () => {
     mockRefetch.mockResolvedValueOnce({ id: 1 });
 
-    const { rerender } = render(<AuthCallback />);
+    const { rerender } = renderWithI18n();
 
     expect(mockSetAuthTokens).toHaveBeenCalledWith(
       "oauth-token",
@@ -70,7 +80,11 @@ describe("AuthCallback", () => {
 
     authState.user = { id: 1 };
     authState.loading = false;
-    rerender(<AuthCallback />);
+    rerender(
+      <I18nProvider initialLocale="en">
+        <AuthCallback />
+      </I18nProvider>,
+    );
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/stats", { replace: true });
@@ -80,10 +94,14 @@ describe("AuthCallback", () => {
   it("returns to login when auth hydration finishes without a user", async () => {
     mockRefetch.mockResolvedValueOnce(null);
 
-    const { rerender } = render(<AuthCallback />);
+    const { rerender } = renderWithI18n();
 
     authState.loading = false;
-    rerender(<AuthCallback />);
+    rerender(
+      <I18nProvider initialLocale="en">
+        <AuthCallback />
+      </I18nProvider>,
+    );
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
@@ -95,7 +113,7 @@ describe("AuthCallback", () => {
     window.history.replaceState({}, "", "/auth/callback?next=%2Fstats");
     mockRefetch.mockResolvedValueOnce(null);
 
-    render(<AuthCallback />);
+    renderWithI18n();
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
@@ -111,7 +129,7 @@ describe("AuthCallback", () => {
       "/auth/callback?desktop=tauri&token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
     );
 
-    render(<AuthCallback />);
+    renderWithI18n();
 
     const link = screen.getByRole("link", { name: "Open Crate" });
     expect(link.getAttribute("href")).toBe(
@@ -120,5 +138,25 @@ describe("AuthCallback", () => {
     expect(mockSetAuthTokens).not.toHaveBeenCalled();
     expect(mockRefetch).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("renders the desktop callback handoff in the active locale", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/callback?desktop=tauri&token=oauth-token&refresh_token=refresh-token&next=%2Fstats",
+    );
+
+    renderWithI18n("es");
+
+    expect(
+      screen.getByRole("heading", { name: "Volver a Crate" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Si la app de escritorio no se abrió automáticamente, usa el botón de abajo.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Abrir Crate" })).toBeVisible();
   });
 });

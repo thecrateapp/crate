@@ -1,5 +1,6 @@
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
   ListMusic,
@@ -64,6 +65,7 @@ export function PlaylistHeroSection({
   secondaryActions,
   menuItems,
 }: PlaylistHeroSectionProps) {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const [menuOpen, setMenuOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
@@ -132,7 +134,7 @@ export function PlaylistHeroSection({
           data-testid="playlist-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
-          aria-label="More"
+          aria-label={t("common.more")}
         >
           <MoreHorizontal
             data-testid="playlist-mobile-hero-menu-icon"
@@ -214,32 +216,32 @@ export function PlaylistHeroSection({
         <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             role="group"
-            aria-label="Primary playlist actions"
+            aria-label={t("playlist.actions.primaryGroup")}
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-[15px]"
               onClick={onPlay}
               disabled={playDisabled}
-              aria-label="Play"
+              aria-label={t("player.play")}
             >
               <Play size={17} fill="currentColor" />
-              <span>Play</span>
+              <span>{t("player.play")}</span>
             </button>
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7"
               onClick={onShuffle}
               disabled={shuffleDisabled}
-              aria-label="Shuffle"
+              aria-label={t("player.shuffle")}
             >
               <Shuffle size={17} />
-              <span>Shuffle</span>
+              <span>{t("player.shuffle")}</span>
             </button>
           </div>
 
           <div
             role="group"
-            aria-label="Secondary playlist actions"
+            aria-label={t("playlist.actions.secondaryGroup")}
             className="grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4"
           >
             {secondaryActions.map((action) => {
@@ -275,10 +277,10 @@ export function PlaylistHeroSection({
                 <button
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleMenu}
-                  aria-label="More"
+                  aria-label={t("common.more")}
                 >
                   <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
-                  <span>More</span>
+                  <span>{t("common.more")}</span>
                 </button>
                 <ContextMenu
                   header={menuHeader}

@@ -11,6 +11,7 @@ and ``db/jobs/``. See the refactor plan for the rationale.
 
 from crate.db.orm.genre import GenreTaxonomyAlias, GenreTaxonomyEdge, GenreTaxonomyNode
 from crate.db.orm.health import HealthIssue
+from crate.db.orm.i18n import I18nBundle, I18nTranslationRequest
 from crate.db.orm.bandcamp import (
     BandcampConnection,
     BandcampImport,
@@ -46,6 +47,8 @@ __all__ = [
     "GenreTaxonomyEdge",
     "GenreTaxonomyNode",
     "HealthIssue",
+    "I18nBundle",
+    "I18nTranslationRequest",
     "LibraryAlbum",
     "LibraryArtist",
     "LibraryTrack",

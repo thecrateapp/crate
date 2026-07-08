@@ -47,6 +47,27 @@ describe("OAuthButtons", () => {
     ).toBeInTheDocument();
   });
 
+  it("uses custom provider labels when supplied", async () => {
+    render(
+      <OAuthButtons
+        fetchProviders={mockProviders({ apple: true, appleConfigured: false })}
+        onOAuthNavigate={vi.fn()}
+        labels={{
+          separator: "o",
+          google: "Continuar con Google",
+          apple: "Continuar con Apple",
+          appleUnavailable: "Apple no disponible",
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("o")).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText("Continuar con Google"),
+    ).toBeInTheDocument();
+    expect(await screen.findByTitle("Apple no disponible")).toBeInTheDocument();
+  });
+
   it("renders nothing when google is enabled but not configured and apple is disabled", async () => {
     const { container } = render(
       <OAuthButtons

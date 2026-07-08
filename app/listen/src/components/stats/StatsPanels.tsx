@@ -1,4 +1,5 @@
 import { Children, type ReactNode, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ResponsiveLine } from "@nivo/line";
 
 import type { StatsTrendPoint, StatsWindow } from "./stats-model";
@@ -64,6 +65,8 @@ export function WindowPicker({
   value: StatsWindow | null;
   onChange: (value: StatsWindow) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="inline-flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-black/25 p-1 shadow-2xl shadow-black/20 backdrop-blur">
       {STATS_WINDOW_OPTIONS.map((option) => (
@@ -76,7 +79,7 @@ export function WindowPicker({
               : "text-muted-foreground hover:bg-white/5 hover:text-white"
           }`}
         >
-          {option.label}
+          {t(option.label)}
         </button>
       ))}
     </div>
@@ -94,6 +97,7 @@ export function TopList({
   loading?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const hasVisibleItems = Children.count(children) > 0;
 
   return (
@@ -101,7 +105,9 @@ export function TopList({
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       <div className="mt-3 space-y-2">
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <p className="text-sm text-muted-foreground">
+            {t("common.loadingShort")}
+          </p>
         ) : hasVisibleItems ? (
           children
         ) : (
@@ -119,23 +125,24 @@ export function TrendChart({
   points: StatsTrendPoint[];
   loading?: boolean;
 }) {
+  const { t, i18n } = useTranslation();
   const data = useMemo(
     () => [
       {
-        id: "Minutes",
+        id: t("stats.metrics.minutes"),
         data: points.map((point) => ({
           x: point.day,
           y: Number(point.minutes_listened.toFixed(2)),
         })),
       },
     ],
-    [points],
+    [points, t],
   );
 
   if (loading) {
     return (
       <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
-        Loading trend data...
+        {t("stats.trend.loading")}
       </div>
     );
   }
@@ -143,7 +150,7 @@ export function TrendChart({
   if (points.length === 0) {
     return (
       <div className="flex h-72 items-center justify-center rounded-[1.35rem] border border-dashed border-white/10 bg-black/20 text-sm text-muted-foreground">
-        Start listening and your daily curve will appear here.
+        {t("stats.trend.empty")}
       </div>
     );
   }
@@ -198,7 +205,7 @@ export function TrendChart({
           tickRotation: points.length > 14 ? -45 : 0,
           format: (value) => {
             const date = new Date(`${String(value)}T12:00:00`);
-            return date.toLocaleDateString("en-US", {
+            return date.toLocaleDateString(i18n.language, {
               month: "short",
               day: "numeric",
             });
@@ -213,7 +220,9 @@ export function TrendChart({
               {String(point.data.xFormatted)}
             </div>
             <div className="mt-1 text-sm text-cyan-300">
-              {point.data.yFormatted} minutes
+              {t("stats.trend.minutesValue", {
+                value: point.data.yFormatted,
+              })}
             </div>
           </div>
         )}

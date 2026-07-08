@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   ArrowRight,
@@ -121,6 +122,7 @@ export function ExploreLoadingState() {
 }
 
 export function SearchResultsView({ results }: { results: SearchResults }) {
+  const { t } = useTranslation();
   const hasArtists = results.artists.length > 0;
   const hasAlbums = results.albums.length > 0;
   const hasTracks = results.tracks.length > 0;
@@ -137,7 +139,9 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
 
   if (!hasArtists && !hasAlbums && !hasTracks) {
     return (
-      <p className="mt-8 text-sm text-muted-foreground">No results found.</p>
+      <p className="mt-8 text-sm text-muted-foreground">
+        {t("explore.search.noResults")}
+      </p>
     );
   }
 
@@ -145,7 +149,9 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
     <div className="space-y-8">
       {hasArtists ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">Artists</h2>
+          <h2 className="px-1 text-lg font-bold">
+            {t("nav.collection.artists")}
+          </h2>
           <ExploreSectionRail>
             {results.artists.map((artist) => (
               <ArtistCard
@@ -155,7 +161,9 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
                 artistSlug={artist.slug}
                 subtitle={
                   artist.album_count
-                    ? `${artist.album_count} albums`
+                    ? t("common.albumCountLabel", {
+                        count: artist.album_count,
+                      })
                     : undefined
                 }
               />
@@ -166,7 +174,9 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
 
       {hasAlbums ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">Albums</h2>
+          <h2 className="px-1 text-lg font-bold">
+            {t("nav.collection.albums")}
+          </h2>
           <ExploreSectionRail>
             {results.albums.map((album) => (
               <AlbumCard
@@ -184,7 +194,7 @@ export function SearchResultsView({ results }: { results: SearchResults }) {
 
       {hasTracks ? (
         <div className="space-y-3">
-          <h2 className="px-1 text-lg font-bold">Tracks</h2>
+          <h2 className="px-1 text-lg font-bold">{t("common.tracks")}</h2>
           <div className="rounded-xl border border-white/5 bg-white/[0.02]">
             {trackRows.map((row, index) => (
               <TrackRow
@@ -210,6 +220,7 @@ export function GenreDetailView({
   onBack: () => void;
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const isDesktop = useIsDesktop();
   const [startingRadio, setStartingRadio] = useState(false);
@@ -243,12 +254,12 @@ export function GenreDetailView({
     try {
       const radio = await startShapedRadio("seeded", "genre", seedSlug);
       if (!radio?.tracks.length) {
-        toast.info("Genre radio is not available yet");
+        toast.info(t("genre.toasts.radioUnavailable"));
         return;
       }
       playAll(radio.tracks, 0, radio.source);
     } catch {
-      toast.error("Failed to start genre radio");
+      toast.error(t("genre.toasts.radioFailed"));
     } finally {
       setStartingRadio(false);
     }
@@ -266,7 +277,7 @@ export function GenreDetailView({
     openShareSheet({
       kind: "genre",
       title: data.name,
-      subtitle: "Genre",
+      subtitle: t("genre.kind"),
       imageUrl: heroCoverUrl,
       url: publicShareUrl(`/explore?genre=${encodeURIComponent(data.slug)}`),
     });
@@ -277,36 +288,40 @@ export function GenreDetailView({
     return [
       action({
         key: "play-radio",
-        label: "Play genre radio",
+        label: t("genre.actions.playRadio"),
         icon: Radio,
         onSelect: handlePlayGenreRadio,
       }),
       action({
         key: "radar",
-        label: nextShow ? "Open next show in Radar" : "Open genre Radar",
+        label: nextShow
+          ? t("genre.actions.openNextShow")
+          : t("genre.actions.openRadar"),
         icon: Calendar,
         disabled: !nextShow,
         onSelect: () => openGenreRadar(nextShow),
       }),
       action({
         key: "share",
-        label: "Share genre",
+        label: t("genre.actions.share"),
         icon: Share2,
         onSelect: shareGenre,
       }),
     ];
-  }, [data, heroCoverUrl, nextShow, startingRadio]);
+  }, [data, heroCoverUrl, nextShow, startingRadio, t]);
   const genreMenu = useItemActionMenu(genreMenuActions);
 
-  if (loading) return <CrateLoader label="Loading genre." />;
+  if (loading) return <CrateLoader label={t("genre.loading")} />;
   if (!data)
-    return <p className="text-sm text-muted-foreground">Genre not found.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">{t("genre.notFound")}</p>
+    );
 
   const description =
     data.description ||
     data.canonical_description ||
     data.external_description ||
-    "A focused corner of your library, shaped by the artists and records you keep returning to.";
+    t("genre.defaultDescription");
   const artistCount = data.artist_count ?? data.artists.length;
   const albumCount = data.album_count ?? data.albums.length;
   const trackCount =
@@ -335,8 +350,8 @@ export function GenreDetailView({
               className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
               onClick={genreMenu.openFromTrigger}
               onContextMenu={genreMenu.handleContextMenu}
-              aria-label="More"
-              title="More"
+              aria-label={t("common.more")}
+              title={t("common.more")}
             >
               <MoreHorizontal
                 data-testid="genre-mobile-hero-menu-icon"
@@ -349,8 +364,11 @@ export function GenreDetailView({
               header={{
                 type: "media",
                 title: data.name,
-                subtitle: "Genre",
-                detail: `${artistCount} artists · ${albumCount} albums`,
+                subtitle: t("genre.kind"),
+                detail: t("genre.menu.detail", {
+                  artists: artistCount,
+                  albums: albumCount,
+                }),
                 imageUrl: heroCoverUrl,
                 imageAlt: data.name,
                 imageShape: "square",
@@ -374,7 +392,7 @@ export function GenreDetailView({
           {heroCoverUrl ? (
             <img
               src={heroCoverUrl}
-              alt={`${data.name} genre cover`}
+              alt={t("genre.coverAlt", { name: data.name })}
               className="absolute inset-0 h-full w-full scale-[1.02] object-cover brightness-[0.66] contrast-110 opacity-[0.68] saturate-125"
               onError={(event) => {
                 if (heroCoverIndex + 1 < heroCoverCandidates.length) {
@@ -402,11 +420,17 @@ export function GenreDetailView({
                 {description}
               </p>
               <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/56">
-                <span>{artistCount} artists</span>
+                <span>
+                  {t("common.artistCountLabel", { count: artistCount })}
+                </span>
                 <span className="text-white/20">/</span>
-                <span>{albumCount} albums</span>
+                <span>
+                  {t("common.albumCountLabel", { count: albumCount })}
+                </span>
                 <span className="text-white/20">/</span>
-                <span>{trackCount} tracks</span>
+                <span>
+                  {t("common.trackCountLabel", { count: trackCount })}
+                </span>
               </div>
             </div>
           </div>
@@ -416,14 +440,14 @@ export function GenreDetailView({
           <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
             <div
               role="group"
-              aria-label="Primary genre actions"
+              aria-label={t("genre.actions.primaryGroup")}
               className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
             >
               <button
                 type="button"
                 onClick={() => void handlePlayGenreRadio()}
                 disabled={startingRadio}
-                aria-label="Play genre radio"
+                aria-label={t("genre.actions.playRadio")}
                 className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] disabled:cursor-wait disabled:opacity-70 md:px-7 md:text-[15px]"
               >
                 {startingRadio ? (
@@ -431,17 +455,17 @@ export function GenreDetailView({
                 ) : (
                   <Play size={17} fill="currentColor" />
                 )}
-                <span>Play</span>
+                <span>{t("player.play")}</span>
               </button>
               {nextShow ? (
                 <button
                   type="button"
                   onClick={() => openGenreRadar(nextShow)}
-                  aria-label="Open next genre show in Radar"
+                  aria-label={t("genre.actions.openNextGenreShow")}
                   className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
                 >
                   <Calendar size={17} />
-                  <span>Next show</span>
+                  <span>{t("genre.actions.nextShow")}</span>
                 </button>
               ) : null}
             </div>
@@ -449,17 +473,17 @@ export function GenreDetailView({
             {isDesktop ? (
               <div
                 role="group"
-                aria-label="Secondary genre actions"
+                aria-label={t("genre.actions.secondaryGroup")}
                 className="ml-auto flex shrink-0 items-center gap-4"
               >
                 <button
                   type="button"
                   className={GENRE_SECONDARY_ACTION_CLASS}
                   onClick={shareGenre}
-                  aria-label="Share genre"
+                  aria-label={t("genre.actions.share")}
                 >
                   <Share2 size={CRATE_ICON_SIZE.lg} />
-                  <span>Share</span>
+                  <span>{t("common.share")}</span>
                 </button>
                 <div className="relative shrink-0">
                   <button
@@ -468,18 +492,21 @@ export function GenreDetailView({
                     className={GENRE_SECONDARY_ACTION_CLASS}
                     onClick={genreMenu.openFromTrigger}
                     onContextMenu={genreMenu.handleContextMenu}
-                    aria-label="More"
+                    aria-label={t("common.more")}
                   >
                     <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
-                    <span>More</span>
+                    <span>{t("common.more")}</span>
                   </button>
                   <ItemActionMenu
                     actions={genreMenuActions}
                     header={{
                       type: "media",
                       title: data.name,
-                      subtitle: "Genre",
-                      detail: `${artistCount} artists · ${albumCount} albums`,
+                      subtitle: t("genre.kind"),
+                      detail: t("genre.menu.detail", {
+                        artists: artistCount,
+                        albums: albumCount,
+                      }),
                       imageUrl: heroCoverUrl,
                       imageAlt: data.name,
                       imageShape: "square",
@@ -500,9 +527,11 @@ export function GenreDetailView({
           <section className="space-y-3">
             <div className="flex items-end justify-between gap-3 px-1">
               <div>
-                <h2 className="text-lg font-bold">Related scenes</h2>
+                <h2 className="text-lg font-bold">
+                  {t("genre.related.title")}
+                </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Adjacent genres with the most music in your library.
+                  {t("genre.related.subtitle")}
                 </p>
               </div>
             </div>
@@ -526,7 +555,9 @@ export function GenreDetailView({
 
         {genreShows.length > 0 ? (
           <section className="space-y-3">
-            <h2 className="px-1 text-lg font-bold">Shows</h2>
+            <h2 className="px-1 text-lg font-bold">
+              {t("genre.sections.shows")}
+            </h2>
             <div className="grid gap-3 lg:grid-cols-2">
               {genreShows.map((show, index) => {
                 const key = itemKey(show, index);
@@ -547,7 +578,9 @@ export function GenreDetailView({
 
         {visibleArtists.length > 0 ? (
           <div className="space-y-3">
-            <h2 className="px-1 text-lg font-bold">Artists</h2>
+            <h2 className="px-1 text-lg font-bold">
+              {t("nav.collection.artists")}
+            </h2>
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
               {visibleArtists.map((artist) => (
                 <ArtistCard
@@ -555,7 +588,9 @@ export function GenreDetailView({
                   name={artist.artist_name}
                   artistId={artist.artist_id}
                   artistSlug={artist.artist_slug}
-                  subtitle={`${artist.album_count} albums`}
+                  subtitle={t("common.albumCountLabel", {
+                    count: artist.album_count,
+                  })}
                   compact
                   layout="grid"
                 />
@@ -566,7 +601,9 @@ export function GenreDetailView({
 
         {visibleAlbums.length > 0 ? (
           <div className="space-y-3">
-            <h2 className="px-1 text-lg font-bold">Albums</h2>
+            <h2 className="px-1 text-lg font-bold">
+              {t("nav.collection.albums")}
+            </h2>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {visibleAlbums.map((album) => (
                 <AlbumCard
@@ -596,6 +633,7 @@ function RelatedGenreCard({
   genre: RelatedGenre;
   onOpen: () => void;
 }) {
+  const { t } = useTranslation();
   const imageCandidates = useMemo(
     () => buildRelatedGenreImageCandidates(genre),
     [genre],
@@ -609,10 +647,10 @@ function RelatedGenreCard({
   const coverUrl = imageCandidates[imageIndex] ?? null;
   const contentLabel = [
     genre.artist_count > 0
-      ? `${genre.artist_count} artist${genre.artist_count === 1 ? "" : "s"}`
+      ? t("common.artistCountLabel", { count: genre.artist_count })
       : null,
     genre.album_count > 0
-      ? `${genre.album_count} album${genre.album_count === 1 ? "" : "s"}`
+      ? t("common.albumCountLabel", { count: genre.album_count })
       : null,
   ]
     .filter(Boolean)
@@ -757,11 +795,12 @@ export function DecadeDetailView({
   decade: string;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const { data, loading } = useApi<DecadeArtists>(
     `/api/artists?decade=${decade}&limit=50`,
   );
 
-  if (loading) return <CrateLoader label="Loading decade." />;
+  if (loading) return <CrateLoader label={t("explore.decade.loading")} />;
 
   return (
     <div className="space-y-6">
@@ -775,7 +814,7 @@ export function DecadeDetailView({
         <div>
           <h1 className="text-2xl font-bold">{decade}</h1>
           <p className="text-sm text-muted-foreground">
-            {data?.total ?? 0} artists
+            {t("common.artistCountLabel", { count: data?.total ?? 0 })}
           </p>
         </div>
       </div>
@@ -788,7 +827,7 @@ export function DecadeDetailView({
               name={artist.name}
               artistId={artist.id}
               artistSlug={artist.slug}
-              subtitle={`${artist.albums} albums`}
+              subtitle={t("common.albumCountLabel", { count: artist.albums })}
               compact
               layout="grid"
             />
@@ -796,7 +835,7 @@ export function DecadeDetailView({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No artists found for this decade.
+          {t("explore.decade.empty")}
         </p>
       )}
     </div>
@@ -810,6 +849,7 @@ export function PlaylistCategoryView({
   category: string;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const { data, loading, refetch } = useApi<SystemPlaylist[]>(
@@ -823,7 +863,7 @@ export function PlaylistCategoryView({
         playAll(playlist.tracks, 0, { ...playlist.source, name: playlistName });
       }
     } catch {
-      toast.error("Failed to play playlist");
+      toast.error(t("playlist.toasts.playFailed"));
     }
   }
 
@@ -834,15 +874,19 @@ export function PlaylistCategoryView({
         isFollowed ? "DELETE" : "POST",
       );
       toast.success(
-        isFollowed ? "Removed from your library" : "Added to your library",
+        isFollowed
+          ? t("actions.playlist.toasts.removedFromLibrary")
+          : t("actions.playlist.toasts.addedToLibrary"),
       );
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("playlist.toasts.updateFailed"));
     }
   }
 
-  if (loading) return <CrateLoader label="Loading playlist category." />;
+  if (loading) {
+    return <CrateLoader label={t("explore.playlistCategory.loading")} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -856,7 +900,7 @@ export function PlaylistCategoryView({
         <div>
           <h1 className="text-2xl font-bold capitalize">{category}</h1>
           <p className="text-sm text-muted-foreground">
-            {data?.length ?? 0} playlists
+            {t("common.playlistCountLabel", { count: data?.length ?? 0 })}
           </p>
         </div>
       </div>
@@ -874,9 +918,11 @@ export function PlaylistCategoryView({
               coverDataUrl={playlist.cover_data_url}
               meta={[
                 playlist.category || null,
-                `${playlist.track_count} tracks`,
+                t("common.trackCountLabel", { count: playlist.track_count }),
                 playlist.follower_count > 0
-                  ? `${playlist.follower_count} followers`
+                  ? t("common.followerCountLabel", {
+                      count: playlist.follower_count,
+                    })
                   : null,
               ]
                 .filter(Boolean)
@@ -896,7 +942,7 @@ export function PlaylistCategoryView({
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-muted-foreground">
-          No playlists found in this category yet.
+          {t("explore.playlistCategory.empty")}
         </div>
       )}
     </div>

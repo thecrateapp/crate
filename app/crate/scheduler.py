@@ -15,6 +15,7 @@ DEFAULT_SCHEDULES = {
     "library_pipeline": 86400,  # 24h — gated maintenance path (watcher handles real-time)
     "compute_analytics": 14400,  # 4h — recompute analytics from DB
     "check_new_releases": 43200,  # 12h — check MusicBrainz for new releases
+    "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
     "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
 }

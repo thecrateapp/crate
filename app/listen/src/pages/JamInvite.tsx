@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 
 export function JamInvite() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
 
@@ -19,12 +21,14 @@ export function JamInvite() {
     )
       .then((response) => {
         if (cancelled) return;
-        toast.success(`Joined ${response.room.name}`);
+        toast.success(
+          t("jamInvite.toasts.joined", { name: response.room.name }),
+        );
         navigate(`/jam/rooms/${response.room.id}`, { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
-        toast.error("Invite is invalid or expired");
+        toast.error(t("jamInvite.toasts.invalid"));
         navigate("/jam", { replace: true });
       });
     return () => {
@@ -36,9 +40,11 @@ export function JamInvite() {
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
       <Loader2 size={22} className="animate-spin text-primary" />
       <div>
-        <p className="text-lg font-medium text-foreground">Joining room…</p>
+        <p className="text-lg font-medium text-foreground">
+          {t("jamInvite.title")}
+        </p>
         <p className="text-sm text-muted-foreground">
-          We are validating the invite and adding you to the session.
+          {t("jamInvite.subtitle")}
         </p>
       </div>
     </div>

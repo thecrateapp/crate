@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Loader2,
   ArrowRight,
@@ -29,7 +30,14 @@ type ProbeState =
   | { status: "probing" }
   | { status: "ok"; inviteOnly: boolean }
   | { status: "not-crate" }
-  | { status: "error"; message: string };
+  | {
+      status: "error";
+      messageKey?:
+        | "serverSetup.errors.connect"
+        | "serverSetup.errors.host"
+        | "serverSetup.errors.required";
+      message?: string;
+    };
 
 async function probe(url: string): Promise<ProbeState> {
   try {
@@ -59,16 +67,20 @@ async function probe(url: string): Promise<ProbeState> {
     const message = err instanceof Error ? err.message : "";
     return {
       status: "error",
-      message:
+      messageKey:
         message === "Load failed" || message === "Failed to fetch"
-          ? "Could not connect. Check the URL and try again."
-          : message || "Could not reach that host",
+          ? "serverSetup.errors.connect"
+          : message
+            ? undefined
+            : "serverSetup.errors.host",
+      message: message || undefined,
     };
   }
 }
 
 export function ServerSetup() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [probeState, setProbeState] = useState<ProbeState>({ status: "idle" });
 
@@ -76,7 +88,10 @@ export function ServerSetup() {
     event.preventDefault();
     const normalised = normaliseServerUrl(url);
     if (!normalised) {
-      setProbeState({ status: "error", message: "Enter a server URL" });
+      setProbeState({
+        status: "error",
+        messageKey: "serverSetup.errors.required",
+      });
       return;
     }
     setProbeState({ status: "probing" });
@@ -102,17 +117,16 @@ export function ServerSetup() {
             <img src="/icons/logo.svg" alt="Crate" className="h-14 w-14" />
           </div>
           <h1 className="text-balance text-3xl font-bold tracking-[-0.04em] text-white sm:text-4xl">
-            Connect to a Crate server
+            {t("serverSetup.title")}
           </h1>
           <p className="mt-3 max-w-md text-sm leading-6 text-slate-400">
-            Enter the API URL for your Crate instance. You can add more servers
-            later from Settings.
+            {t("serverSetup.description")}
           </p>
         </div>
 
         <label className="mt-8 flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Server URL
+            {t("serverSetup.urlLabel")}
           </span>
           <div className="relative">
             <Server
@@ -146,11 +160,11 @@ export function ServerSetup() {
             {probeState.status === "probing" ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                Checking server…
+                {t("serverSetup.checking")}
               </>
             ) : (
               <>
-                Continue
+                {t("serverSetup.continue")}
                 <ArrowRight
                   size={16}
                   className="transition group-hover:translate-x-0.5"
@@ -163,21 +177,21 @@ export function ServerSetup() {
             onClick={() => setUrl("http://localhost:8585")}
             className="min-h-12 rounded-[16px] border border-white/10 px-5 text-sm font-semibold text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05] hover:text-white"
           >
-            Local dev
+            {t("serverSetup.localDev")}
           </button>
         </div>
 
         <p className="pt-5 text-center text-[12px] leading-5 text-slate-500">
-          Don't run your own server yet?{" "}
+          {t("serverSetup.docsPrefix")}{" "}
           <a
             href="https://docs.cratemusic.app/technical/development-deployment-and-operations"
             className="text-cyan-300 underline-offset-2 hover:underline"
             target="_blank"
             rel="noreferrer"
           >
-            Set one up in ~5 minutes
+            {t("serverSetup.docsLink")}
           </a>
-          .
+          {t("serverSetup.docsSuffix")}
         </p>
       </form>
     </div>
@@ -185,6 +199,7 @@ export function ServerSetup() {
 }
 
 function StatusLine({ state }: { state: ProbeState }) {
+  const { t } = useTranslation();
   if (state.status === "idle" || state.status === "probing") {
     return <div className="h-5" />; // Reserve space so the button doesn't jump
   }
@@ -192,7 +207,8 @@ function StatusLine({ state }: { state: ProbeState }) {
     return (
       <div className="flex items-center gap-2 text-[13px] text-emerald-300">
         <CheckCircle2 size={14} />
-        Crate instance detected{state.inviteOnly ? " (invite-only)" : ""}
+        {t("serverSetup.status.detected")}
+        {state.inviteOnly ? ` ${t("serverSetup.status.inviteOnly")}` : ""}
       </div>
     );
   }
@@ -200,14 +216,14 @@ function StatusLine({ state }: { state: ProbeState }) {
     return (
       <div className="flex items-center gap-2 text-[13px] text-amber-300">
         <AlertCircle size={14} />
-        Reachable, but not a Crate server
+        {t("serverSetup.status.notCrate")}
       </div>
     );
   }
   return (
     <div className="flex items-center gap-2 text-[13px] text-rose-300">
       <AlertCircle size={14} />
-      {state.message}
+      {state.messageKey ? t(state.messageKey) : state.message}
     </div>
   );
 }

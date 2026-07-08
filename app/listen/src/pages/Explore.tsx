@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ArrowRight, Radio, Route } from "@crate/ui/icons";
 import { toast } from "sonner";
 
@@ -25,6 +26,7 @@ import { PlaylistCard } from "@/components/playlists/PlaylistCard";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 
 export function Explore() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,7 +49,7 @@ export function Explore() {
         playAll(playlist.tracks, 0, { ...playlist.source, name: playlistName });
       }
     } catch {
-      toast.error("Failed to play playlist");
+      toast.error(t("explore.toasts.playPlaylistFailed"));
     }
   }
 
@@ -58,11 +60,13 @@ export function Explore() {
         isFollowed ? "DELETE" : "POST",
       );
       toast.success(
-        isFollowed ? "Removed from your library" : "Added to your library",
+        isFollowed
+          ? t("explore.toasts.removedFromLibrary")
+          : t("explore.toasts.addedToLibrary"),
       );
       refetch();
     } catch {
-      toast.error("Failed to update playlist");
+      toast.error(t("explore.toasts.updatePlaylistFailed"));
     }
   }
 
@@ -91,7 +95,7 @@ export function Explore() {
   }
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Explore</h1>
+      <h1 className="text-2xl font-bold">{t("explore.title")}</h1>
       <div className="space-y-6">
         {loading ? <ExploreLoadingState /> : null}
 
@@ -99,14 +103,14 @@ export function Explore() {
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <ExploreFeatureCard
-                title="Radio"
-                subtitle="Start from a track, artist, album or genre."
+                title={t("explore.features.radio.title")}
+                subtitle={t("explore.features.radio.subtitle")}
                 icon={Radio}
                 onClick={() => navigate("/radio")}
               />
               <ExploreFeatureCard
-                title="Music Paths"
-                subtitle="Find the route between scenes, artists and records."
+                title={t("explore.features.paths.title")}
+                subtitle={t("explore.features.paths.subtitle")}
                 icon={Route}
                 onClick={() => navigate("/paths")}
               />
@@ -125,8 +129,8 @@ export function Explore() {
             {filters.decades.length > 0 && (
               <div className="space-y-4">
                 <ExploreSectionHeader
-                  title="Time tunnels"
-                  subtitle="Jump into eras with enough depth to wander."
+                  title={t("explore.timeTunnels.title")}
+                  subtitle={t("explore.timeTunnels.subtitle")}
                 />
                 <div className="flex flex-wrap gap-2">
                   {filters.decades.map((d) => (
@@ -155,7 +159,9 @@ export function Explore() {
             ) : null}
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">No filters available.</p>
+          <p className="text-muted-foreground text-sm">
+            {t("explore.noFilters")}
+          </p>
         )}
       </div>
     </div>
@@ -237,11 +243,13 @@ function ExploreCratePlaylists({
   onPlay: (playlistId: number, playlistName: string) => void;
   onToggleFollow: (playlistId: number, isFollowed: boolean) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <section className="space-y-4">
       <ExploreSectionHeader
-        title="From Crate"
-        subtitle="Global playlists curated and generated for discovery."
+        title={t("explore.fromCrate.title")}
+        subtitle={t("explore.fromCrate.subtitle")}
       />
       <ExploreSectionRail>
         {playlists.map((playlist) => (
@@ -255,9 +263,11 @@ function ExploreCratePlaylists({
             coverDataUrl={playlist.cover_data_url}
             meta={[
               playlist.category || null,
-              `${playlist.track_count} tracks`,
+              t("common.trackCount", { count: playlist.track_count }),
               playlist.follower_count > 0
-                ? `${playlist.follower_count} followers`
+                ? t("common.followerCount", {
+                    count: playlist.follower_count,
+                  })
                 : null,
             ]
               .filter(Boolean)
@@ -285,6 +295,7 @@ function GenreExplorer({
   genres: BrowseFilters["genres"];
   onOpen: (genre: string) => void;
 }) {
+  const { t } = useTranslation();
   const topGenres = [...genres].sort((a, b) => b.count - a.count).slice(0, 12);
   if (!topGenres.length) return null;
 
@@ -295,8 +306,8 @@ function GenreExplorer({
   return (
     <section className="space-y-4">
       <ExploreSectionHeader
-        title="Genre rooms"
-        subtitle="Start from a scene, then let Crate lead you sideways."
+        title={t("explore.genreRooms.title")}
+        subtitle={t("explore.genreRooms.subtitle")}
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {topGenres.slice(0, 8).map((genre, index) => {
@@ -336,7 +347,7 @@ function GenreExplorer({
               <div className="relative flex h-full flex-col justify-between gap-5">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary/90">
-                    Genre Room
+                    {t("explore.genreRooms.badge")}
                   </span>
                   <Radio
                     size={15}
@@ -363,6 +374,7 @@ function GenreExplorer({
 }
 
 function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const [loadingMood, setLoadingMood] = useState<string | null>(null);
 
@@ -410,16 +422,16 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
           0,
           {
             type: "playlist",
-            name: `${mood.charAt(0).toUpperCase() + mood.slice(1)} Mix`,
+            name: t("explore.moods.mixName", {
+              mood: mood.charAt(0).toUpperCase() + mood.slice(1),
+            }),
           },
         );
       } else {
-        toast.info(
-          "No tracks match this mood yet — analyze more of your library",
-        );
+        toast.info(t("explore.toasts.noMoodTracks"));
       }
     } catch {
-      toast.error("Failed to load mood tracks");
+      toast.error(t("explore.toasts.loadMoodTracksFailed"));
     } finally {
       setLoadingMood(null);
     }
@@ -430,8 +442,8 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
   return (
     <div className="space-y-3">
       <ExploreSectionHeader
-        title="Browse by Mood"
-        subtitle="Powered by audio analysis of your library."
+        title={t("explore.moods.title")}
+        subtitle={t("explore.moods.subtitle")}
       />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {moods.map((m) => (
@@ -444,10 +456,10 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
             } active:scale-[0.98]`}
           >
             <span className="text-sm font-medium capitalize">
-              {loadingMood === m.name ? "Loading..." : m.name}
+              {loadingMood === m.name ? t("common.loadingShort") : m.name}
             </span>
             <span className="block text-[10px] opacity-60 mt-0.5">
-              {m.track_count} tracks
+              {t("common.trackCount", { count: m.track_count })}
             </span>
           </button>
         ))}

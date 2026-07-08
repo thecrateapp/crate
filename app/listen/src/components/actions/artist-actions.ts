@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Heart,
   HeartBold,
@@ -29,6 +30,7 @@ import { shuffleArray } from "@/lib/utils";
 export function useArtistActionEntries(
   input: ArtistMenuData,
 ): ItemActionMenuEntry[] {
+  const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
   const following = isFollowing(input.artistId);
@@ -61,7 +63,7 @@ export function useArtistActionEntries(
     return [
       action({
         key: "play",
-        label: "Play top tracks",
+        label: t("actions.artist.playTopTracks"),
         icon: Play,
         disabled: input.artistId == null,
         onSelect: async () => {
@@ -69,21 +71,23 @@ export function useArtistActionEntries(
           try {
             const tracks = await fetchArtistTopTracks(input);
             if (!tracks.length) {
-              toast.info("No top tracks available for this artist yet");
+              toast.info(t("actions.artist.toasts.noTopTracks"));
               return;
             }
             playAll(tracks, 0, {
               type: "queue",
-              name: `${input.name} Top Tracks`,
+              name: t("actions.artist.topTracksSource", {
+                name: input.name,
+              }),
             });
           } catch {
-            toast.error("Failed to load top tracks");
+            toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
           }
         },
       }),
       action({
         key: "shuffle",
-        label: "Shuffle top tracks",
+        label: t("actions.artist.shuffleTopTracks"),
         icon: Shuffle,
         disabled: input.artistId == null,
         onSelect: async () => {
@@ -91,35 +95,41 @@ export function useArtistActionEntries(
           try {
             const tracks = await fetchArtistTopTracks(input);
             if (!tracks.length) {
-              toast.info("No top tracks available for this artist yet");
+              toast.info(t("actions.artist.toasts.noTopTracks"));
               return;
             }
             playAll(shuffleArray(tracks), 0, {
               type: "queue",
-              name: `${input.name} Top Tracks`,
+              name: t("actions.artist.topTracksSource", {
+                name: input.name,
+              }),
             });
           } catch {
-            toast.error("Failed to load top tracks");
+            toast.error(t("actions.artist.toasts.loadTopTracksFailed"));
           }
         },
       }),
       { type: "divider", key: "divider-artist-main" },
       action({
         key: "follow",
-        label: following ? "Unfollow artist" : "Follow artist",
+        label: following
+          ? t("actions.artist.unfollow")
+          : t("actions.artist.follow"),
         icon: following ? HeartBold : Heart,
         active: following,
         disabled: input.artistId == null,
         onSelect: async () => {
           await toggleArtistFollow(input.artistId ?? null);
           toast.success(
-            following ? `Unfollowed ${input.name}` : `Following ${input.name}`,
+            following
+              ? t("actions.artist.toasts.unfollowed", { name: input.name })
+              : t("actions.artist.toasts.following", { name: input.name }),
           );
         },
       }),
       action({
         key: "radio",
-        label: "Start artist radio",
+        label: t("actions.artist.radio"),
         icon: Radio,
         disabled: input.artistId == null,
         onSelect: async () => {
@@ -127,24 +137,25 @@ export function useArtistActionEntries(
           try {
             const radio = await fetchArtistRadio(input.artistId, input.name);
             if (!radio.tracks.length) {
-              toast.info("Artist radio is not available yet");
+              toast.info(t("actions.artist.toasts.radioUnavailable"));
               return;
             }
             playAll(radio.tracks, 0, radio.source);
           } catch {
-            toast.error("Failed to start artist radio");
+            toast.error(t("actions.artist.toasts.radioFailed"));
           }
         },
       }),
       action({
         key: "share",
-        label: "Share artist",
+        label: t("actions.artist.share"),
         icon: Share2,
         onSelect: sharePath(artistShare || artistPath, input.name, {
           kind: "artist",
           imageUrl: artistImage,
+          copiedToast: t("share.toasts.linkCopied"),
         }),
       }),
     ];
-  }, [following, input, playAll, toggleArtistFollow]);
+  }, [following, input, playAll, t, toggleArtistFollow]);
 }

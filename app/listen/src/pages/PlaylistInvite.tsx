@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Loader2 } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 
 export function PlaylistInvite() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { token } = useParams<{ token: string }>();
 
@@ -19,12 +21,12 @@ export function PlaylistInvite() {
     )
       .then((response) => {
         if (cancelled) return;
-        toast.success("You joined the collaborative playlist");
+        toast.success(t("playlistInvite.toasts.joined"));
         navigate(`/playlist/${response.playlist_id}`, { replace: true });
       })
       .catch(() => {
         if (cancelled) return;
-        toast.error("Playlist invite is invalid or expired");
+        toast.error(t("playlistInvite.toasts.invalid"));
         navigate("/library?tab=playlists", { replace: true });
       });
     return () => {
@@ -36,9 +38,11 @@ export function PlaylistInvite() {
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
       <Loader2 size={22} className="animate-spin text-primary" />
       <div>
-        <p className="text-lg font-medium text-foreground">Joining playlist…</p>
+        <p className="text-lg font-medium text-foreground">
+          {t("playlistInvite.title")}
+        </p>
         <p className="text-sm text-muted-foreground">
-          We are validating the invite and adding you as a collaborator.
+          {t("playlistInvite.subtitle")}
         </p>
       </div>
     </div>

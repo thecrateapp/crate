@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { ComponentType, ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
   BarChart3,
@@ -42,13 +43,14 @@ import {
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
 
-const WINDOW_COPY: Record<StatsWindow, { title: string; label: string }> = {
-  "7d": { title: "Last 7 days", label: "Week" },
-  "30d": { title: "Last 30 days", label: "Month" },
-  "90d": { title: "Last 90 days", label: "Season" },
-  "365d": { title: "Last year", label: "Year" },
-  all_time: { title: "All-time", label: "Archive" },
-};
+const WINDOW_COPY_KEYS: Record<StatsWindow, { title: string; label: string }> =
+  {
+    "7d": { title: "stats.window.7d", label: "stats.window.week" },
+    "30d": { title: "stats.window.30d", label: "stats.window.month" },
+    "90d": { title: "stats.window.90d", label: "stats.window.season" },
+    "365d": { title: "stats.window.365d", label: "stats.window.year" },
+    all_time: { title: "stats.window.allTime", label: "stats.window.archive" },
+  };
 
 const STATS_WINDOWS: StatsWindow[] = ["7d", "30d", "90d", "365d", "all_time"];
 
@@ -62,16 +64,17 @@ function normalizeMonthParam(value: string | null): string | null {
   return value && /^\d{4}-\d{2}$/.test(value) ? value : null;
 }
 
-function formatMonthTitle(month: string): string {
+function formatMonthTitle(month: string, locale: string): string {
   const date = new Date(`${month}-01T12:00:00`);
   if (Number.isNaN(date.getTime())) return month;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
 }
 
 export function Stats() {
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -84,9 +87,25 @@ export function Stats() {
   const statsPeriodQuery = selectedMonth
     ? `month=${selectedMonth}`
     : `window=${selectedWindow}`;
+  const windowCopy = useMemo(
+    () =>
+      Object.fromEntries(
+        STATS_WINDOWS.map((window) => {
+          const copy = WINDOW_COPY_KEYS[window];
+          return [
+            window,
+            { title: t(copy.title), label: t(copy.label) },
+          ] as const;
+        }),
+      ) as Record<StatsWindow, { title: string; label: string }>,
+    [t],
+  );
   const period = selectedMonth
-    ? { title: formatMonthTitle(selectedMonth), label: "Month" }
-    : WINDOW_COPY[selectedWindow];
+    ? {
+        title: formatMonthTitle(selectedMonth, i18n.language),
+        label: t("stats.window.month"),
+      }
+    : windowCopy[selectedWindow];
 
   const { play, playAll } = usePlayerActions();
   const statsEndpoint = isGlobalStats
@@ -118,8 +137,9 @@ export function Stats() {
         replay ?? undefined,
         topArtistItems,
         topTrackItems,
+        t,
       ),
-    [overview, replay, topArtistItems, topTrackItems],
+    [overview, replay, topArtistItems, topTrackItems, t],
   );
 
   const soundProfile = useMemo(
@@ -149,15 +169,15 @@ export function Stats() {
     username ||
     null;
   const heroTitle = isGlobalStats
-    ? "Crate pulse"
+    ? t("stats.hero.globalTitle")
     : isUserStats && subjectName
-      ? `${subjectName}'s sound`
-      : "Your sound";
+      ? t("stats.hero.userTitle", { name: subjectName })
+      : t("stats.hero.yourTitle");
   const heroBody = isGlobalStats
-    ? "A replay-style read on the whole instance: shared obsessions, global momentum, sound profile, and the records shaping Crate."
+    ? t("stats.hero.globalBody")
     : isUserStats
-      ? "A replay-style read on this listener: obsessions, momentum, sound profile, and the records that owned this window."
-      : "A replay-style read on what you actually lived with: obsessions, momentum, sound profile, and the records that owned this window.";
+      ? t("stats.hero.userBody")
+      : t("stats.hero.yourBody");
 
   const playTopTrack = (item: StatsTrack) => {
     const track = toPlayerTrack(item);
@@ -172,7 +192,7 @@ export function Stats() {
     if (!replayItems.length) return;
     playAll(replayItems.map(toPlayerTrack), 0, {
       type: "playlist",
-      name: replay?.title || "Replay",
+      name: replay?.title || t("stats.replay.title"),
     });
   };
 
@@ -185,11 +205,13 @@ export function Stats() {
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.24em] text-primary shadow-[0_0_30px_rgba(34,211,238,0.14)]">
             <BarChart3 size={12} />
-            Listening DNA
+            {t("stats.hero.badge")}
           </div>
           <h1 className="mt-4 max-w-4xl text-[clamp(2.65rem,8vw,7.5rem)] font-black uppercase leading-[0.82] tracking-[-0.085em] text-foreground">
             {heroTitle}
-            <span className="block text-primary">decoded</span>
+            <span className="block text-primary">
+              {t("stats.hero.decoded")}
+            </span>
           </h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             {heroBody}
@@ -200,15 +222,15 @@ export function Stats() {
             {!isUserStats ? (
               <>
                 <ScopeLink active={!isGlobalStats} to="/stats">
-                  Your DNA
+                  {t("stats.scope.yourDna")}
                 </ScopeLink>
                 <ScopeLink active={isGlobalStats} to="/stats/global">
-                  Crate Pulse
+                  {t("stats.scope.cratePulse")}
                 </ScopeLink>
               </>
             ) : username ? (
               <ScopeLink active={false} to={`/users/${username}`}>
-                Back to profile
+                {t("stats.scope.backToProfile")}
               </ScopeLink>
             ) : null}
           </div>
@@ -239,17 +261,17 @@ export function Stats() {
               </div>
               <div className="mt-5 grid max-w-3xl gap-3 sm:grid-cols-3">
                 <HeroMetric
-                  label="Minutes"
+                  label={t("stats.metrics.minutes")}
                   value={formatStatsMinutes(overview?.minutes_listened ?? 0)}
                 />
                 <HeroMetric
-                  label="Plays"
+                  label={t("stats.metrics.plays")}
                   value={
                     overview?.play_count ? String(overview.play_count) : "0"
                   }
                 />
                 <HeroMetric
-                  label="Active days"
+                  label={t("stats.metrics.activeDays")}
                   value={
                     overview?.active_days ? String(overview.active_days) : "0"
                   }
@@ -270,30 +292,42 @@ export function Stats() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
             <SignalCard
               icon={Flame}
-              label="Obsession"
-              title={leadTrack?.title || "No dominant track yet"}
+              label={t("stats.signals.obsession")}
+              title={leadTrack?.title || t("stats.signals.noDominantTrack")}
               body={
                 leadTrack
-                  ? `${leadTrack.artist} kept surfacing with ${leadTrack.play_count} plays.`
-                  : "Start listening and Crate will find the track that keeps pulling you back."
+                  ? t("stats.signals.dominantTrackBody", {
+                      artist: leadTrack.artist,
+                      count: leadTrack.play_count,
+                    })
+                  : t("stats.signals.noDominantTrackBody")
               }
             />
             <SignalCard
               icon={Search}
-              label={topDiscovery ? "Discovery" : "Gravity"}
+              label={
+                topDiscovery
+                  ? t("stats.signals.discovery")
+                  : t("stats.signals.gravity")
+              }
               title={
                 topDiscovery?.artist_name ||
                 leadArtist?.artist_name ||
-                "No leading artist yet"
+                t("stats.signals.noLeadingArtist")
               }
               body={
                 topDiscovery
-                  ? `${topDiscovery.play_count} first-window plays. New signal, not old habit.`
+                  ? t("stats.signals.discoveryBody", {
+                      count: topDiscovery.play_count,
+                    })
                   : leadArtist
-                    ? `${formatStatsMinutes(
-                        leadArtist.minutes_listened,
-                      )} with ${leadArtist.play_count} plays.`
-                    : "Your strongest artist signal will appear here."
+                    ? t("stats.signals.gravityBody", {
+                        minutes: formatStatsMinutes(
+                          leadArtist.minutes_listened,
+                        ),
+                        count: leadArtist.play_count,
+                      })
+                    : t("stats.signals.noLeadingArtistBody")
               }
             />
           </div>
@@ -307,7 +341,7 @@ export function Stats() {
           ))
         ) : (
           <div className="rounded-[1.75rem] border border-dashed border-white/10 bg-white/[0.03] p-6 text-sm text-muted-foreground lg:col-span-3">
-            Keep listening and this page will start writing your recap.
+            {t("stats.empty.recap")}
           </div>
         )}
       </section>
@@ -351,11 +385,10 @@ export function Stats() {
       {!dashboardLoading && !hasStats ? (
         <div className="mt-8 rounded-[2rem] border border-dashed border-white/10 bg-white/[0.03] p-8 text-center">
           <h2 className="text-xl font-black text-foreground">
-            Your stats are waiting for signal
+            {t("stats.empty.title")}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Play a few albums and this turns into your personal listening
-            dossier.
+            {t("stats.empty.body")}
           </p>
         </div>
       ) : null}
@@ -394,9 +427,12 @@ function AffinityCard({
   affinity?: StatsAffinity | null;
   subject?: string | null;
 }) {
+  const { t } = useTranslation();
   if (!affinity) return null;
 
   const reasons = affinity.affinity_reasons ?? [];
+  const bandKey = `stats.affinity.band.${affinity.affinity_band}`;
+  const bandFallback = affinity.affinity_band.replace("_", " ");
   return (
     <section className="mt-8 overflow-hidden rounded-[1.75rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.13),rgba(255,255,255,0.035)_45%,rgba(244,114,182,0.1))] p-5 shadow-2xl shadow-black/20 sm:p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
@@ -406,20 +442,22 @@ function AffinityCard({
           </div>
           <div>
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              Listener match
+              {t("stats.affinity.title")}
             </div>
             <h2 className="mt-2 text-3xl font-black uppercase leading-none tracking-[-0.06em] text-foreground">
-              {affinity.affinity_score}% affinity
+              {t("stats.affinity.score", {
+                score: affinity.affinity_score,
+              })}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {subject
-                ? `Your listening overlaps with ${subject} across the signals below.`
-                : "Your listening overlaps with this listener across the signals below."}
+                ? t("stats.affinity.subjectBody", { subject })
+                : t("stats.affinity.listenerBody")}
             </p>
           </div>
         </div>
         <div className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white/65">
-          {affinity.affinity_band.replace("_", " ")}
+          {t(bandKey, { defaultValue: bandFallback })}
         </div>
       </div>
       {reasons.length ? (
@@ -449,6 +487,7 @@ function StatsStorySection({
   fallbackDiscovery?: StatsStoryArtistSignal;
   fallbackComeback?: StatsStoryArtistSignal;
 }) {
+  const { t, i18n } = useTranslation();
   if (!story) return null;
   const mover = fallbackMover ?? story.movers[0];
   const discovery = fallbackDiscovery ?? story.discoveries[0];
@@ -460,41 +499,52 @@ function StatsStorySection({
   return (
     <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <StorySignalCard
-        label="Rising"
-        title={mover?.artist_name || "No surge yet"}
+        label={t("stats.story.rising")}
+        title={mover?.artist_name || t("stats.story.noSurge")}
         body={
           mover?.delta_play_count
-            ? `+${mover.delta_play_count} plays versus the previous window.`
-            : "Crate will highlight artists gaining momentum here."
+            ? t("stats.story.risingBody", {
+                count: mover.delta_play_count,
+              })
+            : t("stats.story.risingFallback")
         }
       />
       <StorySignalCard
-        label="New blood"
-        title={discovery?.artist_name || "No new obsession yet"}
+        label={t("stats.story.newBlood")}
+        title={discovery?.artist_name || t("stats.story.noNewObsession")}
         body={
           discovery
-            ? `${discovery.play_count} plays from an artist that was not in your prior history.`
-            : "New-to-you artists will show up here."
+            ? t("stats.story.discoveryBody", {
+                count: discovery.play_count,
+              })
+            : t("stats.story.discoveryFallback")
         }
       />
       <StorySignalCard
-        label="Comeback"
-        title={comeback?.artist_name || "No comeback yet"}
+        label={t("stats.story.comeback")}
+        title={comeback?.artist_name || t("stats.story.noComeback")}
         body={
           comeback
-            ? `${comeback.play_count} plays after a long quiet stretch.`
-            : "Artists returning after a long gap will appear here."
+            ? t("stats.story.comebackBody", {
+                count: comeback.play_count,
+              })
+            : t("stats.story.comebackFallback")
         }
       />
       <StorySignalCard
-        label="Peak ritual"
-        title={rhythm.peak_hour_label || rhythm.peak_weekday || "No rhythm yet"}
+        label={t("stats.story.peakRitual")}
+        title={
+          rhythm.peak_hour_label ||
+          rhythm.peak_weekday ||
+          t("stats.story.noRhythm")
+        }
         body={
           rhythm.peak_weekday
-            ? `${rhythm.peak_weekday} and ${
-                rhythm.peak_hour_label ?? "your peak hour"
-              } carried the strongest signal.`
-            : "Your strongest listening hour and day will land here."
+            ? t("stats.story.rhythmBody", {
+                weekday: formatWeekdayLabel(rhythm.peak_weekday, i18n.language),
+                hour: rhythm.peak_hour_label ?? t("stats.story.peakHour"),
+              })
+            : t("stats.story.rhythmFallback")
         }
       />
     </section>
@@ -593,19 +643,20 @@ function ReplayCard({
   onPlay: () => void;
   onPlayTrack: (item: StatsTrack) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-[1.75rem] border border-primary/20 bg-primary/[0.08] p-5 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-black/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-primary">
             <Repeat2 size={12} />
-            Replay
+            {t("stats.replay.title")}
           </div>
           <h2 className="mt-3 text-2xl font-black tracking-[-0.06em] text-foreground">
-            {replay?.title || "Replay"}
+            {replay?.title || t("stats.replay.title")}
           </h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {replay?.subtitle || "A playable snapshot of this window."}
+            {replay?.subtitle || t("stats.replay.defaultSubtitle")}
           </p>
         </div>
         <button
@@ -618,9 +669,12 @@ function ReplayCard({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <MiniStat label="Tracks" value={String(replay?.track_count ?? 0)} />
         <MiniStat
-          label="Minutes"
+          label={t("common.tracks")}
+          value={String(replay?.track_count ?? 0)}
+        />
+        <MiniStat
+          label={t("stats.metrics.minutes")}
           value={formatStatsMinutes(replay?.minutes_listened ?? 0)}
         />
       </div>
@@ -628,7 +682,7 @@ function ReplayCard({
       <div className="mt-5 space-y-2">
         {loading ? (
           <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
-            Loading replay...
+            {t("stats.replay.loading")}
           </div>
         ) : items.length ? (
           items.slice(0, 5).map((item, index) => (
@@ -651,7 +705,7 @@ function ReplayCard({
           ))
         ) : (
           <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
-            Your replay will appear after a little more listening.
+            {t("stats.replay.empty")}
           </div>
         )}
       </div>
@@ -704,6 +758,7 @@ function NarrativeTile({
   body: string;
   index: number;
 }) {
+  const { t } = useTranslation();
   const tones = [
     "from-cyan-400/18 via-white/[0.035] to-transparent",
     "from-rose-400/16 via-white/[0.035] to-transparent",
@@ -718,7 +773,9 @@ function NarrativeTile({
       )}
     >
       <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/40">
-        Signal 0{index + 1}
+        {t("stats.narrative.signal", {
+          number: String(index + 1).padStart(2, "0"),
+        })}
       </div>
       <div className="mt-3 text-xl font-black tracking-[-0.05em] text-foreground">
         {title}
@@ -737,6 +794,7 @@ function SoundProfileCard({
   genres: StatsGenre[];
   skipRate: number;
 }) {
+  const { t } = useTranslation();
   const genreLabels = normalizeGenreLabels(genres);
 
   return (
@@ -744,27 +802,39 @@ function SoundProfileCard({
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
-            Your sound profile
+            {t("stats.soundProfile.title")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Built from the tracks that dominated this window.
+            {t("stats.soundProfile.subtitle")}
           </p>
         </div>
         <Activity className="text-primary" size={22} />
       </div>
 
       <div className="space-y-4">
-        <ProfileBar label="Energy" value={profile.energy} />
-        <ProfileBar label="Movement" value={profile.danceability} />
-        <ProfileBar label="Brightness" value={profile.valence} />
+        <ProfileBar
+          label={t("stats.soundProfile.energy")}
+          value={profile.energy}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.movement")}
+          value={profile.danceability}
+        />
+        <ProfileBar
+          label={t("stats.soundProfile.brightness")}
+          value={profile.valence}
+        />
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <MiniStat
-          label="Avg BPM"
+          label={t("stats.soundProfile.avgBpm")}
           value={profile.bpm ? String(profile.bpm) : "—"}
         />
-        <MiniStat label="Skip rate" value={formatStatsPercent(skipRate)} />
+        <MiniStat
+          label={t("stats.soundProfile.skipRate")}
+          value={formatStatsPercent(skipRate)}
+        />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
@@ -778,7 +848,7 @@ function SoundProfileCard({
         ))}
         {!genreLabels.length ? (
           <span className="text-sm text-muted-foreground">
-            Genre signal will appear here.
+            {t("stats.soundProfile.genreEmpty")}
           </span>
         ) : null}
       </div>
@@ -795,6 +865,7 @@ function ListeningPulseCard({
   points: StatsTrendPoint[];
   loading: boolean;
 }) {
+  const { t, i18n } = useTranslation();
   const activePoints = points.filter(
     (point) => point.play_count > 0 || point.minutes_listened > 0,
   );
@@ -820,10 +891,10 @@ function ListeningPulseCard({
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black tracking-[-0.04em] text-foreground">
-            Listening rhythm
+            {t("stats.rhythm.title")}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Less graph, more signal: when this window actually happened.
+            {t("stats.rhythm.subtitle")}
           </p>
         </div>
         <CalendarDays className="text-primary" size={22} />
@@ -835,15 +906,19 @@ function ListeningPulseCard({
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <MiniStat
-              label="Strongest day"
-              value={strongestDay ? formatTrendDay(strongestDay.day) : "—"}
+              label={t("stats.rhythm.strongestDay")}
+              value={
+                strongestDay
+                  ? formatTrendDay(strongestDay.day, i18n.language)
+                  : "—"
+              }
             />
             <MiniStat
-              label="Peak hour"
+              label={t("stats.rhythm.peakHour")}
               value={rhythm?.peak_hour_label ?? "—"}
             />
             <MiniStat
-              label="Avg active day"
+              label={t("stats.rhythm.avgActiveDay")}
               value={formatStatsMinutes(averageActiveMinutes)}
             />
           </div>
@@ -852,24 +927,32 @@ function ListeningPulseCard({
 
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
             <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-              Cadence
+              {t("stats.rhythm.cadence")}
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              {formatStatsPercent(consistency)} of days had listening activity.
+              {t("stats.rhythm.activityDays", {
+                percent: formatStatsPercent(consistency),
+              })}
               {rhythm?.peak_weekday
-                ? ` ${rhythm.peak_weekday} carried the strongest weekday signal.`
+                ? ` ${t("stats.rhythm.strongestWeekday", {
+                    weekday: formatWeekdayLabel(
+                      rhythm.peak_weekday,
+                      i18n.language,
+                    ),
+                  })}`
                 : ""}
             </p>
           </div>
         </>
       ) : (
-        <PanelEmpty text="Play a few tracks and Crate will find your listening cadence." />
+        <PanelEmpty text={t("stats.rhythm.empty")} />
       )}
     </div>
   );
 }
 
 function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
+  const { t, i18n } = useTranslation();
   const visible = points.slice(-18);
   const maxMinutes = Math.max(
     ...visible.map((point) => point.minutes_listened),
@@ -890,14 +973,14 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-            Daily signal map
+            {t("stats.rhythm.dailySignalMap")}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Dot size and height follow listening intensity.
+            {t("stats.rhythm.dailySignalDescription")}
           </p>
         </div>
         <div className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white/45">
-          {visible.length} days
+          {t("stats.rhythm.dayCount", { count: visible.length })}
         </div>
       </div>
 
@@ -944,9 +1027,13 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                     ? "text-primary hover:scale-110"
                     : "text-white/18 hover:text-white/35",
                 )}
-                aria-label={`${formatTrendDay(point.day)}: ${formatStatsMinutes(
-                  point.minutes_listened,
-                )}, ${point.play_count} plays`}
+                aria-label={`${formatTrendDay(
+                  point.day,
+                  i18n.language,
+                )}: ${formatStatsMinutes(point.minutes_listened)}, ${t(
+                  "common.playCount",
+                  { count: point.play_count },
+                )}`}
               >
                 <span
                   className={cn(
@@ -982,10 +1069,10 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-black text-white">
-                      {formatTrendDay(point.day)}
+                      {formatTrendDay(point.day, i18n.language)}
                     </div>
                     <div className="mt-0.5 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
-                      {formatShortWeekday(point.day)}
+                      {formatShortWeekday(point.day, i18n.language)}
                     </div>
                   </div>
                   <div className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">
@@ -994,26 +1081,35 @@ function PulseConstellation({ points }: { points: StatsTrendPoint[] }) {
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <TooltipMetric
-                    label="Plays"
+                    label={t("stats.metrics.plays")}
                     value={String(point.play_count)}
                   />
                   <TooltipMetric
-                    label="Done"
+                    label={t("stats.rhythm.done")}
                     value={String(point.complete_play_count)}
                   />
                   <TooltipMetric
-                    label="Skips"
+                    label={t("stats.rhythm.skips")}
                     value={String(point.skip_count)}
                   />
                 </div>
                 <div className="mt-3 space-y-2">
-                  <TooltipMeter label="Completion" value={completionRate} />
-                  <TooltipMeter label="Skip pressure" value={skipRate} />
+                  <TooltipMeter
+                    label={t("stats.rhythm.completion")}
+                    value={completionRate}
+                  />
+                  <TooltipMeter
+                    label={t("stats.rhythm.skipPressure")}
+                    value={skipRate}
+                  />
                 </div>
                 <div className="mt-3 text-xs leading-5 text-muted-foreground">
                   {isActive
-                    ? `${point.complete_play_count} completed plays across ${point.play_count} total plays.`
-                    : "No listening signal recorded this day."}
+                    ? t("stats.rhythm.completedAcross", {
+                        complete: point.complete_play_count,
+                        total: point.play_count,
+                      })
+                    : t("stats.rhythm.noDaySignal")}
                 </div>
               </div>
             </div>
@@ -1088,19 +1184,38 @@ function normalizeGenreLabels(genres: StatsGenre[]): string[] {
   return labels.slice(0, 8);
 }
 
-function formatTrendDay(day: string): string {
+function formatTrendDay(day: string, locale: string): string {
   const date = new Date(`${day}T12:00:00`);
   if (Number.isNaN(date.getTime())) return day;
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
   });
 }
 
-function formatShortWeekday(day: string): string {
+function formatShortWeekday(day: string, locale: string): string {
   const date = new Date(`${day}T12:00:00`);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { weekday: "long" });
+  return date.toLocaleDateString(locale, { weekday: "long" });
+}
+
+const WEEKDAY_INDEX_BY_ENGLISH = new Map(
+  [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ].map((weekday, index) => [weekday, index] as const),
+);
+
+function formatWeekdayLabel(weekday: string, locale: string): string {
+  const weekdayIndex = WEEKDAY_INDEX_BY_ENGLISH.get(weekday.toLowerCase());
+  if (weekdayIndex == null) return weekday;
+  const date = new Date(Date.UTC(2026, 0, 4 + weekdayIndex, 12));
+  return date.toLocaleDateString(locale, { weekday: "long" });
 }
 
 function TopTracksPanel({
@@ -1112,10 +1227,11 @@ function TopTracksPanel({
   loading: boolean;
   onPlayTrack: (item: StatsTrack) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <StatsPanel
-      title="Top tracks"
-      subtitle="The songs that made the loudest dent."
+      title={t("stats.topTracks.title")}
+      subtitle={t("stats.topTracks.subtitle")}
       icon={Music2}
     >
       <div className="space-y-2">
@@ -1151,7 +1267,7 @@ function TopTracksPanel({
             </button>
           ))
         ) : (
-          <PanelEmpty text="No top tracks yet." />
+          <PanelEmpty text={t("stats.topTracks.empty")} />
         )}
       </div>
     </StatsPanel>
@@ -1165,10 +1281,11 @@ function TopArtistsPanel({
   items: StatsArtist[];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <StatsPanel
-      title="Top artists"
-      subtitle="Your strongest gravity wells."
+      title={t("stats.topArtists.title")}
+      subtitle={t("stats.topArtists.subtitle")}
       icon={Flame}
     >
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
@@ -1185,7 +1302,7 @@ function TopArtistsPanel({
               />
             ))
         ) : (
-          <PanelEmpty text="No top artists yet." />
+          <PanelEmpty text={t("stats.topArtists.empty")} />
         )}
       </div>
     </StatsPanel>
@@ -1193,6 +1310,7 @@ function TopArtistsPanel({
 }
 
 function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
+  const { t } = useTranslation();
   const photo = artistPhotoApiUrl(
     { artistId: item.artist_id, artistSlug: item.artist_slug },
     { size: 640 },
@@ -1222,14 +1340,14 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
       </div>
       <div className="relative z-10 flex min-h-32 flex-col justify-between">
         <div className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-          Rank #{index + 1}
+          {t("stats.rank", { rank: index + 1 })}
         </div>
         <div>
           <div className="line-clamp-2 text-3xl font-black uppercase leading-[0.86] tracking-[-0.08em] text-white">
             {item.artist_name}
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/62">
-            <span>{item.play_count} plays</span>
+            <span>{t("common.playCount", { count: item.play_count })}</span>
             <span>{formatStatsMinutes(item.minutes_listened)}</span>
           </div>
         </div>
@@ -1245,10 +1363,11 @@ function TopAlbumsPanel({
   items: StatsAlbum[];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <StatsPanel
-      title="Top albums"
-      subtitle="Records that owned the window."
+      title={t("stats.topAlbums.title")}
+      subtitle={t("stats.topAlbums.subtitle")}
       icon={Disc3}
       className="mt-8"
     >
@@ -1297,7 +1416,7 @@ function TopAlbumsPanel({
             </Link>
           ))
         ) : (
-          <PanelEmpty text="No top albums yet." />
+          <PanelEmpty text={t("stats.topAlbums.empty")} />
         )}
       </div>
     </StatsPanel>
@@ -1373,9 +1492,10 @@ function TrackCover({
 }
 
 function PanelLoading() {
+  const { t } = useTranslation();
   return (
     <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-muted-foreground">
-      Loading...
+      {t("common.loadingShort")}
     </div>
   );
 }

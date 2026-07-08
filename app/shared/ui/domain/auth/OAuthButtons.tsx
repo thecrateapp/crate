@@ -57,6 +57,13 @@ interface OAuthButtonsProps {
   ) => void;
   /** Button border-radius class */
   buttonClassName?: string;
+  /** User-visible labels. Defaults remain English for shared consumers. */
+  labels?: {
+    separator?: string;
+    google?: string;
+    apple?: string;
+    appleUnavailable?: string;
+  };
 }
 
 export function OAuthButtons({
@@ -65,6 +72,7 @@ export function OAuthButtons({
   fetchProviders,
   onOAuthNavigate,
   buttonClassName = "rounded-full",
+  labels,
 }: OAuthButtonsProps) {
   const [providers, setProviders] = useState<Record<string, ProviderConfig>>(
     {},
@@ -91,7 +99,9 @@ export function OAuthButtons({
     <>
       <div className="relative flex items-center gap-3 py-1">
         <div className="flex-1 border-t border-white/10" />
-        <span className="text-xs text-white/40">or</span>
+        <span className="text-xs text-white/40">
+          {labels?.separator ?? "or"}
+        </span>
         <div className="flex-1 border-t border-white/10" />
       </div>
 
@@ -105,8 +115,8 @@ export function OAuthButtons({
               "flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed",
               buttonClassName,
             )}
-            aria-label="Continue with Google"
-            title="Continue with Google"
+            aria-label={labels?.google ?? "Continue with Google"}
+            title={labels?.google ?? "Continue with Google"}
           >
             <GoogleIcon className="h-5 w-5" />
           </button>
@@ -120,11 +130,11 @@ export function OAuthButtons({
               "flex h-10 w-10 items-center justify-center border border-white/10 bg-white/5 text-white transition-colors hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed",
               buttonClassName,
             )}
-            aria-label="Continue with Apple"
+            aria-label={labels?.apple ?? "Continue with Apple"}
             title={
               apple.configured
-                ? "Continue with Apple"
-                : "Apple Sign In — coming soon"
+                ? labels?.apple ?? "Continue with Apple"
+                : labels?.appleUnavailable ?? "Apple Sign In — coming soon"
             }
           >
             <AppleIcon className="h-5 w-5" />

@@ -65,6 +65,10 @@ interface SettingsData {
     enrichment_min_age_hours: number;
     max_track_popularity: number;
   };
+  paths?: {
+    llm_refinement_enabled: boolean;
+    llm_refinement_cache_ttl_hours: number;
+  };
   soulseek?: {
     url: string;
     quality: string;
@@ -202,16 +206,19 @@ function Toggle({
   checked,
   onChange,
   disabled,
+  ariaLabel,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-sm border border-white/10 bg-black/20 p-0.5 transition-colors disabled:opacity-50 ${
@@ -1232,6 +1239,10 @@ function EnrichmentSection({
     enrichment_min_age_hours: 24,
     max_track_popularity: 50,
   };
+  const paths = settings.paths ?? {
+    llm_refinement_enabled: true,
+    llm_refinement_cache_ttl_hours: 168,
+  };
   const exts = settings.library?.audio_extensions ?? [
     ".flac",
     ".mp3",
@@ -1247,8 +1258,16 @@ function EnrichmentSection({
   const [threshold, setThreshold] = useState(proc.mb_auto_apply_threshold);
   const [minAge, setMinAge] = useState(proc.enrichment_min_age_hours);
   const [maxPop, setMaxPop] = useState(proc.max_track_popularity);
+  const [llmRefinementEnabled, setLlmRefinementEnabled] = useState(
+    paths.llm_refinement_enabled,
+  );
+  const [savingPaths, setSavingPaths] = useState(false);
   const [audioExts, setAudioExts] = useState<string[]>(exts);
   const [newExt, setNewExt] = useState("");
+
+  useEffect(() => {
+    setLlmRefinementEnabled(paths.llm_refinement_enabled);
+  }, [paths.llm_refinement_enabled]);
 
   async function saveEnrichment() {
     setSaving(true);
@@ -1269,6 +1288,24 @@ function EnrichmentSection({
       toast.success("Setting saved");
     } catch {
       toast.error("Failed to save");
+    }
+  }
+
+  async function savePathsSetting(enabled: boolean) {
+    const previous = llmRefinementEnabled;
+    setLlmRefinementEnabled(enabled);
+    setSavingPaths(true);
+    try {
+      await api("/api/settings/paths", "PUT", {
+        llm_refinement_enabled: enabled,
+      });
+      toast.success("Music Paths settings saved");
+      refetch();
+    } catch {
+      setLlmRefinementEnabled(previous);
+      toast.error("Failed to save Music Paths settings");
+    } finally {
+      setSavingPaths(false);
     }
   }
 
@@ -1323,6 +1360,41 @@ function EnrichmentSection({
               )}
             </FieldRow>
           ))}
+        </PanelCard>
+      </Section>
+
+      <Section
+        title="Music Paths"
+        description="Control the optional AI review pass used after deterministic path generation."
+      >
+        <PanelCard
+          icon={Bot}
+          title="LLM Refinement"
+          description="Let the configured LLM review generated paths and apply safe swaps from deterministic candidates."
+        >
+          <FieldRow
+            label="LLM refinement"
+            hint={`Accepted refinements are cached for ${paths.llm_refinement_cache_ttl_hours} hours per path signature.`}
+          >
+            <Toggle
+              checked={llmRefinementEnabled}
+              onChange={savePathsSetting}
+              disabled={savingPaths}
+              ariaLabel="LLM refinement"
+            />
+            <Badge
+              variant={llmRefinementEnabled ? "default" : "secondary"}
+              className="text-[10px]"
+            >
+              {llmRefinementEnabled ? "Enabled" : "Disabled"}
+            </Badge>
+            {savingPaths ? (
+              <Loader2
+                size={13}
+                className="animate-spin text-muted-foreground"
+              />
+            ) : null}
+          </FieldRow>
         </PanelCard>
       </Section>
 
@@ -1584,6 +1656,7 @@ function StorageSection({
     { type: "enrichment", label: "Enrichment", variant: "outline" as const },
     { type: "lastfm", label: "Last.fm", variant: "outline" as const },
     { type: "analytics", label: "Analytics", variant: "outline" as const },
+    { type: "paths_llm", label: "Music Paths AI", variant: "outline" as const },
   ];
 
   return (

@@ -13,6 +13,7 @@ import { AppPopover } from "@crate/ui/primitives/AppPopover";
 import { cn } from "@crate/ui/lib/cn";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 
 import {
   loadPlaybackTargetGroups,
@@ -41,13 +42,6 @@ function TargetIcon({ target }: { target: PlaybackTarget }) {
   return <MonitorSpeaker size={CRATE_ICON_SIZE.md} />;
 }
 
-function badgeText(target: PlaybackTarget): string {
-  if (target.active) return "Active";
-  if (!target.available) return "Unavailable";
-  if (target.kind === "system-route") return "System";
-  return "Ready";
-}
-
 export function PlaybackTargetMenu({
   className,
   onOverlayChange,
@@ -62,6 +56,7 @@ export function PlaybackTargetMenu({
   } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
   const targetContextRef = useRef(targetContext);
   targetContextRef.current = targetContext;
   const targetTrackId = targetContext?.currentTrack?.id;
@@ -176,7 +171,9 @@ export function PlaybackTargetMenu({
   const handleTarget = useCallback(
     async (target: PlaybackTarget) => {
       if (!target.available) {
-        toast.info(target.unavailableReason || "Output target is unavailable.");
+        toast.info(
+          target.unavailableReason || t("player.output.unavailableToast"),
+        );
         return;
       }
       const result = await selectPlaybackTarget(
@@ -189,15 +186,22 @@ export function PlaybackTargetMenu({
       }
       close();
     },
-    [close],
+    [close, t],
   );
+
+  const badgeText = (target: PlaybackTarget): string => {
+    if (target.active) return t("player.output.badge.active");
+    if (!target.available) return t("player.output.badge.unavailable");
+    if (target.kind === "system-route") return t("player.output.badge.system");
+    return t("player.output.badge.ready");
+  };
 
   return (
     <div className={cn("flex items-center", className)}>
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Output"
+        aria-label={t("player.output.label")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
@@ -224,7 +228,7 @@ export function PlaybackTargetMenu({
             <AppPopover
               ref={popoverRef}
               role="menu"
-              aria-label="Output targets"
+              aria-label={t("player.output.targets")}
               className="fixed z-[1600] w-[min(calc(100vw-1rem),340px)] rounded-2xl p-2"
               style={{
                 right: popoverPosition.right,
@@ -233,13 +237,13 @@ export function PlaybackTargetMenu({
             >
               <div className="px-2 pb-2 pt-1">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/40">
-                  Output
+                  {t("player.output.label")}
                 </div>
               </div>
               {loading ? (
                 <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
                   <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
-                  Loading targets...
+                  {t("player.output.loading")}
                 </div>
               ) : (
                 <div className="max-h-[360px] overflow-y-auto">
@@ -314,7 +318,7 @@ export function PlaybackTargetMenu({
                   ))}
                   {groups.length === 0 ? (
                     <div className="px-3 py-4 text-sm text-muted-foreground">
-                      No output targets found.
+                      {t("player.output.empty")}
                     </div>
                   ) : null}
                 </div>

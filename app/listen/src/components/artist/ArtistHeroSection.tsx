@@ -1,5 +1,6 @@
 import { useRef, useState, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   CRATE_ICON_SIZE,
@@ -59,6 +60,7 @@ export function ArtistHeroSection({
   onShare,
   onOpenBio,
 }: ArtistHeroSectionProps) {
+  const { t } = useTranslation();
   const isDesktop = useIsDesktop();
   const [menuOpen, setMenuOpen] = useState(false);
   const [desktopMenuPosition, setDesktopMenuPosition] = useState<{
@@ -108,19 +110,19 @@ export function ArtistHeroSection({
   const menuItems: ContextMenuEntry[] = [
     {
       key: "play",
-      label: "Play top tracks",
+      label: t("artist.actions.playTopTracks"),
       icon: Play,
       onSelect: onPlay,
     },
     {
       key: "shuffle",
-      label: "Shuffle",
+      label: t("player.shuffle"),
       icon: Shuffle,
       onSelect: onShuffle,
     },
     {
       key: "radio",
-      label: "Artist radio",
+      label: t("artist.actions.radio"),
       icon: Radio,
       onSelect: onArtistRadio,
     },
@@ -128,7 +130,7 @@ export function ArtistHeroSection({
       ? [
           {
             key: "setlist",
-            label: "Play setlist",
+            label: t("artist.actions.playSetlist"),
             icon: ListMusic,
             disabled: !hasSetlist,
             onSelect: onPlaySetlist,
@@ -137,14 +139,14 @@ export function ArtistHeroSection({
       : []),
     {
       key: "follow",
-      label: following ? "Unfollow" : "Follow",
+      label: following ? t("common.unfollow") : t("common.follow"),
       icon: following ? HeartBold : Heart,
       active: following,
       onSelect: onToggleFollow,
     },
     {
       key: "share",
-      label: "Share",
+      label: t("common.share"),
       icon: Share2,
       onSelect: onShare,
     },
@@ -163,7 +165,7 @@ export function ArtistHeroSection({
           data-testid="artist-mobile-hero-menu"
           className="flex h-11 w-11 touch-manipulation items-center justify-center text-white/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)]"
           onClick={handleToggleMenu}
-          aria-label="More"
+          aria-label={t("common.more")}
         >
           <MoreHorizontal
             data-testid="artist-mobile-hero-menu-icon"
@@ -175,7 +177,11 @@ export function ArtistHeroSection({
           header={{
             type: "media",
             title: artist.name,
-            subtitle: `${artist.total_tracks} tracks · ${artist.albums.length} albums`,
+            subtitle: `${t("common.trackCountLabel", {
+              count: artist.total_tracks,
+            })} · ${t("common.albumCountLabel", {
+              count: artist.albums.length,
+            })}`,
             imageUrl: photoUrl,
             imageAlt: artist.name,
             imageShape: "circle",
@@ -251,14 +257,24 @@ export function ArtistHeroSection({
                 {artistInfo?.listeners ? (
                   <span className="flex items-center gap-1">
                     <Users size={14} />
-                    {formatCompact(artistInfo.listeners)} listeners
+                    {t("artist.meta.listeners", {
+                      count: formatCompact(artistInfo.listeners),
+                    })}
                   </span>
                 ) : null}
                 {artist.total_tracks > 0 ? (
-                  <span>{artist.total_tracks} tracks</span>
+                  <span>
+                    {t("common.trackCountLabel", {
+                      count: artist.total_tracks,
+                    })}
+                  </span>
                 ) : null}
                 {artist.albums.length > 0 ? (
-                  <span>{artist.albums.length} albums</span>
+                  <span>
+                    {t("common.albumCountLabel", {
+                      count: artist.albums.length,
+                    })}
+                  </span>
                 ) : null}
               </div>
 
@@ -272,7 +288,7 @@ export function ArtistHeroSection({
                       className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline"
                       onClick={onOpenBio}
                     >
-                      Show more <ChevronDown size={12} />
+                      {t("common.showMore")} <ChevronDown size={12} />
                     </button>
                   ) : null}
                 </div>
@@ -286,36 +302,36 @@ export function ArtistHeroSection({
         <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6">
           <div
             role="group"
-            aria-label="Primary artist actions"
+            aria-label={t("artist.actions.primaryGroup")}
             className="grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3"
           >
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-[background-color,box-shadow,transform] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_0_24px_rgba(34,211,238,0.34)] md:px-7 md:text-[15px]"
               onClick={onPlay}
-              aria-label="Play"
+              aria-label={t("player.play")}
             >
               <Play size={17} fill="currentColor" />
-              <span>Play</span>
+              <span>{t("player.play")}</span>
             </button>
             <button
               className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-white/[0.08] px-5 text-sm font-semibold text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-white/[0.12] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.24)] md:w-auto md:px-7"
               onClick={onShuffle}
-              aria-label="Shuffle"
+              aria-label={t("player.shuffle")}
             >
               <Shuffle size={17} />
-              <span>Shuffle</span>
+              <span>{t("player.shuffle")}</span>
             </button>
           </div>
 
           <div
             role="group"
-            aria-label="Secondary artist actions"
+            aria-label={t("artist.actions.secondaryGroup")}
             className="grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4"
           >
             <button
               className={SECONDARY_ACTION_CLASS}
               onClick={onArtistRadio}
-              aria-label="Artist Radio"
+              aria-label={t("artist.actions.radio")}
             >
               <Radio size={CRATE_ICON_SIZE.lg} />
               <span>Radio</span>
@@ -324,10 +340,10 @@ export function ArtistHeroSection({
               className={SECONDARY_ACTION_CLASS}
               onClick={onPlaySetlist}
               disabled={!hasSetlist}
-              aria-label="Setlist"
+              aria-label={t("artist.actions.setlist")}
             >
               <ListMusic size={CRATE_ICON_SIZE.lg} />
-              <span>Setlist</span>
+              <span>{t("artist.actions.setlist")}</span>
             </button>
             <button
               className={`${SECONDARY_ACTION_CLASS} ${
@@ -336,7 +352,7 @@ export function ArtistHeroSection({
                   : "text-white/62"
               }`}
               onClick={onToggleFollow}
-              aria-label={following ? "Unfollow" : "Follow"}
+              aria-label={following ? t("common.unfollow") : t("common.follow")}
             >
               {following ? (
                 <HeartBold
@@ -346,15 +362,17 @@ export function ArtistHeroSection({
               ) : (
                 <Heart size={CRATE_ICON_SIZE.lg} />
               )}
-              <span>{following ? "Following" : "Follow"}</span>
+              <span>
+                {following ? t("common.following") : t("common.follow")}
+              </span>
             </button>
             <button
               className={SECONDARY_ACTION_CLASS}
               onClick={onShare}
-              aria-label="Share"
+              aria-label={t("common.share")}
             >
               <Share2 size={CRATE_ICON_SIZE.lg} />
-              <span>Share</span>
+              <span>{t("common.share")}</span>
             </button>
             <BandcampSupportButton
               entityType="artist"
@@ -366,16 +384,20 @@ export function ArtistHeroSection({
                 <button
                   className={SECONDARY_ACTION_CLASS}
                   onClick={handleToggleMenu}
-                  aria-label="More"
+                  aria-label={t("common.more")}
                 >
                   <MoreHorizontal size={CRATE_ICON_SIZE.lg} />
-                  <span>More</span>
+                  <span>{t("common.more")}</span>
                 </button>
                 <ContextMenu
                   header={{
                     type: "media",
                     title: artist.name,
-                    subtitle: `${artist.total_tracks} tracks · ${artist.albums.length} albums`,
+                    subtitle: `${t("common.trackCountLabel", {
+                      count: artist.total_tracks,
+                    })} · ${t("common.albumCountLabel", {
+                      count: artist.albums.length,
+                    })}`,
                     imageUrl: photoUrl,
                     imageAlt: artist.name,
                     imageShape: "circle",

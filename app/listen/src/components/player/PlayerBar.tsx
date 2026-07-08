@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   Play,
   Pause,
@@ -110,6 +111,7 @@ function PlayerSurfaceFallback({
 }: {
   fullscreen?: boolean;
 }) {
+  const { t } = useTranslation();
   if (!fullscreen) {
     return (
       <div
@@ -123,7 +125,7 @@ function PlayerSurfaceFallback({
             size={CRATE_ICON_SIZE.sm}
             className="animate-spin text-primary"
           />
-          Loading player…
+          {t("player.loading")}
         </div>
       </div>
     );
@@ -136,6 +138,7 @@ function PlayerSurfaceFallback({
 }
 
 export function PlayerBar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const {
     currentTime,
@@ -1305,7 +1308,11 @@ export function PlayerBar() {
                 <div className="relative flex items-center justify-center gap-3 lg:gap-5">
                   <button
                     onClick={handleToggleShuffle}
-                    aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
+                    aria-label={
+                      shuffle
+                        ? t("player.disableShuffle")
+                        : t("player.enableShuffle")
+                    }
                     className={`transition-colors ${
                       shuffle
                         ? "text-primary"
@@ -1316,14 +1323,16 @@ export function PlayerBar() {
                   </button>
                   <button
                     onClick={handlePreviousTrack}
-                    aria-label="Previous track"
+                    aria-label={t("player.previous")}
                     className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                   >
                     <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
                   </button>
                   <SpectrumPlayButton
                     onClick={handlePlayPause}
-                    aria-label={effectiveIsPlaying ? "Pause" : "Play"}
+                    aria-label={
+                      effectiveIsPlaying ? t("player.pause") : t("player.play")
+                    }
                     size="sm"
                     active={effectiveIsPlaying}
                   >
@@ -1341,7 +1350,7 @@ export function PlayerBar() {
                   </SpectrumPlayButton>
                   <button
                     onClick={handleNextTrack}
-                    aria-label="Next track"
+                    aria-label={t("player.next")}
                     className="text-white/50 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)]"
                   >
                     <SkipForward
@@ -1351,7 +1360,7 @@ export function PlayerBar() {
                   </button>
                   <button
                     onClick={handleCycleRepeat}
-                    aria-label={`Repeat: ${repeat}`}
+                    aria-label={t("player.repeat", { mode: repeat })}
                     className={`transition-colors ${
                       repeat !== "off"
                         ? "text-primary"
@@ -1438,7 +1447,9 @@ export function PlayerBar() {
             <div className="flex items-center gap-1 self-stretch md:hidden">
               <SpectrumPlayButton
                 onClick={handlePlayPause}
-                aria-label={effectiveIsPlaying ? "Pause" : "Play"}
+                aria-label={
+                  effectiveIsPlaying ? t("player.pause") : t("player.play")
+                }
                 size="md"
                 active={effectiveIsPlaying}
                 className="touch-manipulation"
@@ -1460,7 +1471,7 @@ export function PlayerBar() {
               </SpectrumPlayButton>
               <button
                 onClick={handleNextTrack}
-                aria-label="Next track"
+                aria-label={t("player.next")}
                 className="flex h-12 w-12 touch-manipulation items-center justify-center text-white/50 transition-[color,filter,transform] hover:text-primary hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] active:scale-[0.96] active:text-primary"
               >
                 <SkipForward
@@ -1507,7 +1518,7 @@ export function PlayerBar() {
                     }}
                     onMouseEnter={prepareEqualizerPopover}
                     onFocus={prepareEqualizerPopover}
-                    aria-label="Equalizer"
+                    aria-label={t("player.equalizer")}
                     className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                       showEqualizer
                         ? "text-primary"
@@ -1529,7 +1540,7 @@ export function PlayerBar() {
                         ? "text-primary"
                         : "text-white/30 hover:text-primary"
                     }`}
-                    aria-label="Queue"
+                    aria-label={t("player.queue")}
                   >
                     <ListMusic size={CRATE_ICON_SIZE.md} />
                     {displayQueue.length > 1 && (
@@ -1551,7 +1562,7 @@ export function PlayerBar() {
                         ? "text-primary"
                         : "text-white/30 hover:text-primary"
                     }`}
-                    aria-label="Lyrics"
+                    aria-label={t("player.lyrics")}
                   >
                     <Mic2 size={CRATE_ICON_SIZE.md} />
                   </button>
@@ -1568,7 +1579,7 @@ export function PlayerBar() {
                         ? "text-primary"
                         : "text-white/30 hover:text-primary"
                     }`}
-                    aria-label="Expand player"
+                    aria-label={t("player.expand")}
                   >
                     <Maximize2 size={CRATE_ICON_SIZE.md} />
                   </button>
@@ -1583,7 +1594,7 @@ export function PlayerBar() {
                   onClick={handleToggleQueue}
                   onMouseEnter={prepareQueuePanel}
                   onFocus={prepareQueuePanel}
-                  aria-label="Queue"
+                  aria-label={t("player.queue")}
                   className={`relative p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                     showQueue
                       ? "text-primary"
@@ -1598,7 +1609,7 @@ export function PlayerBar() {
                   onClick={handleToggleExtendedPlayer}
                   onMouseEnter={prepareExtendedPlayer}
                   onFocus={prepareExtendedPlayer}
-                  aria-label="Expand player"
+                  aria-label={t("player.expand")}
                   className={`p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.32)] ${
                     extendedOpen
                       ? "text-primary"

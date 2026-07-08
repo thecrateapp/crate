@@ -1,4 +1,5 @@
 import { Calendar, Play } from "@crate/ui/icons";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
@@ -35,6 +36,7 @@ export function ArtistTopTracksSection({
   tracks,
   coverFallback,
 }: ArtistTopTracksSectionProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const trackRows = useMemo<TrackRowData[]>(
     () => tracks.map((track) => topTrackToTrackRowData(track)),
@@ -45,14 +47,16 @@ export function ArtistTopTracksSection({
   return (
     <section>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold text-foreground">Top Tracks</h2>
+        <h2 className="text-lg font-semibold text-foreground">
+          {t("artist.sections.topTracks")}
+        </h2>
         <button
           className="text-sm text-primary hover:underline"
           onClick={() =>
             navigate(artistTopTracksPath({ artistId, artistSlug }))
           }
         >
-          View all
+          {t("common.viewAll")}
         </button>
       </div>
       <div className="rounded-xl">
@@ -90,11 +94,14 @@ export function ArtistAlbumsSection({
   artistName,
   albums,
 }: ArtistAlbumsSectionProps) {
+  const { t } = useTranslation();
   if (!albums.length) return null;
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">Albums</h2>
+      <h2 className="mb-4 text-lg font-semibold text-foreground">
+        {t("artist.sections.albums")}
+      </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {albums.map((album) => (
           <AlbumCard
@@ -138,6 +145,7 @@ export function ArtistShowsSection({
   onToggleExpand,
   onPlayProbableSetlist,
 }: ArtistShowsSectionProps) {
+  const { t, i18n } = useTranslation();
   const nextAttendingShow = shows.find((item) => item.user_attending);
   if (!shows.length) return null;
 
@@ -145,10 +153,12 @@ export function ArtistShowsSection({
     <section>
       <div className="mb-4 space-y-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-foreground">Shows</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            {t("artist.sections.shows")}
+          </h2>
           {artistHotNow ? (
             <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-primary">
-              Heavy rotation
+              {t("artist.sections.heavyRotation")}
             </div>
           ) : null}
         </div>
@@ -159,7 +169,7 @@ export function ArtistShowsSection({
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-primary">
                   <Calendar size={12} />
-                  Show prep
+                  {t("artist.sections.showPrep")}
                 </div>
                 <h3 className="mt-3 text-xl font-bold text-foreground">
                   {nextAttendingShow.title}
@@ -168,7 +178,7 @@ export function ArtistShowsSection({
                   {nextAttendingShow.subtitle} ·{" "}
                   {new Date(
                     `${nextAttendingShow.date}T12:00:00`,
-                  ).toLocaleDateString("en-US", {
+                  ).toLocaleDateString(i18n.language, {
                     month: "long",
                     day: "numeric",
                     year: "numeric",
@@ -176,8 +186,8 @@ export function ArtistShowsSection({
                 </p>
                 <p className="mt-3 text-sm leading-6 text-white/70">
                   {nextAttendingShow.probable_setlist?.length
-                    ? "You’re going to this show and we already have a probable setlist ready."
-                    : "You’re going to this show. As soon as a probable setlist is available, this becomes an instant prep surface."}
+                    ? t("artist.sections.attendingWithSetlist")
+                    : t("artist.sections.attendingWithoutSetlist")}
                 </p>
               </div>
 
@@ -188,14 +198,14 @@ export function ArtistShowsSection({
                     className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     <Play size={14} fill="currentColor" />
-                    Play probable setlist
+                    {t("artist.sections.playProbableSetlist")}
                   </button>
                 ) : null}
                 <button
                   onClick={() => onToggleExpand(itemKey(nextAttendingShow, 0))}
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2 text-sm text-white/65 transition-colors hover:border-white/20 hover:text-foreground"
                 >
-                  View show details
+                  {t("artist.sections.viewShowDetails")}
                 </button>
               </div>
             </div>
@@ -231,12 +241,13 @@ interface RelatedArtistsSectionProps {
 }
 
 export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
+  const { t } = useTranslation();
   if (!artists.length) return null;
 
   return (
     <section>
       <h2 className="mb-4 text-lg font-semibold text-foreground">
-        Related Artists
+        {t("artist.sections.relatedArtists")}
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {artists.slice(0, 15).map((artist) => {
@@ -254,7 +265,9 @@ export function RelatedArtistsSection({ artists }: RelatedArtistsSectionProps) {
               }
               subtitle={
                 artist.match
-                  ? `${Math.round(artist.match * 100)}% match`
+                  ? t("artist.sections.match", {
+                      percent: Math.round(artist.match * 100),
+                    })
                   : undefined
               }
               href={
@@ -287,12 +300,15 @@ interface ArtistAppearsOnSectionProps {
 export function ArtistAppearsOnSection({
   playlists,
 }: ArtistAppearsOnSectionProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   if (!playlists.length) return null;
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-foreground">Appears On</h2>
+      <h2 className="mb-4 text-lg font-semibold text-foreground">
+        {t("artist.sections.appearsOn")}
+      </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {playlists.slice(0, 8).map((playlist) => {
           const artistTrackCount = playlist.artist_track_count ?? 0;
@@ -307,10 +323,12 @@ export function ArtistAppearsOnSection({
               coverDataUrl={playlist.cover_data_url}
               meta={
                 artistTrackCount > 0
-                  ? `${artistTrackCount} track${
-                      artistTrackCount === 1 ? "" : "s"
-                    } here`
-                  : `${playlist.track_count ?? 0} tracks`
+                  ? t("artist.sections.tracksHere", {
+                      count: artistTrackCount,
+                    })
+                  : t("common.trackCountLabel", {
+                      count: playlist.track_count ?? 0,
+                    })
               }
               systemPlaylist
               crateManaged={playlist.scope === "system"}

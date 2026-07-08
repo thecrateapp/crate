@@ -15,6 +15,7 @@ from crate.api.schemas.settings import (
     CacheClearResponse,
     EnrichmentUpdateRequest,
     LibrarySettingsUpdateRequest,
+    PathsSettingsUpdateRequest,
     ProcessingSettingsUpdateRequest,
     ScheduleIntervalsRequest,
     SettingsResponse,
@@ -86,6 +87,13 @@ def get_settings(request: Request):
                 get_setting("enrichment_min_age_hours", "24")
             ),
             "max_track_popularity": int(get_setting("max_track_popularity", "50")),
+        },
+        "paths": {
+            "llm_refinement_enabled": get_setting(
+                "paths_llm_refinement_enabled", "true"
+            )
+            == "true",
+            "llm_refinement_cache_ttl_hours": 168,
         },
         "shows": _get_shows_settings(),
         "soulseek": {
@@ -239,7 +247,7 @@ def update_enrichment(request: Request, body: EnrichmentUpdateRequest):
 def clear_cache(request: Request, body: CacheClearRequest):
     _require_settings_manager(request)
     cache_type = body.type
-    valid_types = {"all", "enrichment", "lastfm", "analytics"}
+    valid_types = {"all", "enrichment", "lastfm", "analytics", "paths_llm"}
     if cache_type not in valid_types:
         raise HTTPException(
             status_code=422,
@@ -272,6 +280,8 @@ def clear_cache(request: Request, body: CacheClearRequest):
     elif cache_type == "analytics":
         delete_cache("analytics")
         delete_cache("stats")
+    elif cache_type == "paths_llm":
+        delete_cache_prefix("paths:llm_refinement:")
 
     return {"ok": True, "type": cache_type}
 
@@ -312,6 +322,22 @@ def update_processing(request: Request, body: ProcessingSettingsUpdateRequest):
         if val < 10 or val > 500:
             raise HTTPException(status_code=422, detail="Must be 10-500")
         set_setting("max_track_popularity", str(val))
+    return {"ok": True}
+
+
+@router.put(
+    "/paths",
+    response_model=SettingsUpdateResponse,
+    responses=_SETTINGS_RESPONSES,
+    summary="Update Music Paths settings",
+)
+def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
+    _require_settings_manager(request)
+    if body.llm_refinement_enabled is not None:
+        set_setting(
+            "paths_llm_refinement_enabled",
+            "true" if body.llm_refinement_enabled else "false",
+        )
     return {"ok": True}
 
 

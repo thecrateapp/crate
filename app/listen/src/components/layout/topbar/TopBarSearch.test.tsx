@@ -97,6 +97,20 @@ describe("TopBarSearch", () => {
     expect(searchButton).toHaveTextContent("Search");
   });
 
+  it("localizes the search affordance and input", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(<TopBarSearch />, { locale: "es" });
+
+    const searchButton = screen.getByRole("button", { name: "Buscar" });
+    expect(searchButton).toHaveTextContent("Buscar");
+
+    await user.click(searchButton);
+
+    expect(
+      screen.getByPlaceholderText("Buscar artistas, álbumes, pistas..."),
+    ).toBeInTheDocument();
+  });
+
   it("uses the shared glass surface for the mobile search shell", () => {
     mockHoverPointer(false);
     renderWithListenProviders(<TopBarSearch />);

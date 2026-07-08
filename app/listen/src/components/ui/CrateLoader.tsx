@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,19 @@ export const CRATE_LOADING_PHRASES = [
   "Syncing the signal",
 ] as const;
 
+const CRATE_LOADING_PHRASE_KEYS = [
+  "loader.phrases.feedingYourSoul",
+  "loader.phrases.loadingCrate",
+  "loader.phrases.warmingTheAmps",
+  "loader.phrases.spinningUpTheCollection",
+  "loader.phrases.cueingTheNextObsession",
+  "loader.phrases.tuningTheRoom",
+  "loader.phrases.checkingTheLinerNotes",
+  "loader.phrases.dustingOffTheCrates",
+  "loader.phrases.findingSomethingLoud",
+  "loader.phrases.syncingTheSignal",
+] as const;
+
 interface CrateLoaderProps {
   className?: string;
   label?: string;
@@ -37,13 +51,15 @@ interface CrateLoaderProps {
 
 export function CrateLoader({
   className,
-  label = "Loading Music.",
+  label,
   variant = "page",
 }: CrateLoaderProps) {
+  const { t } = useTranslation();
   const phrase = useMemo(() => {
-    const index = Math.floor(Math.random() * CRATE_LOADING_PHRASES.length);
-    return CRATE_LOADING_PHRASES[index] ?? CRATE_LOADING_PHRASES[0];
+    const index = Math.floor(Math.random() * CRATE_LOADING_PHRASE_KEYS.length);
+    return CRATE_LOADING_PHRASE_KEYS[index] ?? CRATE_LOADING_PHRASE_KEYS[0];
   }, []);
+  const accessibleLabel = label ?? t("loader.defaultLabel");
 
   return (
     <div
@@ -77,7 +93,7 @@ export function CrateLoader({
         />
       </div>
       <p className="font-sans text-[0.9375rem] font-semibold tracking-[0.055em] text-cyan-50/80">
-        {phrase}
+        {t(phrase)}
         <span
           className="inline-flex w-[1.35em] justify-start"
           aria-hidden="true"
@@ -95,7 +111,7 @@ export function CrateLoader({
           ))}
         </span>
       </p>
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{accessibleLabel}</span>
     </div>
   );
 }

@@ -103,7 +103,7 @@ services:
     environment:
       - TZ=${TZ}
       - SLSKD_REMOTE_CONFIGURATION=true
-      - SLSKD_SHARED_DIR=/data/music
+      - SLSKD_SHARED_DIR=/music
       - SLSKD_DOWNLOADS_DIR=/data/downloads/soulseek
       - SLSKD_INCOMPLETE_DIR=/data/downloads/soulseek/incomplete
       - SLSKD_WEB_AUTHENTICATION_API_KEYS_SOULSYNC=${SLSKD_API_KEY}
@@ -113,6 +113,7 @@ services:
       - SLSKD_SOULSEEK_LISTEN_PORT=${SLSKD_LISTEN_PORT}
     volumes:
       - ${DATA_DIR}/slskd:/app
+      - ${MEDIA_DIR}/music:/music:ro
       - ${MEDIA_DIR}:/data
     ports:
       - "${SLSKD_PORT}:5030"

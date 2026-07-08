@@ -12,6 +12,101 @@ from crate.slugs import build_public_album_slug
 from crate.track_versions import canonical_track_title_key, track_variant_rank
 
 
+def _clean_release_key_part(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _clean_release_url(value: Any) -> str:
+    return _clean_release_key_part(value).rstrip("/")
+
+
+def _release_position_key(item: dict[str, Any]) -> str:
+    return _clean_release_key_part(
+        item.get("position")
+        or item.get("track_number")
+        or item.get("trackNumber")
+        or item.get("track")
+    )
+
+
+def _release_disc_key(item: dict[str, Any]) -> str:
+    return _clean_release_key_part(
+        item.get("disc_number") or item.get("volume_number") or item.get("disc") or 1
+    )
+
+
+def _release_tracklist_key(item: dict[str, Any]) -> tuple[str, ...] | None:
+    title = canonical_track_title_key(str(item.get("title") or item.get("name") or ""))
+    position = _release_position_key(item)
+    disc = _release_disc_key(item)
+    if title and position:
+        return ("position-title", disc, position, title)
+
+    for key in ("recording_mbid", "musicbrainz_trackid", "id", "url", "source_url"):
+        value = _clean_release_url(item.get(key))
+        if value:
+            return (key, value)
+    if title:
+        return ("title", title)
+    return None
+
+
+def _release_preview_track_key(item: dict[str, Any]) -> tuple[str, ...] | None:
+    for key in ("url", "track_url", "tidal_url"):
+        value = _clean_release_url(item.get(key))
+        if value:
+            return ("url", value)
+
+    explicit_id = _clean_release_key_part(item.get("id"))
+    if explicit_id:
+        return ("id", explicit_id)
+
+    title = canonical_track_title_key(str(item.get("title") or item.get("name") or ""))
+    position = _release_position_key(item)
+    source_url = _clean_release_url(item.get("source_url"))
+    if source_url and title:
+        return ("source-title", source_url, position, title)
+    if title and position:
+        return ("position-title", _release_disc_key(item), position, title)
+    if title:
+        return ("title", title)
+    return None
+
+
+def dedupe_release_tracklist(
+    tracklist: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    seen: set[tuple[str, ...]] = set()
+    deduped: list[dict[str, Any]] = []
+    for item in tracklist or []:
+        if not isinstance(item, dict):
+            continue
+        key = _release_tracklist_key(item)
+        if key is not None:
+            if key in seen:
+                continue
+            seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
+def dedupe_release_preview_tracks(
+    preview_tracks: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    seen: set[tuple[str, ...]] = set()
+    deduped: list[dict[str, Any]] = []
+    for item in preview_tracks or []:
+        if not isinstance(item, dict):
+            continue
+        key = _release_preview_track_key(item)
+        if key is not None:
+            if key in seen:
+                continue
+            seen.add(key)
+        deduped.append(item)
+    return deduped
+
+
 def upsert_new_release(
     artist_name: str,
     album_title: str,
@@ -33,6 +128,8 @@ def upsert_new_release(
     session=None,
 ) -> int:
     """Insert or update a detected new release. Returns release ID."""
+    clean_tracklist = dedupe_release_tracklist(tracklist)
+    clean_preview_tracks = dedupe_release_preview_tracks(preview_tracks)
     if session is None:
         with transaction_scope() as s:
             return upsert_new_release(
@@ -50,8 +147,8 @@ def upsert_new_release(
                 source_name,
                 source_url,
                 cover_source,
-                tracklist,
-                preview_tracks,
+                clean_tracklist,
+                clean_preview_tracks,
                 session=s,
             )
     now = datetime.now(timezone.utc).isoformat()
@@ -116,8 +213,8 @@ def upsert_new_release(
                 "source_name": source_name or None,
                 "source_url": source_url or None,
                 "cover_source": cover_source or None,
-                "tracklist_json": json.dumps(tracklist or []),
-                "preview_tracks_json": json.dumps(preview_tracks or []),
+                "tracklist_json": json.dumps(clean_tracklist),
+                "preview_tracks_json": json.dumps(clean_preview_tracks),
             },
         )
         .mappings()
@@ -204,14 +301,7 @@ def merge_new_release_preview_tracks(
             existing = json.loads(existing)
         except Exception:
             existing = []
-    merged: dict[str, dict] = {}
-    for item in [*existing, *preview_tracks]:
-        if not isinstance(item, dict):
-            continue
-        key = str(item.get("id") or item.get("url") or item.get("title") or "")
-        if not key:
-            continue
-        merged[key] = item
+    merged = dedupe_release_preview_tracks([*existing, *preview_tracks])
 
     session.execute(
         text("""
@@ -233,7 +323,7 @@ def merge_new_release_preview_tracks(
         """),
         {
             "id": abs(int(release_id)),
-            "preview_tracks_json": json.dumps(list(merged.values())),
+            "preview_tracks_json": json.dumps(merged),
             "source_url": source_url,
             "cover_url": cover_url,
             "quality": quality,
