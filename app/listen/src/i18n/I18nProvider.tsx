@@ -96,7 +96,7 @@ export function createListenI18n(initialLocale?: ListenLocale) {
       devicePreference: getLocalListenLocalePreference(),
       browserLanguages: browserLanguages(),
     });
-  instance.use(ICU);
+  instance.use(new ICU({ bindI18nStore: "added removed" }));
   if (translationModeEnabled) {
     instance.use(translationMarkerPostProcessor);
   }
@@ -106,6 +106,7 @@ export function createListenI18n(initialLocale?: ListenLocale) {
     fallbackLng: LISTEN_FALLBACK_LOCALE,
     keySeparator: false,
     interpolation: { escapeValue: false },
+    react: { bindI18nStore: "added removed" },
     postProcess: translationModeEnabled
       ? [TRANSLATION_MARKER_POST_PROCESSOR]
       : undefined,
