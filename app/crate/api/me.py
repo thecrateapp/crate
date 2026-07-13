@@ -145,6 +145,7 @@ from crate.db.repositories.library_contributions import (
     get_user_album_contribution,
     list_user_album_contributions,
 )
+from crate.db.repositories.global_user_library import get_user_global_library_counts
 from crate.db.repositories.playlists import get_followed_system_playlists, get_playlists
 from crate.db.repositories.recommendations import (
     record_recommendation_exposure,
@@ -165,6 +166,7 @@ from crate.db.repositories.user_library import (
 from crate.db.repositories.user_library_shared import resolve_track_reference
 from crate.db.snapshot_events import snapshot_channel
 from crate.db.tx import read_scope
+from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.slugs import build_public_album_slug
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -180,6 +182,15 @@ _ME_RESPONSES = merge_responses(
 )
 
 _STATS_DASHBOARD_CACHE_TTL_SECONDS = 90
+
+
+def _listen_global_cache_mode() -> str:
+    return (
+        "global"
+        if global_catalog_surface_enabled("stats")
+        or global_catalog_surface_enabled("home")
+        else "local"
+    )
 
 
 @router.post(
@@ -440,8 +451,9 @@ def _get_cached_stats_dashboard(
     replay_limit: int,
 ) -> dict:
     period_key = month_period_key(month) if month else window
+    cache_mode = _listen_global_cache_mode()
     cache_key = (
-        f"listen:stats_dashboard:v3:{user_id}:{period_key}:"
+        f"listen:stats_dashboard:v5:{cache_mode}:{user_id}:{period_key}:"
         f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
@@ -607,6 +619,8 @@ def _build_upcoming_insights(
 def my_library(request: Request):
     """Get counts for user's personal library."""
     user = _require_auth(request)
+    if global_catalog_surface_enabled("library"):
+        return get_user_global_library_counts(int(user["id"]))
     return get_user_library_counts(user["id"])
 
 
@@ -1313,8 +1327,9 @@ async def home_discovery_stream(request: Request, initial: bool = Query(True)):
 )
 def home_mix_detail(request: Request, mix_id: str, limit: int = Query(40, ge=1, le=80)):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     mix = _get_cached_home_endpoint_response(
-        cache_key=f"home_mix:v2:{user['id']}:{mix_id}:{limit}",
+        cache_key=f"home_mix:v3:{cache_mode}:{user['id']}:{mix_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_playlist(user["id"], mix_id, limit=limit),
@@ -1334,8 +1349,9 @@ def home_playlist_detail(
     request: Request, playlist_id: str, limit: int = Query(40, ge=1, le=80)
 ):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     playlist = _get_cached_home_endpoint_response(
-        cache_key=f"home_playlist:v2:{user['id']}:{playlist_id}:{limit}",
+        cache_key=f"home_playlist:v3:{cache_mode}:{user['id']}:{playlist_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_playlist(user["id"], playlist_id, limit=limit),
@@ -1355,8 +1371,9 @@ def home_section_detail(
     request: Request, section_id: str, limit: int = Query(42, ge=1, le=120)
 ):
     user = _require_auth(request)
+    cache_mode = _listen_global_cache_mode()
     section = _get_cached_home_endpoint_response(
-        cache_key=f"home_section:{user['id']}:{section_id}:{limit}",
+        cache_key=f"home_section:v4:{cache_mode}:{user['id']}:{section_id}:{limit}",
         max_age_seconds=300,
         ttl=300,
         compute=lambda: get_home_section(user["id"], section_id, limit=limit),
@@ -1378,6 +1395,7 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
         user["id"],
         client_event_id=body.client_event_id,
         track_id=body.track_id,
+        global_track_uid=body.global_track_uid,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
         title=body.title,

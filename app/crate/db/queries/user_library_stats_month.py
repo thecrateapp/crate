@@ -6,6 +6,13 @@ from datetime import date, datetime, timezone
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
+from crate.federation.global_policy import global_catalog_surface_enabled
+
+
+def _global_stats_refs_enabled() -> bool:
+    return global_catalog_surface_enabled("stats") or global_catalog_surface_enabled(
+        "home"
+    )
 
 
 def month_bounds(month: str) -> tuple[datetime, datetime]:
@@ -35,6 +42,7 @@ def month_period_key(month: str) -> str:
 def get_month_stats_overview(user_id: int, month: str) -> dict:
     start, end = month_bounds(month)
     period_key = month_period_key(month)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         overview_row = (
             session.execute(
@@ -63,22 +71,42 @@ def get_month_stats_overview(user_id: int, month: str) -> dict:
                     """
                     SELECT
                         COALESCE(NULLIF(TRIM(upe.artist), ''), 'Unknown artist') AS artist_name,
+                        CASE
+                            WHEN :allow_global_catalog THEN gca.global_artist_uid::text
+                            ELSE NULL
+                        END AS global_artist_uid,
                         la.id AS artist_id,
                         la.slug AS artist_slug,
                         COUNT(*)::integer AS play_count,
                         COALESCE(SUM(upe.played_seconds), 0) / 60.0 AS minutes_listened
                     FROM user_play_events upe
                     LEFT JOIN library_artists la ON lower(la.name) = lower(upe.artist)
+                    LEFT JOIN LATERAL (
+                        SELECT global_artist_uid
+                        FROM global_catalog_artists gca
+                        WHERE (
+                            la.entity_uid IS NOT NULL
+                            AND gca.local_artist_entity_uid = la.entity_uid
+                        )
+                        OR LOWER(gca.canonical_name) = LOWER(upe.artist)
+                        ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                        LIMIT 1
+                    ) gca ON :allow_global_catalog
                     WHERE upe.user_id = :user_id
                       AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
                       AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
                       AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
-                    GROUP BY 1, la.id, la.slug
+                    GROUP BY 1, 2, la.id, la.slug
                     ORDER BY play_count DESC, minutes_listened DESC, artist_name
                     LIMIT 1
                     """
                 ),
-                {"user_id": user_id, "start": start, "end": end},
+                {
+                    "user_id": user_id,
+                    "start": start,
+                    "end": end,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .first()
@@ -124,6 +152,7 @@ def get_month_stats_trends(user_id: int, month: str) -> dict:
 
 def get_month_top_tracks(user_id: int, month: str, limit: int = 20) -> list[dict]:
     start, end = month_bounds(month)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -131,13 +160,38 @@ def get_month_top_tracks(user_id: int, month: str, limit: int = 20) -> list[dict
                     """
                     WITH resolved AS (
                         SELECT
-                            COALESCE(lt.entity_uid::text, upe.track_entity_uid::text, lt.id::text, upe.track_id::text, NULLIF(upe.track_path, ''), CONCAT(upe.artist, '||', upe.title)) AS entity_key,
+                            COALESCE(
+                                CASE
+                                    WHEN :allow_global_catalog
+                                    THEN COALESCE(upe.global_track_uid::text, gct.global_track_uid::text)
+                                    ELSE NULL
+                                END,
+                                lt.entity_uid::text,
+                                upe.track_entity_uid::text,
+                                lt.id::text,
+                                upe.track_id::text,
+                                NULLIF(upe.track_path, ''),
+                                CONCAT(upe.artist, '||', upe.title)
+                            ) AS entity_key,
                             COALESCE(lt.id, upe.track_id) AS track_id,
+                            CASE
+                                WHEN :allow_global_catalog
+                                THEN COALESCE(upe.global_track_uid::text, gct.global_track_uid::text)
+                                ELSE NULL
+                            END AS global_track_uid,
+                            CASE
+                                WHEN :allow_global_catalog THEN gct.global_artist_uid::text
+                                ELSE NULL
+                            END AS global_artist_uid,
+                            CASE
+                                WHEN :allow_global_catalog THEN gct.global_album_uid::text
+                                ELSE NULL
+                            END AS global_album_uid,
                             COALESCE(lt.entity_uid::text, upe.track_entity_uid::text) AS track_entity_uid,
                             COALESCE(lt.path, upe.track_path) AS track_path,
-                            COALESCE(lt.title, upe.title) AS title,
-                            COALESCE(lt.artist, upe.artist) AS artist,
-                            COALESCE(lt.album, upe.album) AS album,
+                            COALESCE(lt.title, gct.canonical_title, upe.title) AS title,
+                            COALESCE(lt.artist, gct.artist_name, upe.artist) AS artist,
+                            COALESCE(lt.album, gct.album_name, upe.album) AS album,
                             art.id AS artist_id,
                             art.slug AS artist_slug,
                             COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
@@ -165,18 +219,43 @@ def get_month_top_tracks(user_id: int, month: str, limit: int = 20) -> list[dict
                             AND COALESCE(upe.track_path, '') <> ''
                             AND lt.path = upe.track_path
                           )
-                        LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, upe.artist)
+                        LEFT JOIN global_catalog_tracks gct
+                          ON :allow_global_catalog
+                          AND (
+                            gct.global_track_uid = upe.global_track_uid
+                            OR (
+                              upe.global_track_uid IS NULL
+                              AND lt.entity_uid IS NOT NULL
+                              AND gct.local_track_entity_uid = lt.entity_uid
+                            )
+                            OR (
+                              upe.global_track_uid IS NULL
+                              AND lt.id IS NULL
+                              AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
+                              AND COALESCE(NULLIF(TRIM(upe.title), ''), '') <> ''
+                              AND LOWER(gct.artist_name) = LOWER(upe.artist)
+                              AND LOWER(gct.canonical_title) = LOWER(upe.title)
+                              AND (
+                                COALESCE(NULLIF(TRIM(upe.album), ''), '') = ''
+                                OR LOWER(COALESCE(gct.album_name, '')) = LOWER(upe.album)
+                              )
+                            )
+                          )
+                        LEFT JOIN library_artists art ON art.name = COALESCE(lt.artist, gct.artist_name, upe.artist)
                         LEFT JOIN library_albums alb_by_id ON alb_by_id.id = lt.album_id
                         LEFT JOIN library_albums alb_by_name
                           ON alb_by_id.id IS NULL
-                         AND alb_by_name.artist = COALESCE(lt.artist, upe.artist)
-                         AND alb_by_name.name = COALESCE(lt.album, upe.album)
+                         AND alb_by_name.artist = COALESCE(lt.artist, gct.artist_name, upe.artist)
+                         AND alb_by_name.name = COALESCE(lt.album, gct.album_name, upe.album)
                         WHERE upe.user_id = :user_id
                           AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
                           AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
                     )
                     SELECT
                         MAX(track_id) AS track_id,
+                        MAX(global_track_uid) AS global_track_uid,
+                        MAX(global_artist_uid) AS global_artist_uid,
+                        MAX(global_album_uid) AS global_album_uid,
                         MAX(track_entity_uid) AS track_entity_uid,
                         MAX(track_path) AS track_path,
                         MAX(title) AS title,
@@ -203,7 +282,13 @@ def get_month_top_tracks(user_id: int, month: str, limit: int = 20) -> list[dict
                     LIMIT :limit
                     """
                 ),
-                {"user_id": user_id, "start": start, "end": end, "limit": limit},
+                {
+                    "user_id": user_id,
+                    "start": start,
+                    "end": end,
+                    "limit": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()
@@ -217,6 +302,7 @@ def get_month_top_tracks(user_id: int, month: str, limit: int = 20) -> list[dict
 
 def get_month_top_artists(user_id: int, month: str, limit: int = 20) -> list[dict]:
     start, end = month_bounds(month)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -224,6 +310,10 @@ def get_month_top_artists(user_id: int, month: str, limit: int = 20) -> list[dic
                     """
                     SELECT
                         COALESCE(NULLIF(TRIM(upe.artist), ''), 'Unknown artist') AS artist_name,
+                        CASE
+                            WHEN :allow_global_catalog THEN gca.global_artist_uid::text
+                            ELSE NULL
+                        END AS global_artist_uid,
                         la.id AS artist_id,
                         la.slug AS artist_slug,
                         COUNT(*)::integer AS play_count,
@@ -231,16 +321,33 @@ def get_month_top_artists(user_id: int, month: str, limit: int = 20) -> list[dic
                         COALESCE(SUM(upe.played_seconds), 0) / 60.0 AS minutes_listened
                     FROM user_play_events upe
                     LEFT JOIN library_artists la ON lower(la.name) = lower(upe.artist)
+                    LEFT JOIN LATERAL (
+                        SELECT global_artist_uid
+                        FROM global_catalog_artists gca
+                        WHERE (
+                            la.entity_uid IS NOT NULL
+                            AND gca.local_artist_entity_uid = la.entity_uid
+                        )
+                        OR LOWER(gca.canonical_name) = LOWER(upe.artist)
+                        ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                        LIMIT 1
+                    ) gca ON :allow_global_catalog
                     WHERE upe.user_id = :user_id
                       AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
                       AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
                       AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
-                    GROUP BY 1, la.id, la.slug
+                    GROUP BY 1, 2, la.id, la.slug
                     ORDER BY play_count DESC, minutes_listened DESC, artist_name
                     LIMIT :limit
                     """
                 ),
-                {"user_id": user_id, "start": start, "end": end, "limit": limit},
+                {
+                    "user_id": user_id,
+                    "start": start,
+                    "end": end,
+                    "limit": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()
@@ -250,6 +357,7 @@ def get_month_top_artists(user_id: int, month: str, limit: int = 20) -> list[dic
 
 def get_month_top_albums(user_id: int, month: str, limit: int = 20) -> list[dict]:
     start, end = month_bounds(month)
+    allow_global_catalog = _global_stats_refs_enabled()
     with read_scope() as session:
         rows = (
             session.execute(
@@ -257,9 +365,18 @@ def get_month_top_albums(user_id: int, month: str, limit: int = 20) -> list[dict
                     """
                     SELECT
                         COALESCE(NULLIF(TRIM(upe.artist), ''), 'Unknown artist') AS artist,
+                        CASE
+                            WHEN :allow_global_catalog
+                            THEN COALESCE(galb.global_artist_uid::text, gca.global_artist_uid::text)
+                            ELSE NULL
+                        END AS global_artist_uid,
                         art.id AS artist_id,
                         art.slug AS artist_slug,
                         COALESCE(NULLIF(TRIM(upe.album), ''), 'Unknown album') AS album,
+                        CASE
+                            WHEN :allow_global_catalog THEN galb.global_album_uid::text
+                            ELSE NULL
+                        END AS global_album_uid,
                         alb.id AS album_id,
                         alb.slug AS album_slug,
                         COUNT(*)::integer AS play_count,
@@ -270,16 +387,55 @@ def get_month_top_albums(user_id: int, month: str, limit: int = 20) -> list[dict
                     LEFT JOIN library_albums alb
                       ON lower(alb.artist) = lower(upe.artist)
                      AND lower(alb.name) = lower(upe.album)
+                    LEFT JOIN LATERAL (
+                        SELECT global_artist_uid
+                        FROM global_catalog_artists gca
+                        WHERE (
+                            art.entity_uid IS NOT NULL
+                            AND gca.local_artist_entity_uid = art.entity_uid
+                        )
+                        OR LOWER(gca.canonical_name) = LOWER(upe.artist)
+                        ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                        LIMIT 1
+                    ) gca ON :allow_global_catalog
+                    LEFT JOIN LATERAL (
+                        SELECT global_album_uid, global_artist_uid
+                        FROM global_catalog_albums galb
+                        WHERE (
+                            alb.entity_uid IS NOT NULL
+                            AND galb.local_album_entity_uid = alb.entity_uid
+                        )
+                        OR (
+                            LOWER(galb.artist_name) = LOWER(upe.artist)
+                            AND LOWER(galb.canonical_name) = LOWER(upe.album)
+                        )
+                        ORDER BY galb.has_local DESC, galb.has_remote DESC, galb.source_count DESC
+                        LIMIT 1
+                    ) galb ON :allow_global_catalog
                     WHERE upe.user_id = :user_id
                       AND upe.ended_at >= CAST(:start AS TIMESTAMPTZ)
                       AND upe.ended_at < CAST(:end AS TIMESTAMPTZ)
                       AND COALESCE(NULLIF(TRIM(upe.album), ''), '') <> ''
-                    GROUP BY 1, art.id, art.slug, 4, alb.id, alb.slug
+                    GROUP BY
+                        1,
+                        2,
+                        art.id,
+                        art.slug,
+                        5,
+                        6,
+                        alb.id,
+                        alb.slug
                     ORDER BY play_count DESC, minutes_listened DESC, album
                     LIMIT :limit
                     """
                 ),
-                {"user_id": user_id, "start": start, "end": end, "limit": limit},
+                {
+                    "user_id": user_id,
+                    "start": start,
+                    "end": end,
+                    "limit": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
             )
             .mappings()
             .all()

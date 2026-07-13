@@ -61,7 +61,7 @@ interface UsePlayerEngineSyncParams {
   commitDuration: (duration: number) => void;
   commitIsPlaying: (isPlaying: boolean) => void;
   commitIsBuffering: (isBuffering: boolean) => void;
-  buildEngineUrls: (tracks: Track[]) => string[];
+  buildEngineUrls: (tracks: Track[], resolvedUrls?: string[]) => string[];
   clearPrevRestartLatch: () => void;
   markSeekPosition: (seconds: number) => void;
 }
@@ -292,21 +292,30 @@ export function usePlayerEngineSync({
         return;
       }
 
-      stopNativeEngineIfAvailable("before web engine sync");
-      gpLoadQueue(buildEngineUrls(nextQueue), nextIndex);
-      gpSetLoop(repeatRef.current === "all");
-      gpSetSingleMode(repeatRef.current === "one");
+      void (async () => {
+        const engineTracks = await toFreshEngineTracks(nextQueue);
+        const engineUrls = engineTracks.map((track) => track.url);
 
-      pullFromEngine(nextQueue);
+        stopNativeEngineIfAvailable("before web engine sync");
+        gpLoadQueue(buildEngineUrls(nextQueue, engineUrls), nextIndex);
+        gpSetLoop(repeatRef.current === "all");
+        gpSetSingleMode(repeatRef.current === "one");
 
-      if (positionMs > 0) {
-        gpSeekTo(positionMs);
-        const positionSeconds = positionMs / 1000;
-        commitCurrentTime(positionSeconds);
-        markSeekPosition(positionSeconds);
-      } else {
-        commitCurrentTime(0);
-      }
+        pullFromEngine(nextQueue);
+
+        if (positionMs > 0) {
+          gpSeekTo(positionMs);
+          const positionSeconds = positionMs / 1000;
+          commitCurrentTime(positionSeconds);
+          markSeekPosition(positionSeconds);
+        } else {
+          commitCurrentTime(0);
+        }
+      })().catch((error) => {
+        console.error("[gapless] failed to sync queue playback:", error);
+        commitIsBuffering(false);
+        commitIsPlaying(false);
+      });
 
       if (autoplay) {
         bufferingIntentRef.current = true;

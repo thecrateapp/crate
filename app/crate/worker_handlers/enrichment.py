@@ -8,7 +8,7 @@ from crate.bandcamp.search import BandcampSearchError, find_exact_album_url
 from crate.content import compute_dir_hash as _compute_dir_hash
 from crate.db.audit import log_audit
 from crate.db.cache_settings import get_setting
-from crate.db.cache_store import delete_cache, get_cache, set_cache
+from crate.db.cache_store import delete_cache, delete_cache_prefix, get_cache, set_cache
 from crate.db.events import emit_task_event
 from crate.db.genres import set_album_genres
 from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
@@ -59,6 +59,10 @@ def _mark_processing(artist_name: str):
 
 def _unmark_processing(artist_name: str):
     delete_cache(f"processing:{artist_name.lower()}")
+
+
+def _invalidate_artist_top_tracks_cache(artist_name: str) -> None:
+    delete_cache_prefix(f"listen:artist_top_tracks:v1:{artist_name.strip().lower()}:")
 
 
 def _clean_album_lookup_name(album_name: str) -> str:
@@ -676,6 +680,8 @@ def _process_new_content_enrich_artist(
     artist_name: str,
     config: dict,
     p: TaskProgress,
+    *,
+    force: bool = False,
 ) -> None:
     from crate.enrichment import enrich_artist
 
@@ -684,7 +690,7 @@ def _process_new_content_enrich_artist(
     p.item = entity_label(artist=artist_name)
     emit_progress(task_id, p, force=True)
     try:
-        enrich_result = enrich_artist(artist_name, config)
+        enrich_result = enrich_artist(artist_name, config, force=force)
         result["steps"]["enrich_artist"] = enrich_result.get("skipped", False)
         emit_task_event(
             task_id,
@@ -898,6 +904,7 @@ def _process_new_content_popularity(
         spotify_track_pop = int(refresh_result.get("spotify_matches", 0))
 
         _normalize_popularity([artist_name])
+        _invalidate_artist_top_tracks_cache(artist_name)
         result["steps"]["popularity"] = {
             "albums": pop_count,
             "lastfm_track_matches": track_pop,
@@ -1239,7 +1246,9 @@ def _process_new_content_inner(
     emit_progress(task_id, p, force=True)
 
     _process_new_content_organize_folders(task_id, result, artist_name, lib, config, p)
-    _process_new_content_enrich_artist(task_id, result, artist_name, config, p)
+    _process_new_content_enrich_artist(
+        task_id, result, artist_name, config, p, force=bool(force)
+    )
     albums = _process_new_content_album_genres(
         task_id, result, artist_name, album_folder, p
     )

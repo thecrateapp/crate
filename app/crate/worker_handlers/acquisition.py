@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from crate.acquisition_tasks import (
     build_tidal_download_params,
@@ -2539,6 +2539,308 @@ def _handle_import_queue_item(task_id: str, params: dict, config: dict) -> dict:
     return result
 
 
+_FEDERATION_EXT_BY_CONTENT_TYPE = {
+    "audio/flac": ".flac",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/aac": ".aac",
+    "audio/ogg": ".ogg",
+    "audio/opus": ".opus",
+    "audio/wav": ".wav",
+}
+_FEDERATION_ALLOWED_FORMATS = {"flac", "mp3", "m4a", "aac", "ogg", "opus", "wav"}
+
+
+def _federation_track_extension(track: dict, content_type: str) -> str:
+    fmt = str(track.get("format") or "").lower().lstrip(".")
+    if fmt in _FEDERATION_ALLOWED_FORMATS:
+        return f".{fmt}"
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return _FEDERATION_EXT_BY_CONTENT_TYPE.get(media_type, ".mp3")
+
+
+def _federation_track_filename(index: int, track: dict, content_type: str) -> str:
+    disc = int(track.get("disc_number") or 1)
+    number = int(track.get("track_number") or index)
+    title = _sanitize_import_name(
+        str(track.get("title") or track.get("entity_uid") or f"Track {index}")
+    )
+    return (
+        f"{disc}-{number:02d} {title}{_federation_track_extension(track, content_type)}"
+    )
+
+
+def _unique_staging_path(staging_dir: Path, filename: str) -> Path:
+    target = staging_dir / filename
+    if not target.exists():
+        return target
+    stem = target.stem
+    suffix = target.suffix
+    counter = 2
+    while True:
+        candidate = staging_dir / f"{stem} ({counter}){suffix}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
+def _handle_federation_import_album(task_id: str, params: dict, config: dict) -> dict:
+    import httpx
+
+    from crate.db.repositories import federation as fed_repo
+    from crate.federation.client import (
+        DEFAULT_TIMEOUT,
+        build_signed_headers,
+        federated_get,
+        federated_post,
+    )
+    from crate.federation.assertions import build_outbound_user_assertion
+    from crate.federation.imports import (
+        record_import_provenance,
+        update_import_request,
+    )
+    from crate.importer import ImportQueue
+
+    request_id = str(params.get("request_id") or "")
+    node_uid = str(params.get("node_uid") or "")
+    remote_entity_uid = str(params.get("remote_entity_uid") or "")
+    if not node_uid or not remote_entity_uid:
+        return {"error": "node_uid and remote_entity_uid are required"}
+
+    local_node = fed_repo.get_local_node()
+    peer = fed_repo.get_peer(node_uid)
+    if not local_node:
+        return {"error": "Local federation node is not configured"}
+    if not peer or peer.get("disabled_at") or peer.get("trust_state") != "approved":
+        return {"error": "Remote peer is not approved"}
+
+    try:
+        if request_id:
+            update_import_request(request_id, status="importing")
+        append_domain_event(
+            "federation.import.started",
+            {
+                "request_id": request_id,
+                "node_uid": node_uid,
+                "remote_entity_uid": remote_entity_uid,
+            },
+            scope="federation.import",
+            subject_key=node_uid,
+        )
+        assertion_user = {
+            "id": params.get("requested_by_user_id") or "worker",
+            "role": "admin",
+        }
+        album_resp = federated_get(
+            base_url=peer["api_base_url"],
+            path=f"/api/federation/v1/albums/{remote_entity_uid}",
+            node_id=local_node["node_uid"],
+            key_id=local_node["active_key_id"],
+            private_key_ref=local_node["private_key_ref"],
+            timeout=DEFAULT_TIMEOUT,
+            user_assertion=build_outbound_user_assertion(
+                local_node,
+                peer,
+                assertion_user,
+                purpose="catalog.album.read",
+                capabilities=["federation.catalog.search"],
+            ),
+        )
+        album_resp.raise_for_status()
+        album_data = album_resp.json()
+
+        tracks = list(album_data.get("tracks") or [])
+        if not tracks:
+            return {"error": "Remote album has no importable tracks"}
+
+        artist = str(
+            params.get("artist") or album_data.get("artist") or "Unknown Artist"
+        )
+        album_title = str(
+            params.get("title") or album_data.get("name") or remote_entity_uid
+        )
+        staging_dir = (
+            Path(config["library_path"])
+            / ".imports"
+            / "federation"
+            / _sanitize_import_name(node_uid)
+            / _sanitize_import_name(remote_entity_uid)
+        )
+        if staging_dir.exists():
+            shutil.rmtree(staging_dir)
+        staging_dir.mkdir(parents=True, exist_ok=True)
+
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Downloading federated album {artist} - {album_title}",
+                "node_uid": node_uid,
+                "remote_entity_uid": remote_entity_uid,
+            },
+        )
+        progress = TaskProgress(
+            phase="download", phase_count=2, total=len(tracks), done=0
+        )
+        emit_progress(task_id, progress, force=True)
+
+        with httpx.Client(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+            for index, track in enumerate(tracks, start=1):
+                if is_cancelled(task_id):
+                    return {"error": "Federated import cancelled"}
+
+                track_uid = str(track.get("entity_uid") or "")
+                if not track_uid:
+                    return {"error": f"Remote track {index} has no entity_uid"}
+
+                ticket_resp = federated_post(
+                    base_url=peer["api_base_url"],
+                    path="/api/federation/v1/stream-tickets",
+                    node_id=local_node["node_uid"],
+                    key_id=local_node["active_key_id"],
+                    private_key_ref=local_node["private_key_ref"],
+                    json_body={
+                        "remote_entity_uid": track_uid,
+                        "delivery_policy": "original",
+                        "requesting_node_uid": local_node["node_uid"],
+                    },
+                    timeout=DEFAULT_TIMEOUT,
+                    user_assertion=build_outbound_user_assertion(
+                        local_node,
+                        peer,
+                        assertion_user,
+                        purpose="stream.ticket",
+                        capabilities=["federation.stream.play"],
+                    ),
+                )
+                ticket_resp.raise_for_status()
+                ticket = ticket_resp.json()
+                remote_stream_url = urljoin(
+                    peer["api_base_url"].rstrip("/") + "/",
+                    str(ticket["stream_url"]).lstrip("/"),
+                )
+                headers = build_signed_headers(
+                    method="GET",
+                    url=remote_stream_url,
+                    node_id=local_node["node_uid"],
+                    key_id=local_node["active_key_id"],
+                    private_key_ref=local_node["private_key_ref"],
+                    body=b"",
+                    content_type="",
+                )
+                with client.stream("GET", remote_stream_url, headers=headers) as stream:
+                    stream.raise_for_status()
+                    filename = _federation_track_filename(
+                        index,
+                        track,
+                        stream.headers.get("content-type", ""),
+                    )
+                    target = _unique_staging_path(staging_dir, filename)
+                    with target.open("wb") as fh:
+                        for chunk in stream.iter_bytes(chunk_size=65536):
+                            if chunk:
+                                fh.write(chunk)
+
+                progress.done = index
+                progress.item = entity_label(
+                    artist=str(track.get("artist") or artist),
+                    album=album_title,
+                    title=str(track.get("title") or track_uid),
+                )
+                emit_progress(task_id, progress)
+
+        progress.phase = "importing"
+        progress.phase_count = 2
+        progress.done = len(tracks)
+        emit_progress(task_id, progress, force=True)
+
+        result = ImportQueue(config).import_item(str(staging_dir), artist, album_title)
+        result["source"] = "federation"
+        result["node_uid"] = node_uid
+        result["remote_entity_uid"] = remote_entity_uid
+        if result.get("error"):
+            if request_id:
+                update_import_request(
+                    request_id,
+                    status="failed",
+                    metadata_patch={
+                        "error": result["error"],
+                        "staging_dir": str(staging_dir),
+                    },
+                )
+            append_domain_event(
+                "federation.import.failed",
+                {
+                    "request_id": request_id,
+                    "node_uid": node_uid,
+                    "remote_entity_uid": remote_entity_uid,
+                    "error": result["error"],
+                },
+                scope="federation.import",
+                subject_key=node_uid,
+            )
+            return result
+
+        imported_album = get_library_album(artist, album_title)
+        if imported_album and imported_album.get("id"):
+            record_import_provenance(
+                album_id=int(imported_album["id"]),
+                node_uid=node_uid,
+                node_name=str(peer.get("display_name") or node_uid),
+                remote_entity_uid=remote_entity_uid,
+                imported_by_user_id=params.get("requested_by_user_id"),
+            )
+
+        if request_id:
+            update_import_request(
+                request_id,
+                status="completed",
+                metadata_patch={"result": result, "staging_dir": str(staging_dir)},
+            )
+        append_domain_event(
+            "federation.import.completed",
+            {
+                "request_id": request_id,
+                "node_uid": node_uid,
+                "remote_entity_uid": remote_entity_uid,
+                "dest": result.get("dest"),
+            },
+            scope="federation.import",
+            subject_key=node_uid,
+        )
+
+        emit_task_event(
+            task_id,
+            "info",
+            {
+                "message": f"Imported federated album to {result.get('dest')}",
+                "dest": result.get("dest"),
+            },
+        )
+        start_scan()
+        return result
+    except Exception as exc:
+        if request_id:
+            update_import_request(
+                request_id,
+                status="failed",
+                metadata_patch={"error": str(exc)[:500]},
+            )
+        append_domain_event(
+            "federation.import.failed",
+            {
+                "request_id": request_id,
+                "node_uid": node_uid,
+                "remote_entity_uid": remote_entity_uid,
+                "error": str(exc)[:500],
+            },
+            scope="federation.import",
+            subject_key=node_uid,
+        )
+        log.warning("Federated album import failed: %s", exc, exc_info=True)
+        return {"error": str(exc)}
+
+
 def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
     from crate.db.import_queue_read_models import (
         list_import_queue_items,
@@ -2647,5 +2949,6 @@ ACQUISITION_TASK_HANDLERS: dict[str, TaskHandler] = {
     "import_queue_item": _handle_import_queue_item,
     "import_queue_all": _handle_import_queue_all,
     "import_queue_remove": _handle_import_queue_remove,
+    "federation_import_album": _handle_federation_import_album,
     "remux_m4a_dash": _handle_remux_m4a_dash,
 }

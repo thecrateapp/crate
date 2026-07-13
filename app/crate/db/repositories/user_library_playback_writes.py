@@ -137,6 +137,7 @@ def record_play_event(
     *,
     client_event_id: str | None = None,
     track_id: int | None = None,
+    global_track_uid: str | None = None,
     track_entity_uid: str | None = None,
     track_path: str | None = None,
     title: str = "",
@@ -199,6 +200,7 @@ def record_play_event(
                     user_id,
                     client_event_id,
                     track_id,
+                    global_track_uid,
                     track_entity_uid,
                     track_path,
                     title,
@@ -222,7 +224,7 @@ def record_play_event(
                     created_at
                 )
                 VALUES (
-                    :user_id, :client_event_id, :track_id, :track_entity_uid, :track_path, :title, :artist, :album,
+                    :user_id, :client_event_id, :track_id, CAST(:global_track_uid AS uuid), :track_entity_uid, :track_path, :title, :artist, :album,
                     :started_at, :ended_at, :played_seconds, :track_duration_seconds,
                     :completion_ratio, :was_skipped, :was_completed,
                     :play_source_type, :play_source_id, :play_source_name,
@@ -236,6 +238,7 @@ def record_play_event(
                     "user_id": user_id,
                     "client_event_id": client_event_id,
                     "track_id": resolved_track_id,
+                    "global_track_uid": global_track_uid,
                     "track_entity_uid": resolved_track_entity_uid,
                     "track_path": resolved_track_path,
                     "title": title,
@@ -274,6 +277,7 @@ def record_play_event(
                 "event_id": event_id,
                 "client_event_id": client_event_id,
                 "track_id": resolved_track_id,
+                "global_track_uid": global_track_uid,
                 "track_entity_uid": resolved_track_entity_uid,
                 "title": title,
                 "artist": artist,

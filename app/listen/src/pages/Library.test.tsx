@@ -87,18 +87,20 @@ vi.mock("@/hooks/use-api", () => ({
       };
     }
 
-    if (url === "/api/me/follows") {
+    if (url === "/api/catalog/me/artists") {
       return {
         data: [
           {
             artist_name: "Converge",
             artist_id: 1,
+            global_artist_uid: "gartist-1",
             artist_entity_uid: "artist-1",
             artist_slug: "converge",
             created_at: "2026-06-01T00:00:00Z",
             album_count: 2,
             track_count: 24,
             has_photo: true,
+            photo_url: "/api/catalog/artists/gartist-1/photo",
           },
         ],
         loading: false,
@@ -107,12 +109,13 @@ vi.mock("@/hooks/use-api", () => ({
       };
     }
 
-    if (url === "/api/me/albums") {
+    if (url === "/api/catalog/me/albums") {
       return {
         data: [
           {
             saved_at: "2026-06-01T00:00:00Z",
             id: 10,
+            global_album_uid: "galbum-10",
             album_entity_uid: "album-10",
             slug: "jane-doe",
             artist: "Converge",

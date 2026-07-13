@@ -60,6 +60,12 @@ func RequiredTablesReady(ctx context.Context, pool *pgxpool.Pool) error {
 			AND to_regclass('public.user_external_identities') IS NOT NULL
 			AND to_regclass('public.settings') IS NOT NULL
 			AND to_regclass('public.ui_snapshots') IS NOT NULL
+			AND to_regclass('public.global_catalog_artists') IS NOT NULL
+			AND to_regclass('public.global_catalog_albums') IS NOT NULL
+			AND to_regclass('public.global_catalog_tracks') IS NOT NULL
+			AND to_regclass('public.global_catalog_sources') IS NOT NULL
+			AND to_regclass('public.global_catalog_entity_genres') IS NOT NULL
+			AND to_regclass('public.genre_taxonomy_releases') IS NOT NULL
 	`
 	var ok bool
 	if err := pool.QueryRow(ctx, query).Scan(&ok); err != nil {

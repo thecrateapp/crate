@@ -11,6 +11,7 @@ from crate.db.home import get_cached_home_discovery
 from crate.db.home_warming import list_recent_home_user_ids
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.queries.tasks import has_inflight_acquisition_for_artist
+from crate.federation.global_policy import global_catalog_surface_enabled
 
 log = logging.getLogger(__name__)
 
@@ -20,6 +21,24 @@ _OPS_EVENT_TYPES = {
     "track.analysis.updated",
     "track.bliss.updated",
     "snapshot.built",
+    "federation.catalog.sync.started",
+    "federation.catalog.sync.completed",
+    "federation.catalog.sync.failed",
+    "federation.catalog.synced",
+    "federation.catalog.item.upserted",
+    "federation.catalog.item.deleted",
+    "federation.catalog.peer.stale",
+    "federation.stream.ticket.created",
+    "federation.stream.proxy.completed",
+    "federation.stream.proxy.failed",
+    "federation.import.requested",
+    "federation.import.completed",
+    "federation.import.failed",
+    "global_catalog.reconcile.started",
+    "global_catalog.reconcile.completed",
+    "global_catalog.reconcile.failed",
+    "global_catalog.entity.changed",
+    "global_catalog.peer.stale",
 }
 
 _HOME_EVENT_TYPES = {
@@ -121,9 +140,13 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
         if (
             event_type in _OPS_EVENT_TYPES
             or scope.startswith("pipeline:")
+            or scope.startswith("federation.")
+            or scope == "global_catalog"
             or scope == "ops"
         ):
             refresh_ops = True
+            if scope == "global_catalog" and global_catalog_surface_enabled("home"):
+                refresh_recent_home = True
 
         if event_type == "library.acquisition.completed":
             try:

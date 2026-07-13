@@ -8,7 +8,11 @@ from crate.db.home_cache import _get_or_compute_home_cache
 from crate.db.queries.home import get_followed_artist_genre_names
 from crate.db.releases import get_new_releases
 from crate.db.tx import read_scope
+from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.genre_taxonomy import choose_mix_seed_genres, summarize_taste_genres
+
+
+_HOME_CONTEXT_CACHE_VERSION = "v3"
 
 
 def _genre_stat_rows_from_names(names: list[str]) -> list[dict]:
@@ -51,6 +55,20 @@ def _coerce_json_rows(value) -> list[dict]:
         if isinstance(loaded, list):
             return [dict(item) for item in loaded if isinstance(item, dict)]
     return []
+
+
+def _strip_global_identity(rows: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    stripped: dict[str, list[dict]] = {}
+    for section, items in rows.items():
+        stripped[section] = [
+            {key: value for key, value in row.items() if not key.startswith("global_")}
+            for row in items
+        ]
+    return stripped
+
+
+def _home_context_cache_mode() -> str:
+    return "global" if global_catalog_surface_enabled("home") else "local"
 
 
 def _load_home_context_rows(
@@ -104,7 +122,9 @@ def _load_home_context_rows(
                 top_artists AS (
                     SELECT
                         uas.artist_name,
+                        gca.global_artist_uid::text AS global_artist_uid,
                         la.id AS artist_id,
+                        la.entity_uid::text AS artist_entity_uid,
                         la.slug AS artist_slug,
                         uas.play_count,
                         uas.complete_play_count,
@@ -113,6 +133,17 @@ def _load_home_context_rows(
                         uas.last_played_at
                     FROM user_artist_stats uas
                     LEFT JOIN library_artists la ON la.name = uas.artist_name
+                    LEFT JOIN LATERAL (
+                        SELECT global_artist_uid
+                        FROM global_catalog_artists gca
+                        WHERE (
+                            la.entity_uid IS NOT NULL
+                            AND gca.local_artist_entity_uid = la.entity_uid
+                        )
+                        OR LOWER(gca.canonical_name) = LOWER(uas.artist_name)
+                        ORDER BY gca.has_local DESC, gca.has_remote DESC, gca.source_count DESC
+                        LIMIT 1
+                    ) gca ON TRUE
                     WHERE uas.user_id = :user_id AND uas.stat_window = '90d'
                     ORDER BY uas.play_count DESC, uas.minutes_listened DESC, uas.last_played_at DESC
                     LIMIT :top_artist_limit
@@ -192,6 +223,8 @@ def get_home_context(
         top_album_limit=top_album_limit,
         top_genre_limit=top_genre_limit,
     )
+    if not global_catalog_surface_enabled("home"):
+        rows = _strip_global_identity(rows)
     followed = rows["followed"]
     saved_albums = rows["saved_albums"]
     top_artists = rows["top_artists"]
@@ -248,7 +281,8 @@ def get_cached_home_context(
     top_genre_limit: int = 8,
 ) -> dict:
     cache_key = (
-        f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+        f"home:context:{_HOME_CONTEXT_CACHE_VERSION}:{_home_context_cache_mode()}:"
+        f"{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
     )
     return _get_or_compute_home_cache(
         cache_key,
@@ -284,24 +318,41 @@ def _cached_new_releases(limit: int = 250) -> list[dict]:
 def merged_artists_from_context(context: dict) -> list[dict]:
     top_artists = context["top_artists"]
     followed = context["followed"]
-    seen_artist_ids = {
-        row.get("artist_id") for row in top_artists if row.get("artist_id") is not None
-    }
+    seen_artist_refs: set[tuple[str, str]] = set()
+    for row in top_artists:
+        seen_artist_refs.update(_artist_merge_refs(row))
+
     merged = list(top_artists)
     for row in followed:
-        aid = row.get("artist_id")
-        if aid is not None and aid not in seen_artist_ids:
+        refs = _artist_merge_refs(row)
+        if refs and refs.isdisjoint(seen_artist_refs):
             merged.append(
                 {
-                    "artist_id": aid,
+                    "artist_id": row.get("artist_id"),
+                    "global_artist_uid": row.get("global_artist_uid"),
+                    "artist_entity_uid": row.get("artist_entity_uid"),
                     "artist_slug": row.get("artist_slug"),
                     "artist_name": row.get("artist_name") or "",
                     "play_count": 0,
                     "minutes_listened": 0,
                 }
             )
-            seen_artist_ids.add(aid)
+            seen_artist_refs.update(refs)
     return merged
+
+
+def _artist_merge_refs(row: dict) -> set[tuple[str, str]]:
+    refs: set[tuple[str, str]] = set()
+    if row.get("global_artist_uid"):
+        refs.add(("global", str(row["global_artist_uid"])))
+    if row.get("artist_entity_uid"):
+        refs.add(("entity", str(row["artist_entity_uid"])))
+    if row.get("artist_id") is not None:
+        refs.add(("id", str(row["artist_id"])))
+    artist_name = (row.get("artist_name") or "").strip().lower()
+    if artist_name:
+        refs.add(("name", artist_name))
+    return refs
 
 
 def recent_releases_from_context(context: dict, *, days: int = 240) -> list[dict]:

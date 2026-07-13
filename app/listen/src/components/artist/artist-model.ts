@@ -11,7 +11,10 @@ import {
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 
 export interface ArtistAlbum {
-  id: number;
+  id?: number | string | null;
+  entity_uid?: string | null;
+  global_album_uid?: string | null;
+  global_uid?: string | null;
   slug?: string;
   name: string;
   display_name: string;
@@ -31,8 +34,11 @@ export interface ArtistAlbum {
 export interface ArtistData {
   id?: number;
   entity_uid?: string | null;
+  global_artist_uid?: string | null;
+  global_uid?: string | null;
   slug?: string;
   name: string;
+  has_photo?: boolean | null;
   updated_at?: string | null;
   albums: ArtistAlbum[];
   total_tracks: number;
@@ -63,6 +69,10 @@ export interface ArtistInfo {
 
 export interface ArtistTopTrack {
   id: string;
+  globalTrackUid?: string;
+  global_track_uid?: string;
+  global_uid?: string;
+  global_artist_uid?: string;
   track_id?: number;
   track_entity_uid?: string;
   library_track_id?: number;
@@ -71,6 +81,7 @@ export interface ArtistTopTrack {
   artist_slug?: string;
   album_id?: number;
   album_entity_uid?: string;
+  global_album_uid?: string;
   album_slug?: string;
   title: string;
   artist: string;
@@ -159,11 +170,12 @@ export function buildArtistPhotoUrl(
 export function buildArtistAlbumCover(
   artistName: string,
   albumName: string,
-  albumId?: number,
+  albumId?: number | null,
   albumSlug?: string,
+  globalAlbumUid?: string | null,
 ) {
   return albumCoverApiUrl(
-    { albumId, albumSlug, artistName, albumName },
+    { albumId, globalAlbumUid, albumSlug, artistName, albumName },
     { size: 512 },
   );
 }
@@ -189,8 +201,13 @@ export function buildArtistPlayerTrack(
   artistName: string,
   coverFallback?: string,
 ): Track {
+  const globalTrackUid =
+    track.globalTrackUid ?? track.global_track_uid ?? track.global_uid;
   return {
-    id: track.track_entity_uid || track.id,
+    id: globalTrackUid || track.track_entity_uid || track.id,
+    globalTrackUid,
+    globalArtistUid: track.global_artist_uid,
+    globalAlbumUid: track.global_album_uid,
     entityUid: track.track_entity_uid,
     title: track.title || "Unknown",
     artist: track.artist || artistName,
@@ -222,6 +239,7 @@ export function buildArtistPlayerTrack(
             track.album,
             track.album_id,
             track.album_slug,
+            track.global_album_uid,
           )
         : coverFallback,
   };

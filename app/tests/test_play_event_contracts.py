@@ -38,6 +38,7 @@ class TestPlayEventContract:
             1,
             client_event_id="evt_abc123",
             track_id=12,
+            global_track_uid=None,
             track_entity_uid=None,
             track_path="Converge/Jane Doe/01 - Concubine.flac",
             title="Concubine",
@@ -58,6 +59,32 @@ class TestPlayEventContract:
             context_playlist_id=None,
             device_type="web",
             app_platform="listen-web",
+        )
+
+    def test_play_event_endpoint_preserves_global_track_uid(self, test_app):
+        payload = {
+            "client_event_id": "evt_high_vis_001",
+            "global_track_uid": "11111111-1111-4111-8111-111111111111",
+            "track_id": None,
+            "track_path": "11111111-1111-4111-8111-111111111111",
+            "title": "0151",
+            "artist": "High Vis",
+            "album": "Blending",
+            "started_at": "2026-04-01T10:00:00Z",
+            "ended_at": "2026-04-01T10:01:34Z",
+            "played_seconds": 73.2,
+            "track_duration_seconds": 94.0,
+            "completion_ratio": 0.779,
+        }
+
+        with patch("crate.api.me.record_play_event", return_value=78) as mock_record:
+            resp = test_app.post("/api/me/play-events", json=payload)
+
+        assert resp.status_code == 200
+        mock_record.assert_called_once()
+        assert (
+            mock_record.call_args.kwargs["global_track_uid"]
+            == "11111111-1111-4111-8111-111111111111"
         )
 
     def test_play_event_endpoint_rejects_inconsistent_completion_flags(self, test_app):

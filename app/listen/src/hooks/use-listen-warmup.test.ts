@@ -69,14 +69,15 @@ describe("collectHomeWarmupAssets", () => {
     const discovery = {
       favorite_artists: [
         {
-          artist_id: 1,
-          artist_slug: "artist",
-          artist_name: "Artist",
+          global_artist_uid: "artist-global-1",
+          artist_name: "High Vis",
         },
       ],
     } as unknown as HomeDiscoveryPayload;
     const result = collectHomeWarmupAssets(discovery);
-    expect(result.length).toBeGreaterThan(0);
+    expect(result).toContain(
+      "/api/catalog/artists/artist-global-1/photo?size=192&format=webp",
+    );
   });
 
   it("collects playlist artwork", () => {

@@ -205,7 +205,9 @@ def get_all_albums_for_covers() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_duplicate_tracks(album_id: int | None = None) -> list[dict]:
+def get_duplicate_tracks(
+    album_id: int | None = None, artist_name: str | None = None
+) -> list[dict]:
     """Find real duplicate tracks inside the same album.
 
     Rows with broken metadata (empty title, track number 0, duration 0) are
@@ -217,6 +219,7 @@ def get_duplicate_tracks(album_id: int | None = None) -> list[dict]:
     durations are near-identical; the fixer then requires readable tags before
     it quarantines anything.
     """
+    artist_filter = artist_name.strip() if artist_name and artist_name.strip() else None
     with read_scope() as session:
         rows = (
             session.execute(
@@ -267,6 +270,7 @@ def get_duplicate_tracks(album_id: int | None = None) -> list[dict]:
                 JOIN library_albums la ON la.id = lt.album_id
                 WHERE lt.album_id IS NOT NULL
                   AND (:album_id IS NULL OR lt.album_id = :album_id)
+                  AND (:artist_name IS NULL OR LOWER(la.artist) = LOWER(:artist_name))
                   AND NULLIF(BTRIM(lt.title), '') IS NOT NULL
                   AND COALESCE(lt.track_number, 0) > 0
                   AND COALESCE(lt.duration, 0) > 1
@@ -302,7 +306,7 @@ def get_duplicate_tracks(album_id: int | None = None) -> list[dict]:
               AND db_identity_mismatches = 0
             ORDER BY artist, album, disc_number, track_number, title
         """),
-                {"album_id": album_id},
+                {"album_id": album_id, "artist_name": artist_filter},
             )
             .mappings()
             .all()

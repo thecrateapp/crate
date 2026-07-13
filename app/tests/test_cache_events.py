@@ -192,6 +192,26 @@ def test_artist_invalidation_clears_listen_artist_page_cache(monkeypatch):
     assert ("home:", None) in marked
 
 
+def test_library_invalidation_clears_listen_browse_and_explore_cache(monkeypatch):
+    from crate.api import cache_events
+
+    deleted_prefixes: list[str] = []
+
+    monkeypatch.setattr(
+        "crate.db.cache_store.delete_cache_prefix",
+        lambda prefix: deleted_prefixes.append(prefix),
+    )
+    monkeypatch.setattr(
+        "crate.db.ui_snapshot_store.mark_ui_snapshots_stale",
+        lambda scope=None, subject_key=None, scope_prefix=None: None,
+    )
+
+    cache_events._clear_backend_cache_for_scopes(["library"])
+
+    assert "listen:browse_filters:" in deleted_prefixes
+    assert "listen:explore_page:" in deleted_prefixes
+
+
 def test_home_user_invalidation_marks_home_snapshot_stale(monkeypatch):
     from crate.api import cache_events
 

@@ -25,7 +25,7 @@ export interface TrackGenrePreset {
 export interface TrackGenre {
   primary: { slug: string; name: string; canonical: boolean } | null;
   topLevel: { slug: string; name: string } | null;
-  source: "album" | "artist" | null;
+  source: "album" | "artist" | "track" | null;
   preset: TrackGenrePreset | null;
 }
 

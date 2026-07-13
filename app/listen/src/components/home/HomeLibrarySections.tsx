@@ -222,11 +222,16 @@ export function JustLandedSection({
                 const trackCount = artist.tracks ?? artist.track_count ?? 0;
                 return (
                   <ArtistCard
-                    key={`just-landed-${artist.id ?? artist.name}`}
+                    key={`just-landed-${
+                      artist.global_artist_uid ?? artist.id ?? artist.name
+                    }`}
                     name={artist.name}
                     artistId={artist.id}
                     artistEntityUid={artist.entity_uid}
+                    globalArtistUid={artist.global_artist_uid}
                     artistSlug={artist.slug}
+                    photo={artist.photo_url ?? undefined}
+                    hasPhoto={artist.has_photo}
                     subtitle={`${t("common.albumCountLabel", {
                       count: albumCount,
                     })} · ${t("common.trackCountLabel", {
@@ -245,11 +250,16 @@ export function JustLandedSection({
               const trackCount = artist.tracks ?? artist.track_count ?? 0;
               return (
                 <ArtistCard
-                  key={`just-landed-grid-${artist.id ?? artist.name}`}
+                  key={`just-landed-grid-${
+                    artist.global_artist_uid ?? artist.id ?? artist.name
+                  }`}
                   name={artist.name}
                   artistId={artist.id}
                   artistEntityUid={artist.entity_uid}
+                  globalArtistUid={artist.global_artist_uid}
                   artistSlug={artist.slug}
+                  photo={artist.photo_url ?? undefined}
+                  hasPhoto={artist.has_photo}
                   subtitle={`${t("common.albumCountLabel", {
                     count: albumCount,
                   })} · ${t("common.trackCountLabel", {

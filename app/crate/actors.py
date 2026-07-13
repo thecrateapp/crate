@@ -101,6 +101,11 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "import_queue_item": TaskPoolConfig("default", 0, 3600, 0),
     "import_queue_all": TaskPoolConfig("default", 0, 14400, 0),
     "import_queue_remove": TaskPoolConfig("default", 0, 300, 0),
+    "federation_import_album": TaskPoolConfig("default", 0, 14400, 0),
+    "federation_sync_catalog": TaskPoolConfig("maintenance", 2, 7200, 1),
+    "federation_health_poll": TaskPoolConfig("maintenance", 1, 300, 0),
+    "global_catalog_reconcile_incremental": TaskPoolConfig("maintenance", 2, 7200, 0),
+    "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
     # New content processing (priority 1)

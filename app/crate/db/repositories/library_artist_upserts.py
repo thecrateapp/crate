@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session
 
 from crate.entity_ids import artist_entity_uid
 from crate.db.repositories.entity_identity_keys import upsert_entity_identity_key
+from crate.db.repositories.global_catalog_dirty_sources import (
+    enqueue_local_dirty_source,
+)
 from crate.db.orm.library import LibraryArtist
 from crate.db.repositories.library_shared import (
     allocate_unique_slug,
@@ -149,6 +152,7 @@ def _update_existing_artist(
             key_type="spotify_id",
             key_value=data.get("spotify_id"),
         )
+    enqueue_local_dirty_source("artist", str(entity_uid), "upsert", session=session)
     return canonical_name
 
 
@@ -251,6 +255,9 @@ def upsert_artist(data: dict, *, session: Session | None = None) -> str:
                         key_type="spotify_id",
                         key_value=data.get("spotify_id"),
                     )
+                enqueue_local_dirty_source(
+                    "artist", str(entity_uid), "upsert", session=s
+                )
         except IntegrityError:
             existing = _select_existing_artist(
                 s,

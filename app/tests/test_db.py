@@ -316,6 +316,36 @@ class TestPlaylistTrackEntityRefs:
                 }
             )
 
+        pg_db.upsert_artist({"name": "Other Duplicate Query Artist"})
+        other_album_id = pg_db.upsert_album(
+            {
+                "artist": "Other Duplicate Query Artist",
+                "name": "Other Safe Duplicate Album",
+                "path": "/music/other-duplicate-query-artist/other-safe-duplicate-album",
+                "track_count": 2,
+                "total_size": 2048,
+                "total_duration": 240.0,
+                "formats": ["flac"],
+            }
+        )
+        for filename in ("01-other-a.flac", "01-other-b.flac"):
+            pg_db.upsert_track(
+                {
+                    "album_id": other_album_id,
+                    "artist": "Other Duplicate Query Artist",
+                    "album": "Other Safe Duplicate Album",
+                    "filename": filename,
+                    "title": "Other Safe Duplicate",
+                    "path": f"/music/other-duplicate-query-artist/other-safe-duplicate-album/{filename}",
+                    "track_number": 1,
+                    "disc_number": 1,
+                    "duration": 120.0,
+                    "size": 1024,
+                    "format": "flac",
+                    "audio_fingerprint": "same-other-fingerprint",
+                }
+            )
+
         rows = get_duplicate_tracks()
         by_title = {row["title"]: row for row in rows}
 
@@ -333,6 +363,13 @@ class TestPlaylistTrackEntityRefs:
         filtered_rows = get_duplicate_tracks(album_id=safe_album_id)
         assert [row["album_id"] for row in filtered_rows] == [safe_album_id]
         assert filtered_rows[0]["title"] == "Safe Duplicate"
+        artist_rows = get_duplicate_tracks(artist_name="duplicate query artist")
+        assert {row["artist"] for row in artist_rows} == {"Duplicate Query Artist"}
+        assert {row["title"] for row in artist_rows} == {
+            "Safe Duplicate",
+            "Strong Duplicate",
+            "Partial Fingerprint Duplicate",
+        }
         assert "Featured Duplicate" not in by_title
         assert "Unsafe Duplicate" not in by_title
 

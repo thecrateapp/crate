@@ -77,6 +77,7 @@ function dispatchPlayEvent(session: PlayEventSession, reason: FlushReason) {
   void postWithRetry("/api/me/play-events", {
     client_event_id: generateClientEventId(),
     track_id: ref.track_id ?? null,
+    global_track_uid: ref.global_track_uid ?? null,
     track_entity_uid: ref.entity_uid ?? null,
     track_path: ref.path || session.track.id,
     title: session.track.title,

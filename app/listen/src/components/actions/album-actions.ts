@@ -35,13 +35,11 @@ import { fetchAlbumRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 
 function albumPlaySource(data: AlbumMenuData): PlaySource {
+  const seedId = data.albumId ?? data.globalAlbumUid;
   return {
     type: "album",
     name: `${data.artist} - ${data.album}`,
-    radio:
-      data.albumId != null
-        ? { seedType: "album", seedId: data.albumId }
-        : undefined,
+    radio: seedId != null ? { seedType: "album", seedId } : undefined,
   };
 }
 
@@ -56,8 +54,9 @@ export function useAlbumActionEntries(
     getAlbumState,
     toggleAlbumOffline,
   } = useOffline();
-  const saved = isSaved(input.albumId);
+  const saved = isSaved(input.albumId, input.globalAlbumUid);
   const offlineState = getAlbumState(input.albumId);
+  const radioSeed = input.albumId ?? input.globalAlbumUid ?? null;
   const offlineActionLabel = (() => {
     switch (offlineState) {
       case "ready":
@@ -78,6 +77,7 @@ export function useAlbumActionEntries(
     const albumPath = albumPagePath({
       albumId: input.albumId,
       albumEntityUid: input.albumEntityUid,
+      globalAlbumUid: input.globalAlbumUid,
       albumSlug: input.albumSlug,
       artistEntityUid: input.artistEntityUid,
       artistSlug: input.artistSlug,
@@ -87,6 +87,7 @@ export function useAlbumActionEntries(
     const albumShare = albumSharePath({
       albumId: input.albumId,
       albumEntityUid: input.albumEntityUid,
+      globalAlbumUid: input.globalAlbumUid,
       albumSlug: input.albumSlug,
       artistSlug: input.artistSlug,
       artistName: input.artist,
@@ -134,9 +135,12 @@ export function useAlbumActionEntries(
         label: saved ? t("actions.album.unsave") : t("actions.album.save"),
         icon: saved ? HeartBold : Heart,
         active: saved,
-        disabled: input.albumId == null,
+        disabled: input.albumId == null && !input.globalAlbumUid,
         onSelect: async () => {
-          await toggleAlbumSaved(input.albumId ?? null);
+          await toggleAlbumSaved(
+            input.albumId ?? null,
+            input.globalAlbumUid ?? null,
+          );
           toast.success(
             saved
               ? t("actions.album.toasts.unsaved")
@@ -148,12 +152,12 @@ export function useAlbumActionEntries(
         key: "radio",
         label: t("actions.album.radio"),
         icon: Radio,
-        disabled: input.albumId == null,
+        disabled: radioSeed == null,
         onSelect: async () => {
-          if (input.albumId == null) return;
+          if (radioSeed == null) return;
           try {
             const radio = await fetchAlbumRadio({
-              albumId: input.albumId,
+              albumId: radioSeed,
               artistName: input.artist,
               albumName: input.album,
             });
@@ -233,6 +237,7 @@ export function useAlbumActionEntries(
     offlineState,
     offlineSupported,
     playAll,
+    radioSeed,
     saved,
     t,
     toggleAlbumOffline,

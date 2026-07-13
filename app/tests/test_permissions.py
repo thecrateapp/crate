@@ -45,6 +45,24 @@ def test_multi_roles_union_capabilities():
     assert "curation.playlists.write" in get_user_capabilities(user)
 
 
+def test_federation_import_request_is_librarian_admin_only():
+    from crate.api.permissions import has_capability
+
+    assert has_capability({"role": "admin"}, "federation.import.request")
+    assert has_capability({"role": "librarian"}, "federation.import.request")
+    assert not has_capability({"role": "curator"}, "federation.import.request")
+    assert not has_capability({"role": "contributor"}, "federation.import.request")
+    assert not has_capability({"role": "user"}, "federation.import.request")
+
+
+def test_federation_listen_access_is_available_to_regular_users():
+    from crate.api.permissions import has_capability
+
+    assert has_capability({"role": "user"}, "federation.catalog.search")
+    assert has_capability({"role": "user"}, "federation.stream.play")
+    assert not has_capability({"role": "user"}, "federation.import.request")
+
+
 def test_require_permission_returns_user_for_allowed_role():
     from crate.api.permissions import require_permission
 

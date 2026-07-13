@@ -116,23 +116,26 @@ export function usePlayerRuntimeState() {
     setQueueState(nextQueue);
   }, []);
 
-  const buildEngineUrls = useCallback((tracks: Track[]): string[] => {
-    const urls = tracks.map(getStreamUrl);
+  const buildEngineUrls = useCallback(
+    (tracks: Track[], resolvedUrls?: string[]): string[] => {
+      const urls = resolvedUrls ?? tracks.map(getStreamUrl);
 
-    const nextMap = new Map<string, Track[]>();
-    tracks.forEach((track, index) => {
-      const url = urls[index];
-      if (!url) return;
-      const bucket = nextMap.get(url);
-      if (bucket) {
-        bucket.push(track);
-      } else {
-        nextMap.set(url, [track]);
-      }
-    });
-    engineTrackMapRef.current = nextMap;
-    return urls;
-  }, []);
+      const nextMap = new Map<string, Track[]>();
+      tracks.forEach((track, index) => {
+        const url = urls[index];
+        if (!url) return;
+        const bucket = nextMap.get(url);
+        if (bucket) {
+          bucket.push(track);
+        } else {
+          nextMap.set(url, [track]);
+        }
+      });
+      engineTrackMapRef.current = nextMap;
+      return urls;
+    },
+    [],
+  );
 
   const registerEngineTrack = useCallback((track: Track): string => {
     const url = getStreamUrl(track);

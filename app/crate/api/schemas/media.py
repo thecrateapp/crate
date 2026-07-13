@@ -54,7 +54,7 @@ class TrackRefResponse(IdentityFieldsMixin):
     album_entity_uid: str | None = None
     album_slug: str | None = None
     album: str
-    path: str
+    path: str | None = None
     duration: float | int | None = None
     bpm: float | None = None
     audio_key: str | None = None
@@ -109,6 +109,7 @@ class TrackInfoResponse(IdentityFieldsMixin):
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    genre: str | None = None
     format: str | None = None
     bitrate: int | None = None
     sample_rate: int | None = None
@@ -193,6 +194,8 @@ class GenrePresetResponse(BaseModel):
 
 
 class TrackGenreResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     primary: GenreRefResponse | None = None
     topLevel: GenreRefResponse | None = None
     source: str | None = None

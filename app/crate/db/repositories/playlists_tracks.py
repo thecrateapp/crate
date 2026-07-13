@@ -13,9 +13,16 @@ from crate.db.repositories.library_track_reads import (
 )
 from crate.db.repositories.playlists_shared import emit_playlist_domain_event
 from crate.db.tx import optional_scope
+from crate.federation.global_policy import global_catalog_remote_playlist_refs_allowed
 
 
 def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
+    global_track_uid = track.get("global_track_uid") or track.get("globalTrackUid")
+    if global_track_uid:
+        if not global_catalog_remote_playlist_refs_allowed():
+            return None
+        return _resolve_global_playlist_track(str(global_track_uid), session=session)
+
     track_id = track.get("track_id") or track.get("libraryTrackId") or track.get("id")
     track_entity_uid = (
         track.get("track_entity_uid")
@@ -40,6 +47,7 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         if not resolved_entity_uid and not resolved_storage_id:
             return None
         return {
+            "global_track_uid": None,
             "track_id": library_track.get("id"),
             "track_entity_uid": resolved_entity_uid,
             "track_storage_id": resolved_storage_id,
@@ -56,6 +64,43 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         }
 
     return None
+
+
+def _resolve_global_playlist_track(
+    global_track_uid: str, *, session: Session
+) -> dict | None:
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT
+                    global_track_uid::text AS global_track_uid,
+                    canonical_title,
+                    artist_name,
+                    album_name,
+                    duration_seconds
+                FROM global_catalog_tracks
+                WHERE global_track_uid = :global_track_uid
+                """
+            ),
+            {"global_track_uid": global_track_uid},
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        return None
+    return {
+        "global_track_uid": row["global_track_uid"],
+        "track_id": None,
+        "track_entity_uid": None,
+        "track_storage_id": None,
+        "track_path": None,
+        "title": row["canonical_title"] or "",
+        "artist": row["artist_name"] or "",
+        "album": row["album_name"] or "",
+        "duration": float(row["duration_seconds"] or 0),
+    }
 
 
 def add_playlist_tracks(
@@ -82,6 +127,7 @@ def add_playlist_tracks(
             s.add(
                 PlaylistTrack(
                     playlist_id=playlist_id,
+                    global_track_uid=resolved["global_track_uid"],
                     track_id=resolved["track_id"],
                     track_entity_uid=resolved["track_entity_uid"],
                     track_storage_id=resolved["track_storage_id"],

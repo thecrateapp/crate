@@ -1,0 +1,422 @@
+# Federation development harness — two local Crate nodes for protocol work.
+# Usage: make federation-dev-up
+#
+# Coexistence: uses dedicated compose project (COMPOSE_PROJECT_NAME=crate-federation-dev)
+# and non-overlapping ports so the normal `make dev` stack can run alongside.
+#
+# Node A: API :18585, Admin :15173, Listen :15174, PG :15433, Redis :16380
+# Node B: API :28585, PG :25433, Redis :26380
+
+name: crate-federation-dev
+
+networks:
+  fed-net:
+
+services:
+  # ── Node A ──────────────────────────────────────────────────────────────
+
+  node-a-postgres:
+    image: pgvector/pgvector:pg15
+    container_name: fed-a-postgres
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+    environment:
+      - POSTGRES_USER=crate
+      - POSTGRES_PASSWORD=crate
+      - POSTGRES_DB=crate
+    volumes:
+      - fed_a_postgres:/var/lib/postgresql/data
+    ports:
+      - "15433:5432"
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crate -d crate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  node-a-redis:
+    image: redis:7-alpine
+    container_name: fed-a-redis
+    command: redis-server --maxmemory 128mb --maxmemory-policy volatile-lru --requirepass redis-dev
+    ports:
+      - "16380:6379"
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "redis-dev" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
+
+  node-a-api:
+    build:
+      context: ./app
+      target: api
+    container_name: fed-a-api
+    environment:
+      - TZ=Europe/Madrid
+      - CRATE_CONFIG=/app/config.yaml
+      - DATA_DIR=/data
+      - CRATE_POSTGRES_USER=crate
+      - CRATE_POSTGRES_PASSWORD=crate
+      - CRATE_POSTGRES_DB=crate
+      - CRATE_POSTGRES_HOST=node-a-postgres
+      - POSTGRES_SUPERUSER_USER=crate
+      - POSTGRES_SUPERUSER_PASSWORD=crate
+      - POSTGRES_SUPERUSER_DB=crate
+      - CRATE_RUNTIME=api
+      - CRATE_INSTANCE_NAME=Federation Node A
+      - DOMAIN=node-a.federation.local
+      - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-a-subject-secret-000000
+      - CRATE_AUTH_COOKIE_DOMAIN=
+      - CRATE_AUTH_COOKIE_SECURE=false
+      - CRATE_AUTH_COOKIE_SAMESITE=lax
+      - JWT_SECRET=fed-dev-secret-node-a
+      - DEFAULT_ADMIN_PASSWORD=admin
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - CRATE_METRICS_REDIS_TTL_SECONDS=86400
+      - CRATE_SSE_REDIS_MAX_CONNECTIONS=32
+      - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=false
+      - LASTFM_APIKEY=${LASTFM_APIKEY:-}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET:-}
+      - FANART_API_KEY=${FANART_API_KEY:-}
+      - SPOTIFY_ID=${SPOTIFY_ID:-}
+      - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
+      - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - OLLAMA_URL=http://ollama:11434
+      - LLM_PROVIDER=gemini/gemini-2.5-flash
+      - SLSKD_URL=http://slskd:5030
+      - SLSKD_API_KEY=
+      - TICKETMASTER_API_KEY=
+      - CRATE_MEDIA_WORKER_URL=http://media-worker:8687
+      - CRATE_MEDIA_WORKER_MAX_ACTIVE=1
+    volumes:
+      - ./app/crate:/app/crate:ro
+      - ./app/tests:/app/tests:ro
+      - ./app/config.yaml:/app/config.yaml:ro
+      - ./test-music-federation/node-a:/music:ro
+      - fed_a_data:/data
+    ports:
+      - "18585:8585"
+    networks:
+      fed-net:
+        aliases:
+          - node-a-api
+          # The Listen nginx image proxies /api to http://crate-api:8585.
+          - crate-api
+    depends_on:
+      node-a-postgres:
+        condition: service_healthy
+      node-a-redis:
+        condition: service_healthy
+    mem_limit: 512m
+    mem_reservation: 192m
+    cpus: "0.75"
+    command: ["api"]
+
+  node-a-worker:
+    build:
+      context: ./app
+      target: worker-core
+    container_name: fed-a-worker
+    environment:
+      - TZ=Europe/Madrid
+      - CRATE_CONFIG=/app/config.yaml
+      - DATA_DIR=/data
+      - CRATE_POSTGRES_USER=crate
+      - CRATE_POSTGRES_PASSWORD=crate
+      - CRATE_POSTGRES_DB=crate
+      - CRATE_POSTGRES_HOST=node-a-postgres
+      - POSTGRES_SUPERUSER_USER=crate
+      - POSTGRES_SUPERUSER_PASSWORD=crate
+      - POSTGRES_SUPERUSER_DB=crate
+      - CRATE_RUNTIME=worker
+      - CRATE_WORKER_PROCESSES=1
+      - FAST_WORKER_PROCESSES=1
+      - MAINTENANCE_WORKER_PROCESSES=1
+      - DOMAIN=node-a.federation.local
+      - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-a-subject-secret-000000
+      - JWT_SECRET=fed-dev-secret-node-a
+      - DEFAULT_ADMIN_PASSWORD=admin
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
+      - VECLIB_MAXIMUM_THREADS=1
+      - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - CRATE_METRICS_REDIS_TTL_SECONDS=86400
+      - CRATE_FFMPEG_THREADS=1
+      - CRATE_RESOURCE_GOVERNOR_ENABLED=false
+      - CRATE_BANDCAMP_DOWNLOAD_BACKEND=web
+      - LASTFM_APIKEY=${LASTFM_APIKEY:-}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET:-}
+      - FANART_API_KEY=${FANART_API_KEY:-}
+      - SPOTIFY_ID=${SPOTIFY_ID:-}
+      - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
+      - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - SLSKD_URL=http://slskd:5030
+      - SLSKD_API_KEY=
+      - TICKETMASTER_API_KEY=
+    volumes:
+      - ./app/crate:/app/crate:ro
+      - ./app/tests:/app/tests:ro
+      - ./app/config.yaml:/app/config.yaml:ro
+      - ./test-music-federation/node-a:/music
+      - fed_a_data:/data
+    networks:
+      - fed-net
+    depends_on:
+      node-a-postgres:
+        condition: service_healthy
+      node-a-redis:
+        condition: service_healthy
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "0.5"
+    command:
+      [
+        "worker",
+        "--queues",
+        "default,fast,maintenance",
+        "--processes",
+        "1",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+      ]
+
+  node-a-listen:
+    build:
+      context: ./app
+      dockerfile: listen/Dockerfile
+    container_name: fed-a-listen
+    ports:
+      - "15174:80"
+    networks:
+      - fed-net
+    depends_on:
+      node-a-api:
+        condition: service_started
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: "0.5"
+
+  node-a-admin:
+    build:
+      context: ./app
+      dockerfile: ui/Dockerfile
+    container_name: fed-a-admin
+    ports:
+      - "15173:80"
+    networks:
+      - fed-net
+    depends_on:
+      node-a-api:
+        condition: service_started
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: "0.5"
+
+  # ── Node B ──────────────────────────────────────────────────────────────
+
+  node-b-postgres:
+    image: pgvector/pgvector:pg15
+    container_name: fed-b-postgres
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+    environment:
+      - POSTGRES_USER=crate
+      - POSTGRES_PASSWORD=crate
+      - POSTGRES_DB=crate
+    volumes:
+      - fed_b_postgres:/var/lib/postgresql/data
+    ports:
+      - "25433:5432"
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crate -d crate"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  node-b-redis:
+    image: redis:7-alpine
+    container_name: fed-b-redis
+    command: redis-server --maxmemory 128mb --maxmemory-policy volatile-lru --requirepass redis-dev
+    ports:
+      - "26380:6379"
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "redis-dev" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
+
+  node-b-api:
+    build:
+      context: ./app
+      target: api
+    container_name: fed-b-api
+    environment:
+      - TZ=Europe/Madrid
+      - CRATE_CONFIG=/app/config.yaml
+      - DATA_DIR=/data
+      - CRATE_POSTGRES_USER=crate
+      - CRATE_POSTGRES_PASSWORD=crate
+      - CRATE_POSTGRES_DB=crate
+      - CRATE_POSTGRES_HOST=node-b-postgres
+      - POSTGRES_SUPERUSER_USER=crate
+      - POSTGRES_SUPERUSER_PASSWORD=crate
+      - POSTGRES_SUPERUSER_DB=crate
+      - CRATE_RUNTIME=api
+      - CRATE_INSTANCE_NAME=Federation Node B
+      - DOMAIN=node-b.federation.local
+      - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-b-subject-secret-000000
+      - CRATE_AUTH_COOKIE_DOMAIN=
+      - CRATE_AUTH_COOKIE_SECURE=false
+      - CRATE_AUTH_COOKIE_SAMESITE=lax
+      - JWT_SECRET=fed-dev-secret-node-b
+      - DEFAULT_ADMIN_PASSWORD=admin
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - CRATE_METRICS_REDIS_TTL_SECONDS=86400
+      - CRATE_SSE_REDIS_MAX_CONNECTIONS=32
+      - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=false
+      - LASTFM_APIKEY=${LASTFM_APIKEY:-}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET:-}
+      - FANART_API_KEY=${FANART_API_KEY:-}
+      - SPOTIFY_ID=${SPOTIFY_ID:-}
+      - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
+      - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - OLLAMA_URL=http://ollama:11434
+      - LLM_PROVIDER=gemini/gemini-2.5-flash
+      - SLSKD_URL=http://slskd:5030
+      - SLSKD_API_KEY=
+      - TICKETMASTER_API_KEY=
+      - CRATE_MEDIA_WORKER_URL=http://media-worker:8687
+      - CRATE_MEDIA_WORKER_MAX_ACTIVE=1
+    volumes:
+      - ./app/crate:/app/crate:ro
+      - ./app/tests:/app/tests:ro
+      - ./app/config.yaml:/app/config.yaml:ro
+      - ./test-music-federation/node-b:/music:ro
+      - fed_b_data:/data
+    ports:
+      - "28585:8585"
+    networks:
+      fed-net:
+        aliases:
+          - node-b-api
+    depends_on:
+      node-b-postgres:
+        condition: service_healthy
+      node-b-redis:
+        condition: service_healthy
+    mem_limit: 512m
+    mem_reservation: 192m
+    cpus: "0.75"
+    command: ["api"]
+
+  node-b-worker:
+    build:
+      context: ./app
+      target: worker-core
+    container_name: fed-b-worker
+    environment:
+      - TZ=Europe/Madrid
+      - CRATE_CONFIG=/app/config.yaml
+      - DATA_DIR=/data
+      - CRATE_POSTGRES_USER=crate
+      - CRATE_POSTGRES_PASSWORD=crate
+      - CRATE_POSTGRES_DB=crate
+      - CRATE_POSTGRES_HOST=node-b-postgres
+      - POSTGRES_SUPERUSER_USER=crate
+      - POSTGRES_SUPERUSER_PASSWORD=crate
+      - POSTGRES_SUPERUSER_DB=crate
+      - CRATE_RUNTIME=worker
+      - CRATE_WORKER_PROCESSES=1
+      - FAST_WORKER_PROCESSES=1
+      - MAINTENANCE_WORKER_PROCESSES=1
+      - DOMAIN=node-b.federation.local
+      - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-b-subject-secret-000000
+      - JWT_SECRET=fed-dev-secret-node-b
+      - DEFAULT_ADMIN_PASSWORD=admin
+      - NUMBA_CACHE_DIR=/tmp/numba_cache
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
+      - VECLIB_MAXIMUM_THREADS=1
+      - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - CRATE_METRICS_REDIS_TTL_SECONDS=86400
+      - CRATE_FFMPEG_THREADS=1
+      - CRATE_RESOURCE_GOVERNOR_ENABLED=false
+      - CRATE_BANDCAMP_DOWNLOAD_BACKEND=web
+      - LASTFM_APIKEY=${LASTFM_APIKEY:-}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET:-}
+      - FANART_API_KEY=${FANART_API_KEY:-}
+      - SPOTIFY_ID=${SPOTIFY_ID:-}
+      - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
+      - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - SLSKD_URL=http://slskd:5030
+      - SLSKD_API_KEY=
+      - TICKETMASTER_API_KEY=
+    volumes:
+      - ./app/crate:/app/crate:ro
+      - ./app/tests:/app/tests:ro
+      - ./app/config.yaml:/app/config.yaml:ro
+      - ./test-music-federation/node-b:/music
+      - fed_b_data:/data
+    networks:
+      - fed-net
+    depends_on:
+      node-b-postgres:
+        condition: service_healthy
+      node-b-redis:
+        condition: service_healthy
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "0.5"
+    command:
+      [
+        "worker",
+        "--queues",
+        "default,fast,maintenance",
+        "--processes",
+        "1",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+      ]
+
+volumes:
+  fed_a_postgres:
+  fed_a_data:
+  fed_b_postgres:
+  fed_b_data:

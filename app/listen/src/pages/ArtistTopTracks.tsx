@@ -140,6 +140,7 @@ export function ArtistTopTracks() {
                 ? albumCoverApiUrl({
                     albumId: track.album_id,
                     albumEntityUid: track.album_entity_uid,
+                    globalAlbumUid: track.global_album_uid,
                     artistEntityUid: track.artist_entity_uid,
                     albumSlug: track.album_slug,
                     artistName: track.artist,

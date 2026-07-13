@@ -37,6 +37,7 @@ interface PersonalizedRadioStation {
   play_count?: number;
   minutes_listened?: number;
   artist_id?: number | null;
+  global_artist_uid?: string | null;
   artist_entity_uid?: string | null;
   artist_slug?: string | null;
   artist_name?: string | null;
@@ -76,10 +77,13 @@ function stationArtwork(station: PersonalizedRadioStation): string | null {
   if (station.type === "genre") {
     return resolveMaybeApiAssetUrl(station.cover_url) || null;
   }
+  const explicitCover = resolveMaybeApiAssetUrl(station.cover_url);
+  if (explicitCover) return explicitCover;
   return (
     artistPhotoApiUrl(
       {
         artistId: station.artist_id,
+        globalArtistUid: station.global_artist_uid,
         artistEntityUid: station.artist_entity_uid,
         artistSlug: station.artist_slug,
         artistName: station.artist_name || station.seed_label,

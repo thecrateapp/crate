@@ -13,6 +13,7 @@ function buildCoverUrl(track: PlaylistArtworkTrack): string | null {
     albumCoverApiUrl(
       {
         albumId: track.album_id,
+        globalAlbumUid: track.global_album_uid,
         albumEntityUid: track.album_entity_uid,
         artistEntityUid: track.artist_entity_uid,
         albumSlug: track.album_slug,

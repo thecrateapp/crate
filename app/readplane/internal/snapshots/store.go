@@ -18,6 +18,8 @@ import (
 
 var ErrNotFound = errors.New("snapshot not found")
 
+var ErrTaxonomyMismatch = errors.New("taxonomy snapshots are incompatible")
+
 const defaultCacheTTL = 2 * time.Second
 
 const defaultCacheMaxEntries = 1000
@@ -204,6 +206,28 @@ func (r Row) DecoratedPayload() map[string]any {
 	payload := cloneMap(r.Payload)
 	payload["snapshot"] = r.Meta
 	return payload
+}
+
+// RequireMatchingTaxonomy ensures catalog memberships and taxonomy vocabulary
+// were built from the exact same immutable taxonomy release.
+func RequireMatchingTaxonomy(taxonomy *Row, memberships *Row) error {
+	if taxonomy == nil || memberships == nil {
+		return ErrTaxonomyMismatch
+	}
+	left, ok := taxonomy.Payload["taxonomy"].(map[string]any)
+	if !ok {
+		return ErrTaxonomyMismatch
+	}
+	right, ok := memberships.Payload["taxonomy"].(map[string]any)
+	if !ok {
+		return ErrTaxonomyMismatch
+	}
+	for _, key := range []string{"id", "version", "digest"} {
+		if fmt.Sprint(left[key]) == "" || fmt.Sprint(left[key]) != fmt.Sprint(right[key]) {
+			return ErrTaxonomyMismatch
+		}
+	}
+	return nil
 }
 
 func cloneMap(input map[string]any) map[string]any {

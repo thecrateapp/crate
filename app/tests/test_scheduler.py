@@ -103,6 +103,12 @@ class TestGetSetSchedules:
 
         assert DEFAULT_SCHEDULES["repair_duplicate_tracks"] == 43200
 
+    def test_default_schedules_include_global_catalog_reconciliation(self):
+        from crate.scheduler import DEFAULT_SCHEDULES
+
+        assert DEFAULT_SCHEDULES["global_catalog_reconcile_incremental"] == 300
+        assert DEFAULT_SCHEDULES["global_catalog_reconcile_full"] == 43200
+
     def test_get_schedules_custom(self):
         import json
 

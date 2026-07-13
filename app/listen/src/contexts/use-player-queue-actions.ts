@@ -130,7 +130,7 @@ interface UsePlayerQueueActionsParams {
   setShuffleState: Dispatch<SetStateAction<boolean>>;
   setRepeatState: Dispatch<SetStateAction<RepeatMode>>;
   setVolumeState: Dispatch<SetStateAction<number>>;
-  buildEngineUrls: (tracks: Track[]) => string[];
+  buildEngineUrls: (tracks: Track[], resolvedUrls?: string[]) => string[];
   registerEngineTrack: (track: Track) => string;
   unregisterEngineTrack: (track: Track) => void;
   resetEngineTrackMap: () => void;
@@ -280,21 +280,31 @@ export function usePlayerQueueActions({
         return;
       }
 
-      stopNativeEngineIfAvailable("before web queue load");
-      gpLoadQueue(buildEngineUrls(tracks), normalizedIndex, {
-        restartIfSameIndex: true,
+      void (async () => {
+        const engineTracks = await toFreshEngineTracks(tracks);
+        const engineUrls = engineTracks.map((track) => track.url);
+
+        stopNativeEngineIfAvailable("before web queue load");
+        gpLoadQueue(buildEngineUrls(tracks, engineUrls), normalizedIndex, {
+          restartIfSameIndex: true,
+        });
+        gpSetLoop(repeatRef.current === "all");
+        gpSetSingleMode(repeatRef.current === "one");
+
+        const { resolvedTrack } = pullFromEngine(tracks);
+        if (resolvedTrack) {
+          rememberActiveTrack(resolvedTrack);
+          startTrackerSession(resolvedTrack, nextSource);
+        }
+
+        gpPlay();
+        void publishConnectState?.({ claimActive: true }).catch(() => {});
+      })().catch((error) => {
+        console.error("[gapless] failed to resolve queue playback:", error);
+        bufferingIntentRef.current = false;
+        commitIsBuffering(false);
+        commitIsPlaying(false);
       });
-      gpSetLoop(repeatRef.current === "all");
-      gpSetSingleMode(repeatRef.current === "one");
-
-      const { resolvedTrack } = pullFromEngine(tracks);
-      if (resolvedTrack) {
-        rememberActiveTrack(resolvedTrack);
-        startTrackerSession(resolvedTrack, nextSource);
-      }
-
-      gpPlay();
-      void publishConnectState?.({ claimActive: true }).catch(() => {});
     },
     [
       buildEngineUrls,

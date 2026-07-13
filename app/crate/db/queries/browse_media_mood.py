@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
+from crate.federation.global_policy import global_catalog_surface_enabled
 
 _MOOD_COLUMNS = {
     "acousticness",
@@ -55,6 +56,9 @@ def count_mood_tracks(conditions: list[str], params: list) -> int:
     # conditions originate from _mood_filter_expression which validates
     # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
+    if global_catalog_surface_enabled("explore"):
+        return _count_global_mood_tracks(named_conditions, named_params)
+
     with read_scope() as session:
         row = (
             session.execute(
@@ -84,6 +88,9 @@ def count_mood_presets(presets: Mapping[str, Mapping[str, Any]]) -> dict[str, in
         params.update(expression_params)
         aliases[name] = alias
 
+    if global_catalog_surface_enabled("explore"):
+        return _count_global_mood_presets(select_parts, params, aliases)
+
     # select_parts are built internally from _mood_filter_expression
     # which validates columns against the _MOOD_COLUMNS whitelist.
     with read_scope() as session:
@@ -109,6 +116,9 @@ def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dic
     # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
     named_params["limit"] = limit
+    if global_catalog_surface_enabled("explore"):
+        return _get_global_mood_tracks(named_conditions, named_params)
+
     with read_scope() as session:
         rows = (
             session.execute(
@@ -150,6 +160,169 @@ def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dic
             )
             items.append(item)
         return items
+
+
+_GLOBAL_MOOD_TRACKS_CTE = """
+WITH remote_track_sources AS (
+    SELECT DISTINCT ON (global_entity_uid)
+        global_entity_uid,
+        node_uid::text AS node_uid,
+        remote_entity_uid,
+        source_payload_json
+    FROM global_catalog_sources
+    WHERE entity_type = 'track'
+      AND source_kind = 'federated'
+      AND source_deleted_at IS NULL
+      AND source_stale = false
+    ORDER BY
+        global_entity_uid,
+        preferred_for_playback DESC,
+        preferred_for_display DESC,
+        updated_at DESC
+),
+global_mood_tracks AS (
+    SELECT
+        gt.local_track_id AS id,
+        gt.global_track_uid::text AS global_track_uid,
+        gt.global_artist_uid::text AS global_artist_uid,
+        gt.global_album_uid::text AS global_album_uid,
+        COALESCE(gt.local_track_entity_uid::text, gt.global_track_uid::text) AS entity_uid,
+        gt.local_track_entity_uid::text AS track_entity_uid,
+        gt.canonical_title AS title,
+        gt.artist_name AS artist,
+        ga.local_artist_id AS artist_id,
+        ga.local_artist_entity_uid::text AS artist_entity_uid,
+        la.slug AS artist_slug,
+        gt.album_name AS album,
+        gal.local_album_id AS album_id,
+        gal.local_album_entity_uid::text AS album_entity_uid,
+        lal.slug AS album_slug,
+        lt.path,
+        gt.duration_seconds AS duration,
+        COALESCE(taf.bpm, lt.bpm, NULLIF(remote.source_payload_json->>'bpm', '')::double precision) AS bpm,
+        COALESCE(taf.energy, lt.energy, NULLIF(remote.source_payload_json->>'energy', '')::double precision) AS energy,
+        COALESCE(taf.danceability, lt.danceability, NULLIF(remote.source_payload_json->>'danceability', '')::double precision) AS danceability,
+        COALESCE(taf.valence, lt.valence, NULLIF(remote.source_payload_json->>'valence', '')::double precision) AS valence,
+        COALESCE(taf.acousticness, lt.acousticness, NULLIF(remote.source_payload_json->>'acousticness', '')::double precision) AS acousticness,
+        COALESCE(taf.instrumentalness, lt.instrumentalness, NULLIF(remote.source_payload_json->>'instrumentalness', '')::double precision) AS instrumentalness,
+        CASE
+            WHEN gt.has_local THEN 'local'
+            WHEN remote.node_uid IS NOT NULL THEN 'remote'
+            ELSE NULL
+        END AS origin,
+        remote.node_uid,
+        remote.remote_entity_uid,
+        gt.availability_json AS availability
+    FROM global_catalog_tracks gt
+    LEFT JOIN library_tracks lt
+      ON lt.id = gt.local_track_id
+    LEFT JOIN track_analysis_features taf
+      ON taf.track_id = lt.id
+    LEFT JOIN global_catalog_artists ga
+      ON ga.global_artist_uid = gt.global_artist_uid
+    LEFT JOIN library_artists la
+      ON la.id = ga.local_artist_id
+    LEFT JOIN global_catalog_albums gal
+      ON gal.global_album_uid = gt.global_album_uid
+    LEFT JOIN library_albums lal
+      ON lal.id = gal.local_album_id
+    LEFT JOIN remote_track_sources remote
+      ON remote.global_entity_uid = gt.global_track_uid
+    WHERE gt.has_local OR gt.has_remote
+)
+"""
+
+
+def _count_global_mood_tracks(conditions: list[str], params: dict[str, Any]) -> int:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    _GLOBAL_MOOD_TRACKS_CTE
+                    + "SELECT COUNT(*) AS cnt FROM global_mood_tracks WHERE "
+                    + " AND ".join(conditions)
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
+        return int(row["cnt"] or 0) if row is not None else 0
+
+
+def _count_global_mood_presets(
+    select_parts: list[str],
+    params: dict[str, Any],
+    aliases: dict[str, str],
+) -> dict[str, int]:
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    _GLOBAL_MOOD_TRACKS_CTE
+                    + "SELECT "
+                    + ", ".join(select_parts)
+                    + " FROM global_mood_tracks WHERE bpm IS NOT NULL"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
+
+    counts = dict(row or {})
+    return {name: int(counts.get(alias) or 0) for name, alias in aliases.items()}
+
+
+def _get_global_mood_tracks(
+    conditions: list[str], params: dict[str, Any]
+) -> list[dict]:
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    _GLOBAL_MOOD_TRACKS_CTE
+                    + """
+                    SELECT
+                        id,
+                        global_track_uid,
+                        global_artist_uid,
+                        global_album_uid,
+                        entity_uid,
+                        track_entity_uid,
+                        title,
+                        artist,
+                        artist_id,
+                        artist_entity_uid,
+                        artist_slug,
+                        COALESCE(album, '') AS album,
+                        album_id,
+                        album_entity_uid,
+                        album_slug,
+                        path,
+                        duration,
+                        bpm,
+                        energy,
+                        danceability,
+                        valence,
+                        origin,
+                        node_uid,
+                        remote_entity_uid,
+                        availability
+                    FROM global_mood_tracks
+                    WHERE """
+                    + " AND ".join(conditions)
+                    + """
+                    ORDER BY RANDOM()
+                    LIMIT :limit
+                    """
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
 
 
 __all__ = [

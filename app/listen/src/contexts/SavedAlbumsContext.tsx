@@ -14,7 +14,8 @@ import { onCacheInvalidation } from "@/lib/cache";
 
 export interface SavedAlbum {
   saved_at: string;
-  id: number;
+  id?: number | null;
+  global_album_uid?: string;
   artist: string;
   name: string;
   year: string;
@@ -26,10 +27,19 @@ export interface SavedAlbum {
 interface SavedAlbumsContextValue {
   savedAlbums: SavedAlbum[];
   loading: boolean;
-  isSaved: (albumId?: number | null) => boolean;
-  saveAlbum: (albumId?: number | null) => Promise<boolean>;
-  unsaveAlbum: (albumId?: number | null) => Promise<boolean>;
-  toggleAlbumSaved: (albumId?: number | null) => Promise<boolean>;
+  isSaved: (albumId?: number | null, globalAlbumUid?: string | null) => boolean;
+  saveAlbum: (
+    albumId?: number | null,
+    globalAlbumUid?: string | null,
+  ) => Promise<boolean>;
+  unsaveAlbum: (
+    albumId?: number | null,
+    globalAlbumUid?: string | null,
+  ) => Promise<boolean>;
+  toggleAlbumSaved: (
+    albumId?: number | null,
+    globalAlbumUid?: string | null,
+  ) => Promise<boolean>;
   refetch: () => Promise<void>;
 }
 
@@ -47,7 +57,7 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const albums = await api<SavedAlbum[]>(
-        "/api/me/albums",
+        "/api/catalog/me/albums/saved",
         "GET",
         undefined,
         {
@@ -84,44 +94,84 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
   }, [refetch]);
 
   const savedIds = useMemo(
-    () => new Set(savedAlbums.map((album) => album.id)),
+    () =>
+      new Set(
+        savedAlbums.flatMap((album) => (album.id != null ? [album.id] : [])),
+      ),
+    [savedAlbums],
+  );
+  const savedGlobalUids = useMemo(
+    () =>
+      new Set(
+        savedAlbums.flatMap((album) =>
+          album.global_album_uid ? [album.global_album_uid] : [],
+        ),
+      ),
     [savedAlbums],
   );
 
   const isSaved = useCallback(
-    (albumId?: number | null) => {
+    (albumId?: number | null, globalAlbumUid?: string | null) => {
+      if (globalAlbumUid) return savedGlobalUids.has(globalAlbumUid);
       if (albumId == null) return false;
       return savedIds.has(albumId);
     },
-    [savedIds],
+    [savedGlobalUids, savedIds],
   );
 
   const saveAlbum = useCallback(
-    async (albumId?: number | null) => {
-      if (albumId == null) return false;
-      await api("/api/me/albums", "POST", { album_id: albumId });
+    async (albumId?: number | null, globalAlbumUid?: string | null) => {
+      if (albumId == null && !globalAlbumUid) return false;
+      if (globalAlbumUid) {
+        await api(
+          `/api/catalog/me/albums/${encodeURIComponent(globalAlbumUid)}/save`,
+          "POST",
+        );
+      } else {
+        await api("/api/me/albums", "POST", { album_id: albumId });
+      }
       await refetch();
       return true;
     },
     [refetch],
   );
 
-  const unsaveAlbum = useCallback(async (albumId?: number | null) => {
-    if (albumId == null) return false;
-    await api(`/api/me/albums/${albumId}`, "DELETE");
-    setSavedAlbums((prev) => prev.filter((album) => album.id !== albumId));
-    return true;
-  }, []);
+  const unsaveAlbum = useCallback(
+    async (albumId?: number | null, globalAlbumUid?: string | null) => {
+      if (albumId == null && !globalAlbumUid) return false;
+      if (globalAlbumUid) {
+        await api(
+          `/api/catalog/me/albums/${encodeURIComponent(globalAlbumUid)}/save`,
+          "DELETE",
+        );
+      } else {
+        await api(`/api/me/albums/${albumId}`, "DELETE");
+      }
+      setSavedAlbums((prev) =>
+        prev.filter((album) =>
+          globalAlbumUid
+            ? album.global_album_uid !== globalAlbumUid
+            : album.id !== albumId,
+        ),
+      );
+      return true;
+    },
+    [],
+  );
 
   const toggleAlbumSaved = useCallback(
-    async (albumId?: number | null) => {
-      if (albumId == null) return false;
-      if (savedIds.has(albumId)) {
-        return unsaveAlbum(albumId);
+    async (albumId?: number | null, globalAlbumUid?: string | null) => {
+      if (albumId == null && !globalAlbumUid) return false;
+      if (
+        globalAlbumUid
+          ? savedGlobalUids.has(globalAlbumUid)
+          : albumId != null && savedIds.has(albumId)
+      ) {
+        return unsaveAlbum(albumId, globalAlbumUid);
       }
-      return saveAlbum(albumId);
+      return saveAlbum(albumId, globalAlbumUid);
     },
-    [saveAlbum, savedIds, unsaveAlbum],
+    [saveAlbum, savedGlobalUids, savedIds, unsaveAlbum],
   );
 
   const value = useMemo<SavedAlbumsContextValue>(

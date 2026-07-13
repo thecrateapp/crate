@@ -62,9 +62,39 @@ async def _refresh_radio_graphs_periodically() -> None:
             log.warning("Radio graph background refresh failed", exc_info=True)
 
 
+def _bootstrap_federation_identity() -> None:
+    from crate.federation.bootstrap import bootstrap_federation_identity
+
+    bootstrap_federation_identity(
+        display_name=os.environ.get("CRATE_INSTANCE_NAME")
+        or os.environ.get("INSTANCE_NAME")
+        or "Crate Node",
+        api_base_url=os.environ.get("CRATE_PUBLIC_API_BASE_URL")
+        or os.environ.get("CRATE_PUBLIC_URL")
+        or "",
+    )
+
+
+def _queue_global_catalog_bootstrap() -> None:
+    """Ensure a new single-node installation builds its canonical catalog."""
+    from crate.db.repositories.global_catalog_state import get_catalog_state
+    from crate.db.repositories.tasks import create_task_dedup
+
+    state = get_catalog_state()
+    if state["status"] not in {"cold", "failed"}:
+        return
+    create_task_dedup(
+        "global_catalog_reconcile_full",
+        {"triggered_by": "api_startup"},
+        dedup_key="bootstrap:global-catalog",
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    _bootstrap_federation_identity()
+    _queue_global_catalog_bootstrap()
     from crate.utils import init_musicbrainz
 
     init_musicbrainz()
@@ -315,6 +345,17 @@ def create_app() -> FastAPI:
     from crate.api.paths import router as paths_router
     from crate.api.admin_ops import router as admin_ops_router
     from crate.api.playback_admin import router as playback_admin_router
+    from crate.api.admin_federation import router as admin_federation_router
+    from crate.api.admin_global_catalog import router as admin_global_catalog_router
+    from crate.api.federation import (
+        router as federation_router,
+        well_known as federation_well_known,
+    )
+    from crate.api.federation_remote import router as federation_remote_router
+    from crate.api.catalog import router as catalog_router
+
+    # Public well-known (no auth required)
+    app.include_router(federation_well_known)
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
     app.include_router(setup_router)
@@ -350,6 +391,9 @@ def create_app() -> FastAPI:
     app.include_router(matcher_router)
     app.include_router(duplicates_router)
     app.include_router(subsonic_router)
+    app.include_router(federation_router)
+    app.include_router(federation_remote_router)
+    app.include_router(catalog_router)
     app.include_router(browse_router)
     app.include_router(tags_router)
     app.include_router(organizer_router)
@@ -364,6 +408,8 @@ def create_app() -> FastAPI:
     from crate.api.admin_metrics import router as admin_metrics_router
 
     app.include_router(admin_ops_router)
+    app.include_router(admin_federation_router)
+    app.include_router(admin_global_catalog_router)
     app.include_router(admin_metrics_router)
 
     # Static files

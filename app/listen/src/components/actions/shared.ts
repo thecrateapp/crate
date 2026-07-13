@@ -14,6 +14,7 @@ import { openShareSheet, type SharePayload } from "@/lib/social-share";
 import {
   albumApiPath,
   albumCoverApiUrl,
+  artistApiPath,
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 
@@ -22,6 +23,9 @@ export { action };
 
 export interface TrackMenuData {
   id?: string | number;
+  global_track_uid?: string;
+  global_artist_uid?: string;
+  global_album_uid?: string;
   entity_uid?: string;
   slug?: string;
   title: string;
@@ -58,6 +62,7 @@ export interface AlbumMenuData {
   album: string;
   albumId?: number;
   albumEntityUid?: string;
+  globalAlbumUid?: string;
   albumSlug?: string;
   cover?: string;
 }
@@ -65,6 +70,7 @@ export interface AlbumMenuData {
 export interface ArtistMenuData {
   artistId?: number;
   artistEntityUid?: string;
+  globalArtistUid?: string;
   artistSlug?: string;
   imageUrl?: string | null;
   name: string;
@@ -90,6 +96,9 @@ export function trackToMenuData(track: Track): TrackMenuData {
 
   return {
     id: track.id,
+    global_track_uid: track.globalTrackUid,
+    global_artist_uid: track.globalArtistUid,
+    global_album_uid: track.globalAlbumUid,
     entity_uid: entityUid,
     title: track.title,
     artist: track.artist,
@@ -126,17 +135,24 @@ export function buildTrackMenuPlayerTrack(
 ): Track {
   const resolvedCover =
     cover ||
-    (track.album_id != null
+    (track.global_album_uid
       ? albumCoverApiUrl(
           {
-            albumId: track.album_id,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
+            globalAlbumUid: track.global_album_uid,
           },
           { size: 512 },
         )
-      : undefined);
+      : track.album_id != null
+        ? albumCoverApiUrl(
+            {
+              albumId: track.album_id,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            },
+            { size: 512 },
+          )
+        : undefined);
 
   return toPlayableTrack(track, { cover: resolvedCover });
 }
@@ -170,10 +186,11 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
     name: string;
     display_name: string;
     tracks: Array<{
-      id: number;
+      id: number | string;
       entity_uid?: string;
+      global_track_uid?: string;
       filename: string;
-      path: string;
+      path?: string | null;
       length_sec: number;
       format?: string;
       bitrate?: number | null;
@@ -192,6 +209,7 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
     albumApiPath({
       albumId: data.albumId,
       albumEntityUid: data.albumEntityUid,
+      globalAlbumUid: data.globalAlbumUid,
       albumSlug: data.albumSlug,
       artistSlug: data.artistSlug,
       artistName: data.artist,
@@ -205,6 +223,7 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
       {
         albumId: data.albumId,
         albumEntityUid: data.albumEntityUid,
+        globalAlbumUid: data.globalAlbumUid,
         albumSlug: data.albumSlug,
         artistName: data.artist,
         albumName: data.album,
@@ -217,11 +236,13 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
       {
         id: track.id,
         entity_uid: track.entity_uid,
+        global_album_uid: data.globalAlbumUid,
         title: track.tags?.title || track.filename || "Unknown",
         artist: response.artist,
         album: response.display_name || response.name,
         album_id: data.albumId,
         album_entity_uid: data.albumEntityUid,
+        global_track_uid: track.global_track_uid,
         album_slug: data.albumSlug,
         duration: track.length_sec,
         path: track.path,
@@ -245,21 +266,29 @@ export async function fetchAlbumTracks(data: AlbumMenuData): Promise<Track[]> {
 export async function fetchArtistTopTracks(
   artist: ArtistMenuData,
 ): Promise<Track[]> {
-  const topTracks = artist.artistSlug
-    ? await api<ArtistTopTrack[]>(
-        `/api/artist-slugs/${encodeURIComponent(
-          artist.artistSlug,
-        )}/top-tracks?count=12`,
-      )
-    : artist.artistId != null
-      ? await api<ArtistTopTrack[]>(
-          `/api/artists/${artist.artistId}/top-tracks?count=12`,
+  const topTracks = artist.globalArtistUid
+    ? (
+        await api<{ top_tracks?: ArtistTopTrack[] }>(
+          artistApiPath({ globalArtistUid: artist.globalArtistUid }),
         )
-      : [];
+      ).top_tracks || []
+    : artist.artistSlug
+      ? await api<ArtistTopTrack[]>(
+          `/api/artist-slugs/${encodeURIComponent(
+            artist.artistSlug,
+          )}/top-tracks?count=12`,
+        )
+      : artist.artistId != null
+        ? await api<ArtistTopTrack[]>(
+            `/api/artists/${artist.artistId}/top-tracks?count=12`,
+          )
+        : [];
   const coverFallback =
     artistPhotoApiUrl(
       {
         artistId: artist.artistId,
+        artistEntityUid: artist.artistEntityUid,
+        globalArtistUid: artist.globalArtistUid,
         artistSlug: artist.artistSlug,
         artistName: artist.name,
       },

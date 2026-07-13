@@ -50,7 +50,7 @@ def _insert_play_event(user_id: int, **kw):
             text(
                 """
                 INSERT INTO user_play_events (
-                    user_id, created_at, track_id, track_entity_uid, track_path,
+                    user_id, created_at, track_id, global_track_uid, track_entity_uid, track_path,
                     title, artist, album,
                     started_at, ended_at, played_seconds, track_duration_seconds,
                     completion_ratio, was_skipped, was_completed,
@@ -58,7 +58,7 @@ def _insert_play_event(user_id: int, **kw):
                     context_artist, context_album,
                     device_type, app_platform
                 ) VALUES (
-                    :user_id, NOW(), :track_id, :track_entity_uid, :track_path,
+                    :user_id, NOW(), :track_id, :global_track_uid, :track_entity_uid, :track_path,
                     :title, :artist, :album,
                     :started_at, :ended_at, :played_seconds, :track_duration_seconds,
                     :completion_ratio, :was_skipped, :was_completed,
@@ -71,6 +71,7 @@ def _insert_play_event(user_id: int, **kw):
             {
                 "user_id": user_id,
                 "track_id": kw.get("track_id"),
+                "global_track_uid": kw.get("global_track_uid"),
                 "track_entity_uid": kw.get("track_entity_uid"),
                 "track_path": kw.get("track_path", ""),
                 "title": kw.get("title", ""),
@@ -92,6 +93,124 @@ def _insert_play_event(user_id: int, **kw):
                 "app_platform": kw.get("app_platform", "listen-web"),
             },
         )
+
+
+def _seed_global_catalog_track(
+    *,
+    artist_uid: str = "11111111-1111-4111-8111-111111111111",
+    album_uid: str = "22222222-2222-4222-8222-222222222222",
+    track_uid: str = "33333333-3333-4333-8333-333333333333",
+    artist: str = "High Vis",
+    album: str = "Blending",
+    title: str = "0151",
+) -> dict[str, str]:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists (
+                    global_artist_uid, canonical_name, sort_name,
+                    normalized_name, has_remote, has_photo
+                )
+                VALUES (
+                    :artist_uid, :artist, :artist,
+                    LOWER(:artist), true, true
+                )
+                ON CONFLICT (global_artist_uid) DO UPDATE
+                SET canonical_name = EXCLUDED.canonical_name,
+                    sort_name = EXCLUDED.sort_name,
+                    normalized_name = EXCLUDED.normalized_name,
+                    has_remote = EXCLUDED.has_remote,
+                    has_photo = EXCLUDED.has_photo
+                """
+            ),
+            {"artist_uid": artist_uid, "artist": artist},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_albums (
+                    global_album_uid, global_artist_uid, canonical_name,
+                    normalized_name, artist_name, has_remote, has_cover
+                )
+                VALUES (
+                    :album_uid, :artist_uid, :album,
+                    LOWER(:album), :artist, true, true
+                )
+                ON CONFLICT (global_album_uid) DO UPDATE
+                SET global_artist_uid = EXCLUDED.global_artist_uid,
+                    canonical_name = EXCLUDED.canonical_name,
+                    normalized_name = EXCLUDED.normalized_name,
+                    artist_name = EXCLUDED.artist_name,
+                    has_remote = EXCLUDED.has_remote,
+                    has_cover = EXCLUDED.has_cover
+                """
+            ),
+            {
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "album": album,
+                "artist": artist,
+            },
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks (
+                    global_track_uid, global_album_uid, global_artist_uid,
+                    canonical_title, normalized_title, artist_name, album_name,
+                    availability_json, has_remote
+                )
+                VALUES (
+                    :track_uid, :album_uid, :artist_uid,
+                    :title, LOWER(:title), :artist, :album,
+                    '{"stream": true}'::jsonb, true
+                )
+                ON CONFLICT (global_track_uid) DO UPDATE
+                SET global_album_uid = EXCLUDED.global_album_uid,
+                    global_artist_uid = EXCLUDED.global_artist_uid,
+                    canonical_title = EXCLUDED.canonical_title,
+                    normalized_title = EXCLUDED.normalized_title,
+                    artist_name = EXCLUDED.artist_name,
+                    album_name = EXCLUDED.album_name,
+                    availability_json = EXCLUDED.availability_json,
+                    has_remote = EXCLUDED.has_remote
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "title": title,
+                "artist": artist,
+                "album": album,
+            },
+        )
+    return {"artist_uid": artist_uid, "album_uid": album_uid, "track_uid": track_uid}
+
+
+def _enable_listen_global_catalog(monkeypatch):
+    for target in (
+        "crate.db.home_context.global_catalog_surface_enabled",
+        "crate.db.home_builder_curated_lists.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_history.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_month.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_overview.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_tops.global_catalog_surface_enabled",
+    ):
+        monkeypatch.setattr(target, lambda _surface: True, raising=False)
+
+
+def _disable_listen_global_catalog(monkeypatch):
+    for target in (
+        "crate.db.home_context.global_catalog_surface_enabled",
+        "crate.db.home_builder_curated_lists.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_history.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_month.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_overview.global_catalog_surface_enabled",
+        "crate.db.queries.user_library_stats_tops.global_catalog_surface_enabled",
+    ):
+        monkeypatch.setattr(target, lambda _surface: False, raising=False)
 
 
 def _seed_library(pg_db):
@@ -721,6 +840,212 @@ class TestPlayHistory:
         assert rows[0]["title"] == "Concubine"
         assert rows[0]["artist"] == "Converge"
 
+    def test_get_play_history_resolves_global_catalog_track_events(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        _pg_db, _data = lib_db
+        artist_uid = "11111111-1111-4111-8111-111111111111"
+        album_uid = "22222222-2222-4222-8222-222222222222"
+        track_uid = "33333333-3333-4333-8333-333333333333"
+        now = datetime.now(timezone.utc)
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_artists (
+                        global_artist_uid, canonical_name, sort_name,
+                        normalized_name, has_remote, has_photo
+                    )
+                    VALUES (
+                        :artist_uid, 'High Vis', 'High Vis',
+                        'high vis', true, true
+                    )
+                    ON CONFLICT (global_artist_uid) DO UPDATE
+                    SET canonical_name = EXCLUDED.canonical_name
+                    """
+                ),
+                {"artist_uid": artist_uid},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_albums (
+                        global_album_uid, global_artist_uid, canonical_name,
+                        normalized_name, artist_name, has_remote, has_cover
+                    )
+                    VALUES (
+                        :album_uid, :artist_uid, 'Blending',
+                        'blending', 'High Vis', true, true
+                    )
+                    ON CONFLICT (global_album_uid) DO UPDATE
+                    SET canonical_name = EXCLUDED.canonical_name
+                    """
+                ),
+                {"album_uid": album_uid, "artist_uid": artist_uid},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_tracks (
+                        global_track_uid, global_album_uid, global_artist_uid,
+                        canonical_title, normalized_title, artist_name,
+                        album_name, duration_seconds, has_remote
+                    )
+                    VALUES (
+                        :track_uid, :album_uid, :artist_uid,
+                        '0151', '0151', 'High Vis',
+                        'Blending', 181, true
+                    )
+                    ON CONFLICT (global_track_uid) DO UPDATE
+                    SET canonical_title = EXCLUDED.canonical_title
+                    """
+                ),
+                {
+                    "track_uid": track_uid,
+                    "album_uid": album_uid,
+                    "artist_uid": artist_uid,
+                },
+            )
+
+        _insert_play_event(
+            TEST_USER_ID,
+            global_track_uid=track_uid,
+            track_path=track_uid,
+            title="0151",
+            artist="High Vis",
+            album="Blending",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_history import get_play_history
+
+        history = get_play_history(TEST_USER_ID, limit=10)
+
+        assert history[0]["title"] == "0151"
+        assert history[0]["global_track_uid"] == track_uid
+        assert history[0]["global_artist_uid"] == artist_uid
+        assert history[0]["global_album_uid"] == album_uid
+        assert history[0]["artist"] == "High Vis"
+        assert history[0]["album"] == "Blending"
+        assert history[0]["artist_id"] is None
+        assert history[0]["album_id"] is None
+
+    def test_get_play_history_hides_global_refs_when_catalog_surface_disabled(
+        self, lib_db, monkeypatch
+    ):
+        _disable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        now = datetime.now(timezone.utc)
+
+        _insert_play_event(
+            TEST_USER_ID,
+            global_track_uid=catalog["track_uid"],
+            track_path=catalog["track_uid"],
+            title="0151",
+            artist="High Vis",
+            album="Blending",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_history import get_play_history
+
+        history = get_play_history(TEST_USER_ID, limit=10)
+
+        assert history[0]["title"] == "0151"
+        assert history[0]["global_track_uid"] is None
+        assert history[0]["global_artist_uid"] is None
+        assert history[0]["global_album_uid"] is None
+        assert history[0]["artist_id"] is None
+        assert history[0]["album_id"] is None
+
+    def test_get_play_history_backfills_legacy_remote_events_from_global_catalog(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        _pg_db, _data = lib_db
+        artist_uid = "44444444-4444-4444-8444-444444444444"
+        album_uid = "55555555-5555-4555-8555-555555555555"
+        track_uid = "66666666-6666-4666-8666-666666666666"
+        now = datetime.now(timezone.utc)
+
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_artists (
+                        global_artist_uid, canonical_name, sort_name,
+                        normalized_name, has_remote
+                    )
+                    VALUES (
+                        :artist_uid, 'Rival Schools', 'Rival Schools',
+                        'rival schools', true
+                    )
+                    ON CONFLICT (global_artist_uid) DO NOTHING
+                    """
+                ),
+                {"artist_uid": artist_uid},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_albums (
+                        global_album_uid, global_artist_uid, canonical_name,
+                        normalized_name, artist_name, has_remote, has_cover
+                    )
+                    VALUES (
+                        :album_uid, :artist_uid, 'Found',
+                        'found', 'Rival Schools', true, true
+                    )
+                    ON CONFLICT (global_album_uid) DO NOTHING
+                    """
+                ),
+                {"album_uid": album_uid, "artist_uid": artist_uid},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_tracks (
+                        global_track_uid, global_album_uid, global_artist_uid,
+                        canonical_title, normalized_title, artist_name,
+                        album_name, duration_seconds, has_remote
+                    )
+                    VALUES (
+                        :track_uid, :album_uid, :artist_uid,
+                        'Dreamlife Avenger', 'dreamlife avenger',
+                        'Rival Schools', 'Found', 207, true
+                    )
+                    ON CONFLICT (global_track_uid) DO NOTHING
+                    """
+                ),
+                {
+                    "track_uid": track_uid,
+                    "album_uid": album_uid,
+                    "artist_uid": artist_uid,
+                },
+            )
+
+        _insert_play_event(
+            TEST_USER_ID,
+            track_path=track_uid,
+            title="Dreamlife Avenger",
+            artist="Rival Schools",
+            album="Found",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_history import get_play_history
+
+        history = get_play_history(TEST_USER_ID, limit=10)
+
+        assert history[0]["global_track_uid"] == track_uid
+        assert history[0]["global_artist_uid"] == artist_uid
+        assert history[0]["global_album_uid"] == album_uid
+
     def test_resolve_play_history_album_fallback_empty_input(self):
         from crate.db.queries.user_library_history import (
             resolve_play_history_album_fallback,
@@ -946,6 +1271,70 @@ class TestStatsOverview:
         assert overview["top_artist"]["artist_name"] == "Converge"
         assert overview["top_artist"]["play_count"] == 3
 
+    def test_get_stats_overview_top_artist_resolves_global_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', 'High Vis',
+                        5, 4, 18.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_overview import get_stats_overview
+
+        overview = get_stats_overview(TEST_USER_ID, window="all_time")
+
+        assert overview["top_artist"] is not None
+        assert overview["top_artist"]["artist_name"] == "High Vis"
+        assert overview["top_artist"]["global_artist_uid"] == catalog["artist_uid"]
+        assert overview["top_artist"]["artist_id"] is None
+
+    def test_get_stats_overview_hides_global_identity_when_catalog_surface_disabled(
+        self, lib_db, monkeypatch
+    ):
+        _disable_listen_global_catalog(monkeypatch)
+        _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', 'High Vis',
+                        5, 4, 18.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_overview import get_stats_overview
+
+        overview = get_stats_overview(TEST_USER_ID, window="all_time")
+
+        assert overview["top_artist"] is not None
+        assert overview["top_artist"]["artist_name"] == "High Vis"
+        assert overview["top_artist"]["global_artist_uid"] is None
+        assert overview["top_artist"]["artist_id"] is None
+
     def test_get_stats_overview_empty(self, lib_db):
         from crate.db.queries.user_library_stats_overview import get_stats_overview
 
@@ -967,6 +1356,122 @@ class TestStatsOverview:
 # ══════════════════════════════════════════════════════════════════════
 # user_library_stats_tops
 # ══════════════════════════════════════════════════════════════════════
+
+
+class TestHomeContextGlobalCatalog:
+    def test_favorite_artists_include_remote_global_catalog_artists(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '90d', 'High Vis',
+                        9, 7, 31.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.home_builder_curated_lists import _build_favorite_artists
+        from crate.db.home_context import get_home_context, merged_artists_from_context
+
+        context = get_home_context(TEST_USER_ID)
+        favorites = _build_favorite_artists(merged_artists_from_context(context), 14)
+
+        assert favorites == [
+            {
+                "artist_id": None,
+                "global_artist_uid": catalog["artist_uid"],
+                "artist_entity_uid": None,
+                "artist_slug": None,
+                "artist_name": "High Vis",
+                "play_count": 9,
+                "minutes_listened": 31.0,
+            }
+        ]
+
+    def test_favorite_artists_dedupe_local_global_artist_aliases(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        _pg_db, data = lib_db
+        artist = data["artists"]["Converge"]
+        artist_uid = "77777777-7777-4777-8777-777777777777"
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_artists (
+                        global_artist_uid, local_artist_entity_uid,
+                        canonical_name, sort_name, normalized_name,
+                        has_local, has_remote, has_photo
+                    )
+                    VALUES (
+                        :artist_uid, :entity_uid,
+                        'Converge', 'Converge', 'converge',
+                        true, true, true
+                    )
+                    ON CONFLICT (global_artist_uid) DO UPDATE
+                    SET local_artist_entity_uid = EXCLUDED.local_artist_entity_uid,
+                        has_local = EXCLUDED.has_local,
+                        has_remote = EXCLUDED.has_remote
+                    """
+                ),
+                {"artist_uid": artist_uid, "entity_uid": artist["entity_uid"]},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '90d', 'Converge',
+                        9, 7, 31.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_follows (user_id, artist_name, created_at)
+                    VALUES (:user_id, 'Converge', NOW())
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.home_builder_curated_lists import _build_favorite_artists
+        from crate.db.home_context import get_home_context, merged_artists_from_context
+
+        context = get_home_context(TEST_USER_ID)
+        favorites = _build_favorite_artists(merged_artists_from_context(context), 14)
+
+        assert favorites == [
+            {
+                "artist_id": artist["id"],
+                "global_artist_uid": artist_uid,
+                "artist_entity_uid": artist["entity_uid"],
+                "artist_slug": artist["slug"],
+                "artist_name": "Converge",
+                "play_count": 9,
+                "minutes_listened": 31.0,
+            }
+        ]
 
 
 class TestStatsTops:
@@ -1038,6 +1543,80 @@ class TestStatsTops:
         assert len(top) == 1
         assert top[0]["title"] == "Concubine"
 
+    def test_get_top_tracks_resolves_legacy_global_catalog_stats(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id,
+                        track_entity_uid, track_path, title, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', 'legacy-high-vis-0151', NULL,
+                        NULL, '', '0151', 'High Vis', 'Blending',
+                        3, 3, 9.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_top_tracks
+
+        top = get_top_tracks(TEST_USER_ID, window="all_time", limit=10)
+
+        assert top[0]["title"] == "0151"
+        assert top[0]["global_track_uid"] == catalog["track_uid"]
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["global_album_uid"] == catalog["album_uid"]
+        assert top[0]["track_id"] is None
+        assert top[0]["album_id"] is None
+
+    def test_get_top_tracks_hides_global_refs_when_catalog_surface_disabled(
+        self, lib_db, monkeypatch
+    ):
+        _disable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id,
+                        global_track_uid, track_entity_uid, track_path,
+                        title, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', :track_uid, NULL,
+                        :track_uid, NULL, '',
+                        '0151', 'High Vis', 'Blending',
+                        3, 3, 9.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID, "track_uid": catalog["track_uid"]},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_top_tracks
+
+        top = get_top_tracks(TEST_USER_ID, window="all_time", limit=10)
+
+        assert top[0]["title"] == "0151"
+        assert top[0]["global_track_uid"] is None
+        assert top[0]["global_artist_uid"] is None
+        assert top[0]["global_album_uid"] is None
+        assert top[0]["track_id"] is None
+        assert top[0]["album_id"] is None
+
     def test_get_top_artists_ranking(self, lib_db):
         self._seed_plays(lib_db)
 
@@ -1050,6 +1629,37 @@ class TestStatsTops:
         assert top[0]["play_count"] == 5
         assert top[1]["artist_name"] == "Botch"
         assert top[1]["play_count"] == 1
+
+    def test_get_top_artists_resolves_global_catalog_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', 'High Vis',
+                        5, 4, 18.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_top_artists
+
+        top = get_top_artists(TEST_USER_ID, window="all_time", limit=10)
+
+        assert top[0]["artist_name"] == "High Vis"
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["artist_id"] is None
 
     def test_get_top_artists_empty(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_top_artists
@@ -1070,6 +1680,40 @@ class TestStatsTops:
         album_names = {a["album"] for a in top}
         assert "Jane Doe" in album_names
         assert "We Are the Romans" in album_names
+
+    def test_get_top_albums_resolves_global_catalog_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_album_stats (
+                        user_id, stat_window, entity_key, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, 'all_time', 'High Vis||Blending',
+                        'High Vis', 'Blending',
+                        7, 6, 24.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_top_albums
+
+        top = get_top_albums(TEST_USER_ID, window="all_time", limit=10)
+
+        assert top[0]["artist"] == "High Vis"
+        assert top[0]["album"] == "Blending"
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["global_album_uid"] == catalog["album_uid"]
+        assert top[0]["album_id"] is None
 
     def test_get_top_albums_empty(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_top_albums
@@ -1105,6 +1749,222 @@ class TestStatsTops:
         assert mix["track_count"] == len(mix["items"])
         # For 30d = "Replay this month"
         assert mix["title"] == "Replay this month"
+
+    def test_get_replay_mix_resolves_global_catalog_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id,
+                        global_track_uid, track_entity_uid, track_path,
+                        title, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '30d', :track_uid, NULL,
+                        :track_uid, NULL, '',
+                        '0151', 'High Vis', 'Blending',
+                        4, 4, 12.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID, "track_uid": catalog["track_uid"]},
+            )
+
+        from crate.db.queries.user_library_stats_tops import get_replay_mix
+
+        mix = get_replay_mix(TEST_USER_ID, window="30d", limit=10)
+        item = mix["items"][0]
+
+        assert item["title"] == "0151"
+        assert item["global_track_uid"] == catalog["track_uid"]
+        assert item["global_artist_uid"] == catalog["artist_uid"]
+        assert item["global_album_uid"] == catalog["album_uid"]
+        assert item["album_id"] is None
+
+    def test_get_month_top_tracks_resolves_global_catalog_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        now = datetime.now(timezone.utc)
+        _insert_play_event(
+            TEST_USER_ID,
+            global_track_uid=catalog["track_uid"],
+            track_path=catalog["track_uid"],
+            title="0151",
+            artist="High Vis",
+            album="Blending",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_stats_month import get_month_top_tracks
+
+        top = get_month_top_tracks(TEST_USER_ID, now.strftime("%Y-%m"), limit=10)
+
+        assert top[0]["title"] == "0151"
+        assert top[0]["global_track_uid"] == catalog["track_uid"]
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["global_album_uid"] == catalog["album_uid"]
+        assert top[0]["track_id"] is None
+        assert top[0]["album_id"] is None
+
+    def test_get_month_replay_mix_hides_global_refs_when_catalog_surface_disabled(
+        self, lib_db, monkeypatch
+    ):
+        _disable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        now = datetime.now(timezone.utc)
+        _insert_play_event(
+            TEST_USER_ID,
+            global_track_uid=catalog["track_uid"],
+            track_path=catalog["track_uid"],
+            title="0151",
+            artist="High Vis",
+            album="Blending",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_stats_month import get_month_replay_mix
+
+        mix = get_month_replay_mix(TEST_USER_ID, now.strftime("%Y-%m"), limit=10)
+        item = mix["items"][0]
+
+        assert item["title"] == "0151"
+        assert item["global_track_uid"] is None
+        assert item["global_artist_uid"] is None
+        assert item["global_album_uid"] is None
+        assert item["track_id"] is None
+
+    def test_get_month_replay_mix_resolves_global_catalog_identity(
+        self, lib_db, monkeypatch
+    ):
+        _enable_listen_global_catalog(monkeypatch)
+        catalog = _seed_global_catalog_track()
+        now = datetime.now(timezone.utc)
+        _insert_play_event(
+            TEST_USER_ID,
+            global_track_uid=catalog["track_uid"],
+            track_path=catalog["track_uid"],
+            title="0151",
+            artist="High Vis",
+            album="Blending",
+            started_at=now - timedelta(minutes=4),
+            ended_at=now,
+        )
+
+        from crate.db.queries.user_library_stats_month import get_month_replay_mix
+
+        mix = get_month_replay_mix(TEST_USER_ID, now.strftime("%Y-%m"), limit=10)
+        item = mix["items"][0]
+
+        assert item["title"] == "0151"
+        assert item["global_track_uid"] == catalog["track_uid"]
+        assert item["global_artist_uid"] == catalog["artist_uid"]
+        assert item["global_album_uid"] == catalog["album_uid"]
+        assert item["album_id"] is None
+
+    def test_get_global_replay_mix_resolves_global_catalog_identity(self, lib_db):
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_stats (
+                        user_id, stat_window, entity_key, track_id,
+                        global_track_uid, track_entity_uid, track_path,
+                        title, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '30d', :track_uid, NULL,
+                        :track_uid, NULL, '',
+                        '0151', 'High Vis', 'Blending',
+                        4, 4, 12.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID, "track_uid": catalog["track_uid"]},
+            )
+
+        from crate.db.queries.user_library_stats_global import get_global_replay_mix
+
+        mix = get_global_replay_mix(window="30d", limit=10)
+        item = mix["items"][0]
+
+        assert item["title"] == "0151"
+        assert item["global_track_uid"] == catalog["track_uid"]
+        assert item["global_artist_uid"] == catalog["artist_uid"]
+        assert item["global_album_uid"] == catalog["album_uid"]
+        assert item["album_id"] is None
+
+    def test_get_global_top_artists_resolves_global_catalog_identity(self, lib_db):
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_artist_stats (
+                        user_id, stat_window, artist_name,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '30d', 'High Vis',
+                        5, 4, 18.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_global import get_global_top_artists
+
+        top = get_global_top_artists(window="30d", limit=10)
+
+        assert top[0]["artist_name"] == "High Vis"
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["artist_id"] is None
+
+    def test_get_global_top_albums_resolves_global_catalog_identity(self, lib_db):
+        catalog = _seed_global_catalog_track()
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_album_stats (
+                        user_id, stat_window, entity_key, artist, album,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        :user_id, '30d', 'High Vis||Blending',
+                        'High Vis', 'Blending',
+                        7, 6, 24.0, NOW(), NOW()
+                    )
+                    """
+                ),
+                {"user_id": TEST_USER_ID},
+            )
+
+        from crate.db.queries.user_library_stats_global import get_global_top_albums
+
+        top = get_global_top_albums(window="30d", limit=10)
+
+        assert top[0]["artist"] == "High Vis"
+        assert top[0]["album"] == "Blending"
+        assert top[0]["global_artist_uid"] == catalog["artist_uid"]
+        assert top[0]["global_album_uid"] == catalog["album_uid"]
+        assert top[0]["album_id"] is None
 
     def test_get_replay_mix_7d_title(self, lib_db):
         from crate.db.queries.user_library_stats_tops import get_replay_mix

@@ -151,6 +151,8 @@ export const protectedAppRoutes: AppRouteDefinition[] = [
     path: "artists/:artistSlug/top-tracks",
     element: deferred(<ArtistTopTracks />),
   },
+  { path: "catalog/artists/:globalArtistUid", element: deferred(<Artist />) },
+  { path: "catalog/albums/:globalAlbumUid", element: deferred(<Album />) },
   {
     path: "artists/:artistSlug/:albumSlug",
     element: deferred(<ArtistChildRoute />),

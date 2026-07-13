@@ -357,7 +357,7 @@ export function InfoTab({ className }: { className?: string }) {
               </h3>
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                {currentTrack.artistId ? (
+                {currentTrack.globalArtistUid || currentTrack.artistId ? (
                   <button
                     type="button"
                     aria-label={t("player.info.openArtist", {
@@ -365,11 +365,18 @@ export function InfoTab({ className }: { className?: string }) {
                     })}
                     onClick={() =>
                       navigate(
-                        artistPagePath({
-                          artistId: currentTrack.artistId,
-                          artistSlug: currentTrack.artistSlug,
-                          artistName: info.artist || currentTrack.artist,
-                        }),
+                        currentTrack.globalArtistUid
+                          ? artistPagePath({
+                              artistId: currentTrack.artistId,
+                              globalArtistUid: currentTrack.globalArtistUid,
+                              artistSlug: currentTrack.artistSlug,
+                              artistName: info.artist || currentTrack.artist,
+                            })
+                          : artistPagePath({
+                              artistId: currentTrack.artistId,
+                              artistSlug: currentTrack.artistSlug,
+                              artistName: info.artist || currentTrack.artist,
+                            }),
                       )
                     }
                     className="min-w-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-white/82 transition-colors hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
@@ -384,7 +391,8 @@ export function InfoTab({ className }: { className?: string }) {
                   </span>
                 )}
 
-                {(info.album || currentTrack.album) && currentTrack.albumId ? (
+                {(info.album || currentTrack.album) &&
+                (currentTrack.globalAlbumUid || currentTrack.albumId) ? (
                   <button
                     type="button"
                     aria-label={t("player.info.openAlbum", {
@@ -392,12 +400,20 @@ export function InfoTab({ className }: { className?: string }) {
                     })}
                     onClick={() =>
                       navigate(
-                        albumPagePath({
-                          albumId: currentTrack.albumId,
-                          albumSlug: currentTrack.albumSlug,
-                          albumName: info.album || currentTrack.album,
-                          artistName: info.artist || currentTrack.artist,
-                        }),
+                        currentTrack.globalAlbumUid
+                          ? albumPagePath({
+                              albumId: currentTrack.albumId,
+                              globalAlbumUid: currentTrack.globalAlbumUid,
+                              albumSlug: currentTrack.albumSlug,
+                              albumName: info.album || currentTrack.album,
+                              artistName: info.artist || currentTrack.artist,
+                            })
+                          : albumPagePath({
+                              albumId: currentTrack.albumId,
+                              albumSlug: currentTrack.albumSlug,
+                              albumName: info.album || currentTrack.album,
+                              artistName: info.artist || currentTrack.artist,
+                            }),
                       )
                     }
                     className="min-w-0 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-white/52 transition-colors hover:bg-white/[0.08] hover:text-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"

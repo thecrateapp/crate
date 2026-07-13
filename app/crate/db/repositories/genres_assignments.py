@@ -95,6 +95,31 @@ def set_artist_genres(
                 "source": source,
             },
         )
+    artist = (
+        session.execute(
+            text(
+                """
+                SELECT entity_uid::text AS entity_uid
+                FROM library_artists
+                WHERE name = :artist_name
+                """
+            ),
+            {"artist_name": artist_name},
+        )
+        .mappings()
+        .first()
+    )
+    if artist and artist["entity_uid"]:
+        from crate.db.repositories.global_catalog_dirty_sources import (
+            enqueue_local_dirty_source,
+        )
+
+        enqueue_local_dirty_source(
+            "artist",
+            str(artist["entity_uid"]),
+            "upsert",
+            session=session,
+        )
 
 
 def set_album_genres(
@@ -122,6 +147,31 @@ def set_album_genres(
                 "weight": weight,
                 "source": source,
             },
+        )
+    album = (
+        session.execute(
+            text(
+                """
+                SELECT entity_uid::text AS entity_uid
+                FROM library_albums
+                WHERE id = :album_id
+                """
+            ),
+            {"album_id": album_id},
+        )
+        .mappings()
+        .first()
+    )
+    if album and album["entity_uid"]:
+        from crate.db.repositories.global_catalog_dirty_sources import (
+            enqueue_local_dirty_source,
+        )
+
+        enqueue_local_dirty_source(
+            "album",
+            str(album["entity_uid"]),
+            "upsert",
+            session=session,
         )
 
 

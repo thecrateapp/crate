@@ -7,8 +7,11 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
 export interface AlbumPlaybackTrack {
-  id: number;
+  id: number | string;
   entity_uid?: string;
+  globalTrackUid?: string;
+  global_track_uid?: string;
+  global_uid?: string;
   filename: string;
   format: string;
   bitrate: number | null;
@@ -21,7 +24,7 @@ export interface AlbumPlaybackTrack {
   danceability?: number | null;
   valence?: number | null;
   bliss_vector?: number[] | null;
-  path: string;
+  path?: string | null;
   is_available?: boolean;
   tags: {
     title: string;
@@ -29,8 +32,11 @@ export interface AlbumPlaybackTrack {
 }
 
 export interface AlbumPlaybackData {
-  id: number;
+  id?: number | null;
   entity_uid?: string;
+  global_album_uid?: string;
+  global_artist_uid?: string;
+  global_uid?: string;
   slug?: string;
   artist_id?: number;
   artist_entity_uid?: string;
@@ -51,11 +57,14 @@ function scoreTrackQuality(track: AlbumPlaybackTrack): number {
 }
 
 export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
+  const globalAlbumUid = data.global_album_uid ?? data.global_uid;
+  const localAlbumId =
+    typeof data.id === "number" && data.id > 0 ? data.id : undefined;
   const cover =
-    data.cover_url ||
     albumCoverApiUrl(
       {
-        albumId: data.id,
+        albumId: localAlbumId,
+        globalAlbumUid,
         albumEntityUid: data.entity_uid,
         artistEntityUid: data.artist_entity_uid,
         albumSlug: data.slug,
@@ -63,7 +72,9 @@ export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
         albumName: data.name,
       },
       { size: 512 },
-    );
+    ) ||
+    data.cover_url ||
+    undefined;
 
   return data.tracks
     .filter((track) => track.is_available !== false)
@@ -71,6 +82,10 @@ export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
       toPlayableTrack(
         {
           id: track.id,
+          globalTrackUid:
+            track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
+          global_artist_uid: data.global_artist_uid,
+          global_album_uid: globalAlbumUid,
           entity_uid: track.entity_uid,
           title: track.tags.title || track.filename,
           artist: data.artist,
@@ -78,11 +93,12 @@ export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
           artist_entity_uid: data.artist_entity_uid,
           artist_slug: data.artist_slug,
           album: data.display_name || data.name,
-          album_id: data.id > 0 ? data.id : undefined,
+          album_id: localAlbumId,
           album_entity_uid: data.entity_uid,
           album_slug: data.slug,
           path: track.path,
-          library_track_id: track.id > 0 ? track.id : undefined,
+          library_track_id:
+            typeof track.id === "number" && track.id > 0 ? track.id : undefined,
           format: track.format || undefined,
           bitrate: track.bitrate,
           sample_rate: track.sample_rate,
@@ -121,6 +137,8 @@ export function buildAlbumQualityBadges(
       getTrackQualityBadge(
         toPlayableTrack({
           id: track.id,
+          globalTrackUid:
+            track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
           entity_uid: track.entity_uid,
           title: track.tags.title || track.filename,
           artist: "",

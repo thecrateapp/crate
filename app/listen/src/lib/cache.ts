@@ -19,7 +19,7 @@ interface CacheEntry<T = unknown> {
   scopes: string[];
 }
 
-const STORAGE_KEY = "crate-api-cache";
+const STORAGE_KEY = "crate-api-cache:v2";
 const memoryCache = new Map<string, CacheEntry>();
 type ScheduledStorageWriteHandle = number | ReturnType<typeof setTimeout>;
 const pendingStorageWrites = new Map<string, ScheduledStorageWriteHandle>();
@@ -109,6 +109,12 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/me/likes")) scopes.push("likes");
   else if (url.startsWith("/api/me/follows")) scopes.push("follows");
   else if (url.startsWith("/api/me/albums")) scopes.push("saved_albums");
+  else if (url.startsWith("/api/catalog/me/follows"))
+    scopes.push("follows", "library");
+  else if (url.startsWith("/api/catalog/me/artists"))
+    scopes.push("follows", "library");
+  else if (url.startsWith("/api/catalog/me/albums"))
+    scopes.push("saved_albums", "library");
   else if (url.startsWith("/api/me/history")) scopes.push("history");
   else if (url.startsWith("/api/me/stats")) scopes.push("history");
   else if (url.startsWith("/api/users/") && url.includes("/stats"))
@@ -152,6 +158,7 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/albums")) scopes.push("library");
   // Search, browse, genres
   else if (url.startsWith("/api/search")) scopes.push("library");
+  else if (url.startsWith("/api/catalog")) scopes.push("library");
   else if (url.startsWith("/api/browse")) scopes.push("library");
   else if (url.match(/^\/api\/genres\/[^/?]+(?:\?|$)/))
     scopes.push("library", "shows", "upcoming");

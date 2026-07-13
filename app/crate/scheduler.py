@@ -1,5 +1,6 @@
 """Task scheduler — configurable recurring tasks."""
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 
@@ -18,6 +19,25 @@ DEFAULT_SCHEDULES = {
     "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
     "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
+    "federation_health_poll": 300,  # 5min — poll approved peers for health
+    "federation_sync_catalog": 7200,  # 2h — sync catalogs from approved peers
+    "global_catalog_reconcile_incremental": 300,  # 5min — drain dirty sources
+    "global_catalog_reconcile_full": 43200,  # 12h — verify canonical catalog
+}
+
+SCHEDULED_TASKS = [
+    {"name": task_type, "interval_seconds": interval_seconds}
+    for task_type, interval_seconds in DEFAULT_SCHEDULES.items()
+]
+
+FEDERATION_SCHEDULED_TASKS = {
+    "federation_health_poll",
+    "federation_sync_catalog",
+}
+
+GLOBAL_CATALOG_SCHEDULED_TASKS = {
+    "global_catalog_reconcile_incremental",
+    "global_catalog_reconcile_full",
 }
 
 
@@ -55,6 +75,12 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
     if not interval or interval <= 0:
         return False  # disabled
 
+    if not _scheduled_task_enabled(task_type):
+        return False
+
+    if task_type == "global_catalog_reconcile_full" and _has_conflicting_full_sync():
+        return False
+
     # Check last completion time
     last_key = f"schedule:last_run:{task_type}"
     last_run = get_setting(last_key)
@@ -65,7 +91,8 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
         last_time = to_datetime(last_run)
         if last_time is not None:
             elapsed = (datetime.now(timezone.utc) - last_time).total_seconds()
-            if elapsed < interval:
+            effective_interval = interval + schedule_jitter_seconds(task_type, interval)
+            if elapsed < effective_interval:
                 return False
 
     # Check if already pending/running
@@ -75,6 +102,47 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
         return False
 
     return True
+
+
+def _scheduled_task_enabled(task_type: str) -> bool:
+    if task_type in FEDERATION_SCHEDULED_TASKS:
+        return True
+
+    if task_type in GLOBAL_CATALOG_SCHEDULED_TASKS:
+        return True
+
+    return True
+
+
+def local_node_uid() -> str:
+    try:
+        from crate.db.repositories.federation import get_local_node
+
+        node = get_local_node()
+        if node and node.get("node_uid"):
+            return str(node["node_uid"])
+    except Exception:
+        pass
+    return "local"
+
+
+def schedule_jitter_seconds(task_type: str, interval: int) -> int:
+    if not task_type.startswith(("global_catalog_", "federation_sync_catalog")):
+        return 0
+    window = min(max(int(interval or 0) // 12, 60), 3600)
+    seed = f"{local_node_uid()}:{task_type}".encode("utf-8")
+    return int(hashlib.sha256(seed).hexdigest()[:8], 16) % (window + 1)
+
+
+def _has_conflicting_full_sync() -> bool:
+    conflicting_types = ("library_pipeline", "scan")
+    for task_type in conflicting_types:
+        try:
+            if list_tasks(status="running", task_type=task_type, limit=1):
+                return True
+        except Exception:
+            log.debug("Unable to inspect conflicting task %s", task_type, exc_info=True)
+    return False
 
 
 def mark_run(task_type: str):

@@ -165,4 +165,79 @@ describe("Stats page", () => {
       screen.getByText("Tu replay aparecerá cuando escuches un poco más."),
     ).toBeInTheDocument();
   });
+
+  it("uses global album artwork for remote replay tracks", () => {
+    const dashboard: StatsDashboard = {
+      window: "30d",
+      overview: {
+        window: "30d",
+        play_count: 1,
+        complete_play_count: 1,
+        skip_count: 0,
+        minutes_listened: 3,
+        active_days: 1,
+        skip_rate: 0,
+        top_artist: null,
+      },
+      trends: {
+        window: "30d",
+        points: [],
+      },
+      top_tracks: {
+        window: "30d",
+        items: [],
+      },
+      top_artists: {
+        window: "30d",
+        items: [],
+      },
+      top_albums: {
+        window: "30d",
+        items: [],
+      },
+      top_genres: {
+        window: "30d",
+        items: [],
+      },
+      replay: {
+        window: "30d",
+        title: "Replay",
+        subtitle: "Snapshot",
+        track_count: 1,
+        minutes_listened: 3,
+        items: [
+          {
+            track_id: null,
+            global_track_uid: "track-global-1",
+            global_artist_uid: "artist-global-1",
+            global_album_uid: "album-global-1",
+            track_path: null,
+            title: "0151",
+            artist: "High Vis",
+            album: "Blending",
+            play_count: 1,
+            complete_play_count: 1,
+            minutes_listened: 3,
+          },
+        ],
+      },
+    };
+
+    mockUseApi.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "es",
+    });
+
+    expect(container.innerHTML).toContain(
+      "/api/catalog/albums/album-global-1/cover",
+    );
+  });
 });

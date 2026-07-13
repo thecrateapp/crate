@@ -27,12 +27,12 @@ from crate.api._deps import (
     artist_name_from_id,
     library_path,
     extensions,
-    safe_path,
 )
 from crate.db.import_queue_read_models import count_import_queue_items
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.repositories.library import get_library_artist, get_library_track_count
 from crate.db.ops_snapshot import get_cached_ops_snapshot
+from crate.storage_layout import resolve_artist_dir
 from crate.db.queries.analytics import (
     get_timeline_albums,
     get_artist_format_distribution,
@@ -127,7 +127,7 @@ def api_instance_listening_stats_dashboard(
     _require_auth(request)
     period_key = f"month:{month}" if month else window
     cache_key = (
-        f"listen:stats_dashboard:v3:instance:{period_key}:"
+        f"listen:stats_dashboard:v4:instance:{period_key}:"
         f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
     )
     cached = get_cache(cache_key, max_age_seconds=_LISTENING_STATS_CACHE_TTL_SECONDS)
@@ -269,12 +269,19 @@ def api_quality(request: Request):
 def api_missing_albums(request: Request, artist: str):
     _require_auth(request)
     lib = library_path()
-    artist_dir = safe_path(lib, artist)
-    if not artist_dir or not artist_dir.is_dir():
+    db_artist = get_library_artist(artist)
+    artist_dir = resolve_artist_dir(
+        lib,
+        db_artist,
+        fallback_name=artist,
+        existing_only=True,
+    )
+    if not artist_dir:
         raise HTTPException(status_code=404, detail="Artist not found")
 
     exts = extensions()
-    result = find_missing_albums(artist_dir, exts)
+    artist_name = str(db_artist.get("name") or artist) if db_artist else artist
+    result = find_missing_albums(artist_dir, exts, artist_name=artist_name)
     return result
 
 

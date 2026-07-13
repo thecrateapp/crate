@@ -858,3 +858,66 @@ class TestArtistEnrichment:
             "reason": "hidden_library_path",
         }
         assert calls == []
+
+    def test_process_new_content_propagates_force_to_artist_enrichment(
+        self, monkeypatch, tmp_path
+    ):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        forwarded_force: list[bool | None] = []
+
+        monkeypatch.setattr(
+            worker_enrichment, "get_library_artist", lambda _artist: None
+        )
+        monkeypatch.setattr(worker_enrichment, "emit_progress", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_organize_folders",
+            lambda *args, **kwargs: None,
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_enrich_artist",
+            lambda *args, **kwargs: forwarded_force.append(kwargs.get("force")),
+        )
+        monkeypatch.setattr(
+            worker_enrichment,
+            "_process_new_content_album_genres",
+            lambda *args, **kwargs: [],
+        )
+        for helper in (
+            "_process_new_content_album_mbids",
+            "_process_new_content_bandcamp_urls",
+            "_process_new_content_lyrics",
+            "_process_new_content_audio_fingerprints",
+            "_process_new_content_popularity",
+            "_process_new_content_missing_covers",
+            "_process_new_content_portable_metadata",
+            "_process_new_content_update_artist_hash",
+        ):
+            monkeypatch.setattr(worker_enrichment, helper, lambda *args, **kwargs: None)
+        monkeypatch.setattr("requests.post", lambda *args, **kwargs: None)
+
+        worker_enrichment._process_new_content_inner(
+            "task-1",
+            {"force": True},
+            {"library_path": str(tmp_path)},
+            "Birds In Row",
+            "",
+        )
+
+        assert forwarded_force == [True]
+
+    def test_invalidate_artist_top_tracks_cache_uses_artist_prefix(self, monkeypatch):
+        from crate.worker_handlers import enrichment as worker_enrichment
+
+        prefixes: list[str] = []
+        monkeypatch.setattr(
+            worker_enrichment,
+            "delete_cache_prefix",
+            lambda prefix: prefixes.append(prefix),
+        )
+
+        worker_enrichment._invalidate_artist_top_tracks_cache(" Birds In Row ")
+
+        assert prefixes == ["listen:artist_top_tracks:v1:birds in row:"]

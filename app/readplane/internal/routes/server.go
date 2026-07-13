@@ -82,6 +82,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/me/history", s.route(http.MethodGet, s.myHistoryRoute))
 	mux.HandleFunc("/api/me/likes", s.route(http.MethodGet, s.myLikesRoute))
 	mux.HandleFunc("/api/cache/events", s.route(http.MethodGet, s.cacheEvents))
+	mux.HandleFunc("/api/catalog/search", s.route(http.MethodGet, s.globalCatalogSearchRoute))
+	mux.HandleFunc("/api/catalog/genres", s.route(http.MethodGet, s.globalCatalogGenresRoute))
 	mux.HandleFunc("/api/favorites", s.route(http.MethodGet, s.favoritesRoute))
 	mux.HandleFunc("/api/genres", s.route(http.MethodGet, s.genresRoute))
 	mux.HandleFunc("/api/genres/", s.route(http.MethodGet, s.genresRoute))

@@ -32,6 +32,10 @@ from crate.db.queries.user_library import (
     get_top_artists,
     get_top_genres,
 )
+from crate.federation.global_policy import global_catalog_surface_enabled
+
+
+_HOME_CONTEXT_CACHE_VERSION = "v3"
 
 
 def _get_home_context(
@@ -56,8 +60,10 @@ def _get_cached_home_context(
     top_album_limit: int = 12,
     top_genre_limit: int = 8,
 ) -> dict:
+    cache_mode = "global" if global_catalog_surface_enabled("home") else "local"
     cache_key = (
-        f"home:context:{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
+        f"home:context:{_HOME_CONTEXT_CACHE_VERSION}:{cache_mode}:"
+        f"{user_id}:{top_artist_limit}:{top_album_limit}:{top_genre_limit}"
     )
     return _get_or_compute_home_cache(
         cache_key,

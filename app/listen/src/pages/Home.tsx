@@ -72,6 +72,7 @@ function toPlayerTrack(item: HomeRecommendedTrack): Track {
       item.artist && item.album
         ? albumCoverApiUrl({
             albumId: item.album_id,
+            globalAlbumUid: item.global_album_uid,
             albumEntityUid: item.album_entity_uid,
             artistEntityUid: item.artist_entity_uid,
             albumSlug: item.album_slug,
@@ -569,6 +570,7 @@ export function Home() {
           item.artist && item.album
             ? albumCoverApiUrl({
                 albumId: item.album_id,
+                globalAlbumUid: item.global_album_uid,
                 albumEntityUid: item.album_entity_uid,
                 artistEntityUid: item.artist_entity_uid,
                 albumSlug: item.album_slug,

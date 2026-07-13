@@ -136,13 +136,17 @@ export function HomeSection() {
 
   async function playRadioStation(station: HomeRadioStation) {
     try {
-      if (
-        station.type === "artist" &&
-        station.artist_id != null &&
-        station.artist_name
-      ) {
+      const artistSeed =
+        station.seed_value ??
+        station.global_artist_uid ??
+        (station.artist_id != null ? String(station.artist_id) : null);
+      const albumSeed =
+        station.seed_value ??
+        station.global_album_uid ??
+        (station.album_id != null ? String(station.album_id) : null);
+      if (station.type === "artist" && artistSeed && station.artist_name) {
         const radio = await fetchArtistRadio(
-          station.artist_id,
+          artistSeed,
           station.artist_name,
           50,
         );
@@ -153,13 +157,9 @@ export function HomeSection() {
         playAll(radio.tracks, 0, radio.source);
         return;
       }
-      if (
-        station.type === "album" &&
-        station.album_id != null &&
-        station.artist_name
-      ) {
+      if (station.type === "album" && albumSeed && station.artist_name) {
         const radio = await fetchAlbumRadio({
-          albumId: station.album_id,
+          albumId: albumSeed,
           artistName: station.artist_name,
           albumName: station.album_name || station.title,
         });
@@ -247,15 +247,19 @@ export function HomeSection() {
           {data.items.map((album) => (
             <AlbumCard
               key={`${
-                album.album_id ?? `${album.artist_name}-${album.album_name}`
+                album.global_album_uid ??
+                album.album_id ??
+                `${album.artist_name}-${album.album_name}`
               }`}
               artist={album.artist_name}
               album={album.album_name}
               albumId={album.album_id}
               albumEntityUid={album.album_entity_uid}
+              globalAlbumUid={album.global_album_uid}
               artistEntityUid={album.artist_entity_uid}
               albumSlug={album.album_slug}
               year={album.year}
+              cover={album.cover_url ?? undefined}
               layout="grid"
             />
           ))}
@@ -282,7 +286,12 @@ export function HomeSection() {
           {data.items.map((station) => (
             <RadioStationCard
               key={`${station.type}-${
-                station.artist_id ?? station.album_id ?? station.title
+                station.seed_value ??
+                station.global_artist_uid ??
+                station.global_album_uid ??
+                station.artist_id ??
+                station.album_id ??
+                station.title
               }`}
               station={station}
               onPlay={() => playRadioStation(station)}
@@ -296,9 +305,14 @@ export function HomeSection() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {data.items.map((artist) => (
             <ArtistCard
-              key={artist.artist_id ?? artist.artist_name}
+              key={
+                artist.global_artist_uid ??
+                artist.artist_id ??
+                artist.artist_name
+              }
               name={artist.artist_name}
               artistId={artist.artist_id}
+              globalArtistUid={artist.global_artist_uid}
               artistEntityUid={artist.artist_entity_uid}
               artistSlug={artist.artist_slug}
               subtitle={t("common.playCount", { count: artist.play_count })}

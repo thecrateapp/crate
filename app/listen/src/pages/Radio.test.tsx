@@ -136,4 +136,51 @@ describe("RadioPage", () => {
     });
     expect(playAll).toHaveBeenCalled();
   });
+
+  it("starts remote artist radio with the global artist seed", async () => {
+    const playAll = vi.fn();
+    vi.mocked(api).mockImplementation(async (url) => {
+      if (url === "/api/radio/stations") {
+        return {
+          artist_stations: [
+            {
+              type: "artist",
+              seed_type: "artist",
+              seed_value: "global-high-vis",
+              seed_label: "High Vis",
+              seed_subtitle: "Artist",
+              artist_id: null,
+              global_artist_uid: "global-high-vis",
+              artist_name: "High Vis",
+              title: "High Vis Radio",
+              subtitle: "",
+              play_count: 7,
+              minutes_listened: 31,
+            },
+          ],
+          genre_stations: [],
+        };
+      }
+      if (url === "/api/genres") return [];
+      if (url.startsWith("/api/search")) return { artists: [], albums: [] };
+      throw new Error(`Unexpected API call: ${url}`);
+    });
+
+    renderWithListenProviders(<RadioPage />, {
+      route: "/radio",
+      path: "/radio",
+      playerActions: { playAll },
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: /High Vis/i }));
+
+    await waitFor(() => {
+      expect(startShapedRadio).toHaveBeenCalledWith(
+        "seeded",
+        "artist",
+        "global-high-vis",
+      );
+    });
+    expect(playAll).toHaveBeenCalled();
+  });
 });

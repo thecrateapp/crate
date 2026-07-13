@@ -7,18 +7,57 @@ from crate.db.queries.user_library_shared import (
     relative_track_path,
 )
 from crate.db.tx import read_scope
+from crate.federation.global_policy import global_catalog_surface_enabled
+
+
+def _global_history_refs_enabled() -> bool:
+    return global_catalog_surface_enabled("home") or global_catalog_surface_enabled(
+        "stats"
+    )
 
 
 def get_play_history_rows(
-    user_id: int, *, limit: int, has_legacy_stream_id_column: bool
+    user_id: int,
+    *,
+    limit: int,
+    has_legacy_stream_id_column: bool,
+    allow_global_catalog: bool | None = None,
 ) -> list[dict]:
+    if allow_global_catalog is None:
+        allow_global_catalog = _global_history_refs_enabled()
     query_sql = """
         SELECT
             COALESCE(lt.id, upe.track_id) AS track_id,
+            CASE
+                WHEN :allow_global_catalog
+                THEN COALESCE(upe.global_track_uid::text, gct.global_track_uid::text)
+                ELSE NULL
+            END AS global_track_uid,
+            CASE
+                WHEN :allow_global_catalog
+                THEN COALESCE(gct.global_artist_uid::text, gca.global_artist_uid::text)
+                ELSE NULL
+            END AS global_artist_uid,
+            CASE
+                WHEN :allow_global_catalog THEN gct.global_album_uid::text
+                ELSE NULL
+            END AS global_album_uid,
             lt.entity_uid::text AS track_entity_uid,
             COALESCE(lt.path, upe.track_path) AS track_path,
-            COALESCE(lt.title, upe.title) AS title,
-            COALESCE(ar_by_album.name, ar_by_albumartist.name, ar_by_track.name, ar_by_event.name, lt.albumartist, alb.artist, lt.artist, upe.artist) AS artist,
+            COALESCE(lt.title, gct.canonical_title, upe.title) AS title,
+            COALESCE(
+                ar_by_album.name,
+                ar_by_albumartist.name,
+                ar_by_track.name,
+                ar_by_event.name,
+                gca.artist_name,
+                gcartist.canonical_name,
+                gct.artist_name,
+                lt.albumartist,
+                alb.artist,
+                lt.artist,
+                upe.artist
+            ) AS artist,
             COALESCE(ar_by_album.id, ar_by_albumartist.id, ar_by_track.id, ar_by_event.id) AS artist_id,
             COALESCE(
                 ar_by_album.entity_uid::text,
@@ -27,7 +66,7 @@ def get_play_history_rows(
                 ar_by_event.entity_uid::text
             ) AS artist_entity_uid,
             COALESCE(ar_by_album.slug, ar_by_albumartist.slug, ar_by_track.slug, ar_by_event.slug) AS artist_slug,
-            COALESCE(lt.album, upe.album) AS album,
+            COALESCE(alb.name, lt.album, gca.canonical_name, gct.album_name, upe.album) AS album,
             alb.id AS album_id,
             alb.entity_uid::text AS album_entity_uid,
             alb.slug AS album_slug,
@@ -49,6 +88,34 @@ def get_play_history_rows(
           OR (upe.track_id IS NULL AND COALESCE(upe.track_path, '') <> '' AND lt.path = upe.track_path)
         """
     query_sql += """
+        LEFT JOIN global_catalog_tracks gct
+          ON :allow_global_catalog
+          AND (
+            gct.global_track_uid = upe.global_track_uid
+            OR (
+              upe.global_track_uid IS NULL
+              AND lt.entity_uid IS NOT NULL
+              AND gct.local_track_entity_uid = lt.entity_uid
+            )
+            OR (
+              upe.global_track_uid IS NULL
+              AND lt.id IS NULL
+              AND COALESCE(NULLIF(TRIM(upe.artist), ''), '') <> ''
+              AND COALESCE(NULLIF(TRIM(upe.title), ''), '') <> ''
+              AND LOWER(gct.artist_name) = LOWER(upe.artist)
+              AND LOWER(gct.canonical_title) = LOWER(upe.title)
+              AND (
+                COALESCE(NULLIF(TRIM(upe.album), ''), '') = ''
+                OR LOWER(COALESCE(gct.album_name, '')) = LOWER(upe.album)
+              )
+            )
+          )
+        LEFT JOIN global_catalog_albums gca
+          ON :allow_global_catalog
+         AND gca.global_album_uid = gct.global_album_uid
+        LEFT JOIN global_catalog_artists gcartist
+          ON :allow_global_catalog
+         AND gcartist.global_artist_uid = gct.global_artist_uid
         LEFT JOIN library_albums alb ON alb.id = lt.album_id
         LEFT JOIN library_artists ar_by_album
           ON COALESCE(alb.artist, '') <> ''
@@ -69,7 +136,14 @@ def get_play_history_rows(
 
     with read_scope() as session:
         rows = (
-            session.execute(text(query_sql), {"user_id": user_id, "lim": limit})
+            session.execute(
+                text(query_sql),
+                {
+                    "user_id": user_id,
+                    "lim": limit,
+                    "allow_global_catalog": allow_global_catalog,
+                },
+            )
             .mappings()
             .all()
         )

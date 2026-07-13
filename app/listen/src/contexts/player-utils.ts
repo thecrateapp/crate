@@ -108,9 +108,19 @@ export function getStoredQueue(): StoredQueue {
 
 function normalizeStoredTrack(track: Track): Track {
   const albumCover = resolveMaybeApiAssetUrl(track.albumCover);
-  return albumCover && albumCover !== track.albumCover
-    ? { ...track, albumCover }
-    : track;
+  const normalized =
+    albumCover && albumCover !== track.albumCover
+      ? { ...track, albumCover }
+      : { ...track };
+  // Strip remote stream URL on restore — always request fresh playback resolution
+  if (normalized.remote) {
+    normalized.remote = {
+      ...normalized.remote,
+      streamUrl: undefined,
+      streamUrlExpiresAt: undefined,
+    };
+  }
+  return normalized;
 }
 
 export interface SaveQueueOptions {
@@ -126,21 +136,38 @@ export function saveQueue(
   options: SaveQueueOptions = {},
 ) {
   try {
+    const safeQueue = queue.map(sanitizeTrackForPersistence);
+    const safeUnshuffled = options.unshuffledQueue
+      ? options.unshuffledQueue.map(sanitizeTrackForPersistence)
+      : null;
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        queue,
+        queue: safeQueue,
         currentIndex,
         currentTime: options.currentTime ?? 0,
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
-        unshuffledQueue: options.unshuffledQueue ?? null,
+        unshuffledQueue: safeUnshuffled,
         savedAt: new Date().toISOString(),
       }),
     );
   } catch {
     /* ignore */
   }
+}
+
+function sanitizeTrackForPersistence(track: Track): Track {
+  if (!track.remote) return track;
+  return {
+    ...track,
+    path: undefined,
+    remote: {
+      ...track.remote,
+      streamUrl: undefined,
+      streamUrlExpiresAt: undefined,
+    },
+  };
 }
 
 export function getStoredRecentlyPlayed(): Track[] {
@@ -162,6 +189,15 @@ export function saveRecentlyPlayed(tracks: Track[]) {
 }
 
 export function getStreamUrl(track: Track): string {
+  if (track.origin === "remote" && track.remote?.streamUrl) {
+    const expired = track.remote.streamUrlExpiresAt
+      ? new Date(track.remote.streamUrlExpiresAt).getTime() < Date.now()
+      : false;
+    if (!expired) {
+      return `${_apiBase()}${track.remote.streamUrl}`;
+    }
+  }
+
   if (track.entityUid || track.path) {
     const localOfflineUrl = getOfflineNativePlaybackUrl(
       track.entityUid ? { entityUid: track.entityUid } : track.path ?? null,

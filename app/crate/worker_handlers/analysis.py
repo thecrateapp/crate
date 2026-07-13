@@ -608,6 +608,12 @@ def _handle_index_genres(task_id: str, params: dict, config: dict) -> dict:
     emit_task_event(
         task_id, "info", {"message": f"Genres indexed: {genre_count} genres"}
     )
+    try:
+        from crate.api.cache_events import broadcast_invalidation
+
+        broadcast_invalidation("library", "home")
+    except Exception:
+        log.debug("Failed to broadcast genre index invalidation", exc_info=True)
     return result
 
 

@@ -15,6 +15,10 @@ vi.mock("@/lib/api", () => ({
 import {
   albumApiPath,
   albumCoverApiUrl,
+  globalAlbumPagePath,
+  globalAlbumUidFromRouteRef,
+  globalArtistPagePath,
+  globalArtistUidFromRouteRef,
   albumPagePath,
   albumSharePath,
   artistApiPath,
@@ -103,6 +107,17 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds canonical artist background URLs for global artists", () => {
+    const url = artistBackgroundApiUrl(
+      { globalArtistUid: "artist-global-1" },
+      { size: 1280 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-1/background?size=1280&format=webp&token=listen-token",
+    );
+  });
+
   it("adds a cache-busting artist asset version after invalidation", () => {
     recordAssetInvalidationScope("artist:9", "artwork-2");
 
@@ -149,6 +164,17 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/quicksand/top-tracks");
   });
 
+  it("prefers local artist paths when a local artist also has a global uid", () => {
+    expect(
+      artistPagePath({
+        artistId: 7,
+        globalArtistUid: "artist-global-7",
+        artistSlug: "quicksand",
+        artistName: "Quicksand",
+      }),
+    ).toBe("/artists/quicksand");
+  });
+
   it("builds public artist share paths from stable identity", () => {
     expect(
       artistSharePath({
@@ -170,6 +196,27 @@ describe("library route asset helpers", () => {
     });
 
     expect(path).toBe("/artists/quicksand/slip");
+  });
+
+  it("builds human album paths from names when stored slugs are absent", () => {
+    expect(
+      albumPagePath({
+        albumId: 9,
+        artistName: "High Vis",
+        albumName: "No Sense No Feeling",
+      }),
+    ).toBe("/artists/high-vis/no-sense-no-feeling");
+  });
+
+  it("prefers local album paths when a local album also has a global uid", () => {
+    expect(
+      albumPagePath({
+        albumId: 9,
+        globalAlbumUid: "785621b5-738e-5922-b6e3-108984976091",
+        artistName: "Birds In Row",
+        albumName: "Gris Klein",
+      }),
+    ).toBe("/artists/birds-in-row/gris-klein");
   });
 
   it("strips stored artist prefixes even when the album name is absent", () => {
@@ -264,6 +311,46 @@ describe("library route asset helpers", () => {
     );
   });
 
+  it("builds global catalog page and cover URLs", () => {
+    expect(
+      globalArtistPagePath({
+        globalArtistUid: "257828ee-c041-574d-aedf-2f74ca60e1fa",
+        artistName: "High Vis",
+      }),
+    ).toBe("/catalog/artists/high-vis--257828ee-c041-574d-aedf-2f74ca60e1fa");
+    expect(
+      globalArtistPagePath({
+        globalArtistUid: "artist-global-1",
+      }),
+    ).toBe("/catalog/artists/artist-global-1");
+    expect(
+      globalAlbumPagePath({
+        globalAlbumUid: "album-global-1",
+        albumName: "No Sense No Feeling",
+      }),
+    ).toBe("/catalog/albums/no-sense-no-feeling--album-global-1");
+    expect(
+      albumCoverApiUrl({ globalAlbumUid: "album-global-1" }, { size: 256 }),
+    ).toBe(
+      "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&format=webp&token=listen-token",
+    );
+  });
+
+  it("parses human global catalog route refs back to stable UIDs", () => {
+    expect(
+      globalArtistUidFromRouteRef(
+        "high-vis--257828ee-c041-574d-aedf-2f74ca60e1fa",
+      ),
+    ).toBe("257828ee-c041-574d-aedf-2f74ca60e1fa");
+    expect(
+      globalArtistUidFromRouteRef("257828ee-c041-574d-aedf-2f74ca60e1fa"),
+    ).toBe("257828ee-c041-574d-aedf-2f74ca60e1fa");
+    expect(globalAlbumUidFromRouteRef("slip--album-global-1")).toBe(
+      "album-global-1",
+    );
+    expect(globalAlbumUidFromRouteRef("album-global-1")).toBe("album-global-1");
+  });
+
   it("builds canonical track routes preferring entity_uid", () => {
     expect(
       trackInfoApiPath({ entityUid: "track-entity-1", libraryTrackId: 12 }),
@@ -295,6 +382,51 @@ describe("library route asset helpers", () => {
     expect(trackOfflineManifestApiPath({ entityUid: "track-entity-1" })).toBe(
       "/api/offline/tracks/by-entity/track-entity-1/manifest",
     );
+  });
+
+  it("builds global catalog playback routes when a global track uid exists", () => {
+    expect(
+      trackInfoApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/info");
+    expect(
+      trackPlaybackApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/playback");
+    expect(
+      trackStreamApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/stream");
+    expect(
+      trackEqFeaturesApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/eq-features");
+    expect(
+      trackEffectiveEqApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/eq");
+    expect(
+      trackGenreApiPath({
+        globalTrackUid: "global-track-1",
+        entityUid: "track-entity-1",
+        libraryTrackId: 12,
+      }),
+    ).toBe("/api/catalog/tracks/global-track-1/genre");
   });
 
   it("builds track download and offline manifest routes from numeric ids", () => {
@@ -333,6 +465,15 @@ describe("library route asset helpers", () => {
         title: "Head to Wall",
       }),
     ).toBe("/share/track/123e4567-e89b-12d3-a456-426614174000/head-to-wall");
+  });
+
+  it("builds public track share paths from global track uids", () => {
+    expect(
+      trackSharePath({
+        globalTrackUid: "global-track-1",
+        title: "Head to Wall",
+      }),
+    ).toBe("/share/track/global-track-1/head-to-wall");
   });
 
   it("falls back to id/path routes only when canonical identity is missing", () => {

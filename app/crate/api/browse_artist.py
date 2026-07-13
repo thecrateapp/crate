@@ -63,6 +63,7 @@ from crate.db.repositories.library import (
 )
 from crate.db.repositories.playlists import get_public_system_playlists_for_artist
 from crate.db.queries.browse_artist import (
+    artist_decade_filter_sql,
     check_artists_in_library,
     get_all_artist_genre_map,
     get_artist_all_tracks,
@@ -648,10 +649,7 @@ def api_artists(
     if decade:
         try:
             decade_start = int(decade.rstrip("s"))
-            where_clauses.append("la.formed IS NOT NULL AND length(la.formed) >= 4")
-            where_clauses.append(
-                "CAST(substring(la.formed, 1, 4) AS INTEGER) BETWEEN :decade_start AND :decade_end"
-            )
+            where_clauses.append(artist_decade_filter_sql("la"))
             params["decade_start"] = decade_start
             params["decade_end"] = decade_start + 9
         except (ValueError, TypeError):

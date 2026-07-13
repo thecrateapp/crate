@@ -26,7 +26,12 @@ def _normalize_text(value: object) -> str:
 
 
 def _track_key(row: dict) -> object | None:
-    return row.get("track_id") or row.get("track_entity_uid") or row.get("track_path")
+    return (
+        row.get("global_track_uid")
+        or row.get("track_id")
+        or row.get("track_entity_uid")
+        or row.get("track_path")
+    )
 
 
 def _album_key(row: dict) -> tuple[str, str] | None:

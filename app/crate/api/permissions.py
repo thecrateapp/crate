@@ -42,6 +42,16 @@ ALL_CAPABILITIES: tuple[str, ...] = (
     "curation.shows.write",
     "curation.releases.write",
     "contributions.own.manage",
+    # Federation v1
+    "federation.nodes.view",
+    "federation.nodes.manage",
+    "federation.policy.manage",
+    "federation.audit.view",
+    "federation.catalog.search",
+    "federation.catalog.sync.manage",
+    "federation.stream.play",
+    "federation.import.request",
+    "federation.import.manage",
 )
 
 ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
@@ -52,6 +62,8 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "ops.logs.view",
         "ops.tasks.manage",
         "ops.runtime.manage",
+        "federation.nodes.view",
+        "federation.audit.view",
     ),
     "librarian": (
         "library.view",
@@ -65,6 +77,11 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "library.import.manage",
         "library.bandcamp.manage",
         "library.tidal.manage",
+        "federation.catalog.search",
+        "federation.catalog.sync.manage",
+        "federation.stream.play",
+        "federation.import.request",
+        "federation.import.manage",
     ),
     "curator": (
         "library.view",
@@ -72,16 +89,26 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
         "curation.genres.write",
         "curation.shows.write",
         "curation.releases.write",
+        "federation.catalog.search",
+        "federation.stream.play",
     ),
     "editor": (
         "library.view",
         "library.metadata.write",
+        "federation.catalog.search",
+        "federation.stream.play",
     ),
     "contributor": (
         "library.view",
         "contributions.own.manage",
+        "federation.catalog.search",
+        "federation.stream.play",
     ),
-    "user": ("library.view",),
+    "user": (
+        "library.view",
+        "federation.catalog.search",
+        "federation.stream.play",
+    ),
 }
 
 SUPPORTED_ROLES: tuple[str, ...] = tuple(ROLE_CAPABILITIES)

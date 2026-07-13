@@ -38,6 +38,28 @@ describe("MixArtwork", () => {
     expect(container.querySelectorAll("img[alt='B']")).toHaveLength(1);
   });
 
+  it("renders global artist images for remote-only artists", () => {
+    const { container } = render(
+      <MixArtwork
+        item={{
+          ...baseItem,
+          artwork_artists: [
+            {
+              artist_name: "High Vis",
+              global_artist_uid: "global-high-vis",
+            },
+          ],
+        }}
+      />,
+    );
+
+    const img = container.querySelector("img[alt='High Vis']");
+    expect(img).toBeInTheDocument();
+    expect(img?.getAttribute("src")).toContain(
+      "/api/catalog/artists/global-high-vis/photo",
+    );
+  });
+
   it("caps at 4 artists", () => {
     const artists = Array.from({ length: 6 }, (_, i) => ({
       artist_id: i,

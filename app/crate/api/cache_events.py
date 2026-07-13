@@ -156,7 +156,12 @@ def _clear_backend_cache_for_scopes(scopes: tuple[str, ...] | list[str]):
         "likes": [],
         "saved_albums": [],
         "history": ["stats:"],
-        "library": ["discover:", "listen:artist_page:"],
+        "library": [
+            "discover:",
+            "listen:artist_page:",
+            "listen:browse_filters:",
+            "listen:explore_page:",
+        ],
         "shows": ["shows:"],
         "upcoming": ["upcoming:"],
         "playlists": ["playlist:"],

@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Play, Search } from "@crate/ui/icons";
+import { Disc3, Play, Search } from "@crate/ui/icons";
 import { api, ApiError } from "@/lib/api";
-import { albumCoverApiUrl } from "@/lib/library-routes";
+import {
+  albumCoverApiUrl,
+  albumPagePath,
+  artistPagePath,
+} from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -13,7 +17,19 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 
 interface SearchData {
-  artists: { id?: number; entity_uid?: string; slug?: string; name: string }[];
+  artists: {
+    id?: number;
+    entity_uid?: string;
+    global_uid?: string;
+    global_artist_uid?: string;
+    slug?: string;
+    name: string;
+    origin?: "local" | "remote";
+    node_uid?: string;
+    node_name?: string;
+    remote_entity_uid?: string;
+    has_photo?: boolean;
+  }[];
   albums: {
     artist: string;
     artist_id?: number;
@@ -22,12 +38,22 @@ interface SearchData {
     name: string;
     id?: number;
     entity_uid?: string;
+    global_uid?: string;
+    global_album_uid?: string;
     slug?: string;
     year?: string;
+    has_cover?: boolean;
+    origin?: "local" | "remote";
+    node_uid?: string;
+    node_name?: string;
+    remote_entity_uid?: string;
   }[];
   tracks: {
     id?: number;
     entity_uid?: string;
+    global_uid?: string;
+    global_track_uid?: string;
+    globalTrackUid?: string;
     slug?: string;
     title: string;
     artist: string;
@@ -37,6 +63,7 @@ interface SearchData {
     album: string;
     album_id?: number;
     album_entity_uid?: string;
+    global_album_uid?: string;
     album_slug?: string;
     path?: string;
     duration?: number;
@@ -47,7 +74,53 @@ interface SearchData {
     danceability?: number | null;
     valence?: number | null;
     bliss_vector?: number[] | null;
+    origin?: "local" | "remote";
+    node_uid?: string;
+    node_name?: string;
+    remote_entity_uid?: string;
+    availability?: {
+      catalog: boolean;
+      stream: boolean;
+      import: boolean;
+      stale?: boolean;
+      local?: boolean;
+      remote?: boolean;
+      healthy?: boolean;
+    };
   }[];
+}
+
+function artistGlobalUid(input: SearchData["artists"][0]): string | null {
+  return input.global_artist_uid ?? input.global_uid ?? null;
+}
+
+function albumGlobalUid(input: SearchData["albums"][0]): string | null {
+  return input.global_album_uid ?? input.global_uid ?? null;
+}
+
+function trackGlobalUid(input: SearchData["tracks"][0]): string | null {
+  return (
+    input.globalTrackUid ?? input.global_track_uid ?? input.global_uid ?? null
+  );
+}
+
+function trackGlobalAlbumUid(input: SearchData["tracks"][0]): string | null {
+  return input.global_album_uid ?? input.album_entity_uid ?? null;
+}
+
+function trackAlbumCover(track: SearchData["tracks"][0]) {
+  const globalAlbumUid = trackGlobalAlbumUid(track);
+  if (trackGlobalUid(track) && globalAlbumUid) {
+    return albumCoverApiUrl({ globalAlbumUid }, { size: 128 });
+  }
+  return albumCoverApiUrl({
+    albumId: track.album_id,
+    albumEntityUid: track.album_entity_uid,
+    artistEntityUid: track.artist_entity_uid,
+    albumSlug: track.album_slug,
+    artistName: track.artist,
+    albumName: track.album,
+  });
 }
 
 function searchErrorHint(
@@ -82,7 +155,7 @@ export function SearchResults() {
     setLoading(true);
     setSearchError(null);
     api<SearchData>(
-      `/api/search?q=${encodeURIComponent(query)}&limit=50`,
+      `/api/catalog/search?q=${encodeURIComponent(query)}&limit=50`,
       "GET",
       undefined,
       { signal: controller.signal },
@@ -112,8 +185,10 @@ export function SearchResults() {
       (data?.tracks ?? []).map((t, i) =>
         toTrackRowData({
           ...t,
+          globalTrackUid: trackGlobalUid(t) ?? undefined,
           id: t.id ?? t.path ?? `${t.artist}-${t.title}-${i}`,
-          library_track_id: typeof t.id === "number" ? t.id : undefined,
+          library_track_id:
+            !trackGlobalUid(t) && typeof t.id === "number" ? t.id : undefined,
         }),
       ),
     [data?.tracks],
@@ -150,19 +225,12 @@ export function SearchResults() {
     toPlayableTrack(
       {
         ...t,
-        library_track_id: typeof t.id === "number" ? t.id : undefined,
+        globalTrackUid: trackGlobalUid(t) ?? undefined,
+        library_track_id:
+          !trackGlobalUid(t) && typeof t.id === "number" ? t.id : undefined,
       },
       {
-        cover: t.album
-          ? albumCoverApiUrl({
-              albumId: t.album_id,
-              albumEntityUid: t.album_entity_uid,
-              artistEntityUid: t.artist_entity_uid,
-              albumSlug: t.album_slug,
-              artistName: t.artist,
-              albumName: t.album,
-            })
-          : undefined,
+        cover: t.album ? trackAlbumCover(t) : undefined,
       },
     );
 
@@ -178,16 +246,34 @@ export function SearchResults() {
             {t("search.artistsCount", { count: data.artists.length })}
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-            {data.artists.map((a) => (
-              <ArtistCard
-                key={a.id || a.entity_uid || a.name}
-                name={a.name}
-                artistId={a.id}
-                artistEntityUid={a.entity_uid}
-                artistSlug={a.slug}
-                layout="grid"
-              />
-            ))}
+            {data.artists.map((a) => {
+              const globalUid = artistGlobalUid(a);
+              return globalUid ? (
+                <ArtistCard
+                  key={globalUid}
+                  name={a.name}
+                  globalArtistUid={globalUid}
+                  hasPhoto={a.has_photo}
+                  layout="grid"
+                  href={artistPagePath({
+                    artistId: a.id,
+                    artistEntityUid: a.entity_uid,
+                    globalArtistUid: globalUid,
+                    artistSlug: a.slug,
+                    artistName: a.name,
+                  })}
+                />
+              ) : (
+                <ArtistCard
+                  key={a.id || a.entity_uid || a.name}
+                  name={a.name}
+                  artistId={a.id}
+                  artistEntityUid={a.entity_uid}
+                  artistSlug={a.slug}
+                  layout="grid"
+                />
+              );
+            })}
           </div>
         </section>
       )}
@@ -198,32 +284,80 @@ export function SearchResults() {
             {t("search.albumsCount", { count: data.albums.length })}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {data.albums.map((a) => (
-              <AlbumCard
-                layout="grid"
-                key={a.id || a.entity_uid || `${a.artist}-${a.name}`}
-                artist={a.artist}
-                album={a.name}
-                albumId={a.id}
-                albumEntityUid={a.entity_uid}
-                artistEntityUid={a.artist_entity_uid}
-                albumSlug={a.slug}
-                year={a.year}
-                cover={albumCoverApiUrl({
-                  albumId: a.id,
-                  albumEntityUid: a.entity_uid,
-                  artistEntityUid: a.artist_entity_uid,
-                  albumSlug: a.slug,
-                  artistName: a.artist,
-                  albumName: a.name,
-                })}
-              />
-            ))}
+            {data.albums.map((a) => {
+              const globalUid = albumGlobalUid(a);
+              return globalUid ? (
+                <Link
+                  key={globalUid}
+                  to={albumPagePath({
+                    albumId: a.id,
+                    albumEntityUid: a.entity_uid,
+                    globalAlbumUid: globalUid,
+                    albumSlug: a.slug,
+                    artistSlug: a.artist_slug,
+                    artistName: a.artist,
+                    albumName: a.name,
+                  })}
+                  className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl"
+                >
+                  <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
+                    {a.has_cover ? (
+                      <img
+                        src={
+                          globalUid
+                            ? albumCoverApiUrl(
+                                { globalAlbumUid: globalUid },
+                                { size: 320 },
+                              )
+                            : ""
+                        }
+                        alt={a.name}
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <Disc3 size={32} className="text-white/25" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {a.name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {a.year ? `${a.year} · ${a.artist}` : a.artist}
+                  </p>
+                </Link>
+              ) : (
+                <AlbumCard
+                  layout="grid"
+                  key={a.id || a.entity_uid || `${a.artist}-${a.name}`}
+                  artist={a.artist}
+                  album={a.name}
+                  albumId={a.id}
+                  albumEntityUid={a.entity_uid}
+                  artistEntityUid={a.artist_entity_uid}
+                  albumSlug={a.slug}
+                  year={a.year}
+                  cover={albumCoverApiUrl({
+                    albumId: a.id,
+                    albumEntityUid: a.entity_uid,
+                    artistEntityUid: a.artist_entity_uid,
+                    albumSlug: a.slug,
+                    artistName: a.artist,
+                    albumName: a.name,
+                  })}
+                />
+              );
+            })}
           </div>
         </section>
       )}
 
-      {data.tracks.length > 0 && (
+      {trackRowData.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-3">
             <h2 className="text-lg font-semibold">
@@ -231,7 +365,7 @@ export function SearchResults() {
             </h2>
             <button
               onClick={() =>
-                playAll(data.tracks.map(trackToPlayer), 0, {
+                playAll((data.tracks ?? []).map(trackToPlayer), 0, {
                   type: "queue",
                   name: t("search.playSource", { query }),
                 })
@@ -250,6 +384,7 @@ export function SearchResults() {
                 showArtist
                 showAlbum
                 queueTracks={trackRowData}
+                albumCover={trackAlbumCover(data.tracks[i]!)}
               />
             ))}
           </div>

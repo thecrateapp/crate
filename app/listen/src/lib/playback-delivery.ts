@@ -68,6 +68,7 @@ export function preparePlaybackDelivery(
   if (tracks.length === 0) return;
 
   const refs = tracks
+    .filter((t) => t.origin !== "remote" && !t.globalTrackUid)
     .map(trackRef)
     .filter((ref) => ref.entity_uid || ref.track_id || ref.path);
   if (refs.length === 0) return;

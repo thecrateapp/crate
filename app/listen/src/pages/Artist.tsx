@@ -36,6 +36,7 @@ import { fetchArtistRadio } from "@/lib/radio";
 import { shuffleArray } from "@/lib/utils";
 import {
   artistBackgroundApiUrl,
+  globalArtistUidFromRouteRef,
   artistPagePath,
   artistPhotoApiUrl,
   artistSharePath,
@@ -44,7 +45,10 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 
 export function Artist() {
   const { t } = useTranslation();
-  const { artistSlug: routeArtistSlug } = useParams<{ artistSlug?: string }>();
+  const { artistSlug: routeArtistSlug, globalArtistUid: routeGlobalArtistRef } =
+    useParams<{ artistSlug?: string; globalArtistUid?: string }>();
+  const routeGlobalArtistUid =
+    globalArtistUidFromRouteRef(routeGlobalArtistRef);
   const navigate = useNavigate();
   const location = useLocation();
   const [bioModalOpen, setBioModalOpen] = useState(false);
@@ -58,15 +62,17 @@ export function Artist() {
     loading,
     error,
   } = useApi<ArtistPageData>(
-    routeArtistSlug
-      ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/page`
-      : null,
+    routeGlobalArtistUid
+      ? `/api/catalog/artists/${encodeURIComponent(routeGlobalArtistUid)}/page`
+      : routeArtistSlug
+        ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/page`
+        : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
   );
   const { data: canonicalTopTracks } = useApi<ArtistTopTrack[]>(
-    routeArtistSlug
+    routeArtistSlug && !routeGlobalArtistUid
       ? `/api/artist-slugs/${encodeURIComponent(
           routeArtistSlug,
         )}/top-tracks?count=50`
@@ -79,6 +85,19 @@ export function Artist() {
 
   useEffect(() => {
     if (!data?.name) return;
+    if (routeGlobalArtistUid) {
+      const canonicalPath = artistPagePath({
+        artistId: data.id,
+        artistEntityUid: data.entity_uid,
+        globalArtistUid: routeGlobalArtistUid,
+        artistSlug: data.slug,
+        artistName: data.name,
+      });
+      if (location.pathname !== canonicalPath) {
+        navigate(canonicalPath, { replace: true });
+      }
+      return;
+    }
     const canonicalPath = artistPagePath({
       artistId: data.id,
       artistSlug: data.slug,
@@ -87,17 +106,26 @@ export function Artist() {
     if (location.pathname !== canonicalPath) {
       navigate(canonicalPath, { replace: true });
     }
-  }, [data?.id, data?.name, data?.slug, location.pathname, navigate]);
+  }, [
+    data?.id,
+    data?.name,
+    data?.slug,
+    location.pathname,
+    navigate,
+    routeGlobalArtistUid,
+  ]);
 
   async function toggleFollow() {
-    if (!data?.id) return;
+    const globalArtistUid =
+      routeGlobalArtistUid ?? data?.global_artist_uid ?? data?.global_uid;
+    if (!data?.id && !globalArtistUid) return;
     try {
-      const following = isFollowing(data.id);
-      await toggleArtistFollow(data.id);
+      const following = isFollowing(data?.id, globalArtistUid);
+      await toggleArtistFollow(data?.id, globalArtistUid, data?.name);
       toast.success(
         following
-          ? t("artist.toasts.unfollowed", { name: data.name })
-          : t("artist.toasts.following", { name: data.name }),
+          ? t("artist.toasts.unfollowed", { name: data?.name })
+          : t("artist.toasts.following", { name: data?.name }),
       );
     } catch {
       toast.error(t("artist.toasts.followFailed"));
@@ -105,27 +133,39 @@ export function Artist() {
   }
 
   async function handleShare() {
-    if (!data?.id) return;
+    const globalArtistUid =
+      routeGlobalArtistUid ?? data?.global_artist_uid ?? data?.global_uid;
+    if (!data?.id && !globalArtistUid) return;
     const shareUrl = publicShareUrl(
       artistSharePath({
-        artistId: data.id,
-        artistEntityUid: data.entity_uid,
-        artistSlug: data.slug,
-        artistName: data.name,
+        artistId: data?.id,
+        artistEntityUid: data?.entity_uid,
+        globalArtistUid,
+        artistSlug: data?.slug,
+        artistName: data?.name,
       }),
     );
     openShareSheet({
       kind: "artist",
-      title: data.name,
-      imageUrl: artistPhotoApiUrl(
-        { artistId: data.id, artistSlug: data.slug, artistName: data.name },
-        { size: 512, version: data.updated_at ?? undefined },
-      ),
+      title: data?.name || t("artist.fallbackName"),
+      imageUrl:
+        data?.has_photo === false
+          ? null
+          : artistPhotoApiUrl(
+              {
+                artistId: data?.id,
+                globalArtistUid,
+                artistSlug: data?.slug,
+                artistName: data?.name,
+              },
+              { size: 512, version: data?.updated_at ?? undefined },
+            ),
       url: shareUrl,
     });
   }
   const info: ArtistInfo | undefined = pageData?.info;
-  const topTracks: ArtistTopTrack[] = canonicalTopTracks ?? [];
+  const topTracks: ArtistTopTrack[] =
+    canonicalTopTracks ?? pageData?.top_tracks ?? [];
   const showsData: { events: ArtistShowEvent[] } | undefined = pageData?.shows;
   const enrichment: ArtistPageEnrichment | undefined = pageData?.enrichment;
 
@@ -133,8 +173,9 @@ export function Artist() {
     ? buildArtistAlbumCover(
         data.name,
         data.albums[0]!.name,
-        data.albums[0]!.id,
+        typeof data.albums[0]!.id === "number" ? data.albums[0]!.id : null,
         data.albums[0]!.slug,
+        data.albums[0]!.global_album_uid ?? data.albums[0]!.global_uid,
       )
     : undefined;
 
@@ -146,10 +187,14 @@ export function Artist() {
   }, [coverFallback, data?.name, topTracks]);
 
   async function handleArtistRadio() {
-    const currentArtistId = data?.id;
-    if (currentArtistId == null || !data?.name) return;
+    const currentArtistSeed =
+      data?.id ??
+      routeGlobalArtistUid ??
+      data?.global_artist_uid ??
+      data?.global_uid;
+    if (currentArtistSeed == null || !data?.name) return;
     try {
-      const radio = await fetchArtistRadio(currentArtistId, data.name);
+      const radio = await fetchArtistRadio(currentArtistSeed, data.name);
       if (!radio.tracks.length) {
         toast.info(t("artist.toasts.radioUnavailable"));
         return;
@@ -183,7 +228,9 @@ export function Artist() {
 
   const similarArtists = info?.similar ?? [];
   const appearsOn = pageData?.appears_on ?? [];
-  const following = isFollowing(data?.id);
+  const currentGlobalArtistUid =
+    routeGlobalArtistUid ?? data?.global_artist_uid ?? data?.global_uid ?? null;
+  const following = isFollowing(data?.id, currentGlobalArtistUid);
   const artistShowItems = buildArtistShowItems(showsData?.events ?? []);
   const albumsSorted = sortArtistAlbumsByYear(data?.albums ?? []);
   const previewTopTracks = topTracks.slice(0, 5);
@@ -226,18 +273,28 @@ export function Artist() {
   }
 
   const imageVersion = data.updated_at ?? undefined;
-  const photoUrl = buildArtistPhotoUrl(
-    data.name,
-    data.id,
-    data.slug,
-    imageVersion,
-  );
-  const canonicalPhotoUrl = artistPhotoApiUrl(
-    { artistId: data.id, artistSlug: data.slug, artistName: data.name },
-    { size: 512, version: imageVersion },
-  );
+  const hasArtistPhoto = data.has_photo !== false;
+  const photoUrl = hasArtistPhoto
+    ? buildArtistPhotoUrl(data.name, data.id, data.slug, imageVersion)
+    : "";
+  const canonicalPhotoUrl = hasArtistPhoto
+    ? artistPhotoApiUrl(
+        {
+          artistId: data.id,
+          globalArtistUid: currentGlobalArtistUid,
+          artistSlug: data.slug,
+          artistName: data.name,
+        },
+        { size: 512, version: imageVersion },
+      )
+    : "";
   const backgroundUrl = artistBackgroundApiUrl(
-    { artistId: data.id, artistSlug: data.slug, artistName: data.name },
+    {
+      artistId: data.id,
+      globalArtistUid: currentGlobalArtistUid,
+      artistSlug: data.slug,
+      artistName: data.name,
+    },
     { size: 1280, version: imageVersion },
   );
   const tags = data.genres.length > 0 ? data.genres : info?.tags ?? [];

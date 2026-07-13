@@ -99,6 +99,7 @@ class RecommendationExposureResponse(BaseModel):
 class RecordPlayEventRequest(IdentityFieldsMixin):
     client_event_id: str | None = None
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
     title: str = ""
@@ -384,6 +385,7 @@ class PlayStatsResponse(BaseModel):
 
 class StatsOverviewTopArtistResponse(BaseModel):
     artist_name: str
+    global_artist_uid: str | None = None
     play_count: int
     minutes_listened: float | int
     artist_id: int | None = None
@@ -418,11 +420,14 @@ class StatsTrackResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    global_artist_uid: str | None = None
+    global_album_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     album_id: int | None = None
@@ -443,6 +448,7 @@ class StatsTrackResponse(IdentityFieldsMixin):
 
 class StatsArtistResponse(BaseModel):
     artist_name: str
+    global_artist_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     play_count: int
@@ -454,9 +460,11 @@ class StatsArtistResponse(BaseModel):
 
 class StatsAlbumResponse(BaseModel):
     artist: str
+    global_artist_uid: str | None = None
     artist_id: int | None = None
     artist_slug: str | None = None
     album: str
+    global_album_uid: str | None = None
     album_id: int | None = None
     album_slug: str | None = None
     play_count: int

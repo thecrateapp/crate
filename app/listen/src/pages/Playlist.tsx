@@ -72,6 +72,9 @@ import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
 interface PlaylistTrack {
   id: number;
   playlist_id: number;
+  global_track_uid?: string;
+  global_artist_uid?: string;
+  global_album_uid?: string;
   track_id?: number;
   track_entity_uid?: string;
   track_path: string;
@@ -175,6 +178,7 @@ export function Playlist() {
               ? albumCoverApiUrl({
                   albumId: t.album_id,
                   albumEntityUid: t.album_entity_uid,
+                  globalAlbumUid: t.global_album_uid,
                   artistEntityUid: t.artist_entity_uid,
                   albumSlug: t.album_slug,
                   artistName: t.artist,
@@ -244,7 +248,9 @@ export function Playlist() {
       album: track.album,
       duration: track.duration,
       path: track.track_path,
+      globalTrackUid: track.global_track_uid,
       libraryTrackId: track.track_id,
+      entityUid: track.track_entity_uid,
       playlistEntryId: track.id,
       playlistPosition: track.position,
     }));
@@ -752,6 +758,9 @@ export function Playlist() {
                 track={toTrackRowData({
                   ...t,
                   id: t.track_id ?? t.track_path ?? t.title,
+                  global_track_uid: t.global_track_uid,
+                  global_artist_uid: t.global_artist_uid,
+                  global_album_uid: t.global_album_uid,
                   library_track_id: t.track_id,
                 })}
                 index={i + 1}

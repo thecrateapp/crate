@@ -225,9 +225,7 @@ export function GenreDetailView({
   const isDesktop = useIsDesktop();
   const [startingRadio, setStartingRadio] = useState(false);
   const [expandedShowId, setExpandedShowId] = useState<string | null>(null);
-  const { data, loading } = useApi<GenreDetail>(
-    `/api/genres/${slug}?view=genre-detail-v5`,
-  );
+  const { data, loading } = useApi<GenreDetail>(`/api/catalog/genres/${slug}`);
   const genreShows = data?.shows?.slice(0, 5) ?? [];
   const nextShow = genreShows[0] ?? null;
   const fallbackGenreSlug = data?.canonical_slug || data?.slug;
@@ -584,10 +582,18 @@ export function GenreDetailView({
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
               {visibleArtists.map((artist) => (
                 <ArtistCard
-                  key={artist.artist_id ?? artist.artist_name}
+                  key={
+                    artist.global_artist_uid ??
+                    artist.artist_id ??
+                    artist.artist_name
+                  }
                   name={artist.artist_name}
                   artistId={artist.artist_id}
+                  artistEntityUid={artist.artist_entity_uid}
+                  globalArtistUid={artist.global_artist_uid}
                   artistSlug={artist.artist_slug}
+                  photo={artist.photo_url ?? undefined}
+                  hasPhoto={artist.has_photo}
                   subtitle={t("common.albumCountLabel", {
                     count: artist.album_count,
                   })}
@@ -607,12 +613,20 @@ export function GenreDetailView({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {visibleAlbums.map((album) => (
                 <AlbumCard
-                  key={album.album_id || `${album.artist}-${album.name}`}
+                  key={
+                    album.global_album_uid ??
+                    album.album_id ??
+                    `${album.artist}-${album.name}`
+                  }
                   artist={album.artist}
                   album={album.name}
-                  albumId={album.album_id}
+                  albumId={album.album_id ?? undefined}
+                  albumEntityUid={album.album_entity_uid}
+                  globalAlbumUid={album.global_album_uid}
+                  artistEntityUid={album.artist_entity_uid}
                   albumSlug={album.album_slug}
                   year={album.year}
+                  cover={album.cover_url ?? undefined}
                   layout="grid"
                 />
               ))}
@@ -765,18 +779,24 @@ function buildGenreHeroCoverCandidates(
 function buildGenreHeroArtistPhotoFallback(artists?: GenreDetail["artists"]) {
   if (!artists?.length) return null;
   const topArtist = artists
-    .filter((artist) => artist.artist_id != null && artist.has_photo)
+    .filter(
+      (artist) =>
+        (artist.artist_id != null || artist.global_artist_uid) &&
+        artist.has_photo,
+    )
     .sort((a, b) => {
       const aListeners = a.listeners ?? -1;
       const bListeners = b.listeners ?? -1;
       return bListeners - aListeners;
     })[0];
 
-  if (!topArtist?.artist_id) return null;
+  if (!topArtist?.artist_id && !topArtist?.global_artist_uid) return null;
 
   const resolved = artistPhotoApiUrl(
     {
       artistId: topArtist.artist_id,
+      globalArtistUid: topArtist.global_artist_uid,
+      artistEntityUid: topArtist.artist_entity_uid,
     },
     {
       size: 1280,
@@ -797,7 +817,7 @@ export function DecadeDetailView({
 }) {
   const { t } = useTranslation();
   const { data, loading } = useApi<DecadeArtists>(
-    `/api/artists?decade=${decade}&limit=50`,
+    `/api/artists?decade=${encodeURIComponent(decade)}&per_page=50`,
   );
 
   if (loading) return <CrateLoader label={t("explore.decade.loading")} />;
@@ -823,9 +843,13 @@ export function DecadeDetailView({
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
           {data.items.map((artist) => (
             <ArtistCard
-              key={artist.id ?? artist.name}
+              key={artist.id ?? artist.global_artist_uid ?? artist.name}
               name={artist.name}
               artistId={artist.id}
+              artistEntityUid={artist.entity_uid ?? undefined}
+              globalArtistUid={
+                artist.global_artist_uid ?? artist.global_uid ?? undefined
+              }
               artistSlug={artist.slug}
               subtitle={t("common.albumCountLabel", { count: artist.albums })}
               compact

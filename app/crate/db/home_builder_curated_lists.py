@@ -10,10 +10,13 @@ from crate.db.home_builder_shared import (
     _select_diverse_tracks_with_backfill,
 )
 from crate.db.queries.home import get_artists_core_track_rows
+from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.playlists import list_system_playlists
+from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.slugs import build_artist_slug
 
 SYSTEM_PLAYLIST_HOME_PREFIX = "system-playlist-"
+GLOBAL_ARTIST_CORE_HOME_PREFIX = "core-tracks-global-artist-"
 
 
 def _artist_slug_from_playlist_rules(playlist: dict) -> str | None:
@@ -36,6 +39,9 @@ def _artist_slug_from_playlist_rules(playlist: dict) -> str | None:
 
 
 def _candidate_identity(row: dict) -> str | None:
+    global_artist_uid = row.get("global_artist_uid")
+    if global_artist_uid:
+        return f"global:{global_artist_uid}"
     artist_id = row.get("artist_id")
     if artist_id is not None:
         return f"id:{artist_id}"
@@ -52,7 +58,11 @@ def _dedupe_artist_candidates(candidates: list[dict]) -> list[dict]:
     deduped: list[dict] = []
     for row in candidates:
         artist_name = row.get("artist_name") or ""
-        if row.get("artist_id") is None or not artist_name:
+        if (
+            row.get("artist_id") is None
+            and not row.get("global_artist_uid")
+            or not artist_name
+        ):
             continue
         identity = _candidate_identity(row)
         if not identity or identity in seen:
@@ -188,6 +198,15 @@ def _system_core_playlist_summary(
     }
 
 
+def _global_artist_core_rows(global_artist_uid: str, track_limit: int) -> list[dict]:
+    seed = get_global_radio_seed_tracks(
+        "artist", global_artist_uid, limit=max(track_limit * 2, track_limit)
+    )
+    if not seed:
+        return []
+    return list(seed.get("tracks") or [])[:track_limit]
+
+
 def _build_radio_stations(
     top_artists: list[dict], top_albums: list[dict], limit: int
 ) -> list[dict]:
@@ -196,9 +215,11 @@ def _build_radio_stations(
 
     for row in top_artists:
         artist_id = row.get("artist_id")
-        if artist_id is None:
+        global_artist_uid = row.get("global_artist_uid")
+        seed_value = str(artist_id) if artist_id is not None else global_artist_uid
+        if not seed_value:
             continue
-        key = ("artist", artist_id)
+        key = ("artist", seed_value)
         if key in seen:
             continue
         seen.add(key)
@@ -206,9 +227,12 @@ def _build_radio_stations(
             {
                 "type": "artist",
                 "seed_type": "artist",
+                "seed_value": seed_value,
                 "seed_label": row.get("artist_name") or "",
                 "seed_subtitle": "Artist",
                 "artist_id": artist_id,
+                "global_artist_uid": global_artist_uid,
+                "artist_entity_uid": row.get("artist_entity_uid"),
                 "artist_slug": row.get("artist_slug"),
                 "artist_name": row.get("artist_name") or "",
                 "title": f"{row.get('artist_name') or ''} Radio",
@@ -221,9 +245,11 @@ def _build_radio_stations(
 
     for row in top_albums:
         album_id = row.get("album_id")
-        if album_id is None:
+        global_album_uid = row.get("global_album_uid")
+        seed_value = str(album_id) if album_id is not None else global_album_uid
+        if not seed_value:
             continue
-        key = ("album", album_id)
+        key = ("album", seed_value)
         if key in seen:
             continue
         seen.add(key)
@@ -231,13 +257,18 @@ def _build_radio_stations(
             {
                 "type": "album",
                 "seed_type": "album",
+                "seed_value": seed_value,
                 "seed_label": row.get("album") or "",
                 "seed_subtitle": row.get("artist") or "Album",
                 "album_id": album_id,
+                "global_album_uid": global_album_uid,
+                "global_artist_uid": row.get("global_artist_uid"),
+                "album_entity_uid": row.get("album_entity_uid"),
                 "album_slug": row.get("album_slug"),
                 "album_name": row.get("album") or "",
                 "artist_name": row.get("artist") or "",
                 "artist_id": row.get("artist_id"),
+                "artist_entity_uid": row.get("artist_entity_uid"),
                 "artist_slug": row.get("artist_slug"),
                 "title": f"{row.get('album') or ''} Radio",
                 "subtitle": "",
@@ -254,13 +285,20 @@ def _build_favorite_artists(top_artists: list[dict], limit: int) -> list[dict]:
     return [
         {
             "artist_id": row.get("artist_id"),
+            "global_artist_uid": row.get("global_artist_uid"),
+            "artist_entity_uid": row.get("artist_entity_uid"),
             "artist_slug": row.get("artist_slug"),
             "artist_name": row.get("artist_name") or "",
             "play_count": row.get("play_count") or 0,
             "minutes_listened": row.get("minutes_listened") or 0,
         }
         for row in top_artists[:limit]
-        if row.get("artist_id") is not None
+        if (row.get("artist_name") or "").strip()
+        and (
+            row.get("artist_id") is not None
+            or row.get("global_artist_uid")
+            or row.get("artist_entity_uid")
+        )
     ]
 
 
@@ -272,10 +310,15 @@ def _build_core_playlists(
     discovery_artists: list[dict] | None = None,
 ) -> list[dict]:
     essentials: list[dict] = []
+    allow_global = global_catalog_surface_enabled("home")
     comfort_candidates = [
         row
         for row in top_artists
-        if row.get("artist_id") is not None and (row.get("artist_name") or "")
+        if (row.get("artist_name") or "")
+        and (
+            row.get("artist_id") is not None
+            or (allow_global and row.get("global_artist_uid"))
+        )
     ]
     visible_discovery_target = max(1, limit // 2) if discovery_artists else 0
     candidates = _blend_core_candidates(
@@ -303,6 +346,34 @@ def _build_core_playlists(
 
     for row in candidates:
         artist_id = row.get("artist_id")
+        global_artist_uid = row.get("global_artist_uid") if allow_global else None
+        if artist_id is None and global_artist_uid:
+            artist_name = row.get("artist_name") or ""
+            recommendation_source = row.get("recommendation_source") or "comfort"
+            rows = _global_artist_core_rows(str(global_artist_uid), track_limit)
+            if not rows:
+                continue
+            essentials.append(
+                {
+                    "id": f"{GLOBAL_ARTIST_CORE_HOME_PREFIX}{global_artist_uid}",
+                    "name": artist_name,
+                    "description": (
+                        f"A discovery route into {artist_name}, tuned to your library."
+                        if recommendation_source == "discovery"
+                        else f"The defining tracks from {artist_name}."
+                    ),
+                    "artwork_tracks": _artwork_tracks(rows),
+                    "artwork_artists": _artwork_artists(rows),
+                    "track_count": len(rows),
+                    "badge": "Artist Set",
+                    "kind": "core",
+                    "source": "global",
+                    "recommendation_source": recommendation_source,
+                }
+            )
+            if len(essentials) >= limit:
+                break
+            continue
         if artist_id is None:
             continue
         artist_id_int = int(artist_id)
@@ -358,6 +429,7 @@ def _build_core_playlists(
 
 
 __all__ = [
+    "GLOBAL_ARTIST_CORE_HOME_PREFIX",
     "_build_core_playlists",
     "_build_core_discovery_artists",
     "_build_favorite_artists",

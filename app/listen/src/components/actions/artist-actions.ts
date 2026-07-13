@@ -33,18 +33,23 @@ export function useArtistActionEntries(
   const { t } = useTranslation();
   const { playAll } = usePlayerActions();
   const { isFollowing, toggleArtistFollow } = useArtistFollows();
-  const following = isFollowing(input.artistId);
+  const following = isFollowing(input.artistId, input.globalArtistUid);
+  const hasPlayableArtist =
+    input.artistId != null || Boolean(input.globalArtistUid);
+  const radioSeed = input.artistId ?? input.globalArtistUid ?? null;
 
   return useMemo<ItemActionMenuEntry[]>(() => {
     const artistPath = artistPagePath({
       artistId: input.artistId,
       artistEntityUid: input.artistEntityUid,
+      globalArtistUid: input.globalArtistUid,
       artistSlug: input.artistSlug,
       artistName: input.name,
     });
     const artistShare = artistSharePath({
       artistId: input.artistId,
       artistEntityUid: input.artistEntityUid,
+      globalArtistUid: input.globalArtistUid,
       artistSlug: input.artistSlug,
       artistName: input.name,
     });
@@ -54,6 +59,7 @@ export function useArtistActionEntries(
         {
           artistId: input.artistId,
           artistEntityUid: input.artistEntityUid,
+          globalArtistUid: input.globalArtistUid,
           artistSlug: input.artistSlug,
           artistName: input.name,
         },
@@ -65,9 +71,9 @@ export function useArtistActionEntries(
         key: "play",
         label: t("actions.artist.playTopTracks"),
         icon: Play,
-        disabled: input.artistId == null,
+        disabled: !hasPlayableArtist,
         onSelect: async () => {
-          if (input.artistId == null) return;
+          if (!hasPlayableArtist) return;
           try {
             const tracks = await fetchArtistTopTracks(input);
             if (!tracks.length) {
@@ -89,9 +95,9 @@ export function useArtistActionEntries(
         key: "shuffle",
         label: t("actions.artist.shuffleTopTracks"),
         icon: Shuffle,
-        disabled: input.artistId == null,
+        disabled: !hasPlayableArtist,
         onSelect: async () => {
-          if (input.artistId == null) return;
+          if (!hasPlayableArtist) return;
           try {
             const tracks = await fetchArtistTopTracks(input);
             if (!tracks.length) {
@@ -117,9 +123,13 @@ export function useArtistActionEntries(
           : t("actions.artist.follow"),
         icon: following ? HeartBold : Heart,
         active: following,
-        disabled: input.artistId == null,
+        disabled: !hasPlayableArtist,
         onSelect: async () => {
-          await toggleArtistFollow(input.artistId ?? null);
+          await toggleArtistFollow(
+            input.artistId ?? null,
+            input.globalArtistUid ?? null,
+            input.name,
+          );
           toast.success(
             following
               ? t("actions.artist.toasts.unfollowed", { name: input.name })
@@ -131,11 +141,11 @@ export function useArtistActionEntries(
         key: "radio",
         label: t("actions.artist.radio"),
         icon: Radio,
-        disabled: input.artistId == null,
+        disabled: radioSeed == null,
         onSelect: async () => {
-          if (input.artistId == null) return;
+          if (radioSeed == null) return;
           try {
-            const radio = await fetchArtistRadio(input.artistId, input.name);
+            const radio = await fetchArtistRadio(radioSeed, input.name);
             if (!radio.tracks.length) {
               toast.info(t("actions.artist.toasts.radioUnavailable"));
               return;
@@ -157,5 +167,13 @@ export function useArtistActionEntries(
         }),
       }),
     ];
-  }, [following, input, playAll, t, toggleArtistFollow]);
+  }, [
+    following,
+    hasPlayableArtist,
+    input,
+    playAll,
+    radioSeed,
+    t,
+    toggleArtistFollow,
+  ]);
 }

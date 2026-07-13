@@ -141,6 +141,42 @@ def test_radio_stations_expose_seed_metadata_without_generic_copy():
     assert stations[1]["seed_subtitle"] == "Converge"
 
 
+def test_radio_stations_include_remote_global_artist_and_album_seeds():
+    from crate.db.home_builder_curated_lists import _build_radio_stations
+
+    stations = _build_radio_stations(
+        [
+            {
+                "artist_id": None,
+                "global_artist_uid": "global-high-vis",
+                "artist_name": "High Vis",
+                "play_count": 44,
+            }
+        ],
+        [
+            {
+                "album_id": None,
+                "global_album_uid": "global-blending",
+                "global_artist_uid": "global-high-vis",
+                "album": "Blending",
+                "artist": "High Vis",
+                "artist_id": None,
+                "play_count": 21,
+            }
+        ],
+        limit=2,
+    )
+
+    assert stations[0]["seed_type"] == "artist"
+    assert stations[0]["seed_value"] == "global-high-vis"
+    assert stations[0]["global_artist_uid"] == "global-high-vis"
+    assert stations[0]["artist_id"] is None
+    assert stations[1]["seed_type"] == "album"
+    assert stations[1]["seed_value"] == "global-blending"
+    assert stations[1]["global_album_uid"] == "global-blending"
+    assert stations[1]["global_artist_uid"] == "global-high-vis"
+
+
 def test_listening_history_cards_put_all_time_before_months(monkeypatch):
     from crate.db.queries import user_library_stats_tops
 
@@ -238,6 +274,102 @@ def test_core_tracks_prefers_existing_system_playlist(monkeypatch):
 
     assert items[0]["id"] == "system-playlist-99"
     assert items[0]["source"] == "system"
+
+
+def test_core_tracks_can_use_global_catalog_artist_tracks(monkeypatch):
+    from crate.db import home_builder_curated_lists
+
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "global_catalog_surface_enabled",
+        lambda surface: surface == "home",
+    )
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "list_system_playlists",
+        lambda **_: [],
+    )
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "get_artists_core_track_rows",
+        lambda **_: [],
+    )
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "get_global_radio_seed_tracks",
+        lambda seed_type, global_uid, **_: {
+            "label": "High Vis",
+            "tracks": [
+                {
+                    "track_id": None,
+                    "global_track_uid": "global-track-1",
+                    "global_artist_uid": global_uid,
+                    "global_album_uid": "global-album-1",
+                    "track_entity_uid": None,
+                    "track_path": None,
+                    "title": "0151",
+                    "artist": "High Vis",
+                    "artist_id": None,
+                    "artist_entity_uid": None,
+                    "artist_slug": None,
+                    "album": "Blending",
+                    "album_id": None,
+                    "album_entity_uid": None,
+                    "album_slug": None,
+                    "duration": 181,
+                }
+            ],
+        },
+    )
+
+    items = home_builder_curated_lists._build_core_playlists(
+        1,
+        [
+            {
+                "artist_id": None,
+                "global_artist_uid": "global-high-vis",
+                "artist_name": "High Vis",
+            }
+        ],
+        limit=1,
+    )
+
+    assert items[0]["id"] == "core-tracks-global-artist-global-high-vis"
+    assert items[0]["source"] == "global"
+    assert items[0]["track_count"] == 1
+    assert items[0]["artwork_tracks"][0]["global_album_uid"] == "global-album-1"
+    assert items[0]["artwork_artists"][0]["global_artist_uid"] == "global-high-vis"
+
+
+def test_core_tracks_ignore_global_catalog_artists_in_standalone(monkeypatch):
+    from crate.db import home_builder_curated_lists
+
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "global_catalog_surface_enabled",
+        lambda surface: False,
+    )
+    monkeypatch.setattr(
+        home_builder_curated_lists,
+        "get_global_radio_seed_tracks",
+        lambda *_, **__: (_ for _ in ()).throw(
+            AssertionError("should not load global")
+        ),
+    )
+
+    items = home_builder_curated_lists._build_core_playlists(
+        1,
+        [
+            {
+                "artist_id": None,
+                "global_artist_uid": "global-high-vis",
+                "artist_name": "High Vis",
+            }
+        ],
+        limit=1,
+    )
+
+    assert items == []
 
 
 def test_album_candidate_rows_include_user_feedback_signals(monkeypatch):

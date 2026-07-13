@@ -25,8 +25,10 @@ interface ArtistCardProps {
   name: string;
   artistId?: number;
   artistEntityUid?: string;
+  globalArtistUid?: string;
   artistSlug?: string;
   photo?: string;
+  hasPhoto?: boolean | null;
   subtitle?: string;
   compact?: boolean;
   href?: string;
@@ -41,8 +43,10 @@ export function ArtistCard({
   name,
   artistId,
   artistEntityUid,
+  globalArtistUid,
   artistSlug,
   photo,
+  hasPhoto,
   subtitle,
   compact,
   href,
@@ -60,19 +64,37 @@ export function ArtistCard({
   const [playingTopTracks, setPlayingTopTracks] = useState(false);
   const [togglingFollow, setTogglingFollow] = useState(false);
   const resolvedPhotoUrl = resolveMaybeApiAssetUrl(photo);
+  const shouldResolvePhoto = hasPhoto !== false;
   const photoUrl =
     resolvedPhotoUrl ||
-    artistPhotoApiUrl(
-      { artistId, artistEntityUid, artistSlug, artistName: name },
-      { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
-    ) ||
+    (shouldResolvePhoto
+      ? artistPhotoApiUrl(
+          {
+            artistId,
+            artistEntityUid,
+            globalArtistUid,
+            artistSlug,
+            artistName: name,
+          },
+          { size: layout === "grid" ? 320 : compact ? 160 : large ? 320 : 256 },
+        )
+      : "") ||
     undefined;
   const targetHref =
-    href || artistPagePath({ artistId, artistSlug, artistName: name });
-  const following = isFollowing(artistId);
+    href ||
+    artistPagePath({
+      artistId,
+      artistEntityUid,
+      globalArtistUid,
+      artistSlug,
+      artistName: name,
+    });
+  const following = isFollowing(artistId, globalArtistUid);
+  const hasPlayableArtist = artistId != null || Boolean(globalArtistUid);
   const actions = useArtistActionEntries({
     artistId,
     artistEntityUid,
+    globalArtistUid,
     artistSlug,
     imageUrl: photoUrl,
     name,
@@ -114,7 +136,7 @@ export function ArtistCard({
             }}
           />
         ) : null}
-        {!external && artistId != null && canUseInlineHoverActions ? (
+        {!external && hasPlayableArtist && canUseInlineHoverActions ? (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/42">
               <div className="pointer-events-none flex translate-y-2 items-center justify-center gap-2 opacity-0 transition-all group-hover:translate-y-0 group-hover:opacity-100">
@@ -123,11 +145,13 @@ export function ArtistCard({
                   className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
                   onClick={async (event) => {
                     event.stopPropagation();
-                    if (artistId == null) return;
+                    if (!hasPlayableArtist) return;
                     setPlayingTopTracks(true);
                     try {
                       const tracks = await fetchArtistTopTracks({
                         artistId,
+                        artistEntityUid,
+                        globalArtistUid,
                         artistSlug,
                         name,
                       });
@@ -171,7 +195,7 @@ export function ArtistCard({
                     event.stopPropagation();
                     setTogglingFollow(true);
                     try {
-                      await toggleArtistFollow(artistId);
+                      await toggleArtistFollow(artistId, globalArtistUid, name);
                       toast.success(
                         following
                           ? t("actions.artist.toasts.unfollowed", { name })

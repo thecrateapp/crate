@@ -28,8 +28,68 @@ export interface PlaybackResolution {
   variant_status: string | null;
 }
 
+type PlaybackQualityForComparison = Pick<
+  PlaybackQuality,
+  | "format"
+  | "codec"
+  | "bitrate"
+  | "sample_rate"
+  | "bit_depth"
+  | "lossless"
+  | "bytes"
+>;
+
+function normalizedQualityFormat(
+  quality: PlaybackQualityForComparison,
+): string {
+  return (quality.codec || quality.format || "").toLowerCase();
+}
+
+function normalizedQualityValue(value: unknown): unknown {
+  return value ?? null;
+}
+
+function playbackQualitiesEquivalent(
+  source: PlaybackQualityForComparison,
+  delivery: PlaybackQualityForComparison,
+): boolean {
+  return (
+    normalizedQualityFormat(source) === normalizedQualityFormat(delivery) &&
+    normalizedQualityValue(source.bitrate) ===
+      normalizedQualityValue(delivery.bitrate) &&
+    normalizedQualityValue(source.sample_rate) ===
+      normalizedQualityValue(delivery.sample_rate) &&
+    normalizedQualityValue(source.bit_depth) ===
+      normalizedQualityValue(delivery.bit_depth) &&
+    normalizedQualityValue(source.lossless) ===
+      normalizedQualityValue(delivery.lossless)
+  );
+}
+
+export function playbackResolutionShowsDeliveryQuality(
+  resolution:
+    | {
+        requested_policy?: string | null;
+        effective_policy?: string | null;
+        transcoded?: boolean | null;
+        source?: PlaybackQualityForComparison | null;
+        delivery?: PlaybackQualityForComparison | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  if (!resolution) return false;
+  if (resolution.transcoded) return true;
+  if (resolution.effective_policy === "original") return false;
+  if (!resolution.source || !resolution.delivery) return true;
+  return !playbackQualitiesEquivalent(resolution.source, resolution.delivery);
+}
+
 export function resolveTrackPlaybackUrl(
-  track: Pick<Track, "id" | "entityUid" | "libraryTrackId" | "path">,
+  track: Pick<
+    Track,
+    "id" | "globalTrackUid" | "entityUid" | "libraryTrackId" | "path"
+  >,
   policy: PlaybackDeliveryPolicy,
 ): string | null {
   const path = trackPlaybackApiPath(track);

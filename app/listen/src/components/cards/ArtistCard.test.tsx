@@ -110,6 +110,18 @@ describe("ArtistCard", () => {
     );
   });
 
+  it("does not request a generated artist photo when catalog says none exists", () => {
+    renderWithListenProviders(
+      <ArtistCard
+        name="High Vis"
+        globalArtistUid="artist-global-1"
+        hasPhoto={false}
+      />,
+    );
+
+    expect(screen.queryByAltText("High Vis")).not.toBeInTheDocument();
+  });
+
   it("opens the desktop action menu when the artist only has stable route identifiers", async () => {
     mockPointerEnvironment(true);
 

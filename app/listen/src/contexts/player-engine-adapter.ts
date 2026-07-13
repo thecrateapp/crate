@@ -1,14 +1,23 @@
 import type { Track } from "@/contexts/player-types";
 import { getStreamUrl } from "@/contexts/player-utils";
-import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
+import { api, ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
+import {
+  resolveTrackPlaybackUrl,
+  type PlaybackResolution,
+} from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
+import { getPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
 
-export function toEngineTrack(track: Track, eqGains?: number[]): EngineTrack {
+export function toEngineTrack(
+  track: Track,
+  eqGains?: number[],
+  streamUrl?: string,
+): EngineTrack {
   const artwork = resolveMaybeApiAssetUrl(track.albumCover) || undefined;
 
   return {
     id: track.id,
-    url: getStreamUrl(track),
+    url: streamUrl ?? getStreamUrl(track),
     title: track.title || "Unknown",
     artist: track.artist || "",
     album: track.album || undefined,
@@ -38,7 +47,11 @@ export async function toFreshEngineTrack(
   eqGains?: number[],
 ): Promise<EngineTrack> {
   await ensureFreshAuthToken();
-  return toEngineTrack(track, eqGains);
+  return toEngineTrack(
+    track,
+    eqGains,
+    await resolveFreshEngineStreamUrl(track),
+  );
 }
 
 export async function toFreshEngineTracks(
@@ -46,5 +59,33 @@ export async function toFreshEngineTracks(
   eqGainsByTrackId?: Map<string, number[]>,
 ): Promise<EngineTrack[]> {
   await ensureFreshAuthToken();
-  return toEngineTracks(tracks, eqGainsByTrackId);
+  return Promise.all(
+    tracks.map(async (track) =>
+      toEngineTrack(
+        track,
+        eqGainsByTrackId?.get(track.id),
+        await resolveFreshEngineStreamUrl(track),
+      ),
+    ),
+  );
+}
+
+function hasFreshRemoteStream(track: Track): boolean {
+  if (track.origin !== "remote" || !track.remote?.streamUrl) return false;
+  if (!track.remote.streamUrlExpiresAt) return true;
+  return new Date(track.remote.streamUrlExpiresAt).getTime() > Date.now();
+}
+
+async function resolveFreshEngineStreamUrl(track: Track): Promise<string> {
+  if (hasFreshRemoteStream(track)) return getStreamUrl(track);
+  if (!track.globalTrackUid) return getStreamUrl(track);
+
+  const path = resolveTrackPlaybackUrl(
+    track,
+    getPlaybackDeliveryPolicyPreference(),
+  );
+  if (!path) return getStreamUrl(track);
+
+  const playback = await api<PlaybackResolution>(path);
+  return resolveMaybeApiAssetUrl(playback.stream_url) || playback.stream_url;
 }

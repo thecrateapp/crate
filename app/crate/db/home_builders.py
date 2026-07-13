@@ -21,6 +21,7 @@ from crate.db.home_builder_curated_lists import (
 from crate.db.home_builder_mix_generation import (
     _build_custom_mix_summaries,
     _build_mix_rows,
+    _global_rows_for_mix,
     _mix_summary_payload,
 )
 from crate.db.home_builder_shared import (
@@ -67,6 +68,7 @@ __all__ = [
     "_filter_interesting_releases",
     "_get_home_hero",
     "_get_library_artist",
+    "_global_rows_for_mix",
     "_merge_track_rows",
     "_mix_summary_payload",
     "_query_discovery_tracks",

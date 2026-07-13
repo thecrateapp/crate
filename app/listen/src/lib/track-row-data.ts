@@ -11,6 +11,9 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
   const track = toPlayableTrack(input);
   return {
     id: track.id,
+    global_track_uid: track.globalTrackUid,
+    global_artist_uid: track.globalArtistUid,
+    global_album_uid: track.globalAlbumUid,
     entity_uid: track.entityUid,
     title: track.title,
     artist: track.artist,
@@ -36,6 +39,11 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
     valence: track.valence,
     bliss_vector: track.blissVector,
     library_track_id: track.libraryTrackId,
+    origin: track.origin,
+    node_uid: track.remote?.nodeUid,
+    node_name: track.remote?.nodeName,
+    remote_entity_uid: track.remote?.remoteEntityUid,
+    availability: input.availability ?? track.remote?.availability,
     disabled: input.disabled,
   };
 }

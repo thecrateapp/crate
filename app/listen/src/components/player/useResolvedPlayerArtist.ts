@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { artistPhotoApiUrl } from "@/lib/library-routes";
 
 interface ResolvedArtistMeta {
-  id: number;
+  id?: number;
+  globalArtistUid?: string;
   name: string;
   slug?: string;
   hasPhoto?: boolean;
@@ -28,8 +29,12 @@ export function useResolvedPlayerArtist(
   const [resolvedArtist, setResolvedArtist] =
     useState<ResolvedArtistMeta | null>(null);
 
-  const artistPhotoUrl =
-    resolvedArtist?.id != null
+  const artistPhotoUrl = resolvedArtist?.globalArtistUid
+    ? artistPhotoApiUrl({
+        globalArtistUid: resolvedArtist.globalArtistUid,
+        artistName: resolvedArtist.name,
+      })
+    : resolvedArtist?.id != null
       ? artistPhotoApiUrl({
           artistId: resolvedArtist.id,
           artistSlug: resolvedArtist.slug,
@@ -47,6 +52,15 @@ export function useResolvedPlayerArtist(
   useEffect(() => {
     if (!currentTrack?.artist) {
       setResolvedArtist(null);
+      return;
+    }
+
+    if (currentTrack.globalArtistUid) {
+      setResolvedArtist({
+        globalArtistUid: currentTrack.globalArtistUid,
+        name: currentTrack.artist,
+        slug: currentTrack.artistSlug,
+      });
       return;
     }
 
@@ -124,6 +138,7 @@ export function useResolvedPlayerArtist(
     currentTrack?.artist,
     currentTrack?.artistId,
     currentTrack?.artistSlug,
+    currentTrack?.globalArtistUid,
     queue,
   ]);
 

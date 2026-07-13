@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -125,7 +125,7 @@ describe("usePlayerQueueActions", () => {
     });
   });
 
-  it("forces a restart when playAll is invoked for the same queue/index", () => {
+  it("forces a restart when playAll is invoked for the same queue/index", async () => {
     const params = createParams();
     params.queueRef.current = [TRACK];
     params.currentIndexRef.current = 0;
@@ -133,11 +133,13 @@ describe("usePlayerQueueActions", () => {
 
     result.current.playAll([TRACK], 0, { type: "album", name: "Album" });
 
-    expect(gaplessPlayer.loadQueue).toHaveBeenCalledWith(
-      ["/music/Artist/Album/01-track.flac"],
-      0,
-      { restartIfSameIndex: true },
-    );
+    await waitFor(() => {
+      expect(gaplessPlayer.loadQueue).toHaveBeenCalledWith(
+        ["/music/Artist/Album/01-track.flac"],
+        0,
+        { restartIfSameIndex: true },
+      );
+    });
     expect(params.commitIsBuffering).toHaveBeenCalledWith(false);
     expect(gaplessPlayer.play).toHaveBeenCalledTimes(1);
     expect(params.publishConnectState).toHaveBeenCalledWith({

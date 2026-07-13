@@ -57,7 +57,7 @@ def create_playlist_schema(cur) -> None:
             track_id INTEGER REFERENCES library_tracks(id) ON DELETE SET NULL,
             track_entity_uid UUID,
             track_storage_id UUID,
-            track_path TEXT NOT NULL,
+            track_path TEXT,
             title TEXT,
             artist TEXT,
             album TEXT,
@@ -78,6 +78,7 @@ def create_playlist_schema(cur) -> None:
     cur.execute(
         "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS track_storage_id UUID"
     )
+    cur.execute("ALTER TABLE playlist_tracks ALTER COLUMN track_path DROP NOT NULL")
     cur.execute(
         "ALTER TABLE playlist_tracks ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'"
     )

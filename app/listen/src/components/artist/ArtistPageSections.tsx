@@ -1,6 +1,6 @@
-import { Calendar, Play } from "@crate/ui/icons";
+import { Calendar, Disc3, Play } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { AlbumCard } from "@/components/cards/AlbumCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
@@ -21,7 +21,11 @@ import {
   UpcomingMonthGroup,
   type UpcomingItem,
 } from "@/components/upcoming/UpcomingRows";
-import { artistPagePath, artistTopTracksPath } from "@/lib/library-routes";
+import {
+  albumPagePath,
+  artistPagePath,
+  artistTopTracksPath,
+} from "@/lib/library-routes";
 
 interface ArtistTopTracksSectionProps {
   artistId?: number;
@@ -38,6 +42,10 @@ export function ArtistTopTracksSection({
 }: ArtistTopTracksSectionProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const topTracksPath =
+    artistId != null || artistSlug
+      ? artistTopTracksPath({ artistId, artistSlug })
+      : "";
   const trackRows = useMemo<TrackRowData[]>(
     () => tracks.map((track) => topTrackToTrackRowData(track)),
     [tracks],
@@ -50,14 +58,14 @@ export function ArtistTopTracksSection({
         <h2 className="text-lg font-semibold text-foreground">
           {t("artist.sections.topTracks")}
         </h2>
-        <button
-          className="text-sm text-primary hover:underline"
-          onClick={() =>
-            navigate(artistTopTracksPath({ artistId, artistSlug }))
-          }
-        >
-          {t("common.viewAll")}
-        </button>
+        {topTracksPath ? (
+          <button
+            className="text-sm text-primary hover:underline"
+            onClick={() => navigate(topTracksPath)}
+          >
+            {t("common.viewAll")}
+          </button>
+        ) : null}
       </div>
       <div className="rounded-xl">
         {tracks.map((track, index) => (
@@ -67,12 +75,13 @@ export function ArtistTopTracksSection({
             index={track.track || index + 1}
             showAlbum
             albumCover={
-              track.album_id
+              track.album_id || track.global_album_uid
                 ? buildArtistAlbumCover(
                     track.artist,
                     track.album,
                     track.album_id,
                     track.album_slug,
+                    track.global_album_uid,
                   )
                 : coverFallback
             }
@@ -103,28 +112,81 @@ export function ArtistAlbumsSection({
         {t("artist.sections.albums")}
       </h2>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {albums.map((album) => (
-          <AlbumCard
-            key={album.id}
-            artist={artistName}
-            album={album.display_name || album.name}
-            albumId={album.is_pre_release ? undefined : album.id}
-            albumSlug={album.slug}
-            year={album.year?.slice(0, 4)}
-            cover={
-              album.cover_url ||
-              buildArtistAlbumCover(
-                artistName,
-                album.name,
-                album.id,
-                album.slug,
-              )
-            }
-            isPreRelease={album.is_pre_release}
-            releaseDate={album.release_date}
-            layout="grid"
-          />
-        ))}
+        {albums.map((album) => {
+          const globalAlbumUid =
+            album.global_album_uid ??
+            album.global_uid ??
+            (typeof album.id === "string" ? album.id : null);
+          const localAlbumId =
+            typeof album.id === "number" && !album.is_pre_release
+              ? album.id
+              : undefined;
+          const cover =
+            album.cover_url ||
+            buildArtistAlbumCover(
+              artistName,
+              album.name,
+              localAlbumId,
+              album.slug,
+              globalAlbumUid,
+            );
+          if (globalAlbumUid) {
+            return (
+              <Link
+                key={globalAlbumUid}
+                to={albumPagePath({
+                  albumId: localAlbumId,
+                  globalAlbumUid,
+                  albumSlug: album.slug,
+                  artistName,
+                  albumName: album.display_name || album.name,
+                })}
+                className="group w-full min-w-0 snap-start cursor-pointer rounded-xl p-2 text-left transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <div className="relative mb-2 aspect-square overflow-hidden rounded-lg bg-white/5">
+                  {cover ? (
+                    <img
+                      src={cover}
+                      alt={album.display_name || album.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                      onError={(event) => {
+                        (event.target as HTMLImageElement).style.display =
+                          "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Disc3 size={32} className="text-white/25" />
+                    </div>
+                  )}
+                </div>
+                <p className="truncate text-sm font-medium text-foreground">
+                  {album.display_name || album.name}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {album.year
+                    ? `${album.year.slice(0, 4)} · ${artistName}`
+                    : artistName}
+                </p>
+              </Link>
+            );
+          }
+          return (
+            <AlbumCard
+              key={album.id}
+              artist={artistName}
+              album={album.display_name || album.name}
+              albumId={localAlbumId}
+              albumSlug={album.slug}
+              year={album.year?.slice(0, 4)}
+              cover={cover}
+              isPreRelease={album.is_pre_release}
+              releaseDate={album.release_date}
+              layout="grid"
+            />
+          );
+        })}
       </div>
     </section>
   );

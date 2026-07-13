@@ -128,22 +128,29 @@ export interface GenreDetail {
   artists: {
     artist_name: string;
     artist_id?: number;
+    global_artist_uid?: string;
+    artist_entity_uid?: string;
     artist_slug?: string;
     album_count: number;
     track_count: number;
     has_photo: boolean;
+    photo_url?: string | null;
     listeners: number | null;
   }[];
   albums: {
-    album_id: number;
+    album_id?: number | null;
+    global_album_uid?: string;
+    album_entity_uid?: string;
     album_slug?: string;
     artist: string;
     artist_id?: number;
+    artist_entity_uid?: string;
     artist_slug?: string;
     name: string;
     year: string;
     track_count: number;
     has_cover: boolean;
+    cover_url?: string | null;
   }[];
   shows?: UpcomingItem[];
   related_genres?: {
@@ -164,6 +171,9 @@ export interface GenreDetail {
 export interface DecadeArtists {
   items: {
     id?: number;
+    entity_uid?: string | null;
+    global_uid?: string | null;
+    global_artist_uid?: string | null;
     slug?: string;
     name: string;
     albums: number;

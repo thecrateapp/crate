@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
+import { toTrackRowData } from "@/lib/track-row-data";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 const navigateMock = vi.hoisted(() => vi.fn());
@@ -343,5 +344,30 @@ describe("TrackRow playback behavior", () => {
     expect(progress.className).not.toContain("conic-gradient");
     expect(progress.innerHTML).not.toContain("conic-gradient");
     expect(container.innerHTML).toContain("stroke-dashoffset");
+  });
+
+  it("uses normalized global album artwork for catalog-only rows", () => {
+    const track = toTrackRowData({
+      id: "track-global-1",
+      globalTrackUid: "track-global-1",
+      globalAlbumUid: "album-global-1",
+      title: "0151",
+      artist: "High Vis",
+      album: "Blending",
+      availability: {
+        catalog: true,
+        stream: true,
+        import: false,
+        local: false,
+      },
+    });
+
+    const { container } = renderWithListenProviders(
+      <TrackRow track={track} showCoverThumb />,
+    );
+
+    expect(container.innerHTML).toContain(
+      "/api/catalog/albums/album-global-1/cover",
+    );
   });
 });

@@ -57,6 +57,9 @@ const COMMAND_ANALYSIS_MANAGE = ["library.analysis.manage"] as const;
 const COMMAND_SYNC_SHOWS = ["curation.shows.write"] as const;
 const COMMAND_GENRE_CURATION = ["curation.genres.write"] as const;
 const COMMAND_RELEASE_CURATION = ["curation.releases.write"] as const;
+const COMMAND_FEDERATION_VIEW = ["federation.nodes.view"] as const;
+const COMMAND_FEDERATION_SYNC = ["federation.catalog.sync.manage"] as const;
+const COMMAND_GLOBAL_CATALOG_MANAGE = ["federation.policy.manage"] as const;
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -116,6 +119,33 @@ export function CommandPalette() {
       capabilities: COMMAND_SYNC_LIBRARY,
       icon: RefreshCw,
       run: () => api("/api/tasks/sync-library", "POST"),
+    },
+    {
+      label: "Sync Federated Catalogs",
+      toastLabel: "Federated catalog sync",
+      capabilities: COMMAND_FEDERATION_SYNC,
+      icon: RefreshCw,
+      run: () => api("/api/admin/federation/sync-catalog", "POST"),
+    },
+    {
+      label: "Reconcile Global Catalog",
+      toastLabel: "Global catalog reconciliation",
+      capabilities: COMMAND_GLOBAL_CATALOG_MANAGE,
+      icon: RefreshCw,
+      run: () =>
+        api("/api/admin/global-catalog/reconcile", "POST", {
+          mode: "incremental",
+        }),
+    },
+    {
+      label: "Full Global Catalog Reconciliation",
+      toastLabel: "Full global catalog reconciliation",
+      capabilities: COMMAND_GLOBAL_CATALOG_MANAGE,
+      icon: RefreshCw,
+      run: () =>
+        api("/api/admin/global-catalog/reconcile", "POST", {
+          mode: "full",
+        }),
     },
     {
       label: "Run Health Check",
@@ -314,6 +344,18 @@ export function CommandPalette() {
                     path: "/stack",
                     icon: Server,
                     capabilities: ["ops.runtime.manage"],
+                  },
+                  {
+                    label: "Federation",
+                    path: "/federation",
+                    icon: Server,
+                    capabilities: COMMAND_FEDERATION_VIEW,
+                  },
+                  {
+                    label: "Global Catalog",
+                    path: "/global-catalog",
+                    icon: Library,
+                    capabilities: COMMAND_FEDERATION_VIEW,
                   },
                   {
                     label: "Users",

@@ -70,8 +70,9 @@ function createOptions(opts: TestOptions = {}) {
       current: opts.repeat ?? ("off" as RepeatMode),
     } as MutableRefObject<RepeatMode>,
     bufferingIntentRef: { current: false } as MutableRefObject<boolean>,
-    buildEngineUrls: vi.fn((tracks: Track[]) =>
-      tracks.map((t) => `/stream/${t.id}`),
+    buildEngineUrls: vi.fn(
+      (tracks: Track[], resolvedUrls?: string[]) =>
+        resolvedUrls ?? tracks.map((t) => `/stream/${t.id}`),
     ),
     pullFromEngine: vi.fn(),
     pushToEngine: vi.fn(),
@@ -80,6 +81,14 @@ function createOptions(opts: TestOptions = {}) {
     markSeekPosition: vi.fn(),
     allowAutoplayRestore: opts.allowAutoplayRestore,
   };
+}
+
+async function flushPlaybackResolution() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 beforeEach(() => {
@@ -106,14 +115,21 @@ describe("useRestoreOnMount", () => {
     expect(opts.pullFromEngine).not.toHaveBeenCalled();
   });
 
-  it("loads the stored queue into the engine on mount", () => {
+  it("loads the stored queue into the engine on mount", async () => {
     setStored([TRACK_A, TRACK_B], 1);
     const opts = createOptions();
 
     renderHook(() => useRestoreOnMount(opts));
+    await flushPlaybackResolution();
 
-    expect(opts.buildEngineUrls).toHaveBeenCalledWith([TRACK_A, TRACK_B]);
-    expect(mockLoadQueue).toHaveBeenCalledWith(["/stream/a", "/stream/b"], 1);
+    expect(opts.buildEngineUrls).toHaveBeenCalledWith(
+      [TRACK_A, TRACK_B],
+      expect.arrayContaining(["/api/tracks/a/stream", "/api/tracks/b/stream"]),
+    );
+    expect(mockLoadQueue).toHaveBeenCalledWith(
+      ["/api/tracks/a/stream", "/api/tracks/b/stream"],
+      1,
+    );
     expect(opts.pullFromEngine).toHaveBeenCalledWith([TRACK_A, TRACK_B]);
   });
 
@@ -136,11 +152,12 @@ describe("useRestoreOnMount", () => {
     expect(result.current.resumeAfterReloadRef.current).toBe(false);
   });
 
-  it("seeks to stored position and reflects it in React state", () => {
+  it("seeks to stored position and reflects it in React state", async () => {
     setStored([TRACK_A], 0, 42);
     const opts = createOptions();
 
     renderHook(() => useRestoreOnMount(opts));
+    await flushPlaybackResolution();
 
     expect(mockSeekTo).toHaveBeenCalledWith(42_000);
     expect(opts.commitCurrentTime).toHaveBeenCalledWith(42);
@@ -163,11 +180,12 @@ describe("useRestoreOnMount", () => {
     expect(result.current.resumeAfterReloadRef.current).toBe(true);
   });
 
-  it("can restore the queue without restoring autoplay", () => {
+  it("can restore the queue without restoring autoplay", async () => {
     setStored([TRACK_A], 0, 0, true);
     const opts = createOptions({ allowAutoplayRestore: false });
 
     const { result } = renderHook(() => useRestoreOnMount(opts));
+    await flushPlaybackResolution();
 
     expect(opts.pullFromEngine).toHaveBeenCalledWith([TRACK_A]);
     expect(result.current.resumeAfterReloadRef.current).toBe(false);
@@ -244,11 +262,12 @@ describe("useRestoreOnMount", () => {
     expect(opts.commitIsBuffering.mock.calls.length).toBe(beforeCalls);
   });
 
-  it("sets the loop/single mode flags based on repeat", () => {
+  it("sets the loop/single mode flags based on repeat", async () => {
     setStored([TRACK_A], 0, 0, false);
     const opts = createOptions({ repeat: "all" });
 
     renderHook(() => useRestoreOnMount(opts));
+    await flushPlaybackResolution();
 
     expect(gaplessPlayer.setLoop).toHaveBeenCalledWith(true);
     expect(gaplessPlayer.setSingleMode).toHaveBeenCalledWith(false);

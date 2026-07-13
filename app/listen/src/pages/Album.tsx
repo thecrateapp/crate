@@ -68,6 +68,7 @@ import {
   albumSharePath,
   artistPagePath,
   artistPhotoApiUrl,
+  globalAlbumUidFromRouteRef,
 } from "@/lib/library-routes";
 import {
   buildAlbumPlayerTracks,
@@ -99,8 +100,11 @@ const ALBUM_MOBILE_HERO_SPACING = {
 } as CSSProperties;
 
 interface AlbumTrack {
-  id: number;
+  id: number | string;
   entity_uid?: string;
+  globalTrackUid?: string;
+  global_track_uid?: string;
+  global_uid?: string;
   filename: string;
   format: string;
   size_mb: number;
@@ -128,15 +132,18 @@ interface AlbumTrack {
     musicbrainz_albumid: string;
     musicbrainz_trackid: string;
   };
-  path: string;
+  path?: string | null;
   is_available?: boolean;
   source?: string | null;
   source_url?: string | null;
 }
 
 interface AlbumData {
-  id: number;
+  id?: number | null;
   entity_uid?: string;
+  global_album_uid?: string;
+  global_artist_uid?: string;
+  global_uid?: string;
   slug?: string;
   artist_id?: number;
   artist_entity_uid?: string;
@@ -187,11 +194,14 @@ export function Album() {
     albumId: albumIdParam,
     artistSlug: routeArtistSlug,
     albumSlug: routeAlbumSlug,
+    globalAlbumUid: routeGlobalAlbumRef,
   } = useParams<{
     albumId?: string;
     artistSlug?: string;
     albumSlug?: string;
+    globalAlbumUid?: string;
   }>();
+  const routeGlobalAlbumUid = globalAlbumUidFromRouteRef(routeGlobalAlbumRef);
   const navigate = useNavigate();
   const location = useLocation();
   const sharedTrackUid = new URLSearchParams(location.search).get("track");
@@ -239,14 +249,16 @@ export function Album() {
   const routeAlbumId = albumIdParam ? Number(albumIdParam) : undefined;
 
   const { data, loading, error } = useApi<AlbumData>(
-    routeAlbumId != null
-      ? albumApiPath({ albumId: routeAlbumId })
-      : routeArtistSlug && routeAlbumSlug
-        ? albumApiPath({
-            artistSlug: routeArtistSlug,
-            albumSlug: routeAlbumSlug,
-          })
-        : null,
+    routeGlobalAlbumUid
+      ? `/api/catalog/albums/${encodeURIComponent(routeGlobalAlbumUid)}`
+      : routeAlbumId != null
+        ? albumApiPath({ albumId: routeAlbumId })
+        : routeArtistSlug && routeAlbumSlug
+          ? albumApiPath({
+              artistSlug: routeArtistSlug,
+              albumSlug: routeAlbumSlug,
+            })
+          : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
@@ -342,6 +354,22 @@ export function Album() {
 
   useEffect(() => {
     if (!data?.name) return;
+    if (routeGlobalAlbumUid) {
+      const canonicalPath = albumPagePath({
+        albumId: typeof data.id === "number" ? data.id : undefined,
+        albumEntityUid: data.entity_uid,
+        globalAlbumUid: routeGlobalAlbumUid,
+        albumSlug: data.slug,
+        artistEntityUid: data.artist_entity_uid,
+        artistSlug: data.artist_slug,
+        artistName: data.artist,
+        albumName: data.name,
+      });
+      if (location.pathname !== canonicalPath) {
+        navigate(canonicalPath, { replace: true });
+      }
+      return;
+    }
     const canonicalPath = albumPagePath({
       albumId: data.id,
       albumSlug: data.slug,
@@ -360,6 +388,7 @@ export function Album() {
     data?.slug,
     location.pathname,
     navigate,
+    routeGlobalAlbumUid,
   ]);
 
   const hasTracks = Boolean(data?.tracks?.length);
@@ -392,6 +421,7 @@ export function Album() {
     albumCoverApiUrl(
       {
         albumId: data.id,
+        globalAlbumUid: data.global_album_uid ?? data.global_uid,
         albumEntityUid: data.entity_uid,
         artistEntityUid: data.artist_entity_uid,
         albumSlug: data.slug,
@@ -404,13 +434,26 @@ export function Album() {
     {
       artistId: data.artist_id,
       artistEntityUid: data.artist_entity_uid,
+      globalArtistUid: data.global_artist_uid,
       artistSlug: data.artist_slug,
       artistName: data.artist,
     },
     { size: 512 },
   );
   const displayName = data.display_name || data.name;
-  const albumId = data.id;
+  const albumId = typeof data.id === "number" ? data.id : 0;
+  const globalAlbumUid = data.global_album_uid ?? data.global_uid ?? null;
+  const globalArtistUid = data.global_artist_uid ?? null;
+  const albumHref = albumPagePath({
+    albumId: typeof data.id === "number" ? data.id : undefined,
+    albumEntityUid: data.entity_uid,
+    globalAlbumUid,
+    albumSlug: data.slug,
+    artistEntityUid: data.artist_entity_uid,
+    artistSlug: data.artist_slug,
+    artistName: data.artist,
+    albumName: displayName,
+  });
   const artistName = data.artist;
   const albumTracks = data.tracks;
   const playableAlbumTracks = albumTracks.filter(
@@ -418,10 +461,18 @@ export function Album() {
   );
   const selectedTrackIdSet = new Set(selectedTrackIds);
   const selectedAlbumTracks = playableAlbumTracks.filter((track) =>
-    selectedTrackIdSet.has(track.id),
+    typeof track.id === "number" ? selectedTrackIdSet.has(track.id) : false,
   );
   const isPreRelease = Boolean(data.is_pre_release);
   const canPersistAlbum = !isPreRelease && albumId > 0;
+  const canSaveAlbum =
+    !isPreRelease && (albumId > 0 || Boolean(globalAlbumUid));
+  const albumRadioSeed =
+    !isPreRelease && (albumId > 0 || globalAlbumUid)
+      ? albumId > 0
+        ? albumId
+        : globalAlbumUid
+      : null;
   const year = data.album_tags?.year?.slice(0, 4);
   const genre =
     data.genres.length > 0 ? data.genres.join(", ") : data.album_tags?.genre;
@@ -434,7 +485,7 @@ export function Album() {
   const visibleContributor =
     primaryContributorName && primaryContributor ? primaryContributor : null;
   const playerTracks: Track[] = buildAlbumPlayerTracks(data);
-  const saved = canPersistAlbum ? isSaved(albumId) : false;
+  const saved = canSaveAlbum ? isSaved(albumId, globalAlbumUid) : false;
   const offlineState = getAlbumState(canPersistAlbum ? albumId : undefined);
   const offlineRecord = canPersistAlbum ? getAlbumRecord(albumId) : null;
   const offlineBusy = isOfflineBusy(offlineState);
@@ -485,24 +536,19 @@ export function Album() {
       playAll(playerTracks, startIndex, {
         type: "album",
         name: `${artistName} — ${displayName}`,
-        href: albumPagePath({
-          albumId,
-          albumSlug: data.slug,
-          artistSlug: data.artist_slug,
-          artistName,
-          albumName: displayName,
-        }),
-        radio: !isPreRelease
-          ? {
-              seedType: "album",
-              seedId: albumId,
-            }
-          : undefined,
+        href: albumHref,
+        radio:
+          albumRadioSeed != null
+            ? {
+                seedType: "album",
+                seedId: albumRadioSeed,
+              }
+            : undefined,
       });
     }
   };
 
-  const handlePlayTrack = (trackId: number) => {
+  const handlePlayTrack = (trackId: number | string) => {
     const startIndex = playableAlbumTracks.findIndex(
       (track) => track.id === trackId,
     );
@@ -518,30 +564,29 @@ export function Album() {
     playAll(shuffled, 0, {
       type: "album",
       name: `${artistName} — ${displayName}`,
-      href: albumPagePath({
-        albumId,
-        albumSlug: data.slug,
-        artistSlug: data.artist_slug,
-        artistName,
-        albumName: displayName,
-      }),
-      radio: !isPreRelease
-        ? {
-            seedType: "album",
-            seedId: albumId,
-          }
-        : undefined,
+      href: albumHref,
+      radio:
+        albumRadioSeed != null
+          ? {
+              seedType: "album",
+              seedId: albumRadioSeed,
+            }
+          : undefined,
     });
   };
 
   async function handleAlbumRadio() {
+    if (albumRadioSeed == null) {
+      toast.info(t("album.toasts.radioUnavailable"));
+      return;
+    }
     if (isPreRelease) {
       toast.info(t("album.toasts.radioPrerelease"));
       return;
     }
     try {
       const radio = await fetchAlbumRadio({
-        albumId,
+        albumId: albumRadioSeed,
         artistName,
         albumName: displayName,
       });
@@ -564,6 +609,7 @@ export function Album() {
   const shareUrl = publicShareUrl(
     albumSharePath({
       albumId,
+      globalAlbumUid,
       albumEntityUid: data.entity_uid,
       albumSlug: data.slug,
       artistEntityUid: data.artist_entity_uid,
@@ -584,8 +630,13 @@ export function Album() {
   }
 
   function albumTrackRowData(track: AlbumTrack, fallbackIndex: number) {
+    const globalTrackUid =
+      track.globalTrackUid ?? track.global_track_uid ?? track.global_uid;
     return toTrackRowData({
       id: track.id,
+      globalTrackUid,
+      global_artist_uid: globalArtistUid,
+      global_album_uid: globalAlbumUid,
       entity_uid: track.entity_uid,
       title: track.tags.title || track.filename,
       artist: albumData.artist,
@@ -593,7 +644,7 @@ export function Album() {
       artist_entity_uid: albumData.artist_entity_uid,
       artist_slug: albumData.artist_slug,
       album: displayName,
-      album_id: albumData.id,
+      album_id: albumId > 0 ? albumId : undefined,
       album_entity_uid: albumData.entity_uid,
       album_slug: albumData.slug,
       duration: track.length_sec,
@@ -610,7 +661,10 @@ export function Album() {
       danceability: track.danceability,
       valence: track.valence,
       bliss_vector: track.bliss_vector,
-      library_track_id: track.is_available === false ? undefined : track.id,
+      library_track_id:
+        track.is_available === false || typeof track.id !== "number"
+          ? undefined
+          : track.id,
       disabled: track.is_available === false,
     });
   }
@@ -626,13 +680,13 @@ export function Album() {
   }
 
   async function handleToggleSaved() {
-    if (!canPersistAlbum) return;
+    if (!canSaveAlbum) return;
     try {
       if (saved) {
-        await unsaveAlbum(albumId);
+        await unsaveAlbum(albumId, globalAlbumUid);
         toast.success(t("album.toasts.removedCollection"));
       } else {
-        await saveAlbum(albumId);
+        await saveAlbum(albumId, globalAlbumUid);
         toast.success(t("album.toasts.addedCollection"));
       }
     } catch {
@@ -659,39 +713,47 @@ export function Album() {
   const playlistTracksPayload = playableAlbumTracks.map((track) => ({
     ...toTrackReferencePayload({
       id: track.id,
+      globalTrackUid:
+        track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
       entity_uid: track.entity_uid,
       path: track.path,
       title: track.tags.title || track.filename,
       artist: artistName,
       album: displayName,
       duration: track.length_sec,
-      library_track_id: track.id,
+      library_track_id: typeof track.id === "number" ? track.id : undefined,
     }),
   }));
   const selectedPlaylistTracksPayload = selectedAlbumTracks.map((track) => ({
     ...toTrackReferencePayload({
       id: track.id,
+      globalTrackUid:
+        track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
       entity_uid: track.entity_uid,
       path: track.path,
       title: track.tags.title || track.filename,
       artist: artistName,
       album: displayName,
       duration: track.length_sec,
-      library_track_id: track.id,
+      library_track_id: typeof track.id === "number" ? track.id : undefined,
     }),
   }));
   const selectedPlayerTracks = selectedAlbumTracks.map((track) =>
     toPlayableTrack({
       id: track.id,
+      globalTrackUid:
+        track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
       entity_uid: track.entity_uid,
       title: track.tags.title || track.filename,
       artist: artistName,
+      global_artist_uid: globalArtistUid,
       artist_entity_uid: albumData.artist_entity_uid,
       album: displayName,
+      global_album_uid: globalAlbumUid,
       album_entity_uid: albumData.entity_uid,
       duration: track.length_sec,
       path: track.path,
-      library_track_id: track.id,
+      library_track_id: typeof track.id === "number" ? track.id : undefined,
       bpm: track.bpm,
       audio_key: track.audio_key,
       audio_scale: track.audio_scale,
@@ -763,7 +825,12 @@ export function Album() {
 
   async function handleAddSelectedToCollection() {
     const missing = selectedAlbumTracks.filter(
-      (track) => !isLiked(track.id, track.entity_uid, track.path),
+      (track) =>
+        !isLiked(
+          typeof track.id === "number" ? track.id : null,
+          track.entity_uid,
+          track.path,
+        ),
     );
     if (!missing.length) {
       toast.info(t("album.toasts.selectedAlreadyCollection"));
@@ -774,7 +841,11 @@ export function Album() {
     try {
       await Promise.all(
         missing.map((track) =>
-          likeTrack(track.id, track.entity_uid ?? null, track.path),
+          likeTrack(
+            typeof track.id === "number" ? track.id : null,
+            track.entity_uid ?? null,
+            track.path,
+          ),
         ),
       );
       toast.success(
@@ -814,6 +885,10 @@ export function Album() {
       tracks: playableAlbumTracks.map((track) =>
         toPlayableTrack({
           id: track.id,
+          globalTrackUid:
+            track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
+          global_artist_uid: globalArtistUid,
+          global_album_uid: globalAlbumUid,
           entity_uid: track.entity_uid,
           title: track.tags.title || track.filename,
           artist: artistName,
@@ -822,7 +897,7 @@ export function Album() {
           album_entity_uid: data?.entity_uid,
           duration: track.length_sec,
           path: track.path,
-          library_track_id: track.id,
+          library_track_id: typeof track.id === "number" ? track.id : undefined,
           bpm: track.bpm,
           audio_key: track.audio_key,
           audio_scale: track.audio_scale,
@@ -896,7 +971,9 @@ export function Album() {
     trackId: number,
     event: MouseEvent<HTMLDivElement>,
   ) {
-    const orderedTrackIds = playableAlbumTracks.map((track) => track.id);
+    const orderedTrackIds = playableAlbumTracks
+      .map((track) => track.id)
+      .filter((id): id is number => typeof id === "number");
     const trackIndex = orderedTrackIds.indexOf(trackId);
     const anchorTrackId = selectionAnchorTrackIdRef.current;
     const anchorIndex =
@@ -980,27 +1057,31 @@ export function Album() {
       icon: ListPlus,
       onSelect: handlePlayNextAlbum,
     },
-    {
-      type: "disclosure",
-      key: "playlist",
-      label: t("playlist.actions.addToPlaylist"),
-      icon: ListPlus,
-      expanded: playlistPickerOpen,
-      onToggle: handleTogglePlaylistPicker,
-      items: [
-        {
-          key: "playlist-create",
-          label: t("playlist.actions.addNew"),
-          onSelect: handleCreatePlaylistFromAlbum,
-        },
-        ...playlists.map((playlist) => ({
-          key: `playlist-${playlist.id}`,
-          label: playlist.name,
-          onSelect: () => handleAddToPlaylist(playlist.id),
-        })),
-      ],
-    },
     ...(canPersistAlbum
+      ? [
+          {
+            type: "disclosure" as const,
+            key: "playlist",
+            label: t("playlist.actions.addToPlaylist"),
+            icon: ListPlus,
+            expanded: playlistPickerOpen,
+            onToggle: handleTogglePlaylistPicker,
+            items: [
+              {
+                key: "playlist-create",
+                label: t("playlist.actions.addNew"),
+                onSelect: handleCreatePlaylistFromAlbum,
+              },
+              ...playlists.map((playlist) => ({
+                key: `playlist-${playlist.id}`,
+                label: playlist.name,
+                onSelect: () => handleAddToPlaylist(playlist.id),
+              })),
+            ],
+          },
+        ]
+      : []),
+    ...(canSaveAlbum
       ? [
           {
             key: "save",
@@ -1011,6 +1092,10 @@ export function Album() {
             active: saved,
             onSelect: handleToggleSaved,
           },
+        ]
+      : []),
+    ...(canPersistAlbum
+      ? [
           {
             key: "offline",
             label: offlineButtonLabel,
@@ -1034,10 +1119,19 @@ export function Album() {
       icon: User,
       onSelect: () =>
         navigate(
-          artistPagePath({
-            artistId: data.artist_id,
-            artistSlug: data.artist_slug,
-          }),
+          globalArtistUid
+            ? artistPagePath({
+                artistId: data.artist_id,
+                artistEntityUid: data.artist_entity_uid,
+                globalArtistUid,
+                artistSlug: data.artist_slug,
+                artistName,
+              })
+            : artistPagePath({
+                artistId: data.artist_id,
+                artistSlug: data.artist_slug,
+                artistName,
+              }),
         ),
     },
     {
@@ -1236,10 +1330,19 @@ export function Album() {
                 className="mb-3 inline-flex items-center gap-2 self-start text-sm text-muted-foreground transition-colors hover:text-primary"
                 onClick={() =>
                   navigate(
-                    artistPagePath({
-                      artistId: data.artist_id,
-                      artistSlug: data.artist_slug,
-                    }),
+                    globalArtistUid
+                      ? artistPagePath({
+                          artistId: data.artist_id,
+                          artistEntityUid: data.artist_entity_uid,
+                          globalArtistUid,
+                          artistSlug: data.artist_slug,
+                          artistName,
+                        })
+                      : artistPagePath({
+                          artistId: data.artist_id,
+                          artistSlug: data.artist_slug,
+                          artistName,
+                        }),
                   )
                 }
               >
@@ -1437,7 +1540,7 @@ export function Album() {
                 <span>{t("common.offline")}</span>
               </button>
             ) : null}
-            {canPersistAlbum ? (
+            {canSaveAlbum ? (
               <button
                 className={`${SECONDARY_ACTION_CLASS} ${
                   saved
@@ -1628,16 +1731,24 @@ export function Album() {
                           onCreatePlaylist={handleCreatePlaylistFromTrack}
                           onActionMenuOpen={ensurePlaylistOptionsLoaded}
                           onPlayOverride={() => handlePlayTrack(t.id)}
-                          selectable={isDesktop}
-                          selected={selectedTrackIdSet.has(t.id)}
-                          onSelect={(_, event) =>
-                            handleTrackSelection(t.id, event)
+                          selectable={isDesktop && canPersistAlbum}
+                          selected={
+                            typeof t.id === "number" &&
+                            selectedTrackIdSet.has(t.id)
                           }
+                          onSelect={(_, event) => {
+                            if (typeof t.id === "number")
+                              handleTrackSelection(t.id, event);
+                          }}
                           onSelectionContextMenu={(_, event) =>
-                            handleSelectionContextMenu(t.id, event)
+                            typeof t.id === "number"
+                              ? handleSelectionContextMenu(t.id, event)
+                              : false
                           }
                           onSelectionActionMenuOpen={(_, event) =>
-                            handleSelectionActionMenuOpen(t.id, event)
+                            typeof t.id === "number"
+                              ? handleSelectionActionMenuOpen(t.id, event)
+                              : false
                           }
                         />
                       </div>
@@ -1662,14 +1773,23 @@ export function Album() {
                     onCreatePlaylist={handleCreatePlaylistFromTrack}
                     onActionMenuOpen={ensurePlaylistOptionsLoaded}
                     onPlayOverride={() => handlePlayTrack(t.id)}
-                    selectable={isDesktop}
-                    selected={selectedTrackIdSet.has(t.id)}
-                    onSelect={(_, event) => handleTrackSelection(t.id, event)}
+                    selectable={isDesktop && canPersistAlbum}
+                    selected={
+                      typeof t.id === "number" && selectedTrackIdSet.has(t.id)
+                    }
+                    onSelect={(_, event) => {
+                      if (typeof t.id === "number")
+                        handleTrackSelection(t.id, event);
+                    }}
                     onSelectionContextMenu={(_, event) =>
-                      handleSelectionContextMenu(t.id, event)
+                      typeof t.id === "number"
+                        ? handleSelectionContextMenu(t.id, event)
+                        : false
                     }
                     onSelectionActionMenuOpen={(_, event) =>
-                      handleSelectionActionMenuOpen(t.id, event)
+                      typeof t.id === "number"
+                        ? handleSelectionActionMenuOpen(t.id, event)
+                        : false
                     }
                   />
                 </div>

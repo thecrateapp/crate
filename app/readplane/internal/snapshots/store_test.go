@@ -47,6 +47,50 @@ func TestSnapshotFreshness(t *testing.T) {
 	})
 }
 
+func TestRequireMatchingTaxonomy(t *testing.T) {
+	matchingTaxonomy := &Row{Payload: map[string]any{
+		"taxonomy": map[string]any{
+			"id": "crate-core", "version": "1.0.0", "digest": "sha256:one",
+		},
+	}}
+
+	tests := []struct {
+		name        string
+		memberships *Row
+		wantErr     bool
+	}{
+		{
+			name: "matching release",
+			memberships: &Row{Payload: map[string]any{
+				"taxonomy": map[string]any{
+					"id": "crate-core", "version": "1.0.0", "digest": "sha256:one",
+				},
+			}},
+		},
+		{
+			name: "digest mismatch",
+			memberships: &Row{Payload: map[string]any{
+				"taxonomy": map[string]any{
+					"id": "crate-core", "version": "1.0.0", "digest": "sha256:two",
+				},
+			}},
+			wantErr: true,
+		},
+		{name: "missing membership snapshot", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RequireMatchingTaxonomy(matchingTaxonomy, tt.memberships)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrTaxonomyMismatch)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestSnapshotCache(t *testing.T) {
 	t.Run("expires and returns copy", func(t *testing.T) {
 		now := time.Unix(1_700_000_000, 0)

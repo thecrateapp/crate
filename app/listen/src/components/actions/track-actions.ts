@@ -72,16 +72,22 @@ export function useTrackActionEntries(
     getTrackState,
     toggleTrackOffline,
   } = useOffline();
+  const globalTrackUid = input.track.global_track_uid ?? null;
 
   const libraryTrackId =
     input.track.library_track_id ??
     (typeof input.track.id === "number" ? input.track.id : null);
   const trackEntityUid =
     input.track.entity_uid ??
-    (typeof input.track.id === "string" && isUuidLikeTrackId(input.track.id)
+    (!globalTrackUid &&
+    typeof input.track.id === "string" &&
+    isUuidLikeTrackId(input.track.id)
       ? input.track.id
       : null);
   const hasTrackRef = hasPlayableTrackReference(input.track);
+  const hasLocalTrackRef = Boolean(
+    libraryTrackId != null || trackEntityUid || input.track.path,
+  );
   const liked = isLiked(libraryTrackId, trackEntityUid, input.track.path);
   const offlineRef = {
     entityUid: trackEntityUid,
@@ -111,8 +117,11 @@ export function useTrackActionEntries(
       input.track,
       input.albumCover,
     );
+    const globalArtistUid = input.track.global_artist_uid;
+    const globalAlbumUid = input.track.global_album_uid;
     const trackShare = trackSharePath({
       id: input.track.id,
+      globalTrackUid,
       entityUid: trackEntityUid,
       libraryTrackId,
       trackSlug: input.track.slug,
@@ -147,7 +156,7 @@ export function useTrackActionEntries(
         label: liked ? t("actions.track.unlike") : t("actions.track.like"),
         icon: liked ? HeartBold : Heart,
         active: liked,
-        disabled: !hasTrackRef,
+        disabled: !hasLocalTrackRef,
         onSelect: async () => {
           await toggleTrackLike(
             libraryTrackId,
@@ -170,6 +179,7 @@ export function useTrackActionEntries(
           try {
             const radio = await fetchTrackRadio({
               libraryTrackId,
+              globalTrackUid,
               entityUid: trackEntityUid,
               path: input.track.path,
               title: input.track.title,
@@ -206,7 +216,7 @@ export function useTrackActionEntries(
             : ArrowDownToLine,
         active: offlineState === "ready",
         disabled:
-          !offlineSupported || !hasTrackRef || isOfflineBusy(offlineState),
+          !offlineSupported || !hasLocalTrackRef || isOfflineBusy(offlineState),
         onSelect: async () => {
           try {
             const result = await toggleTrackOffline({
@@ -232,7 +242,7 @@ export function useTrackActionEntries(
         key: "download",
         label: t("actions.track.download"),
         icon: Download,
-        disabled: !hasTrackRef,
+        disabled: !hasLocalTrackRef,
         onSelect: async () => {
           const path = trackDownloadApiPath({
             entityUid: trackEntityUid,
@@ -279,11 +289,16 @@ export function useTrackActionEntries(
       }
     }
 
-    if (input.track.artist_id != null || input.track.album_id != null) {
+    if (
+      input.track.artist_id != null ||
+      globalArtistUid ||
+      input.track.album_id != null ||
+      globalAlbumUid
+    ) {
       entries.push({ type: "divider", key: "divider-links" });
     }
 
-    if (input.track.artist_id != null) {
+    if (input.track.artist_id != null || globalArtistUid) {
       entries.push(
         action({
           key: "artist",
@@ -293,6 +308,8 @@ export function useTrackActionEntries(
             navigate(
               artistPagePath({
                 artistId: input.track.artist_id,
+                artistEntityUid: input.track.artist_entity_uid,
+                globalArtistUid,
                 artistSlug: input.track.artist_slug,
                 artistName: input.track.artist,
               }),
@@ -301,7 +318,7 @@ export function useTrackActionEntries(
       );
     }
 
-    if (input.track.album_id != null) {
+    if (input.track.album_id != null || globalAlbumUid) {
       entries.push(
         action({
           key: "album",
@@ -311,6 +328,9 @@ export function useTrackActionEntries(
             navigate(
               albumPagePath({
                 albumId: input.track.album_id,
+                albumEntityUid: input.track.album_entity_uid,
+                globalAlbumUid,
+                artistEntityUid: input.track.artist_entity_uid,
                 albumSlug: input.track.album_slug,
                 artistName: input.track.artist,
                 albumName: input.track.album,
@@ -332,6 +352,8 @@ export function useTrackActionEntries(
     liked,
     libraryTrackId,
     hasTrackRef,
+    hasLocalTrackRef,
+    globalTrackUid,
     offlineActionLabel,
     offlineState,
     offlineSupported,

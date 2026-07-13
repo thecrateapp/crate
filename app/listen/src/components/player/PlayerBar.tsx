@@ -33,7 +33,10 @@ import {
   getTrackQualityFromInfo,
   mergeTrackQualityParts,
 } from "@/lib/track-info";
-import { getTrackQualityFromPlaybackQuality } from "@/lib/track-playback";
+import {
+  getTrackQualityFromPlaybackQuality,
+  playbackResolutionShowsDeliveryQuality,
+} from "@/lib/track-playback";
 import {
   getPlaybackDeliveryPolicyPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
@@ -761,8 +764,10 @@ export function PlayerBar() {
         getTrackQualityFromPlaybackQuality(currentTrackPlayback?.source),
       )
     : null;
+  const showsDeliveryQuality =
+    playbackResolutionShowsDeliveryQuality(currentTrackPlayback);
   const activeTrackQuality =
-    currentTrackPlayback && currentTrackPlayback.effective_policy !== "original"
+    currentTrackPlayback && showsDeliveryQuality
       ? mergeTrackQualityParts(
           sourceTrackQuality,
           getTrackQualityFromPlaybackQuality(currentTrackPlayback.delivery, {
@@ -787,10 +792,6 @@ export function PlayerBar() {
           ),
         )
       : 0;
-  const showsDeliveryQuality = Boolean(
-    currentTrackPlayback &&
-      currentTrackPlayback.effective_policy !== "original",
-  );
   const shapedRadioSessionId = displayPlaySource?.radio?.shapedSessionId;
   const isShapedRadioTrack = !!(
     shapedRadioSessionId && displayTrack?.libraryTrackId
@@ -1075,7 +1076,10 @@ export function PlayerBar() {
               <div
                 aria-label={isDesktop ? undefined : "Track artwork"}
                 className={`relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-white/5 md:h-12 md:w-12 ${
-                  isDesktop && displayTrack.albumId ? "cursor-pointer" : ""
+                  isDesktop &&
+                  (displayTrack.globalAlbumUid || displayTrack.albumId)
+                    ? "cursor-pointer"
+                    : ""
                 }`}
                 onTouchStart={handleCoverTouchStart}
                 onTouchMove={handleCoverTouchMove}
@@ -1088,15 +1092,26 @@ export function PlayerBar() {
                     coverLongPressTriggeredRef.current = false;
                     return;
                   }
-                  if (isDesktop && displayTrack.albumId) {
+                  if (
+                    isDesktop &&
+                    (displayTrack.globalAlbumUid || displayTrack.albumId)
+                  ) {
                     e.stopPropagation();
                     navigate(
-                      albumPagePath({
-                        albumId: displayTrack.albumId,
-                        albumSlug: displayTrack.albumSlug,
-                        albumName: displayTrack.album,
-                        artistName: displayTrack.artist,
-                      }),
+                      displayTrack.globalAlbumUid
+                        ? albumPagePath({
+                            albumId: displayTrack.albumId,
+                            globalAlbumUid: displayTrack.globalAlbumUid,
+                            albumSlug: displayTrack.albumSlug,
+                            albumName: displayTrack.album,
+                            artistName: displayTrack.artist,
+                          })
+                        : albumPagePath({
+                            albumId: displayTrack.albumId,
+                            albumSlug: displayTrack.albumSlug,
+                            albumName: displayTrack.album,
+                            artistName: displayTrack.artist,
+                          }),
                     );
                   }
                 }}
@@ -1174,18 +1189,27 @@ export function PlayerBar() {
                     </>
                   ) : (
                     <div key={displayTrack.id} className="animate-track-in">
-                      {isDesktop && displayTrack.albumId ? (
+                      {isDesktop &&
+                      (displayTrack.globalAlbumUid || displayTrack.albumId) ? (
                         <p
                           className="text-[13px] font-semibold text-white truncate leading-tight hover:underline cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
-                              albumPagePath({
-                                albumId: displayTrack.albumId,
-                                albumSlug: displayTrack.albumSlug,
-                                albumName: displayTrack.album,
-                                artistName: displayTrack.artist,
-                              }),
+                              displayTrack.globalAlbumUid
+                                ? albumPagePath({
+                                    albumId: displayTrack.albumId,
+                                    globalAlbumUid: displayTrack.globalAlbumUid,
+                                    albumSlug: displayTrack.albumSlug,
+                                    albumName: displayTrack.album,
+                                    artistName: displayTrack.artist,
+                                  })
+                                : albumPagePath({
+                                    albumId: displayTrack.albumId,
+                                    albumSlug: displayTrack.albumSlug,
+                                    albumName: displayTrack.album,
+                                    artistName: displayTrack.artist,
+                                  }),
                             );
                           }}
                         >
@@ -1196,17 +1220,27 @@ export function PlayerBar() {
                           {displayTrack.title}
                         </p>
                       )}
-                      {isDesktop && displayTrack.artistId ? (
+                      {isDesktop &&
+                      (displayTrack.globalArtistUid ||
+                        displayTrack.artistId) ? (
                         <p
                           className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 hover:text-foreground hover:underline cursor-pointer transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(
-                              artistPagePath({
-                                artistId: displayTrack.artistId,
-                                artistSlug: displayTrack.artistSlug,
-                                artistName: displayTrack.artist,
-                              }),
+                              displayTrack.globalArtistUid
+                                ? artistPagePath({
+                                    artistId: displayTrack.artistId,
+                                    globalArtistUid:
+                                      displayTrack.globalArtistUid,
+                                    artistSlug: displayTrack.artistSlug,
+                                    artistName: displayTrack.artist,
+                                  })
+                                : artistPagePath({
+                                    artistId: displayTrack.artistId,
+                                    artistSlug: displayTrack.artistSlug,
+                                    artistName: displayTrack.artist,
+                                  }),
                             );
                           }}
                         >

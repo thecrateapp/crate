@@ -27,6 +27,7 @@ def recompute_user_track_stats(session, user_id: int, window: str, cutoff: str |
                 stat_window,
                 entity_key,
                 track_id,
+                global_track_uid,
                 track_entity_uid,
                 track_path,
                 title,
@@ -41,8 +42,9 @@ def recompute_user_track_stats(session, user_id: int, window: str, cutoff: str |
             SELECT
                 :user_id,
                 :window,
-                COALESCE(upe.track_entity_uid::text, upe.track_id::text, NULLIF(upe.track_path, ''), 'unknown-track') AS entity_key,
+                COALESCE(upe.global_track_uid::text, upe.track_entity_uid::text, upe.track_id::text, NULLIF(upe.track_path, ''), 'unknown-track') AS entity_key,
                 MAX(upe.track_id) AS track_id,
+                MAX(upe.global_track_uid::text)::uuid AS global_track_uid,
                 MAX(upe.track_entity_uid::text)::uuid AS track_entity_uid,
                 MAX(upe.track_path) AS track_path,
                 MAX(upe.title) AS title,
@@ -55,8 +57,13 @@ def recompute_user_track_stats(session, user_id: int, window: str, cutoff: str |
                 MAX(upe.ended_at) AS last_played_at
             FROM user_play_events upe
             WHERE {where_sql}
-              AND (upe.track_id IS NOT NULL OR upe.track_entity_uid IS NOT NULL OR COALESCE(upe.track_path, '') != '')
-            GROUP BY COALESCE(upe.track_entity_uid::text, upe.track_id::text, NULLIF(upe.track_path, ''), 'unknown-track')
+              AND (
+                upe.track_id IS NOT NULL
+                OR upe.global_track_uid IS NOT NULL
+                OR upe.track_entity_uid IS NOT NULL
+                OR COALESCE(upe.track_path, '') != ''
+              )
+            GROUP BY COALESCE(upe.global_track_uid::text, upe.track_entity_uid::text, upe.track_id::text, NULLIF(upe.track_path, ''), 'unknown-track')
             """
         ),
         params,

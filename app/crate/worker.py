@@ -494,7 +494,21 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "import_queue_item",
             "import_queue_all",
             "import_queue_remove",
+            "federation_import_album",
             "remux_m4a_dash",
+        ),
+    ),
+    (
+        "crate.worker_handlers.federation",
+        "FEDERATION_TASK_HANDLERS",
+        ("federation_sync_catalog", "federation_health_poll"),
+    ),
+    (
+        "crate.worker_handlers.global_catalog",
+        "GLOBAL_CATALOG_TASK_HANDLERS",
+        (
+            "global_catalog_reconcile_incremental",
+            "global_catalog_reconcile_full",
         ),
     ),
     (

@@ -593,7 +593,13 @@ function StatsCoverMosaic({ tracks }: { tracks: StatsTrack[] }) {
   const covers = tracks
     .map((track) =>
       albumCoverApiUrl(
-        { albumId: track.album_id, albumSlug: track.album_slug },
+        {
+          albumId: track.album_id,
+          globalAlbumUid: track.global_album_uid,
+          albumSlug: track.album_slug,
+          artistName: track.artist,
+          albumName: track.album,
+        },
         { size: 512 },
       ),
     )
@@ -1312,7 +1318,12 @@ function TopArtistsPanel({
 function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
   const { t } = useTranslation();
   const photo = artistPhotoApiUrl(
-    { artistId: item.artist_id, artistSlug: item.artist_slug },
+    {
+      artistId: item.artist_id,
+      globalArtistUid: item.global_artist_uid,
+      artistSlug: item.artist_slug,
+      artistName: item.artist_name,
+    },
     { size: 640 },
   );
 
@@ -1320,7 +1331,9 @@ function TopArtistCard({ item, index }: { item: StatsArtist; index: number }) {
     <Link
       to={artistPagePath({
         artistId: item.artist_id,
+        globalArtistUid: item.global_artist_uid,
         artistSlug: item.artist_slug,
+        artistName: item.artist_name,
       })}
       className="group relative min-h-40 overflow-hidden rounded-[1.35rem] border border-white/10 bg-white/[0.04] p-4 transition hover:border-primary/35"
     >
@@ -1380,18 +1393,36 @@ function TopAlbumsPanel({
               key={`${item.artist}-${item.album}-${index}`}
               to={albumPagePath({
                 albumId: item.album_id,
+                globalAlbumUid: item.global_album_uid,
                 albumSlug: item.album_slug,
+                artistSlug: item.artist_slug,
+                artistName: item.artist,
+                albumName: item.album,
               })}
               className="group min-w-0"
             >
               <div className="relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
                 {albumCoverApiUrl(
-                  { albumId: item.album_id, albumSlug: item.album_slug },
+                  {
+                    albumId: item.album_id,
+                    globalAlbumUid: item.global_album_uid,
+                    albumSlug: item.album_slug,
+                    artistSlug: item.artist_slug,
+                    artistName: item.artist,
+                    albumName: item.album,
+                  },
                   { size: 384 },
                 ) ? (
                   <img
                     src={albumCoverApiUrl(
-                      { albumId: item.album_id, albumSlug: item.album_slug },
+                      {
+                        albumId: item.album_id,
+                        globalAlbumUid: item.global_album_uid,
+                        albumSlug: item.album_slug,
+                        artistSlug: item.artist_slug,
+                        artistName: item.artist,
+                        albumName: item.album,
+                      },
                       { size: 384 },
                     )}
                     alt=""
@@ -1465,7 +1496,13 @@ function TrackCover({
   size?: "sm" | "md";
 }) {
   const cover = albumCoverApiUrl(
-    { albumId: item.album_id, albumSlug: item.album_slug },
+    {
+      albumId: item.album_id,
+      globalAlbumUid: item.global_album_uid,
+      albumSlug: item.album_slug,
+      artistName: item.artist,
+      albumName: item.album,
+    },
     { size: 160 },
   );
   return (

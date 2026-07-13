@@ -75,6 +75,7 @@ from crate.db.health import (
     resolve_issue,
     resolve_issues_by_type,
 )
+from crate.db.queries import health as health_queries
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.queries.management import (
     get_last_analyzed_track,
@@ -161,6 +162,79 @@ def _augment_artist_layout_issues(issues: list[dict], artist_name: str) -> list[
         if existing_artist_fix_issue_id is not None:
             artist_fix_issue["id"] = existing_artist_fix_issue_id
         normalized.append(artist_fix_issue)
+
+    return normalized
+
+
+def _issue_check_type(issue: Mapping[str, Any]) -> str:
+    return str(issue.get("check") or issue.get("check_type") or "")
+
+
+def _issue_details(issue: Mapping[str, Any]) -> dict[str, Any]:
+    details = issue.get("details")
+    if isinstance(details, dict):
+        return details
+    details_json = issue.get("details_json")
+    if isinstance(details_json, dict):
+        return details_json
+    return {}
+
+
+def _duplicate_track_issue_key(issue: Mapping[str, Any]) -> tuple:
+    details = _issue_details(issue)
+    return (
+        int(details.get("album_id") or 0),
+        str(details.get("title") or "").casefold(),
+        int(details.get("track_number") or 0),
+        int(details.get("disc_number") or 0),
+    )
+
+
+def _duplicate_track_issue_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "check": "duplicate_tracks",
+        "severity": "medium",
+        "details": {
+            "album_id": row["album_id"],
+            "artist": row["artist"],
+            "album": row["album"],
+            "title": row["title"],
+            "track_number": row.get("track_number"),
+            "disc_number": row.get("disc_number"),
+            "count": row["cnt"],
+            "paths": row.get("paths", []),
+            "track_ids": row.get("track_ids", []),
+            "tracks": row.get("tracks", []),
+            "fingerprinted_count": row.get("fingerprinted_count", 0),
+            "missing_fingerprint_count": row.get("missing_fingerprint_count", 0),
+        },
+    }
+
+
+def _refresh_artist_duplicate_track_issues(
+    issues: list[dict], artist_name: str
+) -> list[dict]:
+    duplicate_issue_ids = {
+        _duplicate_track_issue_key(issue): issue.get("id")
+        for issue in issues
+        if _issue_check_type(issue) == "duplicate_tracks"
+        and issue.get("id") is not None
+    }
+
+    try:
+        duplicate_rows = health_queries.get_duplicate_tracks(artist_name=artist_name)
+    except Exception:
+        return issues
+
+    normalized = [
+        issue for issue in issues if _issue_check_type(issue) != "duplicate_tracks"
+    ]
+    for row in duplicate_rows:
+        issue = _duplicate_track_issue_from_row(row)
+        existing_id = duplicate_issue_ids.get(_duplicate_track_issue_key(issue))
+        if existing_id is not None:
+            issue["id"] = existing_id
+        normalized.append(issue)
 
     return normalized
 
@@ -564,7 +638,8 @@ def repair_artist(request: Request, name: str):
 
 def preview_artist_repair_plan(request: Request, name: str):
     _require_repair_operator(request)
-    issues = _augment_artist_layout_issues(get_artist_issues(name), name)
+    issues = _refresh_artist_duplicate_track_issues(get_artist_issues(name), name)
+    issues = _augment_artist_layout_issues(issues, name)
     preview = _build_repair_preview(issues, auto_only=False)
     return {"artist": name, **preview}
 

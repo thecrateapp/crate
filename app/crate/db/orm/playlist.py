@@ -63,6 +63,7 @@ class PlaylistTrack(Base):
         Integer, ForeignKey("playlists.id", ondelete="CASCADE"), nullable=False
     )
     track_id: Mapped[int | None] = mapped_column(Integer)
+    global_track_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     track_entity_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     track_storage_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     track_path: Mapped[str | None] = mapped_column(Text)

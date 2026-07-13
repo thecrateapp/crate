@@ -178,6 +178,19 @@ describe("getStreamUrl", () => {
     expect(url).toContain("/api/tracks/by-entity/entity-1/stream");
   });
 
+  it("uses global catalog stream URLs when globalTrackUid is available", () => {
+    const url = getStreamUrl({
+      id: "global-track-1",
+      globalTrackUid: "global-track-1",
+      entityUid: "global-track-1",
+      title: "Song",
+      artist: "Band",
+    });
+
+    expect(url).toContain("/api/catalog/tracks/global-track-1/stream");
+    expect(url).not.toContain("/api/tracks/by-entity/global-track-1/stream");
+  });
+
   it("falls back to path-based stream URLs for normal playback without canonical ids", () => {
     const url = getStreamUrl({
       id: "t1",

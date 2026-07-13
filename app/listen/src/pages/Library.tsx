@@ -98,8 +98,10 @@ interface Playlist {
 interface PlaylistTrack {
   id: number;
   track_id?: number;
+  global_track_uid?: string;
+  globalTrackUid?: string;
   track_entity_uid?: string;
-  track_path: string;
+  track_path?: string | null;
   title: string;
   artist: string;
   artist_id?: number;
@@ -144,17 +146,20 @@ interface LibraryPlaylistsPageData {
 interface FollowedArtist {
   artist_name: string;
   artist_id?: number;
+  global_artist_uid?: string;
   artist_entity_uid?: string;
   artist_slug?: string;
   created_at: string;
   album_count: number;
   track_count: number;
   has_photo: boolean;
+  photo_url?: string | null;
 }
 
 interface SavedAlbum {
   saved_at: string;
-  id: number;
+  id?: number | null;
+  global_album_uid?: string;
   album_entity_uid?: string;
   slug?: string;
   artist: string;
@@ -164,6 +169,7 @@ interface SavedAlbum {
   name: string;
   year: string;
   has_cover: boolean;
+  cover_url?: string | null;
   track_count: number;
   total_duration: number;
 }
@@ -672,8 +678,9 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 
 function ArtistsTab() {
   const { t } = useTranslation();
-  const { data: artists, loading } =
-    useApi<FollowedArtist[]>("/api/me/follows");
+  const { data: artists, loading } = useApi<FollowedArtist[]>(
+    "/api/catalog/me/artists",
+  );
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<"recent" | "name" | "popularity">("recent");
 
@@ -717,11 +724,14 @@ function ArtistsTab() {
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
         {sortedArtists.map((a) => (
           <ArtistCard
-            key={a.artist_id ?? a.artist_name}
+            key={a.global_artist_uid ?? a.artist_id ?? a.artist_name}
             name={a.artist_name}
             artistId={a.artist_id}
             artistEntityUid={a.artist_entity_uid}
+            globalArtistUid={a.global_artist_uid}
             artistSlug={a.artist_slug}
+            photo={a.photo_url ?? undefined}
+            hasPhoto={a.has_photo}
             subtitle={t("common.albumCountLabel", { count: a.album_count })}
             layout="grid"
           />
@@ -733,7 +743,9 @@ function ArtistsTab() {
 
 function AlbumsTab() {
   const { t } = useTranslation();
-  const { data: albums, loading } = useApi<SavedAlbum[]>("/api/me/albums");
+  const { data: albums, loading } = useApi<SavedAlbum[]>(
+    "/api/catalog/me/albums",
+  );
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<AlbumSort>("recent");
 
@@ -779,14 +791,16 @@ function AlbumsTab() {
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
         {sortedAlbums.map((a) => (
           <AlbumCard
-            key={a.id}
+            key={a.global_album_uid ?? a.id}
             artist={a.artist}
             album={a.name}
-            albumId={a.id}
+            albumId={a.id ?? undefined}
             albumEntityUid={a.album_entity_uid}
+            globalAlbumUid={a.global_album_uid}
             artistEntityUid={a.artist_entity_uid}
             albumSlug={a.slug}
             year={a.year}
+            cover={a.cover_url ?? undefined}
             layout="grid"
           />
         ))}

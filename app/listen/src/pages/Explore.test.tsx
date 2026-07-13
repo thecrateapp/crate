@@ -189,7 +189,7 @@ describe("Explore", () => {
         };
       }
 
-      if (url === "/api/genres/punk-hardcore?view=genre-detail-v5") {
+      if (url === "/api/catalog/genres/punk-hardcore") {
         return {
           data: {
             id: 1,
@@ -246,7 +246,7 @@ describe("Explore", () => {
         };
       }
 
-      if (url === "/api/genres/hardcore?view=genre-detail-v5") {
+      if (url === "/api/catalog/genres/hardcore") {
         return {
           data: {
             id: 1,
@@ -691,7 +691,7 @@ function mockGenreDetail(
       };
     }
 
-    if (url === "/api/genres/hardcore?view=genre-detail-v5") {
+    if (url === "/api/catalog/genres/hardcore") {
       return {
         data: {
           id: 1,

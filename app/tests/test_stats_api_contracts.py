@@ -15,6 +15,7 @@ class TestStatsApiContracts:
             "skip_rate": 0.1875,
             "top_artist": {
                 "artist_name": "Converge",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
                 "play_count": 10,
                 "minutes_listened": 31.0,
             },
@@ -47,6 +48,9 @@ class TestStatsApiContracts:
                 "title": "Concubine",
                 "artist": "Converge",
                 "album": "Jane Doe",
+                "global_track_uid": "33333333-3333-4333-8333-333333333333",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
+                "global_album_uid": "22222222-2222-4222-8222-222222222222",
                 "play_count": 7,
                 "complete_play_count": 3,
                 "minutes_listened": 8.2,
@@ -126,6 +130,7 @@ class TestStatsApiContracts:
             "skip_rate": 0.1875,
             "top_artist": {
                 "artist_name": "Converge",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
                 "play_count": 10,
                 "minutes_listened": 31.0,
             },
@@ -149,6 +154,9 @@ class TestStatsApiContracts:
                 "title": "Concubine",
                 "artist": "Converge",
                 "album": "Jane Doe",
+                "global_track_uid": "33333333-3333-4333-8333-333333333333",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
+                "global_album_uid": "22222222-2222-4222-8222-222222222222",
                 "play_count": 7,
                 "complete_play_count": 3,
                 "minutes_listened": 8.2,
@@ -157,6 +165,7 @@ class TestStatsApiContracts:
         top_artists = [
             {
                 "artist_name": "Converge",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
                 "artist_id": 7,
                 "play_count": 7,
                 "complete_play_count": 3,
@@ -166,7 +175,9 @@ class TestStatsApiContracts:
         top_albums = [
             {
                 "artist": "Converge",
+                "global_artist_uid": "11111111-1111-4111-8111-111111111111",
                 "album": "Jane Doe",
+                "global_album_uid": "22222222-2222-4222-8222-222222222222",
                 "album_id": 11,
                 "play_count": 7,
                 "complete_play_count": 3,
@@ -267,6 +278,11 @@ class TestStatsApiContracts:
             ) as mock_top_genres,
             patch("crate.api.me.get_replay_mix", return_value=replay) as mock_replay,
             patch("crate.api.me.get_stats_story", return_value=story) as mock_story,
+            patch(
+                "crate.api.me.global_catalog_surface_enabled",
+                return_value=False,
+                create=True,
+            ),
         ):
             resp = test_app.get(
                 "/api/me/stats/dashboard"
@@ -277,12 +293,44 @@ class TestStatsApiContracts:
         data = resp.json()
         assert data["window"] == "90d"
         assert data["overview"]["play_count"] == 48
+        assert (
+            data["overview"]["top_artist"]["global_artist_uid"]
+            == "11111111-1111-4111-8111-111111111111"
+        )
         assert data["trends"]["points"][0]["day"] == "2026-04-01"
         assert data["top_tracks"]["items"][0]["title"] == "Concubine"
+        assert (
+            data["top_tracks"]["items"][0]["global_track_uid"]
+            == "33333333-3333-4333-8333-333333333333"
+        )
+        assert (
+            data["top_tracks"]["items"][0]["global_artist_uid"]
+            == "11111111-1111-4111-8111-111111111111"
+        )
+        assert (
+            data["top_tracks"]["items"][0]["global_album_uid"]
+            == "22222222-2222-4222-8222-222222222222"
+        )
         assert data["top_artists"]["items"][0]["artist_name"] == "Converge"
+        assert (
+            data["top_artists"]["items"][0]["global_artist_uid"]
+            == "11111111-1111-4111-8111-111111111111"
+        )
         assert data["top_albums"]["items"][0]["album"] == "Jane Doe"
+        assert (
+            data["top_albums"]["items"][0]["global_artist_uid"]
+            == "11111111-1111-4111-8111-111111111111"
+        )
+        assert (
+            data["top_albums"]["items"][0]["global_album_uid"]
+            == "22222222-2222-4222-8222-222222222222"
+        )
         assert data["top_genres"]["items"][0]["genre_name"] == "metalcore"
         assert data["replay"]["title"] == "Replay this quarter"
+        assert (
+            data["replay"]["items"][0]["global_album_uid"]
+            == "22222222-2222-4222-8222-222222222222"
+        )
         assert data["story"]["movers"][0]["delta_play_count"] == 6
         assert data["story"]["audio_profile"]["energy"] == 0.82
         assert data["story"]["monthly_snapshots"][0]["title"] == "April 2026"
@@ -296,6 +344,8 @@ class TestStatsApiContracts:
         mock_replay.assert_called_once_with(1, window="90d", limit=9)
         mock_story.assert_called_once_with(1, window="90d")
         mock_set_cache.assert_called_once()
+        cache_key = mock_set_cache.call_args.args[0]
+        assert cache_key.startswith("listen:stats_dashboard:v5:local:")
 
     def test_stats_dashboard_supports_month_snapshots(self, test_app):
         period = "month:2026-04"

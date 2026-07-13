@@ -4,6 +4,38 @@ from crate.worker_handlers.management import (
 )
 
 
+def test_handle_index_genres_broadcasts_library_cache_invalidation(monkeypatch):
+    from crate.worker_handlers.analysis import _handle_index_genres
+
+    emitted_events: list[tuple[str, str, dict]] = []
+    broadcasted_scopes: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr(
+        "crate.genre_indexer.index_all_genres",
+        lambda progress_callback=None: {"total_genres": 2},
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.analysis.emit_task_event",
+        lambda task_id, level, payload: emitted_events.append(
+            (task_id, level, payload)
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.api.cache_events.broadcast_invalidation",
+        lambda *scopes: broadcasted_scopes.append(scopes),
+    )
+
+    result = _handle_index_genres("index-genres-1", {}, {"library_path": "/music"})
+
+    assert result == {"total_genres": 2}
+    assert emitted_events[-1] == (
+        "index-genres-1",
+        "info",
+        {"message": "Genres indexed: 2 genres"},
+    )
+    assert broadcasted_scopes == [("library", "home")]
+
+
 def test_handle_repair_duplicate_tracks_delegates_high_confidence_rows(monkeypatch):
     captured: dict = {}
     duplicate_rows = [

@@ -27,6 +27,8 @@ import {
   Trash2,
   HandHeart,
   Languages,
+  Network,
+  DatabaseZap,
 } from "lucide-react";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
@@ -202,6 +204,18 @@ const navItems = [
     icon: Settings,
     label: "Settings",
     capabilities: ["settings.manage"],
+  },
+  {
+    to: "/federation",
+    icon: Network,
+    label: "Federation",
+    capabilities: ["federation.nodes.view"],
+  },
+  {
+    to: "/global-catalog",
+    icon: DatabaseZap,
+    label: "Global Catalog",
+    capabilities: ["federation.nodes.view"],
   },
 ] as const;
 

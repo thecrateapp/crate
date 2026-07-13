@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 from crate.api._deps import library_path
 from crate.api.browse_shared import ARTIST_PHOTO_NAMES
 from crate.api.image_variants import build_image_response
+from crate.db.queries.global_catalog import get_global_track_info
 from crate.db.repositories.library_album_reads import (
     get_library_album_by_entity_uid,
     get_library_album_by_id,
@@ -116,6 +117,22 @@ def _track_app_path(
     return path
 
 
+def _global_track_app_path(track: LibraryRow) -> str:
+    track_ref = track.get("global_track_uid")
+    album_ref = track.get("global_album_uid")
+    if album_ref:
+        return f"/catalog/albums/{_encode(album_ref)}?track={_encode(track_ref)}"
+    query = quote(
+        " ".join(
+            str(track.get(key) or "")
+            for key in ("artist", "album", "title")
+            if track.get(key)
+        ).strip(),
+        safe="",
+    )
+    return f"/search?q={query}" if query else "/search"
+
+
 def _resolve_artist(ref: str) -> LibraryRow | None:
     if _is_uuid(ref):
         return get_library_artist_by_entity_uid(ref)
@@ -134,7 +151,7 @@ def _resolve_album(ref: str) -> LibraryRow | None:
 
 def _resolve_track(ref: str) -> LibraryRow | None:
     if _is_uuid(ref):
-        return get_library_track_by_entity_uid(ref)
+        return get_library_track_by_entity_uid(ref) or get_global_track_info(ref)
     if ref.isdigit():
         return get_library_track_by_id(int(ref))
     return None
@@ -363,26 +380,37 @@ def share_track(
         else None
     )
     artist = get_library_artist(str(track.get("artist") or ""))
+    is_global_track = bool(track.get("global_track_uid") and not track.get("id"))
     title = str(track.get("title") or track.get("filename") or "Unknown track")
     artist_name = str(track.get("artist") or "Unknown artist")
     album_name = str(track.get("album") or (album or {}).get("name") or "")
     description = f"Listen to {title} by {artist_name} on Crate."
     if album_name:
         description = f"{description} From {album_name}."
-    image_ref = (
-        (album or {}).get("entity_uid")
-        or (album or {}).get("id")
-        or track.get("album_id")
-        or track.get("entity_uid")
-        or track["id"]
+    image_path = (
+        f"/api/catalog/albums/{_encode(track['global_album_uid'])}/cover"
+        if is_global_track and track.get("global_album_uid")
+        else _share_image_path(
+            "album",
+            (album or {}).get("entity_uid")
+            or (album or {}).get("id")
+            or track.get("album_id")
+            or track.get("entity_uid")
+            or track.get("global_track_uid")
+            or track["id"],
+        )
     )
     return _render_preview(
         request,
         title=title,
         eyebrow=f"Track by {artist_name}",
         description=description,
-        image_path=_share_image_path("album", image_ref),
-        app_path=_track_app_path(track, album, artist),
+        image_path=image_path,
+        app_path=(
+            _global_track_app_path(track)
+            if is_global_track
+            else _track_app_path(track, album, artist)
+        ),
         og_type="music.song",
     )
 

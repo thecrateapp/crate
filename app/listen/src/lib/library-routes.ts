@@ -1,11 +1,15 @@
 import {
   artistPagePath as _artistPagePath,
+  globalArtistPagePath as _globalArtistPagePath,
+  globalArtistUidFromRouteRef as _globalArtistUidFromRouteRef,
   artistSharePath as _artistSharePath,
   artistTopTracksPath as _artistTopTracksPath,
   artistApiPath as _artistApiPath,
   artistPhotoApiUrl as _artistPhotoApiUrl,
   artistBackgroundApiUrl as _artistBackgroundApiUrl,
   albumPagePath as _albumPagePath,
+  globalAlbumPagePath as _globalAlbumPagePath,
+  globalAlbumUidFromRouteRef as _globalAlbumUidFromRouteRef,
   albumSharePath as _albumSharePath,
   albumApiPath as _albumApiPath,
   albumDownloadApiPath as _albumDownloadApiPath,
@@ -34,9 +38,13 @@ import { getApiBase, getAuthToken } from "@/lib/api";
 
 // Page routes — no prefix needed (local navigation)
 export const artistPagePath = _artistPagePath;
+export const globalArtistPagePath = _globalArtistPagePath;
+export const globalArtistUidFromRouteRef = _globalArtistUidFromRouteRef;
 export const artistSharePath = _artistSharePath;
 export const artistTopTracksPath = _artistTopTracksPath;
 export const albumPagePath = _albumPagePath;
+export const globalAlbumPagePath = _globalAlbumPagePath;
+export const globalAlbumUidFromRouteRef = _globalAlbumUidFromRouteRef;
 export const albumSharePath = _albumSharePath;
 export const isReservedArtistChildSlug = _isReservedArtistChildSlug;
 
@@ -101,6 +109,7 @@ export const albumCoverApiUrl = authedUrl(((input, options) =>
     input,
     preferModernImageFormat(options),
   )) as typeof _albumCoverApiUrl);
+
 export const trackStreamApiPath = _trackStreamApiPath;
 export const trackDownloadApiPath = _trackDownloadApiPath;
 export const trackSharePath = _trackSharePath;

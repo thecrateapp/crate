@@ -9,6 +9,7 @@ media/
 !app/shared/ui/domain/media/
 !app/shared/ui/domain/media/**
 test-music/
+test-music-federation/
 
 # Node
 node_modules/

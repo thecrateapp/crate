@@ -147,28 +147,83 @@ _DOWNLOAD_RESPONSES = merge_responses(
     responses=AUTH_ERROR_RESPONSES,
     summary="Search artists, albums, and tracks",
 )
-def api_search(request: Request, q: str = "", limit: int = 20):
-    _require_auth(request)
+def api_search(
+    request: Request,
+    q: str = "",
+    limit: int = 20,
+    scope: str = "local",
+):
+    user = _require_auth(request)
     q_stripped = q.strip()
     capped_limit = max(1, min(limit, 50))
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
 
-    cache_key = f"listen:search:v2:{q_stripped.lower()}:{capped_limit}"
+    scope = scope if scope in ("local", "auto", "federated") else "local"
+
+    use_global_catalog = False
+    global_catalog_revision = ""
+    if scope == "auto":
+        from crate.federation.global_policy import global_catalog_surface_enabled
+
+        use_global_catalog = global_catalog_surface_enabled("search")
+        if use_global_catalog:
+            from crate.db.queries.global_catalog import get_global_catalog_revision
+
+            global_catalog_revision = get_global_catalog_revision()
+
+    user_cache_part = f":u:{user.get('id')}" if scope != "local" else ""
+    global_cache_part = (
+        f":global:{global_catalog_revision}" if use_global_catalog else ""
+    )
+    cache_key = (
+        f"listen:search:v2:{q_stripped.lower()}:{capped_limit}:{scope}"
+        f"{user_cache_part}{global_cache_part}"
+    )
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
 
-    if not has_library_data():
-        result = fs_search(q_stripped)
-        result["tracks"] = []
-        set_cache(cache_key, result, ttl=45)
-        return result
+    if scope == "local":
+        if not has_library_data():
+            result = fs_search(q_stripped)
+            result["tracks"] = []
+            set_cache(cache_key, result, ttl=45)
+            return result
 
-    payload = search_all_hybrid(q_stripped, capped_limit)
-    record_later("search.hybrid.results.artists", len(payload["artists"]))
-    record_later("search.hybrid.results.albums", len(payload["albums"]))
-    record_later("search.hybrid.results.tracks", len(payload["tracks"]))
+        payload = search_all_hybrid(q_stripped, capped_limit)
+        record_later("search.hybrid.results.artists", len(payload["artists"]))
+        record_later("search.hybrid.results.albums", len(payload["albums"]))
+        record_later("search.hybrid.results.tracks", len(payload["tracks"]))
+        set_cache(cache_key, payload, ttl=45)
+        return payload
+
+    if use_global_catalog:
+        from crate.db.queries.global_catalog import search_global_catalog
+
+        payload = search_global_catalog(q_stripped, capped_limit)
+        record_later("search.global.results.artists", len(payload["artists"]))
+        record_later("search.global.results.albums", len(payload["albums"]))
+        record_later("search.global.results.tracks", len(payload["tracks"]))
+        set_cache(cache_key, payload, ttl=45)
+        return payload
+
+    # Federated search (scope=auto|federated)
+    from crate.db.repositories import federation as fed_repo
+    from crate.federation.search_fanout import federated_search
+
+    local_node = fed_repo.get_local_node()
+
+    payload = federated_search(
+        query=q_stripped,
+        limit=capped_limit,
+        scope=scope,
+        local_node=local_node,
+        user=user,
+    )
+    record_later("search.federated.results.artists", len(payload["artists"]))
+    record_later("search.federated.results.albums", len(payload["albums"]))
+    record_later("search.federated.results.tracks", len(payload["tracks"]))
     set_cache(cache_key, payload, ttl=45)
     return payload
 
@@ -1488,7 +1543,8 @@ def _mood_conditions(filters: dict) -> tuple[list[str], list]:
 def api_browse_moods(request: Request):
     """Return available mood presets with track counts."""
     _require_auth(request)
-    cached = get_cache("listen:browse_moods:v1", max_age_seconds=600)
+    cache_key = "listen:browse_moods:v2"
+    cached = get_cache(cache_key, max_age_seconds=600)
     if cached is not None:
         return cached
 
@@ -1497,7 +1553,7 @@ def api_browse_moods(request: Request):
         {"name": name, "track_count": counts.get(name, 0), "filters": filters}
         for name, filters in MOOD_PRESETS.items()
     ]
-    set_cache("listen:browse_moods:v1", results, ttl=600)
+    set_cache(cache_key, results, ttl=600)
     return results
 
 

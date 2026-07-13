@@ -458,6 +458,13 @@ APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 
 
 def _cookie_domain() -> str | None:
+    override = os.environ.get("CRATE_AUTH_COOKIE_DOMAIN")
+    if override is not None:
+        domain = override.strip()
+        if not domain or domain in {"localhost", "127.0.0.1", "::1"}:
+            return None
+        return domain if domain.startswith(".") else f".{domain}"
+
     domain = os.environ.get("DOMAIN")
     if domain and domain != "localhost":
         return f".{domain}"
@@ -465,8 +472,21 @@ def _cookie_domain() -> str | None:
 
 
 def _is_secure() -> bool:
+    override = os.environ.get("CRATE_AUTH_COOKIE_SECURE")
+    if override is not None:
+        return override.strip().lower() in {"1", "true", "yes", "on"}
+
     domain = os.environ.get("DOMAIN", "localhost")
     return domain != "localhost"
+
+
+def _cookie_samesite() -> str:
+    override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
+    if override:
+        normalized = override.strip().lower()
+        if normalized in {"lax", "strict", "none"}:
+            return normalized
+    return "none" if _is_secure() else "lax"
 
 
 def _set_auth_cookie(
@@ -480,8 +500,8 @@ def _set_auth_cookie(
         key=cookie_name,
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=_is_secure(),
+        samesite=_cookie_samesite(),
         domain=_cookie_domain(),
         max_age=max_age or JWT_EXPIRY_HOURS * 3600,
         path="/",
@@ -493,8 +513,8 @@ def _set_refresh_cookie(response: Response, refresh_token: str, *, max_age: int)
         key=COOKIE_NAME_LISTEN_REFRESH,
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=_is_secure(),
+        samesite=_cookie_samesite(),
         domain=_cookie_domain(),
         max_age=max_age,
         path="/api/auth",
@@ -505,8 +525,8 @@ def _clear_auth_cookie(response: Response, cookie_name: str = COOKIE_NAME):
     response.delete_cookie(
         key=cookie_name,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=_is_secure(),
+        samesite=_cookie_samesite(),
         domain=_cookie_domain(),
         path="/",
     )
@@ -516,11 +536,29 @@ def _clear_refresh_cookie(response: Response):
     response.delete_cookie(
         key=COOKIE_NAME_LISTEN_REFRESH,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=_is_secure(),
+        samesite=_cookie_samesite(),
         domain=_cookie_domain(),
         path="/api/auth",
     )
+
+
+def _clear_cookies_for_context(
+    response: Response,
+    request: Request,
+    *,
+    app_id: str | None = None,
+    return_to: str | None = None,
+) -> None:
+    cookie_name = _cookie_name_for_context(
+        request,
+        app_id=app_id,
+        return_to=return_to,
+    )
+    _clear_auth_cookie(response, cookie_name)
+    if cookie_name == COOKIE_NAME_LISTEN:
+        _clear_auth_cookie(response, COOKIE_NAME)
+        _clear_refresh_cookie(response)
 
 
 def _clean_header_value(value: str | None, *, max_length: int = 160) -> str | None:
@@ -1182,6 +1220,12 @@ def _set_login_cookies(
     app_id: str | None = None,
     return_to: str | None = None,
 ) -> None:
+    _clear_cookies_for_context(
+        response,
+        request,
+        app_id=app_id,
+        return_to=return_to,
+    )
     _set_auth_cookie(
         response,
         token,
@@ -1566,6 +1610,7 @@ async def refresh_auth(request: Request, body: RefreshTokenRequest | None = None
             },
         }
     )
+    _clear_cookies_for_context(response, request, app_id=session_app_id)
     _set_auth_cookie(
         response,
         access_token,
@@ -1595,8 +1640,7 @@ async def logout(request: Request):
 
         invalidate_session(user["session_id"])
     response = JSONResponse(content={"ok": True})
-    _clear_auth_cookie(response, _cookie_name_for_request(request))
-    _clear_refresh_cookie(response)
+    _clear_cookies_for_context(response, request)
     return response
 
 

@@ -10,8 +10,14 @@ from crate.audio import get_audio_files, read_tags
 log = logging.getLogger(__name__)
 
 
-def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
+def find_missing_albums(
+    artist_dir: Path,
+    extensions: set[str],
+    *,
+    artist_name: str | None = None,
+) -> dict:
     """Compare local albums with MusicBrainz discography for an artist."""
+    canonical_artist_name = artist_name or artist_dir.name
     local_albums = []
     for sub in sorted(artist_dir.iterdir()):
         if not sub.is_dir() or sub.name.startswith("."):
@@ -47,18 +53,17 @@ def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
 
     if not local_albums:
         return {
-            "artist": artist_dir.name,
+            "artist": canonical_artist_name,
             "local": [],
             "missing": [],
             "error": "No local albums",
         }
 
     # Try to find artist on MusicBrainz
-    artist_name = artist_dir.name
-    mb_artist = _find_mb_artist(artist_name)
+    mb_artist = _find_mb_artist(canonical_artist_name)
     if not mb_artist:
         return {
-            "artist": artist_name,
+            "artist": canonical_artist_name,
             "local": local_albums,
             "missing": [],
             "error": "Artist not found on MB",
@@ -87,7 +92,7 @@ def find_missing_albums(artist_dir: Path, extensions: set[str]) -> dict:
         missing.append(mb_album)
 
     return {
-        "artist": artist_name,
+        "artist": canonical_artist_name,
         "mb_artist_id": mb_artist["id"],
         "mb_artist_name": mb_artist["name"],
         "local_count": len(local_albums),

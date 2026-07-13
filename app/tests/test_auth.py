@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 
 from tests.conftest import PG_AVAILABLE
@@ -1095,6 +1095,57 @@ class TestLoginEndpoint:
             # check the Set-Cookie header directly
             set_cookie = resp.headers.get("set-cookie", "")
             assert "crate_session" in set_cookie
+
+    def test_set_login_cookies_clears_stale_auth_cookie_variants(self):
+        from crate.api import auth
+
+        response = Response()
+        request = Request(
+            {
+                "type": "http",
+                "method": "POST",
+                "path": "/api/auth/login",
+                "headers": [(b"x-crate-app", b"listen-web")],
+                "query_string": b"",
+                "client": ("testclient", 50000),
+                "server": ("testserver", 80),
+                "scheme": "http",
+            }
+        )
+
+        auth._set_login_cookies(
+            response,
+            request,
+            "new-access-token",
+            "new-refresh-token",
+            app_id="listen-web",
+        )
+
+        set_cookies = [
+            value.decode("latin1")
+            for key, value in response.raw_headers
+            if key == b"set-cookie"
+        ]
+        assert any(
+            cookie.startswith('crate_session=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith('crate_session_listen=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith('crate_refresh_listen=""') and "Max-Age=0" in cookie
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith("crate_session_listen=new-access-token")
+            for cookie in set_cookies
+        )
+        assert any(
+            cookie.startswith("crate_refresh_listen=new-refresh-token")
+            for cookie in set_cookies
+        )
 
     def test_login_wrong_password(self, test_app):
         fake_user = {

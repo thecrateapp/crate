@@ -93,3 +93,37 @@ def test_share_track_preview_deep_links_to_track(test_app, monkeypatch):
         f'href="https://listen.example.test/artists/high-vis/blending?track={TRACK_UID}"'
         in response.text
     )
+
+
+def test_share_track_preview_falls_back_to_global_catalog_track(test_app, monkeypatch):
+    from crate.api import share
+
+    global_album_uid = "44444444-4444-4444-8444-444444444444"
+    global_track = {
+        "global_track_uid": TRACK_UID,
+        "global_artist_uid": "55555555-5555-4555-8555-555555555555",
+        "global_album_uid": global_album_uid,
+        "artist": "High Vis",
+        "album": "Blending",
+        "title": "Talk for Hours",
+    }
+
+    monkeypatch.setattr(share, "get_library_track_by_entity_uid", lambda ref: None)
+    monkeypatch.setattr(share, "get_global_track_info", lambda ref: global_track)
+    monkeypatch.setattr(share, "get_library_artist", lambda name: None)
+
+    response = test_app.get(
+        f"/share/track/{TRACK_UID}/talk-for-hours",
+        headers={"host": "listen.example.test", "x-forwarded-proto": "https"},
+    )
+
+    assert response.status_code == 200
+    assert 'property="og:type" content="music.song"' in response.text
+    assert (
+        f'property="og:image" content="https://listen.example.test/api/catalog/albums/{global_album_uid}/cover"'
+        in response.text
+    )
+    assert (
+        f'href="https://listen.example.test/catalog/albums/{global_album_uid}?track={TRACK_UID}"'
+        in response.text
+    )

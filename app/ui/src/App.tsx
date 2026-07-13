@@ -95,6 +95,14 @@ const Logs = lazy(() =>
 const PlaylistEditor = lazy(() =>
   import("@/pages/PlaylistEditor").then((m) => ({ default: m.PlaylistEditor })),
 );
+const Federation = lazy(() =>
+  import("@/pages/Federation").then((m) => ({ default: m.Federation })),
+);
+const GlobalCatalog = lazy(() =>
+  import("@/pages/GlobalCatalog").then((m) => ({
+    default: m.GlobalCatalog,
+  })),
+);
 
 function PageSpinner() {
   return (
@@ -186,6 +194,7 @@ const UPCOMING_CURATION = [
   "library.tidal.manage",
 ] as const;
 const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
+const FEDERATION_NODES_VIEW = ["federation.nodes.view"] as const;
 export default function App() {
   return (
     <BrowserRouter>
@@ -428,6 +437,22 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={BANDCAMP_MANAGE}>
                       <Bandcamp />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="federation"
+                  element={
+                    <RequireCapabilities anyOf={FEDERATION_NODES_VIEW}>
+                      <Federation />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="global-catalog"
+                  element={
+                    <RequireCapabilities anyOf={FEDERATION_NODES_VIEW}>
+                      <GlobalCatalog />
                     </RequireCapabilities>
                   }
                 />

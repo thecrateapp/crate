@@ -1,9 +1,25 @@
 import type { Track } from "@/contexts/player-types";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
+interface RemoteAvailabilityInput {
+  catalog: boolean;
+  stream: boolean;
+  import: boolean;
+  stale?: boolean;
+  local?: boolean;
+  remote?: boolean;
+  healthy?: boolean;
+}
+
 export interface PlayableTrackInput {
   id?: string | number | null;
   track_id?: string | number | null;
+  global_track_uid?: string | null;
+  globalTrackUid?: string | null;
+  global_artist_uid?: string | null;
+  globalArtistUid?: string | null;
+  global_album_uid?: string | null;
+  globalAlbumUid?: string | null;
   entity_uid?: string | null;
   entityUid?: string | null;
   track_entity_uid?: string | null;
@@ -48,12 +64,22 @@ export interface PlayableTrackInput {
   isSuggested?: boolean;
   suggestion_source?: "playlist";
   suggestionSource?: "playlist";
+  origin?: "local" | "remote";
+  node_uid?: string | null;
+  nodeUid?: string | null;
+  node_name?: string | null;
+  nodeName?: string | null;
+  remote_entity_uid?: string | null;
+  remoteEntityUid?: string | null;
+  availability?: RemoteAvailabilityInput | null;
 }
 
 export type PlayableTrackIdentityInput = Pick<
   PlayableTrackInput,
   | "id"
   | "track_id"
+  | "global_track_uid"
+  | "globalTrackUid"
   | "entity_uid"
   | "entityUid"
   | "track_entity_uid"
@@ -83,9 +109,35 @@ export function getPlayableTrackLibraryId(
   );
 }
 
+function remoteNodeUid(input: PlayableTrackInput): string | null {
+  return input.nodeUid ?? input.node_uid ?? null;
+}
+
+function remoteEntityUid(input: PlayableTrackInput): string | null {
+  return input.remoteEntityUid ?? input.remote_entity_uid ?? null;
+}
+
+function isRemotePlayableInput(input: PlayableTrackInput): boolean {
+  return (
+    input.origin === "remote" &&
+    Boolean(remoteNodeUid(input)) &&
+    Boolean(remoteEntityUid(input))
+  );
+}
+
+function globalTrackUid(input: Partial<PlayableTrackInput>): string | null {
+  return input.globalTrackUid ?? input.global_track_uid ?? null;
+}
+
 export function hasPlayableTrackReference(
-  input: PlayableTrackIdentityInput,
+  input: PlayableTrackIdentityInput & Partial<PlayableTrackInput>,
 ): boolean {
+  if (globalTrackUid(input)) {
+    return true;
+  }
+  if (isRemotePlayableInput(input as PlayableTrackInput)) {
+    return (input as PlayableTrackInput).availability?.stream !== false;
+  }
   if (typeof input.id === "string" && isUuidLikeTrackId(input.id)) {
     return true;
   }
@@ -102,6 +154,13 @@ export function hasPlayableTrackReference(
 }
 
 export function resolvePlayableTrackId(input: PlayableTrackInput): string {
+  const globalUid = globalTrackUid(input);
+  if (globalUid) {
+    return globalUid;
+  }
+  if (isRemotePlayableInput(input)) {
+    return `remote:${remoteNodeUid(input)}:${remoteEntityUid(input)}`;
+  }
   return (
     input.entityUid ||
     input.entity_uid ||
@@ -119,16 +178,33 @@ export function toPlayableTrack(
 ): Track {
   const albumCover =
     resolveMaybeApiAssetUrl(options.cover || input.albumCover) || undefined;
+  const canonicalGlobalTrackUid = globalTrackUid(input) ?? undefined;
+  const inferredLocalEntityUid =
+    !canonicalGlobalTrackUid &&
+    typeof input.id === "string" &&
+    isUuidLikeTrackId(input.id)
+      ? input.id
+      : undefined;
   const entityUid =
     input.entityUid ??
     input.entity_uid ??
     input.track_entity_uid ??
-    (typeof input.id === "string" && isUuidLikeTrackId(input.id)
-      ? input.id
-      : undefined);
+    inferredLocalEntityUid;
+  const origin = input.origin === "remote" ? "remote" : undefined;
+  const nodeUid = remoteNodeUid(input);
+  const remoteUid = remoteEntityUid(input);
+  const availability = input.availability ?? {
+    catalog: true,
+    stream: true,
+    import: false,
+  };
 
   return {
     id: resolvePlayableTrackId(input),
+    globalTrackUid: canonicalGlobalTrackUid,
+    globalArtistUid:
+      input.globalArtistUid ?? input.global_artist_uid ?? undefined,
+    globalAlbumUid: input.globalAlbumUid ?? input.global_album_uid ?? undefined,
     entityUid,
     title: input.title || "Unknown",
     artist: input.artist,
@@ -157,5 +233,15 @@ export function toPlayableTrack(
     blissVector: input.blissVector ?? input.bliss_vector ?? null,
     isSuggested: input.isSuggested ?? input.is_suggested,
     suggestionSource: input.suggestionSource ?? input.suggestion_source,
+    origin,
+    remote:
+      origin === "remote" && nodeUid && remoteUid
+        ? {
+            nodeUid,
+            nodeName: input.nodeName ?? input.node_name ?? "",
+            remoteEntityUid: remoteUid,
+            availability,
+          }
+        : undefined,
   };
 }

@@ -218,6 +218,123 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/reference" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
+# ===========================================================================
+# FEDERATION DEV (two-node local harness)
+# ===========================================================================
+
+DC_FED := COMPOSE_PROJECT_NAME=crate-federation-dev $(DC) -f docker-compose.federation-dev.yaml
+FED_CONTAINERS := fed-a-api fed-a-worker fed-a-admin fed-a-listen fed-a-postgres fed-a-redis fed-b-api fed-b-worker fed-b-postgres fed-b-redis
+FED_API_A := http://localhost:18585
+FED_API_B := http://localhost:28585
+FED_ADMIN_A := http://localhost:15173
+FED_LISTEN_A := http://localhost:15174
+
+.PHONY: federation-dev-up
+federation-dev-up: ## Start the two-node federation dev harness with Node A Admin and Listen
+	@echo "$(YELLOW)Checking port availability...$(NC)"
+	@for port in 18585 28585 15173 15174 15433 25433 16380 26380; do \
+		if lsof -ti :$$port >/dev/null 2>&1; then \
+			echo "$(RED)Port $$port is already in use. Stop conflicting services first.$(NC)"; \
+			exit 1; \
+		fi; \
+	done
+	@echo "$(YELLOW)Seeding fixtures...$(NC)"
+	@bash scripts/federation-fixture-seed.sh
+	@echo "$(YELLOW)Starting federation stack...$(NC)"
+	@$(DC_FED) up -d --build
+	@echo "$(YELLOW)Waiting for federation services...$(NC)"
+	@for url in "$(FED_API_A)/api/status" "$(FED_API_B)/api/status"; do \
+		ok=0; \
+		for _ in $$(seq 1 60); do \
+			if curl -fsS "$$url" >/dev/null 2>&1; then ok=1; break; fi; \
+			sleep 2; \
+		done; \
+		if [ "$$ok" != "1" ]; then \
+			echo "$(RED)Service did not become ready: $$url$(NC)"; \
+			exit 1; \
+		fi; \
+	done
+	@ok=0; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS "$(FED_ADMIN_A)" 2>/dev/null | grep -q '<div id="root"'; then ok=1; break; fi; \
+		sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then \
+		echo "$(RED)Admin did not become ready: $(FED_ADMIN_A)$(NC)"; \
+		exit 1; \
+	fi
+	@ok=0; \
+	for _ in $$(seq 1 60); do \
+		if curl -fsS "$(FED_LISTEN_A)" 2>/dev/null | grep -q '<div id="root"'; then ok=1; break; fi; \
+		sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then \
+		echo "$(RED)Listen did not become ready: $(FED_LISTEN_A)$(NC)"; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "$(GREEN)Federation dev harness running:$(NC)"
+	@echo "  Node A API: $(FED_API_A)"
+	@echo "  Node A Admin: $(FED_ADMIN_A)"
+	@echo "  Node A Listen: $(FED_LISTEN_A)"
+	@echo "  Node B API: $(FED_API_B)"
+	@echo ""
+	@echo "  Next: make federation-dev-smoke && make federation-dev-e2e"
+
+.PHONY: federation-dev-down
+federation-dev-down: ## Stop the federation dev harness (preserves data volumes)
+	@$(DC_FED) down
+	@docker rm -f $(FED_CONTAINERS) >/dev/null 2>&1 || true
+	@echo "$(GREEN)Federation stack stopped (data preserved)$(NC)"
+
+.PHONY: federation-dev-reset
+federation-dev-reset: ## Reset the federation dev harness (wipes data volumes)
+	@$(DC_FED) down -v
+	@docker rm -f $(FED_CONTAINERS) >/dev/null 2>&1 || true
+	@rm -rf test-music-federation
+	@echo "$(GREEN)Federation stack reset (volumes + fixtures removed)$(NC)"
+
+.PHONY: federation-dev-seed
+federation-dev-seed: ## Re-seed federation fixture directories only
+	@rm -rf test-music-federation
+	@bash scripts/federation-fixture-seed.sh
+	@echo "$(GREEN)Fixtures re-seeded$(NC)"
+
+.PHONY: federation-dev-logs
+federation-dev-logs: ## Tail federation harness logs (usage: make federation-dev-logs s=fed-a-api)
+	@if [ -n "$(s)" ]; then \
+		$(DC_FED) logs -f $(s); \
+	else \
+		$(DC_FED) logs -f; \
+	fi
+
+.PHONY: federation-dev-smoke
+federation-dev-smoke: ## Run federation smoke check
+	@bash scripts/federation-smoke.sh
+
+.PHONY: federation-dev-e2e
+federation-dev-e2e: ## Pair nodes, sync fixtures, and verify cross-node search + playback
+	@python3 scripts/federation-dev-e2e.py e2e
+
+.PHONY: federation-dev-global-catalog-e2e
+federation-dev-global-catalog-e2e: ## Verify Listen-ready global catalog search, artwork, and playback
+	@python3 scripts/federation-dev-e2e.py global-catalog
+
+.PHONY: federation-dev-ps
+federation-dev-ps: ## Show federation service status
+	@$(DC_FED) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+
+# ── Federation dev helpers ────────────────────────────────────────────────
+
+.PHONY: federation-dev-pair
+federation-dev-pair: ## Pair node A and B bidirectionally and grant Listen access
+	@python3 scripts/federation-dev-e2e.py pair
+
+.PHONY: federation-dev-shell
+federation-dev-shell: ## Open a shell in a federation service (usage: make federation-dev-shell s=fed-a-api)
+	@if [ -z "$(s)" ]; then echo "$(RED)Specify a service: make federation-dev-shell s=fed-a-api$(NC)"; exit 1; fi
+	@$(DC_FED) exec $(s) sh
+
 .PHONY: dev-test
 dev-test: dev-test-backend dev-test-readplane dev-test-rust dev-test-frontend ## Run backend, frontend, Go, and Rust checks
 	@echo "$(GREEN)All dev checks passed$(NC)"
