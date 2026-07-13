@@ -764,8 +764,10 @@ ready -> backfilling    (explicit full rebuild only)
 ```
 
 Also assert API lifespan creates a deduplicated
-`global_catalog_bootstrap` task only while state is `cold`, and that it runs
-after `init_db()` and identity bootstrap.
+`global_catalog_bootstrap` task while state is `cold` **or** while
+`user_refs_backfill_version` is missing/stale, and that it runs after
+`init_db()` and identity bootstrap. A node that was marked `ready` by an older
+projection must not skip a newly added user-reference migration.
 
 **Step 2: Run the tests.**
 
@@ -786,7 +788,9 @@ The bootstrap handler must:
 3. run the user-reference backfill from Task 3.2;
 4. enqueue a deduplicated incremental reconcile for any mutations received
    during bootstrap;
-5. transition to `ready` only after both catalog and user data are complete;
+5. transition to `ready` only after both catalog and user data are complete,
+   and persist the applied user-reference projection version plus an
+   unresolved-reference report;
 6. store a concise error and transition to `failed` on exception.
 
 Expose an authenticated Admin status payload with `status`, generation,
@@ -824,13 +828,18 @@ git commit -m "feat: bootstrap mandatory catalog read model"
 **Files:**
 
 - Modify: `app/crate/db/repositories/global_user_library.py`
+- Modify: `app/crate/db/repositories/global_catalog_state.py`
 - Modify: `app/crate/db/repositories/playlists_tracks.py`
+- Modify: `app/crate/db/repositories/playlists_duplicate.py`
 - Modify: `app/crate/db/repositories/user_library_playback_writes.py`
-- Modify: `app/crate/db/queries/user_library_history.py`
-- Create: `app/crate/db/jobs/global_catalog_backfill.py`
+- Modify: `app/crate/db/repositories/user_library_preferences.py`
+- Modify: `app/crate/db/queries/user_library_library.py`
+- Modify: `app/readplane/internal/catalog/store.go`
+- Create: `app/crate/db/migrations/versions/061_user_ref_backfill_version.py`
 - Test: `app/tests/test_global_catalog_user_refs.py`
 - Test: `app/tests/test_global_catalog_playlists.py`
-- Test: `app/tests/test_global_catalog_playback.py`
+- Test: `app/tests/test_global_catalog_library_api.py`
+- Test: `app/tests/test_user_ref_backfill_migration.py`
 
 **Step 1: Write failing idempotent backfill tests.**
 
@@ -840,10 +849,18 @@ Seed local library rows plus legacy user data, then assert:
 - `user_saved_albums.album_id` maps to the canonical global album UID;
 - legacy `playlist_tracks` with a local track ID/entity UID gain
   `global_track_uid` while retaining local fields for compatibility;
+- generated `playlist_track_exclusions` gain the same global identity so a
+  regeneration cannot reintroduce an intentionally removed canonical track;
 - `user_play_events` and `user_track_stats` resolve a global track UID from
   their local entity UID/track ID;
+- listening aggregates are rebuilt from projected events, including the
+  canonical `entity_key`, rather than patched in place;
 - a second run changes zero rows;
-- ambiguous/missing rows are counted and recorded, never guessed.
+- an existing `ready` node with an older checkpoint queues the backfill again;
+- ambiguous/missing rows are counted and recorded, never guessed, deleted, or
+  hidden from the user;
+- FastAPI compatibility routes and the Go readplane return the same canonical
+  rows plus unresolved legacy fallbacks, including remote-only follows/saves.
 
 Keep `user_liked_tracks` local in this phase. Its existing local-track join is
 the current product contract; do not create remote likes implicitly.
@@ -859,25 +876,38 @@ PYTHONPATH=app uv run pytest \
 
 Expected: red because migrations 055/057 only create columns/tables.
 
-**Step 3: Implement chunked backfill jobs.**
+**Step 3: Implement the versioned backfill.**
 
-Use keyset pagination and `INSERT ... ON CONFLICT DO NOTHING`/conditional
-updates. Return structured counters:
+Add migration 061 with a monotonically versioned
+`global_catalog_state.user_refs_backfill_version`, a JSON unresolved report,
+the missing exclusion `global_track_uid`, and indexes for local-to-global track
+lookups. Use `INSERT ... ON CONFLICT DO NOTHING`/conditional updates. A full
+reconcile must run local catalog projection before this job.
+
+Return and persist structured counters:
 
 ```python
 {
-    "follows_backfilled": 0,
-    "saves_backfilled": 0,
-    "playlist_tracks_backfilled": 0,
-    "play_events_backfilled": 0,
-    "track_stats_backfilled": 0,
-    "unresolved": {"follows": 0, "albums": 0, "tracks": 0},
+    "artist_follows": 0,
+    "album_saves": 0,
+    "playlist_tracks": 0,
+    "playlist_track_exclusions": 0,
+    "play_events": 0,
+    "listening_stats_users": 0,
+    "unresolved_artist_follows": 0,
+    "unresolved_album_saves": 0,
+    "unresolved_playlist_tracks": 0,
+    "unresolved_playlist_track_exclusions": 0,
+    "unresolved_play_events": 0,
 }
 ```
 
 Do not delete legacy references. New mutations should write canonical IDs when
 available and retain local references only where the local write model needs
-them.
+them. If no exact mapping exists, leave the local row intact and expose it as
+the compatibility fallback; an operator may repair it later from the persisted
+report. `user_liked_tracks` remains deliberately local in v1 because remote
+likes are out of scope.
 
 **Step 4: Verify data preservation and rerun safety.**
 
@@ -885,25 +915,33 @@ them.
 PYTHONPATH=app uv run pytest \
   app/tests/test_global_catalog_user_refs.py \
   app/tests/test_global_catalog_playlists.py \
-  app/tests/test_global_catalog_playback.py \
-  app/tests/test_user_library_queries.py -q
+  app/tests/test_global_catalog_library_api.py \
+  app/tests/test_node_first_catalog_contract.py \
+  app/tests/test_user_ref_backfill_migration.py -q
 ```
 
 Expected: green. Verify the second bootstrap/backfill invocation reports zero
-additional migrated rows.
+additional migrated rows, while an old checkpoint schedules exactly one retry.
+Verify the Go readplane count/list/follow-state contract as well; a canonical
+count with a legacy-only list is a release blocker.
 
 **Step 5: Commit.**
 
 ```bash
 git add app/crate/db/repositories/global_user_library.py \
+  app/crate/db/repositories/global_catalog_state.py \
   app/crate/db/repositories/playlists_tracks.py \
+  app/crate/db/repositories/playlists_duplicate.py \
   app/crate/db/repositories/user_library_playback_writes.py \
-  app/crate/db/queries/user_library_history.py \
-  app/crate/db/jobs/global_catalog_backfill.py \
+  app/crate/db/repositories/user_library_preferences.py \
+  app/crate/db/queries/user_library_library.py \
+  app/crate/db/migrations/versions/061_user_ref_backfill_version.py \
+  app/readplane/internal/catalog/store.go \
   app/tests/test_global_catalog_user_refs.py \
   app/tests/test_global_catalog_playlists.py \
-  app/tests/test_global_catalog_playback.py
-git commit -m "feat: backfill canonical user catalog references"
+  app/tests/test_global_catalog_library_api.py \
+  app/tests/test_user_ref_backfill_migration.py
+git commit -m "fix: backfill canonical user references"
 ```
 
 ### Task 3.3: Separate canonical track references from remote-source permission
@@ -2311,6 +2349,9 @@ two-node harness but the one-node bootstrap/backfill is unverified.
       receives catalog data.
 - [ ] A migrated node preserves follows, saves, playlists, history, and stats
       through canonical references.
+- [ ] A stale user-reference checkpoint automatically requeues the full
+      reconciliation, records its projection version/report, and never deletes
+      an unresolved historical row.
 - [ ] Local upserts enqueue bounded dirty projection work.
 - [ ] Local deletes tombstone/remove their canonical source correctly.
 - [ ] A no-peer node makes no federation HTTP request and exposes only local
@@ -2325,6 +2366,8 @@ two-node harness but the one-node bootstrap/backfill is unverified.
       and falls back safely for remote facets/assets/playback.
 - [ ] FastAPI/readplane contract smoke passes for canonical search and
       user-library reads.
+- [ ] FastAPI and Go return the same canonical-plus-unresolved-legacy count,
+      list, and follow-state semantics for user-library compatibility routes.
 - [ ] Every node, including a zero-peer node, advertises one stable signed
       `crate-core` taxonomy descriptor with immutable global genre IDs.
 - [ ] Peer manifests retain legacy raw genres during protocol compatibility and
