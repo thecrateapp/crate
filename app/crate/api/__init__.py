@@ -76,12 +76,15 @@ def _bootstrap_federation_identity() -> None:
 
 
 def _queue_global_catalog_bootstrap() -> None:
-    """Ensure a new single-node installation builds its canonical catalog."""
+    """Ensure the canonical catalog and historical user refs are projected."""
     from crate.db.repositories.global_catalog_state import get_catalog_state
     from crate.db.repositories.tasks import create_task_dedup
 
     state = get_catalog_state()
-    if state["status"] not in {"cold", "failed"}:
+    if (
+        state["status"] not in {"cold", "failed"}
+        and state.get("user_refs_backfilled_at") is not None
+    ):
         return
     create_task_dedup(
         "global_catalog_reconcile_full",

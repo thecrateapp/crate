@@ -18,6 +18,7 @@ def test_startup_bootstraps_one_local_node_without_env_flag(monkeypatch):
     )
     monkeypatch.setattr(bootstrap, "store_private_key", lambda *_args: None)
     monkeypatch.setattr(bootstrap, "public_key_to_base64", lambda _key: "public")
+
     def ensure_local_node(**kwargs):
         created["ensure"] = kwargs
         return node
@@ -65,7 +66,34 @@ def test_cold_single_node_queues_a_catalog_backfill_on_startup(monkeypatch):
     from crate.db.repositories import global_catalog_state, tasks
 
     queued: dict[str, object] = {}
-    monkeypatch.setattr(global_catalog_state, "get_catalog_state", lambda: {"status": "cold"})
+    monkeypatch.setattr(
+        global_catalog_state, "get_catalog_state", lambda: {"status": "cold"}
+    )
+    monkeypatch.setattr(
+        tasks,
+        "create_task_dedup",
+        lambda *args, **kwargs: queued.update({"args": args, "kwargs": kwargs}),
+    )
+
+    api._queue_global_catalog_bootstrap()
+
+    assert queued["args"] == (
+        "global_catalog_reconcile_full",
+        {"triggered_by": "api_startup"},
+    )
+    assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+
+
+def test_ready_node_without_user_ref_projection_queues_a_catalog_backfill(monkeypatch):
+    from crate import api
+    from crate.db.repositories import global_catalog_state, tasks
+
+    queued: dict[str, object] = {}
+    monkeypatch.setattr(
+        global_catalog_state,
+        "get_catalog_state",
+        lambda: {"status": "ready", "user_refs_backfilled_at": None},
+    )
     monkeypatch.setattr(
         tasks,
         "create_task_dedup",

@@ -241,6 +241,68 @@ def get_user_global_library_counts(user_id: int) -> dict[str, int]:
     return {key: int(value or 0) for key, value in dict(row or {}).items()}
 
 
+def backfill_legacy_user_library_refs() -> dict[str, int]:
+    """Project resolvable local library references into the canonical catalog."""
+    with transaction_scope() as session:
+        artist_follows = session.execute(
+            text(
+                """
+                INSERT INTO user_global_artist_follows
+                    (user_id, global_artist_uid, created_at)
+                SELECT DISTINCT ON (uf.user_id, global_artist.global_artist_uid)
+                    uf.user_id,
+                    global_artist.global_artist_uid,
+                    uf.created_at
+                FROM user_follows uf
+                JOIN library_artists local_artist
+                  ON lower(local_artist.name) = lower(uf.artist_name)
+                JOIN global_catalog_artists global_artist
+                  ON global_artist.local_artist_id = local_artist.id
+                ORDER BY
+                    uf.user_id,
+                    global_artist.global_artist_uid,
+                    uf.created_at ASC
+                ON CONFLICT DO NOTHING
+                """
+            )
+        )
+        album_saves = session.execute(
+            text(
+                """
+                INSERT INTO user_global_album_saves
+                    (user_id, global_album_uid, created_at)
+                SELECT DISTINCT ON (usa.user_id, global_album.global_album_uid)
+                    usa.user_id,
+                    global_album.global_album_uid,
+                    usa.created_at
+                FROM user_saved_albums usa
+                JOIN global_catalog_albums global_album
+                  ON global_album.local_album_id = usa.album_id
+                ORDER BY
+                    usa.user_id,
+                    global_album.global_album_uid,
+                    usa.created_at ASC
+                ON CONFLICT DO NOTHING
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_state
+                SET
+                    user_refs_backfilled_at = COALESCE(user_refs_backfilled_at, NOW()),
+                    updated_at = NOW()
+                WHERE singleton = TRUE
+                """
+            )
+        )
+    return {
+        "artist_follows": max(0, int(artist_follows.rowcount or 0)),
+        "album_saves": max(0, int(album_saves.rowcount or 0)),
+    }
+
+
 def follow_global_artist(user_id: int, global_artist_uid: str) -> bool:
     now = utc_now_iso()
     with transaction_scope() as session:
@@ -501,6 +563,7 @@ def _has_changed(result: Any) -> bool:
 
 
 __all__ = [
+    "backfill_legacy_user_library_refs",
     "follow_global_artist",
     "get_user_global_library_counts",
     "is_global_album_saved",

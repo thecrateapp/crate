@@ -127,6 +127,59 @@ def _seed_global_artist_and_album(pg_db):
     return artist_uid, album_uid
 
 
+def test_backfill_legacy_library_refs_projects_resolved_local_entities(pg_db):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs,
+        get_user_global_library_counts,
+        list_user_global_album_saves,
+        list_user_global_artist_follows,
+    )
+    from crate.db.repositories.global_catalog_state import get_catalog_state
+    from crate.db.tx import transaction_scope
+
+    artist_uid, album_uid = _seed_global_artist_and_album(pg_db)
+    with transaction_scope() as session:
+        album_id = session.execute(
+            text("SELECT id FROM library_albums WHERE name = 'Blending' LIMIT 1")
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO user_follows (user_id, artist_name, created_at)
+                VALUES (1, 'High Vis', '2026-07-13T10:00:00+00:00')
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO user_saved_albums (user_id, album_id, created_at)
+                VALUES (1, :album_id, '2026-07-13T10:00:00+00:00')
+                """
+            ),
+            {"album_id": album_id},
+        )
+
+    assert backfill_legacy_user_library_refs() == {
+        "artist_follows": 1,
+        "album_saves": 1,
+    }
+    assert get_user_global_library_counts(1)["followed_artists"] == 1
+    assert get_user_global_library_counts(1)["saved_albums"] == 1
+    assert [row["global_artist_uid"] for row in list_user_global_artist_follows(1)] == [
+        artist_uid
+    ]
+    assert [row["global_album_uid"] for row in list_user_global_album_saves(1)] == [
+        album_uid
+    ]
+    assert get_catalog_state()["user_refs_backfilled_at"] is not None
+
+    assert backfill_legacy_user_library_refs() == {
+        "artist_follows": 0,
+        "album_saves": 0,
+    }
+
+
 def test_global_artist_follow_dual_writes_local_follow(pg_db):
     from crate.db.repositories.global_user_library import (
         follow_global_artist,

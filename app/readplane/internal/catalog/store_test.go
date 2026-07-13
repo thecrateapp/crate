@@ -66,6 +66,24 @@ func TestEmptyTrackGenrePayload(t *testing.T) {
 	}
 }
 
+func TestUserLibraryCountsQueryUsesCanonicalCatalogRefs(t *testing.T) {
+	tests := []struct {
+		name  string
+		table string
+	}{
+		{name: "followed artists", table: "user_global_artist_follows"},
+		{name: "saved albums", table: "user_global_album_saves"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Contains(t, userLibraryCountsQuery, tt.table)
+		})
+	}
+	assert.NotContains(t, userLibraryCountsQuery, "FROM user_follows")
+	assert.NotContains(t, userLibraryCountsQuery, "FROM user_saved_albums")
+}
+
 func TestAnnotateGenreSummary(t *testing.T) {
 	t.Run("mapped genre", func(t *testing.T) {
 		row := map[string]any{

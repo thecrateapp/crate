@@ -8,6 +8,7 @@ from crate.db.repositories.global_catalog_state import (
     get_catalog_state,
     transition_catalog_state,
 )
+from crate.db.repositories.global_user_library import backfill_legacy_user_library_refs
 from crate.federation.global_genres import refresh_global_catalog_genre_snapshots
 from crate.federation.global_reconciliation import (
     reconcile_dirty_catalog_sources,
@@ -41,6 +42,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
         local = reconcile_local_catalog(batch_size=batch_size)
         remote = reconcile_remote_catalog(batch_size=batch_size)
         refresh_global_catalog_genre_snapshots()
+        user_refs = backfill_legacy_user_library_refs()
     except Exception as exc:
         transition_catalog_state("failed", last_error=str(exc)[:4000])
         raise
@@ -52,6 +54,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
         "mode": "full",
         "local": local,
         "remote": remote,
+        "user_refs": user_refs,
     }
 
 

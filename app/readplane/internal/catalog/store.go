@@ -15,6 +15,14 @@ import (
 
 var ErrNotFound = errors.New("catalog item not found")
 
+const userLibraryCountsQuery = `
+		SELECT
+			(SELECT COUNT(*) FROM user_global_artist_follows WHERE user_id = $1)::INTEGER AS followed_artists,
+			(SELECT COUNT(*) FROM user_global_album_saves WHERE user_id = $1)::INTEGER AS saved_albums,
+			(SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = $1)::INTEGER AS liked_tracks,
+			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists
+	`
+
 // Store provides read-only catalog queries backed by a PostgreSQL pool.
 type Store struct {
 	pool         *pgxpool.Pool
@@ -241,13 +249,7 @@ func (s *Store) LikedTracks(ctx context.Context, userID int64, limit int) ([]map
 func (s *Store) UserLibraryCounts(ctx context.Context, userID int64) (map[string]any, error) {
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	rows, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT
-			(SELECT COUNT(*) FROM user_follows WHERE user_id = $1)::INTEGER AS followed_artists,
-			(SELECT COUNT(*) FROM user_saved_albums WHERE user_id = $1)::INTEGER AS saved_albums,
-			(SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = $1)::INTEGER AS liked_tracks,
-			(SELECT COUNT(*) FROM playlists WHERE user_id = $1)::INTEGER AS playlists
-	`, userID))
+	rows, err := rowsToMaps(s.pool.Query(ctx, userLibraryCountsQuery, userID))
 	if err != nil {
 		return nil, err
 	}
