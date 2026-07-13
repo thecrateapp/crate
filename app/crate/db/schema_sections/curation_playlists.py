@@ -131,15 +131,27 @@ def create_playlist_schema(cur) -> None:
         """
     )
     cur.execute(
+        "ALTER TABLE playlist_track_exclusions ADD COLUMN IF NOT EXISTS global_track_uid UUID"
+    )
+    cur.execute("DROP INDEX IF EXISTS idx_playlist_track_exclusions_identity")
+    cur.execute(
         """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_track_exclusions_identity
         ON playlist_track_exclusions(
             playlist_id,
+            COALESCE(global_track_uid::text, ''),
             COALESCE(track_entity_uid::text, ''),
             COALESCE(track_storage_id::text, ''),
             COALESCE(track_path, ''),
             COALESCE(track_id::text, '')
         )
+        """
+    )
+    cur.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_playlist_track_exclusions_global_track_uid
+        ON playlist_track_exclusions(global_track_uid)
+        WHERE global_track_uid IS NOT NULL
         """
     )
 

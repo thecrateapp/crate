@@ -2,72 +2,23 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.repositories.global_user_library import (
+    get_user_global_library_counts,
+    list_user_global_album_saves,
+    list_user_global_artist_follows,
+)
 from crate.db.queries.user_library_shared import relative_track_path
 from crate.db.tx import read_scope
 
 
 def get_followed_artists(user_id: int) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT
-                    uf.artist_name,
-                    uf.created_at,
-                    la.id AS artist_id,
-                    la.entity_uid::text AS artist_entity_uid,
-                    la.slug AS artist_slug,
-                    la.album_count,
-                    la.track_count,
-                    la.has_photo
-                FROM user_follows uf
-                LEFT JOIN library_artists la ON la.name = uf.artist_name
-                WHERE uf.user_id = :user_id
-                ORDER BY uf.created_at DESC
-                """
-                ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+    """Return canonical follows, retaining unresolved legacy rows as fallbacks."""
+    return list_user_global_artist_follows(user_id)
 
 
 def get_saved_albums(user_id: int) -> list[dict]:
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT
-                    usa.created_at AS saved_at,
-                    la.id,
-                    la.entity_uid::text AS album_entity_uid,
-                    la.slug,
-                    la.artist,
-                    art.id AS artist_id,
-                    art.entity_uid::text AS artist_entity_uid,
-                    art.slug AS artist_slug,
-                    la.name,
-                    la.year,
-                    la.has_cover,
-                    la.track_count,
-                    la.total_duration
-                FROM user_saved_albums usa
-                JOIN library_albums la ON la.id = usa.album_id
-                LEFT JOIN library_artists art ON art.name = la.artist
-                WHERE usa.user_id = :user_id
-                ORDER BY usa.created_at DESC
-                """
-                ),
-                {"user_id": user_id},
-            )
-            .mappings()
-            .all()
-        )
-    return [dict(row) for row in rows]
+    """Return canonical saves, retaining unresolved legacy rows as fallbacks."""
+    return list_user_global_album_saves(user_id)
 
 
 def is_following(user_id: int, artist_name: str) -> bool:
@@ -75,7 +26,20 @@ def is_following(user_id: int, artist_name: str) -> bool:
         row = (
             session.execute(
                 text(
-                    "SELECT 1 FROM user_follows WHERE user_id = :user_id AND artist_name = :artist_name"
+                    """
+                    SELECT 1
+                    FROM user_global_artist_follows followed
+                    JOIN global_catalog_artists artist
+                      ON artist.global_artist_uid = followed.global_artist_uid
+                    WHERE followed.user_id = :user_id
+                      AND lower(artist.canonical_name) = lower(:artist_name)
+                    UNION ALL
+                    SELECT 1
+                    FROM user_follows
+                    WHERE user_id = :user_id
+                      AND lower(artist_name) = lower(:artist_name)
+                    LIMIT 1
+                    """
                 ),
                 {"user_id": user_id, "artist_name": artist_name},
             )
@@ -172,24 +136,7 @@ def is_track_liked(user_id: int, track_id: int) -> bool:
 
 
 def get_user_library_counts(user_id: int) -> dict:
-    with read_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    """
-                SELECT
-                    (SELECT COUNT(*) FROM user_follows WHERE user_id = :uid1) AS followed_artists,
-                    (SELECT COUNT(*) FROM user_saved_albums WHERE user_id = :uid2) AS saved_albums,
-                    (SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = :uid3) AS liked_tracks,
-                    (SELECT COUNT(*) FROM playlists WHERE user_id = :uid4) AS playlists
-                """
-                ),
-                {"uid1": user_id, "uid2": user_id, "uid3": user_id, "uid4": user_id},
-            )
-            .mappings()
-            .first()
-        )
-    return dict(row or {})
+    return get_user_global_library_counts(user_id)
 
 
 __all__ = [

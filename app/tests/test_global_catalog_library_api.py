@@ -65,6 +65,33 @@ def test_catalog_me_albums_returns_user_global_saves(
     mocked.assert_called_once()
 
 
+def test_legacy_saved_albums_route_keeps_remote_only_saves_visible(test_app):
+    remote_album = {
+        "saved_at": "2026-07-10T10:00:00+00:00",
+        "id": None,
+        "global_album_uid": "album-global",
+        "global_artist_uid": "artist-global",
+        "album_entity_uid": None,
+        "slug": None,
+        "artist": "Rival Schools",
+        "artist_id": None,
+        "artist_entity_uid": None,
+        "artist_slug": None,
+        "name": "Pedals",
+        "year": "2011",
+        "has_cover": False,
+        "track_count": 10,
+        "total_duration": 2400,
+        "cover_url": None,
+    }
+
+    with patch("crate.api.me.get_saved_albums", return_value=[remote_album]):
+        response = test_app.get("/api/me/albums")
+
+    assert response.status_code == 200
+    assert response.json() == [remote_album]
+
+
 def test_me_library_counts_use_global_refs_when_library_surface_on(test_app):
     global_counts = {
         "followed_artists": 3,
@@ -99,7 +126,9 @@ def test_me_library_counts_use_local_refs_when_library_surface_off(test_app):
 
     with (
         patch("crate.api.me.global_catalog_surface_enabled", return_value=False),
-        patch("crate.api.me.get_user_library_counts", return_value=local_counts) as mocked,
+        patch(
+            "crate.api.me.get_user_library_counts", return_value=local_counts
+        ) as mocked,
         patch("crate.api.me.get_user_global_library_counts") as global_mock,
     ):
         response = test_app.get("/api/me")

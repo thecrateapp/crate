@@ -66,7 +66,7 @@ func TestEmptyTrackGenrePayload(t *testing.T) {
 	}
 }
 
-func TestUserLibraryCountsQueryUsesCanonicalCatalogRefs(t *testing.T) {
+func TestUserLibraryCountsQueryKeepsCanonicalAndUnresolvedLegacyRefs(t *testing.T) {
 	tests := []struct {
 		name  string
 		table string
@@ -80,8 +80,18 @@ func TestUserLibraryCountsQueryUsesCanonicalCatalogRefs(t *testing.T) {
 			assert.Contains(t, userLibraryCountsQuery, tt.table)
 		})
 	}
-	assert.NotContains(t, userLibraryCountsQuery, "FROM user_follows")
-	assert.NotContains(t, userLibraryCountsQuery, "FROM user_saved_albums")
+	for _, table := range []string{"user_follows", "user_saved_albums"} {
+		assert.Contains(t, userLibraryCountsQuery, table)
+	}
+	assert.Contains(t, userLibraryCountsQuery, "projected.user_id IS NULL")
+}
+
+func TestReadplaneUserLibraryQueriesUseCanonicalRefs(t *testing.T) {
+	queries := []string{followedArtistsQuery, savedAlbumsQuery, followingArtistNameQuery}
+	for _, query := range queries {
+		assert.Contains(t, query, "user_global_")
+		assert.Contains(t, query, "global_catalog_")
+	}
 }
 
 func TestAnnotateGenreSummary(t *testing.T) {

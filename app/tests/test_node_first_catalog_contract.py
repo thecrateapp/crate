@@ -107,3 +107,37 @@ def test_ready_node_without_user_ref_projection_queues_a_catalog_backfill(monkey
         {"triggered_by": "api_startup"},
     )
     assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+
+
+def test_ready_node_with_an_older_user_ref_backfill_queues_a_catalog_backfill(
+    monkeypatch,
+):
+    from crate import api
+    from crate.db.repositories import global_catalog_state, tasks
+    from crate.db.repositories.global_user_library import (
+        USER_LIBRARY_REFS_BACKFILL_VERSION,
+    )
+
+    queued: dict[str, object] = {}
+    monkeypatch.setattr(
+        global_catalog_state,
+        "get_catalog_state",
+        lambda: {
+            "status": "ready",
+            "user_refs_backfilled_at": "2026-07-13T10:00:00+00:00",
+            "user_refs_backfill_version": USER_LIBRARY_REFS_BACKFILL_VERSION - 1,
+        },
+    )
+    monkeypatch.setattr(
+        tasks,
+        "create_task_dedup",
+        lambda *args, **kwargs: queued.update({"args": args, "kwargs": kwargs}),
+    )
+
+    api._queue_global_catalog_bootstrap()
+
+    assert queued["args"] == (
+        "global_catalog_reconcile_full",
+        {"triggered_by": "api_startup"},
+    )
+    assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}

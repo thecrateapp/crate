@@ -163,6 +163,15 @@ def test_backfill_legacy_library_refs_projects_resolved_local_entities(pg_db):
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 1,
         "album_saves": 1,
+        "playlist_tracks": 0,
+        "playlist_track_exclusions": 0,
+        "play_events": 0,
+        "listening_stats_users": 0,
+        "unresolved_artist_follows": 0,
+        "unresolved_album_saves": 0,
+        "unresolved_playlist_tracks": 0,
+        "unresolved_playlist_track_exclusions": 0,
+        "unresolved_play_events": 0,
     }
     assert get_user_global_library_counts(1)["followed_artists"] == 1
     assert get_user_global_library_counts(1)["saved_albums"] == 1
@@ -177,7 +186,443 @@ def test_backfill_legacy_library_refs_projects_resolved_local_entities(pg_db):
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 0,
         "album_saves": 0,
+        "playlist_tracks": 0,
+        "playlist_track_exclusions": 0,
+        "play_events": 0,
+        "listening_stats_users": 0,
+        "unresolved_artist_follows": 0,
+        "unresolved_album_saves": 0,
+        "unresolved_playlist_tracks": 0,
+        "unresolved_playlist_track_exclusions": 0,
+        "unresolved_play_events": 0,
     }
+
+
+def test_backfill_legacy_library_refs_projects_all_local_track_references(pg_db):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs,
+    )
+    from crate.db.tx import transaction_scope
+
+    artist_uid, album_uid = _seed_global_artist_and_album(pg_db)
+    track_uid = str(uuid.uuid4())
+    track_entity_uid = str(uuid.uuid4())
+    pg_db.upsert_track(
+        {
+            "artist": "High Vis",
+            "album": "Blending",
+            "filename": "01 - Trauma Bonds.flac",
+            "title": "Trauma Bonds",
+            "path": "/music/High Vis/Blending/01 - Trauma Bonds.flac",
+            "entity_uid": track_entity_uid,
+            "duration": 180,
+        }
+    )
+
+    with transaction_scope() as session:
+        track_id = session.execute(
+            text(
+                """
+                SELECT id
+                FROM library_tracks
+                WHERE entity_uid = CAST(:track_entity_uid AS uuid)
+                """
+            ),
+            {"track_entity_uid": track_entity_uid},
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks
+                    (
+                        global_track_uid,
+                        global_album_uid,
+                        global_artist_uid,
+                        canonical_title,
+                        normalized_title,
+                        artist_name,
+                        album_name,
+                        duration_seconds,
+                        local_track_id,
+                        local_track_entity_uid,
+                        has_local
+                    )
+                VALUES
+                    (
+                        :track_uid,
+                        :album_uid,
+                        :artist_uid,
+                        'Trauma Bonds',
+                        'trauma bonds',
+                        'High Vis',
+                        'Blending',
+                        180,
+                        :track_id,
+                        :track_entity_uid,
+                        true
+                    )
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "track_id": track_id,
+                "track_entity_uid": track_entity_uid,
+            },
+        )
+        playlist_id = session.execute(
+            text(
+                """
+                INSERT INTO playlists (name, user_id, created_at, updated_at)
+                VALUES ('Backfill', 1, NOW(), NOW())
+                RETURNING id
+                """
+            )
+        ).scalar_one()
+        session.execute(
+            text(
+                """
+                INSERT INTO playlist_tracks
+                    (
+                        playlist_id,
+                        track_id,
+                        track_entity_uid,
+                        track_path,
+                        title,
+                        artist,
+                        album,
+                        duration,
+                        position,
+                        added_at
+                    )
+                VALUES
+                    (
+                        :playlist_id,
+                        :track_id,
+                        CAST(:track_entity_uid AS uuid),
+                        '/music/High Vis/Blending/01 - Trauma Bonds.flac',
+                        'Trauma Bonds',
+                        'High Vis',
+                        'Blending',
+                        180,
+                        1,
+                        NOW()
+                    )
+                """
+            ),
+            {
+                "playlist_id": playlist_id,
+                "track_id": track_id,
+                "track_entity_uid": track_entity_uid,
+            },
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO user_play_events
+                    (
+                        user_id,
+                        track_id,
+                        track_entity_uid,
+                        started_at,
+                        ended_at,
+                        created_at
+                    )
+                VALUES
+                    (
+                        1,
+                        :track_id,
+                        CAST(:track_entity_uid AS uuid),
+                        NOW(),
+                        NOW(),
+                        NOW()
+                    )
+                """
+            ),
+            {"track_id": track_id, "track_entity_uid": track_entity_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO playlist_track_exclusions
+                    (
+                        playlist_id,
+                        track_id,
+                        track_entity_uid,
+                        track_path,
+                        created_at
+                    )
+                VALUES
+                    (
+                        :playlist_id,
+                        :track_id,
+                        CAST(:track_entity_uid AS uuid),
+                        '/music/High Vis/Blending/01 - Trauma Bonds.flac',
+                        NOW()
+                    )
+                """
+            ),
+            {
+                "playlist_id": playlist_id,
+                "track_id": track_id,
+                "track_entity_uid": track_entity_uid,
+            },
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO user_track_stats
+                    (user_id, stat_window, entity_key, track_id, track_entity_uid)
+                VALUES
+                    (
+                        1,
+                        'all_time',
+                        :track_entity_uid,
+                        :track_id,
+                        CAST(:track_entity_uid AS uuid)
+                    )
+                """
+            ),
+            {"track_id": track_id, "track_entity_uid": track_entity_uid},
+        )
+
+    assert backfill_legacy_user_library_refs() == {
+        "artist_follows": 0,
+        "album_saves": 0,
+        "playlist_tracks": 1,
+        "playlist_track_exclusions": 1,
+        "play_events": 1,
+        "listening_stats_users": 1,
+        "unresolved_artist_follows": 0,
+        "unresolved_album_saves": 0,
+        "unresolved_playlist_tracks": 0,
+        "unresolved_playlist_track_exclusions": 0,
+        "unresolved_play_events": 0,
+    }
+
+    with transaction_scope() as session:
+        assert (
+            session.execute(
+                text(
+                    """
+                SELECT global_track_uid::text
+                FROM playlist_tracks
+                WHERE playlist_id = :playlist_id
+                """
+                ),
+                {"playlist_id": playlist_id},
+            ).scalar_one()
+            == track_uid
+        )
+        assert (
+            session.execute(
+                text("SELECT global_track_uid::text FROM user_play_events")
+            ).scalar_one()
+            == track_uid
+        )
+        assert (
+            session.execute(
+                text(
+                    """
+                SELECT global_track_uid::text
+                FROM user_track_stats
+                WHERE stat_window = 'all_time'
+                """
+                )
+            ).scalar_one()
+            == track_uid
+        )
+        assert (
+            session.execute(
+                text("SELECT global_track_uid::text FROM playlist_track_exclusions")
+            ).scalar_one()
+            == track_uid
+        )
+
+    assert backfill_legacy_user_library_refs() == {
+        "artist_follows": 0,
+        "album_saves": 0,
+        "playlist_tracks": 0,
+        "playlist_track_exclusions": 0,
+        "play_events": 0,
+        "listening_stats_users": 0,
+        "unresolved_artist_follows": 0,
+        "unresolved_album_saves": 0,
+        "unresolved_playlist_tracks": 0,
+        "unresolved_playlist_track_exclusions": 0,
+        "unresolved_play_events": 0,
+    }
+
+
+def test_unresolved_legacy_library_refs_remain_visible_to_the_user(pg_db):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs,
+        get_user_global_library_counts,
+        list_user_global_artist_follows,
+    )
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO user_follows (user_id, artist_name, created_at)
+                VALUES (1, 'Historical Artist', '2026-07-13T10:00:00+00:00')
+                """
+            )
+        )
+
+    result = backfill_legacy_user_library_refs()
+
+    assert result["unresolved_artist_follows"] == 1
+    assert get_user_global_library_counts(1)["followed_artists"] == 1
+    rows = list_user_global_artist_follows(1)
+    assert len(rows) == 1
+    assert rows[0]["created_at"] is not None
+    assert {key: value for key, value in rows[0].items() if key != "created_at"} == {
+        "global_artist_uid": None,
+        "artist_name": "Historical Artist",
+        "artist_id": None,
+        "artist_entity_uid": None,
+        "artist_slug": None,
+        "album_count": 0,
+        "track_count": 0,
+        "has_photo": False,
+        "photo_url": None,
+    }
+
+
+def test_legacy_library_writes_project_canonical_refs_without_waiting_for_backfill(
+    pg_db,
+):
+    from crate.db.repositories.global_user_library import (
+        get_user_global_library_counts,
+    )
+    from crate.db.repositories.user_library_preferences import follow_artist, save_album
+    from crate.db.tx import transaction_scope
+
+    artist_uid, album_uid = _seed_global_artist_and_album(pg_db)
+    with transaction_scope() as session:
+        album_id = int(
+            session.execute(
+                text("SELECT id FROM library_albums WHERE name = 'Blending' LIMIT 1")
+            ).scalar_one()
+        )
+
+    assert follow_artist(1, "High Vis") is True
+    assert save_album(1, album_id) is True
+
+    with transaction_scope() as session:
+        assert (
+            session.execute(
+                text(
+                    """
+                SELECT global_artist_uid::text
+                FROM user_global_artist_follows
+                WHERE user_id = 1
+                """
+                )
+            ).scalar_one()
+            == artist_uid
+        )
+        assert (
+            session.execute(
+                text(
+                    """
+                SELECT global_album_uid::text
+                FROM user_global_album_saves
+                WHERE user_id = 1
+                """
+                )
+            ).scalar_one()
+            == album_uid
+        )
+    assert get_user_global_library_counts(1) == {
+        "followed_artists": 1,
+        "saved_albums": 1,
+        "liked_tracks": 0,
+        "playlists": 0,
+    }
+
+
+def test_new_local_play_events_resolve_their_canonical_track_ref(pg_db, monkeypatch):
+    from crate.db.repositories.user_library_playback_writes import record_play_event
+    from crate.db.tx import transaction_scope
+
+    artist_uid, album_uid = _seed_global_artist_and_album(pg_db)
+    track_uid = str(uuid.uuid4())
+    track_entity_uid = str(uuid.uuid4())
+    pg_db.upsert_track(
+        {
+            "artist": "High Vis",
+            "album": "Blending",
+            "filename": "01 - Trauma Bonds.flac",
+            "title": "Trauma Bonds",
+            "path": "/music/High Vis/Blending/01 - Trauma Bonds.flac",
+            "entity_uid": track_entity_uid,
+            "duration": 180,
+        }
+    )
+    with transaction_scope() as session:
+        track_id = int(
+            session.execute(
+                text(
+                    """
+                    SELECT id FROM library_tracks
+                    WHERE entity_uid = CAST(:track_entity_uid AS uuid)
+                    """
+                ),
+                {"track_entity_uid": track_entity_uid},
+            ).scalar_one()
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_tracks (
+                    global_track_uid, global_album_uid, global_artist_uid,
+                    canonical_title, normalized_title, artist_name, album_name,
+                    duration_seconds, local_track_id, local_track_entity_uid,
+                    has_local, has_remote
+                ) VALUES (
+                    :track_uid, :album_uid, :artist_uid,
+                    'Trauma Bonds', 'trauma bonds', 'High Vis', 'Blending',
+                    180, :track_id, CAST(:track_entity_uid AS uuid), true, false
+                )
+                """
+            ),
+            {
+                "track_uid": track_uid,
+                "album_uid": album_uid,
+                "artist_uid": artist_uid,
+                "track_id": track_id,
+                "track_entity_uid": track_entity_uid,
+            },
+        )
+    monkeypatch.setattr(
+        "crate.db.repositories.user_library_playback_writes._schedule_play_event_followups",
+        lambda *_args, **_kwargs: None,
+    )
+
+    record_play_event(
+        1,
+        track_id=track_id,
+        title="Trauma Bonds",
+        artist="High Vis",
+        album="Blending",
+        started_at="2026-07-13T10:00:00+00:00",
+        ended_at="2026-07-13T10:03:00+00:00",
+        played_seconds=180,
+        was_completed=True,
+    )
+
+    with transaction_scope() as session:
+        assert (
+            session.execute(
+                text("SELECT global_track_uid::text FROM user_play_events")
+            ).scalar_one()
+            == track_uid
+        )
 
 
 def test_global_artist_follow_dual_writes_local_follow(pg_db):
@@ -197,6 +642,12 @@ def test_global_artist_follow_dual_writes_local_follow(pg_db):
 
 
 def test_user_global_library_counts_include_remote_only_refs(pg_db):
+    from crate.db.queries.user_library_library import (
+        get_followed_artists,
+        get_saved_albums,
+        get_user_library_counts,
+        is_following,
+    )
     from crate.db.repositories.global_user_library import (
         follow_global_artist,
         get_user_global_library_counts,
@@ -251,8 +702,21 @@ def test_user_global_library_counts_include_remote_only_refs(pg_db):
     assert counts["saved_albums"] == 2
     assert counts["liked_tracks"] == 0
 
+    legacy_route_counts = get_user_library_counts(1)
+    assert legacy_route_counts["followed_artists"] == 2
+    assert legacy_route_counts["saved_albums"] == 2
+    assert is_following(1, "Rival Schools") is True
+
     artists = list_user_global_artist_follows(1)
     albums = list_user_global_album_saves(1)
+    assert {artist["artist_name"] for artist in get_followed_artists(1)} == {
+        "High Vis",
+        "Rival Schools",
+    }
+    assert {album["name"] for album in get_saved_albums(1)} == {
+        "Blending",
+        "Pedals",
+    }
     assert any(
         artist["photo_url"] == f"/api/catalog/artists/{local_artist_uid}/photo"
         for artist in artists

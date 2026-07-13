@@ -299,7 +299,7 @@ class SavedAlbumResponse(IdentityFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     saved_at: datetime | str | None = None
-    id: int
+    id: int | None = None
     album_entity_uid: str | None = None
     slug: str | None = None
     artist: str | None = None

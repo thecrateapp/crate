@@ -128,3 +128,35 @@ def test_playlist_repository_persists_global_track_refs(pg_db, monkeypatch):
     assert tracks[0]["track_id"] is None
     assert tracks[0]["title"] == "Wring It Out"
     assert tracks[0]["artist"] == "Rival Schools"
+
+
+def test_replacing_and_duplicating_a_playlist_preserves_global_track_refs(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.db.repositories.playlists_duplicate import duplicate_playlist
+    from crate.db.repositories.playlists_tracks import replace_playlist_tracks
+
+    playlist_id, _artist_uid, _album_uid, track_uid = _seed_playlist_and_global_track(
+        pg_db
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.playlists_tracks.global_catalog_remote_playlist_refs_allowed",
+        lambda: True,
+    )
+
+    assert (
+        replace_playlist_tracks(
+            playlist_id,
+            [{"global_track_uid": track_uid, "source": "manual"}],
+        )
+        == 1
+    )
+    assert get_playlist_tracks(playlist_id)[0]["global_track_uid"] == track_uid
+
+    duplicated = duplicate_playlist(playlist_id)
+
+    assert duplicated is not None
+    assert (
+        get_playlist_tracks(int(duplicated["id"]))[0]["global_track_uid"] == track_uid
+    )

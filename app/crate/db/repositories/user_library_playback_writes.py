@@ -26,6 +26,34 @@ def _schedule_stats_refresh(user_id: int) -> None:
     set_cache(debounce_key, True, ttl=_STATS_REFRESH_DEBOUNCE_SECONDS)
 
 
+def _resolve_global_track_uid(
+    session, *, track_id: int | None, track_entity_uid: str | None
+) -> str | None:
+    if track_id is None and not track_entity_uid:
+        return None
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT global_track_uid::text AS global_track_uid
+                FROM global_catalog_tracks
+                WHERE local_track_id = :track_id
+                   OR (
+                        :track_entity_uid IS NOT NULL
+                        AND local_track_entity_uid = CAST(:track_entity_uid AS uuid)
+                   )
+                ORDER BY local_track_id = :track_id DESC
+                LIMIT 1
+                """
+            ),
+            {"track_id": track_id, "track_entity_uid": track_entity_uid},
+        )
+        .mappings()
+        .first()
+    )
+    return str(row["global_track_uid"]) if row else None
+
+
 def _queue_scrobble(
     user_id: int,
     *,
@@ -192,6 +220,11 @@ def record_play_event(
             "track_entity_uid"
         ) or track_entity_uid
         resolved_track_path = track_path or (resolved_track or {}).get("track_path")
+        resolved_global_track_uid = global_track_uid or _resolve_global_track_uid(
+            session,
+            track_id=resolved_track_id,
+            track_entity_uid=resolved_track_entity_uid,
+        )
         row = (
             session.execute(
                 text(
@@ -238,7 +271,7 @@ def record_play_event(
                     "user_id": user_id,
                     "client_event_id": client_event_id,
                     "track_id": resolved_track_id,
-                    "global_track_uid": global_track_uid,
+                    "global_track_uid": resolved_global_track_uid,
                     "track_entity_uid": resolved_track_entity_uid,
                     "track_path": resolved_track_path,
                     "title": title,
@@ -277,7 +310,7 @@ def record_play_event(
                 "event_id": event_id,
                 "client_event_id": client_event_id,
                 "track_id": resolved_track_id,
-                "global_track_uid": global_track_uid,
+                "global_track_uid": resolved_global_track_uid,
                 "track_entity_uid": resolved_track_entity_uid,
                 "title": title,
                 "artist": artist,

@@ -20,6 +20,8 @@ _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
 _MUTABLE_FIELDS = {
     "bootstrap_cursor_json",
     "user_refs_backfilled_at",
+    "user_refs_backfill_version",
+    "user_refs_backfill_report_json",
     "last_full_reconcile_at",
     "last_error",
 }
@@ -47,6 +49,8 @@ def get_catalog_state(*, session=None) -> dict[str, Any]:
                         generation::text AS generation,
                         bootstrap_cursor_json,
                         user_refs_backfilled_at,
+                        user_refs_backfill_version,
+                        user_refs_backfill_report_json,
                         last_full_reconcile_at,
                         last_error,
                         created_at,
@@ -106,6 +110,8 @@ def transition_catalog_state(
                         generation::text AS generation,
                         bootstrap_cursor_json,
                         user_refs_backfilled_at,
+                        user_refs_backfill_version,
+                        user_refs_backfill_report_json,
                         last_full_reconcile_at,
                         last_error,
                         created_at,

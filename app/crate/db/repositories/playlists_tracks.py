@@ -47,7 +47,11 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         if not resolved_entity_uid and not resolved_storage_id:
             return None
         return {
-            "global_track_uid": None,
+            "global_track_uid": _resolve_local_global_track_uid(
+                session,
+                track_id=library_track.get("id"),
+                track_entity_uid=resolved_entity_uid,
+            ),
             "track_id": library_track.get("id"),
             "track_entity_uid": resolved_entity_uid,
             "track_storage_id": resolved_storage_id,
@@ -64,6 +68,32 @@ def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
         }
 
     return None
+
+
+def _resolve_local_global_track_uid(
+    session: Session, *, track_id: int | None, track_entity_uid: str | None
+) -> str | None:
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT global_track_uid::text AS global_track_uid
+                FROM global_catalog_tracks
+                WHERE local_track_id = :track_id
+                   OR (
+                        :track_entity_uid IS NOT NULL
+                        AND local_track_entity_uid = CAST(:track_entity_uid AS uuid)
+                   )
+                ORDER BY local_track_id = :track_id DESC
+                LIMIT 1
+                """
+            ),
+            {"track_id": track_id, "track_entity_uid": track_entity_uid},
+        )
+        .mappings()
+        .first()
+    )
+    return str(row["global_track_uid"]) if row else None
 
 
 def _resolve_global_playlist_track(
@@ -187,7 +217,8 @@ def remove_playlist_track(
             s.execute(
                 text(
                     """
-                    SELECT id, track_id, track_entity_uid, track_storage_id, track_path, source
+                    SELECT id, global_track_uid, track_id, track_entity_uid,
+                           track_storage_id, track_path, source
                     FROM playlist_tracks
                     WHERE playlist_id = :playlist_id AND position = :position
                     """
@@ -305,6 +336,7 @@ def replace_playlist_tracks(
             s.add(
                 PlaylistTrack(
                     playlist_id=playlist_id,
+                    global_track_uid=resolved["global_track_uid"],
                     track_id=resolved["track_id"],
                     track_entity_uid=resolved["track_entity_uid"],
                     track_storage_id=resolved["track_storage_id"],
@@ -408,16 +440,19 @@ def _insert_playlist_track_exclusion(
         text(
             """
             INSERT INTO playlist_track_exclusions (
-                playlist_id, track_id, track_entity_uid, track_storage_id, track_path, created_by
+                playlist_id, global_track_uid, track_id, track_entity_uid,
+                track_storage_id, track_path, created_by
             )
             VALUES (
-                :playlist_id, :track_id, :track_entity_uid, :track_storage_id, :track_path, :created_by
+                :playlist_id, CAST(:global_track_uid AS uuid), :track_id,
+                :track_entity_uid, :track_storage_id, :track_path, :created_by
             )
             ON CONFLICT DO NOTHING
             """
         ),
         {
             "playlist_id": playlist_id,
+            "global_track_uid": track.get("global_track_uid"),
             "track_id": track.get("track_id"),
             "track_entity_uid": track.get("track_entity_uid"),
             "track_storage_id": track.get("track_storage_id"),
@@ -432,7 +467,8 @@ def _get_preserved_playlist_tracks(s: Session, playlist_id: int) -> list[dict]:
         s.execute(
             text(
                 """
-                SELECT track_id, track_entity_uid, track_storage_id, track_path,
+                SELECT global_track_uid::text AS global_track_uid, track_id,
+                       track_entity_uid, track_storage_id, track_path,
                        title, artist, album, duration, position, source, locked
                 FROM playlist_tracks
                 WHERE playlist_id = :playlist_id
@@ -453,7 +489,8 @@ def _get_playlist_track_exclusion_keys(s: Session, playlist_id: int) -> set[tupl
         s.execute(
             text(
                 """
-                SELECT track_id, track_entity_uid, track_storage_id, track_path
+                SELECT global_track_uid::text AS global_track_uid, track_id,
+                       track_entity_uid, track_storage_id, track_path
                 FROM playlist_track_exclusions
                 WHERE playlist_id = :playlist_id
                 """
@@ -468,6 +505,7 @@ def _get_playlist_track_exclusion_keys(s: Session, playlist_id: int) -> set[tupl
 
 def _track_identity_key(track: dict) -> tuple:
     return (
+        str(track.get("global_track_uid") or ""),
         str(track.get("track_entity_uid") or ""),
         str(track.get("track_storage_id") or ""),
         str(track.get("track_path") or ""),

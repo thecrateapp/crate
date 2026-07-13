@@ -78,12 +78,17 @@ def _bootstrap_federation_identity() -> None:
 def _queue_global_catalog_bootstrap() -> None:
     """Ensure the canonical catalog and historical user refs are projected."""
     from crate.db.repositories.global_catalog_state import get_catalog_state
+    from crate.db.repositories.global_user_library import (
+        USER_LIBRARY_REFS_BACKFILL_VERSION,
+    )
     from crate.db.repositories.tasks import create_task_dedup
 
     state = get_catalog_state()
     if (
         state["status"] not in {"cold", "failed"}
         and state.get("user_refs_backfilled_at") is not None
+        and state.get("user_refs_backfill_version", 0)
+        >= USER_LIBRARY_REFS_BACKFILL_VERSION
     ):
         return
     create_task_dedup(
