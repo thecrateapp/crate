@@ -140,7 +140,7 @@ describe("useTrackActionEntries", () => {
     }
   });
 
-  it("uses global refs for remote track radio without enabling local-only actions", async () => {
+  it("enables global actions for remote tracks without enabling local-only actions", async () => {
     vi.mocked(fetchTrackRadio).mockResolvedValue({
       tracks: [],
       source: { type: "radio", name: "Remote Radio" },
@@ -169,7 +169,7 @@ describe("useTrackActionEntries", () => {
       return entry;
     };
 
-    expect(byKey("like").disabled).toBe(true);
+    expect(byKey("like").disabled).toBe(false);
     expect(byKey("offline").disabled).toBe(true);
     expect(byKey("download").disabled).toBe(true);
     expect(byKey("radio").disabled).toBe(false);

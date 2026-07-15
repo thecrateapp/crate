@@ -67,7 +67,126 @@ def test_federation_dev_harness_inherits_enrichment_provider_credentials():
         "SPOTIFY_ID=${SPOTIFY_ID:-}",
         "SPOTIFY_SECRET=${SPOTIFY_SECRET:-}",
         "SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}",
+        "TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}",
+        "OPENAI_API_KEY=${OPENAI_API_KEY:-}",
+        "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}",
+        "GEMINI_API_KEY=${GEMINI_API_KEY:-}",
+        "AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}",
+        "LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}",
     }
 
     for service_name in ("node-a-api", "node-a-worker", "node-b-api", "node-b-worker"):
         assert expected <= set(services[service_name]["environment"])
+
+
+def test_federation_dev_harness_uses_strong_consistent_jwt_secrets_per_node():
+    services = _compose()["services"]
+
+    for node in ("a", "b"):
+        secrets = set()
+        for service_name in (f"node-{node}-api", f"node-{node}-worker"):
+            environment = services[service_name]["environment"]
+            secret = next(
+                value.removeprefix("JWT_SECRET=")
+                for value in environment
+                if value.startswith("JWT_SECRET=")
+            )
+            assert len(secret.encode()) >= 32
+            secrets.add(secret)
+        assert len(secrets) == 1
+
+
+def test_federation_dev_harness_has_a_real_singleton_acceptance_mode():
+    makefile = (ROOT / "Makefile").read_text()
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert "federation-dev-up-singleton:" in makefile
+    assert "federation-dev-singleton-e2e:" in makefile
+    assert "run_singleton_e2e" in script
+    assert 'mode in {"singleton", "singleton-parity"}' in script
+    assert "wait_for_catalog_ready" in script
+    assert "expected zero peers" in script
+
+
+def test_federation_dev_harness_routes_remote_streams_through_go_readplane():
+    services = _compose()["services"]
+    makefile = (ROOT / "Makefile").read_text()
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    for node, port in (("a", 18686), ("b", 28686)):
+        readplane = services[f"node-{node}-readplane"]
+        assert readplane["build"] == {"context": "./app/readplane"}
+        assert f"{port}:8686" in readplane["ports"]
+        assert not readplane.get("volumes"), "readplane must never mount signing keys"
+        environment = set(readplane["environment"])
+        assert "READPLANE_FEDERATION_PROXY_ENABLED=true" in environment
+        assert "CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true" in environment
+
+    assert "FED_READPLANE_A := http://localhost:18686" in makefile
+    assert "FED_READPLANE_B := http://localhost:28686" in makefile
+    assert 'NODE_A_READPLANE = "http://localhost:18686"' in script
+    assert "_stream_data_plane_url(stream_url)" in script
+
+
+def test_federation_dev_global_e2e_checks_human_catalog_routes():
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert "probe_human_catalog_routes(a, album)" in script
+    assert 'f"/api/artist-slugs/{artist_slug}/page"' in script
+    assert 'f"/api/artist-slugs/{artist_slug}/albums/{album_slug}"' in script
+
+
+def test_federation_dev_e2e_accepts_the_documented_all_switch():
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert 'mode in {"all", "--all"}' in script
+    assert "run_e2e()" in script
+    assert "run_global_catalog_e2e()" in script
+    assert "run_import_e2e()" in script
+
+
+def test_federation_dev_harness_has_no_obsolete_mode_flags():
+    compose_text = (ROOT / "docker-compose.federation-dev.yaml").read_text()
+
+    for prohibited in (
+        "CRATE_FEDERATION_ENABLED",
+        "CRATE_GLOBAL_CATALOG_ENABLED",
+        "CRATE_GLOBAL_CATALOG_LISTEN_SURFACES",
+        "CRATE_GLOBAL_CATALOG_ALLOW_REMOTE_PLAYLIST_REFS",
+    ):
+        assert prohibited not in compose_text
+
+
+def test_api_image_dependency_install_is_resumable():
+    dockerfile = (ROOT / "app/Dockerfile").read_text()
+    api_stage = dockerfile.split("FROM base AS api", 1)[1].split(
+        "FROM base AS worker-core-deps", 1
+    )[0]
+
+    assert "--mount=type=cache,target=/root/.cache/pip" in api_stage
+    assert "--retries 10" in api_stage
+    assert "--timeout 60" in api_stage
+    assert "--no-cache-dir" not in api_stage
+
+
+def test_federation_dev_e2e_approves_pairing_on_the_receiving_node():
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert "remote: NodeClient" in script
+    assert (
+        'remote.post(f"/api/admin/federation/pairing/{request_uid}/approve")' in script
+    )
+    assert (
+        'local.post(f"/api/admin/federation/pairing/{request_uid}/approve")'
+        not in script
+    )
+    assert 'ensure_pair(a, b, "Node B"' in script
+    assert 'ensure_pair(b, a, "Node A"' in script
+
+
+def test_federation_dev_nodes_advertise_peer_reachable_api_urls():
+    services = _compose()["services"]
+
+    for node in ("a", "b"):
+        environment = set(services[f"node-{node}-api"]["environment"])
+        assert f"CRATE_PUBLIC_API_BASE_URL=http://node-{node}-api:8585" in environment

@@ -8,7 +8,6 @@ from crate.db.home_cache import _get_or_compute_home_cache
 from crate.db.queries.home import get_followed_artist_genre_names
 from crate.db.releases import get_new_releases
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.genre_taxonomy import choose_mix_seed_genres, summarize_taste_genres
 
 
@@ -68,7 +67,7 @@ def _strip_global_identity(rows: dict[str, list[dict]]) -> dict[str, list[dict]]
 
 
 def _home_context_cache_mode() -> str:
-    return "global" if global_catalog_surface_enabled("home") else "local"
+    return "global"
 
 
 def _load_home_context_rows(
@@ -223,8 +222,6 @@ def get_home_context(
         top_album_limit=top_album_limit,
         top_genre_limit=top_genre_limit,
     )
-    if not global_catalog_surface_enabled("home"):
-        rows = _strip_global_identity(rows)
     followed = rows["followed"]
     saved_albums = rows["saved_albums"]
     top_artists = rows["top_artists"]

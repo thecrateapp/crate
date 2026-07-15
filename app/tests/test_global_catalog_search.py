@@ -4,7 +4,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE
+from tests.conftest import approve_federation_node, PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -37,7 +37,9 @@ def _seed_local(pg_db):
 def _insert_remote_artist(title: str, *, deleted: bool = False):
     from crate.db.tx import transaction_scope
 
+    node_uid = str(uuid.uuid4())
     with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
         session.execute(
             text(
                 """
@@ -66,7 +68,7 @@ def _insert_remote_artist(title: str, *, deleted: bool = False):
                 """
             ),
             {
-                "node_uid": str(uuid.uuid4()),
+                "node_uid": node_uid,
                 "remote_entity_uid": str(uuid.uuid4()),
                 "title": title,
                 "deleted": deleted,
@@ -112,7 +114,7 @@ def test_global_catalog_search_hides_remote_node_labels_by_default(pg_db):
     assert "remote_entity_uid" not in artist
 
 
-def test_global_catalog_search_ranks_stale_sources_below_healthy_sources(pg_db):
+def test_global_catalog_search_prunes_deleted_remote_sources(pg_db):
     from crate.db.queries.global_catalog import search_global_catalog
     from crate.federation.global_reconciliation import reconcile_remote_catalog
 
@@ -122,7 +124,4 @@ def test_global_catalog_search_ranks_stale_sources_below_healthy_sources(pg_db):
 
     result = search_global_catalog("Rival", limit=10)
 
-    assert [artist["name"] for artist in result["artists"][:2]] == [
-        "Rival Healthy",
-        "Rival Stale",
-    ]
+    assert [artist["name"] for artist in result["artists"]] == ["Rival Healthy"]

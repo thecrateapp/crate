@@ -14,6 +14,7 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/auth"
 	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
+	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
 )
 
@@ -87,8 +88,59 @@ func TestAuthMe_NoToken(t *testing.T) {
 	assertUnauthorized(t, newTestServerWithAuth(), http.MethodGet, "/api/auth/me")
 }
 
+func TestFederatedStreamFallsBackWhenGoProxyIsDisabled(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/federation/remote/streams/ticket-a", r.URL.Path)
+		w.WriteHeader(http.StatusPartialContent)
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	server := newTestServerNoAuth()
+	server.fallback = fallback
+	request := httptest.NewRequest(http.MethodGet, "/api/federation/remote/streams/ticket-a", nil)
+	response := httptest.NewRecorder()
+
+	server.Handler().ServeHTTP(response, request)
+
+	assert.Equal(t, http.StatusPartialContent, response.Code)
+	assert.Equal(t, "fallback", response.Header().Get("X-Crate-Readplane"))
+}
+
 func TestAuthMe_MethodNotAllowed(t *testing.T) {
 	assertMethodNotAllowed(t, newTestServerWithAuth(), http.MethodPost, "/api/auth/me")
+}
+
+func TestAuthMe_PrefersFastAPIFallbackForPermissionParity(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/auth/me", r.URL.Path)
+		assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+		_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{
+			"id":           1,
+			"email":        "admin@cratemusic.app",
+			"role":         "admin",
+			"roles":        []string{"admin"},
+			"capabilities": []string{"admin.access", "catalog.read"},
+		})
+	}))
+	defer backend.Close()
+
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	server := newTestServerWithAuth()
+	server.fallback = fallback
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+	var body map[string]any
+	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, []any{"admin"}, body["roles"])
+	assert.Equal(t, []any{"admin.access", "catalog.read"}, body["capabilities"])
 }
 
 // ── myLibraryRoute ────────────────────────────────────────────────────────
@@ -177,6 +229,23 @@ func TestMyAlbumsRoute_NoCatalog(t *testing.T) {
 
 func TestMyAlbumsRoute_Unauthenticated(t *testing.T) {
 	assertUnauthorized(t, newTestServerWithCatalog(), http.MethodGet, "/api/me/albums")
+}
+
+func TestCanonicalCatalogReadRoutesRequireAuthentication(t *testing.T) {
+	server := newTestServerWithCatalog()
+	paths := []string{
+		"/api/catalog/search?q=high",
+		"/api/catalog/genres",
+		"/api/catalog/me/artists",
+		"/api/catalog/me/albums",
+		"/api/catalog/me/follows",
+		"/api/catalog/me/albums/saved",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			assertUnauthorized(t, server, http.MethodGet, path)
+		})
+	}
 }
 
 func TestMyAlbumsRoute_MethodNotAllowed(t *testing.T) {

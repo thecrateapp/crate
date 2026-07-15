@@ -50,12 +50,15 @@ def create_task_dedup(
     params: dict | None = None,
     dedup_key: str = "",
     dispatch: bool = True,
+    *,
+    session=None,
 ) -> str | None:
     return _create_task_dedup(
         task_type,
         params,
         dedup_key,
         dispatch,
+        session,
         dispatch_task_fn=dispatch_task,
         dumps_fn=dumps,
         register_tasks_surface_signal_fn=register_tasks_surface_signal,

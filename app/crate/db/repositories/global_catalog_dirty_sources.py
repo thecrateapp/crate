@@ -29,6 +29,15 @@ def enqueue_local_dirty_source(
         source_revision=source_revision,
         session=session,
     )
+    from crate.db.jobs.federation_catalog_changes import append_local_catalog_change
+
+    append_local_catalog_change(
+        entity_type=entity_type,
+        entity_uid=entity_uid,
+        operation=operation,
+        source_revision=source_revision,
+        session=session,
+    )
 
 
 def enqueue_federated_dirty_source(
@@ -124,10 +133,21 @@ def _enqueue_dirty_source(
             "source_revision": source_revision,
         },
     )
+    from crate.db.repositories.tasks import create_task_dedup
+
+    create_task_dedup(
+        "global_catalog_reconcile_incremental",
+        {"triggered_by": "dirty_source"},
+        dedup_key="dirty:global-catalog",
+        session=session,
+    )
 
 
-def claim_dirty_sources(limit: int, *, session) -> list[dict[str, Any]]:
+def claim_dirty_sources(
+    limit: int, *, session, lease_seconds: int = 900
+) -> list[dict[str, Any]]:
     capped = max(1, min(int(limit or 1), 1000))
+    capped_lease = max(30, min(int(lease_seconds or 900), 86400))
     rows = (
         session.execute(
             text(
@@ -136,7 +156,10 @@ def claim_dirty_sources(limit: int, *, session) -> list[dict[str, Any]]:
                     SELECT id
                     FROM global_catalog_dirty_sources
                     WHERE completed_at IS NULL
-                      AND claimed_at IS NULL
+                      AND (
+                        claimed_at IS NULL
+                        OR claimed_at < NOW() - make_interval(secs => :lease_seconds)
+                      )
                     ORDER BY requested_at, id
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
@@ -164,7 +187,7 @@ def claim_dirty_sources(limit: int, *, session) -> list[dict[str, Any]]:
                     dirty.last_error
                 """
             ),
-            {"limit": capped},
+            {"limit": capped, "lease_seconds": capped_lease},
         )
         .mappings()
         .all()
@@ -172,30 +195,70 @@ def claim_dirty_sources(limit: int, *, session) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def complete_dirty_source(source_id: int, *, session) -> None:
-    session.execute(
+def complete_dirty_source(
+    source_id: int,
+    *,
+    requested_at,
+    claimed_at,
+    session,
+) -> bool:
+    result = session.execute(
         text(
             """
             UPDATE global_catalog_dirty_sources
-            SET completed_at = NOW(), claimed_at = NULL, last_error = NULL
+            SET
+                completed_at = CASE
+                    WHEN requested_at = :requested_at THEN NOW()
+                    ELSE NULL
+                END,
+                claimed_at = NULL,
+                last_error = CASE
+                    WHEN requested_at = :requested_at THEN NULL
+                    ELSE last_error
+                END
             WHERE id = :source_id
+              AND claimed_at = :claimed_at
             """
         ),
-        {"source_id": source_id},
+        {
+            "source_id": source_id,
+            "requested_at": requested_at,
+            "claimed_at": claimed_at,
+        },
     )
+    return int(getattr(result, "rowcount", 0) or 0) == 1
 
 
-def fail_dirty_source(source_id: int, error: str, *, session) -> None:
-    session.execute(
+def fail_dirty_source(
+    source_id: int,
+    error: str,
+    *,
+    requested_at,
+    claimed_at,
+    session,
+) -> bool:
+    result = session.execute(
         text(
             """
             UPDATE global_catalog_dirty_sources
-            SET claimed_at = NULL, last_error = :error
+            SET
+                claimed_at = NULL,
+                last_error = CASE
+                    WHEN requested_at = :requested_at THEN :error
+                    ELSE last_error
+                END
             WHERE id = :source_id
+              AND claimed_at = :claimed_at
             """
         ),
-        {"source_id": source_id, "error": error[:4000]},
+        {
+            "source_id": source_id,
+            "error": error[:4000],
+            "requested_at": requested_at,
+            "claimed_at": claimed_at,
+        },
     )
+    return int(getattr(result, "rowcount", 0) or 0) == 1
 
 
 __all__ = [

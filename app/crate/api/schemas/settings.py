@@ -137,5 +137,13 @@ class SettingsUpdateResponse(OkResponse):
     pass
 
 
+class RemoteScrobblingPreferenceResponse(BaseModel):
+    remote_scrobbling_enabled: bool = False
+
+
+class RemoteScrobblingPreferenceUpdate(BaseModel):
+    remote_scrobbling_enabled: bool
+
+
 class TelegramTestResponse(OkResponse):
     pass

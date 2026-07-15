@@ -428,9 +428,16 @@ export function TopBarSearch() {
                         </p>
                       ) : null}
                     </div>
-                    <span className="shrink-0 text-[10px] capitalize text-white/20">
-                      {t(`search.resultType.${item.type}`)}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
+                      {item.origin === "remote" ? (
+                        <span className="rounded-full border border-cyan-300/15 bg-cyan-300/8 px-1.5 py-0.5 text-cyan-200/70">
+                          {item.nodeName || t("search.remoteSource")}
+                        </span>
+                      ) : null}
+                      <span className="capitalize text-white/20">
+                        {t(`search.resultType.${item.type}`)}
+                      </span>
+                    </div>
                   </button>
                 ))}
                 {showSearchError ? (

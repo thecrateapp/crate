@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
@@ -367,8 +367,15 @@ class RadioNextRequest(BaseModel):
 
 class RadioFeedbackRequest(BaseModel):
     session_id: str
-    track_id: int
+    track_id: int | None = None
+    global_track_uid: str | None = None
     action: str = Field(description="like | dislike")
+
+    @model_validator(mode="after")
+    def require_track_reference(self):
+        if self.track_id is None and not self.global_track_uid:
+            raise ValueError("track_id or global_track_uid is required")
+        return self
 
 
 @router.post(
@@ -420,7 +427,12 @@ def api_radio_feedback(request: Request, body: RadioFeedbackRequest):
     _require_auth(request)
     from crate.radio_engine import radio_feedback
 
-    result = radio_feedback(body.session_id, body.track_id, body.action)
+    result = radio_feedback(
+        body.session_id,
+        body.track_id,
+        body.action,
+        global_track_uid=body.global_track_uid,
+    )
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     return result

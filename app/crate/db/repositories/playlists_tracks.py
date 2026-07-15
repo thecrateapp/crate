@@ -13,14 +13,11 @@ from crate.db.repositories.library_track_reads import (
 )
 from crate.db.repositories.playlists_shared import emit_playlist_domain_event
 from crate.db.tx import optional_scope
-from crate.federation.global_policy import global_catalog_remote_playlist_refs_allowed
 
 
 def _resolve_playlist_track(track: dict, *, session: Session) -> dict | None:
     global_track_uid = track.get("global_track_uid") or track.get("globalTrackUid")
     if global_track_uid:
-        if not global_catalog_remote_playlist_refs_allowed():
-            return None
         return _resolve_global_playlist_track(str(global_track_uid), session=session)
 
     track_id = track.get("track_id") or track.get("libraryTrackId") or track.get("id")

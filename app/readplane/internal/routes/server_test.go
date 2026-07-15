@@ -32,6 +32,7 @@ func TestHealthz(t *testing.T) {
 	var payload map[string]any
 	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
 	assert.Equal(t, "crate-readplane", payload["service"])
+	assert.Equal(t, "node-first", payload["federation_model"])
 }
 
 func TestMethodNotAllowed(t *testing.T) {

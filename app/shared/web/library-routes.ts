@@ -96,16 +96,6 @@ function encodeEntityUid(value: string | null | undefined) {
   return value ? encodeURIComponent(value) : "";
 }
 
-function routeRefWithSlug(
-  uid: string | null | undefined,
-  slug: string | null | undefined,
-) {
-  const trimmedUid = uid?.trim();
-  if (!trimmedUid) return "";
-  if (!slug) return encodeEntityUid(trimmedUid);
-  return `${encPath(slug)}--${encodeEntityUid(trimmedUid)}`;
-}
-
 function uidFromRouteRef(value: string | null | undefined) {
   if (!value) return null;
   let decoded = value;
@@ -289,10 +279,8 @@ export function artistPagePath(input: ArtistRouteInput) {
 }
 
 export function globalArtistPagePath(input: GlobalArtistRouteInput) {
-  const uid = input.globalArtistUid || input.global_artist_uid;
-  return uid
-    ? `/catalog/artists/${routeRefWithSlug(uid, publicArtistSlug(input))}`
-    : "";
+  const slug = publicArtistSlug(input);
+  return slug ? `/artists/${encPath(slug)}` : "";
 }
 
 export function globalArtistUidFromRouteRef(value: string | null | undefined) {
@@ -314,14 +302,8 @@ export function artistTopTracksPath(input: ArtistRouteInput) {
 }
 
 export function artistSharePath(input: ArtistRouteInput) {
-  const ref =
-    input.globalArtistUid ||
-    input.global_artist_uid ||
-    input.artistEntityUid ||
-    input.artistId ||
-    publicArtistSlug(input);
-  const slug = safeSlug(input.artistSlug, input.artistName || "artist");
-  return ref ? `/share/artist/${encodeURIComponent(ref)}/${slug}` : "/share";
+  const slug = publicArtistSlug(input);
+  return slug ? `/share/artist/${encPath(slug)}` : "/share";
 }
 
 export function artistApiPath(input: ArtistRouteInput) {
@@ -444,8 +426,10 @@ export function albumPagePath(input: AlbumRouteInput) {
     input.globalAlbumUid || input.global_album_uid,
   );
   const localAlbumPath =
-    artistSlug && albumSlug && !isReservedArtistChildSlug(albumSlug)
-      ? `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`
+    artistSlug && albumSlug
+      ? isReservedArtistChildSlug(albumSlug)
+        ? `/artists/${encPath(artistSlug)}/albums/${encPath(albumSlug)}`
+        : `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`
       : "";
   if (localAlbumPath && (input.albumId != null || !hasGlobalAlbumUid)) {
     return localAlbumPath;
@@ -465,10 +449,12 @@ export function albumPagePath(input: AlbumRouteInput) {
 }
 
 export function globalAlbumPagePath(input: GlobalAlbumRouteInput) {
-  const uid = input.globalAlbumUid || input.global_album_uid;
-  return uid
-    ? `/catalog/albums/${routeRefWithSlug(uid, publicAlbumSlug(input))}`
-    : "";
+  const artistSlug = publicArtistSlug(input);
+  const albumSlug = publicAlbumSlug(input);
+  if (!artistSlug || !albumSlug) return "";
+  return isReservedArtistChildSlug(albumSlug)
+    ? `/artists/${encPath(artistSlug)}/albums/${encPath(albumSlug)}`
+    : `/artists/${encPath(artistSlug)}/${encPath(albumSlug)}`;
 }
 
 export function globalAlbumUidFromRouteRef(value: string | null | undefined) {
@@ -502,16 +488,11 @@ export function albumApiPath(input: AlbumRouteInput) {
 }
 
 export function albumSharePath(input: AlbumRouteInput) {
-  const ref =
-    input.globalAlbumUid ||
-    input.global_album_uid ||
-    input.albumEntityUid ||
-    input.albumId;
-  const publicSlug = publicAlbumSlug(input);
-  const slug = publicSlug
-    ? encPath(publicSlug)
-    : safeSlug(input.albumSlug, input.albumName || "album");
-  return ref ? `/share/album/${encodeURIComponent(ref)}/${slug}` : "/share";
+  const artistSlug = publicArtistSlug(input);
+  const albumSlug = publicAlbumSlug(input);
+  return artistSlug && albumSlug
+    ? `/share/album/${encPath(artistSlug)}/${encPath(albumSlug)}`
+    : "/share";
 }
 
 export function albumRelatedApiPath(input: AlbumRouteInput) {

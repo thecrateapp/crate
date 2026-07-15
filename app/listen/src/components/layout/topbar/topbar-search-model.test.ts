@@ -57,4 +57,26 @@ describe("flattenTopBarSearchResults", () => {
     const trackItem = items[2];
     expect(trackItem?.trackData?.globalTrackUid).toBe("track-global-1");
   });
+
+  it("derives remote origin from canonical availability", () => {
+    const [item] = flattenTopBarSearchResults({
+      artists: [
+        {
+          name: "High Vis",
+          global_artist_uid: "artist-global-1",
+          availability: {
+            catalog: true,
+            stream: true,
+            import: false,
+            local: false,
+            remote: true,
+          },
+        },
+      ],
+      albums: [],
+      tracks: [],
+    });
+
+    expect(item?.origin).toBe("remote");
+  });
 });

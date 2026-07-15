@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { api } from "@/lib/api";
+import { catalogWarmingRetryDelayMs } from "../../../shared/web/use-api";
 import {
   cacheGet,
   cacheSet,
@@ -112,6 +113,7 @@ export function useApi<T>(
     const controller = new AbortController();
     let cancelled = false;
     let cancelScheduledFetch: (() => void) | null = null;
+    let warmingRetryTimer: ReturnType<typeof setTimeout> | null = null;
     const hasCachedPayload =
       method === "GET" ? cacheGet<T>(requestUrl) !== null : false;
 
@@ -121,6 +123,7 @@ export function useApi<T>(
 
     const runFetch = () => {
       if (cancelled || controller.signal.aborted) return;
+      warmingRetryTimer = null;
       api<T>(requestUrl, method, body, { signal: controller.signal })
         .then((freshData) => {
           cacheSet(requestUrl, freshData);
@@ -132,12 +135,18 @@ export function useApi<T>(
           });
         })
         .catch((e: Error) => {
+          const retryDelay =
+            method === "GET" ? catalogWarmingRetryDelayMs(e) : null;
+          if (!cancelled && !controller.signal.aborted && retryDelay != null) {
+            warmingRetryTimer = setTimeout(runFetch, retryDelay);
+            return;
+          }
           if (!cancelled && !controller.signal.aborted) {
             setError(e.message);
           }
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled && warmingRetryTimer == null) setLoading(false);
         });
     };
 
@@ -155,6 +164,7 @@ export function useApi<T>(
     return () => {
       cancelled = true;
       cancelScheduledFetch?.();
+      if (warmingRetryTimer != null) clearTimeout(warmingRetryTimer);
       controller.abort();
     };
   }, [url, method, trigger, revalidateIfCached, idleRevalidateMs]);

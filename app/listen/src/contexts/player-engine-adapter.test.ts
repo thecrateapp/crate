@@ -31,6 +31,7 @@ import {
   toEngineTrack,
   toFreshEngineTrack,
 } from "@/contexts/player-engine-adapter";
+import { getPlaybackSession } from "@/lib/playback-provenance";
 
 describe("player engine adapter", () => {
   beforeEach(() => {
@@ -98,14 +99,17 @@ describe("player engine adapter", () => {
       task_id: null,
       variant_id: null,
       variant_status: null,
+      playback_session: "signed-global-playback",
+      content_origin: "remote",
     });
 
-    const track = await toFreshEngineTrack({
+    const sourceTrack = {
       id: "global-track-1",
       globalTrackUid: "global-track-1",
       title: "Remote Song",
       artist: "Remote Band",
-    });
+    };
+    const track = await toFreshEngineTrack(sourceTrack);
 
     expect(apiMock).toHaveBeenCalledWith(
       "/api/catalog/tracks/global-track-1/playback",
@@ -116,6 +120,7 @@ describe("player engine adapter", () => {
     expect(track.url).not.toContain(
       "/api/catalog/tracks/global-track-1/stream",
     );
+    expect(getPlaybackSession(sourceTrack)).toBe("signed-global-playback");
   });
 
   it("reuses fresh remote stream tickets before resolving global catalog playback again", async () => {

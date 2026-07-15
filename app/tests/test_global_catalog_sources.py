@@ -89,7 +89,9 @@ def test_local_source_match_keys_are_stable(pg_db):
 
     _seed_local_album_track(pg_db)
 
-    keys = {source["entity_type"]: source["match_key"] for source in iter_local_sources()}
+    keys = {
+        source["entity_type"]: source["match_key"] for source in iter_local_sources()
+    }
 
     assert keys == {
         "artist": "artist:rival schools",
@@ -273,3 +275,72 @@ def test_global_source_resolver_picks_lowest_latency_facet_source(pg_db):
 
     assert selection["node_uid"] == fast_node_uid
     assert selection["remote_entity_uid"] == "album-fast"
+
+
+def test_global_source_resolver_rejects_orphaned_peer_source(pg_db):
+    from crate.db.tx import transaction_scope
+    from crate.federation.global_source_resolver import (
+        NoGlobalSource,
+        resolve_global_source,
+    )
+
+    artist_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_artists
+                    (
+                        global_artist_uid,
+                        canonical_name,
+                        sort_name,
+                        normalized_name,
+                        source_count,
+                        has_remote
+                    )
+                VALUES
+                    (:artist_uid, 'Orphan Artist', 'Orphan Artist', 'orphan artist', 1, true)
+                """
+            ),
+            {"artist_uid": artist_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO global_catalog_sources
+                    (
+                        entity_type,
+                        global_entity_uid,
+                        source_kind,
+                        node_uid,
+                        remote_entity_uid,
+                        source_payload_json,
+                        match_key
+                    )
+                VALUES
+                    (
+                        'artist',
+                        :artist_uid,
+                        'federated',
+                        :node_uid,
+                        'artist-1',
+                        CAST(:source_payload_json AS jsonb),
+                        'artist:orphan'
+                    )
+                """
+            ),
+            {
+                "artist_uid": artist_uid,
+                "node_uid": str(uuid.uuid4()),
+                "source_payload_json": json.dumps(
+                    {"facets": {"metadata": {"available": True}}}
+                ),
+            },
+        )
+
+    with pytest.raises(NoGlobalSource):
+        resolve_global_source(
+            global_entity_uid=artist_uid,
+            entity_type="artist",
+            facet="metadata",
+        )

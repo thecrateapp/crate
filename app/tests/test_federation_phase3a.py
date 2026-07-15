@@ -135,4 +135,4 @@ class TestHeaderFiltering:
         )
 
     def test_ticket_ttl_is_reasonable(self):
-        assert TICKET_TTL_MINUTES == 5
+        assert TICKET_TTL_MINUTES == 2

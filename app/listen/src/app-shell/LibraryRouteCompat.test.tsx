@@ -45,6 +45,20 @@ describe("LibraryRouteCompat", () => {
     expect(await screen.findByText("Album page")).toBeTruthy();
   });
 
+  it("renders reserved album slugs through the explicit human album route", async () => {
+    renderRoute(
+      "/artists/quicksand/albums/top-tracks",
+      <Routes>
+        <Route
+          path="/artists/:artistSlug/albums/:albumSlug"
+          element={<ArtistChildRoute />}
+        />
+      </Routes>,
+    );
+
+    expect(await screen.findByText("Album page")).toBeTruthy();
+  });
+
   it("redirects legacy artist top tracks URLs to the canonical slug route", async () => {
     renderRoute(
       "/artists/52/quicksand/top-tracks",

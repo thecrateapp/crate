@@ -37,7 +37,7 @@ func (s *Server) homeSlice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Query().Get("fresh") == "1" {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -46,7 +46,7 @@ func (s *Server) homeSlice(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := s.snapshots.Get(r.Context(), "home:discovery", strconv.FormatInt(user.ID, 10))
 	if err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		status := http.StatusServiceUnavailable

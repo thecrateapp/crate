@@ -63,6 +63,31 @@ _FAKE_TRACK_BASIC = {
     "path": "/music/Converge/Jane Doe/01 - Concubine.flac",
 }
 
+_GLOBAL_ARTIST_UID = "11111111-1111-4111-8111-111111111111"
+_GLOBAL_ALBUM_UID = "22222222-2222-4222-8222-222222222222"
+_GLOBAL_TRACK_UID = "33333333-3333-4333-8333-333333333333"
+_FAKE_GLOBAL_ARTISTS = [
+    {
+        "global_artist_uid": f"00000000-0000-4000-8000-{artist['id']:012d}",
+        "name": artist["name"],
+        "album_count": artist["album_count"],
+    }
+    for artist in _FAKE_ARTISTS
+]
+_FAKE_GLOBAL_ALBUM = {
+    **_FAKE_ALBUM,
+    "global_artist_uid": _GLOBAL_ARTIST_UID,
+    "global_album_uid": _GLOBAL_ALBUM_UID,
+}
+_FAKE_GLOBAL_TRACK = {
+    **_FAKE_TRACK,
+    "global_artist_uid": _GLOBAL_ARTIST_UID,
+    "global_album_uid": _GLOBAL_ALBUM_UID,
+    "global_track_uid": _GLOBAL_TRACK_UID,
+    "track_number": _FAKE_TRACK["track"],
+    "disc_number": _FAKE_TRACK["disc"],
+}
+
 
 # ── Auth helpers ─────────────────────────────────────────────────────
 
@@ -293,7 +318,8 @@ class TestSubsonicBrowse:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.get_all_artists_sorted", return_value=_FAKE_ARTISTS
+                "crate.api.subsonic.list_global_artists",
+                return_value=_FAKE_GLOBAL_ARTISTS,
             ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getArtists?u=admin&p=admin")
@@ -331,16 +357,11 @@ class TestSubsonicBrowse:
             assert len(a["album"]) == 1
             assert a["album"][0]["name"] == "Jane Doe"
 
-    def test_get_artist_by_raw_id(self, test_app):
-        """Artist id without the 'ar-' prefix should also work."""
-        with (
-            _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_artist_by_id", return_value=_FAKE_ARTISTS[1]),
-            patch("crate.api.subsonic.get_albums_by_artist_name", return_value=[]),
-        ):
+    def test_get_artist_by_raw_id_is_rejected(self, test_app):
+        with _subsonic_auth_ok():
             resp = test_app.get(f"{_SUBSONIC_BASE}/getArtist?u=admin&p=admin&id=2")
-            sr = _subsonic_ok_response(resp)
-            assert sr["artist"]["name"] == "Birds In Row"
+
+        _subsonic_error_response(resp, code=70)
 
     def test_get_artist_not_found(self, test_app):
         with (
@@ -422,10 +443,12 @@ class TestSubsonicAlbumList2:
     """getAlbumList2 with sorting strategies."""
 
     def test_album_list_default_order(self, test_app):
-        albums = [_FAKE_ALBUM]
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_album_list", return_value=albums),
+            patch(
+                "crate.api.subsonic.list_global_albums",
+                return_value=[_FAKE_GLOBAL_ALBUM],
+            ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin")
             sr = _subsonic_ok_response(resp)
@@ -437,7 +460,7 @@ class TestSubsonicAlbumList2:
     def test_album_list_with_type_and_pagination(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_album_list", return_value=[]),
+            patch("crate.api.subsonic.list_global_albums", return_value=[]),
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin"
@@ -449,7 +472,10 @@ class TestSubsonicAlbumList2:
     def test_album_list_with_random_type(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_album_list", return_value=[_FAKE_ALBUM]),
+            patch(
+                "crate.api.subsonic.list_global_albums",
+                return_value=[_FAKE_GLOBAL_ALBUM],
+            ),
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/getAlbumList2?u=admin&p=admin&type=random"
@@ -473,16 +499,17 @@ class TestSubsonicSearch:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.search_artists",
-                return_value=[{"id": 1, "name": "Converge"}],
-            ),
-            patch(
-                "crate.api.subsonic.search_albums",
-                return_value=[_FAKE_ALBUM],
-            ),
-            patch(
-                "crate.api.subsonic.search_tracks",
-                return_value=[_FAKE_TRACK],
+                "crate.api.subsonic.search_global_catalog",
+                return_value={
+                    "artists": [
+                        {
+                            "global_artist_uid": _GLOBAL_ARTIST_UID,
+                            "name": "Converge",
+                        }
+                    ],
+                    "albums": [_FAKE_GLOBAL_ALBUM],
+                    "tracks": [_FAKE_GLOBAL_TRACK],
+                },
             ),
         ):
             resp = test_app.get(
@@ -499,9 +526,10 @@ class TestSubsonicSearch:
     def test_search_empty_query(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.search_artists", return_value=[]),
-            patch("crate.api.subsonic.search_albums", return_value=[]),
-            patch("crate.api.subsonic.search_tracks", return_value=[]),
+            patch(
+                "crate.api.subsonic.search_global_catalog",
+                return_value={"artists": [], "albums": [], "tracks": []},
+            ),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/search3?u=admin&p=admin&query=")
             sr = _subsonic_ok_response(resp)
@@ -534,7 +562,10 @@ class TestSubsonicStubs:
             _subsonic_error_response(resp, code=40)
 
     def test_starred2_returns_empty_lists(self, test_app):
-        with _subsonic_auth_ok():
+        with (
+            _subsonic_auth_ok(),
+            patch("crate.api.subsonic.get_starred_global_tracks", return_value=[]),
+        ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getStarred2?u=admin&p=admin")
             sr = _subsonic_ok_response(resp)
             assert sr["starred2"]["artist"] == []
@@ -545,8 +576,8 @@ class TestSubsonicStubs:
         with (
             _subsonic_auth_ok(),
             patch(
-                "crate.api.subsonic.get_random_tracks",
-                return_value=[_FAKE_TRACK],
+                "crate.api.subsonic.get_random_global_tracks",
+                return_value=[_FAKE_GLOBAL_TRACK],
             ),
         ):
             resp = test_app.get(
@@ -566,7 +597,7 @@ class TestSubsonicStubs:
     def test_random_songs_empty(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_random_tracks", return_value=[]),
+            patch("crate.api.subsonic.get_random_global_tracks", return_value=[]),
         ):
             resp = test_app.get(f"{_SUBSONIC_BASE}/getRandomSongs?u=admin&p=admin")
             sr = _subsonic_ok_response(resp)
@@ -693,8 +724,12 @@ class TestSubsonicScrobble:
     def test_scrobble_submission_get(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_track_basic", return_value=_FAKE_TRACK_BASIC),
-            patch("crate.db.repositories.user_library.record_play"),
+            patch("crate.api.subsonic.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.playback_provenance.resolve_local_content_provenance",
+                return_value=("local", None),
+            ),
+            patch("crate.db.repositories.user_library.record_play_event"),
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=true"
@@ -705,8 +740,10 @@ class TestSubsonicScrobble:
         """submission=false is a 'now playing' notification — no play recorded."""
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_track_basic", return_value=_FAKE_TRACK_BASIC),
-            patch("crate.db.repositories.user_library.record_play") as mock_record,
+            patch("crate.api.subsonic.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.db.repositories.user_library.record_play_event"
+            ) as mock_record,
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=false"
@@ -717,8 +754,12 @@ class TestSubsonicScrobble:
     def test_scrobble_submission_post(self, test_app):
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_track_basic", return_value=_FAKE_TRACK_BASIC),
-            patch("crate.db.repositories.user_library.record_play"),
+            patch("crate.api.subsonic.get_track_full", return_value=_FAKE_TRACK),
+            patch(
+                "crate.playback_provenance.resolve_local_content_provenance",
+                return_value=("local", None),
+            ),
+            patch("crate.db.repositories.user_library.record_play_event"),
         ):
             resp = test_app.post(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=1&submission=true"
@@ -734,8 +775,10 @@ class TestSubsonicScrobble:
         """When track doesn't exist, scrobble still returns ok (no crash)."""
         with (
             _subsonic_auth_ok(),
-            patch("crate.api.subsonic.get_track_basic", return_value=None),
-            patch("crate.db.repositories.user_library.record_play") as mock_record,
+            patch("crate.api.subsonic.get_track_full", return_value=None),
+            patch(
+                "crate.db.repositories.user_library.record_play_event"
+            ) as mock_record,
         ):
             resp = test_app.get(
                 f"{_SUBSONIC_BASE}/scrobble?u=admin&p=admin&id=999&submission=true"

@@ -250,7 +250,7 @@ describe("scopesForUrl", () => {
 
   // Browse, search, genres
   it("returns library scope for search", () => {
-    expect(scopesForUrl("/api/search?q=foo")).toEqual(["library"]);
+    expect(scopesForUrl("/api/catalog/search?q=foo")).toEqual(["library"]);
     expect(scopesForUrl("/api/catalog/search?q=foo")).toEqual(["library"]);
   });
 

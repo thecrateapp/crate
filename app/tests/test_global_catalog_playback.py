@@ -4,7 +4,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE
+from tests.conftest import approve_federation_node, PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -56,6 +56,7 @@ def _insert_remote_catalog_items(*, stale_track: bool = False) -> tuple[str, str
         ),
     ]
     with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
         for (
             remote_entity_uid,
             entity_type,
@@ -156,15 +157,29 @@ def test_resolve_global_track_playback_selects_healthy_remote_source(pg_db):
 
 def test_resolve_global_track_playback_rejects_stale_remote_source(pg_db):
     from crate.db.queries.global_catalog import search_global_catalog
+    from crate.db.tx import transaction_scope
     from crate.federation.global_playback import NoPlayableGlobalTrack
     from crate.federation.global_playback import resolve_global_track_playback
     from crate.federation.global_reconciliation import reconcile_remote_catalog
 
-    _insert_remote_catalog_items(stale_track=True)
+    node_uid, remote_track_uid = _insert_remote_catalog_items()
     reconcile_remote_catalog()
     track_uid = search_global_catalog("Talk For Hours", 10)["tracks"][0][
         "global_track_uid"
     ]
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE global_catalog_sources
+                SET source_stale = TRUE
+                WHERE node_uid = CAST(:node_uid AS uuid)
+                  AND remote_entity_uid = :remote_entity_uid
+                  AND entity_type = 'track'
+                """
+            ),
+            {"node_uid": node_uid, "remote_entity_uid": remote_track_uid},
+        )
 
     with pytest.raises(NoPlayableGlobalTrack):
         resolve_global_track_playback(track_uid)
@@ -186,7 +201,7 @@ def test_catalog_track_playback_endpoint_uses_local_playback_payload(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog._playback_payload_for_track",
-            lambda track, delivery: {
+            lambda track, delivery, **_kwargs: {
                 "stream_url": f"/api/tracks/by-entity/{track['entity_uid']}/stream",
                 "requested_policy": delivery,
                 "effective_policy": delivery,
@@ -198,6 +213,7 @@ def test_catalog_track_playback_endpoint_uses_local_playback_payload(test_app):
                 "task_id": None,
                 "variant_id": None,
                 "variant_status": None,
+                "content_origin": "local",
             },
         )
 
@@ -222,10 +238,12 @@ def test_catalog_track_playback_endpoint_creates_remote_ticket(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog.resolve_remote_playback",
-            lambda node_uid, remote_entity_uid, request: {
+            lambda node_uid, remote_entity_uid, request, **_kwargs: {
                 "stream_url": "/api/federation/remote/streams/ticket-1",
                 "expires_at": "2026-07-10T10:00:00Z",
                 "delivery_policy": "balanced",
+                "playback_session": "session-token",
+                "content_origin": "remote",
             },
         )
 
@@ -260,10 +278,12 @@ def test_catalog_track_playback_endpoint_preserves_remote_quality(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog.resolve_remote_playback",
-            lambda node_uid, remote_entity_uid, request: {
+            lambda node_uid, remote_entity_uid, request, **_kwargs: {
                 "stream_url": "/api/federation/remote/streams/ticket-1",
                 "expires_at": "2026-07-10T10:00:00Z",
                 "delivery_policy": "balanced",
+                "playback_session": "session-token",
+                "content_origin": "remote",
             },
         )
 
@@ -292,10 +312,12 @@ def test_catalog_track_stream_endpoint_redirects_to_resolved_stream(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog.resolve_remote_playback",
-            lambda node_uid, remote_entity_uid, request: {
+            lambda node_uid, remote_entity_uid, request, **_kwargs: {
                 "stream_url": "/api/federation/remote/streams/ticket-1",
                 "expires_at": "2026-07-10T10:00:00Z",
                 "delivery_policy": "balanced",
+                "playback_session": "session-token",
+                "content_origin": "remote",
             },
         )
 
@@ -491,3 +513,19 @@ def test_catalog_track_genre_endpoint_uses_remote_track_info_facet(test_app):
     assert payload["topLevel"] is None
     assert payload["source"] == "track"
     assert payload["preset"] is None
+
+
+def test_catalog_track_genre_does_not_mask_canonical_query_failures(monkeypatch):
+    from types import SimpleNamespace
+
+    from crate.api import catalog
+
+    monkeypatch.setattr(catalog, "_require_auth", lambda _request: {"id": 1})
+
+    def fail(_global_track_uid):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(catalog, "get_global_track_genres", fail)
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        catalog.catalog_track_genre(SimpleNamespace(), str(uuid.uuid4()))

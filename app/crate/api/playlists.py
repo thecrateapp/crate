@@ -51,7 +51,6 @@ from crate.db.repositories.playlists import (
     remove_playlist_track,
     update_playlist,
 )
-from crate.federation.global_policy import global_catalog_remote_playlist_refs_allowed
 
 router = APIRouter(prefix="/api/playlists", tags=["playlists"])
 
@@ -265,11 +264,6 @@ def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
 
     for track in tracks:
         if track.get("global_track_uid") or track.get("globalTrackUid"):
-            if not global_catalog_remote_playlist_refs_allowed():
-                raise HTTPException(
-                    status_code=422,
-                    detail="Global playlist track refs are disabled",
-                )
             continue
         deny_remote_for_local_action(track, "add to playlist")
     added = add_playlist_tracks(playlist_id, tracks)

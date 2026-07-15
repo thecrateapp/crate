@@ -15,6 +15,8 @@ describe("remote track playback resolution", () => {
     apiMock.mockResolvedValueOnce({
       stream_url: "/api/federation/remote/streams/ticket-1",
       expires_at: new Date(Date.now() + 60_000).toISOString(),
+      playback_session: "signed-playback-session",
+      content_origin: "remote",
     });
 
     const baseTrack = {
@@ -41,5 +43,7 @@ describe("remote track playback resolution", () => {
     expect(second.remote?.streamUrl).toBe(
       "/api/federation/remote/streams/ticket-1",
     );
+    expect(first.remote?.playbackSession).toBe("signed-playback-session");
+    expect(second.remote?.playbackSession).toBe("signed-playback-session");
   });
 });

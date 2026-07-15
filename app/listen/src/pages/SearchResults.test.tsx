@@ -237,9 +237,7 @@ describe("SearchResults", () => {
     const links = screen.getAllByRole("link");
     expect(
       links.find(
-        (link) =>
-          link.getAttribute("href") ===
-          "/catalog/albums/blending--album-global-1",
+        (link) => link.getAttribute("href") === "/artists/high-vis/blending",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("Remote")).not.toBeInTheDocument();

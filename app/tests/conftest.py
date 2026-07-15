@@ -65,6 +65,27 @@ _tc_container = None  # Testcontainers instance, kept alive for session
 TEST_DB_NAME = "crate_test"
 
 
+def approve_federation_node(session, node_uid: str) -> None:
+    from sqlalchemy import text
+
+    session.execute(
+        text(
+            """
+            INSERT INTO federation_nodes
+                (node_uid, display_name, api_base_url, active_key_id, trust_state)
+            VALUES
+                (CAST(:node_uid AS uuid), 'Remote fixture', :api_base_url, 'key-1', 'approved')
+            ON CONFLICT (node_uid) DO UPDATE
+            SET trust_state = 'approved', disabled_at = NULL
+            """
+        ),
+        {
+            "node_uid": node_uid,
+            "api_base_url": f"https://{node_uid}.example.test",
+        },
+    )
+
+
 def _try_env_pg() -> bool:
     """Try connecting to a PG instance for testing.
 
@@ -191,6 +212,19 @@ atexit.register(_shutdown_tc)
 # ── Fixtures ───────────────────────────────────────────────────────
 
 
+@pytest.fixture(scope="session", autouse=True)
+def test_runtime_data_dir(tmp_path_factory):
+    previous = os.environ.get("DATA_DIR")
+    os.environ["DATA_DIR"] = str(tmp_path_factory.mktemp("crate_runtime_data"))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("DATA_DIR", None)
+        else:
+            os.environ["DATA_DIR"] = previous
+
+
 @pytest.fixture
 def pg_db():
     """Provide a clean test database with all tables created.
@@ -270,6 +304,14 @@ def test_app():
         patch("crate.api._deps.load_config", return_value=mock_config),
         patch("crate.db.init_db"),
         patch("crate.api.cache_events.broadcast_invalidation"),
+        patch(
+            "crate.db.repositories.global_catalog_state.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
+        patch(
+            "crate.api.catalog.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
         patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user),
     ):
         from crate.api import create_app

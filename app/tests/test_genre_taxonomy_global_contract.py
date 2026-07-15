@@ -100,3 +100,36 @@ def test_seeded_core_nodes_use_core_uid_and_locked_edges(pg_db):
         "origin": "core",
     }
     assert locked is True
+
+
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_runtime_taxonomy_nodes_are_valid_global_overlay_nodes(pg_db):
+    from crate.db.tx import read_scope
+
+    created = pg_db.upsert_genre_taxonomy_node(
+        "fixture-global-overlay", name="Fixture Global Overlay"
+    )
+
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        entity_uid::text AS entity_uid,
+                        global_genre_uid::text AS global_genre_uid,
+                        taxonomy_id,
+                        origin
+                    FROM genre_taxonomy_nodes
+                    WHERE slug = 'fixture-global-overlay'
+                    """
+                )
+            )
+            .mappings()
+            .one()
+        )
+
+    assert created is not None
+    assert row["global_genre_uid"] == row["entity_uid"]
+    assert row["taxonomy_id"] == "crate-core"
+    assert row["origin"] == "overlay"

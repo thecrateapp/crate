@@ -20,7 +20,11 @@ def test_match_keys_are_deterministic_and_conservative():
     assert artist_match_key({"name": "Rival Schools"}) == "artist:rival schools"
     assert (
         album_match_key(
-            {"artist": "Rival Schools", "title": "Pedals (Deluxe Edition)", "year": "2011"}
+            {
+                "artist": "Rival Schools",
+                "title": "Pedals (Deluxe Edition)",
+                "year": "2011",
+            }
         )
         == "album:rival schools|pedals|2011"
     )
@@ -64,8 +68,16 @@ def test_artist_scoring_uses_authoritative_ids_before_name_matches():
 
 def test_album_scoring_keeps_ambiguous_editions_out_of_auto_merge():
     release = score_album_match(
-        {"artist": "Rival Schools", "title": "Pedals", "musicbrainz_release_mbid": "rel"},
-        {"artist": "Rival Schools", "title": "Pedals", "musicbrainz_release_mbid": "rel"},
+        {
+            "artist": "Rival Schools",
+            "title": "Pedals",
+            "musicbrainz_release_mbid": "rel",
+        },
+        {
+            "artist": "Rival Schools",
+            "title": "Pedals",
+            "musicbrainz_release_mbid": "rel",
+        },
     )
     assert release.confidence == 1.0
     assert release.auto_merge is True

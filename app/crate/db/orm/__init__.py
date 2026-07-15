@@ -10,6 +10,16 @@ and ``db/jobs/``. See the refactor plan for the rationale.
 """
 
 from crate.db.orm.genre import GenreTaxonomyAlias, GenreTaxonomyEdge, GenreTaxonomyNode
+from crate.db.orm.federation import (
+    FederationDirectoryCandidate,
+    FederationDirectoryRefreshRun,
+    FederationDirectorySubscription,
+    FederationKeyRotation,
+    FederationLocalKey,
+    FederationPairing,
+    FederationPeerGrant,
+    FederationPeerKey,
+)
 from crate.db.orm.health import HealthIssue
 from crate.db.orm.i18n import I18nBundle, I18nTranslationRequest
 from crate.db.orm.bandcamp import (
@@ -32,7 +42,13 @@ from crate.db.orm.playlist import (
 from crate.db.orm.releases import NewRelease
 from crate.db.orm.settings import Setting
 from crate.db.orm.tidal import TidalDownload, TidalMonitoredArtist
-from crate.db.orm.user import AuthInvite, Session, User, UserExternalIdentity
+from crate.db.orm.user import (
+    AuthInvite,
+    Session,
+    User,
+    UserExternalIdentity,
+    UserGlobalTrackLike,
+)
 
 __all__ = [
     "AuthInvite",
@@ -46,6 +62,14 @@ __all__ = [
     "GenreTaxonomyAlias",
     "GenreTaxonomyEdge",
     "GenreTaxonomyNode",
+    "FederationKeyRotation",
+    "FederationDirectoryCandidate",
+    "FederationDirectoryRefreshRun",
+    "FederationDirectorySubscription",
+    "FederationLocalKey",
+    "FederationPairing",
+    "FederationPeerGrant",
+    "FederationPeerKey",
     "HealthIssue",
     "I18nBundle",
     "I18nTranslationRequest",
@@ -63,5 +87,6 @@ __all__ = [
     "User",
     "UserBandcampItem",
     "UserFollowedPlaylist",
+    "UserGlobalTrackLike",
     "UserExternalIdentity",
 ]

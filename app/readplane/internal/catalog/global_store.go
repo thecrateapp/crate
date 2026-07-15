@@ -2,12 +2,42 @@ package catalog
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
+
+var globalSearchFeatSuffix = regexp.MustCompile(`(?i)\s*[\(\[]?\s*(?:feat|ft|featuring)\.?\s+.+?[\)\]]?\s*$`)
+
+// GlobalCatalogReady reports whether the canonical catalog can serve reads.
+// A cold or backfilling catalog must never fall back to library_* rows.
+func (s *Store) GlobalCatalogReady(ctx context.Context) (bool, error) {
+	if s.globalCatalogReadyFn != nil {
+		return s.globalCatalogReadyFn(ctx)
+	}
+	if s.pool == nil {
+		return false, fmt.Errorf("catalog database pool is unavailable")
+	}
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	var ready bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT status = 'ready'
+		FROM global_catalog_state
+		WHERE singleton = TRUE
+	`).Scan(&ready)
+	if err != nil {
+		return false, err
+	}
+	return ready, nil
+}
 
 // GlobalSearch reads the canonical node-first catalog. It deliberately never
 // falls back to library_* tables: a zero-peer node is represented by its local
@@ -15,10 +45,11 @@ import (
 func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[string]any, error) {
 	q := strings.TrimSpace(query)
 	cappedLimit := clamp(limit, 1, 50)
-	if len(q) < 2 {
+	if utf8.RuneCountInString(q) < 2 {
 		return map[string]any{"artists": []any{}, "albums": []any{}, "tracks": []any{}}, nil
 	}
-	like := "%" + q + "%"
+	like := "%" + escapeGlobalSearchLike(q) + "%"
+	normalizedLike := "%" + escapeGlobalSearchLike(normalizeGlobalSearchQuery(q)) + "%"
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
@@ -30,21 +61,33 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 	group.Go(func() error {
 		var err error
 		artists, err = rowsToMaps(s.pool.Query(groupCtx, `
-			SELECT global_artist_uid::text AS global_uid,
-			       global_artist_uid::text AS global_artist_uid,
-			       local_artist_id AS id,
-			       local_artist_entity_uid::text AS entity_uid,
-			       canonical_name AS name, has_photo
-			FROM global_catalog_artists
-			WHERE canonical_name ILIKE $1 AND (has_local OR has_remote)
-			ORDER BY has_local DESC, source_count DESC, canonical_name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+			WITH source_health AS (
+				SELECT global_entity_uid,
+				       BOOL_OR(NOT source_stale AND source_deleted_at IS NULL) AS has_healthy_source
+				FROM global_catalog_sources
+				WHERE entity_type = 'artist'
+				GROUP BY global_entity_uid
+			)
+			SELECT a.global_artist_uid::text AS global_artist_uid,
+			       a.canonical_name,
+			       a.local_artist_id,
+			       a.local_artist_entity_uid::text AS local_artist_entity_uid,
+			       a.availability_json, a.source_count, a.has_local, a.has_remote,
+			       a.has_photo, COALESCE(sh.has_healthy_source, false) AS has_healthy_source
+			FROM global_catalog_artists a
+			LEFT JOIN source_health sh ON sh.global_entity_uid = a.global_artist_uid
+			WHERE a.search_vector @@ plainto_tsquery('simple', $1)
+			   OR a.canonical_name ILIKE $2 ESCAPE '\'
+			   OR a.normalized_name ILIKE $3 ESCAPE '\'
+			ORDER BY a.has_local DESC, COALESCE(sh.has_healthy_source, false) DESC,
+			         a.source_count DESC, a.canonical_name ASC
+			LIMIT $4
+		`, q, like, normalizedLike, cappedLimit))
 		if err != nil {
 			return err
 		}
-		for _, artist := range artists {
-			artist["has_photo"] = boolValue(artist["has_photo"])
+		for index, artist := range artists {
+			artists[index] = globalArtistSearchPayload(artist)
 		}
 		return nil
 	})
@@ -52,26 +95,33 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 	group.Go(func() error {
 		var err error
 		albums, err = rowsToMaps(s.pool.Query(groupCtx, `
-			SELECT global_album_uid::text AS global_uid,
-			       global_album_uid::text AS global_album_uid,
-			       global_artist_uid::text AS global_artist_uid,
-			       local_album_id AS id,
-			       local_album_entity_uid::text AS entity_uid,
-			       artist_name AS artist, canonical_name AS name, year, has_cover
-			FROM global_catalog_albums
-			WHERE (canonical_name ILIKE $1 OR artist_name ILIKE $1)
-			  AND (has_local OR has_remote)
-			ORDER BY has_local DESC, source_count DESC, artist_name ASC, canonical_name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+			WITH source_health AS (
+				SELECT global_entity_uid,
+				       BOOL_OR(NOT source_stale AND source_deleted_at IS NULL) AS has_healthy_source
+				FROM global_catalog_sources
+				WHERE entity_type = 'album'
+				GROUP BY global_entity_uid
+			)
+			SELECT a.global_album_uid::text AS global_album_uid,
+			       a.global_artist_uid::text AS global_artist_uid,
+			       a.canonical_name, a.artist_name, a.year, a.local_album_id,
+			       a.local_album_entity_uid::text AS local_album_entity_uid,
+			       a.availability_json, a.source_count, a.has_local, a.has_remote,
+			       a.has_cover, COALESCE(sh.has_healthy_source, false) AS has_healthy_source
+			FROM global_catalog_albums a
+			LEFT JOIN source_health sh ON sh.global_entity_uid = a.global_album_uid
+			WHERE a.search_vector @@ plainto_tsquery('simple', $1)
+			   OR a.canonical_name ILIKE $2 ESCAPE '\' OR a.artist_name ILIKE $2 ESCAPE '\'
+			   OR a.normalized_name ILIKE $3 ESCAPE '\'
+			ORDER BY a.has_local DESC, COALESCE(sh.has_healthy_source, false) DESC,
+			         a.source_count DESC, a.artist_name ASC, a.canonical_name ASC
+			LIMIT $4
+		`, q, like, normalizedLike, cappedLimit))
 		if err != nil {
 			return err
 		}
-		for _, album := range albums {
-			album["has_cover"] = boolValue(album["has_cover"])
-			if album["year"] == nil {
-				album["year"] = ""
-			}
+		for index, album := range albums {
+			albums[index] = globalAlbumSearchPayload(album)
 		}
 		return nil
 	})
@@ -79,32 +129,34 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 	group.Go(func() error {
 		var err error
 		tracks, err = rowsToMaps(s.pool.Query(groupCtx, `
-			SELECT global_track_uid::text AS global_uid,
-			       global_track_uid::text AS global_track_uid,
-			       global_artist_uid::text AS global_artist_uid,
-			       global_album_uid::text AS global_album_uid,
-			       local_track_id AS id,
-			       local_track_entity_uid::text AS entity_uid,
-			       canonical_title AS title, artist_name AS artist,
-			       album_name AS album, duration_seconds AS duration
-			FROM global_catalog_tracks
-			WHERE (canonical_title ILIKE $1 OR artist_name ILIKE $1 OR album_name ILIKE $1)
-			  AND (has_local OR has_remote)
-			ORDER BY has_local DESC, source_count DESC, artist_name ASC, canonical_title ASC
-			LIMIT $2
-		`, like, cappedLimit))
+			WITH source_health AS (
+				SELECT global_entity_uid,
+				       BOOL_OR(NOT source_stale AND source_deleted_at IS NULL) AS has_healthy_source
+				FROM global_catalog_sources
+				WHERE entity_type = 'track'
+				GROUP BY global_entity_uid
+			)
+			SELECT t.global_track_uid::text AS global_track_uid,
+			       t.global_album_uid::text AS global_album_uid,
+			       t.global_artist_uid::text AS global_artist_uid,
+			       t.canonical_title, t.artist_name, t.album_name, t.duration_seconds,
+			       t.local_track_id, t.local_track_entity_uid::text AS local_track_entity_uid,
+			       t.availability_json, t.source_count, t.has_local, t.has_remote,
+			       COALESCE(sh.has_healthy_source, false) AS has_healthy_source
+			FROM global_catalog_tracks t
+			LEFT JOIN source_health sh ON sh.global_entity_uid = t.global_track_uid
+			WHERE t.search_vector @@ plainto_tsquery('simple', $1)
+			   OR t.canonical_title ILIKE $2 ESCAPE '\' OR t.artist_name ILIKE $2 ESCAPE '\' OR t.album_name ILIKE $2 ESCAPE '\'
+			   OR t.normalized_title ILIKE $3 ESCAPE '\'
+			ORDER BY t.has_local DESC, COALESCE(sh.has_healthy_source, false) DESC,
+			         t.source_count DESC, t.artist_name ASC, t.canonical_title ASC
+			LIMIT $4
+		`, q, like, normalizedLike, cappedLimit))
 		if err != nil {
 			return err
 		}
-		for _, track := range tracks {
-			track["path"] = nil
-			track["bpm"] = nil
-			track["audio_key"] = nil
-			track["audio_scale"] = nil
-			track["energy"] = nil
-			track["danceability"] = nil
-			track["valence"] = nil
-			track["bliss_vector"] = nil
+		for index, track := range tracks {
+			tracks[index] = globalTrackSearchPayload(track)
 		}
 		return nil
 	})
@@ -113,4 +165,129 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 		return nil, err
 	}
 	return map[string]any{"artists": artists, "albums": albums, "tracks": tracks}, nil
+}
+
+func normalizeGlobalSearchQuery(query string) string {
+	query = globalSearchFeatSuffix.ReplaceAllString(strings.TrimSpace(query), "")
+	query = strings.ReplaceAll(query, "&", " and ")
+	var normalized strings.Builder
+	for _, character := range norm.NFD.String(query) {
+		if unicode.Is(unicode.Mn, character) || character > unicode.MaxASCII {
+			continue
+		}
+		if unicode.IsLetter(character) || unicode.IsDigit(character) {
+			normalized.WriteRune(unicode.ToLower(character))
+		} else {
+			normalized.WriteByte(' ')
+		}
+	}
+	return strings.Join(strings.Fields(normalized.String()), " ")
+}
+
+func escapeGlobalSearchLike(query string) string {
+	replacer := strings.NewReplacer(
+		"\\", "\\\\",
+		"%", "\\%",
+		"_", "\\_",
+	)
+	return replacer.Replace(query)
+}
+
+func globalArtistSearchPayload(row map[string]any) map[string]any {
+	slug := slugify(stringValue(row["canonical_name"]))
+	if slug == "" {
+		slug = "artist"
+	}
+	payload := map[string]any{
+		"global_uid":        row["global_artist_uid"],
+		"global_artist_uid": row["global_artist_uid"],
+		"slug":              slug,
+		"name":              row["canonical_name"],
+		"has_photo":         boolValue(row["has_photo"]),
+		"availability":      globalSearchAvailability(row),
+	}
+	if row["local_artist_id"] != nil {
+		payload["id"] = row["local_artist_id"]
+	}
+	if row["local_artist_entity_uid"] != nil {
+		payload["entity_uid"] = row["local_artist_entity_uid"]
+		payload["local_artist_entity_uid"] = row["local_artist_entity_uid"]
+	}
+	return payload
+}
+
+func globalAlbumSearchPayload(row map[string]any) map[string]any {
+	slug := slugify(stringValue(row["canonical_name"]))
+	if slug == "" {
+		slug = "album"
+	}
+	artistSlug := slugify(stringValue(row["artist_name"]))
+	if artistSlug == "" {
+		artistSlug = "artist"
+	}
+	payload := map[string]any{
+		"global_uid":        row["global_album_uid"],
+		"global_album_uid":  row["global_album_uid"],
+		"global_artist_uid": row["global_artist_uid"],
+		"slug":              slug,
+		"artist_slug":       artistSlug,
+		"artist":            row["artist_name"],
+		"name":              row["canonical_name"],
+		"display_name":      row["canonical_name"],
+		"year":              row["year"],
+		"tracks":            intValue(row["track_count"]),
+		"formats":           []any{},
+		"size_mb":           0,
+		"has_cover":         boolValue(row["has_cover"]),
+		"availability":      globalSearchAvailability(row),
+	}
+	if row["local_album_id"] != nil {
+		payload["id"] = row["local_album_id"]
+	}
+	if row["local_album_entity_uid"] != nil {
+		payload["entity_uid"] = row["local_album_entity_uid"]
+		payload["local_album_entity_uid"] = row["local_album_entity_uid"]
+	}
+	if row["year"] == nil {
+		delete(payload, "year")
+	}
+	return payload
+}
+
+func globalTrackSearchPayload(row map[string]any) map[string]any {
+	payload := map[string]any{
+		"global_uid":        row["global_track_uid"],
+		"global_track_uid":  row["global_track_uid"],
+		"globalTrackUid":    row["global_track_uid"],
+		"global_artist_uid": row["global_artist_uid"],
+		"title":             row["canonical_title"],
+		"artist":            row["artist_name"],
+		"album":             row["album_name"],
+		"duration":          row["duration_seconds"],
+		"availability":      globalSearchAvailability(row),
+	}
+	if row["global_album_uid"] != nil {
+		payload["global_album_uid"] = row["global_album_uid"]
+	}
+	if row["local_track_id"] != nil {
+		payload["id"] = row["local_track_id"]
+	}
+	if row["local_track_entity_uid"] != nil {
+		payload["entity_uid"] = row["local_track_entity_uid"]
+	}
+	if row["duration_seconds"] == nil {
+		delete(payload, "duration")
+	}
+	return payload
+}
+
+func globalSearchAvailability(row map[string]any) map[string]any {
+	availability := map[string]any{}
+	if raw, ok := row["availability_json"].(map[string]any); ok {
+		availability = cloneMap(raw)
+	}
+	availability["local"] = boolValue(row["has_local"])
+	availability["remote"] = boolValue(row["has_remote"])
+	availability["healthy"] = boolValue(row["has_healthy_source"])
+	return availability
 }

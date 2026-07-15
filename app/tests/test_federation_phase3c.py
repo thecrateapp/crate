@@ -1,6 +1,5 @@
 """Phase 3C tests — quotas, stream slots, byte tracking."""
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 
@@ -14,6 +13,9 @@ from crate.federation.quotas import (
     DEFAULT_MAX_STREAMS_PER_PEER,
     DEFAULT_MAX_STREAMS_PER_SUBJECT,
     DEFAULT_DAILY_BYTES_PER_PEER,
+    _daily_bytes_key,
+    _slots_key,
+    _subject_slots_key,
 )
 from crate.api.federation_remote import _stream_byte_limits, _stream_slot_limits
 
@@ -83,11 +85,6 @@ class _MemoryRedis:
         self.values.pop(key, None)
 
 
-def _today_peer_bytes_key(node_uid: str) -> str:
-    today = datetime.now(timezone.utc).strftime("%Y%m%d")
-    return f"federation:bytes:peer:{node_uid}:{today}"
-
-
 class TestStreamSlots:
     def test_acquire_succeeds_when_under_limit(self):
         redis = _mock_redis()
@@ -98,7 +95,7 @@ class TestStreamSlots:
         assert redis.sadd.called
 
     def test_acquire_fails_when_peer_at_limit(self):
-        scard = {"federation:slots:peer:node-1": 2}
+        scard = {_slots_key("node-1"): 2}
         redis = _mock_redis(scard_values=scard)
         ok, reason, stream_id = acquire_stream_slot(redis, "node-1")
         assert ok is False
@@ -106,8 +103,8 @@ class TestStreamSlots:
 
     def test_acquire_fails_when_subject_at_limit(self):
         scard = {
-            "federation:slots:peer:node-1": 0,
-            "federation:slots:subject:node-1:hash123": 1,
+            _slots_key("node-1"): 0,
+            _subject_slots_key("node-1", "hash123"): 1,
         }
         redis = _mock_redis(scard_values=scard)
         ok, reason, stream_id = acquire_stream_slot(
@@ -122,7 +119,7 @@ class TestStreamSlots:
         assert redis.srem.called
 
     def test_active_count_returns_scard(self):
-        redis = _mock_redis(scard_values={"federation:slots:peer:node-1": 3})
+        redis = _mock_redis(scard_values={_slots_key("node-1"): 3})
         count = get_active_stream_count(redis, "node-1")
         assert count == 3
 
@@ -186,7 +183,7 @@ class TestByteQuotas:
         assert ok is True
 
     def test_check_denies_when_peer_over_limit(self):
-        get_vals = {_today_peer_bytes_key("node-1"): str(DEFAULT_DAILY_BYTES_PER_PEER)}
+        get_vals = {_daily_bytes_key("node-1"): str(DEFAULT_DAILY_BYTES_PER_PEER)}
         redis = _mock_redis(get_values=get_vals)
         ok, reason = check_byte_quota(redis, "node-1")
         assert ok is False
@@ -202,7 +199,7 @@ class TestByteQuotas:
         assert get_daily_bytes(redis, "node-1") == 0
 
     def test_get_daily_bytes_returns_stored_value(self):
-        get_vals = {_today_peer_bytes_key("node-1"): "500000"}
+        get_vals = {_daily_bytes_key("node-1"): "500000"}
         redis = _mock_redis(get_values=get_vals)
         assert get_daily_bytes(redis, "node-1") == 500000
 

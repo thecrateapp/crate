@@ -60,7 +60,6 @@ from crate.db.repositories.radio import (
     persist_radio_feedback,
 )
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.track_versions import (
     canonical_track_title_key,
     dedupe_track_variants,
@@ -384,8 +383,6 @@ def _resolve_global_seed_tracks(
     session=None,
     limit: int = 120,
 ) -> dict | None:
-    if not global_catalog_surface_enabled("radio"):
-        return None
     return get_global_radio_seed_tracks(
         seed_type,
         seed_value,
@@ -425,7 +422,7 @@ def _global_radio_track_payload(track: dict, distance: int = 0) -> dict:
 
 def _reload_global_tracks(session: dict, count: int) -> list[dict]:
     tracks = list(session.get("global_tracks") or [])
-    if session.get("global_exhausted"):
+    if session.get("global_source_exhausted"):
         return tracks
 
     seed_type = str(session.get("seed_type") or "")
@@ -433,7 +430,7 @@ def _reload_global_tracks(session: dict, count: int) -> list[dict]:
     if not seed_type or not seed_value:
         return tracks
 
-    next_limit = min(max(len(tracks) + max(count * 6, count), 120), 250)
+    next_limit = min(max(len(tracks) + max(count * 6, count), 120), 5_000)
     if next_limit <= len(tracks):
         return tracks
 
@@ -447,11 +444,13 @@ def _reload_global_tracks(session: dict, count: int) -> list[dict]:
 
     refreshed_tracks = list(refreshed.get("tracks") or [])
     if len(refreshed_tracks) <= len(tracks):
+        session["global_source_exhausted"] = True
         return tracks
 
     session["global_tracks"] = refreshed_tracks
     session["seed_label"] = refreshed.get("seed_label") or session.get("seed_label")
     session["global_exhausted"] = False
+    session["global_source_exhausted"] = len(refreshed_tracks) < next_limit
     return refreshed_tracks
 
 
@@ -461,9 +460,19 @@ def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict
     if cursor >= len(tracks):
         tracks = _reload_global_tracks(session, count)
 
-    selected = tracks[cursor : cursor + count]
-    session["global_cursor"] = cursor + len(selected)
-    session["global_exhausted"] = session["global_cursor"] >= len(tracks)
+    excluded = set(session.get("excluded_global_track_uids") or [])
+    selected: list[dict] = []
+    while cursor < len(tracks) and len(selected) < count:
+        track = tracks[cursor]
+        cursor += 1
+        if track.get("global_track_uid") in excluded:
+            continue
+        selected.append(track)
+    session["global_cursor"] = cursor
+    queue_exhausted = session["global_cursor"] >= len(tracks)
+    session["global_exhausted"] = bool(
+        queue_exhausted and session.get("global_source_exhausted")
+    )
     return [_global_radio_track_payload(track) for track in selected]
 
 
@@ -489,6 +498,8 @@ def start_radio(
                     limit=max(_BATCH_SIZE * 6, 120),
                 )
                 if global_seed:
+                    initial_limit = max(_BATCH_SIZE * 6, 120)
+                    global_tracks = list(global_seed["tracks"])
                     session_id = str(uuid.uuid4())
                     session = {
                         "id": session_id,
@@ -498,8 +509,11 @@ def start_radio(
                         "seed_value": seed_value,
                         "seed_label": global_seed["seed_label"],
                         "radio_profile": "global_catalog",
-                        "global_tracks": global_seed["tracks"],
+                        "global_tracks": global_tracks,
                         "global_cursor": 0,
+                        "global_source_exhausted": len(global_tracks) < initial_limit,
+                        "liked_vectors": [],
+                        "disliked_vectors": [],
                         "track_count": 0,
                         "created_at": datetime.now(timezone.utc).isoformat(),
                     }
@@ -608,40 +622,60 @@ def next_tracks(session_id: str, count: int = _BATCH_SIZE) -> dict | None:
 # ── Feedback ──────────────────────────────────────────────────────
 
 
-def radio_feedback(session_id: str, track_id: int, action: str) -> dict | None:
+def radio_feedback(
+    session_id: str,
+    track_id: int | None,
+    action: str,
+    *,
+    global_track_uid: str | None = None,
+) -> dict | None:
     """Process like/dislike feedback — updates session AND persists to DB."""
     session = _load_session(session_id)
     if not session:
         return None
 
-    vec = get_track_bliss_vector(track_id)
+    vec = get_track_bliss_vector(track_id) if track_id is not None else None
+    if not vec and global_track_uid:
+        vec = _global_track_feedback_vector(session, global_track_uid)
     if not vec:
+        if (
+            session.get("radio_profile") == "global_catalog"
+            and global_track_uid
+            and action == "dislike"
+        ):
+            excluded = list(session.get("excluded_global_track_uids") or [])
+            if global_track_uid not in excluded:
+                excluded.append(global_track_uid)
+                session["excluded_global_track_uids"] = excluded
+                _save_session(session)
+            return {"status": "ok", "effect": "exclusion_added"}
         return {"status": "ok", "effect": "none"}
 
     if action == "like":
-        session["liked_vectors"].append(vec)
+        session.setdefault("liked_vectors", []).append(vec)
         liked = session["liked_vectors"]
         like_centroid = _centroid(liked)
         blend = min(0.4, 0.08 * len(liked))
-        session["current_target"] = _lerp(
-            session["initial_target"], like_centroid, blend
-        )
+        initial_target = session.get("initial_target") or vec
+        session.setdefault("initial_target", initial_target)
+        session["current_target"] = _lerp(initial_target, like_centroid, blend)
         effect = "target_shifted"
     elif action == "dislike":
-        session["disliked_vectors"].append(vec)
+        session.setdefault("disliked_vectors", []).append(vec)
         effect = "exclusion_added"
     else:
         return {"status": "ok", "effect": "none"}
 
     _save_session(session)
 
-    persist_radio_feedback(
-        user_id=session["user_id"],
-        track_id=track_id,
-        action=action,
-        bliss_vector=vec,
-        session_seed=session.get("seed_label", ""),
-    )
+    if track_id is not None:
+        persist_radio_feedback(
+            user_id=session["user_id"],
+            track_id=track_id,
+            action=action,
+            bliss_vector=vec,
+            session_seed=session.get("seed_label", ""),
+        )
 
     return {
         "status": "ok",
@@ -649,6 +683,19 @@ def radio_feedback(session_id: str, track_id: int, action: str) -> dict | None:
         "liked_count": len(session["liked_vectors"]),
         "disliked_count": len(session["disliked_vectors"]),
     }
+
+
+def _global_track_feedback_vector(
+    session: dict, global_track_uid: str
+) -> list[float] | None:
+    for track in session.get("global_tracks") or []:
+        if str(track.get("global_track_uid") or "") != global_track_uid:
+            continue
+        vector = track.get("bliss_vector")
+        if isinstance(vector, list) and vector:
+            return vector
+        return None
+    return None
 
 
 # ── Track generation ──────────────────────────────────────────────

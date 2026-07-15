@@ -186,6 +186,9 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "top-tracks" {
+		if s.tryFallback(w, r) {
+			return
+		}
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
@@ -197,7 +200,7 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		payload, err := s.catalog.AlbumByArtistAndAlbumSlug(r.Context(), parts[0], parts[2])
@@ -380,7 +383,7 @@ func (s *Server) writeCatalogPayload(w http.ResponseWriter, r *http.Request, pay
 		return
 	}
 	s.logger.Warn("readplane catalog query failed", "path", r.URL.Path, "error", err)
-	if s.fallback.ServeHTTP(w, r) {
+	if s.tryFallback(w, r) {
 		return
 	}
 	httpx.MarkReadplane(w, "miss")
@@ -388,14 +391,14 @@ func (s *Server) writeCatalogPayload(w http.ResponseWriter, r *http.Request, pay
 }
 
 func (s *Server) writeCatalogPayloadOrFallbackNotFound(w http.ResponseWriter, r *http.Request, payload any, err error, fallbackDetail string, notFoundDetail string) {
-	if errors.Is(err, catalog.ErrNotFound) && s.fallback.ServeHTTP(w, r) {
+	if errors.Is(err, catalog.ErrNotFound) && s.tryFallback(w, r) {
 		return
 	}
 	s.writeCatalogPayload(w, r, payload, err, fallbackDetail, notFoundDetail)
 }
 
 func (s *Server) catalogUnavailable(w http.ResponseWriter, r *http.Request, detail string) {
-	if s.fallback.ServeHTTP(w, r) {
+	if s.tryFallback(w, r) {
 		return
 	}
 	httpx.MarkReadplane(w, "miss")
@@ -403,11 +406,15 @@ func (s *Server) catalogUnavailable(w http.ResponseWriter, r *http.Request, deta
 }
 
 func (s *Server) fallbackOrRouteMiss(w http.ResponseWriter, r *http.Request) {
-	if s.fallback.ServeHTTP(w, r) {
+	if s.tryFallback(w, r) {
 		return
 	}
 	httpx.MarkReadplane(w, "miss")
 	httpx.WriteError(w, http.StatusNotFound, "Not found")
+}
+
+func (s *Server) tryFallback(w http.ResponseWriter, r *http.Request) bool {
+	return s.fallback != nil && s.fallback.ServeHTTP(w, r)
 }
 
 func routeParts(path string, prefix string) ([]string, bool) {

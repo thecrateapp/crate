@@ -14,6 +14,7 @@ import hashlib
 import math
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
@@ -28,6 +29,51 @@ _MIN_BUCKET_TTL_SECONDS = 3600
 _MAX_BUCKET_TTL_SECONDS = 7 * 86400
 _ASYNC_QUEUE_MAX = 10_000
 _ROUTE_LATENCY_METRIC = "api.route.latency"
+FEDERATION_METRICS = frozenset(
+    {
+        "federation.pairing.attempt",
+        "federation.pairing.latency",
+        "federation.signed_request.latency",
+        "federation.signed_request.result",
+        "federation.sync.lag",
+        "federation.sync.rows",
+        "federation.sync.bytes",
+        "federation.stream.active",
+        "federation.stream.ttfb",
+        "federation.stream.bytes",
+        "federation.stream.disconnect",
+        "federation.import.state",
+        "federation.import.reserved_bytes",
+        "federation.directory.freshness",
+        "federation.auth.denial",
+        "federation.risk.signal",
+        "federation.risk.action",
+        "federation.source.availability",
+        "federation.source.fallback",
+    }
+)
+FEDERATION_REASON_CODES = frozenset(
+    {
+        "ok",
+        "signature_invalid",
+        "nonce_replay",
+        "pairing_rate_limit",
+        "peer_not_approved",
+        "peer_disabled",
+        "subject_blocked",
+        "no_matching_grant",
+        "capability_denied",
+        "invalid_constraints",
+        "peer_stream_limit",
+        "subject_stream_limit",
+        "peer_byte_quota",
+        "subject_byte_quota",
+        "manifest_digest_mismatch",
+        "track_digest_mismatch",
+        "upstream_error",
+        "other",
+    }
+)
 _async_metric_queue: Queue[tuple[str, float, dict | None]] = Queue(
     maxsize=_ASYNC_QUEUE_MAX
 )
@@ -297,6 +343,37 @@ def record_later(name: str, value: float, tags: dict | None = None):
 
 def record_counter_later(name: str, tags: dict | None = None):
     record_later(name, 1.0, tags)
+
+
+def federation_metric_tags(
+    *, peer_uid: str | None = None, reason_code: str = "ok"
+) -> dict[str, str]:
+    tags: dict[str, str] = {}
+    if peer_uid is not None:
+        try:
+            tags["peer_uid"] = str(uuid.UUID(str(peer_uid)))
+        except ValueError as exc:
+            raise ValueError("peer_uid must be a UUID") from exc
+    if reason_code not in FEDERATION_REASON_CODES:
+        raise ValueError("Unknown federation metric reason code")
+    tags["reason_code"] = reason_code
+    return tags
+
+
+def record_federation_metric(
+    name: str,
+    value: float = 1.0,
+    *,
+    peer_uid: str | None = None,
+    reason_code: str = "ok",
+) -> None:
+    if name not in FEDERATION_METRICS:
+        raise ValueError("Unknown federation metric name")
+    record_later(
+        name,
+        value,
+        federation_metric_tags(peer_uid=peer_uid, reason_code=reason_code),
+    )
 
 
 def record_route_latency_later(

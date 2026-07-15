@@ -5,47 +5,7 @@ import crate.db.home_personalized_discovery as home_personalized_discovery
 import crate.db.queries.radio_stations as radio_stations
 
 
-def test_recent_global_artists_remains_local_when_home_surface_disabled(monkeypatch):
-    monkeypatch.setattr(
-        home_builder_upcoming_artists,
-        "global_catalog_surface_enabled",
-        lambda surface: False,
-    )
-    monkeypatch.setattr(
-        home_builder_upcoming_artists,
-        "get_recent_global_artist_rows",
-        lambda limit: [
-            {
-                "id": 7,
-                "slug": "high-vis",
-                "name": "High Vis",
-                "album_count": 2,
-                "track_count": 20,
-                "has_photo": 1,
-            }
-        ],
-    )
-
-    assert home_builder_upcoming_artists._build_recent_global_artists(7) == [
-        {
-            "id": 7,
-            "slug": "high-vis",
-            "name": "High Vis",
-            "album_count": 2,
-            "track_count": 20,
-            "has_photo": True,
-        }
-    ]
-
-
-def test_recent_global_artists_uses_canonical_catalog_when_home_surface_enabled(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        home_builder_upcoming_artists,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "home",
-    )
+def test_recent_global_artists_uses_canonical_catalog(monkeypatch):
     monkeypatch.setattr(
         home_builder_upcoming_artists,
         "list_global_collection_artists",
@@ -268,12 +228,7 @@ def test_home_artwork_preserves_global_catalog_refs():
     ]
 
 
-def test_radio_stations_use_global_catalog_when_surface_enabled(monkeypatch):
-    monkeypatch.setattr(
-        radio_stations,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "radio",
-    )
+def test_radio_stations_use_global_catalog(monkeypatch):
     monkeypatch.setattr(
         radio_stations,
         "get_cached_home_context",
@@ -348,51 +303,9 @@ def test_radio_stations_use_global_catalog_when_surface_enabled(monkeypatch):
     ]
 
 
-def test_radio_stations_ignore_global_catalog_in_standalone(monkeypatch):
-    monkeypatch.setattr(
-        radio_stations,
-        "global_catalog_surface_enabled",
-        lambda _surface: False,
-    )
-    monkeypatch.setattr(
-        radio_stations,
-        "get_cached_home_context",
-        lambda *_args, **_kwargs: {
-            "top_genres": [],
-            "top_artists": [
-                {
-                    "artist_id": None,
-                    "global_artist_uid": "global-high-vis",
-                    "artist_name": "High Vis",
-                }
-            ],
-            "followed": [],
-        },
-    )
-    monkeypatch.setattr(
-        radio_stations,
-        "list_global_collection_artists",
-        lambda limit: [
-            {
-                "global_artist_uid": "global-rival-schools",
-                "artist_name": "Rival Schools",
-            }
-        ],
-    )
-
-    payload = radio_stations.get_user_radio_stations(7)
-
-    assert payload["artist_stations"] == []
-
-
 def test_global_artist_core_home_playlist_returns_catalog_tracks(monkeypatch):
     from crate.db import home_personalized_collections
 
-    monkeypatch.setattr(
-        home_personalized_collections,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "home",
-    )
     monkeypatch.setattr(
         home_personalized_collections,
         "get_global_radio_seed_tracks",
@@ -430,31 +343,6 @@ def test_global_artist_core_home_playlist_returns_catalog_tracks(monkeypatch):
     assert payload["tracks"][0]["global_track_uid"] == "global-track-1"
     assert payload["tracks"][0]["global_artist_uid"] == "global-high-vis"
     assert payload["artwork_tracks"][0]["global_album_uid"] == "global-album-1"
-
-
-def test_global_artist_core_home_playlist_disabled_in_standalone(monkeypatch):
-    from crate.db import home_personalized_collections
-
-    monkeypatch.setattr(
-        home_personalized_collections,
-        "global_catalog_surface_enabled",
-        lambda surface: False,
-    )
-    monkeypatch.setattr(
-        home_personalized_collections,
-        "get_global_radio_seed_tracks",
-        lambda *_, **__: (_ for _ in ()).throw(
-            AssertionError("should not load global")
-        ),
-    )
-
-    assert (
-        home_personalized_collections.get_home_playlist(
-            7,
-            "core-tracks-global-artist-global-high-vis",
-        )
-        is None
-    )
 
 
 def test_home_recommended_tracks_endpoint_merges_global_tracks(monkeypatch):
@@ -679,9 +567,7 @@ def test_home_custom_mix_detail_merges_global_tracks(monkeypatch):
         ],
     )
 
-    payload = home_personalized_collections.get_home_mix(
-        7, "daily-discovery", limit=8
-    )
+    payload = home_personalized_collections.get_home_mix(7, "daily-discovery", limit=8)
 
     assert payload is not None
     assert payload["tracks"][0]["global_track_uid"] == "global-track-1"
@@ -788,7 +674,9 @@ def test_home_genre_custom_mix_detail_filters_global_tracks_by_direct_genre(
 
     assert payload is not None
     track_global_uids = {
-        track.get("global_track_uid") for track in payload["tracks"] if track.get("global_track_uid")
+        track.get("global_track_uid")
+        for track in payload["tracks"]
+        if track.get("global_track_uid")
     }
     assert "global-screamo-track" in track_global_uids
     assert "global-high-vis-track" not in track_global_uids

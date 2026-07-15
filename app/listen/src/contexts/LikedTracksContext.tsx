@@ -14,9 +14,10 @@ import { onCacheInvalidation } from "@/lib/cache";
 import { toTrackReferencePayload } from "@/lib/track-reference";
 
 export interface LikedTrack {
-  track_id: number;
+  global_track_uid?: string;
+  track_id?: number;
   track_entity_uid?: string;
-  path: string;
+  path?: string;
   relative_path?: string;
   liked_at: string;
   title: string;
@@ -29,6 +30,13 @@ export interface LikedTrack {
   album_entity_uid?: string;
   album_slug?: string;
   duration: number;
+  availability?: {
+    catalog: boolean;
+    stream: boolean;
+    import: boolean;
+    local?: boolean;
+    remote?: boolean;
+  };
   bpm?: number | null;
   audio_key?: string | null;
   audio_scale?: string | null;
@@ -45,21 +53,25 @@ interface LikedTracksContextValue {
     trackId?: number | null,
     trackEntityUid?: string | null,
     trackPath?: string | null,
+    globalTrackUid?: string | null,
   ) => boolean;
   likeTrack: (
     trackId?: number | null,
     trackEntityUid?: string | null,
     trackPath?: string | null,
+    globalTrackUid?: string | null,
   ) => Promise<boolean>;
   unlikeTrack: (
     trackId?: number | null,
     trackEntityUid?: string | null,
     trackPath?: string | null,
+    globalTrackUid?: string | null,
   ) => Promise<boolean>;
   toggleTrackLike: (
     trackId?: number | null,
     trackEntityUid?: string | null,
     trackPath?: string | null,
+    globalTrackUid?: string | null,
   ) => Promise<boolean>;
   refetch: () => Promise<void>;
 }
@@ -79,6 +91,11 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
   const [likedTracks, setLikedTracks] = useState<LikedTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const likedTracksRequestRef = useRef<AbortController | null>(null);
+  const likedTracksRef = useRef<LikedTrack[]>([]);
+
+  useEffect(() => {
+    likedTracksRef.current = likedTracks;
+  }, [likedTracks]);
 
   const refetch = useCallback(async () => {
     likedTracksRequestRef.current?.abort();
@@ -125,15 +142,17 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
 
   const likedIndex = useMemo(() => {
     const ids = new Set<number>();
+    const globalUids = new Set<string>();
     const entityUids = new Set<string>();
     const paths = new Set<string>();
     for (const track of likedTracks) {
-      ids.add(track.track_id);
+      if (track.global_track_uid) globalUids.add(track.global_track_uid);
+      if (track.track_id != null) ids.add(track.track_id);
       if (track.track_entity_uid) entityUids.add(track.track_entity_uid);
       for (const key of getComparableKeys(track.path)) paths.add(key);
       for (const key of getComparableKeys(track.relative_path)) paths.add(key);
     }
-    return { ids, entityUids, paths };
+    return { globalUids, ids, entityUids, paths };
   }, [likedTracks]);
 
   const isLiked = useCallback(
@@ -141,7 +160,10 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       trackId?: number | null,
       trackEntityUid?: string | null,
       trackPath?: string | null,
+      globalTrackUid?: string | null,
     ) => {
+      if (globalTrackUid && likedIndex.globalUids.has(globalTrackUid))
+        return true;
       if (trackId != null && likedIndex.ids.has(trackId)) return true;
       if (trackEntityUid && likedIndex.entityUids.has(trackEntityUid))
         return true;
@@ -158,22 +180,45 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       trackId?: number | null,
       trackEntityUid?: string | null,
       trackPath?: string | null,
+      globalTrackUid?: string | null,
     ) => {
-      if (trackId == null && !trackEntityUid && !trackPath) return false;
+      if (trackId == null && !trackEntityUid && !trackPath && !globalTrackUid)
+        return false;
       const ref = toTrackReferencePayload({
         id: trackId,
+        globalTrackUid,
         entity_uid: trackEntityUid,
         path: trackPath,
       });
-      await api("/api/me/likes", "POST", {
-        track_id: ref.track_id,
-        track_entity_uid: ref.entity_uid,
-        track_path: ref.path,
-      });
-      await refetch();
-      return true;
+      const previous = likedTracksRef.current;
+      setLikedTracks((current) => [
+        {
+          global_track_uid: ref.global_track_uid,
+          track_id: ref.track_id,
+          track_entity_uid: ref.entity_uid,
+          path: ref.path,
+          liked_at: new Date().toISOString(),
+          title: "",
+          artist: "",
+          album: "",
+          duration: 0,
+        },
+        ...current,
+      ]);
+      try {
+        await api("/api/me/likes", "POST", {
+          track_id: ref.track_id,
+          global_track_uid: ref.global_track_uid,
+          track_entity_uid: ref.entity_uid,
+          track_path: ref.path,
+        });
+        return true;
+      } catch (error) {
+        setLikedTracks(previous);
+        throw error;
+      }
     },
-    [refetch],
+    [],
   );
 
   const unlikeTrack = useCallback(
@@ -181,20 +226,21 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       trackId?: number | null,
       trackEntityUid?: string | null,
       trackPath?: string | null,
+      globalTrackUid?: string | null,
     ) => {
-      if (trackId == null && !trackEntityUid && !trackPath) return false;
+      if (trackId == null && !trackEntityUid && !trackPath && !globalTrackUid)
+        return false;
       const ref = toTrackReferencePayload({
         id: trackId,
+        globalTrackUid,
         entity_uid: trackEntityUid,
         path: trackPath,
       });
-      await api("/api/me/likes", "DELETE", {
-        track_id: ref.track_id,
-        track_entity_uid: ref.entity_uid,
-        track_path: ref.path,
-      });
+      const previous = likedTracksRef.current;
       setLikedTracks((prev) =>
         prev.filter((track) => {
+          if (globalTrackUid && track.global_track_uid === globalTrackUid)
+            return false;
           if (trackId != null && track.track_id === trackId) return false;
           if (trackEntityUid && track.track_entity_uid === trackEntityUid)
             return false;
@@ -207,7 +253,18 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
           );
         }),
       );
-      return true;
+      try {
+        await api("/api/me/likes", "DELETE", {
+          track_id: ref.track_id,
+          global_track_uid: ref.global_track_uid,
+          track_entity_uid: ref.entity_uid,
+          track_path: ref.path,
+        });
+        return true;
+      } catch (error) {
+        setLikedTracks(previous);
+        throw error;
+      }
     },
     [],
   );
@@ -217,12 +274,14 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       trackId?: number | null,
       trackEntityUid?: string | null,
       trackPath?: string | null,
+      globalTrackUid?: string | null,
     ) => {
-      if (trackId == null && !trackEntityUid && !trackPath) return false;
-      if (isLiked(trackId, trackEntityUid, trackPath)) {
-        return unlikeTrack(trackId, trackEntityUid, trackPath);
+      if (trackId == null && !trackEntityUid && !trackPath && !globalTrackUid)
+        return false;
+      if (isLiked(trackId, trackEntityUid, trackPath, globalTrackUid)) {
+        return unlikeTrack(trackId, trackEntityUid, trackPath, globalTrackUid);
       }
-      return likeTrack(trackId, trackEntityUid, trackPath);
+      return likeTrack(trackId, trackEntityUid, trackPath, globalTrackUid);
     },
     [isLiked, likeTrack, unlikeTrack],
   );

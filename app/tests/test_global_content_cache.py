@@ -12,7 +12,9 @@ def test_remote_json_facet_is_cached_after_first_fetch(pg_db, monkeypatch):
 
     calls = []
 
-    def fake_remote_json_facet(node_uid, remote_entity_uid, entity_type, facet, request):
+    def fake_remote_json_facet(
+        node_uid, remote_entity_uid, entity_type, facet, request
+    ):
         calls.append((node_uid, remote_entity_uid, entity_type, facet))
         return {"bio": "cached remote bio"}
 
@@ -51,7 +53,9 @@ def test_remote_json_facet_cache_is_revision_scoped(pg_db, monkeypatch):
 
     calls = []
 
-    def fake_remote_json_facet(node_uid, remote_entity_uid, entity_type, facet, request):
+    def fake_remote_json_facet(
+        node_uid, remote_entity_uid, entity_type, facet, request
+    ):
         calls.append(len(calls) + 1)
         return {"bio": f"remote bio {len(calls)}"}
 
@@ -72,8 +76,12 @@ def test_remote_json_facet_cache_is_revision_scoped(pg_db, monkeypatch):
     rev_1 = {**base_selection, "source_revision": "rev-1"}
     rev_2 = {**base_selection, "source_revision": "rev-2"}
 
-    assert get_or_fetch_remote_json_facet(rev_1, request=object())["bio"] == "remote bio 1"
-    assert get_or_fetch_remote_json_facet(rev_2, request=object())["bio"] == "remote bio 2"
+    assert (
+        get_or_fetch_remote_json_facet(rev_1, request=object())["bio"] == "remote bio 1"
+    )
+    assert (
+        get_or_fetch_remote_json_facet(rev_2, request=object())["bio"] == "remote bio 2"
+    )
     assert calls == [1, 2]
 
 

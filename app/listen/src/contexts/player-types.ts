@@ -6,6 +6,7 @@ export interface RemoteTrackRef {
   remoteEntityUid: string;
   streamUrl?: string;
   streamUrlExpiresAt?: string;
+  playbackSession?: string;
   availability: RemoteTrackAvailability;
 }
 

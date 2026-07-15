@@ -869,7 +869,9 @@ class TestArtistEnrichment:
         monkeypatch.setattr(
             worker_enrichment, "get_library_artist", lambda _artist: None
         )
-        monkeypatch.setattr(worker_enrichment, "emit_progress", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            worker_enrichment, "emit_progress", lambda *args, **kwargs: None
+        )
         monkeypatch.setattr(
             worker_enrichment,
             "_process_new_content_organize_folders",

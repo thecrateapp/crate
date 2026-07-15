@@ -26,12 +26,29 @@ def get_recent_liked_seed_rows(
             s.execute(
                 text(
                     f"""
+                WITH likes AS (
+                    SELECT global_track.local_track_id AS track_id, liked.created_at
+                    FROM user_global_track_likes liked
+                    JOIN global_catalog_tracks global_track
+                      ON global_track.global_track_uid = liked.global_track_uid
+                    WHERE liked.user_id = :user_id
+                      AND global_track.local_track_id IS NOT NULL
+                    UNION ALL
+                    SELECT legacy.track_id, legacy.created_at
+                    FROM user_liked_tracks legacy
+                    LEFT JOIN global_catalog_tracks global_track
+                      ON global_track.local_track_id = legacy.track_id
+                    LEFT JOIN user_global_track_likes projected
+                      ON projected.user_id = legacy.user_id
+                     AND projected.global_track_uid = global_track.global_track_uid
+                    WHERE legacy.user_id = :user_id
+                      AND projected.user_id IS NULL
+                )
                 SELECT t.id AS track_id, t.artist, t.title, t.bliss_vector
-                FROM user_liked_tracks lt
+                FROM likes lt
                 JOIN library_tracks t ON t.id = lt.track_id
                 LEFT JOIN library_albums a ON a.id = t.album_id
-                WHERE lt.user_id = :user_id
-                  AND t.bliss_vector IS NOT NULL
+                WHERE t.bliss_vector IS NOT NULL
                   AND {playable_track_clause("t", "a")}
                 ORDER BY lt.created_at DESC
                 LIMIT :limit
@@ -167,7 +184,20 @@ def count_user_radio_signals(user_id: int, *, session=None) -> dict:
                 text(
                     """
                 SELECT
-                    (SELECT count(*) FROM user_liked_tracks WHERE user_id = :uid) AS likes,
+                    (
+                        (SELECT count(*) FROM user_global_track_likes
+                         WHERE user_id = :uid)
+                        +
+                        (SELECT count(*)
+                         FROM user_liked_tracks legacy
+                         LEFT JOIN global_catalog_tracks global_track
+                           ON global_track.local_track_id = legacy.track_id
+                         LEFT JOIN user_global_track_likes projected
+                           ON projected.user_id = legacy.user_id
+                          AND projected.global_track_uid = global_track.global_track_uid
+                         WHERE legacy.user_id = :uid
+                           AND projected.user_id IS NULL)
+                    ) AS likes,
                     (SELECT count(*) FROM user_follows WHERE user_id = :uid) AS follows,
                     (SELECT count(*) FROM user_saved_albums WHERE user_id = :uid) AS saved_albums
                 """
@@ -203,14 +233,30 @@ def get_discovery_seed_sources(user_id: int, *, session=None) -> dict[int, list[
                         t.artist,
                         t.title,
                         t.bliss_vector,
-                        ROW_NUMBER() OVER (ORDER BY lt.created_at DESC, t.id) AS source_rank
-                    FROM user_liked_tracks lt
-                    JOIN library_tracks t ON t.id = lt.track_id
+                        ROW_NUMBER() OVER (ORDER BY likes.created_at DESC, t.id) AS source_rank
+                    FROM (
+                        SELECT global_track.local_track_id AS track_id, value.created_at
+                        FROM user_global_track_likes value
+                        JOIN global_catalog_tracks global_track
+                          ON global_track.global_track_uid = value.global_track_uid
+                        WHERE value.user_id = :uid
+                          AND global_track.local_track_id IS NOT NULL
+                        UNION ALL
+                        SELECT legacy.track_id, legacy.created_at
+                        FROM user_liked_tracks legacy
+                        LEFT JOIN global_catalog_tracks global_track
+                          ON global_track.local_track_id = legacy.track_id
+                        LEFT JOIN user_global_track_likes projected
+                          ON projected.user_id = legacy.user_id
+                         AND projected.global_track_uid = global_track.global_track_uid
+                        WHERE legacy.user_id = :uid
+                          AND projected.user_id IS NULL
+                    ) likes
+                    JOIN library_tracks t ON t.id = likes.track_id
                     LEFT JOIN library_albums a ON a.id = t.album_id
-                    WHERE lt.user_id = :uid
-                      AND t.bliss_vector IS NOT NULL
+                    WHERE t.bliss_vector IS NOT NULL
                       AND {playable_track_clause("t", "a")}
-                    ORDER BY lt.created_at DESC, t.id
+                    ORDER BY likes.created_at DESC, t.id
                     LIMIT 10
                 ),
                 followed AS (
@@ -302,11 +348,23 @@ def get_discovery_excluded_artist_keys(user_id: int, *, session=None) -> list[st
                       AND LOWER(COALESCE(artist_name, '')) <> '.crate-trash'
                 ),
                 liked AS (
+                    SELECT global_track.artist_name
+                    FROM user_global_track_likes value
+                    JOIN global_catalog_tracks global_track
+                      ON global_track.global_track_uid = value.global_track_uid
+                    WHERE value.user_id = :uid
+                    UNION ALL
                     SELECT t.artist AS artist_name
-                    FROM user_liked_tracks lt
-                    JOIN library_tracks t ON t.id = lt.track_id
+                    FROM user_liked_tracks legacy
+                    JOIN library_tracks t ON t.id = legacy.track_id
                     LEFT JOIN library_albums a ON a.id = t.album_id
-                    WHERE lt.user_id = :uid
+                    LEFT JOIN global_catalog_tracks global_track
+                      ON global_track.local_track_id = legacy.track_id
+                    LEFT JOIN user_global_track_likes projected
+                      ON projected.user_id = legacy.user_id
+                     AND projected.global_track_uid = global_track.global_track_uid
+                    WHERE legacy.user_id = :uid
+                      AND projected.user_id IS NULL
                       AND {playable_track_clause("t", "a")}
                 ),
                 saved AS (

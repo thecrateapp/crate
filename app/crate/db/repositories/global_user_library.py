@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any
 
 from sqlalchemy import text
@@ -14,7 +15,7 @@ from crate.db.repositories.user_library_shared import (
 from crate.db.tx import read_scope, transaction_scope
 
 
-USER_LIBRARY_REFS_BACKFILL_VERSION = 2
+USER_LIBRARY_REFS_BACKFILL_VERSION = 3
 
 
 def list_global_collection_artists(limit: int = 500) -> list[dict[str, Any]]:
@@ -167,8 +168,24 @@ def list_user_global_artist_follows(user_id: int) -> list[dict[str, Any]]:
                             COALESCE(local_artist.has_photo, 0) != 0 AS has_photo,
                             NULL::text AS photo_url
                         FROM user_follows uf
-                        LEFT JOIN library_artists local_artist
-                          ON lower(local_artist.name) = lower(uf.artist_name)
+                        LEFT JOIN LATERAL (
+                            SELECT candidate.*
+                            FROM library_artists candidate
+                            WHERE candidate.name = uf.artist_name
+                               OR (
+                                    lower(candidate.name) = lower(uf.artist_name)
+                                    AND NOT EXISTS (
+                                        SELECT 1 FROM library_artists exact
+                                        WHERE exact.name = uf.artist_name
+                                    )
+                                    AND 1 = (
+                                        SELECT COUNT(*) FROM library_artists matching
+                                        WHERE lower(matching.name) = lower(uf.artist_name)
+                                    )
+                               )
+                            ORDER BY (candidate.name = uf.artist_name) DESC
+                            LIMIT 1
+                        ) local_artist ON TRUE
                         LEFT JOIN global_catalog_artists global_artist
                           ON global_artist.local_artist_id = local_artist.id
                         LEFT JOIN user_global_artist_follows projected
@@ -269,6 +286,175 @@ def list_user_global_album_saves(user_id: int) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def mutate_global_track_like(
+    user_id: int,
+    *,
+    liked: bool,
+    global_track_uid: str | None = None,
+    track_id: int | None = None,
+    track_entity_uid: str | None = None,
+    track_path: str | None = None,
+) -> bool | None:
+    """Dual-write one like while global identity is the canonical key."""
+    from crate.db.repositories.user_library_shared import resolve_track_id
+
+    supplied_global_uid = _valid_uuid(global_track_uid)
+    if global_track_uid and supplied_global_uid is None:
+        return None
+    now = utc_now_iso()
+    with transaction_scope() as session:
+        local_track_id = resolve_track_id(
+            session,
+            track_id=track_id,
+            track_entity_uid=track_entity_uid,
+            track_path=track_path,
+        )
+        global_track = _resolve_global_track(
+            session,
+            global_track_uid=supplied_global_uid,
+            local_track_id=local_track_id,
+        )
+        if global_track and local_track_id is None:
+            local_track_id = global_track.get("local_track_id")
+        if global_track is None and local_track_id is None:
+            return None
+
+        changed = False
+        canonical_uid = str(global_track["global_track_uid"]) if global_track else None
+        if liked:
+            if canonical_uid:
+                changed = (
+                    _has_changed(
+                        session.execute(
+                            text(
+                                """
+                            INSERT INTO user_global_track_likes
+                                (user_id, global_track_uid, created_at)
+                            VALUES (:user_id, CAST(:global_track_uid AS uuid), :created_at)
+                            ON CONFLICT DO NOTHING
+                            """
+                            ),
+                            {
+                                "user_id": user_id,
+                                "global_track_uid": canonical_uid,
+                                "created_at": now,
+                            },
+                        )
+                    )
+                    or changed
+                )
+            if local_track_id is not None:
+                changed = (
+                    _has_changed(
+                        session.execute(
+                            text(
+                                """
+                            INSERT INTO user_liked_tracks (user_id, track_id, created_at)
+                            VALUES (:user_id, :track_id, :created_at)
+                            ON CONFLICT DO NOTHING
+                            """
+                            ),
+                            {
+                                "user_id": user_id,
+                                "track_id": int(local_track_id),
+                                "created_at": now,
+                            },
+                        )
+                    )
+                    or changed
+                )
+        else:
+            if canonical_uid:
+                changed = (
+                    _has_changed(
+                        session.execute(
+                            text(
+                                """
+                            DELETE FROM user_global_track_likes
+                            WHERE user_id = :user_id
+                              AND global_track_uid = CAST(:global_track_uid AS uuid)
+                            """
+                            ),
+                            {"user_id": user_id, "global_track_uid": canonical_uid},
+                        )
+                    )
+                    or changed
+                )
+            if local_track_id is not None:
+                changed = (
+                    _has_changed(
+                        session.execute(
+                            text(
+                                """
+                            DELETE FROM user_liked_tracks
+                            WHERE user_id = :user_id AND track_id = :track_id
+                            """
+                            ),
+                            {"user_id": user_id, "track_id": int(local_track_id)},
+                        )
+                    )
+                    or changed
+                )
+
+        if changed:
+            emit_user_domain_event(
+                session,
+                event_type="user.likes.changed",
+                user_id=user_id,
+                payload={
+                    "action": "like" if liked else "unlike",
+                    "global_track_uid": canonical_uid,
+                    "track_id": local_track_id,
+                },
+            )
+        return changed
+
+
+def _resolve_global_track(
+    session,
+    *,
+    global_track_uid: str | None,
+    local_track_id: int | None,
+) -> dict[str, Any] | None:
+    if global_track_uid is None and local_track_id is None:
+        return None
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT global_track_uid::text AS global_track_uid, local_track_id
+                FROM global_catalog_tracks
+                WHERE (
+                    :global_track_uid IS NOT NULL
+                    AND global_track_uid = CAST(:global_track_uid AS uuid)
+                ) OR (
+                    :global_track_uid IS NULL
+                    AND local_track_id = :local_track_id
+                )
+                ORDER BY (:global_track_uid IS NOT NULL) DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "global_track_uid": global_track_uid,
+                "local_track_id": local_track_id,
+            },
+        )
+        .mappings()
+        .first()
+    )
+    return dict(row) if row else None
+
+
+def _valid_uuid(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def get_user_global_library_counts(user_id: int) -> dict[str, int]:
     with read_scope() as session:
         row = (
@@ -282,8 +468,24 @@ def get_user_global_library_counts(user_id: int) -> dict[str, int]:
                             (
                                 SELECT COUNT(*)
                                 FROM user_follows uf
-                                LEFT JOIN library_artists local_artist
-                                  ON lower(local_artist.name) = lower(uf.artist_name)
+                                LEFT JOIN LATERAL (
+                                    SELECT candidate.*
+                                    FROM library_artists candidate
+                                    WHERE candidate.name = uf.artist_name
+                                       OR (
+                                            lower(candidate.name) = lower(uf.artist_name)
+                                            AND NOT EXISTS (
+                                                SELECT 1 FROM library_artists exact
+                                                WHERE exact.name = uf.artist_name
+                                            )
+                                            AND 1 = (
+                                                SELECT COUNT(*) FROM library_artists matching
+                                                WHERE lower(matching.name) = lower(uf.artist_name)
+                                            )
+                                       )
+                                    ORDER BY (candidate.name = uf.artist_name) DESC
+                                    LIMIT 1
+                                ) local_artist ON TRUE
                                 LEFT JOIN global_catalog_artists global_artist
                                   ON global_artist.local_artist_id = local_artist.id
                                 LEFT JOIN user_global_artist_follows projected
@@ -309,9 +511,20 @@ def get_user_global_library_counts(user_id: int) -> dict[str, int]:
                             )
                         ) AS saved_albums,
                         (
-                            SELECT COUNT(*)
-                            FROM user_liked_tracks
-                            WHERE user_id = :uid3
+                            (SELECT COUNT(*) FROM user_global_track_likes
+                             WHERE user_id = :uid3)
+                            +
+                            (
+                                SELECT COUNT(*)
+                                FROM user_liked_tracks legacy
+                                LEFT JOIN global_catalog_tracks global_track
+                                  ON global_track.local_track_id = legacy.track_id
+                                LEFT JOIN user_global_track_likes projected
+                                  ON projected.user_id = legacy.user_id
+                                 AND projected.global_track_uid = global_track.global_track_uid
+                                WHERE legacy.user_id = :uid3
+                                  AND projected.user_id IS NULL
+                            )
                         ) AS liked_tracks,
                         (
                             SELECT COUNT(*)
@@ -328,146 +541,305 @@ def get_user_global_library_counts(user_id: int) -> dict[str, int]:
     return {key: int(value or 0) for key, value in dict(row or {}).items()}
 
 
+_BACKFILL_COUNTERS = (
+    "artist_follows",
+    "album_saves",
+    "track_likes",
+    "playlist_tracks",
+    "playlist_track_exclusions",
+    "play_events",
+    "listening_stats_users",
+)
+
+
 def backfill_legacy_user_library_refs() -> dict[str, int]:
-    """Project every resolvable local user reference into the canonical catalog.
-
-    Legacy rows are deliberately retained.  Records with no exact canonical
-    counterpart remain available through the compatibility read path and are
-    reported in catalog state for operators to repair later.
-    """
+    """Run the resumable user-reference backfill to completion."""
     with transaction_scope() as session:
-        artist_follows = session.execute(
-            text(
-                """
-                INSERT INTO user_global_artist_follows
-                    (user_id, global_artist_uid, created_at)
-                SELECT DISTINCT ON (uf.user_id, global_artist.global_artist_uid)
-                    uf.user_id,
-                    global_artist.global_artist_uid,
-                    uf.created_at
-                FROM user_follows uf
-                JOIN library_artists local_artist
-                  ON lower(local_artist.name) = lower(uf.artist_name)
-                JOIN global_catalog_artists global_artist
-                  ON global_artist.local_artist_id = local_artist.id
-                ORDER BY
-                    uf.user_id,
-                    global_artist.global_artist_uid,
-                    uf.created_at ASC
-                ON CONFLICT DO NOTHING
-                """
-            )
-        )
-        album_saves = session.execute(
-            text(
-                """
-                INSERT INTO user_global_album_saves
-                    (user_id, global_album_uid, created_at)
-                SELECT DISTINCT ON (usa.user_id, global_album.global_album_uid)
-                    usa.user_id,
-                    global_album.global_album_uid,
-                    usa.created_at
-                FROM user_saved_albums usa
-                JOIN global_catalog_albums global_album
-                  ON global_album.local_album_id = usa.album_id
-                ORDER BY
-                    usa.user_id,
-                    global_album.global_album_uid,
-                    usa.created_at ASC
-                ON CONFLICT DO NOTHING
-                """
-            )
-        )
-        playlist_tracks = session.execute(
-            text(
-                """
-                UPDATE playlist_tracks playlist_track
-                SET global_track_uid = global_track.global_track_uid
-                FROM global_catalog_tracks global_track
-                WHERE playlist_track.global_track_uid IS NULL
-                  AND (
-                    global_track.local_track_id = playlist_track.track_id
-                    OR (
-                        playlist_track.track_entity_uid IS NOT NULL
-                        AND global_track.local_track_entity_uid = playlist_track.track_entity_uid
-                    )
-                  )
-                """
-            )
-        )
-        playlist_track_exclusions = session.execute(
-            text(
-                """
-                UPDATE playlist_track_exclusions exclusion
-                SET global_track_uid = global_track.global_track_uid
-                FROM global_catalog_tracks global_track
-                WHERE exclusion.global_track_uid IS NULL
-                  AND (
-                    global_track.local_track_id = exclusion.track_id
-                    OR (
-                        exclusion.track_entity_uid IS NOT NULL
-                        AND global_track.local_track_entity_uid = exclusion.track_entity_uid
-                    )
-                  )
-                """
-            )
-        )
-        play_events = session.execute(
-            text(
-                """
-                UPDATE user_play_events event
-                SET global_track_uid = global_track.global_track_uid
-                FROM global_catalog_tracks global_track
-                WHERE event.global_track_uid IS NULL
-                  AND (
-                    global_track.local_track_id = event.track_id
-                    OR (
-                        event.track_entity_uid IS NOT NULL
-                        AND global_track.local_track_entity_uid = event.track_entity_uid
-                    )
-                  )
-                """
-            )
-        )
-
         state = _get_catalog_state_for_backfill(session)
-        must_rebuild_listening_stats = (
-            int(state.get("user_refs_backfill_version") or 0)
-            < USER_LIBRARY_REFS_BACKFILL_VERSION
-            or _row_count(play_events) > 0
+    rebuild_stats = (
+        int(state.get("user_refs_backfill_version") or 0)
+        < USER_LIBRARY_REFS_BACKFILL_VERSION
+    )
+    report = {name: 0 for name in _BACKFILL_COUNTERS}
+    cursor: int | None = None
+    while True:
+        batch = backfill_legacy_user_library_refs_batch(
+            batch_size=100,
+            cursor=cursor,
+            rebuild_listening_stats=rebuild_stats,
         )
-        listening_stats_users = 0
-        if must_rebuild_listening_stats:
-            from crate.db.repositories.user_library_aggregate_runner import (
-                recompute_user_listening_aggregates_in_session,
-            )
+        for name in _BACKFILL_COUNTERS:
+            report[name] += int(batch[name])
+        if batch["completed"]:
+            break
+        cursor = int(batch["next_cursor"])
+    return finalize_user_library_refs_backfill(report)
 
-            user_ids = [
-                int(row["user_id"])
-                for row in session.execute(
+
+def backfill_legacy_user_library_refs_batch(
+    *,
+    batch_size: int = 100,
+    cursor: int | None = None,
+    rebuild_listening_stats: bool = False,
+) -> dict[str, Any]:
+    """Project one bounded keyset page of users and retain every legacy row."""
+    capped = max(1, min(int(batch_size or 100), 1000))
+    after_user_id = max(0, int(cursor or 0))
+    with transaction_scope() as session:
+        candidate_user_ids = [
+            int(row["user_id"])
+            for row in session.execute(
+                text(
+                    """
+                    SELECT DISTINCT user_id
+                    FROM (
+                        SELECT user_id FROM user_follows
+                        UNION ALL SELECT user_id FROM user_saved_albums
+                        UNION ALL SELECT user_id FROM user_liked_tracks
+                        UNION ALL SELECT user_id FROM playlists
+                        UNION ALL SELECT user_id FROM user_play_events
+                    ) referenced_users
+                    WHERE user_id > :after_user_id
+                    ORDER BY user_id
+                    LIMIT :limit
+                    """
+                ),
+                {"after_user_id": after_user_id, "limit": capped + 1},
+            )
+            .mappings()
+            .all()
+        ]
+        user_ids = candidate_user_ids[:capped]
+        result: dict[str, Any] = {name: 0 for name in _BACKFILL_COUNTERS}
+        if user_ids:
+            params = {"user_ids": user_ids}
+            result["artist_follows"] = _row_count(
+                session.execute(
                     text(
                         """
-                        SELECT DISTINCT user_id
-                        FROM user_play_events
-                        WHERE global_track_uid IS NOT NULL
+                        INSERT INTO user_global_artist_follows
+                            (user_id, global_artist_uid, created_at)
+                        SELECT DISTINCT ON (followed.user_id, global_artist.global_artist_uid)
+                            followed.user_id,
+                            global_artist.global_artist_uid,
+                            followed.created_at
+                        FROM user_follows followed
+                        JOIN LATERAL (
+                            SELECT candidate.*
+                            FROM library_artists candidate
+                            WHERE candidate.name = followed.artist_name
+                               OR (
+                                    lower(candidate.name) = lower(followed.artist_name)
+                                    AND NOT EXISTS (
+                                        SELECT 1 FROM library_artists exact
+                                        WHERE exact.name = followed.artist_name
+                                    )
+                                    AND 1 = (
+                                        SELECT COUNT(*) FROM library_artists matching
+                                        WHERE lower(matching.name) = lower(followed.artist_name)
+                                    )
+                               )
+                            ORDER BY (candidate.name = followed.artist_name) DESC
+                            LIMIT 1
+                        ) local_artist ON TRUE
+                        JOIN global_catalog_artists global_artist
+                          ON global_artist.local_artist_id = local_artist.id
+                        WHERE followed.user_id = ANY(CAST(:user_ids AS integer[]))
+                        ORDER BY followed.user_id, global_artist.global_artist_uid,
+                                 followed.created_at ASC
+                        ON CONFLICT DO NOTHING
                         """
-                    )
+                    ),
+                    params,
                 )
-                .mappings()
-                .all()
-            ]
-            for user_id in user_ids:
-                recompute_user_listening_aggregates_in_session(session, user_id)
-            listening_stats_users = len(user_ids)
+            )
+            result["album_saves"] = _row_count(
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO user_global_album_saves
+                            (user_id, global_album_uid, created_at)
+                        SELECT DISTINCT ON (saved.user_id, global_album.global_album_uid)
+                            saved.user_id, global_album.global_album_uid, saved.created_at
+                        FROM user_saved_albums saved
+                        JOIN global_catalog_albums global_album
+                          ON global_album.local_album_id = saved.album_id
+                        WHERE saved.user_id = ANY(CAST(:user_ids AS integer[]))
+                        ORDER BY saved.user_id, global_album.global_album_uid,
+                                 saved.created_at ASC
+                        ON CONFLICT DO NOTHING
+                        """
+                    ),
+                    params,
+                )
+            )
+            result["track_likes"] = _row_count(
+                session.execute(
+                    text(
+                        """
+                        INSERT INTO user_global_track_likes
+                            (user_id, global_track_uid, created_at)
+                        SELECT DISTINCT ON (liked.user_id, global_track.global_track_uid)
+                            liked.user_id,
+                            global_track.global_track_uid,
+                            liked.created_at
+                        FROM user_liked_tracks liked
+                        JOIN global_catalog_tracks global_track
+                          ON global_track.local_track_id = liked.track_id
+                        WHERE liked.user_id = ANY(CAST(:user_ids AS integer[]))
+                        ORDER BY liked.user_id, global_track.global_track_uid,
+                                 liked.created_at ASC
+                        ON CONFLICT (user_id, global_track_uid) DO UPDATE
+                        SET created_at = LEAST(
+                            user_global_track_likes.created_at,
+                            EXCLUDED.created_at
+                        )
+                        """
+                    ),
+                    params,
+                )
+            )
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_global_track_like_repairs
+                        (user_id, legacy_track_id, created_at, status, reason,
+                         last_attempt_at)
+                    SELECT liked.user_id, liked.track_id, liked.created_at,
+                           'unresolved', 'global_track_not_found', NOW()
+                    FROM user_liked_tracks liked
+                    WHERE liked.user_id = ANY(CAST(:user_ids AS integer[]))
+                      AND NOT EXISTS (
+                          SELECT 1 FROM global_catalog_tracks global_track
+                          WHERE global_track.local_track_id = liked.track_id
+                      )
+                    ON CONFLICT (user_id, legacy_track_id) DO UPDATE
+                    SET last_attempt_at = NOW(), status = 'unresolved'
+                    """
+                ),
+                params,
+            )
+            session.execute(
+                text(
+                    """
+                    UPDATE user_global_track_like_repairs repair
+                    SET status = 'resolved', resolved_at = NOW(), last_attempt_at = NOW()
+                    WHERE repair.user_id = ANY(CAST(:user_ids AS integer[]))
+                      AND EXISTS (
+                          SELECT 1
+                          FROM global_catalog_tracks global_track
+                          WHERE global_track.local_track_id = repair.legacy_track_id
+                      )
+                    """
+                ),
+                params,
+            )
+            result["playlist_tracks"] = _row_count(
+                session.execute(
+                    text(
+                        """
+                        UPDATE playlist_tracks playlist_track
+                        SET global_track_uid = global_track.global_track_uid
+                        FROM global_catalog_tracks global_track, playlists playlist
+                        WHERE playlist_track.global_track_uid IS NULL
+                          AND playlist.id = playlist_track.playlist_id
+                          AND playlist.user_id = ANY(CAST(:user_ids AS integer[]))
+                          AND (
+                            global_track.local_track_id = playlist_track.track_id
+                            OR (
+                                playlist_track.track_entity_uid IS NOT NULL
+                                AND global_track.local_track_entity_uid = playlist_track.track_entity_uid
+                            )
+                          )
+                        """
+                    ),
+                    params,
+                )
+            )
+            result["playlist_track_exclusions"] = _row_count(
+                session.execute(
+                    text(
+                        """
+                        UPDATE playlist_track_exclusions exclusion
+                        SET global_track_uid = global_track.global_track_uid
+                        FROM global_catalog_tracks global_track, playlists playlist
+                        WHERE exclusion.global_track_uid IS NULL
+                          AND playlist.id = exclusion.playlist_id
+                          AND playlist.user_id = ANY(CAST(:user_ids AS integer[]))
+                          AND (
+                            global_track.local_track_id = exclusion.track_id
+                            OR (
+                                exclusion.track_entity_uid IS NOT NULL
+                                AND global_track.local_track_entity_uid = exclusion.track_entity_uid
+                            )
+                          )
+                        """
+                    ),
+                    params,
+                )
+            )
+            play_events = session.execute(
+                text(
+                    """
+                    UPDATE user_play_events event
+                    SET global_track_uid = global_track.global_track_uid
+                    FROM global_catalog_tracks global_track
+                    WHERE event.global_track_uid IS NULL
+                      AND event.user_id = ANY(CAST(:user_ids AS integer[]))
+                      AND (
+                        global_track.local_track_id = event.track_id
+                        OR (
+                            event.track_entity_uid IS NOT NULL
+                            AND global_track.local_track_entity_uid = event.track_entity_uid
+                        )
+                      )
+                    """
+                ),
+                params,
+            )
+            result["play_events"] = _row_count(play_events)
+            if rebuild_listening_stats or result["play_events"] > 0:
+                from crate.db.repositories.user_library_aggregate_runner import (
+                    recompute_user_listening_aggregates_in_session,
+                )
 
+                listening_user_ids = [
+                    int(row["user_id"])
+                    for row in session.execute(
+                        text(
+                            """
+                            SELECT DISTINCT user_id
+                            FROM user_play_events
+                            WHERE user_id = ANY(CAST(:user_ids AS integer[]))
+                              AND global_track_uid IS NOT NULL
+                            """
+                        ),
+                        params,
+                    )
+                    .mappings()
+                    .all()
+                ]
+                for user_id in listening_user_ids:
+                    recompute_user_listening_aggregates_in_session(session, user_id)
+                result["listening_stats_users"] = len(listening_user_ids)
+
+    completed = len(candidate_user_ids) <= capped
+    result.update(
+        {
+            "users_processed": len(user_ids),
+            "completed": completed,
+            "next_cursor": None if completed else user_ids[-1],
+        }
+    )
+    return result
+
+
+def finalize_user_library_refs_backfill(report: dict[str, int]) -> dict[str, int]:
+    """Persist the aggregate report only after every user batch completed."""
+    with transaction_scope() as session:
         unresolved = _unresolved_user_reference_counts(session)
         result = {
-            "artist_follows": _row_count(artist_follows),
-            "album_saves": _row_count(album_saves),
-            "playlist_tracks": _row_count(playlist_tracks),
-            "playlist_track_exclusions": _row_count(playlist_track_exclusions),
-            "play_events": _row_count(play_events),
-            "listening_stats_users": listening_stats_users,
+            **{name: int(report.get(name) or 0) for name in _BACKFILL_COUNTERS},
             **{f"unresolved_{name}": count for name, count in unresolved.items()},
         }
         session.execute(
@@ -499,8 +871,24 @@ def project_local_artist_follow(session, *, user_id: int, artist_name: str) -> N
                 (user_id, global_artist_uid, created_at)
             SELECT followed.user_id, global_artist.global_artist_uid, followed.created_at
             FROM user_follows followed
-            JOIN library_artists local_artist
-              ON lower(local_artist.name) = lower(followed.artist_name)
+            JOIN LATERAL (
+                SELECT candidate.*
+                FROM library_artists candidate
+                WHERE candidate.name = followed.artist_name
+                   OR (
+                        lower(candidate.name) = lower(followed.artist_name)
+                        AND NOT EXISTS (
+                            SELECT 1 FROM library_artists exact
+                            WHERE exact.name = followed.artist_name
+                        )
+                        AND 1 = (
+                            SELECT COUNT(*) FROM library_artists matching
+                            WHERE lower(matching.name) = lower(followed.artist_name)
+                        )
+                   )
+                ORDER BY (candidate.name = followed.artist_name) DESC
+                LIMIT 1
+            ) local_artist ON TRUE
             JOIN global_catalog_artists global_artist
               ON global_artist.local_artist_id = local_artist.id
             WHERE followed.user_id = :user_id
@@ -605,7 +993,18 @@ def _unresolved_user_reference_counts(session) -> dict[str, int]:
                         FROM library_artists local_artist
                         JOIN global_catalog_artists global_artist
                           ON global_artist.local_artist_id = local_artist.id
-                        WHERE lower(local_artist.name) = lower(uf.artist_name)
+                        WHERE local_artist.name = uf.artist_name
+                           OR (
+                                lower(local_artist.name) = lower(uf.artist_name)
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM library_artists exact
+                                    WHERE exact.name = uf.artist_name
+                                )
+                                AND 1 = (
+                                    SELECT COUNT(*) FROM library_artists matching
+                                    WHERE lower(matching.name) = lower(uf.artist_name)
+                                )
+                           )
                     )
                 ) AS artist_follows,
                 (
@@ -617,6 +1016,15 @@ def _unresolved_user_reference_counts(session) -> dict[str, int]:
                         WHERE global_album.local_album_id = saved.album_id
                     )
                 ) AS album_saves,
+                (
+                    SELECT COUNT(*)
+                    FROM user_liked_tracks liked
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM global_catalog_tracks global_track
+                        WHERE global_track.local_track_id = liked.track_id
+                    )
+                ) AS track_likes,
                 (SELECT COUNT(*) FROM playlist_tracks WHERE global_track_uid IS NULL) AS playlist_tracks,
                 (
                     SELECT COUNT(*)
@@ -899,6 +1307,8 @@ def _row_count(result: Any) -> int:
 __all__ = [
     "USER_LIBRARY_REFS_BACKFILL_VERSION",
     "backfill_legacy_user_library_refs",
+    "backfill_legacy_user_library_refs_batch",
+    "finalize_user_library_refs_backfill",
     "follow_global_artist",
     "get_user_global_library_counts",
     "is_global_album_saved",
@@ -907,6 +1317,7 @@ __all__ = [
     "list_global_collection_artists",
     "list_user_global_album_saves",
     "list_user_global_artist_follows",
+    "mutate_global_track_like",
     "project_local_album_save",
     "project_local_artist_follow",
     "remove_projected_local_album_save",

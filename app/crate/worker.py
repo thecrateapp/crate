@@ -192,7 +192,36 @@ def _run_projector_loop(stop_event: threading.Event):
     run_projector_loop(stop_event, interval_seconds=5, limit=200)
 
 
-def _run_periodic_cleanup() -> None:
+def _cleanup_federation_imports(config: dict) -> int:
+    import shutil
+    from pathlib import Path, PurePosixPath
+
+    from crate.db.jobs.federation_imports import expire_stale_imports
+
+    library_path = Path(str(config.get("library_path") or "")).resolve()
+    if not config.get("library_path"):
+        return 0
+    removed = 0
+    for item in expire_stale_imports():
+        raw = str(item.get("staging_relative_path") or "")
+        relative = PurePosixPath(raw)
+        if (
+            relative.is_absolute()
+            or len(relative.parts) < 3
+            or relative.parts[:2] != (".imports", "federation")
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            continue
+        target = (library_path / Path(*relative.parts)).resolve()
+        if library_path not in target.parents:
+            continue
+        if target.exists():
+            shutil.rmtree(target)
+            removed += 1
+    return removed
+
+
+def _run_periodic_cleanup(config: dict | None = None) -> None:
     from crate.db.events import cleanup_old_events, cleanup_old_tasks
     from crate.db.repositories.auth import (
         cleanup_ended_jam_rooms,
@@ -209,6 +238,8 @@ def _run_periodic_cleanup() -> None:
     cleanup_ended_jam_rooms(max_age_days=30)
     delete_expired_recommendation_exposures()
     cleanup_old_logs(max_age_days=7)
+    if config:
+        _cleanup_federation_imports(config)
 
 
 def _run_service_loop(config: dict, stop_event: threading.Event):
@@ -466,7 +497,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
         if now - last_cleanup > 3600:
             last_cleanup = now
             try:
-                _run_periodic_cleanup()
+                _run_periodic_cleanup(config)
             except Exception:
                 log.debug("Auto-cleanup failed")
 
@@ -494,14 +525,18 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "import_queue_item",
             "import_queue_all",
             "import_queue_remove",
-            "federation_import_album",
             "remux_m4a_dash",
         ),
     ),
     (
         "crate.worker_handlers.federation",
         "FEDERATION_TASK_HANDLERS",
-        ("federation_sync_catalog", "federation_health_poll"),
+        (
+            "federation_sync_catalog",
+            "federation_health_poll",
+            "federation_import_album",
+            "federation_directory_refresh",
+        ),
     ),
     (
         "crate.worker_handlers.global_catalog",

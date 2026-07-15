@@ -86,6 +86,10 @@ from crate.api.schemas.me import (
     UpdateProfileResponse,
     UserLibraryCountsResponse,
 )
+from crate.api.schemas.settings import (
+    RemoteScrobblingPreferenceResponse,
+    RemoteScrobblingPreferenceUpdate,
+)
 from crate.db.cache_store import delete_cache, get_cache, set_cache
 from crate.db.home import (
     get_cached_home_discovery,
@@ -117,7 +121,6 @@ from crate.db.queries.user_library import (
     get_top_artists,
     get_top_genres,
     get_top_tracks,
-    get_user_library_counts,
     is_following,
 )
 from crate.db.queries.user_library_stats_month import (
@@ -164,10 +167,14 @@ from crate.db.repositories.user_library import (
     unsave_album,
 )
 from crate.db.repositories.user_library_shared import resolve_track_reference
+from crate.db.repositories.users import (
+    get_remote_scrobbling_enabled,
+    set_remote_scrobbling_enabled,
+)
 from crate.db.snapshot_events import snapshot_channel
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.slugs import build_public_album_slug
+from crate.playback_provenance import PlaybackSessionInvalid, verify_playback_session
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 log = logging.getLogger(__name__)
@@ -185,12 +192,7 @@ _STATS_DASHBOARD_CACHE_TTL_SECONDS = 90
 
 
 def _listen_global_cache_mode() -> str:
-    return (
-        "global"
-        if global_catalog_surface_enabled("stats")
-        or global_catalog_surface_enabled("home")
-        else "local"
-    )
+    return "global"
 
 
 @router.post(
@@ -619,9 +621,7 @@ def _build_upcoming_insights(
 def my_library(request: Request):
     """Get counts for user's personal library."""
     user = _require_auth(request)
-    if global_catalog_surface_enabled("library"):
-        return get_user_global_library_counts(int(user["id"]))
-    return get_user_library_counts(user["id"])
+    return get_user_global_library_counts(int(user["id"]))
 
 
 @router.get(
@@ -889,6 +889,7 @@ def like(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
     added = like_track(
         user["id"],
+        global_track_uid=body.global_track_uid,
         track_id=body.track_id,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
@@ -908,6 +909,7 @@ def unlike(request: Request, body: LikeTrackRequest):
     user = _require_auth(request)
     removed = unlike_track(
         user["id"],
+        global_track_uid=body.global_track_uid,
         track_id=body.track_id,
         track_entity_uid=body.track_entity_uid,
         track_path=body.track_path,
@@ -1391,6 +1393,19 @@ def home_section_detail(
 )
 def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
     user = _require_auth(request)
+    content_origin = "local"
+    source_node_uid = None
+    if body.playback_session:
+        try:
+            claims = verify_playback_session(
+                body.playback_session,
+                user_id=int(user["id"]),
+                global_track_uid=body.global_track_uid,
+            )
+        except PlaybackSessionInvalid as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        content_origin = claims.content_origin
+        source_node_uid = claims.source_node_uid
     event_id = record_play_event(
         user["id"],
         client_event_id=body.client_event_id,
@@ -1416,6 +1431,8 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
         context_playlist_id=body.context_playlist_id,
         device_type=body.device_type,
         app_platform=body.app_platform,
+        content_origin=content_origin,
+        source_node_uid=source_node_uid,
     )
     return {"ok": True, "id": event_id}
 
@@ -1697,6 +1714,31 @@ def change_password(request: Request, body: ChangePasswordRequest):
 
 
 # ── Scrobble Services ──────────────────────────────────────────
+
+
+@router.get(
+    "/scrobble/preferences",
+    response_model=RemoteScrobblingPreferenceResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get remote scrobbling preference",
+)
+def remote_scrobbling_preferences(request: Request):
+    user = _require_auth(request)
+    return {"remote_scrobbling_enabled": get_remote_scrobbling_enabled(user["id"])}
+
+
+@router.put(
+    "/scrobble/preferences",
+    response_model=RemoteScrobblingPreferenceResponse,
+    responses=_ME_RESPONSES,
+    summary="Update remote scrobbling preference",
+)
+def update_remote_scrobbling_preferences(
+    request: Request, body: RemoteScrobblingPreferenceUpdate
+):
+    user = _require_auth(request)
+    enabled = set_remote_scrobbling_enabled(user["id"], body.remote_scrobbling_enabled)
+    return {"remote_scrobbling_enabled": enabled}
 
 
 @router.get(

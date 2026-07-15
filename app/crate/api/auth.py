@@ -5,7 +5,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from threading import RLock
-from typing import overload
+from typing import Literal, overload
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import jwt
@@ -480,12 +480,16 @@ def _is_secure() -> bool:
     return domain != "localhost"
 
 
-def _cookie_samesite() -> str:
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
     override = os.environ.get("CRATE_AUTH_COOKIE_SAMESITE")
     if override:
         normalized = override.strip().lower()
-        if normalized in {"lax", "strict", "none"}:
-            return normalized
+        if normalized == "lax":
+            return "lax"
+        if normalized == "strict":
+            return "strict"
+        if normalized == "none":
+            return "none"
     return "none" if _is_secure() else "lax"
 
 

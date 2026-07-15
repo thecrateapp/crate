@@ -74,3 +74,34 @@ def test_repeated_upsert_coalesces_its_pending_dirty_source(pg_db):
         ).scalar_one()
 
     assert count == 1
+
+
+def test_local_mutation_schedules_incremental_projection_in_same_commit(pg_db):
+    from crate.db.tx import read_scope
+
+    pg_db.upsert_artist({"name": "Immediately Projected Artist"})
+    pg_db.upsert_artist({"name": "Immediately Projected Artist", "has_photo": 1})
+
+    with read_scope() as session:
+        tasks = (
+            session.execute(
+                text(
+                    """
+                    SELECT type, status, dedup_key
+                    FROM tasks
+                    WHERE type = 'global_catalog_reconcile_incremental'
+                      AND status IN ('pending', 'running', 'delegated', 'completing')
+                    """
+                )
+            )
+            .mappings()
+            .all()
+        )
+
+    assert [dict(task) for task in tasks] == [
+        {
+            "type": "global_catalog_reconcile_incremental",
+            "status": "pending",
+            "dedup_key": "dirty:global-catalog",
+        }
+    ]

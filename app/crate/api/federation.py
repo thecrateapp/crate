@@ -7,23 +7,45 @@ The descriptor (/.well-known/crate-node) is public.
 from __future__ import annotations
 
 import base64
+import asyncio
+import hashlib
 import json as _json
 import logging
+import os
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import text
 
+from crate.api import browse_artist as browse_artist_api
 from crate.api.openapi_responses import error_response
+from crate.api.schemas.federation import PairingAcceptanceV1, PairingOfferV1
+from crate.db.queries.federation_manifest import (
+    get_federation_manifest_revision_row,
+    list_federation_manifest_rows,
+)
+from crate.db.jobs.federation_catalog_changes import (
+    catalog_high_water_mark,
+    catalog_retention_floor,
+    list_catalog_changes,
+)
 from crate.db.repositories import federation as repo
-from crate.db.tx import read_scope
-from crate.federation.grants import evaluate_grant
-from crate.federation.identity import build_descriptor
+from crate.db.repositories import federation_trust as trust_repo
+from crate.federation.authorization import AuthorizationDecision, authorize
+from crate.federation.contracts import CAPABILITIES
+from crate.federation.identity import build_signed_descriptor, load_private_key
+from crate.federation.pairing import (
+    build_ack,
+    verify_acceptance,
+    verify_offer,
+)
+from crate.federation.policy import apply_result_limit, entity_is_allowed
+from crate.federation.url_policy import FederationURLPolicy
 from crate.federation.search import handle_remote_search
 from crate.federation.assertions import verify_signed_assertion
 from crate.federation.signing import (
@@ -51,6 +73,43 @@ _MANIFEST_QUALITY_KEYS = (
     "bit_depth",
     "size_bytes",
 )
+
+
+def _catalog_page_max_bytes() -> int:
+    try:
+        configured = int(
+            os.environ.get("CRATE_FEDERATION_CATALOG_PAGE_MAX_BYTES", "2097152")
+        )
+    except ValueError:
+        configured = 2_097_152
+    return max(1_024, min(configured, 16_777_216))
+
+
+def _cap_catalog_items_by_bytes(
+    items: list[dict[str, Any]], *, max_bytes: int
+) -> tuple[list[dict[str, Any]], bool]:
+    """Bound one catalog page without materializing or retaining the full catalog."""
+    budget = max(2, int(max_bytes))
+    used = 2  # JSON list brackets.
+    bounded: list[dict[str, Any]] = []
+    for item in items:
+        encoded_size = len(
+            _json.dumps(
+                item,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode("utf-8")
+        )
+        required = encoded_size + (1 if bounded else 0)
+        if required + used > budget:
+            if not bounded:
+                raise ValueError("single catalog item exceeds the page byte budget")
+            return bounded, True
+        bounded.append(item)
+        used += required
+    return bounded, False
+
 
 router = APIRouter(prefix="/api/federation/v1", tags=["federation"])
 well_known = APIRouter(tags=["federation"])
@@ -91,6 +150,7 @@ class StreamTicketBody(BaseModel):
     remote_entity_uid: str
     delivery_policy: str = "balanced"
     requesting_node_uid: str
+    playback_session: str = ""
 
 
 class PairingOfferBody(BaseModel):
@@ -104,6 +164,9 @@ class PairingAcceptBody(BaseModel):
 class KeyRotationBody(BaseModel):
     node_uid: str = ""
     new_key_id: str = ""
+    new_public_key: str = ""
+    activate_at: datetime
+    grace_until: datetime
 
 
 # -- Signature validation ----------------------------------------------------
@@ -124,6 +187,9 @@ def _request_redis(request: Request):
 
 
 def _peer_public_keys(peer: dict) -> list[dict[str, Any]]:
+    normalized = trust_repo.list_peer_verification_keys(str(peer["node_uid"]))
+    if normalized:
+        return normalized
     public_keys = peer.get("public_keys_json", [])
     if isinstance(public_keys, str):
         return list(_json.loads(public_keys or "[]"))
@@ -191,14 +257,17 @@ def _verify_signed_node_request(request: Request, body_bytes: bytes) -> dict:
         raise HTTPException(status_code=401, detail="Invalid signature format")
     sig_b64 = signature_full.removeprefix("ed25519:")
 
-    matching_key = next(
-        (
-            pk
-            for pk in _peer_public_keys(peer)
-            if pk.get("key_id") == key_id and pk.get("status") in ("active", "pending")
-        ),
-        None,
-    )
+    matching_key = trust_repo.get_peer_verification_key(str(node_id), str(key_id))
+    if matching_key is None:
+        matching_key = next(
+            (
+                pk
+                for pk in _peer_public_keys(peer)
+                if pk.get("key_id") == key_id
+                and pk.get("status") in ("active", "pending", "retiring")
+            ),
+            None,
+        )
     if not matching_key:
         raise HTTPException(status_code=401, detail="Unknown or inactive key ID")
 
@@ -237,25 +306,67 @@ def _verify_signed_node_request(request: Request, body_bytes: bytes) -> dict:
     return peer
 
 
-def _require_capability(peer: dict, capability: str) -> None:
-    ok, err = evaluate_grant(
-        peer_trust_state=peer.get("trust_state", ""),
-        peer_disabled_at=peer.get("disabled_at"),
-        preset_name=peer.get("default_grant_preset") or "discovery",
-        required_capability=capability,
+def _require_capability(
+    peer: dict,
+    capability: str,
+    *,
+    assertion: dict | None = None,
+) -> AuthorizationDecision:
+    decision = authorize(
+        peer=peer,
+        grants=repo.get_peer_grants(str(peer["node_uid"])),
+        capability=capability,
+        subject_hash=str(assertion.get("sub") or "") if assertion else None,
+        roles={str(role) for role in assertion.get("roles", [])}
+        if assertion
+        else set(),
     )
-    if not ok:
-        raise HTTPException(status_code=403, detail=err or "Capability denied")
+    if not decision.allowed:
+        try:
+            repo.record_audit_event(
+                event_type="authorization.denied",
+                status="denied",
+                node_uid=peer.get("node_uid"),
+                metadata={
+                    "capability": capability,
+                    "reason": decision.denial_code,
+                    "policy_revision": decision.policy_revision,
+                },
+            )
+        except Exception:
+            log.warning(
+                "Unable to persist federation authorization denial", exc_info=True
+            )
+        raise HTTPException(
+            status_code=403,
+            detail=decision.denial_code or "capability_denied",
+        )
+    return decision
 
 
 def _peer_has_capability(peer: dict, capability: str) -> bool:
-    ok, _ = evaluate_grant(
-        peer_trust_state=peer.get("trust_state", ""),
-        peer_disabled_at=peer.get("disabled_at"),
-        preset_name=peer.get("default_grant_preset") or "discovery",
-        required_capability=capability,
+    decision = authorize(
+        peer=peer,
+        grants=repo.get_peer_grants(str(peer["node_uid"])),
+        capability=capability,
+        subject_hash=None,
+        roles=set(),
     )
-    return ok
+    return decision.allowed
+
+
+def _require_entity_allowed(
+    decision: AuthorizationDecision,
+    *,
+    entity_type: str,
+    entity_uid: str,
+) -> None:
+    if not entity_is_allowed(
+        decision,
+        entity_type=entity_type,
+        entity_uid=entity_uid,
+    ):
+        raise HTTPException(status_code=404, detail="Federated entity not available")
 
 
 def _local_node_uid() -> str:
@@ -348,24 +459,46 @@ def _empty_search_response() -> dict[str, list[dict]]:
 
 @well_known.get("/.well-known/crate-node")
 def get_descriptor(request: Request):
+    return _build_local_descriptor(request)
+
+
+def _build_local_descriptor(request: Request) -> dict:
     node = repo.get_local_node()
     if not node:
         raise HTTPException(status_code=503, detail="Local node not configured")
-    return build_descriptor(
+    active_key = trust_repo.get_active_local_key()
+    if active_key is None or not active_key.get("private_key_ref"):
+        raise HTTPException(
+            status_code=503,
+            detail="Federation signing key is unavailable",
+        )
+    configured_capabilities = (
+        _json.loads(node["capabilities_json"])
+        if isinstance(node["capabilities_json"], str)
+        else node["capabilities_json"]
+    )
+    from crate.federation.global_genres import taxonomy_release_health
+
+    taxonomy_release = taxonomy_release_health()
+    published_taxonomy = None
+    if taxonomy_release.get("valid"):
+        published_taxonomy = {
+            "taxonomy_id": taxonomy_release["taxonomy_id"],
+            "version": taxonomy_release["version"],
+            "digest": taxonomy_release["digest"],
+            "key_id": taxonomy_release["key_id"],
+            "signature": taxonomy_release["signature"],
+        }
+    return build_signed_descriptor(
         node_uid=node["node_uid"],
         display_name=node["display_name"],
         api_base_url=node["api_base_url"] or str(request.base_url).rstrip("/"),
         listen_base_url=node["listen_base_url"],
-        active_key_id=node["active_key_id"],
-        public_keys=_json.loads(node["public_keys_json"])
-        if isinstance(node["public_keys_json"], str)
-        else node["public_keys_json"],
-        capabilities=_json.loads(node["capabilities_json"])
-        if isinstance(node["capabilities_json"], str)
-        else node["capabilities_json"],
-        policy=_json.loads(node["policy_json"])
-        if isinstance(node["policy_json"], str)
-        else node["policy_json"],
+        active_key_id=active_key["key_id"],
+        public_keys=trust_repo.list_local_public_keys(),
+        capabilities=configured_capabilities or sorted(CAPABILITIES),
+        private_key=load_private_key(active_key["key_id"]),
+        taxonomy_release=published_taxonomy,
     )
 
 
@@ -394,7 +527,13 @@ async def get_capabilities(request: Request):
 @router.get("/health")
 async def get_health(request: Request):
     await _require_signed_node_request(request)
-    return {"status": "ok"}
+    from crate.federation.global_genres import taxonomy_release_health
+
+    taxonomy = taxonomy_release_health()
+    return {
+        "status": "ok" if taxonomy["status"] == "ok" else "degraded",
+        "taxonomy": taxonomy,
+    }
 
 
 # -- Search ------------------------------------------------------------------
@@ -403,16 +542,23 @@ async def get_health(request: Request):
 @router.post("/search")
 async def federated_search(body: SearchBody, request: Request):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.search")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="catalog.search",
         required_capability="federation.catalog.search",
     )
+    decision = _require_capability(peer, "catalog.search", assertion=assertion)
     if not _catalog_policy_allows_live_search(_catalog_share_policy()):
         return _empty_search_response()
-    return _strip_paths(handle_remote_search(query=body.q, limit=body.limit))
+    payload = handle_remote_search(query=body.q, limit=body.limit)
+    return _strip_paths(
+        apply_result_limit(
+            payload,
+            requested_limit=body.limit,
+            constraints=decision.constraints,
+        )
+    )
 
 
 def _strip_paths(result: Any) -> Any:
@@ -433,13 +579,14 @@ def _strip_paths(result: Any) -> Any:
 @router.get("/albums/{remote_entity_uid}")
 async def federated_album_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.album.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="catalog.album.read",
         required_capability="federation.catalog.search",
     )
+    decision = _require_capability(peer, "catalog.album.read", assertion=assertion)
+    _require_entity_allowed(decision, entity_type="album", entity_uid=remote_entity_uid)
     if not _catalog_policy_allows_item(
         {
             "entity_type": "album",
@@ -458,12 +605,15 @@ async def federated_album_detail(remote_entity_uid: str, request: Request):
 @router.get("/artists/{remote_entity_uid}")
 async def federated_artist_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.artist.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="catalog.artist.read",
         required_capability="federation.catalog.search",
+    )
+    decision = _require_capability(peer, "catalog.artist.read", assertion=assertion)
+    _require_entity_allowed(
+        decision, entity_type="artist", entity_uid=remote_entity_uid
     )
     if not _catalog_policy_allows_item(
         {
@@ -483,13 +633,14 @@ async def federated_artist_detail(remote_entity_uid: str, request: Request):
 @router.get("/tracks/{remote_entity_uid}")
 async def federated_track_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.track.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="catalog.track.read",
         required_capability="federation.catalog.search",
     )
+    decision = _require_capability(peer, "catalog.track.read", assertion=assertion)
+    _require_entity_allowed(decision, entity_type="track", entity_uid=remote_entity_uid)
     if not _catalog_policy_allows_item(
         {
             "entity_type": "track",
@@ -513,13 +664,14 @@ async def federated_artwork(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "artwork.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="artwork.read",
         required_capability="federation.catalog.search",
     )
+    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    _require_entity_allowed(decision, entity_type="album", entity_uid=remote_entity_uid)
     return _serve_federated_album_asset(
         remote_entity_uid,
         size=size,
@@ -569,12 +721,15 @@ async def federated_artist_photo(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "artwork.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="artist_photo.read",
         required_capability="federation.catalog.search",
+    )
+    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    _require_entity_allowed(
+        decision, entity_type="artist", entity_uid=remote_entity_uid
     )
     if not _catalog_policy_allows_item(
         {
@@ -603,12 +758,15 @@ async def federated_artist_background(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "artwork.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="artist_background.read",
         required_capability="federation.catalog.search",
+    )
+    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    _require_entity_allowed(
+        decision, entity_type="artist", entity_uid=remote_entity_uid
     )
     if not _catalog_policy_allows_item(
         {
@@ -639,8 +797,7 @@ async def federated_asset(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "artwork.read")
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="artwork.read",
@@ -648,6 +805,12 @@ async def federated_asset(
     )
     normalized_type = entity_type.strip().lower()
     normalized_asset = asset_name.strip().lower()
+    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    _require_entity_allowed(
+        decision,
+        entity_type=normalized_type,
+        entity_uid=remote_entity_uid,
+    )
     if not _catalog_policy_allows_item(
         {
             "entity_type": normalized_type,
@@ -780,12 +943,21 @@ async def federated_json_facet(
     request: Request,
 ):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, _facet_capability(entity_type))
-    _require_user_assertion(
+    assertion = _require_user_assertion(
         request,
         peer,
         purpose="catalog.facet.read",
         required_capability="federation.catalog.search",
+    )
+    decision = _require_capability(
+        peer,
+        _facet_capability(entity_type),
+        assertion=assertion,
+    )
+    _require_entity_allowed(
+        decision,
+        entity_type=entity_type,
+        entity_uid=remote_entity_uid,
     )
     if not _catalog_policy_allows_item(
         {
@@ -833,7 +1005,7 @@ def _public_facet_payload(
 
 
 def _artist_info_facet(artist: dict) -> dict:
-    return {
+    payload = {
         "bio": artist.get("bio") or "",
         "tags": _json_list(artist.get("tags_json")),
         "similar": _json_list(artist.get("similar_json")),
@@ -846,6 +1018,8 @@ def _artist_info_facet(artist: dict) -> dict:
         "formed": artist.get("formed"),
         "ended": artist.get("ended"),
     }
+    payload.update(browse_artist_api.build_public_artist_page_facet(artist))
+    return payload
 
 
 def _json_list(value: Any) -> list:
@@ -965,25 +1139,201 @@ def _public_track_detail(remote_entity_uid: str) -> dict | None:
     }
 
 
+@router.get("/albums/{remote_entity_uid}/import-manifest")
+async def federated_album_import_manifest(
+    remote_entity_uid: str,
+    request: Request,
+):
+    peer = await _require_signed_node_request(request)
+    assertion = _require_user_assertion(
+        request,
+        peer,
+        purpose="import.manifest",
+        required_capability="federation.import.request",
+    )
+    decision = _require_capability(peer, "import.pull", assertion=assertion)
+    _require_entity_allowed(
+        decision,
+        entity_type="album",
+        entity_uid=remote_entity_uid,
+    )
+    from crate.federation.imports import (
+        build_album_import_manifest,
+        sign_import_manifest,
+    )
+
+    try:
+        manifest = await asyncio.to_thread(
+            build_album_import_manifest,
+            remote_entity_uid,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    constraints = decision.constraints
+    max_bytes = constraints.max_import_bytes if constraints else None
+    if max_bytes is not None and int(manifest["total_bytes"]) > max_bytes:
+        raise HTTPException(status_code=413, detail="import_size_limit")
+    active_key = trust_repo.get_active_local_key()
+    if not active_key:
+        raise HTTPException(
+            status_code=503, detail="Federation signing key unavailable"
+        )
+    return sign_import_manifest(
+        manifest,
+        key_id=str(active_key["key_id"]),
+        private_key=load_private_key(str(active_key["key_id"])),
+    )
+
+
+@router.get("/import-files/{remote_entity_uid}")
+async def federated_import_file(remote_entity_uid: str, request: Request):
+    peer = await _require_signed_node_request(request)
+    assertion = _require_user_assertion(
+        request,
+        peer,
+        purpose="import.file",
+        required_capability="federation.import.request",
+    )
+    decision = _require_capability(peer, "import.pull", assertion=assertion)
+    _require_entity_allowed(
+        decision,
+        entity_type="track",
+        entity_uid=remote_entity_uid,
+    )
+    from crate.api.browse_media import _playback_headers, _stream_resolved_file
+    from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
+    from crate.streaming.service import media_type_for_path, resolve_playback
+
+    track = get_track_delivery_row_by_entity_uid(remote_entity_uid)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    resolution = resolve_playback(track, "original", enqueue=False)
+    if resolution is None:
+        raise HTTPException(status_code=404, detail="Track not found")
+    max_bytes = decision.constraints.max_import_bytes if decision.constraints else None
+    if max_bytes is not None and resolution.file_path.stat().st_size > max_bytes:
+        raise HTTPException(status_code=413, detail="import_size_limit")
+    return _stream_resolved_file(
+        request,
+        resolution.file_path,
+        media_type=resolution.media_type or media_type_for_path(resolution.file_path),
+        extra_headers=_playback_headers(resolution),
+        require_auth=False,
+    )
+
+
 # -- Catalog sync ------------------------------------------------------------
 
 
 @router.get("/catalog/manifest")
-async def catalog_manifest(request: Request, page: int = 0, page_size: int = 100):
+async def catalog_manifest(
+    request: Request,
+    cursor: str = "",
+    page: int = 0,
+    page_size: int = 100,
+):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.sync")
+    decision = _require_capability(peer, "catalog.sync")
     capped_page = max(0, page)
     capped_page_size = max(1, min(page_size, 500))
+    if (
+        decision is not None
+        and decision.constraints
+        and decision.constraints.max_results is not None
+    ):
+        capped_page_size = min(
+            capped_page_size,
+            decision.constraints.max_results,
+        )
     genres_allowed = _peer_has_capability(peer, "catalog.metadata.genres")
-    payload = {
-        "revision": str(int(time.time())),
-        "page": capped_page,
-        "page_size": capped_page_size,
-        "items": _catalog_manifest_items(
-            page=capped_page,
+    policy = _catalog_share_policy()
+    snapshot = _catalog_manifest_snapshot(policy)
+    peer_uid = str(peer["node_uid"])
+    after_entity_type = ""
+    after_entity_uid = ""
+    snapshot_sequence = int(snapshot.get("snapshot_sequence") or 0)
+    if cursor:
+        from crate.federation.catalog import (
+            InvalidCatalogCursor,
+            decode_catalog_cursor,
+        )
+
+        try:
+            decoded = decode_catalog_cursor(cursor, peer_uid=peer_uid)
+        except InvalidCatalogCursor as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_cursor", "message": str(exc)},
+            ) from exc
+        if decoded["mode"] != "snapshot":
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "invalid_cursor",
+                    "message": "Expected snapshot cursor",
+                },
+            )
+        position = decoded["position"]
+        after_entity_type = str(position.get("entity_type") or "")
+        after_entity_uid = str(position.get("entity_uid") or "")
+        snapshot_sequence = int(position.get("snapshot_sequence") or 0)
+
+    if not cursor:
+        # Compatibility for one release. The query remains keyset-based.
+        compatibility_items = _catalog_manifest_items(
+            page=page,
             page_size=capped_page_size,
             include_genres=genres_allowed,
-        ),
+        )
+        items = compatibility_items
+    else:
+        items = _catalog_manifest_items_after(
+            after_entity_type=after_entity_type,
+            after_entity_uid=after_entity_uid,
+            page_size=capped_page_size,
+            include_genres=genres_allowed,
+        )
+    try:
+        items, byte_truncated = _cap_catalog_items_by_bytes(
+            items,
+            max_bytes=_catalog_page_max_bytes(),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail={"code": "catalog_item_too_large", "message": str(exc)},
+        ) from exc
+    total_items = int(snapshot["total_items"])
+    from crate.federation.catalog import encode_catalog_cursor
+
+    snapshot_cursor = encode_catalog_cursor(
+        peer_uid=peer_uid,
+        mode="delta",
+        position={"sequence": snapshot_sequence},
+    )
+    next_cursor = None
+    if items:
+        last = items[-1]
+        next_cursor = encode_catalog_cursor(
+            peer_uid=peer_uid,
+            mode="snapshot",
+            position={
+                "entity_type": last["entity_type"],
+                "entity_uid": last["remote_entity_uid"],
+                "snapshot_sequence": snapshot_sequence,
+            },
+        )
+    payload = {
+        "revision": snapshot["revision"],
+        "page": capped_page,
+        "page_size": capped_page_size,
+        "total_items": total_items,
+        "total_pages": (total_items + capped_page_size - 1) // capped_page_size,
+        "items": items,
+        "next_cursor": next_cursor,
+        "snapshot_cursor": snapshot_cursor,
+        "snapshot_sequence": snapshot_sequence,
+        "has_more": byte_truncated or len(items) == capped_page_size,
     }
     if genres_allowed:
         from crate.genre_taxonomy import get_core_taxonomy_descriptor
@@ -993,29 +1343,105 @@ async def catalog_manifest(request: Request, page: int = 0, page_size: int = 100
 
 
 @router.get("/catalog/delta")
-async def catalog_delta(request: Request, cursor: str = ""):
-    await _require_signed_node_request(request)
-    from crate.federation.catalog import get_cursor
+async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
+    peer = await _require_signed_node_request(request)
+    _require_capability(peer, "catalog.sync")
+    from crate.federation.catalog import (
+        InvalidCatalogCursor,
+        decode_catalog_cursor,
+        encode_catalog_cursor,
+    )
 
-    stored = get_cursor(request.headers.get("X-Crate-Node-Id", ""))
-    operations: list[dict] = []
-
-    if stored and stored.get("cursor"):
-        import time
-        from crate.db.queries import browse_media_search
-
-        recent = browse_media_search.search_all_hybrid(query="", limit=50)
-        for album in recent.get("albums", [])[:20]:
-            operations.append(
-                {
-                    "op": "upsert",
-                    "entity_type": "album",
-                    "remote_entity_uid": album.get("entity_uid", ""),
-                    "revision": str(int(time.time())),
-                }
+    peer_uid = str(peer["node_uid"])
+    after_sequence = 0
+    if cursor:
+        try:
+            decoded = decode_catalog_cursor(cursor, peer_uid=peer_uid)
+        except InvalidCatalogCursor as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_cursor", "message": str(exc)},
+            ) from exc
+        if decoded["mode"] != "delta":
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_cursor", "message": "Expected delta cursor"},
             )
+        after_sequence = int(decoded["position"].get("sequence") or 0)
 
-    return {"cursor": cursor, "operations": operations}
+    floor = catalog_retention_floor()
+    if floor and after_sequence < floor - 1:
+        raise HTTPException(
+            status_code=410,
+            detail={
+                "code": "full_sync_required",
+                "message": "Catalog cursor predates retained changes",
+            },
+        )
+
+    capped_limit = max(1, min(int(limit), 500))
+    changes = list_catalog_changes(
+        after_sequence=after_sequence,
+        limit=capped_limit + 1,
+    )
+    policy = _catalog_share_policy()
+    items: list[dict[str, Any]] = []
+    scanned_sequence = after_sequence
+    for change in changes:
+        scanned_sequence = int(change["sequence"])
+        payload = dict(change.get("payload_json") or {})
+        candidate = {
+            **payload,
+            "entity_type": change["entity_type"],
+            "remote_entity_uid": change["entity_uid"],
+        }
+        if not _catalog_policy_allows_item(candidate, policy):
+            continue
+        items.append(
+            {
+                "sequence": scanned_sequence,
+                "entity_type": change["entity_type"],
+                "remote_entity_uid": change["entity_uid"],
+                "operation": change["operation"],
+                "payload_revision": change["payload_revision"],
+                "payload": payload,
+            }
+        )
+        if len(items) >= capped_limit:
+            break
+
+    try:
+        items, byte_truncated = _cap_catalog_items_by_bytes(
+            items,
+            max_bytes=_catalog_page_max_bytes(),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=413,
+            detail={"code": "catalog_item_too_large", "message": str(exc)},
+        ) from exc
+    if byte_truncated and items:
+        scanned_sequence = int(items[-1]["sequence"])
+
+    high_water = catalog_high_water_mark()
+    next_cursor = encode_catalog_cursor(
+        peer_uid=peer_uid,
+        mode="delta",
+        position={"sequence": scanned_sequence},
+    )
+    digest_input = _json.dumps(
+        items, sort_keys=True, separators=(",", ":"), default=str
+    )
+    return {
+        "items": items,
+        "operations": items,
+        "next_cursor": next_cursor,
+        "cursor": next_cursor,
+        "has_more": byte_truncated or scanned_sequence < high_water,
+        "high_water_mark": high_water,
+        "scanned_sequence": scanned_sequence,
+        "digest": f"sha256:{hashlib.sha256(digest_input.encode()).hexdigest()}",
+    }
 
 
 def _catalog_manifest_items(
@@ -1024,145 +1450,38 @@ def _catalog_manifest_items(
     *,
     include_genres: bool = True,
 ) -> list[dict]:
-    offset = page * page_size
-    policy = _catalog_share_policy()
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """
-                SELECT *
-                FROM (
-                    SELECT
-                        'artist' AS entity_type,
-                        entity_uid::text AS remote_entity_uid,
-                        name AS title,
-                        name AS artist,
-                        NULL::text AS album,
-                        NULL::text AS year,
-                        NULL::double precision AS duration_seconds,
-                        NULL::integer AS track_number,
-                        NULL::integer AS disc_number,
-                        (COALESCE(has_photo, 0) <> 0) AS has_photo,
-                        NULL::boolean AS has_cover,
-                        (
-                            SELECT COALESCE(
-                                jsonb_agg(
-                                    jsonb_build_object('raw_label', g.name, 'weight', ag.weight)
-                                    ORDER BY ag.weight DESC, g.name ASC
-                                ),
-                                '[]'::jsonb
-                            )
-                            FROM artist_genres ag
-                            JOIN genres g ON g.id = ag.genre_id
-                            WHERE ag.artist_name = library_artists.name
-                        ) AS genres_json,
-                        NULL::text AS genre,
-                        NULL::double precision AS bpm,
-                        NULL::double precision AS energy,
-                        NULL::double precision AS danceability,
-                        NULL::double precision AS valence,
-                        NULL::double precision AS acousticness,
-                        NULL::double precision AS instrumentalness,
-                        NULL::text AS format,
-                        NULL::integer AS bitrate,
-                        NULL::integer AS sample_rate,
-                        NULL::integer AS bit_depth,
-                        NULL::bigint AS size_bytes,
-                        updated_at AS updated_at,
-                        'library' AS _share_scope
-                    FROM library_artists
-                    WHERE entity_uid IS NOT NULL
-                      AND name NOT LIKE '.%'
-                      AND (folder_name IS NULL OR folder_name NOT LIKE '.%')
-                    UNION ALL
-                    SELECT
-                        'album' AS entity_type,
-                        entity_uid::text AS remote_entity_uid,
-                        name AS title,
-                        artist AS artist,
-                        name AS album,
-                        year::text AS year,
-                        total_duration::double precision AS duration_seconds,
-                        NULL::integer AS track_number,
-                        NULL::integer AS disc_number,
-                        NULL::boolean AS has_photo,
-                        (COALESCE(has_cover, 0) <> 0) AS has_cover,
-                        (
-                            SELECT COALESCE(
-                                jsonb_agg(
-                                    jsonb_build_object('raw_label', g.name, 'weight', ag.weight)
-                                    ORDER BY ag.weight DESC, g.name ASC
-                                ),
-                                '[]'::jsonb
-                            )
-                            FROM album_genres ag
-                            JOIN genres g ON g.id = ag.genre_id
-                            WHERE ag.album_id = library_albums.id
-                        ) AS genres_json,
-                        NULL::text AS genre,
-                        NULL::double precision AS bpm,
-                        NULL::double precision AS energy,
-                        NULL::double precision AS danceability,
-                        NULL::double precision AS valence,
-                        NULL::double precision AS acousticness,
-                        NULL::double precision AS instrumentalness,
-                        NULL::text AS format,
-                        NULL::integer AS bitrate,
-                        NULL::integer AS sample_rate,
-                        NULL::integer AS bit_depth,
-                        NULL::bigint AS size_bytes,
-                        updated_at AS updated_at,
-                        'library' AS _share_scope
-                    FROM library_albums
-                    WHERE entity_uid IS NOT NULL
-                      AND quarantined_at IS NULL
-                    UNION ALL
-                    SELECT
-                        'track' AS entity_type,
-                        lt.entity_uid::text AS remote_entity_uid,
-                        COALESCE(NULLIF(lt.title, ''), lt.filename) AS title,
-                        lt.artist AS artist,
-                        lt.album AS album,
-                        lt.year::text AS year,
-                        lt.duration::double precision AS duration_seconds,
-                        lt.track_number AS track_number,
-                        lt.disc_number AS disc_number,
-                        NULL::boolean AS has_photo,
-                        NULL::boolean AS has_cover,
-                        '[]'::jsonb AS genres_json,
-                        lt.genre::text AS genre,
-                        COALESCE(taf.bpm, lt.bpm)::double precision AS bpm,
-                        COALESCE(taf.energy, lt.energy)::double precision AS energy,
-                        COALESCE(taf.danceability, lt.danceability)::double precision AS danceability,
-                        COALESCE(taf.valence, lt.valence)::double precision AS valence,
-                        COALESCE(taf.acousticness, lt.acousticness)::double precision AS acousticness,
-                        COALESCE(taf.instrumentalness, lt.instrumentalness)::double precision AS instrumentalness,
-                        LOWER(NULLIF(lt.format, ''))::text AS format,
-                        CASE
-                            WHEN lt.bitrate IS NULL THEN NULL
-                            ELSE FLOOR(lt.bitrate / 1000.0)::integer
-                        END AS bitrate,
-                        lt.sample_rate::integer AS sample_rate,
-                        lt.bit_depth::integer AS bit_depth,
-                        lt.size::bigint AS size_bytes,
-                        lt.updated_at AS updated_at,
-                        'library' AS _share_scope
-                    FROM library_tracks lt
-                    LEFT JOIN track_analysis_features taf
-                      ON taf.track_id = lt.id
-                    WHERE lt.entity_uid IS NOT NULL
-                ) AS catalog
-                ORDER BY entity_type, artist, album, title
-                OFFSET :offset
-                LIMIT :limit
-                """
-                ),
-                {"offset": offset, "limit": page_size},
-            )
-            .mappings()
-            .all()
+    after_entity_type = ""
+    after_entity_uid = ""
+    items: list[dict] = []
+    for _ in range(max(0, page) + 1):
+        items = _catalog_manifest_items_after(
+            after_entity_type=after_entity_type,
+            after_entity_uid=after_entity_uid,
+            page_size=page_size,
+            include_genres=include_genres,
         )
+        if not items:
+            break
+        after_entity_type = str(items[-1]["entity_type"])
+        after_entity_uid = str(items[-1]["remote_entity_uid"])
+    return items
+
+
+def _catalog_manifest_items_after(
+    *,
+    after_entity_type: str,
+    after_entity_uid: str,
+    page_size: int,
+    include_genres: bool = True,
+) -> list[dict]:
+    policy = _catalog_share_policy()
+    policy_params = _catalog_manifest_policy_params(policy)
+    rows = list_federation_manifest_rows(
+        after_entity_type=after_entity_type,
+        after_entity_uid=after_entity_uid,
+        limit=page_size,
+        policy_params=policy_params,
+    )
 
     items: list[dict] = []
     for row in rows:
@@ -1184,6 +1503,52 @@ def _catalog_manifest_items(
         item.pop("genre", None)
         items.append(item)
     return items
+
+
+def _catalog_manifest_snapshot(policy: dict[str, Any]) -> dict[str, Any]:
+    """Return a deterministic revision and exact size for one manifest view."""
+    policy_params = _catalog_manifest_policy_params(policy)
+    row = get_federation_manifest_revision_row(policy_params)
+
+    total_items = int(row["total_items"] or 0)
+    snapshot_sequence = catalog_high_water_mark()
+    revision_input = _json.dumps(
+        {
+            "policy": policy_params,
+            "total_items": total_items,
+            "snapshot_sequence": snapshot_sequence,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return {
+        "revision": f"sha256:{hashlib.sha256(revision_input.encode()).hexdigest()}",
+        "total_items": total_items,
+        "snapshot_sequence": snapshot_sequence,
+    }
+
+
+def _catalog_manifest_policy_params(policy: dict[str, Any]) -> dict[str, Any]:
+    catalog_filter = policy.get("catalog_filter") or {}
+    expected_scope = catalog_filter.get("share_scope")
+    return {
+        "share_allowed": expected_scope in (None, "", "library"),
+        "allowed_entity_uids": sorted(
+            str(value) for value in catalog_filter.get("entity_uids") or []
+        ),
+        "allowed_artist_uids": sorted(
+            str(value) for value in catalog_filter.get("artist_entity_uids") or []
+        ),
+        "allowed_album_uids": sorted(
+            str(value) for value in catalog_filter.get("album_entity_uids") or []
+        ),
+        "allowed_track_uids": sorted(
+            str(value) for value in catalog_filter.get("track_entity_uids") or []
+        ),
+        "denied_entity_uids": sorted(
+            str(value) for value in catalog_filter.get("deny_entity_uids") or []
+        ),
+    }
 
 
 def _normalize_manifest_audio(item: dict[str, Any]) -> None:
@@ -1292,7 +1657,7 @@ def _manifest_genre_assertions(item: dict[str, Any]) -> list[dict[str, Any]]:
             "confidence": 1.0,
             "is_direct": True,
         }
-        if canonical_slug in known_slugs:
+        if canonical_slug and canonical_slug in known_slugs:
             assertion.update(
                 {
                     "global_genre_uid": core_genre_uid(canonical_slug),
@@ -1354,31 +1719,140 @@ def _facet(available: bool, revision: str | None) -> dict[str, Any]:
 
 def _manifest_revision(item: dict[str, Any]) -> str:
     updated_at = item.get("updated_at")
-    if hasattr(updated_at, "isoformat"):
-        return updated_at.isoformat()
+    isoformat = getattr(updated_at, "isoformat", None)
+    if callable(isoformat):
+        return str(isoformat())
     return str(int(time.time()))
 
 
 # -- Pairing -----------------------------------------------------------------
 
 
-@router.post("/pairing/offer")
-def pairing_offer(body: PairingOfferBody, request: Request):
-    node_id = request.headers.get("X-Crate-Node-Id", "")
-    if not node_id:
-        raise HTTPException(status_code=401, detail="Missing node identity")
-    return {"status": "received", "challenge": body.challenge}
+@router.post("/pairing/offers", status_code=202)
+def pairing_offer(body: PairingOfferV1, request: Request):
+    local_descriptor = _build_local_descriptor(request)
+    try:
+        offer = verify_offer(
+            body.model_dump(mode="json"),
+            local_descriptor=local_descriptor,
+        )
+        FederationURLPolicy().validate_base_url(offer.source_descriptor.api_base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = trust_repo.get_pairing(offer.pairing_uid)
+    serialized_offer = offer.model_dump(mode="json")
+    if existing is not None:
+        if existing.get("offer_json") != serialized_offer:
+            raise HTTPException(status_code=409, detail="Pairing offer replay conflict")
+        return {"status": existing["state"], "pairing_uid": offer.pairing_uid}
+
+    source = offer.source_descriptor
+    trust_repo.create_pairing(
+        pairing_uid=offer.pairing_uid,
+        remote_base_url=source.api_base_url,
+        remote_node_uid=source.node_uid,
+        direction="inbound",
+        state="remote_pending",
+        local_challenge=offer.challenge,
+        negotiated_protocol=source.protocol_version,
+        signature_profile=source.signature_profile,
+        descriptor_digest=source.descriptor_digest,
+        offer_json=serialized_offer,
+        expires_at=offer.expires_at,
+    )
+    for key in source.public_keys:
+        trust_repo.upsert_peer_key(
+            node_uid=source.node_uid,
+            key_id=key.key_id,
+            public_key=key.public_key,
+            status=key.status,
+            not_before=key.not_before,
+            not_after=key.not_after,
+        )
+    repo.upsert_peer(
+        node_uid=source.node_uid,
+        display_name=source.name,
+        api_base_url=source.api_base_url,
+        listen_base_url=source.listen_base_url,
+        active_key_id=source.active_key_id,
+        public_keys_json=[key.model_dump(mode="json") for key in source.public_keys],
+        capabilities_json={name: True for name in source.capabilities},
+        trust_state="pending",
+        direction="inbound",
+    )
+    return {"status": "remote_pending", "pairing_uid": offer.pairing_uid}
 
 
-@router.post("/pairing/accept")
-def pairing_accept(body: PairingAcceptBody, request: Request):
-    node_id = request.headers.get("X-Crate-Node-Id", "")
-    if body.node_uid and node_id and body.node_uid != node_id:
-        raise HTTPException(status_code=400, detail="Mismatched node identity")
-    return {
-        "status": "manual_approval_required",
-        "node_uid": body.node_uid or node_id,
-    }
+@router.post("/pairing/acceptances")
+def pairing_accept(body: PairingAcceptanceV1, request: Request):
+    pairing = trust_repo.get_pairing(body.pairing_uid)
+    if pairing is None or pairing.get("direction") != "outbound":
+        raise HTTPException(status_code=404, detail="Pairing offer not found")
+    local_descriptor = _build_local_descriptor(request)
+    try:
+        acceptance = verify_acceptance(
+            body.model_dump(mode="json"),
+            pairing_offer=pairing["offer_json"],
+            local_descriptor=local_descriptor,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    source = acceptance.source_descriptor
+    offer = PairingOfferV1.model_validate(pairing["offer_json"])
+    for key in source.public_keys:
+        trust_repo.upsert_peer_key(
+            node_uid=source.node_uid,
+            key_id=key.key_id,
+            public_key=key.public_key,
+            status=key.status,
+            not_before=key.not_before,
+            not_after=key.not_after,
+        )
+    repo.upsert_peer(
+        node_uid=source.node_uid,
+        display_name=source.name,
+        api_base_url=source.api_base_url,
+        listen_base_url=source.listen_base_url,
+        active_key_id=source.active_key_id,
+        public_keys_json=[key.model_dump(mode="json") for key in source.public_keys],
+        capabilities_json={name: True for name in source.capabilities},
+        trust_state="approved",
+        direction="outbound",
+        default_grant_preset=offer.outbound_grant,
+    )
+    from crate.federation.grants import resolve_preset
+
+    resolved_grant = resolve_preset(offer.outbound_grant)
+    repo.upsert_peer_grant(
+        node_uid=source.node_uid,
+        principal_selector=f"peer_users:{source.node_uid}",
+        preset=offer.outbound_grant,
+        capabilities_json=resolved_grant["capabilities"],
+        constraints_json=resolved_grant["constraints"],
+    )
+    if pairing["state"] != "completed":
+        trust_repo.update_pairing(
+            body.pairing_uid,
+            expected_states={"offered", "accepted"},
+            state="completed",
+            remote_node_uid=source.node_uid,
+            remote_challenge=acceptance.challenge,
+            acceptance_json=acceptance.model_dump(mode="json"),
+            verified_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
+        )
+    active_key = trust_repo.get_active_local_key()
+    if active_key is None:
+        raise HTTPException(
+            status_code=503, detail="Federation signing key unavailable"
+        )
+    return build_ack(
+        acceptance=acceptance,
+        source_descriptor=local_descriptor,
+        private_key=load_private_key(active_key["key_id"]),
+    )
 
 
 @router.post("/key-rotation")
@@ -1386,21 +1860,54 @@ async def key_rotation(body: KeyRotationBody, request: Request):
     peer = await _require_signed_node_request(request)
     if body.node_uid and body.node_uid != peer["node_uid"]:
         raise HTTPException(status_code=403, detail="Cannot rotate another peer key")
-    if not body.new_key_id:
-        raise HTTPException(status_code=400, detail="new_key_id required")
+    if not body.new_key_id or not body.new_public_key:
+        raise HTTPException(
+            status_code=400,
+            detail="new_key_id and new_public_key are required",
+        )
+    now = datetime.now(timezone.utc)
+    if body.activate_at <= now or body.grace_until <= body.activate_at:
+        raise HTTPException(status_code=400, detail="Invalid rotation window")
+    try:
+        Ed25519PublicKey.from_public_bytes(
+            base64.b64decode(body.new_public_key, validate=True)
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="Invalid Ed25519 public key"
+        ) from exc
 
-    key_ids = {pk.get("key_id") for pk in _peer_public_keys(peer)}
-    if body.new_key_id not in key_ids:
-        raise HTTPException(status_code=400, detail="Unknown new_key_id")
-
-    repo.update_peer(peer["node_uid"], active_key_id=body.new_key_id)
+    old_key_id = request.headers.get("X-Crate-Key-Id", "")
+    old_key = trust_repo.get_peer_verification_key(str(peer["node_uid"]), old_key_id)
+    if old_key is None:
+        raise HTTPException(status_code=401, detail="Rotation must use the old key")
+    trust_repo.upsert_peer_key(
+        node_uid=str(peer["node_uid"]),
+        key_id=old_key_id,
+        public_key=old_key["public_key"],
+        status="retiring",
+        not_before=old_key.get("not_before"),
+        not_after=body.grace_until,
+    )
+    trust_repo.upsert_peer_key(
+        node_uid=str(peer["node_uid"]),
+        key_id=body.new_key_id,
+        public_key=body.new_public_key,
+        status="pending",
+        not_before=body.activate_at,
+        not_after=None,
+    )
+    repo.update_peer(
+        peer["node_uid"],
+        public_keys_json=trust_repo.list_peer_public_keys(str(peer["node_uid"])),
+    )
     repo.record_audit_event(
         event_type="key.rotation.received",
         status="success",
         node_uid=peer["node_uid"],
         metadata={"new_key_id": body.new_key_id},
     )
-    return {"status": "ok"}
+    return {"status": "announced", "activate_at": body.activate_at}
 
 
 # -- Stream tickets ----------------------------------------------------------
@@ -1419,20 +1926,34 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
         required_capability="federation.stream.play",
     )
 
-    from crate.federation.stream_proxy import (
-        create_ticket,
-        validate_peer_stream_grant,
-    )
+    from crate.federation.stream_proxy import create_ticket
 
-    ok, err = validate_peer_stream_grant(peer, body.delivery_policy)
-    if not ok:
-        raise HTTPException(status_code=403, detail=err)
+    decision = _require_capability(peer, "stream.proxy", assertion=assertion)
+    _require_entity_allowed(
+        decision,
+        entity_type="track",
+        entity_uid=body.remote_entity_uid,
+    )
+    if body.delivery_policy == "original":
+        _require_capability(peer, "stream.original", assertion=assertion)
+    constraints = decision.constraints
+    if constraints and constraints.delivery:
+        if body.delivery_policy not in constraints.delivery:
+            raise HTTPException(status_code=403, detail="delivery_mode_denied")
 
     ticket = create_ticket(
         node_uid=peer_uid,
         remote_entity_uid=body.remote_entity_uid,
         delivery_policy=body.delivery_policy,
         subject_hash=str(assertion.get("sub") or ""),
+        direction="inbound",
+        audience=peer_uid,
+        playback_session=body.playback_session or str(assertion.get("jti") or ""),
+        range_policy="bytes",
+        max_bytes=constraints.daily_stream_bytes if constraints else None,
+        grant_uid=str(decision.grant_uid) if decision.grant_uid else None,
+        policy_revision=decision.policy_revision,
+        assertion_jti=str(assertion.get("jti") or ""),
     )
 
     repo.record_audit_event(
@@ -1461,6 +1982,7 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
         "ticket_uid": ticket["ticket_uid"],
         "expires_at": str(ticket["expires_at"]),
         "delivery_policy": body.delivery_policy,
+        "playback_session": (body.playback_session or str(assertion.get("jti") or "")),
         "stream_url": f"/api/federation/v1/streams/{ticket['ticket_uid']}",
     }
 
@@ -1470,32 +1992,150 @@ async def serve_stream(ticket_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
 
     from crate.api.browse_media import _playback_headers, _stream_resolved_file
+    from crate.db.repositories.federation_stream_tickets import get_ticket
     from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
-    from crate.federation.stream_proxy import validate_ticket
+    from crate.federation.quotas import (
+        DEFAULT_DAILY_BYTES_PER_PEER,
+        DEFAULT_DAILY_BYTES_PER_SUBJECT,
+        DEFAULT_MAX_STREAMS_PER_PEER,
+        DEFAULT_MAX_STREAMS_PER_SUBJECT,
+        acquire_stream_slot,
+        reconcile_stream_bytes,
+        release_stream_slot,
+        reserve_stream_bytes,
+    )
+    from crate.federation.stream_proxy import (
+        FederationQuotaResponse,
+        requested_byte_count,
+        validate_ticket,
+    )
     from crate.streaming.service import media_type_for_path, resolve_playback
 
-    ticket = validate_ticket(ticket_uid)
-    if not ticket:
+    preview = get_ticket(ticket_uid)
+    if not preview:
         raise HTTPException(status_code=404, detail="Ticket not found or expired")
-    if ticket["node_uid"] != peer["node_uid"]:
+    subject_hash = str(preview.get("subject_hash") or "")
+    subject = repo.get_remote_subject(str(peer["node_uid"]), subject_hash) or {}
+    roles = subject.get("last_roles_json") or []
+    if isinstance(roles, str):
+        roles = _json.loads(roles or "[]")
+    decision = _require_capability(
+        peer,
+        "stream.proxy",
+        assertion={"sub": subject_hash, "roles": roles},
+    )
+    playback_session = request.headers.get("X-Crate-Playback-Session", "")
+    if not playback_session:
+        raise HTTPException(status_code=403, detail="playback_session_required")
+    if str(preview["node_uid"]) != str(peer["node_uid"]):
         raise HTTPException(status_code=403, detail="Ticket belongs to another peer")
 
-    track = get_track_delivery_row_by_entity_uid(ticket["remote_entity_uid"])
+    track = get_track_delivery_row_by_entity_uid(preview["remote_entity_uid"])
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
 
     resolution = resolve_playback(
         track,
-        ticket.get("delivery_policy") or "balanced",
+        preview.get("delivery_policy") or "balanced",
         enqueue=True,
     )
     if resolution is None:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    return _stream_resolved_file(
+    response = _stream_resolved_file(
         request,
         resolution.file_path,
         media_type=resolution.media_type or media_type_for_path(resolution.file_path),
         extra_headers=_playback_headers(resolution),
         require_auth=False,
+    )
+    if request.method == "HEAD":
+        return response
+
+    file_size = int(resolution.file_path.stat().st_size)
+    reserved_bytes = requested_byte_count(file_size, request.headers.get("range"))
+    ticket_constraints = preview.get("constraints_json") or {}
+    if isinstance(ticket_constraints, str):
+        ticket_constraints = _json.loads(ticket_constraints or "{}")
+    max_ticket_bytes = ticket_constraints.get("max_bytes")
+    if max_ticket_bytes is not None and reserved_bytes > int(max_ticket_bytes):
+        raise HTTPException(status_code=429, detail="ticket_byte_limit")
+
+    constraints = decision.constraints
+    max_peer_slots = (
+        constraints.max_concurrent_streams
+        if constraints and constraints.max_concurrent_streams
+        else DEFAULT_MAX_STREAMS_PER_PEER
+    )
+    max_daily_bytes = (
+        constraints.daily_stream_bytes
+        if constraints and constraints.daily_stream_bytes
+        else DEFAULT_DAILY_BYTES_PER_PEER
+    )
+    redis_client = _request_redis(request)
+    allowed, reason, stream_id = acquire_stream_slot(
+        redis_client,
+        str(peer["node_uid"]),
+        subject_hash,
+        max_peer_slots=max_peer_slots,
+        max_subject_slots=max(
+            max_peer_slots,
+            DEFAULT_MAX_STREAMS_PER_SUBJECT,
+        ),
+        logical_stream_key=ticket_uid,
+    )
+    if not allowed or not stream_id:
+        raise HTTPException(status_code=429, detail=reason or "stream_limit")
+    allowed, reason = reserve_stream_bytes(
+        redis_client,
+        str(peer["node_uid"]),
+        reserved_bytes,
+        subject_hash=subject_hash,
+        max_peer_bytes=max_daily_bytes,
+        max_subject_bytes=min(max_daily_bytes, DEFAULT_DAILY_BYTES_PER_SUBJECT),
+    )
+    if not allowed:
+        release_stream_slot(
+            redis_client,
+            str(peer["node_uid"]),
+            subject_hash,
+            stream_id,
+        )
+        raise HTTPException(status_code=429, detail=reason or "byte_quota")
+
+    ticket = validate_ticket(
+        ticket_uid,
+        expected_node_uid=str(peer["node_uid"]),
+        expected_audience=str(peer["node_uid"]),
+        expected_subject=subject_hash,
+        playback_session=playback_session,
+        requested_range=request.headers.get("range"),
+        current_policy_revision=decision.policy_revision,
+    )
+    if not ticket:
+        reconcile_stream_bytes(
+            redis_client,
+            str(peer["node_uid"]),
+            reserved_bytes=reserved_bytes,
+            actual_bytes=0,
+            subject_hash=subject_hash,
+        )
+        release_stream_slot(
+            redis_client,
+            str(peer["node_uid"]),
+            subject_hash,
+            stream_id,
+        )
+        raise HTTPException(status_code=404, detail="Ticket not found or expired")
+
+    return FederationQuotaResponse(
+        response,
+        redis_client=redis_client,
+        node_uid=str(peer["node_uid"]),
+        subject_hash=subject_hash,
+        stream_id=stream_id,
+        ticket_uid=ticket_uid,
+        reserved_bytes=reserved_bytes,
+        reconcile=reconcile_stream_bytes,
+        release=release_stream_slot,
     )

@@ -4,7 +4,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE
+from tests.conftest import approve_federation_node, PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -28,6 +28,7 @@ def _insert_remote_item(
     from crate.db.tx import transaction_scope
 
     with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
         session.execute(
             text(
                 """
@@ -147,7 +148,7 @@ def test_remote_sources_do_not_expose_local_refs(pg_db):
     assert source["remote_entity_uid"] == "album-1"
 
 
-def test_remote_deleted_items_are_marked_stale(pg_db):
+def test_remote_deleted_items_are_not_projected(pg_db):
     from crate.federation.global_sources import iter_remote_sources
 
     node_uid = str(uuid.uuid4())
@@ -161,10 +162,114 @@ def test_remote_deleted_items_are_marked_stale(pg_db):
         deleted=True,
     )
 
-    source = next(iter_remote_sources())
+    assert list(iter_remote_sources()) == []
 
-    assert source["source_deleted_at"] is not None
-    assert source["source_stale"] is True
+
+def test_remote_items_from_unapproved_peers_are_not_projected(pg_db):
+    from crate.db.tx import transaction_scope
+    from crate.federation.global_sources import get_remote_source, iter_remote_sources
+
+    node_uid = str(uuid.uuid4())
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO federation_nodes
+                    (
+                        node_uid,
+                        display_name,
+                        api_base_url,
+                        active_key_id,
+                        trust_state
+                    )
+                VALUES
+                    (
+                        :node_uid,
+                        'Pending peer',
+                        'http://pending.test',
+                        'key-1',
+                        'pending'
+                    )
+                """
+            ),
+            {"node_uid": node_uid},
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO federation_catalog_items
+                    (node_uid, remote_entity_uid, entity_type, title, remote_revision)
+                VALUES (:node_uid, 'artist-1', 'artist', 'Pending Artist', 'rev-1')
+                """
+            ),
+            {"node_uid": node_uid},
+        )
+
+    assert list(iter_remote_sources()) == []
+    assert get_remote_source(node_uid, "artist", "artist-1") is None
+
+
+def test_completed_manifest_tombstones_items_missing_from_revision(pg_db):
+    from crate.db.tx import read_scope
+    from crate.federation.catalog import (
+        tombstone_catalog_items_missing_from_revision,
+        upsert_catalog_item,
+    )
+
+    node_uid = str(uuid.uuid4())
+    upsert_catalog_item(
+        node_uid,
+        "artist-current",
+        "artist",
+        "High Vis",
+        remote_revision="rev-current",
+    )
+    upsert_catalog_item(
+        node_uid,
+        "artist-removed",
+        "artist",
+        "Removed Artist",
+        remote_revision="rev-previous",
+    )
+
+    tombstoned = tombstone_catalog_items_missing_from_revision(node_uid, "rev-current")
+
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT remote_entity_uid, deleted_at
+                    FROM federation_catalog_items
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                    ORDER BY remote_entity_uid
+                    """
+                ),
+                {"node_uid": node_uid},
+            )
+            .mappings()
+            .all()
+        )
+        dirty = (
+            session.execute(
+                text(
+                    """
+                    SELECT operation
+                    FROM global_catalog_dirty_sources
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                      AND remote_entity_uid = 'artist-removed'
+                    """
+                ),
+                {"node_uid": node_uid},
+            )
+            .mappings()
+            .one()
+        )
+
+    assert tombstoned == 1
+    assert rows[0]["deleted_at"] is None
+    assert rows[1]["deleted_at"] is not None
+    assert dirty["operation"] == "delete"
 
 
 def test_catalog_manifest_items_expose_content_facets(pg_db):
@@ -265,6 +370,73 @@ def test_catalog_manifest_items_expose_content_facets(pg_db):
     assert by_type["track"]["size_bytes"] == 31767318
 
 
+def test_catalog_manifest_applies_allowlist_before_pagination(pg_db, monkeypatch):
+    from crate.api import federation
+
+    denied_uid = str(uuid.uuid4())
+    allowed_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "A Denied", "entity_uid": denied_uid})
+    pg_db.upsert_artist({"name": "Z Allowed", "entity_uid": allowed_uid})
+    monkeypatch.setattr(
+        federation,
+        "_catalog_share_policy",
+        lambda: {"catalog_filter": {"artist_entity_uids": [allowed_uid]}},
+    )
+
+    items = federation._catalog_manifest_items(page=0, page_size=1)
+
+    assert [item["remote_entity_uid"] for item in items] == [allowed_uid]
+
+
+def test_catalog_manifest_snapshot_is_stable_when_catalog_is_empty(monkeypatch):
+    from crate.api import federation
+
+    monkeypatch.setattr(
+        federation,
+        "get_federation_manifest_revision_row",
+        lambda _policy_params: {"total_items": 0, "latest_update": None},
+    )
+
+    first = federation._catalog_manifest_snapshot({})
+    second = federation._catalog_manifest_snapshot({})
+
+    assert first == second
+    assert first["total_items"] == 0
+    assert first["revision"].startswith("sha256:")
+
+
+def test_catalog_manifest_exposes_stable_snapshot_pagination(monkeypatch):
+    import asyncio
+
+    from crate.api import federation
+
+    async def require_peer(_request):
+        return {"node_uid": "peer", "default_grant_preset": "catalog"}
+
+    monkeypatch.setattr(federation, "_require_signed_node_request", require_peer)
+    monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
+    monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
+    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(
+        federation,
+        "_catalog_manifest_snapshot",
+        lambda _policy: {"revision": "snapshot-revision", "total_items": 501},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        federation,
+        "_catalog_manifest_items",
+        lambda *, page, page_size, include_genres: [],
+    )
+
+    first = asyncio.run(federation.catalog_manifest(object(), page=0, page_size=500))
+    last = asyncio.run(federation.catalog_manifest(object(), page=1, page_size=500))
+
+    assert first["revision"] == last["revision"] == "snapshot-revision"
+    assert first["total_items"] == last["total_items"] == 501
+    assert first["total_pages"] == last["total_pages"] == 2
+
+
 def test_catalog_manifest_hides_all_genre_evidence_without_metadata_grant(
     monkeypatch,
 ):
@@ -278,6 +450,7 @@ def test_catalog_manifest_hides_all_genre_evidence_without_metadata_grant(
     monkeypatch.setattr(federation, "_require_signed_node_request", fake_peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
+
     def fake_items(*, include_genres: bool, **_kwargs):
         item = {"entity_type": "artist", "remote_entity_uid": "artist-1"}
         if include_genres:
@@ -409,9 +582,7 @@ def test_remote_artist_photo_availability_comes_from_manifest_facets(pg_db):
         entity_type="artist",
         title="High Vis",
         raw_json={
-            "facets": {
-                "artist_photo": {"available": True, "revision": "photo-rev"}
-            }
+            "facets": {"artist_photo": {"available": True, "revision": "photo-rev"}}
         },
     )
 

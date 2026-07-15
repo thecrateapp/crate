@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
 from sqlalchemy import text
@@ -13,7 +14,7 @@ CatalogStatus = Literal["cold", "backfilling", "ready", "failed"]
 
 _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "cold": {"backfilling"},
-    "backfilling": {"ready", "failed"},
+    "backfilling": {"backfilling", "ready", "failed"},
     "ready": {"backfilling"},
     "failed": {"backfilling"},
 }
@@ -25,6 +26,7 @@ _MUTABLE_FIELDS = {
     "last_full_reconcile_at",
     "last_error",
 }
+_JSON_FIELDS = {"bootstrap_cursor_json", "user_refs_backfill_report_json"}
 
 
 def get_catalog_state(*, session=None) -> dict[str, Any]:
@@ -92,8 +94,12 @@ def transition_catalog_state(
         assignments = ["status = :status", "updated_at = NOW()"]
         params: dict[str, object] = {"status": status}
         for name in sorted(fields):
-            assignments.append(f"{name} = :{name}")
-            params[name] = fields[name]
+            if name in _JSON_FIELDS:
+                assignments.append(f"{name} = CAST(:{name} AS jsonb)")
+                params[name] = json.dumps(fields[name])
+            else:
+                assignments.append(f"{name} = :{name}")
+                params[name] = fields[name]
         if status == "backfilling" and "last_error" not in fields:
             assignments.append("last_error = NULL")
 

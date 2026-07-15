@@ -22,41 +22,53 @@ const (
 
 // Config holds all runtime configuration for the readplane service.
 type Config struct {
-	Addr            string
-	DatabaseURL     string
-	RedisURL        string
-	JWTSecret       string
-	Enabled         bool
-	MaxDBConns      int32
-	MinDBConns      int32
-	QueryTimeout    time.Duration
-	SnapshotMaxAge  time.Duration
-	StaleMaxAge     time.Duration
-	EnableSSE       bool
-	RouteMode       string
-	APIBase         string
-	FallbackEnabled bool
-	Version         string
+	Addr                           string
+	DatabaseURL                    string
+	RedisURL                       string
+	JWTSecret                      string
+	Enabled                        bool
+	MaxDBConns                     int32
+	MinDBConns                     int32
+	QueryTimeout                   time.Duration
+	SnapshotMaxAge                 time.Duration
+	StaleMaxAge                    time.Duration
+	EnableSSE                      bool
+	RouteMode                      string
+	APIBase                        string
+	FallbackEnabled                bool
+	FederationProxyEnabled         bool
+	FederationAllowPrivateNetworks bool
+	ServiceToken                   string
+	FederationControlTimeout       time.Duration
+	FederationConnectTimeout       time.Duration
+	FederationHeaderTimeout        time.Duration
+	Version                        string
 }
 
 // Load reads environment variables and returns a populated Config.
 func Load(version string) Config {
 	return Config{
-		Addr:            stringEnv("READPLANE_ADDR", defaultAddr),
-		DatabaseURL:     databaseURL(),
-		RedisURL:        stringEnv("REDIS_URL", defaultRedisURL),
-		JWTSecret:       stringEnv("JWT_SECRET", ""),
-		Enabled:         boolEnv("READPLANE_ENABLED", true),
-		MaxDBConns:      int32Env("READPLANE_MAX_DB_CONNS", defaultMaxDBConns),
-		MinDBConns:      int32Env("READPLANE_MIN_DB_CONNS", defaultMinDBConns),
-		QueryTimeout:    msEnv("READPLANE_QUERY_TIMEOUT_MS", defaultQueryTimeoutMS),
-		SnapshotMaxAge:  secondsEnv("READPLANE_SNAPSHOT_MAX_AGE_SECONDS", defaultSnapshotMaxAgeSeconds),
-		StaleMaxAge:     secondsEnv("READPLANE_STALE_MAX_AGE_SECONDS", defaultStaleMaxAgeSeconds),
-		EnableSSE:       boolEnv("READPLANE_ENABLE_SSE", true),
-		RouteMode:       stringEnv("READPLANE_ROUTE_MODE", defaultRouteMode),
-		APIBase:         strings.TrimRight(stringEnv("API_FALLBACK_BASE", defaultFallbackBase), "/"),
-		FallbackEnabled: boolEnv("READPLANE_FALLBACK_ENABLED", true),
-		Version:         version,
+		Addr:                           stringEnv("READPLANE_ADDR", defaultAddr),
+		DatabaseURL:                    databaseURL(),
+		RedisURL:                       stringEnv("REDIS_URL", defaultRedisURL),
+		JWTSecret:                      stringEnv("JWT_SECRET", ""),
+		Enabled:                        boolEnv("READPLANE_ENABLED", true),
+		MaxDBConns:                     int32Env("READPLANE_MAX_DB_CONNS", defaultMaxDBConns),
+		MinDBConns:                     int32Env("READPLANE_MIN_DB_CONNS", defaultMinDBConns),
+		QueryTimeout:                   msEnv("READPLANE_QUERY_TIMEOUT_MS", defaultQueryTimeoutMS),
+		SnapshotMaxAge:                 secondsEnv("READPLANE_SNAPSHOT_MAX_AGE_SECONDS", defaultSnapshotMaxAgeSeconds),
+		StaleMaxAge:                    secondsEnv("READPLANE_STALE_MAX_AGE_SECONDS", defaultStaleMaxAgeSeconds),
+		EnableSSE:                      boolEnv("READPLANE_ENABLE_SSE", true),
+		RouteMode:                      stringEnv("READPLANE_ROUTE_MODE", defaultRouteMode),
+		APIBase:                        strings.TrimRight(stringEnv("API_FALLBACK_BASE", defaultFallbackBase), "/"),
+		FallbackEnabled:                boolEnv("READPLANE_FALLBACK_ENABLED", true),
+		FederationProxyEnabled:         boolEnv("READPLANE_FEDERATION_PROXY_ENABLED", true),
+		FederationAllowPrivateNetworks: boolEnv("CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS", false),
+		ServiceToken:                   stringEnv("CRATE_READPLANE_SERVICE_TOKEN", ""),
+		FederationControlTimeout:       msEnv("READPLANE_FEDERATION_CONTROL_TIMEOUT_MS", 2000),
+		FederationConnectTimeout:       msEnv("READPLANE_FEDERATION_CONNECT_TIMEOUT_MS", 5000),
+		FederationHeaderTimeout:        msEnv("READPLANE_FEDERATION_HEADER_TIMEOUT_MS", 10000),
+		Version:                        version,
 	}
 }
 

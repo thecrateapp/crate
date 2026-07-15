@@ -4,7 +4,7 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE
+from tests.conftest import approve_federation_node, PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -19,6 +19,7 @@ def _insert_remote_artist(
     from crate.db.tx import transaction_scope
 
     with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
         session.execute(
             text(
                 """
@@ -52,6 +53,67 @@ def _insert_remote_artist(
                 "raw_json": json.dumps({"fixture": True}),
             },
         )
+
+
+def _insert_remote_release(*, node_uid: str) -> None:
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
+        for item in (
+            {
+                "remote_entity_uid": "artist-remote",
+                "entity_type": "artist",
+                "title": "High Viz",
+                "artist": None,
+                "album": None,
+            },
+            {
+                "remote_entity_uid": "album-remote",
+                "entity_type": "album",
+                "title": "Blending",
+                "artist": "High Viz",
+                "album": None,
+            },
+            {
+                "remote_entity_uid": "track-remote",
+                "entity_type": "track",
+                "title": "0151",
+                "artist": "High Viz",
+                "album": "Blending",
+            },
+        ):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO federation_catalog_items (
+                        node_uid,
+                        remote_entity_uid,
+                        entity_type,
+                        title,
+                        artist,
+                        album,
+                        remote_revision,
+                        raw_json
+                    )
+                    VALUES (
+                        CAST(:node_uid AS uuid),
+                        :remote_entity_uid,
+                        :entity_type,
+                        :title,
+                        :artist,
+                        :album,
+                        'rev-1',
+                        :raw_json
+                    )
+                    """
+                ),
+                {
+                    "node_uid": node_uid,
+                    "raw_json": json.dumps({"fixture": True}),
+                    **item,
+                },
+            )
 
 
 def _only_artist_uid():
@@ -112,6 +174,111 @@ def test_force_merge_decision_overrides_remote_artist_scoring(pg_db):
         "tracks": 0,
         "sources": 2,
     }
+
+
+def test_force_merge_decision_prunes_previous_orphaned_canonical_artist(pg_db):
+    from crate.db.queries.global_catalog import (
+        get_global_catalog_counts,
+        list_global_sources,
+    )
+    from crate.federation.global_decisions import record_match_decision
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_remote_catalog,
+    )
+
+    node_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "High Vis"})
+    reconcile_local_catalog()
+    local_uid = _only_artist_uid()
+    _insert_remote_artist(
+        node_uid=node_uid,
+        remote_entity_uid="artist-remote",
+        title="High Viz",
+    )
+    reconcile_remote_catalog()
+    assert get_global_catalog_counts()["artists"] == 2
+
+    record_match_decision(
+        entity_type="artist",
+        decision_type="force_merge",
+        source_a={"global_entity_uid": local_uid},
+        source_b={"match_key": "artist:high viz"},
+        target_global_uid=local_uid,
+        admin_user_id=7,
+    )
+    reconcile_remote_catalog()
+
+    assert get_global_catalog_counts() == {
+        "artists": 1,
+        "albums": 0,
+        "tracks": 0,
+        "sources": 2,
+    }
+    assert {source["global_entity_uid"] for source in list_global_sources()} == {
+        local_uid
+    }
+
+
+def test_force_merge_artist_reparents_existing_remote_release_graph(pg_db):
+    from crate.db.queries.global_catalog import get_global_catalog_counts
+    from crate.db.tx import read_scope
+    from crate.federation.global_decisions import record_match_decision
+    from crate.federation.global_reconciliation import (
+        reconcile_local_catalog,
+        reconcile_remote_catalog,
+    )
+
+    node_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "High Vis"})
+    reconcile_local_catalog()
+    local_uid = _only_artist_uid()
+    _insert_remote_release(node_uid=node_uid)
+    reconcile_remote_catalog()
+
+    record_match_decision(
+        entity_type="artist",
+        decision_type="force_merge",
+        source_a={"global_entity_uid": local_uid},
+        source_b={"match_key": "artist:high viz"},
+        target_global_uid=local_uid,
+        admin_user_id=7,
+    )
+    reconcile_remote_catalog()
+
+    assert get_global_catalog_counts() == {
+        "artists": 1,
+        "albums": 1,
+        "tracks": 1,
+        "sources": 4,
+    }
+    with read_scope() as session:
+        album = (
+            session.execute(
+                text(
+                    """
+                SELECT global_artist_uid::text AS global_artist_uid, artist_name
+                FROM global_catalog_albums
+                """
+                )
+            )
+            .mappings()
+            .one()
+        )
+        track = (
+            session.execute(
+                text(
+                    """
+                SELECT global_artist_uid::text AS global_artist_uid, artist_name
+                FROM global_catalog_tracks
+                """
+                )
+            )
+            .mappings()
+            .one()
+        )
+    assert album == {"global_artist_uid": local_uid, "artist_name": "High Vis"}
+    assert track == {"global_artist_uid": local_uid, "artist_name": "High Vis"}
 
 
 def test_force_split_decision_blocks_automatic_name_merge(pg_db):

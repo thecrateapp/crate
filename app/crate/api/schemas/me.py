@@ -32,6 +32,7 @@ class SaveAlbumRequest(BaseModel):
 
 class LikeTrackRequest(IdentityFieldsMixin):
     track_id: int | None = None
+    global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
 
@@ -120,6 +121,7 @@ class RecordPlayEventRequest(IdentityFieldsMixin):
     context_playlist_id: int | None = None
     device_type: str | None = None
     app_platform: str | None = None
+    playback_session: str | None = Field(default=None, max_length=4096)
 
     @field_validator("played_seconds")
     @classmethod

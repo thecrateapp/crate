@@ -191,7 +191,9 @@ function trackGlobalAlbumUid(track: SearchTrackResult): string | null {
 function resultOrigin(
   item: SearchArtistResult | SearchAlbumResult | SearchTrackResult,
 ): "local" | "remote" {
-  return item.origin === "remote" ? "remote" : "local";
+  if (item.origin === "remote") return "remote";
+  if (item.availability?.remote && !item.availability.local) return "remote";
+  return "local";
 }
 
 function resultNodeName(

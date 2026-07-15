@@ -274,6 +274,45 @@ function rect(top: number, bottom: number, width = 320): DOMRect {
 }
 
 describe("Album page", () => {
+  it("offers explicit import only for remote-only albums", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: {
+        ...ALBUM_DATA,
+        id: null,
+        global_album_uid: "global-morir",
+        availability: {
+          local: false,
+          remote: true,
+          healthy: true,
+          source_name: "Node B",
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    expect(
+      screen.getByRole("button", { name: "Make available locally" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer remote import when the album is already local", () => {
+    renderWithListenProviders(<Album />, {
+      route: "/artists/crossed/morir",
+      path: "/artists/:artistSlug/:albumSlug",
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Make available locally" }),
+    ).toBeNull();
+  });
+
   it("groups desktop hero actions into primary pills and secondary icon labels", () => {
     renderWithListenProviders(<Album />, {
       route: "/artists/crossed/morir",
@@ -344,7 +383,7 @@ describe("Album page", () => {
     ).toHaveTextContent("Más");
   });
 
-  it("uses global album identity for remote album actions without enabling local-only offline", async () => {
+  it("uses global album identity from a human remote album route", async () => {
     const playAll = vi.fn();
     const baseTrack = ALBUM_DATA.tracks[0]!;
     vi.mocked(fetchAlbumRadio).mockResolvedValue({
@@ -398,8 +437,8 @@ describe("Album page", () => {
     });
 
     renderWithListenProviders(<Album />, {
-      route: "/catalog/albums/global-gris-klein--gris-klein",
-      path: "/catalog/albums/:globalAlbumUid",
+      route: "/artists/birds-in-row/gris-klein",
+      path: "/artists/:artistSlug/:albumSlug",
       playerActions: { playAll },
     });
 

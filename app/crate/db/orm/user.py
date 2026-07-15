@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from crate.db.engine import Base
@@ -43,6 +44,9 @@ class User(Base):
     crate_connect_enabled: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
+    remote_scrobbling_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")
     external_identities: Mapped[list["UserExternalIdentity"]] = relationship(
@@ -72,6 +76,18 @@ class UserRole(Base):
     user: Mapped["User"] = relationship(
         back_populates="role_assignments",
         foreign_keys=[user_id],
+    )
+
+
+class UserGlobalTrackLike(Base):
+    __tablename__ = "user_global_track_likes"
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    global_track_uid: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
     )
 
 

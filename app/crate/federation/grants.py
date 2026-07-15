@@ -73,6 +73,7 @@ PRESETS: dict[str, dict] = {
             "stream.transcoded",
             "stream.original",
             "import.request",
+            "import.pull",
         ],
         "constraints": {
             "max_results": 50,
@@ -81,6 +82,8 @@ PRESETS: dict[str, dict] = {
             "delivery": ["balanced", "original"],
             "allow_original": True,
             "allowed_entity_types": ["artist", "album", "track"],
+            "max_import_bytes": 100_000_000_000,
+            "import_requires_approval": True,
         },
     },
 }

@@ -104,6 +104,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "federation_import_album": TaskPoolConfig("default", 0, 14400, 0),
     "federation_sync_catalog": TaskPoolConfig("maintenance", 2, 7200, 1),
     "federation_health_poll": TaskPoolConfig("maintenance", 1, 300, 0),
+    "federation_directory_refresh": TaskPoolConfig("maintenance", 2, 600, 1),
     "global_catalog_reconcile_incremental": TaskPoolConfig("maintenance", 2, 7200, 0),
     "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
@@ -956,22 +957,10 @@ _register_actors()
     min_backoff=5_000,
     max_backoff=60_000,
 )
-def scrobble_play_event_actor(
-    user_id: int,
-    artist: str,
-    track: str,
-    album: str = "",
-    timestamp: int | None = None,
-):
-    from crate.scrobble import scrobble_play_event
+def scrobble_play_event_actor(event_id: int):
+    from crate.scrobble import dispatch_scrobble_play_event
 
-    scrobble_play_event(
-        user_id,
-        artist=artist,
-        track=track,
-        album=album,
-        timestamp=timestamp,
-    )
+    dispatch_scrobble_play_event(event_id)
 
 
 def get_actor(task_type: str) -> dramatiq.Actor | None:

@@ -1,7 +1,7 @@
 """Schema models for search, track metadata, and media-browse endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -65,10 +65,19 @@ class TrackRefResponse(IdentityFieldsMixin):
     bliss_vector: list[float] | None = None
 
 
+class FederationSearchStatusResponse(BaseModel):
+    complete: bool
+    attempted_peers: int = 0
+    completed_peers: int = 0
+    failed_peer_uids: list[str] = Field(default_factory=list)
+    timed_out_peer_uids: list[str] = Field(default_factory=list)
+
+
 class SearchResponse(BaseModel):
     artists: list[SearchArtistResultResponse] = Field(default_factory=list)
     albums: list[SearchAlbumResultResponse] = Field(default_factory=list)
     tracks: list[TrackRefResponse] = Field(default_factory=list)
+    federation: FederationSearchStatusResponse | None = None
 
 
 class FavoriteItemResponse(BaseModel):
@@ -285,6 +294,8 @@ class PlaybackResolutionResponse(BaseModel):
     task_id: str | None = None
     variant_id: str | None = None
     variant_status: str | None = None
+    playback_session: str
+    content_origin: Literal["local", "remote", "imported"]
 
 
 class PlaybackPrepareTrackRequest(BaseModel):

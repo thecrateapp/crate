@@ -157,7 +157,6 @@ export function scopesForUrl(url: string): string[] {
   else if (url.startsWith("/api/artists")) scopes.push("library");
   else if (url.startsWith("/api/albums")) scopes.push("library");
   // Search, browse, genres
-  else if (url.startsWith("/api/search")) scopes.push("library");
   else if (url.startsWith("/api/catalog")) scopes.push("library");
   else if (url.startsWith("/api/browse")) scopes.push("library");
   else if (url.match(/^\/api\/genres\/[^/?]+(?:\?|$)/))

@@ -127,7 +127,7 @@ function EndpointPanel({
             artist_entity_uid?: string;
             artist_slug?: string;
           }[];
-        }>(`/api/search?q=${encodeURIComponent(q)}&limit=5`),
+        }>(`/api/catalog/search?q=${encodeURIComponent(q)}&limit=5`),
         api<{ slug: string; name: string }[]>("/api/genres"),
       ]);
 

@@ -281,11 +281,6 @@ def test_core_tracks_can_use_global_catalog_artist_tracks(monkeypatch):
 
     monkeypatch.setattr(
         home_builder_curated_lists,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "home",
-    )
-    monkeypatch.setattr(
-        home_builder_curated_lists,
         "list_system_playlists",
         lambda **_: [],
     )
@@ -339,37 +334,6 @@ def test_core_tracks_can_use_global_catalog_artist_tracks(monkeypatch):
     assert items[0]["track_count"] == 1
     assert items[0]["artwork_tracks"][0]["global_album_uid"] == "global-album-1"
     assert items[0]["artwork_artists"][0]["global_artist_uid"] == "global-high-vis"
-
-
-def test_core_tracks_ignore_global_catalog_artists_in_standalone(monkeypatch):
-    from crate.db import home_builder_curated_lists
-
-    monkeypatch.setattr(
-        home_builder_curated_lists,
-        "global_catalog_surface_enabled",
-        lambda surface: False,
-    )
-    monkeypatch.setattr(
-        home_builder_curated_lists,
-        "get_global_radio_seed_tracks",
-        lambda *_, **__: (_ for _ in ()).throw(
-            AssertionError("should not load global")
-        ),
-    )
-
-    items = home_builder_curated_lists._build_core_playlists(
-        1,
-        [
-            {
-                "artist_id": None,
-                "global_artist_uid": "global-high-vis",
-                "artist_name": "High Vis",
-            }
-        ],
-        limit=1,
-    )
-
-    assert items == []
 
 
 def test_album_candidate_rows_include_user_feedback_signals(monkeypatch):

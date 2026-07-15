@@ -394,12 +394,15 @@ def _format_artist_top_track(row: dict) -> dict:
     return {
         "id": str(row["id"]),
         "track_id": row["id"],
+        "track_entity_uid": row.get("track_entity_uid"),
         "title": row["title"],
         "artist": row["artist"],
         "artist_id": row["artist_id"],
+        "artist_entity_uid": row.get("artist_entity_uid"),
         "artist_slug": row["artist_slug"],
         "album": row["album"],
         "album_id": row["album_id"],
+        "album_entity_uid": row.get("album_entity_uid"),
         "album_slug": row["album_slug"],
         "duration": row["duration"] or 0,
         "track": row["track_number"] or 0,
@@ -468,7 +471,7 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
 
 
 def _get_artist_page_shows(
-    *, user_id: int, name: str, limit: int, country: str
+    *, user_id: int | None, name: str, limit: int, country: str
 ) -> dict:
     from crate import setlistfm
     from crate.ticketmaster import is_configured
@@ -485,9 +488,13 @@ def _get_artist_page_shows(
         db_get_shows(artist_name=name, country=country or None, limit=limit),
     )
     if cached:
-        attending_show_ids = get_attending_show_ids(
-            user_id,
-            [show["id"] for show in cached if show.get("id") is not None],
+        attending_show_ids = (
+            get_attending_show_ids(
+                user_id,
+                [show["id"] for show in cached if show.get("id") is not None],
+            )
+            if user_id is not None
+            else set()
         )
         events = [
             {
@@ -527,6 +534,29 @@ def _get_artist_page_shows(
         return {"events": [], "configured": False, "source": "none"}
 
     return {"events": [], "configured": True, "source": "deferred"}
+
+
+def build_public_artist_page_facet(artist: dict) -> dict:
+    """Build the shareable, non-user-specific artist page intelligence."""
+    name = str(artist.get("name") or "").strip()
+    if not name:
+        return {}
+    try:
+        from crate.api.enrichment import get_artist_page_enrichment
+
+        enrichment = get_artist_page_enrichment(name)
+    except Exception:
+        enrichment = {}
+    return {
+        "top_tracks": _get_artist_top_tracks_payload(name, count=12),
+        "shows": _get_artist_page_shows(
+            user_id=None,
+            name=name,
+            limit=12,
+            country="",
+        ),
+        "enrichment": enrichment,
+    }
 
 
 @router.get(
@@ -746,57 +776,6 @@ def api_artist_by_slug(request: Request, artist_slug: str):
     if not artist:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return api_artist(request, artist["name"])
-
-
-@router.get(
-    "/api/artist-slugs/{artist_slug}/page",
-    response_model=ArtistPageResponse,
-    responses=_BROWSE_RESPONSES,
-    summary="Get a listen-optimized artist page payload by slug",
-)
-def api_artist_page_by_slug(
-    request: Request,
-    artist_slug: str,
-    top_tracks_count: int = Query(12, ge=1, le=50),
-    shows_limit: int = Query(12, ge=1, le=50),
-    stats_window: str = Query("30d"),
-    stats_limit: int = Query(12, ge=1, le=50),
-):
-    user = _require_auth(request)
-    artist = get_library_artist_by_slug(artist_slug)
-    if not artist:
-        return JSONResponse({"error": "Not found"}, status_code=404)
-    try:
-        payload = _build_artist_page_payload(
-            request,
-            user_id=user["id"],
-            artist_id=artist["id"],
-            artist_slug=artist_slug,
-            top_tracks_count=top_tracks_count,
-            shows_limit=shows_limit,
-            stats_window=stats_window,
-            stats_limit=stats_limit,
-        )
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    if isinstance(payload, JSONResponse):
-        return payload
-    return payload
-
-
-@router.get(
-    "/api/artist-slugs/{artist_slug}/top-tracks",
-    response_model=list[ArtistTopTrackResponse],
-    responses=AUTH_ERROR_RESPONSES,
-    summary="Get top tracks for an artist by slug",
-)
-def api_artist_top_tracks_by_slug(
-    request: Request, artist_slug: str, count: int = Query(20, ge=1, le=50)
-):
-    artist = get_library_artist_by_slug(artist_slug)
-    if not artist:
-        return JSONResponse([], status_code=200)
-    return api_artist_top_tracks(request, artist["id"], count=count)
 
 
 @router.get(

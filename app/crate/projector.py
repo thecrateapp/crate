@@ -11,7 +11,6 @@ from crate.db.home import get_cached_home_discovery
 from crate.db.home_warming import list_recent_home_user_ids
 from crate.db.ops_snapshot import get_cached_ops_snapshot
 from crate.db.queries.tasks import has_inflight_acquisition_for_artist
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 log = logging.getLogger(__name__)
 
@@ -145,7 +144,7 @@ def process_domain_events(*, limit: int = 100) -> dict[str, int]:
             or scope == "ops"
         ):
             refresh_ops = True
-            if scope == "global_catalog" and global_catalog_surface_enabled("home"):
+            if scope == "global_catalog":
                 refresh_recent_home = True
 
         if event_type == "library.acquisition.completed":

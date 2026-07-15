@@ -31,7 +31,7 @@ SIGNED_HEADER_NAMES = [
     "x-crate-body-sha256",
 ]
 SIGNED_HEADERS = ";".join(SIGNED_HEADER_NAMES)
-TIMESTAMP_SKEW_SECONDS = 300
+TIMESTAMP_SKEW_SECONDS = 60
 
 
 def generate_nonce() -> str:
@@ -146,6 +146,14 @@ def verify_signature(
         return True
     except (InvalidSignature, ValueError) as e:
         log.debug("Signature verification failed: %s", e)
+        from crate.federation.abuse import observe_risk_signal
+
+        observe_risk_signal(
+            "invalid_signature",
+            peer_node_uid=node_id,
+            severity="high",
+            reason_code="signature_invalid",
+        )
         return False
 
 

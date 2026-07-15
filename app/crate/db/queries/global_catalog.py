@@ -8,6 +8,11 @@ from sqlalchemy import text
 
 from crate.db.tx import optional_scope, read_scope
 from crate.federation.global_matching import normalize_name
+from crate.slugs import build_artist_slug, build_public_album_slug
+
+
+class GlobalCatalogPublicRouteConflict(ValueError):
+    """Raised when a human catalog route identifies more than one entity."""
 
 
 def search_global_catalog(
@@ -670,7 +675,10 @@ def get_global_decade_artists(
     }
 
 
-def get_global_artist_page(global_artist_uid: str) -> dict | None:
+def get_global_artist_page(
+    global_artist_uid: str, *, top_tracks_limit: int = 12
+) -> dict | None:
+    capped_top_tracks_limit = max(1, min(int(top_tracks_limit or 12), 50))
     with read_scope() as session:
         artist = (
             session.execute(
@@ -686,6 +694,11 @@ def get_global_artist_page(global_artist_uid: str) -> dict | None:
                         has_local,
                         has_remote,
                         has_photo,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM global_catalog_tracks track
+                            WHERE track.global_artist_uid = global_catalog_artists.global_artist_uid
+                        ) AS total_tracks,
                         true AS has_healthy_source
                     FROM global_catalog_artists
                     WHERE global_artist_uid = :global_artist_uid
@@ -710,6 +723,11 @@ def get_global_artist_page(global_artist_uid: str) -> dict | None:
                         canonical_name,
                         artist_name,
                         year,
+                        (
+                            SELECT COUNT(*)::integer
+                            FROM global_catalog_tracks track
+                            WHERE track.global_album_uid = global_catalog_albums.global_album_uid
+                        ) AS track_count,
                         local_album_id,
                         local_album_entity_uid::text AS local_album_entity_uid,
                         availability_json,
@@ -754,10 +772,13 @@ def get_global_artist_page(global_artist_uid: str) -> dict | None:
                     FROM global_catalog_tracks
                     WHERE global_artist_uid = :global_artist_uid
                     ORDER BY has_local DESC, source_count DESC, canonical_title ASC
-                    LIMIT 12
+                    LIMIT :top_tracks_limit
                     """
                 ),
-                {"global_artist_uid": global_artist_uid},
+                {
+                    "global_artist_uid": global_artist_uid,
+                    "top_tracks_limit": capped_top_tracks_limit,
+                },
             )
             .mappings()
             .all()
@@ -765,11 +786,12 @@ def get_global_artist_page(global_artist_uid: str) -> dict | None:
 
     artist_payload = _artist_payload(artist, include_sources=False)
     artist_payload["albums"] = albums
-    artist_payload["total_tracks"] = len(top_tracks)
+    artist_payload["total_tracks"] = int(artist["total_tracks"] or 0)
     artist_payload.setdefault("total_size_mb", 0)
     artist_payload.setdefault("primary_format", None)
     artist_payload.setdefault("genres", [])
     artist_payload.setdefault("issue_count", 0)
+    artist_payload.setdefault("is_v2", False)
     return {
         "artist": artist_payload,
         "info": {
@@ -787,6 +809,15 @@ def get_global_artist_page(global_artist_uid: str) -> dict | None:
         "enrichment": {},
         "artist_hot_rank": None,
     }
+
+
+def get_global_artist_page_by_public_slug(
+    artist_slug: str, *, top_tracks_limit: int = 12
+) -> dict | None:
+    global_artist_uid = _global_artist_uid_by_public_slug(artist_slug)
+    if not global_artist_uid:
+        return None
+    return get_global_artist_page(global_artist_uid, top_tracks_limit=top_tracks_limit)
 
 
 def get_global_album_detail(global_album_uid: str) -> dict | None:
@@ -906,6 +937,49 @@ def get_global_album_detail(global_album_uid: str) -> dict | None:
     return payload
 
 
+def get_global_album_detail_by_public_slugs(
+    artist_slug: str, album_slug: str
+) -> dict | None:
+    global_artist_uid = _global_artist_uid_by_public_slug(artist_slug)
+    if not global_artist_uid:
+        return None
+
+    requested_slug = _public_album_slug(album_slug)
+    if not requested_slug:
+        return None
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_album_uid::text AS global_album_uid
+                    FROM global_catalog_album_route_aliases
+                    WHERE global_artist_uid = :global_artist_uid
+                      AND slug = :public_slug
+                    UNION
+                    SELECT global_album_uid::text AS global_album_uid
+                    FROM global_catalog_albums
+                    WHERE global_artist_uid = :global_artist_uid
+                      AND public_slug = :public_slug
+                    """
+                ),
+                {
+                    "global_artist_uid": global_artist_uid,
+                    "public_slug": requested_slug,
+                },
+            )
+            .mappings()
+            .all()
+        )
+    matches = [row["global_album_uid"] for row in rows]
+    global_album_uid = _single_public_route_match(
+        matches, f"/artists/{_public_artist_slug(artist_slug)}/{requested_slug}"
+    )
+    if not global_album_uid:
+        return None
+    return get_global_album_detail(global_album_uid)
+
+
 def get_global_track_info(global_track_uid: str) -> dict | None:
     with read_scope() as session:
         row = (
@@ -946,7 +1020,7 @@ def get_global_radio_seed_tracks(
 ) -> dict | None:
     """Return a deterministic playable global queue for a radio seed."""
     normalized_type = (seed_type or "").strip().lower()
-    capped = max(1, min(int(limit or 120), 250))
+    capped = max(1, min(int(limit or 120), 5_000))
     if normalized_type not in {"artist", "album", "track"}:
         return None
 
@@ -1059,12 +1133,28 @@ def _global_radio_tracks_sql(seed_type: str):
             t.has_local,
             t.has_remote,
             t.availability_json,
-            COALESCE(taf.bpm, lt.bpm) AS bpm,
+            COALESCE(
+                taf.bpm,
+                lt.bpm,
+                NULLIF(preferred_source.source_payload_json->>'bpm', '')::double precision
+            ) AS bpm,
             COALESCE(taf.audio_key, lt.audio_key) AS audio_key,
             COALESCE(taf.audio_scale, lt.audio_scale) AS audio_scale,
-            COALESCE(taf.energy, lt.energy) AS energy,
-            COALESCE(taf.danceability, lt.danceability) AS danceability,
-            COALESCE(taf.valence, lt.valence) AS valence,
+            COALESCE(
+                taf.energy,
+                lt.energy,
+                NULLIF(preferred_source.source_payload_json->>'energy', '')::double precision
+            ) AS energy,
+            COALESCE(
+                taf.danceability,
+                lt.danceability,
+                NULLIF(preferred_source.source_payload_json->>'danceability', '')::double precision
+            ) AS danceability,
+            COALESCE(
+                taf.valence,
+                lt.valence,
+                NULLIF(preferred_source.source_payload_json->>'valence', '')::double precision
+            ) AS valence,
             COALESCE(tbe.bliss_vector, lt.bliss_vector) AS bliss_vector,
             COALESCE(genre_sources.genres, '[]'::jsonb) AS genres,
             a.local_album_id,
@@ -1083,6 +1173,20 @@ def _global_radio_tracks_sql(seed_type: str):
           ON a.global_album_uid = t.global_album_uid
         LEFT JOIN global_catalog_artists ar
           ON ar.global_artist_uid = t.global_artist_uid
+        LEFT JOIN LATERAL (
+            SELECT source_payload_json
+            FROM global_catalog_sources source
+            WHERE source.entity_type = 'track'
+              AND source.global_entity_uid = t.global_track_uid
+              AND NOT source.source_stale
+              AND source.source_deleted_at IS NULL
+            ORDER BY
+                (source.source_kind = 'local') DESC,
+                source.preferred_for_playback DESC,
+                source.preferred_for_display DESC,
+                source.updated_at DESC
+            LIMIT 1
+        ) preferred_source ON TRUE
         LEFT JOIN LATERAL (
             SELECT COALESCE(
                 jsonb_agg(DISTINCT taxonomy.name ORDER BY taxonomy.name),
@@ -1201,6 +1305,7 @@ def _artist_payload(row, *, include_sources: bool) -> dict:
         "local_artist_entity_uid": row["local_artist_entity_uid"],
         "global_uid": row["global_artist_uid"],
         "global_artist_uid": row["global_artist_uid"],
+        "slug": build_artist_slug(row["canonical_name"]),
         "name": row["canonical_name"],
         "has_photo": row["has_photo"],
         "availability": _availability(row),
@@ -1217,11 +1322,13 @@ def _album_payload(row, *, include_sources: bool) -> dict:
         "global_album_uid": row["global_album_uid"],
         "global_artist_uid": row["global_artist_uid"],
         "artist_entity_uid": None,
+        "slug": build_public_album_slug(row["canonical_name"]),
+        "artist_slug": build_artist_slug(row["artist_name"]),
         "artist": row["artist_name"],
         "name": row["canonical_name"],
         "display_name": row["canonical_name"],
         "year": row["year"],
-        "tracks": row["track_count"] if "track_count" in row else None,
+        "tracks": int(row["track_count"] or 0) if "track_count" in row else 0,
         "formats": [],
         "size_mb": 0,
         "has_cover": row["has_cover"],
@@ -1238,7 +1345,7 @@ def _artist_top_track_payload(row) -> dict:
     payload["globalTrackUid"] = row["global_track_uid"]
     payload["artist_id"] = None
     payload["album_id"] = row["local_album_id"] if "local_album_id" in row else None
-    payload["duration"] = row["duration_seconds"]
+    payload["duration"] = row["duration_seconds"] or 0
     payload["track"] = (row["track_number"] if "track_number" in row else None) or 0
     return payload
 
@@ -1259,7 +1366,7 @@ def _album_track_payload(row) -> dict:
             "bitrate": quality["bitrate"],
             "sample_rate": quality["sample_rate"],
             "bit_depth": quality["bit_depth"],
-            "length_sec": duration,
+            "length_sec": duration or 0,
             "rating": 0,
             "tags": {
                 "title": title,
@@ -1274,6 +1381,7 @@ def _album_track_payload(row) -> dict:
                 "musicbrainz_trackid": "",
             },
             "is_available": bool(row["has_healthy_source"]),
+            "path": "",
         }
     )
     return payload
@@ -1372,14 +1480,61 @@ def _with_debug_source(payload: dict, row, *, include_sources: bool) -> dict:
     return payload
 
 
+def _public_artist_slug(value: str) -> str | None:
+    requested = str(value or "").strip()
+    return build_artist_slug(requested) if requested else None
+
+
+def _public_album_slug(value: str) -> str | None:
+    requested = str(value or "").strip()
+    return build_public_album_slug(requested) if requested else None
+
+
+def _global_artist_uid_by_public_slug(artist_slug: str) -> str | None:
+    requested_slug = _public_artist_slug(artist_slug)
+    if not requested_slug:
+        return None
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT global_artist_uid::text AS global_artist_uid
+                    FROM global_catalog_artist_route_aliases
+                    WHERE slug = :public_slug
+                    UNION
+                    SELECT global_artist_uid::text AS global_artist_uid
+                    FROM global_catalog_artists
+                    WHERE public_slug = :public_slug
+                    """
+                ),
+                {"public_slug": requested_slug},
+            )
+            .mappings()
+            .all()
+        )
+    matches = [row["global_artist_uid"] for row in rows]
+    return _single_public_route_match(matches, f"/artists/{requested_slug}")
+
+
+def _single_public_route_match(matches: list[str], route: str) -> str | None:
+    unique_matches = sorted(set(matches))
+    if len(unique_matches) > 1:
+        raise GlobalCatalogPublicRouteConflict(route)
+    return unique_matches[0] if unique_matches else None
+
+
 def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 __all__ = [
+    "GlobalCatalogPublicRouteConflict",
     "get_global_catalog_counts",
     "get_global_decade_artists",
+    "get_global_artist_page_by_public_slug",
     "get_global_artist_page",
+    "get_global_album_detail_by_public_slugs",
     "get_global_album_detail",
     "get_global_radio_seed_tracks",
     "get_global_track_info",

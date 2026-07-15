@@ -1307,6 +1307,7 @@ class TestBlissSimilarityCandidates:
         _set_bliss_embedding(seed_id, make_vec(0.0))
         _set_bliss_embedding(keep_id, make_vec(0.1))
 
+        _insert_artist(pg_db, ".crate-trash")
         hidden_album_id = _insert_album(
             pg_db,
             ".crate-trash",
@@ -1324,6 +1325,7 @@ class TestBlissSimilarityCandidates:
         )
         _set_bliss_embedding(hidden_id, make_vec_near(0.0))
 
+        _insert_artist(pg_db, "Multi Quarantine")
         quarantine_album_id = _insert_album(
             pg_db,
             "Multi Quarantine",

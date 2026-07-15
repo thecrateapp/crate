@@ -121,7 +121,7 @@ def verify_signed_assertion(
             key
             for key in public_keys
             if key.get("key_id") == key_id
-            and key.get("status", "active") in {"active", "pending"}
+            and key.get("status", "active") in {"active", "pending", "retiring"}
         ),
         None,
     )

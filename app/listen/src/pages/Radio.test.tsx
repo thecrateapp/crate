@@ -77,7 +77,8 @@ describe("RadioPage", () => {
         };
       }
       if (url === "/api/genres") return [];
-      if (url.startsWith("/api/search")) return { artists: [], albums: [] };
+      if (url.startsWith("/api/catalog/search"))
+        return { artists: [], albums: [] };
       throw new Error(`Unexpected API call: ${url}`);
     });
   });
@@ -162,7 +163,8 @@ describe("RadioPage", () => {
         };
       }
       if (url === "/api/genres") return [];
-      if (url.startsWith("/api/search")) return { artists: [], albums: [] };
+      if (url.startsWith("/api/catalog/search"))
+        return { artists: [], albums: [] };
       throw new Error(`Unexpected API call: ${url}`);
     });
 

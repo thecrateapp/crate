@@ -195,6 +195,7 @@ describe("PlayerBar mobile mini-player", () => {
       42,
       "track-uid",
       "/music/long-press.flac",
+      null,
     );
     expect(triggerHapticMock).toHaveBeenCalledWith("selection");
     expect(toastSuccessMock).toHaveBeenCalledWith("Added to liked tracks");

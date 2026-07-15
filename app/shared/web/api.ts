@@ -15,9 +15,19 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public retryAfterMs?: number,
   ) {
     super(message);
   }
+}
+
+function retryAfterMs(response: Response): number | undefined {
+  const value = response.headers?.get?.("Retry-After")?.trim();
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : undefined;
 }
 
 export function createApiClient(options: ApiClientOptions = {}) {
@@ -99,7 +109,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
           onUnauthorized();
         }
         const text = await res.text().catch(() => "Request failed");
-        throw new ApiError(res.status, text);
+        throw new ApiError(res.status, text, retryAfterMs(res));
       }
       const text = await res.text();
       return text ? JSON.parse(text) : (null as T);

@@ -16,9 +16,7 @@ def test_global_genre_detail_expands_core_parent_hierarchy_at_read_time(pg_db):
     from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
     from crate.genre_taxonomy import core_genre_uid
 
-    pg_db.upsert_artist(
-        {"name": "Hierarchy Artist", "entity_uid": str(uuid.uuid4())}
-    )
+    pg_db.upsert_artist({"name": "Hierarchy Artist", "entity_uid": str(uuid.uuid4())})
     pg_db.set_artist_genres("Hierarchy Artist", [("hardcore", 1.0, "test")])
     assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
 

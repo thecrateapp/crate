@@ -163,6 +163,16 @@ describe("createApiClient", () => {
     });
   });
 
+  it("exposes Retry-After on API errors", async () => {
+    mockFetch(503, { detail: "catalog_warming" }, { "Retry-After": "3" });
+    const api = createApiClient();
+
+    await expect(api("/api/catalog/search")).rejects.toMatchObject({
+      status: 503,
+      retryAfterMs: 3_000,
+    });
+  });
+
   it("calls onUnauthorized on 401 and does not call it for /auth/login", async () => {
     mockFetchText(401, "Unauthorized");
     const onUnauthorized = vi.fn();

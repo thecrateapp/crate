@@ -216,6 +216,8 @@ def test_global_radio_batch_reloads_when_initial_queue_is_exhausted(monkeypatch)
         "seed_label": "High Vis",
         "global_tracks": [first_track],
         "global_cursor": 1,
+        "global_exhausted": True,
+        "global_source_exhausted": False,
     }
 
     tracks = radio_engine._generate_global_batch(session, count=1)
@@ -224,6 +226,87 @@ def test_global_radio_batch_reloads_when_initial_queue_is_exhausted(monkeypatch)
     assert requested_limits and requested_limits[0] > 1
     assert session["global_cursor"] == 2
     assert session["global_tracks"] == [first_track, second_track]
+
+
+def test_global_radio_like_uses_the_canonical_track_vector(monkeypatch):
+    from crate import radio_engine
+
+    vector = _vector(0.7)
+    session = {
+        "id": "global-session",
+        "user_id": 1,
+        "radio_profile": "global_catalog",
+        "initial_target": _vector(0.1),
+        "current_target": _vector(0.1),
+        "liked_vectors": [],
+        "disliked_vectors": [],
+        "global_tracks": [
+            {
+                "global_track_uid": "remote-track",
+                "title": "Remote track",
+                "bliss_vector": vector,
+            }
+        ],
+    }
+    saved: list[dict] = []
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
+    monkeypatch.setattr(
+        radio_engine, "_save_session", lambda value: saved.append(value)
+    )
+    monkeypatch.setattr(
+        radio_engine,
+        "persist_radio_feedback",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("global feedback must not write a local track FK")
+        ),
+    )
+
+    result = radio_engine.radio_feedback(
+        "global-session",
+        None,
+        "like",
+        global_track_uid="remote-track",
+    )
+
+    assert result == {
+        "status": "ok",
+        "effect": "target_shifted",
+        "liked_count": 1,
+        "disliked_count": 0,
+    }
+    assert session["liked_vectors"] == [vector]
+    assert saved
+
+
+def test_global_radio_dislike_excludes_a_remote_track_without_local_vector(monkeypatch):
+    from crate import radio_engine
+
+    session = {
+        "id": "global-session",
+        "user_id": 1,
+        "radio_profile": "global_catalog",
+        "global_tracks": [
+            {"global_track_uid": "remote-track", "title": "Remote track"},
+            {"global_track_uid": "next-track", "title": "Next track"},
+        ],
+        "global_cursor": 0,
+    }
+    monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _: None)
+
+    result = radio_engine.radio_feedback(
+        "global-session",
+        None,
+        "dislike",
+        global_track_uid="remote-track",
+    )
+
+    assert result == {"status": "ok", "effect": "exclusion_added"}
+    assert session["excluded_global_track_uids"] == ["remote-track"]
+    assert [
+        track["global_track_uid"]
+        for track in radio_engine._generate_global_batch(session, 2)
+    ] == ["next-track"]
 
 
 def test_next_tracks_marks_global_radio_session_exhausted(monkeypatch):

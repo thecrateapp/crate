@@ -7,6 +7,7 @@ import {
 } from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
 import { getPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
+import { setPlaybackSession } from "@/lib/playback-provenance";
 
 export function toEngineTrack(
   track: Track,
@@ -87,5 +88,6 @@ async function resolveFreshEngineStreamUrl(track: Track): Promise<string> {
   if (!path) return getStreamUrl(track);
 
   const playback = await api<PlaybackResolution>(path);
+  setPlaybackSession(track, playback.playback_session);
   return resolveMaybeApiAssetUrl(playback.stream_url) || playback.stream_url;
 }

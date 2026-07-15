@@ -1,12 +1,70 @@
 """Phase 2 federation tests — search fan-out, merge/dedupe, result tagging."""
 
+from datetime import datetime, timedelta, timezone
+import time
+
 from crate.federation.search_fanout import (
     _tag_remote_results,
     _merge_results,
     _artist_match_key,
     _album_match_key,
     _has_strong_local_matches,
+    _peer_is_in_backoff,
 )
+
+
+def test_unhealthy_peer_is_skipped_during_backoff_window():
+    backoff_until = datetime.now(timezone.utc) + timedelta(minutes=1)
+
+    assert _peer_is_in_backoff(
+        {"health_json": {"healthy": False, "backoff_until": backoff_until.isoformat()}}
+    )
+    assert not _peer_is_in_backoff(
+        {
+            "health_json": {
+                "healthy": False,
+                "backoff_until": (backoff_until - timedelta(minutes=2)).isoformat(),
+            }
+        }
+    )
+
+
+def test_fanout_deadline_returns_partial_results_without_waiting(monkeypatch):
+    from crate.federation import search_fanout
+
+    local = {"artists": [{"name": "Local"}], "albums": [], "tracks": []}
+    monkeypatch.setattr(search_fanout, "FANOUT_DEADLINE_SECONDS", 0.01)
+    monkeypatch.setattr(search_fanout, "search_all_hybrid", lambda *args: local)
+    monkeypatch.setattr(
+        search_fanout,
+        "_get_approved_peers_for_search",
+        lambda: [{"node_uid": "slow", "health_json": {"healthy": True}}],
+    )
+    monkeypatch.setattr(search_fanout, "_search_local_index", lambda *args: None)
+
+    def slow_search(**kwargs):
+        del kwargs
+        time.sleep(0.2)
+        return {"artists": [{"name": "Too late"}], "albums": [], "tracks": []}
+
+    monkeypatch.setattr(search_fanout, "_search_one_peer", slow_search)
+
+    started = time.monotonic()
+    result = search_fanout.federated_search(
+        "query",
+        scope="network",
+        local_node={"node_uid": "local"},
+    )
+
+    assert time.monotonic() - started < 0.1
+    assert result["artists"] == local["artists"]
+    assert result["federation"] == {
+        "complete": False,
+        "attempted_peers": 1,
+        "completed_peers": 0,
+        "failed_peer_uids": [],
+        "timed_out_peer_uids": ["slow"],
+    }
 
 
 class TestRemoteResultTagging:

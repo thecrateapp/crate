@@ -13,6 +13,28 @@ networks:
   fed-net:
 
 services:
+  stream-benchmark:
+    profiles: ["benchmark"]
+    build:
+      context: ./app
+      target: api
+    entrypoint: ["python"]
+    command:
+      - /app/tests/load/federation_stream_benchmark.py
+      - --file-mib
+      - "8"
+      - --concurrency
+      - 1,10,25,50
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./app/crate:/app/crate:ro
+      - ./app/tests:/app/tests:ro
+    networks:
+      - fed-net
+    mem_limit: 768m
+    cpus: "1.0"
+
   # ── Node A ──────────────────────────────────────────────────────────────
 
   node-a-postgres:
@@ -78,12 +100,20 @@ services:
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
       - CRATE_INSTANCE_NAME=Federation Node A
+      - CRATE_PUBLIC_API_BASE_URL=http://node-a-api:8585
       - DOMAIN=node-a.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-a-subject-secret-000000
+      - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=2147483648
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=4294967296
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=8589934592
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=16777216
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
       - CRATE_AUTH_COOKIE_DOMAIN=
       - CRATE_AUTH_COOKIE_SECURE=false
       - CRATE_AUTH_COOKIE_SAMESITE=lax
-      - JWT_SECRET=fed-dev-secret-node-a
+      - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
@@ -96,13 +126,18 @@ services:
       - SPOTIFY_ID=${SPOTIFY_ID:-}
       - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
       - OLLAMA_URL=http://ollama:11434
-      - LLM_PROVIDER=gemini/gemini-2.5-flash
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
-      - TICKETMASTER_API_KEY=
       - CRATE_MEDIA_WORKER_URL=http://media-worker:8687
       - CRATE_MEDIA_WORKER_MAX_ACTIVE=1
+      - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-a-readplane-service-token-000000
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
@@ -127,6 +162,38 @@ services:
     cpus: "0.75"
     command: ["api"]
 
+  node-a-readplane:
+    build:
+      context: ./app/readplane
+    container_name: fed-a-readplane
+    environment:
+      - READPLANE_ADDR=:8686
+      - DATABASE_URL=postgresql://crate:crate@node-a-postgres:5432/crate?sslmode=disable
+      - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
+      - READPLANE_ENABLED=true
+      - READPLANE_ENABLE_SSE=true
+      - READPLANE_ROUTE_MODE=active
+      - READPLANE_FALLBACK_ENABLED=true
+      - READPLANE_FEDERATION_PROXY_ENABLED=true
+      - API_FALLBACK_BASE=http://node-a-api:8585
+      - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-a-readplane-service-token-000000
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+    ports:
+      - "18686:8686"
+    networks:
+      - fed-net
+    depends_on:
+      node-a-postgres:
+        condition: service_healthy
+      node-a-redis:
+        condition: service_healthy
+      node-a-api:
+        condition: service_started
+    mem_limit: 128m
+    mem_reservation: 32m
+    cpus: "0.25"
+
   node-a-worker:
     build:
       context: ./app
@@ -149,7 +216,14 @@ services:
       - MAINTENANCE_WORKER_PROCESSES=1
       - DOMAIN=node-a.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-a-subject-secret-000000
-      - JWT_SECRET=fed-dev-secret-node-a
+      - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=2147483648
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=4294967296
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=8589934592
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=16777216
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
+      - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - OMP_NUM_THREADS=1
@@ -168,9 +242,14 @@ services:
       - SPOTIFY_ID=${SPOTIFY_ID:-}
       - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
-      - TICKETMASTER_API_KEY=
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
@@ -296,12 +375,20 @@ services:
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=api
       - CRATE_INSTANCE_NAME=Federation Node B
+      - CRATE_PUBLIC_API_BASE_URL=http://node-b-api:8585
       - DOMAIN=node-b.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-b-subject-secret-000000
+      - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=2147483648
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=4294967296
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=8589934592
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=16777216
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
       - CRATE_AUTH_COOKIE_DOMAIN=
       - CRATE_AUTH_COOKIE_SECURE=false
       - CRATE_AUTH_COOKIE_SAMESITE=lax
-      - JWT_SECRET=fed-dev-secret-node-b
+      - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
@@ -314,13 +401,18 @@ services:
       - SPOTIFY_ID=${SPOTIFY_ID:-}
       - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
       - OLLAMA_URL=http://ollama:11434
-      - LLM_PROVIDER=gemini/gemini-2.5-flash
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
-      - TICKETMASTER_API_KEY=
       - CRATE_MEDIA_WORKER_URL=http://media-worker:8687
       - CRATE_MEDIA_WORKER_MAX_ACTIVE=1
+      - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-b-readplane-service-token-000000
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro
@@ -342,6 +434,38 @@ services:
     mem_reservation: 192m
     cpus: "0.75"
     command: ["api"]
+
+  node-b-readplane:
+    build:
+      context: ./app/readplane
+    container_name: fed-b-readplane
+    environment:
+      - READPLANE_ADDR=:8686
+      - DATABASE_URL=postgresql://crate:crate@node-b-postgres:5432/crate?sslmode=disable
+      - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
+      - READPLANE_ENABLED=true
+      - READPLANE_ENABLE_SSE=true
+      - READPLANE_ROUTE_MODE=active
+      - READPLANE_FALLBACK_ENABLED=true
+      - READPLANE_FEDERATION_PROXY_ENABLED=true
+      - API_FALLBACK_BASE=http://node-b-api:8585
+      - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-b-readplane-service-token-000000
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+    ports:
+      - "28686:8686"
+    networks:
+      - fed-net
+    depends_on:
+      node-b-postgres:
+        condition: service_healthy
+      node-b-redis:
+        condition: service_healthy
+      node-b-api:
+        condition: service_started
+    mem_limit: 128m
+    mem_reservation: 32m
+    cpus: "0.25"
 
   node-b-worker:
     build:
@@ -365,7 +489,14 @@ services:
       - MAINTENANCE_WORKER_PROCESSES=1
       - DOMAIN=node-b.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-b-subject-secret-000000
-      - JWT_SECRET=fed-dev-secret-node-b
+      - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
+      - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=2147483648
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=4294967296
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=8589934592
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=16777216
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=900
+      - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - OMP_NUM_THREADS=1
@@ -384,9 +515,14 @@ services:
       - SPOTIFY_ID=${SPOTIFY_ID:-}
       - SPOTIFY_SECRET=${SPOTIFY_SECRET:-}
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
-      - TICKETMASTER_API_KEY=
     volumes:
       - ./app/crate:/app/crate:ro
       - ./app/tests:/app/tests:ro

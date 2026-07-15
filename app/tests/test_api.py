@@ -432,11 +432,11 @@ class TestArtistDetailAPI:
 
         with (
             patch(
-                "crate.api.browse_artist.get_library_artist_by_slug",
+                "crate.api.catalog_artist_compat.get_library_artist_by_slug",
                 return_value={"id": 7, "slug": "tool", "name": "Tool"},
             ),
             patch(
-                "crate.api.browse_artist._build_artist_page_payload",
+                "crate.api.catalog_artist_compat._build_artist_page_payload",
                 return_value=artist_payload,
             ) as mock_payload,
         ):
@@ -1989,7 +1989,6 @@ class TestHomeEndpointCaching:
 
         with (
             patch("crate.api.me.get_cache", return_value=cached_mix) as mock_get_cache,
-            patch("crate.api.me.global_catalog_surface_enabled", return_value=False),
             patch(
                 "crate.api.me.get_home_playlist",
                 side_effect=AssertionError("unexpected playlist rebuild"),
@@ -2001,7 +2000,7 @@ class TestHomeEndpointCaching:
         data = resp.json()
         assert data["id"] == "daily-discovery"
         assert data["name"] == "Daily Discovery"
-        assert mock_get_cache.call_args.args[0].startswith("home_mix:v3:local:")
+        assert mock_get_cache.call_args.args[0].startswith("home_mix:v3:global:")
 
     def test_home_section_detail_uses_cache(self, test_app):
         cached_section = {
@@ -2015,7 +2014,6 @@ class TestHomeEndpointCaching:
             patch(
                 "crate.api.me.get_cache", return_value=cached_section
             ) as mock_get_cache,
-            patch("crate.api.me.global_catalog_surface_enabled", return_value=True),
             patch(
                 "crate.api.me.get_home_section",
                 side_effect=AssertionError("unexpected section rebuild"),

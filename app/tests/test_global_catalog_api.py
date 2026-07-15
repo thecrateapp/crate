@@ -36,7 +36,9 @@ def test_catalog_search_endpoint_uses_global_search_without_a_mode_switch(test_a
         "tracks": [],
     }
 
-    with patch("crate.api.catalog.search_global_catalog", return_value=payload) as search:
+    with patch(
+        "crate.api.catalog.search_global_catalog", return_value=payload
+    ) as search:
         response = test_app.get("/api/catalog/search?q=high&limit=7")
 
     assert response.status_code == 200

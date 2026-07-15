@@ -88,7 +88,12 @@ export function useTrackActionEntries(
   const hasLocalTrackRef = Boolean(
     libraryTrackId != null || trackEntityUid || input.track.path,
   );
-  const liked = isLiked(libraryTrackId, trackEntityUid, input.track.path);
+  const liked = isLiked(
+    libraryTrackId,
+    trackEntityUid,
+    input.track.path,
+    globalTrackUid,
+  );
   const offlineRef = {
     entityUid: trackEntityUid,
     libraryTrackId,
@@ -156,12 +161,13 @@ export function useTrackActionEntries(
         label: liked ? t("actions.track.unlike") : t("actions.track.like"),
         icon: liked ? HeartBold : Heart,
         active: liked,
-        disabled: !hasLocalTrackRef,
+        disabled: !hasTrackRef,
         onSelect: async () => {
           await toggleTrackLike(
             libraryTrackId,
             trackEntityUid,
             input.track.path,
+            globalTrackUid,
           );
           toast.success(
             liked

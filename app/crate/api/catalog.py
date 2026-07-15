@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 
-from crate.api.auth import _require_auth
+from crate.api.auth import _require_auth as _require_authenticated_user
 from crate.api.browse_artist import (
     api_artist_background_by_entity_uid,
     api_artist_background_by_id,
@@ -25,6 +25,7 @@ from crate.api.browse_media import (
     api_track_info_by_entity_uid,
     api_track_info_by_id,
 )
+from crate.api.catalog_artist_compat import router as artist_compat_router
 from crate.api.federation_remote import (
     remote_album_cover_cached as remote_album_cover,
     remote_artist_background,
@@ -45,6 +46,7 @@ from crate.db.repositories.streaming import (
     get_track_delivery_row_by_id,
 )
 from crate.db.queries.global_catalog import (
+    get_global_decade_artists,
     get_global_album_detail,
     get_global_artist_page,
     get_global_genre_detail,
@@ -63,6 +65,7 @@ from crate.db.repositories.global_user_library import (
     unfollow_global_artist,
     unsave_global_album,
 )
+from crate.db.repositories.global_catalog_state import get_catalog_state
 from crate.federation.global_artwork import (
     GlobalArtistNotFound,
     GlobalAlbumNotFound,
@@ -86,6 +89,7 @@ from crate.federation.global_source_resolver import (
 )
 
 router = APIRouter(tags=["catalog"])
+router.include_router(artist_compat_router)
 
 
 _TRACK_INFO_REMOTE_FIELDS = {
@@ -131,6 +135,18 @@ _ALBUM_TRACK_REMOTE_FIELDS = {
     "track_number",
     "disc_number",
 }
+
+
+def _require_auth(request: Request) -> dict:
+    """Require an authenticated user and a ready canonical catalog."""
+    user = _require_authenticated_user(request)
+    if get_catalog_state()["status"] != "ready":
+        raise HTTPException(
+            status_code=503,
+            detail="catalog_warming",
+            headers={"Retry-After": "3"},
+        )
+    return user
 
 
 @router.get(
@@ -311,6 +327,32 @@ def catalog_me_unsave_album(request: Request, global_album_uid: str):
 
 
 @router.get(
+    "/api/catalog/artists",
+    responses=AUTH_ERROR_RESPONSES,
+    summary="List canonical artists for a decade",
+)
+def catalog_artists_by_decade(
+    request: Request,
+    decade: str,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=120),
+):
+    _require_auth(request)
+    try:
+        decade_start = int(decade.removesuffix("s"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid decade") from None
+    if decade_start < 1000 or decade_start > 9999 or decade_start % 10:
+        raise HTTPException(status_code=400, detail="Invalid decade")
+    return get_global_decade_artists(
+        decade_start=decade_start,
+        decade_end=decade_start + 9,
+        page=page,
+        per_page=per_page,
+    )
+
+
+@router.get(
     "/api/catalog/artists/{global_artist_uid}/page",
     responses=AUTH_ERROR_RESPONSES,
     summary="Get a canonical artist page",
@@ -322,7 +364,7 @@ def catalog_artist_page(request: Request, global_artist_uid: str):
         from fastapi import HTTPException
 
         raise HTTPException(status_code=404, detail="Artist not found")
-    return _hydrate_catalog_artist_page(request, global_artist_uid, payload)
+    return hydrate_catalog_artist_page(request, global_artist_uid, payload)
 
 
 @router.get(
@@ -487,7 +529,7 @@ def _is_not_found_response(response: object) -> bool:
     return getattr(response, "status_code", None) == 404
 
 
-def _hydrate_catalog_artist_page(
+def hydrate_catalog_artist_page(
     request: Request,
     global_artist_uid: str,
     payload: dict,
@@ -508,11 +550,11 @@ def _hydrate_catalog_artist_page(
             if exc.status_code != 404:
                 raise
         else:
-            if not hasattr(local_payload, "status_code"):
+            if isinstance(local_payload, dict):
                 return _merge_global_artist_identity(
-                    dict(local_payload),
+                    local_payload,
                     global_artist_uid,
-                    artist,
+                    payload,
                 )
 
     try:
@@ -532,23 +574,179 @@ def _hydrate_catalog_artist_page(
         return payload
     hydrated = dict(payload)
     hydrated["info"] = _merge_artist_info(hydrated.get("info"), remote_info)
+    return _merge_remote_artist_page_sections(hydrated, remote_info)
+
+
+def _merge_remote_artist_page_sections(payload: dict, remote_info: dict) -> dict:
+    hydrated = dict(payload)
+    remote_top_tracks = remote_info.get("top_tracks")
+    current_top_tracks = hydrated.get("top_tracks")
+    if isinstance(remote_top_tracks, list) and isinstance(current_top_tracks, list):
+        by_key = {
+            _artist_track_key(track): track
+            for track in current_top_tracks
+            if isinstance(track, dict)
+        }
+        ranked: list = []
+        used: set[tuple[str, str]] = set()
+        for remote_track in remote_top_tracks:
+            if not isinstance(remote_track, dict):
+                continue
+            key = _artist_track_key(remote_track)
+            track = by_key.get(key)
+            if track is not None and key not in used:
+                ranked.append(track)
+                used.add(key)
+        ranked.extend(
+            track
+            for track in current_top_tracks
+            if isinstance(track, dict) and _artist_track_key(track) not in used
+        )
+        hydrated["top_tracks"] = ranked
+
+    shows = remote_info.get("shows")
+    if isinstance(shows, dict):
+        hydrated["shows"] = shows
+    enrichment = remote_info.get("enrichment")
+    if isinstance(enrichment, dict):
+        hydrated["enrichment"] = enrichment
     return hydrated
+
+
+def _artist_track_key(track: dict) -> tuple[str, str]:
+    return (
+        str(track.get("title") or "").strip().casefold(),
+        str(track.get("album") or "").strip().casefold(),
+    )
 
 
 def _merge_global_artist_identity(
     local_payload: dict,
     global_artist_uid: str,
-    global_artist: dict,
+    global_payload: dict,
 ) -> dict:
-    artist = dict(local_payload.get("artist") or {})
+    merged = dict(local_payload)
+    global_artist = dict(global_payload.get("artist") or {})
+    artist = _merge_catalog_identity(
+        dict(local_payload.get("artist") or {}), global_artist
+    )
     artist["global_uid"] = global_artist_uid
     artist["global_artist_uid"] = global_artist_uid
     artist.setdefault(
         "local_artist_entity_uid", global_artist.get("local_artist_entity_uid")
     )
     artist.setdefault("availability", global_artist.get("availability", {}))
-    local_payload["artist"] = artist
-    return local_payload
+    artist["albums"] = _merge_catalog_identity_lists(
+        artist.get("albums"), global_artist.get("albums"), entity_type="album"
+    )
+    merged["artist"] = artist
+    merged["top_tracks"] = _merge_catalog_identity_lists(
+        local_payload.get("top_tracks"),
+        global_payload.get("top_tracks"),
+        entity_type="track",
+    )
+    return merged
+
+
+def _merge_global_album_identity(local_payload: dict, global_payload: dict) -> dict:
+    merged = _merge_catalog_identity(dict(local_payload), global_payload)
+    merged["tracks"] = _merge_catalog_identity_lists(
+        local_payload.get("tracks"),
+        global_payload.get("tracks"),
+        entity_type="track",
+    )
+    return merged
+
+
+_CATALOG_IDENTITY_FIELDS = (
+    "global_uid",
+    "global_artist_uid",
+    "global_album_uid",
+    "global_track_uid",
+    "globalTrackUid",
+    "local_artist_entity_uid",
+    "local_album_entity_uid",
+    "local_track_entity_uid",
+    "availability",
+)
+
+
+def _merge_catalog_identity(local: dict, canonical: dict) -> dict:
+    merged = dict(local)
+    for field in _CATALOG_IDENTITY_FIELDS:
+        value = canonical.get(field)
+        if value is not None:
+            merged[field] = value
+    return merged
+
+
+def _merge_catalog_identity_lists(
+    local_items: object,
+    canonical_items: object,
+    *,
+    entity_type: str,
+) -> list:
+    if not isinstance(local_items, list):
+        return []
+    if not isinstance(canonical_items, list):
+        return list(local_items)
+
+    canonical_by_key: dict[tuple[str, ...], dict] = {}
+    for item in canonical_items:
+        if not isinstance(item, dict):
+            continue
+        for key in _catalog_identity_keys(item, entity_type):
+            canonical_by_key.setdefault(key, item)
+
+    merged_items = []
+    for item in local_items:
+        if not isinstance(item, dict):
+            merged_items.append(item)
+            continue
+        canonical = next(
+            (
+                canonical_by_key[key]
+                for key in _catalog_identity_keys(item, entity_type)
+                if key in canonical_by_key
+            ),
+            None,
+        )
+        merged_items.append(
+            _merge_catalog_identity(item, canonical) if canonical else dict(item)
+        )
+    return merged_items
+
+
+def _catalog_identity_keys(item: dict, entity_type: str) -> list[tuple[str, ...]]:
+    keys: list[tuple[str, ...]] = []
+    entity_fields = (
+        ("local_album_entity_uid", "entity_uid")
+        if entity_type == "album"
+        else ("local_track_entity_uid", "track_entity_uid", "entity_uid")
+    )
+    for field in entity_fields:
+        value = item.get(field)
+        if value:
+            keys.append(("entity", str(value)))
+
+    id_fields = (
+        ("id",) if entity_type == "album" else ("local_track_id", "track_id", "id")
+    )
+    for field in id_fields:
+        value = item.get(field)
+        if isinstance(value, int) or (isinstance(value, str) and value.isdigit()):
+            keys.append(("id", str(value)))
+
+    if entity_type == "album":
+        name = str(item.get("name") or "").strip().casefold()
+        if name:
+            keys.append(("name", name))
+    else:
+        title = str(item.get("title") or "").strip().casefold()
+        album = str(item.get("album") or "").strip().casefold()
+        if title:
+            keys.append(("name", album, title))
+    return keys
 
 
 def _merge_artist_info(current: object, remote_info: dict) -> dict:
@@ -576,10 +774,10 @@ def catalog_album_detail(request: Request, global_album_uid: str):
     payload = get_global_album_detail(global_album_uid)
     if payload is None:
         raise HTTPException(status_code=404, detail="Album not found")
-    return _hydrate_catalog_album_detail(request, global_album_uid, payload)
+    return hydrate_catalog_album_detail(request, global_album_uid, payload)
 
 
-def _hydrate_catalog_album_detail(
+def hydrate_catalog_album_detail(
     request: Request,
     global_album_uid: str,
     payload: dict,
@@ -651,8 +849,10 @@ def _album_track_key(track: dict) -> tuple[int, int, str]:
 
 
 def _album_track_number(value: object, *, default: int) -> int:
+    if not isinstance(value, int | float | str):
+        return default
     try:
-        return int(value or default)
+        return int(value) if value else default
     except (TypeError, ValueError):
         return default
 
@@ -870,10 +1070,7 @@ def _track_genre_payload_from_name(raw_genre: str | None) -> dict:
 )
 def catalog_track_genre(request: Request, global_track_uid: str):
     _require_auth(request)
-    try:
-        canonical = get_global_track_genres(global_track_uid)
-    except Exception:
-        canonical = None
+    canonical = get_global_track_genres(global_track_uid)
     if canonical is not None:
         genres = canonical.get("genres") or []
         primary = genres[0] if genres else None
@@ -1004,6 +1201,7 @@ def _catalog_track_playback_payload(
     global_track_uid: str,
     delivery: str,
 ) -> dict:
+    user = _require_authenticated_user(request)
     try:
         selection = resolve_global_track_playback(global_track_uid)
     except GlobalTrackNotFound:
@@ -1022,13 +1220,26 @@ def _catalog_track_playback_payload(
             track = get_track_delivery_row_by_id(selection["local_track_id"])
         if not track:
             raise HTTPException(status_code=404, detail="Local track not found")
-        return _playback_payload_for_track(track, delivery)
+        payload = _playback_payload_for_track(track, delivery, user_id=int(user["id"]))
+        from crate.playback_provenance import issue_playback_session
+
+        payload["playback_session"] = issue_playback_session(
+            user_id=int(user["id"]),
+            global_track_uid=global_track_uid,
+            content_origin=payload["content_origin"],
+            source_node_uid=None
+            if payload["content_origin"] == "local"
+            else payload.get("_source_node_uid"),
+        )
+        payload.pop("_source_node_uid", None)
+        return payload
 
     if selection["kind"] == "remote":
         remote = resolve_remote_playback(
             selection["node_uid"],
             selection["remote_entity_uid"],
             request,
+            global_track_uid=global_track_uid,
         )
         remote["quality"] = selection.get("quality")
         return _remote_playback_resolution(remote, requested_policy=delivery)
@@ -1061,6 +1272,8 @@ def _remote_playback_resolution(remote: dict, *, requested_policy: str) -> dict:
         "task_id": None,
         "variant_id": None,
         "variant_status": None,
+        "playback_session": remote["playback_session"],
+        "content_origin": "remote",
     }
 
 

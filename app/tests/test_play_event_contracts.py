@@ -59,6 +59,8 @@ class TestPlayEventContract:
             context_playlist_id=None,
             device_type="web",
             app_platform="listen-web",
+            content_origin="local",
+            source_node_uid=None,
         )
 
     def test_play_event_endpoint_preserves_global_track_uid(self, test_app):

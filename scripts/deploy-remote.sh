@@ -225,6 +225,11 @@ cmd_backup() {
       cp -a "$file" "$BACKUP_DIR/$file"
     fi
   done
+  if [[ -f deploy/traefik/federation-readplane.yml ]]; then
+    mkdir -p "$BACKUP_DIR/deploy/traefik"
+    cp -a deploy/traefik/federation-readplane.yml \
+      "$BACKUP_DIR/deploy/traefik/federation-readplane.yml"
+  fi
 
   printf '%s\n' "$ROLLBACK_TAG" > "$BACKUP_DIR/rollback_tag"
 
@@ -385,6 +390,11 @@ cmd_rollback() {
       cp -a "$BACKUP_DIR/$file" "$file"
     fi
   done
+  if [[ -f "$BACKUP_DIR/deploy/traefik/federation-readplane.yml" ]]; then
+    mkdir -p deploy/traefik
+    cp -a "$BACKUP_DIR/deploy/traefik/federation-readplane.yml" \
+      deploy/traefik/federation-readplane.yml
+  fi
 
   target_tag="$(env_value CRATE_IMAGE_TAG)"
   if [[ -z "$target_tag" ]]; then

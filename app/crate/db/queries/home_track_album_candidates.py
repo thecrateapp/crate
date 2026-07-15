@@ -38,7 +38,7 @@ def get_track_candidates_for_album_ids(
             t.bliss_vector,
             COALESCE(t.lastfm_playcount, 0) AS popularity,
             COALESCE(uts.play_count, 0) AS user_play_count,
-            (ult.track_id IS NOT NULL) AS is_liked
+            (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked
         FROM library_tracks t
         JOIN library_albums alb ON alb.id = t.album_id
         LEFT JOIN library_artists art ON art.name = t.artist
@@ -49,6 +49,11 @@ def get_track_candidates_for_album_ids(
         LEFT JOIN user_liked_tracks ult
           ON ult.user_id = :user_id
          AND ult.track_id = t.id
+        LEFT JOIN global_catalog_tracks global_track
+          ON global_track.local_track_id = t.id
+        LEFT JOIN user_global_track_likes global_like
+          ON global_like.user_id = :user_id
+         AND global_like.global_track_uid = global_track.global_track_uid
         WHERE t.album_id = ANY(:album_ids)
         ORDER BY
             COALESCE(t.lastfm_playcount, 0) DESC,

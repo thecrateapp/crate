@@ -20,8 +20,25 @@ def test_should_run_respects_disable_by_zero(monkeypatch):
     )
 
 
-def test_scheduler_runs_federation_tasks_without_an_instance_mode():
+def test_scheduler_skips_federation_transport_tasks_without_approved_peers(
+    monkeypatch,
+):
     from crate import scheduler
+
+    monkeypatch.setattr(
+        scheduler, "_has_approved_federation_peers", lambda: False, raising=False
+    )
+
+    assert scheduler._scheduled_task_enabled("federation_health_poll") is False
+    assert scheduler._scheduled_task_enabled("federation_sync_catalog") is False
+
+
+def test_scheduler_runs_federation_transport_tasks_with_approved_peers(monkeypatch):
+    from crate import scheduler
+
+    monkeypatch.setattr(
+        scheduler, "_has_approved_federation_peers", lambda: True, raising=False
+    )
 
     assert scheduler._scheduled_task_enabled("federation_health_poll") is True
     assert scheduler._scheduled_task_enabled("federation_sync_catalog") is True
@@ -30,7 +47,10 @@ def test_scheduler_runs_federation_tasks_without_an_instance_mode():
 def test_scheduler_runs_global_catalog_tasks_without_a_feature_gate():
     from crate import scheduler
 
-    assert scheduler._scheduled_task_enabled("global_catalog_reconcile_incremental") is True
+    assert (
+        scheduler._scheduled_task_enabled("global_catalog_reconcile_incremental")
+        is True
+    )
     assert scheduler._scheduled_task_enabled("global_catalog_reconcile_full") is True
 
 

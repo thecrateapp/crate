@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -16,6 +18,82 @@ from crate.federation.events import (
 from crate.federation.global_content_cache import invalidate_source_cache
 
 log = logging.getLogger(__name__)
+
+HEALTH_BACKOFF_BASE_SECONDS = 30
+HEALTH_BACKOFF_MAX_SECONDS = 30 * 60
+
+
+def federation_health_snapshot() -> dict:
+    local_node = repo.get_local_node()
+    if local_node is None:
+        return {
+            "ok": True,
+            "state": "unconfigured_singleton",
+            "peer_count": 0,
+            "healthy_peer_count": 0,
+            "unhealthy_peer_count": 0,
+        }
+    capabilities = local_node.get("capabilities_json") or {}
+    if isinstance(capabilities, str):
+        try:
+            capabilities = json.loads(capabilities)
+        except json.JSONDecodeError:
+            capabilities = {}
+    if isinstance(capabilities, dict) and capabilities.get("catalog.search") is False:
+        return {
+            "ok": True,
+            "state": "disabled",
+            "peer_count": 0,
+            "healthy_peer_count": 0,
+            "unhealthy_peer_count": 0,
+        }
+
+    peers = [peer for peer in repo.list_peers() if peer.get("disabled_at") is None]
+    if not peers:
+        return {
+            "ok": True,
+            "state": "healthy_singleton",
+            "peer_count": 0,
+            "healthy_peer_count": 0,
+            "unhealthy_peer_count": 0,
+        }
+    healthy = sum(
+        1
+        for peer in peers
+        if isinstance(peer.get("health_json"), dict)
+        and peer["health_json"].get("healthy") is True
+    )
+    unhealthy = len(peers) - healthy
+    state = "healthy" if unhealthy == 0 else "degraded" if healthy else "unavailable"
+    return {
+        "ok": state != "unavailable",
+        "state": state,
+        "peer_count": len(peers),
+        "healthy_peer_count": healthy,
+        "unhealthy_peer_count": unhealthy,
+    }
+
+
+def _failure_health(peer: dict, *, latency_ms: int) -> dict:
+    previous = peer.get("health_json")
+    previous_failures = (
+        int(previous.get("consecutive_failures") or 0)
+        if isinstance(previous, dict)
+        else 0
+    )
+    failures = previous_failures + 1
+    backoff_seconds = min(
+        HEALTH_BACKOFF_BASE_SECONDS * (2 ** min(failures - 1, 10)),
+        HEALTH_BACKOFF_MAX_SECONDS,
+    )
+    return {
+        "healthy": False,
+        "latency_ms": latency_ms,
+        "consecutive_failures": failures,
+        "backoff_until": (
+            datetime.now(timezone.utc) + timedelta(seconds=backoff_seconds)
+        ).isoformat(),
+    }
 
 
 def _previous_healthy(peer: dict) -> bool | None:
@@ -55,7 +133,12 @@ def poll_peer(
         if descriptor:
             repo.update_peer(
                 peer["node_uid"],
-                health_json={"healthy": True, "latency_ms": latency_ms},
+                health_json={
+                    "healthy": True,
+                    "latency_ms": latency_ms,
+                    "consecutive_failures": 0,
+                    "backoff_until": None,
+                },
                 last_health_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 last_success_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 last_error=None,
@@ -66,7 +149,7 @@ def poll_peer(
             latency_ms = int((time.monotonic() - start) * 1000)
             repo.update_peer(
                 peer["node_uid"],
-                health_json={"healthy": False, "latency_ms": latency_ms},
+                health_json=_failure_health(peer, latency_ms=latency_ms),
                 last_health_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 last_error="descriptor_unreachable",
             )
@@ -81,7 +164,7 @@ def poll_peer(
         latency_ms = int((time.monotonic() - start) * 1000)
         repo.update_peer(
             peer["node_uid"],
-            health_json={"healthy": False, "latency_ms": latency_ms},
+            health_json=_failure_health(peer, latency_ms=latency_ms),
             last_health_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             last_error=str(e)[:200],
         )

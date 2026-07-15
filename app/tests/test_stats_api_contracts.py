@@ -278,11 +278,6 @@ class TestStatsApiContracts:
             ) as mock_top_genres,
             patch("crate.api.me.get_replay_mix", return_value=replay) as mock_replay,
             patch("crate.api.me.get_stats_story", return_value=story) as mock_story,
-            patch(
-                "crate.api.me.global_catalog_surface_enabled",
-                return_value=False,
-                create=True,
-            ),
         ):
             resp = test_app.get(
                 "/api/me/stats/dashboard"
@@ -345,7 +340,7 @@ class TestStatsApiContracts:
         mock_story.assert_called_once_with(1, window="90d")
         mock_set_cache.assert_called_once()
         cache_key = mock_set_cache.call_args.args[0]
-        assert cache_key.startswith("listen:stats_dashboard:v5:local:")
+        assert cache_key.startswith("listen:stats_dashboard:v5:global:")
 
     def test_stats_dashboard_supports_month_snapshots(self, test_app):
         period = "month:2026-04"

@@ -64,9 +64,13 @@ class TestCatalogSyncPagination:
                                 with patch(
                                     "crate.federation.catalog.upsert_catalog_item"
                                 ):
-                                    _handle_catalog_sync(
-                                        "task-1", {"node_uid": "p1"}, {}
-                                    )
+                                    with patch(
+                                        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+                                        return_value=0,
+                                    ):
+                                        _handle_catalog_sync(
+                                            "task-1", {"node_uid": "p1"}, {}
+                                        )
                                     assert len(call_paths) > 0
                                     path = call_paths[0]
                                     assert "page" in path.lower()
@@ -111,9 +115,13 @@ class TestCatalogSyncPagination:
                                 with patch(
                                     "crate.federation.catalog.upsert_catalog_item"
                                 ):
-                                    result = _handle_catalog_sync(
-                                        "t", {"node_uid": "p1"}, {}
-                                    )
+                                    with patch(
+                                        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+                                        return_value=0,
+                                    ):
+                                        result = _handle_catalog_sync(
+                                            "t", {"node_uid": "p1"}, {}
+                                        )
                                     assert "synced" in result
                                     assert result["synced"] == 0
 

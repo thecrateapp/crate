@@ -5,7 +5,6 @@ from decimal import Decimal
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
 from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
@@ -91,10 +90,7 @@ def _genre_station(row: dict) -> dict | None:
 def _build_artist_stations(context: dict, *, limit: int) -> list[dict]:
     stations: list[dict] = []
     seen: set[str] = set()
-    allow_global = global_catalog_surface_enabled("radio")
     for row in merged_artists_from_context(context):
-        if not allow_global and row.get("artist_id") is None:
-            continue
         station = _artist_station(row)
         if not station:
             continue
@@ -105,9 +101,6 @@ def _build_artist_stations(context: dict, *, limit: int) -> list[dict]:
         stations.append(station)
         if len(stations) >= limit:
             return stations
-
-    if not allow_global:
-        return stations
 
     for row in list_global_collection_artists(limit=limit * 2):
         station = _artist_station(row)

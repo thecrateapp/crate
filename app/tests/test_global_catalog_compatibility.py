@@ -19,7 +19,9 @@ def _request():
 def test_search_scope_local_remains_an_explicit_legacy_query_scope(monkeypatch):
     from crate.api import browse_media
 
-    monkeypatch.setattr(browse_media, "_require_auth", lambda request: request.state.user)
+    monkeypatch.setattr(
+        browse_media, "_require_auth", lambda request: request.state.user
+    )
     monkeypatch.setattr(browse_media, "get_cache", lambda *args, **kwargs: None)
     monkeypatch.setattr(browse_media, "set_cache", lambda *args, **kwargs: None)
     monkeypatch.setattr(browse_media, "record_later", lambda *args, **kwargs: None)

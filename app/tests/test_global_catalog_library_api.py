@@ -1,6 +1,18 @@
 from unittest.mock import patch
 
 
+def test_catalog_routes_return_retryable_warming_error_until_ready(test_app):
+    with patch(
+        "crate.api.catalog.get_catalog_state",
+        return_value={"status": "backfilling"},
+    ):
+        response = test_app.get("/api/catalog/me/artists")
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "3"
+    assert response.json() == {"detail": "catalog_warming"}
+
+
 def test_catalog_me_artists_returns_user_global_follows(
     test_app,
 ):
@@ -19,10 +31,16 @@ def test_catalog_me_artists_returns_user_global_follows(
         }
     ]
 
-    with patch(
-        "crate.api.catalog.list_user_global_artist_follows",
-        return_value=global_artists,
-    ) as mocked:
+    with (
+        patch(
+            "crate.api.catalog.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
+        patch(
+            "crate.api.catalog.list_user_global_artist_follows",
+            return_value=global_artists,
+        ) as mocked,
+    ):
         response = test_app.get("/api/catalog/me/artists")
 
     assert response.status_code == 200
@@ -54,10 +72,16 @@ def test_catalog_me_albums_returns_user_global_saves(
         }
     ]
 
-    with patch(
-        "crate.api.catalog.list_user_global_album_saves",
-        return_value=global_albums,
-    ) as mocked:
+    with (
+        patch(
+            "crate.api.catalog.get_catalog_state",
+            return_value={"status": "ready"},
+        ),
+        patch(
+            "crate.api.catalog.list_user_global_album_saves",
+            return_value=global_albums,
+        ) as mocked,
+    ):
         response = test_app.get("/api/catalog/me/albums")
 
     assert response.status_code == 200
@@ -92,7 +116,7 @@ def test_legacy_saved_albums_route_keeps_remote_only_saves_visible(test_app):
     assert response.json() == [remote_album]
 
 
-def test_me_library_counts_use_global_refs_when_library_surface_on(test_app):
+def test_me_library_counts_always_use_global_refs(test_app):
     global_counts = {
         "followed_artists": 3,
         "saved_albums": 4,
@@ -101,39 +125,13 @@ def test_me_library_counts_use_global_refs_when_library_surface_on(test_app):
     }
 
     with (
-        patch("crate.api.me.global_catalog_surface_enabled", return_value=True),
         patch(
             "crate.api.me.get_user_global_library_counts",
             return_value=global_counts,
         ) as global_mock,
-        patch("crate.api.me.get_user_library_counts") as local_mock,
     ):
         response = test_app.get("/api/me")
 
     assert response.status_code == 200
     assert response.json() == global_counts
     global_mock.assert_called_once_with(1)
-    local_mock.assert_not_called()
-
-
-def test_me_library_counts_use_local_refs_when_library_surface_off(test_app):
-    local_counts = {
-        "followed_artists": 1,
-        "saved_albums": 2,
-        "liked_tracks": 3,
-        "playlists": 4,
-    }
-
-    with (
-        patch("crate.api.me.global_catalog_surface_enabled", return_value=False),
-        patch(
-            "crate.api.me.get_user_library_counts", return_value=local_counts
-        ) as mocked,
-        patch("crate.api.me.get_user_global_library_counts") as global_mock,
-    ):
-        response = test_app.get("/api/me")
-
-    assert response.status_code == 200
-    assert response.json() == local_counts
-    mocked.assert_called_once_with(1)
-    global_mock.assert_not_called()

@@ -9,7 +9,34 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
+from crate.db.cache_runtime import get_redis
+from crate.db.repositories.federation_stream_tickets import list_active_tickets
+from crate.federation.stream_proxy import revoke_active_stream
+
 log = logging.getLogger(__name__)
+
+
+def signal_active_stream_revocations(
+    *,
+    node_uid: str | None = None,
+    subject_hash: str | None = None,
+    grant_uid: str | None = None,
+) -> int:
+    """Notify in-flight responses before their persisted tickets are revoked."""
+    tickets = list_active_tickets(
+        node_uid=node_uid,
+        subject_hash=subject_hash,
+        grant_uid=grant_uid,
+    )
+    if not tickets:
+        return 0
+    redis_client = get_redis()
+    if redis_client is None:
+        log.error("Cannot signal %d stream revocations without Redis", len(tickets))
+        return 0
+    for ticket in tickets:
+        revoke_active_stream(redis_client, str(ticket["ticket_uid"]))
+    return len(tickets)
 
 
 def _publish_event(

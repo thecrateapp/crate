@@ -817,7 +817,7 @@ export function DecadeDetailView({
 }) {
   const { t } = useTranslation();
   const { data, loading } = useApi<DecadeArtists>(
-    `/api/artists?decade=${encodeURIComponent(decade)}&per_page=50`,
+    `/api/catalog/artists?decade=${encodeURIComponent(decade)}&per_page=50`,
   );
 
   if (loading) return <CrateLoader label={t("explore.decade.loading")} />;

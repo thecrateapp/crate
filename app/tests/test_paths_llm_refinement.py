@@ -33,10 +33,14 @@ def test_llm_refinement_skips_when_no_llm_is_configured(monkeypatch):
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Middle", artist="Odd Artist", genre_slug="punk"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
 
-    monkeypatch.setattr(paths_llm_refinement, "_llm_refinement_is_configured", lambda: False)
+    monkeypatch.setattr(
+        paths_llm_refinement, "_llm_refinement_is_configured", lambda: False
+    )
     monkeypatch.setattr(
         paths_llm_refinement,
         "ask_structured",
@@ -64,22 +68,26 @@ def test_llm_refinement_skips_when_admin_setting_is_disabled(monkeypatch):
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Middle", artist="Odd Artist", genre_slug="punk"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
 
     monkeypatch.setattr(
         paths_llm_refinement,
         "get_setting",
-        lambda key, default=None: "false"
-        if key == "paths_llm_refinement_enabled"
-        else default,
+        lambda key, default=None: (
+            "false" if key == "paths_llm_refinement_enabled" else default
+        ),
     )
     monkeypatch.setattr(
         paths_llm_refinement,
         "get_config",
         lambda: {"provider": "gemini", "model": "gemini/gemini-2.5-flash"},
     )
-    monkeypatch.setattr(paths_llm_refinement, "get_provider_api_key", lambda _provider: "key")
+    monkeypatch.setattr(
+        paths_llm_refinement, "get_provider_api_key", lambda _provider: "key"
+    )
     monkeypatch.setattr(
         paths_llm_refinement,
         "ask_structured",
@@ -107,7 +115,9 @@ def test_llm_refinement_skips_when_setting_store_is_unavailable(monkeypatch):
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Middle", artist="Odd Artist", genre_slug="punk"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
 
     monkeypatch.setattr(
@@ -146,7 +156,9 @@ def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
     candidate = _track(
         4,
@@ -155,7 +167,9 @@ def test_llm_refinement_applies_valid_candidate_replacement(monkeypatch):
         genre_slug="rock",
     )
 
-    monkeypatch.setattr(paths_llm_refinement, "_llm_refinement_is_configured", lambda: True)
+    monkeypatch.setattr(
+        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+    )
     monkeypatch.setattr(
         paths_llm_refinement,
         "ask_structured",
@@ -194,7 +208,9 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Odd Step", artist="Odd Artist", genre_slug="rock"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
     candidate = _track(
         4,
@@ -205,8 +221,12 @@ def test_llm_refinement_uses_cache_for_identical_path(monkeypatch):
     cache: dict[str, dict] = {}
     calls = {"count": 0}
 
-    monkeypatch.setattr(paths_llm_refinement, "_llm_refinement_is_configured", lambda: True)
-    monkeypatch.setattr(paths_llm_refinement, "get_cache", lambda key, **_kwargs: cache.get(key))
+    monkeypatch.setattr(
+        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+    )
+    monkeypatch.setattr(
+        paths_llm_refinement, "get_cache", lambda key, **_kwargs: cache.get(key)
+    )
     monkeypatch.setattr(
         paths_llm_refinement,
         "set_cache",
@@ -252,10 +272,14 @@ def test_llm_refinement_ignores_anchor_and_missing_candidate_replacements(monkey
     tracks = [
         _track(1, title="Origin", artist="Origin Artist", genre_slug="punk"),
         _track(2, title="Middle", artist="Middle Artist", genre_slug="punk"),
-        _track(3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"),
+        _track(
+            3, title="Destination", artist="Dest Artist", genre_slug="post-hardcore"
+        ),
     ]
 
-    monkeypatch.setattr(paths_llm_refinement, "_llm_refinement_is_configured", lambda: True)
+    monkeypatch.setattr(
+        paths_llm_refinement, "_llm_refinement_is_configured", lambda: True
+    )
     monkeypatch.setattr(
         paths_llm_refinement,
         "ask_structured",
@@ -283,7 +307,9 @@ def test_llm_refinement_ignores_anchor_and_missing_candidate_replacements(monkey
         origin_type="artist",
         dest_type="artist",
         tracks=tracks,
-        candidates_by_genre={"punk": [_track(4, title="Other", artist="Other", genre_slug="punk")]},
+        candidates_by_genre={
+            "punk": [_track(4, title="Other", artist="Other", genre_slug="punk")]
+        },
     )
 
     assert [track["id"] for track in refined] == [1, 2, 3]

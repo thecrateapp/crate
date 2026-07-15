@@ -23,7 +23,7 @@ export function useNotifications() {
 
   const notify = useCallback((title: string, body: string) => {
     if (Notification.permission === "granted" && document.hidden) {
-      new Notification(title, { body, icon: "/favicon.ico" });
+      new Notification(title, { body, icon: "/assets/icon-192.png" });
     }
   }, []);
 

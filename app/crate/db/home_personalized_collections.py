@@ -34,7 +34,6 @@ from crate.db.home_context import (
 )
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.playlists import get_playlist, get_playlist_tracks
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.track_versions import dedupe_track_variants
 
 
@@ -132,8 +131,6 @@ def get_home_playlist(user_id: int, playlist_id: str, limit: int = 40) -> dict |
         }
 
     if playlist_id.startswith(GLOBAL_ARTIST_CORE_HOME_PREFIX):
-        if not global_catalog_surface_enabled("home"):
-            return None
         global_artist_uid = playlist_id.removeprefix(GLOBAL_ARTIST_CORE_HOME_PREFIX)
         seed = get_global_radio_seed_tracks("artist", global_artist_uid, limit=limit)
         if not seed:

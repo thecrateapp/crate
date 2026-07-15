@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import logging
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
@@ -17,19 +18,31 @@ from fastapi.responses import FileResponse, JSONResponse
 from crate.db.repositories.auth import get_user_by_email
 from crate.db.queries.subsonic import (
     get_user_by_username,
-    get_all_artists_sorted,
     get_artist_by_id,
     get_albums_by_artist_name,
     get_album_with_artist,
     get_tracks_by_album_id,
     get_track_full,
-    get_album_list,
-    search_artists,
-    search_albums,
-    search_tracks,
     get_track_path_and_format,
-    get_track_basic,
-    get_random_tracks,
+)
+from crate.db.queries.subsonic_global import (
+    get_global_album,
+    get_global_artist,
+    get_global_track,
+    get_random_global_tracks,
+    get_starred_global_tracks,
+    list_global_album_tracks,
+    list_global_albums,
+    list_global_artist_albums,
+    list_global_artists,
+    search_global_catalog,
+)
+from crate.subsonic.global_ids import (
+    EntityKind,
+    SubsonicEntityId,
+    SubsonicIdError,
+    decode_subsonic_id,
+    global_subsonic_id,
 )
 from crate.auth import verify_password
 from crate.api._deps import library_path
@@ -165,6 +178,59 @@ class SubsonicAuthError(Exception):
     pass
 
 
+def _decode_entity_id(value: str, kind: EntityKind) -> SubsonicEntityId | None:
+    try:
+        return decode_subsonic_id(value, expected_kind=kind)
+    except SubsonicIdError:
+        return None
+
+
+def _global_album_payload(album: dict) -> dict:
+    album_id = global_subsonic_id("album", album["global_album_uid"])
+    return {
+        "id": album_id,
+        "name": album["name"],
+        "artist": album["artist"],
+        "artistId": global_subsonic_id("artist", album["global_artist_uid"]),
+        "year": int(album["year"]) if str(album.get("year") or "").isdigit() else None,
+        "songCount": album.get("track_count") or 0,
+        "duration": album.get("duration") or 0,
+        "coverArt": album_id if album.get("has_cover") else None,
+    }
+
+
+def _global_song_payload(track: dict) -> dict:
+    album_uid = track.get("global_album_uid")
+    album_id = global_subsonic_id("album", album_uid) if album_uid else None
+    return {
+        "id": global_subsonic_id("track", track["global_track_uid"]),
+        "title": track["title"],
+        "artist": track["artist"],
+        "album": track.get("album") or "",
+        "albumId": album_id,
+        "artistId": global_subsonic_id("artist", track["global_artist_uid"]),
+        "track": track.get("track_number") or 0,
+        "discNumber": track.get("disc_number") or 1,
+        "year": int(track["year"]) if str(track.get("year") or "").isdigit() else None,
+        "duration": track.get("duration") or 0,
+        "bitRate": track.get("bitrate") or 0,
+        "suffix": (track.get("format") or "mp3").lower(),
+        "contentType": _content_type(track.get("format")),
+        "path": "/".join(
+            part.strip("/")
+            for part in (
+                str(track.get("artist") or ""),
+                str(track.get("album") or ""),
+                str(track.get("title") or ""),
+            )
+            if part
+        ),
+        "coverArt": album_id if album_id and track.get("has_cover") else None,
+        "type": "music",
+        **({"starred": str(track["starred"])} if track.get("starred") else {}),
+    }
+
+
 # ── System ──────────────────────────────────────────────────────
 
 
@@ -264,7 +330,7 @@ def get_artists(request: Request):
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    rows = get_all_artists_sorted()
+    rows = list_global_artists()
 
     # Group by first letter
     index_map: dict[str, list] = {}
@@ -274,7 +340,7 @@ def get_artists(request: Request):
             letter = "#"
         index_map.setdefault(letter, []).append(
             {
-                "id": f"ar-{row['id']}",
+                "id": global_subsonic_id("artist", row["global_artist_uid"]),
                 "name": row["name"],
                 "albumCount": row["album_count"] or 0,
             }
@@ -302,8 +368,27 @@ def get_artist(request: Request, id: str = Query("")):
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    artist_id = int(id.replace("ar-", "")) if id.startswith("ar-") else int(id)
+    entity_id = _decode_entity_id(id, "artist")
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    if entity_id.scope == "global":
+        artist = get_global_artist(str(entity_id.global_uid))
+        albums = list_global_artist_albums(str(entity_id.global_uid)) if artist else []
+        if not artist:
+            return _subsonic_error(70, "Artist not found")
+        artist_id = global_subsonic_id("artist", artist["global_artist_uid"])
+        return _subsonic_response(
+            {
+                "artist": {
+                    "id": artist_id,
+                    "name": artist["name"],
+                    "albumCount": len(albums),
+                    "album": [_global_album_payload(album) for album in albums],
+                }
+            }
+        )
 
+    artist_id = int(entity_id.local_id or 0)
     artist = get_artist_by_id(artist_id)
     if not artist:
         return _subsonic_error(70, "Artist not found")
@@ -346,8 +431,25 @@ def get_album(request: Request, id: str = Query("")):
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    album_id = int(id.replace("al-", "")) if id.startswith("al-") else int(id)
+    entity_id = _decode_entity_id(id, "album")
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    if entity_id.scope == "global":
+        album = get_global_album(str(entity_id.global_uid))
+        tracks = list_global_album_tracks(str(entity_id.global_uid)) if album else []
+        if not album:
+            return _subsonic_error(70, "Album not found")
+        return _subsonic_response(
+            {
+                "album": {
+                    **_global_album_payload(album),
+                    "songCount": len(tracks),
+                    "song": [_global_song_payload(track) for track in tracks],
+                }
+            }
+        )
 
+    album_id = int(entity_id.local_id or 0)
     album = get_album_with_artist(album_id)
     if not album:
         return _subsonic_error(70, "Album not found")
@@ -405,7 +507,16 @@ def get_song(request: Request, id: str = Query("")):
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    track_id = int(id)
+    entity_id = _decode_entity_id(id, "track")
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    if entity_id.scope == "global":
+        track = get_global_track(str(entity_id.global_uid))
+        if not track:
+            return _subsonic_error(70, "Song not found")
+        return _subsonic_response({"song": _global_song_payload(track)})
+
+    track_id = int(entity_id.local_id or 0)
     t = get_track_full(track_id)
     if not t:
         return _subsonic_error(70, "Song not found")
@@ -448,42 +559,20 @@ def get_song(request: Request, id: str = Query("")):
 def get_album_list2(
     request: Request,
     type: str = Query("alphabeticalByName"),
-    size: int = Query(10),
-    offset: int = Query(0),
+    size: int = Query(10, ge=1, le=500),
+    offset: int = Query(0, ge=0),
 ):
     try:
         _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    order_map = {
-        "alphabeticalByName": "a.name ASC",
-        "alphabeticalByArtist": "a.artist ASC, a.name ASC",
-        "newest": "COALESCE(a.year, '0') DESC, a.name ASC",
-        "recent": "a.updated_at DESC",
-        "frequent": "a.play_count DESC NULLS LAST",
-        "random": "RANDOM()",
-    }
-    order = order_map.get(type, "a.name ASC")
-
-    albums = get_album_list(order, size, offset)
+    albums = list_global_albums(type, size=size, offset=offset)
 
     return _subsonic_response(
         {
             "albumList2": {
-                "album": [
-                    {
-                        "id": f"al-{a['id']}",
-                        "name": a["name"],
-                        "artist": a["artist"],
-                        "artistId": f"ar-{a['artist_id']}" if a["artist_id"] else None,
-                        "year": int(a["year"]) if a["year"] else None,
-                        "songCount": a["track_count"] or 0,
-                        "duration": a["duration"],
-                        "coverArt": f"al-{a['id']}" if a["has_cover"] else None,
-                    }
-                    for a in albums
-                ],
+                "album": [_global_album_payload(album) for album in albums],
             }
         }
     )
@@ -501,53 +590,32 @@ def get_album_list2(
 def search3(
     request: Request,
     query: str = Query("", alias="query"),
-    artistCount: int = Query(5),
-    albumCount: int = Query(5),
-    songCount: int = Query(10),
+    artistCount: int = Query(5, ge=0, le=100),
+    albumCount: int = Query(5, ge=0, le=100),
+    songCount: int = Query(10, ge=0, le=200),
 ):
     try:
         _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    q = f"%{query}%"
-    result: dict = {"artist": [], "album": [], "song": []}
-
-    result["artist"] = [
-        {"id": f"ar-{r['id']}", "name": r["name"]}
-        for r in search_artists(q, artistCount)
-    ]
-
-    result["album"] = [
-        {
-            "id": f"al-{r['id']}",
-            "name": r["name"],
-            "artist": r["artist"],
-            "artistId": f"ar-{r['artist_id']}" if r["artist_id"] else None,
-            "year": int(r["year"]) if r["year"] else None,
-            "coverArt": f"al-{r['id']}" if r["has_cover"] else None,
-        }
-        for r in search_albums(q, albumCount)
-    ]
-
-    result["song"] = [
-        {
-            "id": str(r["id"]),
-            "title": r["title"],
-            "artist": r["artist"],
-            "album": r["album"],
-            "duration": r["duration"] or 0,
-            "albumId": f"al-{r['album_id']}" if r["album_id"] else None,
-            "artistId": f"ar-{r['artist_id']}" if r["artist_id"] else None,
-            "coverArt": f"al-{r['album_id']}"
-            if r["album_id"] and r["has_cover"]
-            else None,
-            "suffix": (r["format"] or "mp3").lower(),
-            "contentType": _content_type(r["format"]),
-            "type": "music",
-        }
-        for r in search_tracks(q, songCount)
-    ]
+    matches = search_global_catalog(
+        query,
+        artist_limit=artistCount,
+        album_limit=albumCount,
+        track_limit=songCount,
+    )
+    result: dict = {
+        "artist": [
+            {
+                "id": global_subsonic_id("artist", row["global_artist_uid"]),
+                "name": row["name"],
+            }
+            for row in matches["artists"]
+        ],
+        "album": [_global_album_payload(row) for row in matches["albums"]],
+        "song": [_global_song_payload(row) for row in matches["tracks"]],
+    }
 
     return _subsonic_response({"searchResult3": result})
 
@@ -581,11 +649,29 @@ def search3(
 @router.get("/stream.view", include_in_schema=False)
 def stream(request: Request, id: str = Query("")):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    track_id = int(id)
+    entity_id = _decode_entity_id(id, "track")
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    if entity_id.scope == "global":
+        from crate.federation.playback_service import (
+            PlaybackServiceError,
+            stream_global_track,
+        )
+
+        try:
+            return stream_global_track(
+                str(entity_id.global_uid),
+                user=user,
+                request_headers=dict(request.headers),
+            )
+        except PlaybackServiceError as exc:
+            return Response(status_code=exc.status_code)
+
+    track_id = int(entity_id.local_id or 0)
     track = get_track_path_and_format(track_id)
     if not track:
         return Response(status_code=404)
@@ -631,22 +717,40 @@ def stream(request: Request, id: str = Query("")):
 @router.get("/getCoverArt.view", include_in_schema=False)
 def get_cover_art(request: Request, id: str = Query("")):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    if id.startswith("al-"):
-        album_id = int(id[3:])
+    entity_type: EntityKind
+    if id.startswith(("al-", "gal-")):
+        entity_type = "album"
+    elif id.startswith(("ar-", "ga-")):
+        entity_type = "artist"
+    else:
+        return Response(status_code=404)
+
+    entity_id = _decode_entity_id(id, entity_type)
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    if entity_id.scope == "global":
+        from crate.federation.global_artwork import serve_global_artwork
+
+        return serve_global_artwork(
+            str(entity_id.global_uid),
+            entity_type=entity_type,
+            user=user,
+            size=None,
+            image_format=None,
+        )
+
+    if entity_type == "album":
         from crate.api.browse_album import api_cover_by_id
 
-        return api_cover_by_id(album_id)
-    elif id.startswith("ar-"):
-        artist_id = int(id[3:])
-        from crate.api.browse_artist import api_artist_photo_by_id
+        return api_cover_by_id(int(entity_id.local_id or 0))
 
-        return api_artist_photo_by_id(request, artist_id)
+    from crate.api.browse_artist import api_artist_photo_by_id
 
-    return Response(status_code=404)
+    return api_artist_photo_by_id(request, int(entity_id.local_id or 0))
 
 
 # ── Scrobble ────────────────────────────────────────────────────
@@ -664,7 +768,12 @@ def get_cover_art(request: Request, id: str = Query("")):
     summary="Record a completed Subsonic scrobble",
 )
 @router.post("/scrobble.view", include_in_schema=False)
-def scrobble(request: Request, id: str = Query(""), submission: str = Query("true")):
+def scrobble(
+    request: Request,
+    id: str = Query(""),
+    submission: str = Query("true"),
+    time: int | None = Query(None),
+):
     try:
         user = _require_subsonic_auth(request)
     except SubsonicAuthError:
@@ -673,18 +782,80 @@ def scrobble(request: Request, id: str = Query(""), submission: str = Query("tru
     if submission != "true":
         return _subsonic_response({})
 
-    track_id = int(id)
-    track = get_track_basic(track_id)
+    entity_id = _decode_entity_id(id, "track")
+    if entity_id is None:
+        return _subsonic_error(70, "Invalid Subsonic entity ID")
+    global_track_uid = None
+    track_id = None
+    content_origin = "local"
+    source_node_uid = None
+    if entity_id.scope == "global":
+        global_track_uid = str(entity_id.global_uid)
+        track = get_global_track(global_track_uid)
+        if track:
+            from crate.federation.playback_service import get_remembered_source
+
+            source = get_remembered_source(int(user["id"]), global_track_uid)
+            if source:
+                content_origin = str(source.get("content_origin") or "local")
+                source_node_uid = source.get("source_node_uid")
+            else:
+                from crate.federation.global_playback import (
+                    resolve_global_track_playback,
+                )
+
+                selected = resolve_global_track_playback(global_track_uid)
+                if selected["kind"] == "remote":
+                    content_origin = "remote"
+                    source_node_uid = str(selected["node_uid"])
+                else:
+                    from crate.playback_provenance import (
+                        resolve_local_content_provenance,
+                    )
+
+                    content_origin, source_node_uid = resolve_local_content_provenance(
+                        selected.get("local_track_id")
+                    )
+    else:
+        track_id = int(entity_id.local_id or 0)
+        track = get_track_full(track_id)
+        if track:
+            from crate.playback_provenance import resolve_local_content_provenance
+
+            content_origin, source_node_uid = resolve_local_content_provenance(track_id)
 
     if track:
-        from crate.db.repositories.user_library import record_play
+        from crate.db.repositories.user_library import record_play_event
 
-        record_play(
-            user["id"],
+        duration = float(track.get("duration") or 0)
+        ended_at = (
+            datetime.fromtimestamp(time / 1000, tz=timezone.utc)
+            if time is not None and time > 0
+            else datetime.now(timezone.utc)
+        )
+        started_at = ended_at - timedelta(seconds=duration)
+        event_identity = f"subsonic:{user['id']}:{id}:{int(ended_at.timestamp())}"
+        record_play_event(
+            int(user["id"]),
+            client_event_id=hashlib.sha256(event_identity.encode()).hexdigest(),
             track_id=track_id,
-            title=track["title"],
-            artist=track["artist"],
-            album=track["album"],
+            global_track_uid=global_track_uid,
+            title=str(track.get("title") or ""),
+            artist=str(track.get("artist") or ""),
+            album=str(track.get("album") or ""),
+            started_at=started_at.isoformat(),
+            ended_at=ended_at.isoformat(),
+            played_seconds=duration,
+            track_duration_seconds=duration or None,
+            completion_ratio=1.0 if duration else None,
+            was_completed=True,
+            play_source_type="subsonic",
+            play_source_id=id,
+            play_source_name="Open Subsonic",
+            device_type="subsonic",
+            app_platform="subsonic",
+            content_origin=content_origin,
+            source_node_uid=source_node_uid,
         )
 
     return _subsonic_response({})
@@ -715,10 +886,21 @@ def get_playlists(request: Request):
 @router.get("/getStarred2.view", include_in_schema=False)
 def get_starred2(request: Request):
     try:
-        _require_subsonic_auth(request)
+        user = _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
-    return _subsonic_response({"starred2": {"artist": [], "album": [], "song": []}})
+    return _subsonic_response(
+        {
+            "starred2": {
+                "artist": [],
+                "album": [],
+                "song": [
+                    _global_song_payload(track)
+                    for track in get_starred_global_tracks(int(user["id"]))
+                ],
+            }
+        }
+    )
 
 
 @router.get(
@@ -727,36 +909,18 @@ def get_starred2(request: Request):
     summary="Fetch random songs for Subsonic clients",
 )
 @router.get("/getRandomSongs.view", include_in_schema=False)
-def get_random_songs(request: Request, size: int = Query(10)):
+def get_random_songs(request: Request, size: int = Query(10, ge=1, le=500)):
     try:
         _require_subsonic_auth(request)
     except SubsonicAuthError:
         return _subsonic_error(40, "Wrong username or password")
 
-    tracks = get_random_tracks(size)
+    tracks = get_random_global_tracks(size)
 
     return _subsonic_response(
         {
             "randomSongs": {
-                "song": [
-                    {
-                        "id": str(t["id"]),
-                        "title": t["title"],
-                        "artist": t["artist"],
-                        "album": t["album"],
-                        "albumId": f"al-{t['album_id']}" if t["album_id"] else None,
-                        "artistId": f"ar-{t['artist_id']}" if t["artist_id"] else None,
-                        "duration": t["duration"] or 0,
-                        "bitRate": t["bitrate"] or 0,
-                        "suffix": (t["format"] or "mp3").lower(),
-                        "contentType": _content_type(t["format"]),
-                        "coverArt": f"al-{t['album_id']}"
-                        if t["album_id"] and t["has_cover"]
-                        else None,
-                        "type": "music",
-                    }
-                    for t in tracks
-                ],
+                "song": [_global_song_payload(track) for track in tracks],
             }
         }
     )

@@ -5,11 +5,14 @@ interface RemotePlaybackResponse {
   stream_url: string;
   expires_at?: string;
   delivery_policy?: string;
+  playback_session: string;
+  content_origin: "remote";
 }
 
 interface RemotePlaybackCacheEntry {
   streamUrl: string;
   streamUrlExpiresAt?: string;
+  playbackSession: string;
 }
 
 const remotePlaybackCache = new Map<string, RemotePlaybackCacheEntry>();
@@ -53,6 +56,7 @@ export async function resolveRemotePlayableTrack(track: Track): Promise<Track> {
         ...track.remote,
         streamUrl: cached.streamUrl,
         streamUrlExpiresAt: cached.streamUrlExpiresAt,
+        playbackSession: cached.playbackSession,
       },
     };
   }
@@ -68,6 +72,7 @@ export async function resolveRemotePlayableTrack(track: Track): Promise<Track> {
             .then((payload) => ({
               streamUrl: payload.stream_url,
               streamUrlExpiresAt: payload.expires_at,
+              playbackSession: payload.playback_session,
             }))
             .then((entry) => {
               if (cacheKey) remotePlaybackCache.set(cacheKey, entry);
@@ -86,6 +91,7 @@ export async function resolveRemotePlayableTrack(track: Track): Promise<Track> {
       ...track.remote,
       streamUrl: response.streamUrl,
       streamUrlExpiresAt: response.streamUrlExpiresAt,
+      playbackSession: response.playbackSession,
     },
   };
 }

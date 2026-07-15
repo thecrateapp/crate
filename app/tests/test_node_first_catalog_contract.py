@@ -59,6 +59,7 @@ def test_federation_policy_has_no_instance_enabled_switch():
     assert not hasattr(policy, "FEDERATION_ENABLED")
     assert not hasattr(policy, "is_federation_enabled")
     assert not hasattr(policy, "require_federation_enabled")
+    assert not hasattr(policy, "DEFAULT_SEARCH_MODE")
 
 
 def test_cold_single_node_queues_a_catalog_backfill_on_startup(monkeypatch):

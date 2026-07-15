@@ -30,7 +30,7 @@ type cacheInvalidationEvent struct {
 
 func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 	if s.redis == nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -57,7 +57,7 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		latest, err := s.latestCacheEventID(r.Context())
 		if err != nil {
-			if s.fallback.ServeHTTP(w, r) {
+			if s.tryFallback(w, r) {
 				return
 			}
 			httpx.MarkReadplane(w, "miss")
@@ -70,7 +70,7 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 	pubsub := s.redis.Subscribe(r.Context(), cacheLiveChannel)
 	defer pubsub.Close()
 	if _, err := pubsub.Receive(r.Context()); err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")
@@ -80,7 +80,7 @@ func (s *Server) cacheEvents(w http.ResponseWriter, r *http.Request) {
 
 	missed, err := s.cacheEventsSince(r.Context(), lastEventID)
 	if err != nil {
-		if s.fallback.ServeHTTP(w, r) {
+		if s.tryFallback(w, r) {
 			return
 		}
 		httpx.MarkReadplane(w, "miss")

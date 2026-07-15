@@ -75,6 +75,24 @@ describe("Explore", () => {
     );
   });
 
+  it("loads decade details from the canonical catalog", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: { items: [], total: 0, page: 1, per_page: 50 },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithListenProviders(<Explore />, {
+      route: "/explore?decade=1990s",
+      path: "/explore",
+    });
+
+    expect(useApi).toHaveBeenCalledWith(
+      "/api/catalog/artists?decade=1990s&per_page=50",
+    );
+  });
+
   it("renders stronger feature cards and genre room editorial copy", () => {
     vi.mocked(useApi).mockReturnValue({
       data: {

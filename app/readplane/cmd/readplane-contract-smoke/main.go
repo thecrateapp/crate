@@ -66,29 +66,49 @@ func main() {
 		mustCheckP1(ctx, fastapi, readplane, token, cfg.p1Query)
 	}
 	mustCheckGenres(ctx, fastapi, readplane, token)
+	if cfg.checkGlobalCatalog {
+		mustCheckGlobalCatalog(ctx, fastapi, readplane, token, cfg.p1Query)
+	}
 }
 
 type smokeConfig struct {
-	fastapiBase   string
-	readplaneBase string
-	email         string
-	password      string
-	timeout       time.Duration
-	checkSSE      bool
-	checkP1       bool
-	p1Query       string
+	fastapiBase        string
+	readplaneBase      string
+	email              string
+	password           string
+	timeout            time.Duration
+	checkSSE           bool
+	checkP1            bool
+	checkGlobalCatalog bool
+	p1Query            string
 }
 
 func loadConfig() smokeConfig {
 	return smokeConfig{
-		fastapiBase:   env("FASTAPI_BASE", "http://127.0.0.1:8585"),
-		readplaneBase: env("READPLANE_BASE", "http://127.0.0.1:8686"),
-		email:         env("CRATE_AUTH_EMAIL", "admin@cratemusic.app"),
-		password:      env("CRATE_AUTH_PASSWORD", "admin"),
-		timeout:       durationEnv("READPLANE_CONTRACT_TIMEOUT", 15*time.Second),
-		checkSSE:      boolEnv("READPLANE_CONTRACT_CHECK_SSE", true),
-		checkP1:       boolEnv("READPLANE_CONTRACT_CHECK_P1", true),
-		p1Query:       env("READPLANE_CONTRACT_P1_QUERY", "high"),
+		fastapiBase:        env("FASTAPI_BASE", "http://127.0.0.1:8585"),
+		readplaneBase:      env("READPLANE_BASE", "http://127.0.0.1:8686"),
+		email:              env("CRATE_AUTH_EMAIL", "admin@cratemusic.app"),
+		password:           env("CRATE_AUTH_PASSWORD", "admin"),
+		timeout:            durationEnv("READPLANE_CONTRACT_TIMEOUT", 15*time.Second),
+		checkSSE:           boolEnv("READPLANE_CONTRACT_CHECK_SSE", true),
+		checkP1:            boolEnv("READPLANE_CONTRACT_CHECK_P1", true),
+		checkGlobalCatalog: boolEnv("READPLANE_CONTRACT_CHECK_GLOBAL_CATALOG", true),
+		p1Query:            env("READPLANE_CONTRACT_P1_QUERY", "high"),
+	}
+}
+
+func mustCheckGlobalCatalog(ctx context.Context, fastapi contract.Client, readplane contract.Client, token string, query string) {
+	checks := []check{
+		{name: "catalog/search", path: "/api/catalog/search?q=" + queryEscape(query) + "&limit=5"},
+		{name: "catalog/genres", path: "/api/catalog/genres"},
+		{name: "catalog/me/artists", path: "/api/catalog/me/artists"},
+		{name: "catalog/me/albums", path: "/api/catalog/me/albums"},
+		{name: "catalog/me/follows", path: "/api/catalog/me/follows"},
+		{name: "catalog/me/albums/saved", path: "/api/catalog/me/albums/saved"},
+	}
+	for _, item := range checks {
+		mustEnsureGET(ctx, fastapi, readplane, item, token, "hit")
+		mustCompareGET(ctx, fastapi, readplane, item, token)
 	}
 }
 

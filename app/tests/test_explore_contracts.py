@@ -39,11 +39,12 @@ class TestExploreFiltersContract:
         mock_scope = _make_mock_session(
             [
                 [{"name": "Metalcore", "cnt": 4}, {"name": "Post-Hardcore", "cnt": 2}],
+                [],
                 [{"country": "US", "cnt": 3}],
                 [
-                    {"formed": "1994-01-01"},
-                    {"formed": "2005"},
-                    {"formed": "2001-08-09"},
+                    {"year": "1994"},
+                    {"year": "2005"},
+                    {"year": "2001"},
                 ],
                 [{"format": "FLAC", "cnt": 12}],
             ]

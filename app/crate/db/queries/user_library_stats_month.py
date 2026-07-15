@@ -6,13 +6,10 @@ from datetime import date, datetime, timezone
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 
 def _global_stats_refs_enabled() -> bool:
-    return global_catalog_surface_enabled("stats") or global_catalog_surface_enabled(
-        "home"
-    )
+    return True
 
 
 def month_bounds(month: str) -> tuple[datetime, datetime]:

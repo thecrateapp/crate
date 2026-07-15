@@ -468,7 +468,7 @@ export function JamSession() {
     const timer = window.setTimeout(() => {
       setQueueSearchLoading(true);
       api<SearchData>(
-        `/api/search?q=${encodeURIComponent(query)}&limit=8`,
+        `/api/catalog/search?q=${encodeURIComponent(query)}&limit=8`,
         "GET",
         undefined,
         { signal: controller.signal },

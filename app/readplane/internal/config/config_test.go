@@ -21,6 +21,7 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, defaultQueryTimeoutMS*time.Millisecond, cfg.QueryTimeout)
 		assert.True(t, cfg.Enabled, "Enabled should default to true")
 		assert.True(t, cfg.FallbackEnabled, "FallbackEnabled should default to true")
+		assert.True(t, cfg.FederationProxyEnabled, "federation proxy should default to true")
 	})
 
 	t.Run("parses overrides", func(t *testing.T) {
@@ -30,6 +31,9 @@ func TestLoad(t *testing.T) {
 		t.Setenv("READPLANE_QUERY_TIMEOUT_MS", "1500")
 		t.Setenv("READPLANE_ENABLE_SSE", "0")
 		t.Setenv("READPLANE_FALLBACK_ENABLED", "yes")
+		t.Setenv("READPLANE_FEDERATION_PROXY_ENABLED", "false")
+		t.Setenv("CRATE_READPLANE_SERVICE_TOKEN", "service-token")
+		t.Setenv("CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS", "true")
 
 		cfg := Load("test")
 
@@ -39,6 +43,9 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, 1500*time.Millisecond, cfg.QueryTimeout)
 		assert.False(t, cfg.EnableSSE, "EnableSSE should parse false")
 		assert.True(t, cfg.FallbackEnabled, "FallbackEnabled should parse yes")
+		assert.False(t, cfg.FederationProxyEnabled)
+		assert.Equal(t, "service-token", cfg.ServiceToken)
+		assert.True(t, cfg.FederationAllowPrivateNetworks)
 	})
 
 	t.Run("builds database URL from Crate Postgres env vars", func(t *testing.T) {

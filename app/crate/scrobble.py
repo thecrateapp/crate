@@ -12,6 +12,11 @@ from dataclasses import dataclass
 
 import requests
 
+from crate.db.jobs.scrobble_dispatch import (
+    claim_scrobble_dispatch,
+    finish_scrobble_dispatch,
+)
+
 log = logging.getLogger(__name__)
 
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
@@ -292,3 +297,41 @@ def scrobble_play_event(
 
     except Exception:
         log.debug("scrobble_play_event failed for user %s", user_id, exc_info=True)
+
+
+def _claim_scrobble_dispatch(event_id: int) -> tuple[str, dict | None]:
+    return claim_scrobble_dispatch(event_id)
+
+
+def _finish_scrobble_dispatch(
+    event_id: int, status: str, *, error: str | None = None
+) -> None:
+    finish_scrobble_dispatch(event_id, status, error=error)
+
+
+def dispatch_scrobble_play_event(event_id: int) -> str:
+    """Dispatch one completed play event at most once per database claim."""
+    status, event = _claim_scrobble_dispatch(event_id)
+    if event is None:
+        return status
+
+    if event["content_origin"] == "remote" and not event["remote_scrobbling_enabled"]:
+        _finish_scrobble_dispatch(event_id, "skipped")
+        return "skipped"
+
+    started_at = event.get("started_at")
+    timestamp = int(started_at.timestamp()) if started_at is not None else None
+    try:
+        scrobble_play_event(
+            int(event["user_id"]),
+            artist=str(event.get("artist") or ""),
+            track=str(event.get("title") or ""),
+            album=str(event.get("album") or ""),
+            timestamp=timestamp,
+        )
+    except Exception as exc:
+        _finish_scrobble_dispatch(event_id, "failed", error=str(exc)[:1000])
+        raise
+
+    _finish_scrobble_dispatch(event_id, "completed")
+    return "completed"

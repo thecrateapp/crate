@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import text
-
-from crate.db.tx import read_scope
+from crate.db.queries.global_source_selection import list_global_source_candidates
 
 
 class GlobalEntityNotFound(Exception):
@@ -18,11 +16,7 @@ class NoGlobalSource(Exception):
     """Raised when no healthy source can serve the requested facet."""
 
 
-_ENTITY_TABLES = {
-    "artist": ("global_catalog_artists", "global_artist_uid"),
-    "album": ("global_catalog_albums", "global_album_uid"),
-    "track": ("global_catalog_tracks", "global_track_uid"),
-}
+_ENTITY_TYPES = {"artist", "album", "track"}
 
 _PREFERRED_COLUMNS = {
     "artist_background": "preferred_for_artwork",
@@ -46,52 +40,15 @@ def resolve_global_source(
     facet: str,
 ) -> dict[str, Any]:
     """Return the best local or federated source for a global entity facet."""
-    if entity_type not in _ENTITY_TABLES:
+    if entity_type not in _ENTITY_TYPES:
         raise GlobalEntityNotFound(global_entity_uid)
 
-    with read_scope() as session:
-        if not _entity_exists(session, entity_type, global_entity_uid):
-            raise GlobalEntityNotFound(global_entity_uid)
-
-        rows = [
-            dict(row)
-            for row in session.execute(
-                text(
-                    """
-                    SELECT
-                        s.entity_type,
-                        s.global_entity_uid::text AS global_entity_uid,
-                        s.source_kind,
-                        s.node_uid::text AS node_uid,
-                        s.remote_entity_uid,
-                        s.local_id,
-                        s.local_entity_uid::text AS local_entity_uid,
-                        s.source_revision,
-                        s.source_payload_json,
-                        s.match_confidence,
-                        s.preferred_for_display,
-                        s.preferred_for_artwork,
-                        s.preferred_for_playback,
-                        s.updated_at,
-                        n.trust_state,
-                        n.disabled_at,
-                        n.health_json
-                    FROM global_catalog_sources s
-                    LEFT JOIN federation_nodes n ON n.node_uid = s.node_uid
-                    WHERE s.entity_type = :entity_type
-                      AND s.global_entity_uid = :global_entity_uid
-                      AND NOT s.source_stale
-                      AND s.source_deleted_at IS NULL
-                    """
-                ),
-                {
-                    "entity_type": entity_type,
-                    "global_entity_uid": global_entity_uid,
-                },
-            )
-            .mappings()
-            .all()
-        ]
+    rows = list_global_source_candidates(
+        entity_type=entity_type,
+        global_entity_uid=global_entity_uid,
+    )
+    if rows is None:
+        raise GlobalEntityNotFound(global_entity_uid)
 
     candidates = [
         candidate
@@ -121,15 +78,6 @@ def resolve_global_source(
     return result
 
 
-def _entity_exists(session, entity_type: str, global_entity_uid: str) -> bool:
-    table_name, id_column = _ENTITY_TABLES[entity_type]
-    row = session.execute(
-        text(f"SELECT 1 FROM {table_name} WHERE {id_column} = :global_entity_uid"),
-        {"global_entity_uid": global_entity_uid},
-    ).first()
-    return row is not None
-
-
 def _candidate_for(row: dict[str, Any], facet: str) -> _Candidate | None:
     if row["source_kind"] == "federated" and not _peer_is_usable(row):
         return None
@@ -142,7 +90,11 @@ def _candidate_for(row: dict[str, Any], facet: str) -> _Candidate | None:
     latency = _latency_ms(row)
     confidence = -float(row.get("match_confidence") or 0)
     updated_at = row.get("updated_at")
-    updated_rank = -updated_at.timestamp() if hasattr(updated_at, "timestamp") else 0
+    timestamp = getattr(updated_at, "timestamp", None)
+    timestamp_value = timestamp() if callable(timestamp) else None
+    updated_rank = (
+        -float(timestamp_value) if isinstance(timestamp_value, int | float | str) else 0
+    )
     stable_rank = str(row.get("remote_entity_uid") or row.get("local_entity_uid") or "")
 
     return _Candidate(
@@ -162,7 +114,7 @@ def _candidate_for(row: dict[str, Any], facet: str) -> _Candidate | None:
 def _peer_is_usable(row: dict[str, Any]) -> bool:
     trust_state = row.get("trust_state")
     if trust_state is None:
-        return True
+        return False
     if trust_state != "approved" or row.get("disabled_at") is not None:
         return False
     health = _health(row)

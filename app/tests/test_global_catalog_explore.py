@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import text
 
 import crate.db.queries.genres_library_detail as genres_library_detail
-from tests.conftest import PG_AVAILABLE
+from tests.conftest import approve_federation_node, PG_AVAILABLE
 
 
 class _Rows:
@@ -117,6 +117,7 @@ def test_remote_only_genre_detail_resolves_global_entities(pg_db, monkeypatch):
     artist_uid = str(uuid.uuid4())
     album_uid = str(uuid.uuid4())
     with transaction_scope() as session:
+        approve_federation_node(session, node_uid)
         for item in [
             {
                 "remote_entity_uid": artist_uid,
@@ -194,11 +195,6 @@ def test_remote_only_genre_detail_resolves_global_entities(pg_db, monkeypatch):
                 },
             )
 
-    monkeypatch.setattr(
-        genres_library_detail,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "explore",
-    )
     reconcile_remote_catalog()
 
     detail = genres_library_detail.get_genre_detail("post-punk")

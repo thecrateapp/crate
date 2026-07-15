@@ -7,7 +7,6 @@ from crate.db.queries.genres_shared import (
     get_taxonomy_node_stats,
 )
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.genre_taxonomy import (
     get_genre_catalog,
     get_genre_description,
@@ -164,8 +163,6 @@ def get_genre_detail(slug: str) -> dict | None:
     with read_scope() as session:
         genre = get_genre_summary_by_slug(session, slug)
         if not genre:
-            if not global_catalog_surface_enabled("explore"):
-                return None
             return _build_global_only_genre_detail(session, slug)
         if not genre.get("description") and not genre.get("mapped"):
             genre["description"] = (
@@ -304,8 +301,7 @@ def get_genre_detail(slug: str) -> dict | None:
             .all()
         )
         genre["albums"] = [dict(r) for r in rows]
-        if global_catalog_surface_enabled("explore"):
-            _augment_global_genre_entities(session, genre)
+        _augment_global_genre_entities(session, genre)
         genre["artist_count"] = len(genre["artists"])
         genre["album_count"] = len(genre["albums"])
         genre["track_count"] = sum(

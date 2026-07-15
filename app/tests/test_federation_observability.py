@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+from pathlib import Path
+import re
+from types import SimpleNamespace
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    ("local_node", "peers", "expected"),
+    [
+        (None, [], "unconfigured_singleton"),
+        ({"capabilities_json": {"catalog.search": False}}, [], "disabled"),
+        ({"capabilities_json": {"catalog.search": True}}, [], "healthy_singleton"),
+        (
+            {"capabilities_json": {"catalog.search": True}},
+            [{"health_json": {"healthy": True}, "disabled_at": None}],
+            "healthy",
+        ),
+        (
+            {"capabilities_json": {"catalog.search": True}},
+            [
+                {"health_json": {"healthy": True}, "disabled_at": None},
+                {"health_json": {"healthy": False}, "disabled_at": None},
+            ],
+            "degraded",
+        ),
+        (
+            {"capabilities_json": {"catalog.search": True}},
+            [{"health_json": {"healthy": False}, "disabled_at": None}],
+            "unavailable",
+        ),
+    ],
+)
+def test_health_distinguishes_legitimate_singleton_and_peer_failure(
+    monkeypatch, local_node, peers, expected
+):
+    from crate.federation import health
+
+    monkeypatch.setattr(health.repo, "get_local_node", lambda: local_node)
+    monkeypatch.setattr(health.repo, "list_peers", lambda **_kwargs: peers)
+
+    assert health.federation_health_snapshot()["state"] == expected
+
+
+def test_federation_metric_tags_reject_secrets_urls_and_unbounded_reasons():
+    from crate.metrics import federation_metric_tags
+
+    tags = federation_metric_tags(
+        peer_uid="11111111-1111-4111-8111-111111111111",
+        reason_code="signature_invalid",
+    )
+    assert tags == {
+        "peer_uid": "11111111-1111-4111-8111-111111111111",
+        "reason_code": "signature_invalid",
+    }
+
+    with pytest.raises(ValueError):
+        federation_metric_tags(
+            peer_uid="https://peer.example/?token=secret",
+            reason_code="anything-from-upstream",
+        )
+
+
+def test_admin_health_returns_snapshot_for_unconfigured_node(monkeypatch):
+    from crate.api import admin_federation
+
+    monkeypatch.setattr(
+        "crate.federation.health.federation_health_snapshot",
+        lambda: {"state": "unconfigured_singleton", "ok": True},
+    )
+    request = SimpleNamespace(
+        state=SimpleNamespace(
+            user={"id": 1, "role": "admin", "permissions": ["federation.nodes.view"]}
+        )
+    )
+
+    assert admin_federation.get_federation_health(request) == {
+        "state": "unconfigured_singleton",
+        "ok": True,
+    }
+
+
+def test_slo_document_defines_windows_alerts_and_runbooks():
+    document = Path("docs/technical/federation-slos.md").read_text()
+    for text in (
+        "99.5%",
+        "p95",
+        "5 minutes",
+        "Alert window",
+        "Runbook",
+        "cardinality",
+    ):
+        assert text in document
+
+
+def test_slo_document_local_runbook_links_resolve():
+    source = Path("docs/technical/federation-slos.md")
+    for target in re.findall(r"\[[^]]+]\(([^)]+)\)", source.read_text()):
+        if "://" in target:
+            continue
+        relative_path, _, anchor = target.partition("#")
+        destination = source.parent / relative_path
+        assert destination.is_file(), target
+        if anchor:
+            headings = {
+                re.sub(r"[^a-z0-9 -]", "", line.lstrip("# ").lower()).replace(" ", "-")
+                for line in destination.read_text().splitlines()
+                if line.startswith("#")
+            }
+            assert anchor in headings, target

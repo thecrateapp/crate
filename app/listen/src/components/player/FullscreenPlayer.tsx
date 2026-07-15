@@ -245,6 +245,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.libraryTrackId ?? null,
         currentTrack.entityUid ?? null,
         currentTrack.path || currentTrack.id,
+        currentTrack.globalTrackUid ?? null,
       )
     : false;
 
@@ -282,6 +283,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         currentTrack.libraryTrackId ?? null,
         currentTrack.entityUid ?? null,
         currentTrack.path || currentTrack.id,
+        currentTrack.globalTrackUid ?? null,
       );
       toast.success(
         nextLiked

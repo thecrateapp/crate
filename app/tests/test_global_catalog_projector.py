@@ -33,11 +33,6 @@ def test_projector_refreshes_ops_for_global_catalog_reconcile_event(monkeypatch)
     )
     monkeypatch.setattr(
         projector,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "home",
-    )
-    monkeypatch.setattr(
-        projector,
         "mark_domain_events_processed",
         lambda event_ids: calls["processed"].append(event_ids),
     )
@@ -88,11 +83,6 @@ def test_projector_refreshes_home_for_global_source_changed(monkeypatch):
         projector,
         "list_recent_home_user_ids",
         lambda window_minutes=30, limit=10: [7],
-    )
-    monkeypatch.setattr(
-        projector,
-        "global_catalog_surface_enabled",
-        lambda surface: surface == "home",
     )
     monkeypatch.setattr(
         projector,

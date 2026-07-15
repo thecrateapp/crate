@@ -7,13 +7,10 @@ from crate.db.queries.user_library_shared import (
     window_day_cutoff,
 )
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 
 def _global_stats_refs_enabled() -> bool:
-    return global_catalog_surface_enabled("stats") or global_catalog_surface_enabled(
-        "home"
-    )
+    return True
 
 
 def get_play_stats(user_id: int) -> dict:

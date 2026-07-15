@@ -175,7 +175,7 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/quicksand");
   });
 
-  it("builds public artist share paths from stable identity", () => {
+  it("builds fully human artist share paths", () => {
     expect(
       artistSharePath({
         artistId: 7,
@@ -183,7 +183,7 @@ describe("library route asset helpers", () => {
         artistSlug: "quicksand",
         artistName: "Quicksand",
       }),
-    ).toBe("/share/artist/artist-entity-7/quicksand");
+    ).toBe("/share/artist/quicksand");
   });
 
   it("builds nested album paths under the artist when the slug is not reserved", () => {
@@ -263,7 +263,7 @@ describe("library route asset helpers", () => {
     ).toBe("/artists/lip-critic/lip-critic-ii");
   });
 
-  it("falls back to the legacy album route for reserved child slugs", () => {
+  it("keeps reserved album slugs human without colliding with artist children", () => {
     const path = albumPagePath({
       albumId: 9,
       artistSlug: "quicksand",
@@ -272,7 +272,7 @@ describe("library route asset helpers", () => {
       albumName: "Top Tracks",
     });
 
-    expect(path).toBe("/albums/9/quicksand-top-tracks");
+    expect(path).toBe("/artists/quicksand/albums/top-tracks");
     expect(isReservedArtistChildSlug("top-tracks")).toBe(true);
   });
 
@@ -287,15 +287,16 @@ describe("library route asset helpers", () => {
     expect(path).toBe("/api/artist-slugs/quicksand/albums/slip");
   });
 
-  it("builds public album share paths from stable identity", () => {
+  it("builds fully human album share paths", () => {
     expect(
       albumSharePath({
         albumId: 9,
         albumEntityUid: "album-entity-9",
+        artistName: "Quicksand",
         albumSlug: "quicksand-slip",
         albumName: "Slip",
       }),
-    ).toBe("/share/album/album-entity-9/slip");
+    ).toBe("/share/album/quicksand/slip");
   });
 
   it("falls back to entity UID album APIs and artwork when slugs and numeric ids are unavailable", () => {
@@ -311,29 +312,47 @@ describe("library route asset helpers", () => {
     );
   });
 
-  it("builds global catalog page and cover URLs", () => {
+  it("builds human global catalog page URLs while keeping global asset URLs internal", () => {
     expect(
       globalArtistPagePath({
         globalArtistUid: "257828ee-c041-574d-aedf-2f74ca60e1fa",
         artistName: "High Vis",
       }),
-    ).toBe("/catalog/artists/high-vis--257828ee-c041-574d-aedf-2f74ca60e1fa");
+    ).toBe("/artists/high-vis");
     expect(
       globalArtistPagePath({
         globalArtistUid: "artist-global-1",
+        artistName: "Birds In Row",
       }),
-    ).toBe("/catalog/artists/artist-global-1");
+    ).toBe("/artists/birds-in-row");
     expect(
       globalAlbumPagePath({
         globalAlbumUid: "album-global-1",
+        artistName: "High Vis",
         albumName: "No Sense No Feeling",
       }),
-    ).toBe("/catalog/albums/no-sense-no-feeling--album-global-1");
+    ).toBe("/artists/high-vis/no-sense-no-feeling");
     expect(
       albumCoverApiUrl({ globalAlbumUid: "album-global-1" }, { size: 256 }),
     ).toBe(
       "https://api.example.test/api/catalog/albums/album-global-1/cover?size=256&format=webp&token=listen-token",
     );
+  });
+
+  it("never exposes global identifiers in public share URLs", () => {
+    expect(
+      artistSharePath({
+        globalArtistUid: "257828ee-c041-574d-aedf-2f74ca60e1fa",
+        artistName: "High Vis",
+      }),
+    ).toBe("/share/artist/high-vis");
+    expect(
+      albumSharePath({
+        globalAlbumUid: "40919666-af53-5810-a574-9cfeb5cec68b",
+        artistName: "High Vis",
+        albumName: "Blending",
+      }),
+    ).toBe("/share/album/high-vis/blending");
   });
 
   it("parses human global catalog route refs back to stable UIDs", () => {

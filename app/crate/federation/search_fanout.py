@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+from datetime import datetime, timezone
+from typing import Any
 
 from crate.db.queries.browse_media_search import search_all_hybrid
 from crate.db.repositories import federation as repo
@@ -20,6 +22,23 @@ log = logging.getLogger(__name__)
 
 MAX_CONCURRENT_PEERS = 2
 DEFAULT_PEER_SEARCH_TIMEOUT_MS = 600
+FANOUT_DEADLINE_SECONDS = 2.0
+
+
+def _peer_is_in_backoff(peer: dict, *, now: datetime | None = None) -> bool:
+    health = peer.get("health_json")
+    if not isinstance(health, dict) or health.get("healthy") is not False:
+        return False
+    raw_backoff_until = health.get("backoff_until")
+    if not isinstance(raw_backoff_until, str):
+        return False
+    try:
+        backoff_until = datetime.fromisoformat(raw_backoff_until.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if backoff_until.tzinfo is None:
+        backoff_until = backoff_until.replace(tzinfo=timezone.utc)
+    return backoff_until > (now or datetime.now(timezone.utc))
 
 
 def _search_one_peer(
@@ -106,7 +125,9 @@ def _tag_remote_results(data: dict, peer: dict) -> dict:
 def _get_approved_peers_for_search() -> list[dict]:
     """Return approved peers that should receive search queries."""
     peers = repo.list_peers(trust_state="approved")
-    return [p for p in peers if p.get("disabled_at") is None]
+    return [
+        p for p in peers if p.get("disabled_at") is None and not _peer_is_in_backoff(p)
+    ]
 
 
 def _merge_results(
@@ -162,7 +183,7 @@ def federated_search(
     scope: str = "local",
     local_node: dict | None = None,
     user: dict | None = None,
-) -> dict:
+) -> dict[str, Any]:
     if scope == "local":
         return search_all_hybrid(query, limit)
 
@@ -170,20 +191,24 @@ def federated_search(
     peers = _get_approved_peers_for_search()
 
     if not peers:
-        return local
+        return _with_federation_status(local)
 
     if scope == "auto" and _has_strong_local_matches(local):
-        return local
+        return _with_federation_status(local)
 
     remote_results: list[dict] = []
+    completed_peer_uids: set[str] = set()
+    failed_peer_uids: set[str] = set()
+    timed_out_peer_uids: set[str] = set()
     indexed_results = _search_local_index(query, limit, peers)
     if indexed_results:
         remote_results.extend(indexed_results)
 
     # Live fan-out
-    with concurrent.futures.ThreadPoolExecutor(
+    executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=min(MAX_CONCURRENT_PEERS, len(peers))
-    ) as executor:
+    )
+    try:
         futures = {}
         for peer in peers:
             if not local_node:
@@ -198,18 +223,73 @@ def federated_search(
             )
             futures[future] = peer
 
-        for future in concurrent.futures.as_completed(futures, timeout=2.0):
-            try:
-                result = future.result(timeout=1.0)
-                if result:
-                    remote_results.append(result)
-            except Exception as e:
-                log.debug("Peer search future failed: %s", e)
+        try:
+            for future in concurrent.futures.as_completed(
+                futures, timeout=FANOUT_DEADLINE_SECONDS
+            ):
+                try:
+                    result = future.result()
+                    peer_uid = str(futures[future]["node_uid"])
+                    if result is None:
+                        failed_peer_uids.add(peer_uid)
+                    else:
+                        completed_peer_uids.add(peer_uid)
+                        remote_results.append(result)
+                except Exception as exc:
+                    failed_peer_uids.add(str(futures[future]["node_uid"]))
+                    log.debug("Peer search future failed: %s", exc)
+        except TimeoutError:
+            timed_out_peer_uids.update(
+                str(peer["node_uid"])
+                for future, peer in futures.items()
+                if not future.done()
+            )
+            log.info(
+                "Federated search returned partial results; %d peer(s) timed out",
+                len(timed_out_peer_uids),
+            )
+    finally:
+        for future in futures:
+            future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
 
-    if not remote_results:
-        return local
+    attempted_peer_uids = {str(peer["node_uid"]) for peer in peers}
+    unattempted_peer_uids = attempted_peer_uids - {
+        *completed_peer_uids,
+        *failed_peer_uids,
+        *timed_out_peer_uids,
+    }
+    failed_peer_uids.update(unattempted_peer_uids)
+    payload = _merge_results(local, remote_results) if remote_results else local
+    return _with_federation_status(
+        payload,
+        attempted_peers=len(peers),
+        completed_peers=len(completed_peer_uids),
+        failed_peer_uids=failed_peer_uids,
+        timed_out_peer_uids=timed_out_peer_uids,
+    )
 
-    return _merge_results(local, remote_results)
+
+def _with_federation_status(
+    payload: dict,
+    *,
+    attempted_peers: int = 0,
+    completed_peers: int = 0,
+    failed_peer_uids: set[str] | None = None,
+    timed_out_peer_uids: set[str] | None = None,
+) -> dict[str, Any]:
+    failed = sorted(failed_peer_uids or ())
+    timed_out = sorted(timed_out_peer_uids or ())
+    return {
+        **payload,
+        "federation": {
+            "complete": not failed and not timed_out,
+            "attempted_peers": attempted_peers,
+            "completed_peers": completed_peers,
+            "failed_peer_uids": failed,
+            "timed_out_peer_uids": timed_out,
+        },
+    }
 
 
 def _has_strong_local_matches(local: dict) -> bool:

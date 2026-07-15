@@ -190,8 +190,9 @@ const followingArtistNameQuery = `
 
 // Store provides read-only catalog queries backed by a PostgreSQL pool.
 type Store struct {
-	pool         *pgxpool.Pool
-	queryTimeout time.Duration
+	pool                 *pgxpool.Pool
+	queryTimeout         time.Duration
+	globalCatalogReadyFn func(context.Context) (bool, error)
 }
 
 type historyFallbackRef struct {

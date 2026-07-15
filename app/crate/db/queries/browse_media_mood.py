@@ -6,7 +6,6 @@ from typing import Any
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 _MOOD_COLUMNS = {
     "acousticness",
@@ -56,22 +55,7 @@ def count_mood_tracks(conditions: list[str], params: list) -> int:
     # conditions originate from _mood_filter_expression which validates
     # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
-    if global_catalog_surface_enabled("explore"):
-        return _count_global_mood_tracks(named_conditions, named_params)
-
-    with read_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    "SELECT COUNT(*) AS cnt FROM library_tracks WHERE "
-                    + " AND ".join(named_conditions)
-                ),
-                named_params,
-            )
-            .mappings()
-            .first()
-        )
-        return int(row["cnt"] or 0) if row is not None else 0
+    return _count_global_mood_tracks(named_conditions, named_params)
 
 
 def count_mood_presets(presets: Mapping[str, Mapping[str, Any]]) -> dict[str, int]:
@@ -88,27 +72,7 @@ def count_mood_presets(presets: Mapping[str, Mapping[str, Any]]) -> dict[str, in
         params.update(expression_params)
         aliases[name] = alias
 
-    if global_catalog_surface_enabled("explore"):
-        return _count_global_mood_presets(select_parts, params, aliases)
-
-    # select_parts are built internally from _mood_filter_expression
-    # which validates columns against the _MOOD_COLUMNS whitelist.
-    with read_scope() as session:
-        row = (
-            session.execute(
-                text(
-                    "SELECT "
-                    + ", ".join(select_parts)
-                    + " FROM library_tracks WHERE bpm IS NOT NULL"
-                ),
-                params,
-            )
-            .mappings()
-            .first()
-        )
-
-    counts = dict(row or {})
-    return {name: int(counts.get(alias) or 0) for name, alias in aliases.items()}
+    return _count_global_mood_presets(select_parts, params, aliases)
 
 
 def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dict]:
@@ -116,50 +80,7 @@ def get_mood_tracks(conditions: list[str], params: list, limit: int) -> list[dic
     # column names against _MOOD_COLUMNS whitelist; values use SQL params.
     named_conditions, named_params = _convert_mood_params(conditions, params)
     named_params["limit"] = limit
-    if global_catalog_surface_enabled("explore"):
-        return _get_global_mood_tracks(named_conditions, named_params)
-
-    with read_scope() as session:
-        rows = (
-            session.execute(
-                text(
-                    """SELECT t.id, t.title, t.artist, a.name AS album, t.path, t.duration,
-                           t.entity_uid::text AS entity_uid,
-                           ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
-                           a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
-                           t.bpm, t.energy, t.danceability, t.valence
-                    FROM library_tracks t
-                    JOIN library_albums a ON a.id = t.album_id
-                    LEFT JOIN library_artists ar ON ar.name = t.artist
-                    WHERE """
-                    + " AND ".join(named_conditions)
-                    + """
-                    ORDER BY RANDOM() LIMIT :limit"""
-                ),
-                named_params,
-            )
-            .mappings()
-            .all()
-        )
-        items: list[dict] = []
-        for row in rows:
-            item = dict(row)
-            entity_uid = (
-                str(item["entity_uid"]) if item.get("entity_uid") is not None else None
-            )
-            item["entity_uid"] = entity_uid
-            item["artist_entity_uid"] = (
-                str(item["artist_entity_uid"])
-                if item.get("artist_entity_uid") is not None
-                else None
-            )
-            item["album_entity_uid"] = (
-                str(item["album_entity_uid"])
-                if item.get("album_entity_uid") is not None
-                else None
-            )
-            items.append(item)
-        return items
+    return _get_global_mood_tracks(named_conditions, named_params)
 
 
 _GLOBAL_MOOD_TRACKS_CTE = """

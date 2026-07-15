@@ -878,6 +878,7 @@ export function PlayerBar() {
     displayTrack.libraryTrackId ?? null,
     displayTrack.entityUid ?? null,
     displayTrack.path || displayTrack.id,
+    displayTrack.globalTrackUid ?? null,
   );
 
   function prepareQueuePanel() {
@@ -959,10 +960,20 @@ export function PlayerBar() {
     const trackPath = displayTrack.path || displayTrack.id;
     try {
       if (liked) {
-        await unlikeTrack(trackId, trackEntityUid, trackPath);
+        await unlikeTrack(
+          trackId,
+          trackEntityUid,
+          trackPath,
+          displayTrack.globalTrackUid ?? null,
+        );
         return false;
       } else {
-        await likeTrack(trackId, trackEntityUid, trackPath);
+        await likeTrack(
+          trackId,
+          trackEntityUid,
+          trackPath,
+          displayTrack.globalTrackUid ?? null,
+        );
         return true;
       }
     } catch {
@@ -1003,6 +1014,7 @@ export function PlayerBar() {
         displayTrack.libraryTrackId ?? null,
         displayTrack.entityUid ?? null,
         displayTrack.path || displayTrack.id,
+        displayTrack.globalTrackUid ?? null,
       );
       toast.success("Added to collection");
     } catch {
@@ -1310,6 +1322,7 @@ export function PlayerBar() {
                     <RadioFeedback
                       sessionId={shapedRadioSessionId!}
                       trackId={displayTrack.libraryTrackId}
+                      globalTrackUid={displayTrack.globalTrackUid}
                       onDislike={handleNextTrack}
                     />
                   )}

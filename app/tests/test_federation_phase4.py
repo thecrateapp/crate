@@ -11,18 +11,18 @@ from crate.federation.catalog import (
 
 
 class TestStaleMarkers:
-    @patch("crate.federation.catalog.get_cursor")
+    @patch("crate.db.repositories.federation_catalog.get_cursor")
     def test_no_cursor_is_stale(self, mock_get_cursor):
         mock_get_cursor.return_value = None
         assert is_catalog_stale("node-1") is True
 
-    @patch("crate.federation.catalog.get_cursor")
+    @patch("crate.db.repositories.federation_catalog.get_cursor")
     def test_recent_cursor_is_fresh(self, mock_get_cursor):
         now = datetime.now(timezone.utc)
-        mock_get_cursor.return_value = {"updated_at": now}
+        mock_get_cursor.return_value = {"full_sync_completed_at": now}
         assert is_catalog_stale("node-1") is False
 
-    @patch("crate.federation.catalog.get_cursor")
+    @patch("crate.db.repositories.federation_catalog.get_cursor")
     def test_old_cursor_is_stale(self, mock_get_cursor):
         old = datetime.now(timezone.utc) - timedelta(hours=STALE_THRESHOLD_HOURS + 1)
         mock_get_cursor.return_value = {"updated_at": old}
@@ -44,7 +44,7 @@ class TestCatalogSearchSQL:
 
 
 class TestCatalogCount:
-    @patch("crate.federation.catalog.read_scope")
+    @patch("crate.db.repositories.federation_catalog.read_scope")
     def test_count_catalog_items(self, mock_read_scope):
         from crate.federation.catalog import count_catalog_items
 

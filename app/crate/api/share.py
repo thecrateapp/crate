@@ -13,7 +13,12 @@ from fastapi.responses import HTMLResponse, Response
 from crate.api._deps import library_path
 from crate.api.browse_shared import ARTIST_PHOTO_NAMES
 from crate.api.image_variants import build_image_response
-from crate.db.queries.global_catalog import get_global_track_info
+from crate.db.queries.global_catalog import (
+    GlobalCatalogPublicRouteConflict,
+    get_global_album_detail_by_public_slugs,
+    get_global_artist_page_by_public_slug,
+    get_global_track_info,
+)
 from crate.db.repositories.library_album_reads import (
     get_library_album_by_entity_uid,
     get_library_album_by_id,
@@ -42,6 +47,7 @@ _IMAGE_HEADERS = {
     "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"
 }
 LibraryRow = Mapping[str, Any]
+_RESERVED_ARTIST_CHILD_SLUGS = {"top-tracks", "shows", "radio"}
 
 
 def _is_uuid(value: str) -> bool:
@@ -94,6 +100,10 @@ def _album_app_path(album: LibraryRow, artist: LibraryRow | None = None) -> str:
     album_slug = album.get("slug") or build_public_album_slug(album.get("name"))
     public_album_slug = build_public_album_slug(album.get("name") or album_slug)
     if artist_slug and public_album_slug:
+        if public_album_slug in _RESERVED_ARTIST_CHILD_SLUGS:
+            return (
+                f"/artists/{_encode(artist_slug)}/albums/{_encode(public_album_slug)}"
+            )
         return f"/artists/{_encode(artist_slug)}/{_encode(public_album_slug)}"
     return f"/albums/{album['id']}/{_encode(album_slug or 'album')}"
 
@@ -119,9 +129,11 @@ def _track_app_path(
 
 def _global_track_app_path(track: LibraryRow) -> str:
     track_ref = track.get("global_track_uid")
-    album_ref = track.get("global_album_uid")
-    if album_ref:
-        return f"/catalog/albums/{_encode(album_ref)}?track={_encode(track_ref)}"
+    artist_name = str(track.get("artist") or "").strip()
+    album_name = str(track.get("album") or "").strip()
+    if artist_name and album_name:
+        path = _album_app_path({"artist": artist_name, "name": album_name})
+        return f"{path}?track={_encode(track_ref)}" if track_ref else path
     query = quote(
         " ".join(
             str(track.get(key) or "")
@@ -138,7 +150,11 @@ def _resolve_artist(ref: str) -> LibraryRow | None:
         return get_library_artist_by_entity_uid(ref)
     if ref.isdigit():
         return get_library_artist_by_id(int(ref))
-    return get_library_artist_by_slug(ref)
+    artist = get_library_artist_by_slug(ref)
+    if artist:
+        return artist
+    page = get_global_artist_page_by_public_slug(ref)
+    return page.get("artist") if page else None
 
 
 def _resolve_album(ref: str) -> LibraryRow | None:
@@ -147,6 +163,21 @@ def _resolve_album(ref: str) -> LibraryRow | None:
     if ref.isdigit():
         return get_library_album_by_id(int(ref))
     return None
+
+
+def _resolve_album_by_public_slugs(
+    artist_slug: str, album_slug: str
+) -> LibraryRow | None:
+    artist = get_library_artist_by_slug(artist_slug)
+    if artist:
+        matches = [
+            album
+            for album in get_library_albums(str(artist.get("name") or ""))
+            if build_public_album_slug(str(album.get("name") or "")) == album_slug
+        ]
+        if len(matches) == 1:
+            return matches[0]
+    return get_global_album_detail_by_public_slugs(artist_slug, album_slug)
 
 
 def _resolve_track(ref: str) -> LibraryRow | None:
@@ -318,7 +349,10 @@ def _render_preview(
 def share_artist(
     request: Request, artist_ref: str, slug: str | None = None
 ) -> HTMLResponse:
-    artist = _resolve_artist(artist_ref)
+    try:
+        artist = _resolve_artist(artist_ref)
+    except GlobalCatalogPublicRouteConflict:
+        raise HTTPException(status_code=409, detail="Ambiguous artist route") from None
     if not artist:
         raise HTTPException(status_code=404, detail="Artist not found")
     name = str(artist.get("name") or "Unknown artist")
@@ -331,8 +365,13 @@ def share_artist(
         title=name,
         eyebrow="Artist",
         description=description,
-        image_path=_share_image_path(
-            "artist", artist.get("entity_uid") or artist["id"]
+        image_path=(
+            f"/api/catalog/artists/{_encode(artist['global_artist_uid'])}/photo"
+            if not artist.get("id") and artist.get("global_artist_uid")
+            else _share_image_path(
+                "artist",
+                artist.get("entity_uid") or artist.get("id") or artist.get("name"),
+            )
         ),
         app_path=_artist_app_path(artist),
         og_type="profile",
@@ -344,7 +383,12 @@ def share_artist(
 def share_album(
     request: Request, album_ref: str, slug: str | None = None
 ) -> HTMLResponse:
-    album = _resolve_album(album_ref)
+    try:
+        album = _resolve_album(album_ref)
+        if not album and slug:
+            album = _resolve_album_by_public_slugs(album_ref, slug)
+    except GlobalCatalogPublicRouteConflict:
+        raise HTTPException(status_code=409, detail="Ambiguous album route") from None
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
     artist = get_library_artist(str(album.get("artist") or ""))
@@ -360,7 +404,14 @@ def share_album(
         title=title,
         eyebrow=f"Album by {artist_name}",
         description=description,
-        image_path=_share_image_path("album", album.get("entity_uid") or album["id"]),
+        image_path=(
+            f"/api/catalog/albums/{_encode(album['global_album_uid'])}/cover"
+            if not album.get("id") and album.get("global_album_uid")
+            else _share_image_path(
+                "album",
+                album.get("entity_uid") or album.get("id") or album.get("name"),
+            )
+        ),
         app_path=_album_app_path(album, artist),
         og_type="music.album",
     )

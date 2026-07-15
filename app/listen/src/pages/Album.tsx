@@ -51,6 +51,7 @@ import { CrateLoader } from "@/components/ui/CrateLoader";
 import { ContextMenu, type ContextMenuEntry } from "@crate/ui/domain/actions";
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { BandcampSupportButton } from "@/components/bandcamp/BandcampSupportButton";
+import { RemoteImportAction } from "@/components/imports/RemoteImportAction";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
 import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { isOfflineBusy } from "@/lib/offline";
@@ -176,6 +177,12 @@ interface AlbumData {
   release_type?: string | null;
   source_name?: string | null;
   source_url?: string | null;
+  availability?: {
+    local?: boolean;
+    remote?: boolean;
+    healthy?: boolean;
+    source_name?: string | null;
+  };
 }
 
 interface AlbumContributor {
@@ -444,6 +451,8 @@ export function Album() {
   const albumId = typeof data.id === "number" ? data.id : 0;
   const globalAlbumUid = data.global_album_uid ?? data.global_uid ?? null;
   const globalArtistUid = data.global_artist_uid ?? null;
+  const remoteOnly =
+    data.availability?.remote === true && data.availability.local !== true;
   const albumHref = albumPagePath({
     albumId: typeof data.id === "number" ? data.id : undefined,
     albumEntityUid: data.entity_uid,
@@ -830,6 +839,7 @@ export function Album() {
           typeof track.id === "number" ? track.id : null,
           track.entity_uid,
           track.path,
+          track.global_track_uid,
         ),
     );
     if (!missing.length) {
@@ -845,6 +855,7 @@ export function Album() {
             typeof track.id === "number" ? track.id : null,
             track.entity_uid ?? null,
             track.path,
+            track.global_track_uid ?? null,
           ),
         ),
       );
@@ -1610,6 +1621,20 @@ export function Album() {
           </div>
         </div>
       </div>
+
+      {remoteOnly && globalAlbumUid ? (
+        <div className="px-4 pb-4 sm:px-6">
+          <div className="mx-auto w-full max-w-[1480px]">
+            <RemoteImportAction
+              globalAlbumUid={globalAlbumUid}
+              estimatedBytes={
+                data.total_size_mb > 0 ? data.total_size_mb * 1_000_000 : null
+              }
+              sourceName={data.availability?.source_name}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {offlineStatusDetail ? (
         <div className="px-4 sm:px-6 pb-4">

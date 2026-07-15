@@ -243,6 +243,31 @@ describe("usePlayEventTracker — explicit lifecycle", () => {
     expect(payload.played_seconds).toBe(0);
   });
 
+  it("posts the signed playback session selected by the resolver", () => {
+    const { result } = setup();
+    const remoteTrack: Track = {
+      ...TRACK_A,
+      origin: "remote",
+      remote: {
+        nodeUid: "node-b",
+        nodeName: "Node B",
+        remoteEntityUid: "remote-track-a",
+        playbackSession: "signed-playback-session",
+        availability: { catalog: true, stream: true, import: false },
+      },
+    };
+
+    act(() => {
+      result.current.startSession(remoteTrack, null);
+      result.current.flushCurrentPlayEvent("completed", remoteTrack);
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/me/play-events",
+      expect.objectContaining({ playback_session: "signed-playback-session" }),
+    );
+  });
+
   it("skipped flush with <2s listened is dropped", () => {
     const { result } = setup();
     act(() => {

@@ -531,13 +531,15 @@ export async function fetchShapedRadioNext(
 
 export async function sendRadioFeedback(
   sessionId: string,
-  trackId: number,
+  trackId: number | undefined,
   action: "like" | "dislike",
+  globalTrackUid?: string,
 ): Promise<void> {
   try {
     await api("/api/radio/feedback", "POST", {
       session_id: sessionId,
-      track_id: trackId,
+      ...(trackId !== undefined ? { track_id: trackId } : {}),
+      ...(globalTrackUid ? { global_track_uid: globalTrackUid } : {}),
       action,
     });
   } catch {

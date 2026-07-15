@@ -19,8 +19,9 @@ DEFAULT_SCHEDULES = {
     "repair_duplicate_tracks": 43200,  # 12h — clean high-confidence duplicate tracks
     "cleanup_incomplete_downloads": 172800,  # 48h — remove incomplete soulseek downloads
     "sync_shows": 86400,  # 24h — sync shows from Ticketmaster
-    "federation_health_poll": 300,  # 5min — poll approved peers for health
-    "federation_sync_catalog": 7200,  # 2h — sync catalogs from approved peers
+    "federation_health_poll": 60,  # 1min — poll approved peers for health
+    "federation_sync_catalog": 120,  # 2min — consume peer catalog deltas
+    "federation_directory_refresh": 300,  # 5min — refresh due signed directories
     "global_catalog_reconcile_incremental": 300,  # 5min — drain dirty sources
     "global_catalog_reconcile_full": 43200,  # 12h — verify canonical catalog
 }
@@ -34,6 +35,8 @@ FEDERATION_SCHEDULED_TASKS = {
     "federation_health_poll",
     "federation_sync_catalog",
 }
+
+DIRECTORY_SCHEDULED_TASKS = {"federation_directory_refresh"}
 
 GLOBAL_CATALOG_SCHEDULED_TASKS = {
     "global_catalog_reconcile_incremental",
@@ -106,12 +109,33 @@ def should_run(task_type: str, schedules: dict[str, int] | None = None) -> bool:
 
 def _scheduled_task_enabled(task_type: str) -> bool:
     if task_type in FEDERATION_SCHEDULED_TASKS:
-        return True
+        return _has_approved_federation_peers()
+
+    if task_type in DIRECTORY_SCHEDULED_TASKS:
+        return _has_due_federation_directories()
 
     if task_type in GLOBAL_CATALOG_SCHEDULED_TASKS:
         return True
 
     return True
+
+
+def _has_due_federation_directories() -> bool:
+    try:
+        from crate.db.repositories.federation_directories import (
+            list_due_subscriptions,
+        )
+
+        return bool(list_due_subscriptions(limit=1))
+    except Exception:
+        log.debug("Unable to inspect federation directories", exc_info=True)
+        return False
+
+
+def _has_approved_federation_peers() -> bool:
+    from crate.db.repositories.federation import list_peers
+
+    return bool(list_peers(trust_state="approved"))
 
 
 def local_node_uid() -> str:
@@ -127,7 +151,9 @@ def local_node_uid() -> str:
 
 
 def schedule_jitter_seconds(task_type: str, interval: int) -> int:
-    if not task_type.startswith(("global_catalog_", "federation_sync_catalog")):
+    if not task_type.startswith(
+        ("global_catalog_", "federation_sync_catalog", "federation_directory")
+    ):
         return 0
     window = min(max(int(interval or 0) // 12, 60), 3600)
     seed = f"{local_node_uid()}:{task_type}".encode("utf-8")

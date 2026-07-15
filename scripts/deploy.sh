@@ -129,12 +129,16 @@ resolve_image_tag() {
 
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
+  mkdir -p "$TMP_DIR/deploy/traefik"
 
   if [[ "${DEPLOY_USE_WORKTREE:-0}" == "1" ]]; then
     cp "$ROOT_DIR/docker-compose.yaml" "$TMP_DIR/docker-compose.yaml"
     cp "$ROOT_DIR/docker-compose.project.yaml" "$TMP_DIR/docker-compose.project.yaml"
+    cp "$ROOT_DIR/deploy/traefik/federation-readplane.yml" \
+      "$TMP_DIR/deploy/traefik/federation-readplane.yml"
   else
     git -C "$ROOT_DIR" archive "$DEPLOY_REF" docker-compose.yaml docker-compose.project.yaml \
+      deploy/traefik/federation-readplane.yml \
       | tar -x -C "$TMP_DIR"
   fi
 
@@ -201,13 +205,15 @@ local_preflight() {
 
 sync_config() {
   log "Syncing deploy config from ${DEPLOY_REF}"
-  ssh_remote "mkdir -p '$SERVER_PATH' '$SERVER_PATH/.deploy'"
+  ssh_remote "mkdir -p '$SERVER_PATH' '$SERVER_PATH/.deploy' '$SERVER_PATH/deploy/traefik'"
 
   scp \
     "$TMP_DIR/docker-compose.yaml" \
     "$TMP_DIR/docker-compose.project.yaml" \
     "$REMOTE:$SERVER_PATH/"
   scp "$TMP_DIR/.env" "$REMOTE:$SERVER_PATH/.deploy/env.candidate"
+  scp "$TMP_DIR/deploy/traefik/federation-readplane.yml" \
+    "$REMOTE:$SERVER_PATH/deploy/traefik/federation-readplane.yml"
   ssh_remote "if [ ! -f '$SERVER_PATH/.env' ]; then cp '$SERVER_PATH/.deploy/env.candidate' '$SERVER_PATH/.env' && chmod 600 '$SERVER_PATH/.env'; fi"
 
   scp "$ROOT_DIR/scripts/deploy-remote.sh" "$REMOTE:$REMOTE_SCRIPT_PATH"

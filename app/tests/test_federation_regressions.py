@@ -62,7 +62,7 @@ def test_create_app_imports_with_federation_router_registered(monkeypatch):
 
     app = create_app()
 
-    paths = {route.path for route in app.routes}
+    paths = app.openapi()["paths"]
     assert "/.well-known/crate-node" in paths
     assert "/api/federation/v1/search" in paths
 
@@ -123,8 +123,8 @@ def test_auth_cookie_defaults_remain_secure_for_real_domain(monkeypatch):
 def test_sanitize_base_url_blocks_private_ip_addresses():
     from crate.federation.client import _sanitize_base_url
 
-    with pytest.raises(ValueError, match="Blocked address"):
-        _sanitize_base_url("http://10.0.0.1:8585")
+    with pytest.raises(ValueError, match="non-public"):
+        _sanitize_base_url("https://10.0.0.1:8585")
 
 
 def test_remote_search_payload_strips_local_only_identifiers():
@@ -276,6 +276,7 @@ def test_federated_post_serializes_uuid_body(monkeypatch):
 
     class _Response:
         status_code = 200
+        content = b""
 
     class _Client:
         def __enter__(self):
@@ -288,6 +289,9 @@ def test_federated_post_serializes_uuid_body(monkeypatch):
             captured.update(kwargs)
             return _Response()
 
+        def close(self):
+            pass
+
     monkeypatch.setattr(client, "_build_client", lambda _timeout: _Client())
     monkeypatch.setattr(client, "build_signed_headers", lambda **_kwargs: {})
 
@@ -299,6 +303,11 @@ def test_federated_post_serializes_uuid_body(monkeypatch):
         key_id="key-a",
         private_key_ref="federation/keys/key-a.pem",
         json_body={"requesting_node_uid": node_uid},
+        policy=client.FederationURLPolicy(
+            resolver=lambda host, port, **kwargs: [
+                (2, 1, 6, "", ("93.184.216.34", port))
+            ]
+        ),
     )
 
     assert json.loads(captured["content"]) == {"requesting_node_uid": str(node_uid)}
@@ -324,6 +333,16 @@ def test_create_stream_ticket_accepts_uuid_peer_node_uid(monkeypatch):
         federation_api,
         "_require_user_assertion",
         lambda *_args, **_kwargs: {"sub": "subject-hash"},
+    )
+    monkeypatch.setattr(
+        federation_api,
+        "_require_capability",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            allowed=True,
+            constraints=None,
+            grant_uid=None,
+            policy_revision=1,
+        ),
     )
     monkeypatch.setattr(
         stream_proxy,
@@ -510,7 +529,11 @@ def test_federated_artwork_serves_image_variants(tmp_path, monkeypatch):
         "_require_signed_node_request",
         fake_require_signed_node_request,
     )
-    monkeypatch.setattr(federation_api, "_require_capability", lambda *_args: None)
+    monkeypatch.setattr(
+        federation_api,
+        "_require_capability",
+        lambda *_args, **_kwargs: SimpleNamespace(allowed=True, constraints=None),
+    )
     monkeypatch.setattr(
         federation_api, "_require_user_assertion", lambda *_args, **_kwargs: None
     )
@@ -552,7 +575,11 @@ def test_federated_artist_photo_serves_sidecar_without_local_user_session(
         "_require_signed_node_request",
         fake_require_signed_node_request,
     )
-    monkeypatch.setattr(federation_api, "_require_capability", lambda *_args: None)
+    monkeypatch.setattr(
+        federation_api,
+        "_require_capability",
+        lambda *_args, **_kwargs: SimpleNamespace(allowed=True, constraints=None),
+    )
     monkeypatch.setattr(
         federation_api, "_require_user_assertion", lambda *_args, **_kwargs: None
     )
@@ -601,7 +628,11 @@ def test_federated_generic_artist_background_serves_sidecar(tmp_path, monkeypatc
         "_require_signed_node_request",
         fake_require_signed_node_request,
     )
-    monkeypatch.setattr(federation_api, "_require_capability", lambda *_args: None)
+    monkeypatch.setattr(
+        federation_api,
+        "_require_capability",
+        lambda *_args, **_kwargs: SimpleNamespace(allowed=True, constraints=None),
+    )
     monkeypatch.setattr(
         federation_api, "_require_user_assertion", lambda *_args, **_kwargs: None
     )
@@ -655,6 +686,28 @@ def test_artist_info_facet_preserves_remote_popularity_fields():
     assert payload["playcount"] == 5678
     assert payload["image_url"] == "https://img.example/artist.jpg"
     assert payload["url"] == "https://last.fm/music/High+Vis"
+
+
+def test_artist_info_facet_includes_public_page_intelligence(monkeypatch):
+    from crate.api import federation as federation_api
+
+    monkeypatch.setattr(
+        federation_api.browse_artist_api,
+        "build_public_artist_page_facet",
+        lambda artist: {
+            "top_tracks": [{"title": "Choose To Lose"}],
+            "shows": {"events": [{"id": "show-1"}]},
+            "enrichment": {"setlist": {"probable_setlist": [{"title": "On We Lose"}]}},
+        },
+    )
+
+    payload = federation_api._artist_info_facet({"name": "High Vis"})
+
+    assert payload["top_tracks"][0]["title"] == "Choose To Lose"
+    assert payload["shows"]["events"][0]["id"] == "show-1"
+    assert payload["enrichment"]["setlist"]["probable_setlist"][0]["title"] == (
+        "On We Lose"
+    )
 
 
 def test_valid_signed_post_body_is_accepted(monkeypatch):

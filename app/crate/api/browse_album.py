@@ -31,6 +31,10 @@ from crate.api.schemas.browse import AlbumDetailResponse, RelatedAlbumResponse
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
 from crate.db.cache_store import get_cache, set_cache
+from crate.db.queries.global_catalog import (
+    GlobalCatalogPublicRouteConflict,
+    get_global_album_detail_by_public_slugs,
+)
 from crate.db.queries.browse import (
     find_album_row,
     get_album_genre_ids,
@@ -828,7 +832,7 @@ def api_album(request: Request, artist: str, album: str):
 def api_album_by_artist_slug(request: Request, artist_slug: str, album_slug: str):
     artist = get_library_artist_by_slug(artist_slug)
     if not artist:
-        return JSONResponse({"error": "Not found"}, status_code=404)
+        return _global_album_by_public_slugs(request, artist_slug, album_slug)
 
     release = find_upcoming_release_by_artist_album_slug(artist["name"], album_slug)
     if release:
@@ -843,8 +847,38 @@ def api_album_by_artist_slug(request: Request, artist_slug: str, album_slug: str
         None,
     )
     if not album:
+        return _global_album_by_public_slugs(request, artist_slug, album_slug)
+    payload = api_album(request, artist["name"], album["name"])
+    if not isinstance(payload, dict):
+        return payload
+    try:
+        canonical = get_global_album_detail_by_public_slugs(artist_slug, album_slug)
+    except GlobalCatalogPublicRouteConflict:
+        return JSONResponse({"error": "Ambiguous public album route"}, status_code=409)
+    if not canonical:
+        return payload
+    from crate.api.catalog import _merge_global_album_identity
+
+    return _merge_global_album_identity(payload, canonical)
+
+
+def _global_album_by_public_slugs(request: Request, artist_slug: str, album_slug: str):
+    try:
+        payload = get_global_album_detail_by_public_slugs(artist_slug, album_slug)
+    except GlobalCatalogPublicRouteConflict:
+        return JSONResponse({"error": "Ambiguous public album route"}, status_code=409)
+    if not payload:
         return JSONResponse({"error": "Not found"}, status_code=404)
-    return api_album(request, artist["name"], album["name"])
+    return _hydrate_global_album_public_detail(request, payload)
+
+
+def _hydrate_global_album_public_detail(request: Request, payload: dict) -> dict:
+    from crate.api.catalog import hydrate_catalog_album_detail
+
+    global_album_uid = payload.get("global_album_uid") or payload.get("global_uid")
+    if not global_album_uid:
+        return payload
+    return hydrate_catalog_album_detail(request, str(global_album_uid), payload)
 
 
 @router.get(

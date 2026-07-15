@@ -26,6 +26,8 @@ export interface PlaybackResolution {
   task_id: string | null;
   variant_id: string | null;
   variant_status: string | null;
+  playback_session: string;
+  content_origin: "local" | "remote" | "imported";
 }
 
 type PlaybackQualityForComparison = Pick<

@@ -278,12 +278,13 @@ export const TrackRow = memo(function TrackRow({
     Boolean(track.disabled) ||
     (isRemote && playerTrack.remote?.availability.stream === false) ||
     (isGlobalCatalogOnly && track.availability?.healthy === false);
-  const liked = showLocalActions
+  const liked = hasTrackRef
     ? isLiked(
         track.library_track_id ??
           (typeof track.id === "number" ? track.id : null),
         track.entity_uid,
         track.path,
+        track.global_track_uid,
       )
     : false;
   const offlineState = showLocalActions
@@ -573,7 +574,7 @@ export const TrackRow = memo(function TrackRow({
       )}
 
       {/* Like + Actions */}
-      {showLocalActions && !disabled ? (
+      {hasTrackRef ? (
         <ActionIconButton
           variant="row"
           active={liked}
@@ -594,6 +595,7 @@ export const TrackRow = memo(function TrackRow({
                 libraryTrackId ?? null,
                 trackEntityUid,
                 path,
+                track.global_track_uid,
               );
             } catch {
               // Keep row interaction non-blocking; caller surfaces persistence elsewhere.

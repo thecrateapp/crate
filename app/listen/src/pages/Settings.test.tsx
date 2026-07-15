@@ -17,13 +17,17 @@ vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
-    api: vi.fn(async (url: string) => {
+    api: vi.fn(async (url: string, method?: string, body?: unknown) => {
       if (url === "/api/bandcamp/me/status") {
         return {
           connected: false,
           status: "disconnected",
           bridge_enabled: false,
         };
+      }
+      if (url === "/api/me/scrobble/preferences") {
+        if (method === "PUT") return body;
+        return { remote_scrobbling_enabled: false };
       }
       return {};
     }),
@@ -64,5 +68,24 @@ describe("Settings", () => {
     expect(
       await screen.findByRole("heading", { name: "Ajustes" }),
     ).toBeInTheDocument();
+  });
+
+  it("keeps remote scrobbling opt-in and persists an explicit toggle", async () => {
+    const user = userEvent.setup();
+    const { api } = await import("@/lib/api");
+
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    const toggle = await screen.findByRole("button", {
+      name: "Scrobble remote plays",
+    });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(toggle);
+
+    expect(api).toHaveBeenCalledWith("/api/me/scrobble/preferences", "PUT", {
+      remote_scrobbling_enabled: true,
+    });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
   });
 });

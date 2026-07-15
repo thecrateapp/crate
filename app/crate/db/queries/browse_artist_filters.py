@@ -3,7 +3,6 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
 
 MIN_GENRE_MEMBERSHIP_SCORE = 0.45
@@ -165,20 +164,17 @@ def get_browse_filter_genres(
                     "cover_url": item.get("cover_url"),
                 }
             )
-        if global_catalog_surface_enabled("explore"):
-            _merge_remote_global_genres(
-                session,
-                items,
-                country=country,
-                decade=decade,
-                format=format,
-                decade_start=int(params["decade_start"])
-                if "decade_start" in params
-                else None,
-                decade_end=int(params["decade_end"])
-                if "decade_end" in params
-                else None,
-            )
+        _merge_remote_global_genres(
+            session,
+            items,
+            country=country,
+            decade=decade,
+            format=format,
+            decade_start=int(params["decade_start"])
+            if "decade_start" in params
+            else None,
+            decade_end=int(params["decade_end"]) if "decade_end" in params else None,
+        )
         return sorted(items, key=lambda item: (-int(item["count"] or 0), item["name"]))
 
 

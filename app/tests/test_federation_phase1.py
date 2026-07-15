@@ -51,6 +51,16 @@ class TestIdentity:
         finally:
             identity.KEYS_DIR = orig_keys
 
+    def test_key_directory_resolves_runtime_data_dir(self, monkeypatch, tmp_path):
+        original_keys = identity.KEYS_DIR
+        identity.KEYS_DIR = None
+        monkeypatch.setenv("DATA_DIR", str(tmp_path))
+        monkeypatch.delenv("FEDERATION_KEYS_DIR", raising=False)
+        try:
+            assert identity.get_keys_dir() == tmp_path / "federation" / "keys"
+        finally:
+            identity.KEYS_DIR = original_keys
+
     def test_is_valid_key_ref_valid(self):
         assert identity.is_valid_key_ref("federation/keys/2026-07-test.pem")
 
@@ -229,11 +239,11 @@ class TestSigning:
     def test_validate_timestamp_within_skew(self):
         now = int(time.time() * 1000)
         assert signing.validate_timestamp(now) is True
-        assert signing.validate_timestamp(now - 200_000) is True
+        assert signing.validate_timestamp(now - 59_000) is True
 
     def test_validate_timestamp_outside_skew(self):
         now = int(time.time() * 1000)
-        assert signing.validate_timestamp(now + 400_000) is False
+        assert signing.validate_timestamp(now + 61_000) is False
 
     def test_generate_nonce_is_unique(self):
         nonces = {signing.generate_nonce() for _ in range(10)}

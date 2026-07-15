@@ -12,7 +12,6 @@ from crate.db.home_builder_shared import (
 from crate.db.queries.home import get_artists_core_track_rows
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.playlists import list_system_playlists
-from crate.federation.global_policy import global_catalog_surface_enabled
 from crate.slugs import build_artist_slug
 
 SYSTEM_PLAYLIST_HOME_PREFIX = "system-playlist-"
@@ -310,7 +309,7 @@ def _build_core_playlists(
     discovery_artists: list[dict] | None = None,
 ) -> list[dict]:
     essentials: list[dict] = []
-    allow_global = global_catalog_surface_enabled("home")
+    allow_global = True
     comfort_candidates = [
         row
         for row in top_artists

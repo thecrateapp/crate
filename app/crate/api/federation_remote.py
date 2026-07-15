@@ -7,8 +7,10 @@ URLs, or bearer tokens.
 
 from __future__ import annotations
 
+import json
 import logging
-from urllib.parse import urlencode, urljoin
+import uuid
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response, StreamingResponse
@@ -22,6 +24,7 @@ from crate.federation.client import (
     DEFAULT_TIMEOUT,
     build_signed_headers,
     federated_get,
+    prepare_outbound_resource,
 )
 
 
@@ -107,10 +110,7 @@ def _stream_slot_limits(peer: dict) -> tuple[int, int]:
         return DEFAULT_MAX_STREAMS_PER_PEER, DEFAULT_MAX_STREAMS_PER_SUBJECT
 
     raw_limit = (preset.get("constraints") or {}).get("max_concurrent_streams")
-    try:
-        subject_limit = int(raw_limit)
-    except (TypeError, ValueError):
-        subject_limit = DEFAULT_MAX_STREAMS_PER_SUBJECT
+    subject_limit = _integer_constraint(raw_limit, DEFAULT_MAX_STREAMS_PER_SUBJECT)
     subject_limit = max(2, min(subject_limit, 16))
     peer_limit = max(DEFAULT_MAX_STREAMS_PER_PEER, subject_limit * 2)
     return peer_limit, subject_limit
@@ -129,13 +129,19 @@ def _stream_byte_limits(peer: dict) -> tuple[int, int]:
         return DEFAULT_DAILY_BYTES_PER_PEER, DEFAULT_DAILY_BYTES_PER_SUBJECT
 
     raw_limit = (preset.get("constraints") or {}).get("daily_stream_bytes")
-    try:
-        peer_limit = int(raw_limit)
-    except (TypeError, ValueError):
-        peer_limit = DEFAULT_DAILY_BYTES_PER_PEER
+    peer_limit = _integer_constraint(raw_limit, DEFAULT_DAILY_BYTES_PER_PEER)
     peer_limit = max(DEFAULT_DAILY_BYTES_PER_PEER, peer_limit)
     subject_limit = max(DEFAULT_DAILY_BYTES_PER_SUBJECT, peer_limit // 2)
     return peer_limit, subject_limit
+
+
+def _integer_constraint(value: object, default: int) -> int:
+    if not isinstance(value, int | float | str):
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
 
 
 def _user_assertion(
@@ -596,6 +602,7 @@ def resolve_remote_playback(
     node_uid: str,
     remote_entity_uid: str,
     request: Request,
+    global_track_uid: str | None = None,
 ):
     user = _require_auth(request)
     from crate.api.permissions import require_permission
@@ -604,6 +611,7 @@ def resolve_remote_playback(
 
     local_node = _get_local_node()
     peer = _get_peer(node_uid)
+    playback_session = str(uuid.uuid4())
 
     from crate.federation.client import federated_post
 
@@ -618,6 +626,7 @@ def resolve_remote_playback(
                 "remote_entity_uid": remote_entity_uid,
                 "delivery_policy": "balanced",
                 "requesting_node_uid": local_node["node_uid"],
+                "playback_session": playback_session,
             },
             timeout=DEFAULT_TIMEOUT,
             user_assertion=_user_assertion(
@@ -646,12 +655,23 @@ def resolve_remote_playback(
         delivery_policy=ticket_data.get("delivery_policy", "balanced"),
         subject_hash=outbound_subject_hash(local_node, peer, user),
         local_user_id=int(user["id"]) if user.get("id") is not None else None,
+        audience=str(local_node["node_uid"]),
+        playback_session=playback_session,
     )
+
+    from crate.playback_provenance import issue_playback_session
 
     return {
         "stream_url": f"/api/federation/remote/streams/{local_ticket['ticket_uid']}",
         "expires_at": local_ticket.get("expires_at"),
         "delivery_policy": ticket_data.get("delivery_policy", "balanced"),
+        "playback_session": issue_playback_session(
+            user_id=int(user["id"]),
+            global_track_uid=global_track_uid,
+            content_origin="remote",
+            source_node_uid=node_uid,
+        ),
+        "content_origin": "remote",
     }
 
 
@@ -676,10 +696,11 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
     peer = _get_peer(ticket["node_uid"])
     local_node = _get_local_node()
     remote_ticket_uid = ticket["remote_entity_uid"]
-    remote_stream_url = urljoin(
-        peer["api_base_url"].rstrip("/") + "/",
-        f"api/federation/v1/streams/{remote_ticket_uid}",
+    prepared_stream = prepare_outbound_resource(
+        peer["api_base_url"],
+        f"/api/federation/v1/streams/{remote_ticket_uid}",
     )
+    remote_stream_url = prepared_stream.external_url
 
     from crate.federation.quotas import (
         acquire_stream_slot,
@@ -722,11 +743,25 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
             content_type="",
         )
     )
+    constraints = ticket.get("constraints_json") or {}
+    if isinstance(constraints, str):
+        constraints = json.loads(constraints)
+    upstream_headers["X-Crate-Playback-Session"] = str(
+        constraints.get("playback_session") or ""
+    )
 
-    client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0))
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(30.0, connect=10.0),
+        follow_redirects=False,
+    )
     try:
         upstream = await client.send(
-            client.build_request("GET", remote_stream_url, headers=upstream_headers),
+            client.build_request(
+                "GET",
+                prepared_stream.connection_url,
+                headers=upstream_headers,
+                extensions={"sni_hostname": prepared_stream.sni_hostname},
+            ),
             stream=True,
         )
     except Exception as exc:
@@ -861,11 +896,9 @@ def request_remote_import(
     require_permission(request, "federation.import.request")
     peer = _get_peer(node_uid)
 
-    from crate.db.repositories.tasks import create_task
     from crate.federation.imports import (
         can_request_import,
         create_import_request,
-        update_import_request,
     )
 
     ok, err = can_request_import(peer)
@@ -879,7 +912,7 @@ def request_remote_import(
         title=body.title or remote_entity_uid,
         requested_by_user_id=int(user["id"]) if user.get("id") is not None else None,
         metadata={"album_name": body.title, "artist": body.artist},
-        requires_approval=False,
+        requires_approval=True,
     )
     _append_federation_event(
         "federation.import.requested",
@@ -891,28 +924,82 @@ def request_remote_import(
         scope="federation.import",
         subject_key=node_uid,
     )
-    task_id = create_task(
-        "federation_import_album",
-        {
-            "request_id": str(import_req["request_id"]),
-            "node_uid": node_uid,
-            "remote_entity_uid": remote_entity_uid,
-            "title": body.title,
-            "artist": body.artist,
-            "requested_by_user_id": user.get("id"),
-        },
-    )
-    updated = (
-        update_import_request(
-            str(import_req["request_id"]),
-            status="queued",
-            metadata_patch={"task_id": task_id},
-        )
-        or import_req
-    )
-
     return {
-        "request_id": updated["request_id"],
-        "status": updated["status"],
-        "task_id": task_id,
+        "request_id": import_req["request_id"],
+        "status": import_req["status"],
+        "task_id": None,
+    }
+
+
+@router.post("/albums/{global_album_uid}/import")
+def request_global_album_import(global_album_uid: str, request: Request):
+    user = _require_auth(request)
+    from crate.api.permissions import require_permission
+    from crate.federation.global_source_resolver import (
+        GlobalEntityNotFound,
+        NoGlobalSource,
+        resolve_global_source,
+    )
+    from crate.federation.imports import can_request_import, create_import_request
+
+    require_permission(request, "federation.import.request")
+    try:
+        source = resolve_global_source(
+            global_entity_uid=global_album_uid,
+            entity_type="album",
+            facet="album_detail",
+        )
+    except GlobalEntityNotFound as exc:
+        raise HTTPException(status_code=404, detail="Album not found") from exc
+    except NoGlobalSource as exc:
+        raise HTTPException(status_code=503, detail="No healthy album source") from exc
+    if source["kind"] == "local":
+        raise HTTPException(
+            status_code=409, detail="Album is already available locally"
+        )
+    peer = _get_peer(str(source["node_uid"]))
+    ok, error = can_request_import(peer)
+    if not ok:
+        raise HTTPException(status_code=403, detail=error)
+    payload = source.get("source_payload") or {}
+    import_request = create_import_request(
+        node_uid=str(source["node_uid"]),
+        remote_entity_uid=str(source["remote_entity_uid"]),
+        global_album_uid=global_album_uid,
+        entity_type="album",
+        title=str(payload.get("title") or payload.get("name") or global_album_uid),
+        requested_by_user_id=int(user["id"]) if user.get("id") is not None else None,
+        metadata={"global_album_uid": global_album_uid},
+        requires_approval=True,
+    )
+    return {
+        "request_id": str(import_request["request_id"]),
+        "status": import_request["status"],
+        "task_id": (import_request.get("metadata_json") or {}).get("task_id"),
+    }
+
+
+@router.get("/import-requests/{request_id}")
+def get_remote_import_status(request_id: str, request: Request):
+    user = _require_auth(request)
+    from crate.federation.imports import get_import_request
+
+    import_request = get_import_request(request_id)
+    if not import_request:
+        raise HTTPException(status_code=404, detail="Import request not found")
+    requester_id = import_request.get("requested_by_user_id")
+    user_id = user.get("id")
+    if requester_id is None or user_id is None or int(requester_id) != int(user_id):
+        # Deliberately hide the existence and owner of another user's request.
+        raise HTTPException(status_code=404, detail="Import request not found")
+    metadata = import_request.get("metadata_json") or {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    return {
+        "request_id": str(import_request["request_id"]),
+        "status": str(import_request["status"]),
+        "task_id": metadata.get("task_id"),
+        "expected_bytes": import_request.get("expected_bytes"),
+        "received_bytes": import_request.get("received_bytes"),
+        "failure_reason": import_request.get("failure_reason"),
     }

@@ -16,8 +16,11 @@ services:
       JWT_SECRET: dev-secret-not-for-production
       READPLANE_ENABLED: "true"
       READPLANE_ENABLE_SSE: "true"
-      READPLANE_ROUTE_MODE: shadow
+      READPLANE_ROUTE_MODE: active
       READPLANE_FALLBACK_ENABLED: "true"
+      READPLANE_FEDERATION_PROXY_ENABLED: "true"
+      CRATE_READPLANE_SERVICE_TOKEN: crate-dev-readplane-service-token-at-least-32-bytes
+      CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS: "true"
       API_FALLBACK_BASE: http://api:8585
       READPLANE_MAX_DB_CONNS: "4"
       READPLANE_MIN_DB_CONNS: "1"

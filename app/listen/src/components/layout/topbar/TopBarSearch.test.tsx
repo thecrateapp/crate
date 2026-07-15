@@ -221,6 +221,42 @@ describe("TopBarSearch", () => {
     );
   });
 
+  it("labels canonical results that are only available remotely", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({
+      artists: [
+        {
+          global_artist_uid: "artist-global-1",
+          name: "High Vis",
+          availability: {
+            catalog: true,
+            stream: true,
+            import: false,
+            local: false,
+            remote: true,
+          },
+        },
+      ],
+      albums: [],
+      tracks: [],
+    });
+    mockSearchBoxRect();
+
+    renderWithListenProviders(<TopBarSearch />);
+
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    vi.useRealTimers();
+
+    expect(await screen.findByText("Remote")).toBeInTheDocument();
+  });
+
   it("opens local albums through local human routes when search returns global uids", async () => {
     vi.useFakeTimers();
     vi.mocked(api).mockResolvedValue({

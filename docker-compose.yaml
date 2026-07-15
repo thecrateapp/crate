@@ -22,6 +22,7 @@ services:
       - ${DATA_DIR}/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ${DATA_DIR}/traefik/acme.json:/acme.json
       - ${DATA_DIR}/traefik/conf:/conf
+      - ./deploy/traefik/federation-readplane.yml:/conf/crate-federation-readplane.yml:ro
       - ${DATA_DIR}/traefik/logs:/var/log/traefik
     labels:
       traefik.enable: true
@@ -269,6 +270,12 @@ services:
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
       - CRATE_MEDIA_WORKER_URL=http://crate-media-worker:8687
       - CRATE_MEDIA_WORKER_MAX_ACTIVE=${CRATE_MEDIA_WORKER_MAX_ACTIVE:-1}
+      - CRATE_READPLANE_SERVICE_TOKEN=${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
     volumes:
       - ./app/config.yaml:/app/config.yaml:ro
       - ${MEDIA_DIR}/music:/music:ro
@@ -328,8 +335,13 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - READPLANE_ENABLED=${READPLANE_ENABLED:-true}
       - READPLANE_ENABLE_SSE=${READPLANE_ENABLE_SSE:-true}
-      - READPLANE_ROUTE_MODE=${READPLANE_ROUTE_MODE:-shadow}
+      - READPLANE_ROUTE_MODE=${READPLANE_ROUTE_MODE:-active}
       - READPLANE_FALLBACK_ENABLED=${READPLANE_FALLBACK_ENABLED:-true}
+      - READPLANE_FEDERATION_PROXY_ENABLED=${READPLANE_FEDERATION_PROXY_ENABLED:-true}
+      - CRATE_READPLANE_SERVICE_TOKEN=${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+      - READPLANE_FEDERATION_CONTROL_TIMEOUT_MS=${READPLANE_FEDERATION_CONTROL_TIMEOUT_MS:-2000}
+      - READPLANE_FEDERATION_CONNECT_TIMEOUT_MS=${READPLANE_FEDERATION_CONNECT_TIMEOUT_MS:-5000}
+      - READPLANE_FEDERATION_HEADER_TIMEOUT_MS=${READPLANE_FEDERATION_HEADER_TIMEOUT_MS:-10000}
       - API_FALLBACK_BASE=http://crate-api:8585
       - READPLANE_MAX_DB_CONNS=${READPLANE_MAX_DB_CONNS:-8}
       - READPLANE_MIN_DB_CONNS=${READPLANE_MIN_DB_CONNS:-1}
@@ -351,6 +363,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.crate-readplane-catalog.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && PathPrefix(`/api/catalog/`)
+      traefik.http.routers.crate-readplane-catalog.entryPoints: websecure
+      traefik.http.routers.crate-readplane-catalog.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-readplane-catalog.priority: 100
+      traefik.http.routers.crate-readplane-catalog.tls: true
+      traefik.http.routers.crate-readplane-catalog.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && PathPrefix(`/api/federation/remote/streams/`)
+      traefik.http.routers.crate-readplane-stream.entryPoints: websecure
+      traefik.http.routers.crate-readplane-stream.priority: 110
+      traefik.http.routers.crate-readplane-stream.tls: true
+      traefik.http.routers.crate-readplane-stream.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-readplane-stream.service: crate-readplane-stream@file
+      traefik.http.services.crate-readplane.loadbalancer.server.port: 8686
 
   crate-worker:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}
@@ -407,6 +435,11 @@ services:
       - NUMBA_NUM_THREADS=${CRATE_WORKER_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${CRATE_WORKER_FFMPEG_THREADS:-1}
       - CRATE_DOWNLOAD_SEM_MAX=${CRATE_DOWNLOAD_SEM_MAX:-2}
+      - CRATE_FEDERATION_IMPORT_MAX_BYTES=${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
+      - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
+      - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES=${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
+      - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
+      - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=http://slskd:5030

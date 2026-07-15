@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.repositories.global_user_library import list_global_collection_albums
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 
 def global_artist_uids_from_context(context: dict, limit: int = 12) -> list[str]:
-    if not global_catalog_surface_enabled("home"):
-        return []
     seen: set[str] = set()
     uids: list[str] = []
     for section in ("top_artists", "followed"):
@@ -25,9 +22,6 @@ def global_artist_uids_from_context(context: dict, limit: int = 12) -> list[str]
 def global_recommended_track_rows(
     global_artist_uids: list[str], *, limit: int
 ) -> list[dict]:
-    if not global_catalog_surface_enabled("home"):
-        return []
-
     rows: list[dict] = []
     seen: set[str] = set()
     for global_artist_uid in global_artist_uids[:12]:
@@ -62,8 +56,6 @@ def merge_global_track_rows(
 
 
 def global_suggested_albums(limit: int) -> list[dict]:
-    if not global_catalog_surface_enabled("home"):
-        return []
     return [
         {
             "album_id": row.get("id"),

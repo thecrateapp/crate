@@ -120,3 +120,59 @@ class FederationStatus(BaseModel):
     peer_count: int = 0
     approved_peer_count: int = 0
     pending_pairing_count: int = 0
+
+
+class FederationKey(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key_id: str
+    node_uid: str
+    public_key: str
+    status: str
+    not_before: datetime | None = None
+    not_after: datetime | None = None
+
+
+class FederationPairing(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    pairing_uid: str
+    remote_node_uid: str | None = None
+    remote_base_url: str
+    direction: str
+    state: str
+    local_challenge: str
+    remote_challenge: str | None = None
+    negotiated_protocol: str | None = None
+    signature_profile: str | None = None
+    descriptor_digest: str | None = None
+    expires_at: datetime
+    verified_at: datetime | None = None
+    completed_at: datetime | None = None
+    failure_reason: str | None = None
+
+
+class FederationImportRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    request_id: str
+    idempotency_key: str
+    node_uid: str
+    remote_entity_uid: str
+    global_album_uid: str | None = None
+    entity_type: str = "album"
+    title: str
+    status: str
+    requested_by_user_id: int | None = None
+    approved_by_user_id: int | None = None
+    expected_bytes: int | None = None
+    reserved_bytes: int = 0
+    received_bytes: int = 0
+    manifest_digest: str | None = None
+    approval_metadata: dict = {}
+    staging_relative_path: str | None = None
+    cleanup_deadline: datetime | None = None
+    failure_reason: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    completed_at: datetime | None = None

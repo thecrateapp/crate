@@ -51,9 +51,7 @@ func AsPgError(err error, target **pgconn.PgError) bool {
 	return errors.As(err, target)
 }
 
-// RequiredTablesReady verifies that the minimal schema required by readplane exists.
-func RequiredTablesReady(ctx context.Context, pool *pgxpool.Pool) error {
-	const query = `
+const requiredTablesReadyQuery = `
 		SELECT
 			to_regclass('public.users') IS NOT NULL
 			AND to_regclass('public.sessions') IS NOT NULL
@@ -64,11 +62,16 @@ func RequiredTablesReady(ctx context.Context, pool *pgxpool.Pool) error {
 			AND to_regclass('public.global_catalog_albums') IS NOT NULL
 			AND to_regclass('public.global_catalog_tracks') IS NOT NULL
 			AND to_regclass('public.global_catalog_sources') IS NOT NULL
+			AND to_regclass('public.global_catalog_state') IS NOT NULL
 			AND to_regclass('public.global_catalog_entity_genres') IS NOT NULL
 			AND to_regclass('public.genre_taxonomy_releases') IS NOT NULL
+			AND to_regclass('public.federation_stream_tickets') IS NOT NULL
 	`
+
+// RequiredTablesReady verifies that the minimal schema required by readplane exists.
+func RequiredTablesReady(ctx context.Context, pool *pgxpool.Pool) error {
 	var ok bool
-	if err := pool.QueryRow(ctx, query).Scan(&ok); err != nil {
+	if err := pool.QueryRow(ctx, requiredTablesReadyQuery).Scan(&ok); err != nil {
 		return err
 	}
 	if !ok {

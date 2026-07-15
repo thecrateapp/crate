@@ -7,13 +7,10 @@ from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import normalize_stats_window
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 
 def _global_stats_refs_enabled() -> bool:
-    return global_catalog_surface_enabled("stats") or global_catalog_surface_enabled(
-        "home"
-    )
+    return True
 
 
 def get_top_tracks(user_id: int, window: str = "30d", limit: int = 20) -> list[dict]:

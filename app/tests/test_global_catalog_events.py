@@ -1,5 +1,5 @@
 def test_reconciliation_emits_batch_domain_events(monkeypatch):
-    from crate.federation import global_reconciliation
+    from crate.db.jobs import global_catalog_reconciliation as global_reconciliation
 
     events: list[tuple[str, dict, str, str]] = []
 
@@ -10,15 +10,36 @@ def test_reconciliation_emits_batch_domain_events(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
 
-    monkeypatch.setattr(global_reconciliation, "iter_local_sources", lambda **_: [])
+    monkeypatch.setattr(
+        global_reconciliation,
+        "reconcile_local_catalog_batch",
+        lambda **_: {
+            "mode": "local",
+            "source_rows_seen": 0,
+            "sources_upserted": 0,
+            "canonical_created": 0,
+            "canonical_updated": 0,
+            "completed": True,
+            "next_cursor": None,
+        },
+    )
+    monkeypatch.setattr(
+        global_reconciliation,
+        "prune_local_catalog_sources_batch",
+        lambda **_: {
+            "sources_pruned": 0,
+            "completed": True,
+            "next_cursor": None,
+        },
+    )
     monkeypatch.setattr(global_reconciliation, "transaction_scope", lambda: FakeTx())
     monkeypatch.setattr(global_reconciliation, "_insert_run", lambda *_, **__: None)
     monkeypatch.setattr(global_reconciliation, "_complete_run", lambda *_, **__: None)
     monkeypatch.setattr(
         global_reconciliation,
         "append_domain_event",
-        lambda event_type, payload=None, scope=None, subject_key=None, session=None: events.append(
-            (event_type, payload or {}, scope or "", subject_key or "")
+        lambda event_type, payload=None, scope=None, subject_key=None, session=None: (
+            events.append((event_type, payload or {}, scope or "", subject_key or ""))
         ),
     )
 
@@ -33,19 +54,37 @@ def test_reconciliation_emits_batch_domain_events(monkeypatch):
 
 
 def test_reconciliation_failure_emits_failed_event(monkeypatch):
-    from crate.federation import global_reconciliation
+    from crate.db.jobs import global_catalog_reconciliation as global_reconciliation
 
     events: list[tuple[str, dict, str, str]] = []
+    failed_runs: list[tuple[str, str]] = []
+
+    class FakeTx:
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
 
     def broken_sources(**_kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(global_reconciliation, "iter_local_sources", broken_sources)
+    monkeypatch.setattr(
+        global_reconciliation, "reconcile_local_catalog_batch", broken_sources
+    )
+    monkeypatch.setattr(global_reconciliation, "transaction_scope", lambda: FakeTx())
+    monkeypatch.setattr(global_reconciliation, "_insert_run", lambda *_, **__: None)
+    monkeypatch.setattr(
+        global_reconciliation,
+        "_fail_run",
+        lambda _session, *, run_id, error: failed_runs.append((run_id, error)),
+        raising=False,
+    )
     monkeypatch.setattr(
         global_reconciliation,
         "append_domain_event",
-        lambda event_type, payload=None, scope=None, subject_key=None, session=None: events.append(
-            (event_type, payload or {}, scope or "", subject_key or "")
+        lambda event_type, payload=None, scope=None, subject_key=None, session=None: (
+            events.append((event_type, payload or {}, scope or "", subject_key or ""))
         ),
     )
 
@@ -56,6 +95,7 @@ def test_reconciliation_failure_emits_failed_event(monkeypatch):
 
     assert events[-1][0] == "global_catalog.reconcile.failed"
     assert events[-1][1]["error"] == "boom"
+    assert failed_runs == [(events[-1][1]["run_id"], "boom")]
 
 
 def test_peer_health_change_invalidates_remote_source_cache(monkeypatch):
@@ -153,7 +193,7 @@ def test_global_source_changed_event_uses_global_catalog_scope(monkeypatch):
 
 
 def test_tombstone_catalog_item_invalidates_remote_source_cache(monkeypatch):
-    from crate.federation import catalog
+    from crate.db.repositories import federation_catalog as catalog
 
     invalidations: list[tuple[str, str | None]] = []
     source_events: list[dict] = []
@@ -170,6 +210,10 @@ def test_tombstone_catalog_item_invalidates_remote_source_cache(monkeypatch):
             return False
 
     monkeypatch.setattr(catalog, "transaction_scope", lambda: FakeTx())
+    monkeypatch.setattr(
+        "crate.db.repositories.global_catalog_dirty_sources.enqueue_federated_dirty_source",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(
         catalog,
         "invalidate_source_cache",

@@ -31,6 +31,12 @@ x-crate-env: &crate-env
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+  CRATE_FEDERATION_IMPORT_MAX_BYTES: ${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
+  CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
+  CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
+  CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES: ${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
+  CRATE_FEDERATION_IMPORT_LEASE_SECONDS: ${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
 
 x-crate-enrichment-env: &crate-enrichment-env
   LASTFM_APIKEY: ${LASTFM_APIKEY:-}
@@ -89,6 +95,7 @@ services:
       - ${DATA_DIR}/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ${DATA_DIR}/traefik/acme.json:/acme.json
       - ${DATA_DIR}/traefik/conf:/conf
+      - ./deploy/traefik/federation-readplane.yml:/conf/crate-federation-readplane.yml:ro
       - ${DATA_DIR}/traefik/logs:/var/log/traefik
     networks:
       - crate
@@ -251,8 +258,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me}
       READPLANE_ENABLED: ${READPLANE_ENABLED:-true}
       READPLANE_ENABLE_SSE: ${READPLANE_ENABLE_SSE:-true}
-      READPLANE_ROUTE_MODE: ${READPLANE_ROUTE_MODE:-shadow}
+      READPLANE_ROUTE_MODE: ${READPLANE_ROUTE_MODE:-active}
       READPLANE_FALLBACK_ENABLED: ${READPLANE_FALLBACK_ENABLED:-true}
+      READPLANE_FEDERATION_PROXY_ENABLED: ${READPLANE_FEDERATION_PROXY_ENABLED:-true}
+      CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+      READPLANE_FEDERATION_CONTROL_TIMEOUT_MS: ${READPLANE_FEDERATION_CONTROL_TIMEOUT_MS:-2000}
+      READPLANE_FEDERATION_CONNECT_TIMEOUT_MS: ${READPLANE_FEDERATION_CONNECT_TIMEOUT_MS:-5000}
+      READPLANE_FEDERATION_HEADER_TIMEOUT_MS: ${READPLANE_FEDERATION_HEADER_TIMEOUT_MS:-10000}
       API_FALLBACK_BASE: http://crate-api:8585
       READPLANE_MAX_DB_CONNS: ${READPLANE_MAX_DB_CONNS:-8}
       READPLANE_MIN_DB_CONNS: ${READPLANE_MIN_DB_CONNS:-1}
@@ -271,6 +283,22 @@ services:
     mem_limit: 128m
     mem_reservation: 32m
     cpus: "0.25"
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.crate-readplane-catalog.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && PathPrefix(`/api/catalog/`)
+      traefik.http.routers.crate-readplane-catalog.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-catalog.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-readplane-catalog.priority: 100
+      traefik.http.routers.crate-readplane-catalog.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-catalog.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && PathPrefix(`/api/federation/remote/streams/`)
+      traefik.http.routers.crate-readplane-stream.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-stream.priority: 110
+      traefik.http.routers.crate-readplane-stream.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-stream.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-stream.service: crate-readplane-stream@file
+      traefik.http.services.crate-readplane.loadbalancer.server.port: 8686
 
   crate-worker:
     image: ${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}

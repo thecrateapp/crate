@@ -62,6 +62,20 @@ def _insert_remote_album():
         ),
     ]
     with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO federation_nodes
+                    (node_uid, display_name, api_base_url, active_key_id, trust_state)
+                VALUES
+                    (:node_uid, 'Remote fixture', :api_base_url, 'key-1', 'approved')
+                """
+            ),
+            {
+                "node_uid": node_uid,
+                "api_base_url": f"https://{node_uid}.example.test",
+            },
+        )
         for (
             remote_entity_uid,
             entity_type,
@@ -121,7 +135,10 @@ def _insert_remote_album():
 
 
 def test_global_album_detail_returns_local_album_payload(pg_db):
-    from crate.db.queries.global_catalog import get_global_album_detail, search_global_catalog
+    from crate.db.queries.global_catalog import (
+        get_global_album_detail,
+        search_global_catalog,
+    )
     from crate.federation.global_reconciliation import reconcile_local_catalog
 
     _seed_local_album(pg_db)
@@ -138,7 +155,10 @@ def test_global_album_detail_returns_local_album_payload(pg_db):
 
 
 def test_global_album_detail_returns_remote_album_without_node_labels(pg_db):
-    from crate.db.queries.global_catalog import get_global_album_detail, search_global_catalog
+    from crate.db.queries.global_catalog import (
+        get_global_album_detail,
+        search_global_catalog,
+    )
     from crate.federation.global_reconciliation import reconcile_remote_catalog
 
     _insert_remote_album()
@@ -157,6 +177,60 @@ def test_global_album_detail_returns_remote_album_without_node_labels(pg_db):
     assert payload["tracks"][0]["size_mb"] == 30
     assert "node_uid" not in payload
     assert "remote_entity_uid" not in payload["tracks"][0]
+
+
+def test_remote_global_catalog_resolves_human_artist_and_album_slugs(pg_db):
+    from crate.api.schemas.browse import ArtistPageResponse, AlbumDetailResponse
+    from crate.db.queries.global_catalog import (
+        get_global_album_detail_by_public_slugs,
+        get_global_artist_page_by_public_slug,
+    )
+    from crate.federation.global_reconciliation import reconcile_remote_catalog
+
+    _insert_remote_album()
+    reconcile_remote_catalog()
+
+    artist_page = get_global_artist_page_by_public_slug("high-vis")
+    album = get_global_album_detail_by_public_slugs("high-vis", "no-sense-no-feeling")
+
+    assert artist_page is not None
+    assert artist_page["artist"]["name"] == "High Vis"
+    assert artist_page["artist"]["global_artist_uid"]
+    ArtistPageResponse.model_validate(artist_page)
+    assert album is not None
+    assert album["artist"] == "High Vis"
+    assert album["name"] == "No Sense No Feeling"
+    assert album["global_album_uid"]
+    AlbumDetailResponse.model_validate(album)
+
+
+def test_global_artist_slug_conflicts_do_not_select_an_arbitrary_entity(pg_db):
+    from crate.db.queries.global_catalog import (
+        GlobalCatalogPublicRouteConflict,
+        get_global_artist_page_by_public_slug,
+    )
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        for name, normalized_name in (("A+B", "a b"), ("A B", "a b")):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO global_catalog_artists
+                        (global_artist_uid, canonical_name, public_slug, sort_name, normalized_name)
+                    VALUES (:global_artist_uid, :canonical_name, 'a-b', :sort_name, :normalized_name)
+                    """
+                ),
+                {
+                    "global_artist_uid": str(uuid.uuid4()),
+                    "canonical_name": name,
+                    "sort_name": name,
+                    "normalized_name": normalized_name,
+                },
+            )
+
+    with pytest.raises(GlobalCatalogPublicRouteConflict):
+        get_global_artist_page_by_public_slug("a-b")
 
 
 def test_catalog_album_detail_endpoint(test_app):
@@ -281,15 +355,12 @@ def test_catalog_album_cover_endpoint_uses_remote_artwork_source(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog.remote_album_cover",
-            lambda node_uid,
-            remote_entity_uid,
-            request,
-            size=None,
-            image_format=None,
-            selection=None: Response(
-                content=b"remote-cover",
-                media_type="image/jpeg",
-                headers={"X-Remote-Album": f"{node_uid}:{remote_entity_uid}"},
+            lambda node_uid, remote_entity_uid, request, size=None, image_format=None, selection=None: (
+                Response(
+                    content=b"remote-cover",
+                    media_type="image/jpeg",
+                    headers={"X-Remote-Album": f"{node_uid}:{remote_entity_uid}"},
+                )
             ),
         )
 

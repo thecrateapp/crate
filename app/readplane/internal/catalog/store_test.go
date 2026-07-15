@@ -18,8 +18,19 @@ func TestPublicAlbumSlug(t *testing.T) {
 }
 
 func TestSlugify(t *testing.T) {
-	got := slugify("  Live in Orlando, FL 3/14/2022  ")
-	assert.Equal(t, "live-in-orlando-fl-3-14-2022", got)
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "punctuation", value: "  Live in Orlando, FL 3/14/2022  ", want: "live-in-orlando-fl-3-14-2022"},
+		{name: "unicode accents", value: "Björk à París", want: "bjork-a-paris"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, slugify(tt.value))
+		})
+	}
 }
 
 func TestLooksLikeUUID(t *testing.T) {
@@ -118,6 +129,7 @@ func TestAnnotateGenreSummary(t *testing.T) {
 
 		assert.Equal(t, true, row["mapped"])
 		assert.Equal(t, "hardcore expanded into dynamics.", row["description"])
+		assert.Equal(t, 0, row["track_count"])
 		_, ok := row["canonical_eq_gains"]
 		assert.False(t, ok, "leaked canonical_eq_gains")
 		preset, ok := row["eq_preset_resolved"].(map[string]any)

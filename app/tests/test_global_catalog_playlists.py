@@ -84,37 +84,28 @@ def _seed_playlist_and_global_track(pg_db):
     return playlist_id, artist_uid, album_uid, track_uid
 
 
-def test_add_playlist_tracks_rejects_global_refs_when_disabled(test_app):
+def test_add_playlist_tracks_accepts_global_refs_without_a_gate(test_app):
     with (
-        pytest.MonkeyPatch.context() as mp,
         patch("crate.api.playlists.get_playlist", return_value={"id": 1, "user_id": 1}),
         patch("crate.api.playlists.can_edit_playlist", return_value=True),
+        patch("crate.api.playlists.add_playlist_tracks", return_value=1),
     ):
-        mp.setattr(
-            "crate.api.playlists.global_catalog_remote_playlist_refs_allowed",
-            lambda: False,
-        )
         response = test_app.post(
             "/api/playlists/1/tracks",
             json={"tracks": [{"global_track_uid": str(uuid.uuid4())}]},
         )
 
-    assert response.status_code == 422
-    assert "Global playlist track refs are disabled" in response.text
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "added": 1}
 
 
-def test_playlist_repository_persists_global_track_refs(pg_db, monkeypatch):
+def test_playlist_repository_persists_global_track_refs(pg_db):
     from crate.db.repositories.playlists_tracks import add_playlist_tracks
     from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
 
     playlist_id, artist_uid, album_uid, track_uid = _seed_playlist_and_global_track(
         pg_db
     )
-    monkeypatch.setattr(
-        "crate.db.repositories.playlists_tracks.global_catalog_remote_playlist_refs_allowed",
-        lambda: True,
-    )
-
     added = add_playlist_tracks(
         playlist_id,
         [{"global_track_uid": track_uid, "source": "manual"}],
@@ -130,9 +121,7 @@ def test_playlist_repository_persists_global_track_refs(pg_db, monkeypatch):
     assert tracks[0]["artist"] == "Rival Schools"
 
 
-def test_replacing_and_duplicating_a_playlist_preserves_global_track_refs(
-    pg_db, monkeypatch
-):
+def test_replacing_and_duplicating_a_playlist_preserves_global_track_refs(pg_db):
     from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
     from crate.db.repositories.playlists_duplicate import duplicate_playlist
     from crate.db.repositories.playlists_tracks import replace_playlist_tracks
@@ -140,11 +129,6 @@ def test_replacing_and_duplicating_a_playlist_preserves_global_track_refs(
     playlist_id, _artist_uid, _album_uid, track_uid = _seed_playlist_and_global_track(
         pg_db
     )
-    monkeypatch.setattr(
-        "crate.db.repositories.playlists_tracks.global_catalog_remote_playlist_refs_allowed",
-        lambda: True,
-    )
-
     assert (
         replace_playlist_tracks(
             playlist_id,

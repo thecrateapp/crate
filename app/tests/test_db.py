@@ -567,7 +567,7 @@ class TestPlaylistTrackEntityRefs:
         assert tracks[0]["artist"] == "Playlist Resolve Artist"
         assert tracks[0]["album"] == "Playlist Resolve Album"
 
-    def test_get_playlist_tracks_skips_stale_track_refs(self, pg_db):
+    def test_get_playlist_tracks_preserves_unresolved_legacy_snapshot(self, pg_db):
         from crate.db.repositories.playlists_create import create_playlist
         from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
         from crate.db.tx import transaction_scope
@@ -621,7 +621,16 @@ class TestPlaylistTrackEntityRefs:
 
         tracks = get_playlist_tracks(playlist_id)
 
-        assert tracks == []
+        assert len(tracks) == 1
+        assert tracks[0]["global_track_uid"] is None
+        assert tracks[0]["track_id"] is None
+        assert tracks[0]["track_entity_uid"] == stale_entity_uid
+        assert tracks[0]["track_storage_id"] == stale_storage_id
+        assert tracks[0]["track_path"] == "legacy/relative/path.flac"
+        assert tracks[0]["title"] == "Legacy Snapshot Title"
+        assert tracks[0]["artist"] == "Legacy Snapshot Artist"
+        assert tracks[0]["album"] == "Legacy Snapshot Album"
+        assert tracks[0]["duration"] == 123.0
 
     def test_replace_playlist_tracks_skips_unresolvable_tracks(self, pg_db):
         from crate.db.repositories.playlists_create import create_playlist
@@ -724,6 +733,9 @@ class TestAnalyticsQueries:
     def test_count_mood_presets_counts_multiple_presets_in_one_read(self, pg_db):
         from crate.db.queries.browse_media_mood import count_mood_presets
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         pg_db.upsert_artist({"name": "Mood Browse Artist"})
         album_id = pg_db.upsert_album(
@@ -797,6 +809,10 @@ class TestAnalyticsQueries:
                     ),
                     {"id": row["id"], **audio},
                 )
+
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
 
         counts = count_mood_presets(
             {

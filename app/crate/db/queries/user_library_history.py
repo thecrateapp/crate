@@ -7,13 +7,10 @@ from crate.db.queries.user_library_shared import (
     relative_track_path,
 )
 from crate.db.tx import read_scope
-from crate.federation.global_policy import global_catalog_surface_enabled
 
 
 def _global_history_refs_enabled() -> bool:
-    return global_catalog_surface_enabled("home") or global_catalog_surface_enabled(
-        "stats"
-    )
+    return True
 
 
 def get_play_history_rows(

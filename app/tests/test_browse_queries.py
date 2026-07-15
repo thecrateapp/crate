@@ -424,11 +424,6 @@ def test_browse_filter_genres_include_remote_global_genres(pg_db, monkeypatch):
             },
         )
 
-    monkeypatch.setattr(
-        "crate.db.queries.browse_artist_filters.global_catalog_surface_enabled",
-        lambda surface: surface == "explore",
-    )
-
     rows = get_browse_filter_genres()
     post_punk = next(row for row in rows if row["name"] == "post-punk")
 
@@ -1387,6 +1382,9 @@ class TestMood:
     def test_count_mood_tracks_counts_filtered_rows(self, pg_db):
         from crate.db.queries.browse_media_mood import count_mood_tracks
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         artist = "Mood Count Artist"
         album = "Mood Count Album"
@@ -1431,6 +1429,10 @@ class TestMood:
                     },
                 )
 
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
+
         count = count_mood_tracks(["energy >= %s", "bpm >= %s"], [0.7, 120])
         assert count == 1
 
@@ -1443,6 +1445,9 @@ class TestMood:
     def test_get_mood_tracks_returns_limited_results(self, pg_db):
         from crate.db.queries.browse_media_mood import get_mood_tracks
         from crate.db.tx import transaction_scope
+        from crate.federation.global_reconciliation import (
+            reconcile_dirty_catalog_sources,
+        )
 
         artist = "Mood Tracks Artist"
         album = "Mood Tracks Album"
@@ -1474,6 +1479,10 @@ class TestMood:
                     {"b": 120, "p": f"/music/{artist}/{album}/{i:02d}-mood.flac"},
                 )
 
+        projection = reconcile_dirty_catalog_sources(limit=100)
+        assert projection["failed"] == 0
+        assert projection["remaining"] == 0
+
         tracks = get_mood_tracks(["bpm >= %s"], [80], 3)
         assert len(tracks) == 3
         for t in tracks:
@@ -1488,17 +1497,10 @@ class TestMood:
 
         assert get_mood_tracks(["energy >= %s"], [0.999], 10) == []
 
-    def test_count_mood_presets_include_remote_global_tracks(
-        self, pg_db, monkeypatch
-    ):
+    def test_count_mood_presets_include_remote_global_tracks(self, pg_db, monkeypatch):
         from crate.db.queries.browse_media_mood import count_mood_presets
 
         _insert_remote_global_mood_track(pg_db)
-        monkeypatch.setattr(
-            "crate.db.queries.browse_media_mood.global_catalog_surface_enabled",
-            lambda surface: surface == "explore",
-        )
-
         counts = count_mood_presets(
             {"energetic": {"energy_min": 0.7, "danceability_min": 0.5}}
         )
@@ -1509,11 +1511,6 @@ class TestMood:
         from crate.db.queries.browse_media_mood import get_mood_tracks
 
         track_uid = _insert_remote_global_mood_track(pg_db)
-        monkeypatch.setattr(
-            "crate.db.queries.browse_media_mood.global_catalog_surface_enabled",
-            lambda surface: surface == "explore",
-        )
-
         tracks = get_mood_tracks(["energy >= %s", "danceability >= %s"], [0.7, 0.5], 5)
 
         assert len(tracks) == 1

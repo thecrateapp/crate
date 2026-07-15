@@ -15,6 +15,7 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/auth"
 	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
+	readplanefederation "github.com/thecrateapp/crate/app/readplane/internal/federation"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 	"github.com/thecrateapp/crate/app/readplane/internal/redisx"
@@ -66,7 +67,34 @@ func main() {
 	authenticator := auth.NewAuthenticator(pool, cfg.JWTSecret, cfg.QueryTimeout)
 	catalogStore := catalog.NewStore(pool, cfg.QueryTimeout)
 	snapshotStore := snapshots.NewStore(pool, cfg.QueryTimeout, cfg.SnapshotMaxAge, cfg.StaleMaxAge)
-	server := routes.NewServer(cfg, pool, redisClient, authenticator, catalogStore, snapshotStore, fallback, logger)
+	var federationProxy *readplanefederation.Proxy
+	if cfg.FederationProxyEnabled {
+		signer, signerErr := readplanefederation.NewControlPlaneSigner(
+			cfg.APIBase, cfg.ServiceToken, cfg.FederationControlTimeout,
+		)
+		if signerErr != nil {
+			logger.Error("failed to configure federation control plane", "error", signerErr)
+			os.Exit(1)
+		}
+		federationProxy = readplanefederation.NewProxy(
+			readplanefederation.ProxyConfig{
+				AllowPrivateNetworks:  cfg.FederationAllowPrivateNetworks,
+				ConnectTimeout:        cfg.FederationConnectTimeout,
+				ResponseHeaderTimeout: cfg.FederationHeaderTimeout,
+			},
+			signer,
+			fallback.ServeHTTP,
+			func(checkCtx context.Context, ticketUID string) bool {
+				if redisClient == nil {
+					return false
+				}
+				key := "federation:stream-revoked:{" + ticketUID + "}"
+				revoked, checkErr := redisClient.Exists(checkCtx, key).Result()
+				return checkErr != nil || revoked > 0
+			},
+		)
+	}
+	server := routes.NewServer(cfg, pool, redisClient, authenticator, catalogStore, snapshotStore, fallback, federationProxy, logger)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,

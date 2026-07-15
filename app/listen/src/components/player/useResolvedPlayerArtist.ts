@@ -104,7 +104,7 @@ export function useResolvedPlayerArtist(
         slug?: string;
         has_photo?: boolean;
       }[];
-    }>(`/api/search?q=${encodeURIComponent(artistName)}&limit=5`)
+    }>(`/api/catalog/search?q=${encodeURIComponent(artistName)}&limit=5`)
       .then((result) => {
         if (cancelled) return;
         const exactMatches =

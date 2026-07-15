@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from starlette.requests import Request
@@ -177,7 +178,7 @@ def test_node_to_node_track_detail_route_is_registered(monkeypatch):
     from crate.api import create_app
 
     app = create_app()
-    paths = {route.path for route in app.routes}
+    paths = app.openapi()["paths"]
 
     assert "/api/federation/v1/tracks/{remote_entity_uid}" in paths
 
@@ -242,6 +243,19 @@ def _stream_request(headers: dict[str, str] | None = None) -> Request:
     return Request(scope, receive)
 
 
+def _install_prepared_stream(monkeypatch, federation_remote) -> None:
+    monkeypatch.setattr(
+        federation_remote,
+        "prepare_outbound_resource",
+        lambda base_url, candidate: SimpleNamespace(
+            external_url=f"{base_url}{candidate}",
+            connection_url=f"{base_url}{candidate}",
+            host_header="node-b.test",
+            sni_hostname="node-b.test",
+        ),
+    )
+
+
 def _install_proxy_stream_mocks(
     monkeypatch,
     *,
@@ -277,7 +291,8 @@ def _install_proxy_stream_mocks(
         def __init__(self, *args, **kwargs):
             pass
 
-        def build_request(self, method, url, headers):
+        def build_request(self, method, url, headers, **kwargs):
+            del kwargs
             calls["upstream_request"] = (method, url, headers)
             return object()
 
@@ -350,6 +365,7 @@ def _install_proxy_stream_mocks(
         lambda **kwargs: {"X-Crate-Node-Id": kwargs["node_id"]},
     )
     monkeypatch.setattr(federation_remote.httpx, "AsyncClient", Client)
+    _install_prepared_stream(monkeypatch, federation_remote)
     return calls
 
 
@@ -381,7 +397,8 @@ def test_proxy_remote_stream_preserves_206_headers_and_accounts_bytes(monkeypatc
         def __init__(self, *args, **kwargs):
             pass
 
-        def build_request(self, method, url, headers):
+        def build_request(self, method, url, headers, **kwargs):
+            del kwargs
             calls["upstream_request"] = (method, url, headers)
             return object()
 
@@ -452,6 +469,7 @@ def test_proxy_remote_stream_preserves_206_headers_and_accounts_bytes(monkeypatc
         lambda **kwargs: {"X-Crate-Node-Id": kwargs["node_id"]},
     )
     monkeypatch.setattr(federation_remote.httpx, "AsyncClient", Client)
+    _install_prepared_stream(monkeypatch, federation_remote)
 
     async def run():
         response = await federation_remote.proxy_remote_stream(
@@ -495,8 +513,8 @@ def test_proxy_remote_stream_records_midstream_failure_and_releases_slot(monkeyp
         def __init__(self, *args, **kwargs):
             pass
 
-        def build_request(self, method, url, headers):
-            del method, url, headers
+        def build_request(self, method, url, headers, **kwargs):
+            del method, url, headers, kwargs
             return object()
 
         async def send(self, request, stream):
@@ -560,6 +578,7 @@ def test_proxy_remote_stream_records_midstream_failure_and_releases_slot(monkeyp
         lambda **kwargs: {"X-Crate-Node-Id": kwargs["node_id"]},
     )
     monkeypatch.setattr(federation_remote.httpx, "AsyncClient", Client)
+    _install_prepared_stream(monkeypatch, federation_remote)
 
     async def run():
         response = await federation_remote.proxy_remote_stream(
@@ -685,9 +704,9 @@ def test_playlist_add_tracks_rejects_non_imported_remote_refs(monkeypatch):
 
 def test_worker_registry_uses_real_federation_import_album_handler():
     from crate.worker import TASK_HANDLERS
-    from crate.worker_handlers.acquisition import _handle_federation_import_album
+    from crate.worker_handlers.federation import _handle_federation_import
 
-    assert TASK_HANDLERS["federation_import_album"] is _handle_federation_import_album
+    assert TASK_HANDLERS["federation_import_album"] is _handle_federation_import
 
 
 def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
@@ -756,6 +775,10 @@ def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
         lambda node_uid, cursor: cursors.append((node_uid, cursor)),
     )
     monkeypatch.setattr(
+        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+        lambda *_args, **_kwargs: 0,
+    )
+    monkeypatch.setattr(
         "crate.federation.events.emit_catalog_sync_completed",
         lambda *args, **kwargs: None,
     )
@@ -765,6 +788,249 @@ def test_catalog_sync_accepts_manifest_item_list(monkeypatch):
     assert result["synced"] == 3
     assert [item["entity_type"] for item in upserts] == ["artist", "album", "track"]
     assert cursors == [("node-b", "rev-list")]
+
+
+def test_catalog_sync_consumes_every_manifest_page_without_implicit_cap(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    from crate.worker_handlers.federation import _handle_catalog_sync
+
+    requested_pages: list[int] = []
+    completed: list[tuple[str, int, str]] = []
+    pruned: list[tuple[str, str]] = []
+
+    class Response:
+        def __init__(self, page: int):
+            self.page = page
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "revision": "rev-12-pages",
+                "page": self.page,
+                "page_size": 1,
+                "total_pages": 12,
+                "items": [
+                    {
+                        "entity_type": "artist",
+                        "remote_entity_uid": f"artist-{self.page}",
+                        "title": f"Artist {self.page}",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_peer",
+        lambda node_uid: {"node_uid": node_uid, "api_base_url": "https://peer.test"},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_local_node",
+        lambda: {
+            "node_uid": "local",
+            "active_key_id": "key-1",
+            "private_key_ref": "federation/keys/key-1.pem",
+        },
+    )
+
+    def federated_get(**kwargs):
+        page = int(parse_qs(urlsplit(kwargs["path"]).query)["page"][0])
+        requested_pages.append(page)
+        return Response(page)
+
+    monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_cursor", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.save_catalog_sync_checkpoint",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+        lambda node_uid, revision: pruned.append((node_uid, revision)) or 0,
+    )
+    monkeypatch.setattr(
+        "crate.federation.events.emit_catalog_sync_completed",
+        lambda node_uid, count, revision: completed.append((node_uid, count, revision)),
+    )
+
+    result = _handle_catalog_sync("task-1", {"node_uid": "node-b", "page_size": 1}, {})
+
+    assert requested_pages == list(range(12))
+    assert result["synced"] == 12
+    assert result["pages"] == 12
+    assert result["status"] == "completed"
+    assert completed == [("node-b", 12, "rev-12-pages")]
+    assert pruned == [("node-b", "rev-12-pages")]
+
+
+def test_catalog_sync_partial_failure_is_not_marked_completed(monkeypatch):
+    from crate.worker_handlers.federation import _handle_catalog_sync
+
+    calls = {"request": 0, "cursor": 0, "completed": 0, "failed": 0}
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "revision": "rev-partial",
+                "page": 0,
+                "page_size": 1,
+                "total_pages": 2,
+                "items": [
+                    {
+                        "entity_type": "artist",
+                        "remote_entity_uid": "artist-1",
+                        "title": "High Vis",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_peer",
+        lambda node_uid: {"node_uid": node_uid, "api_base_url": "https://peer.test"},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_local_node",
+        lambda: {
+            "node_uid": "local",
+            "active_key_id": "key-1",
+            "private_key_ref": "federation/keys/key-1.pem",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.update_peer", lambda *_args, **_kwargs: None
+    )
+
+    def federated_get(**_kwargs):
+        calls["request"] += 1
+        if calls["request"] == 1:
+            return Response()
+        raise RuntimeError("peer disconnected")
+
+    monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_cursor",
+        lambda *_args, **_kwargs: calls.__setitem__("cursor", calls["cursor"] + 1),
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.save_catalog_sync_checkpoint",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "crate.federation.events.emit_catalog_sync_completed",
+        lambda *_args, **_kwargs: calls.__setitem__(
+            "completed", calls["completed"] + 1
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.federation.events.emit_catalog_sync_failed",
+        lambda *_args, **_kwargs: calls.__setitem__("failed", calls["failed"] + 1),
+    )
+
+    result = _handle_catalog_sync("task-1", {"node_uid": "node-b", "page_size": 1}, {})
+
+    assert result["status"] == "failed"
+    assert result["synced"] == 1
+    assert result["error"] == "peer disconnected"
+    assert calls == {"request": 2, "cursor": 0, "completed": 0, "failed": 1}
+
+
+def test_catalog_sync_resumes_a_matching_partial_manifest(monkeypatch):
+    import json
+    from urllib.parse import parse_qs, urlsplit
+
+    from crate.worker_handlers.federation import _handle_catalog_sync
+
+    requested_pages: list[int] = []
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "revision": "rev-resume",
+                "page": 3,
+                "page_size": 1,
+                "total_items": 4,
+                "total_pages": 4,
+                "items": [
+                    {
+                        "entity_type": "artist",
+                        "remote_entity_uid": "artist-3",
+                        "title": "Artist 3",
+                    }
+                ],
+            }
+
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_peer",
+        lambda node_uid: {"node_uid": node_uid, "api_base_url": "https://peer.test"},
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.federation.get_local_node",
+        lambda: {
+            "node_uid": "local",
+            "active_key_id": "key-1",
+            "private_key_ref": "federation/keys/key-1.pem",
+        },
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.get_cursor",
+        lambda _node_uid: {
+            "cursor": json.dumps(
+                {
+                    "status": "partial",
+                    "revision": "rev-resume",
+                    "next_page": 3,
+                    "page_size": 1,
+                    "synced": 3,
+                }
+            )
+        },
+    )
+
+    def federated_get(**kwargs):
+        requested_pages.append(int(parse_qs(urlsplit(kwargs["path"]).query)["page"][0]))
+        return Response()
+
+    monkeypatch.setattr("crate.federation.client.federated_get", federated_get)
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_catalog_item", lambda **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.save_catalog_sync_checkpoint",
+        lambda *_args, **_kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+        lambda *_args, **_kwargs: 0,
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.upsert_cursor", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        "crate.federation.events.emit_catalog_sync_completed",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = _handle_catalog_sync("task-1", {"node_uid": "node-b", "page_size": 1}, {})
+
+    assert requested_pages == [3]
+    assert result["synced"] == 4
+    assert result["status"] == "completed"
 
 
 def test_catalog_sync_without_node_uid_iterates_approved_peers(monkeypatch):
@@ -867,6 +1133,10 @@ def test_catalog_sync_invalidates_cached_remote_facets(monkeypatch):
     monkeypatch.setattr(
         "crate.federation.catalog.upsert_cursor",
         lambda node_uid, cursor: None,
+    )
+    monkeypatch.setattr(
+        "crate.federation.catalog.tombstone_catalog_items_missing_from_revision",
+        lambda *_args, **_kwargs: 0,
     )
     monkeypatch.setattr(
         "crate.federation.events.emit_catalog_sync_completed",

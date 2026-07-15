@@ -8,6 +8,7 @@ import { sendRadioFeedback } from "@/lib/radio";
 interface RadioFeedbackProps {
   sessionId: string;
   trackId: number | undefined;
+  globalTrackUid?: string;
   onDislike?: () => void;
   size?: "sm" | "md";
 }
@@ -15,6 +16,7 @@ interface RadioFeedbackProps {
 export function RadioFeedback({
   sessionId,
   trackId,
+  globalTrackUid,
   onDislike,
   size = "md",
 }: RadioFeedbackProps) {
@@ -25,9 +27,9 @@ export function RadioFeedback({
   useEffect(() => {
     setLiked(false);
     setDisliked(false);
-  }, [sessionId, trackId]);
+  }, [sessionId, trackId, globalTrackUid]);
 
-  if (!trackId) return null;
+  if (!trackId && !globalTrackUid) return null;
 
   const buttonClass = size === "sm" ? "h-11 w-11" : "h-8 w-8";
   const iconSize = size === "sm" ? 16 : 14;
@@ -36,7 +38,9 @@ export function RadioFeedback({
     if (liked) return;
     setLiked(true);
     setDisliked(false);
-    await sendRadioFeedback(sessionId, trackId, "like");
+    await (globalTrackUid
+      ? sendRadioFeedback(sessionId, trackId, "like", globalTrackUid)
+      : sendRadioFeedback(sessionId, trackId, "like"));
     toast.success(t("player.radio.moreLikeThis"), { duration: 1500 });
   };
 
@@ -44,25 +48,29 @@ export function RadioFeedback({
     if (disliked) return;
     setDisliked(true);
     setLiked(false);
-    void sendRadioFeedback(sessionId, trackId, "dislike");
+    void (globalTrackUid
+      ? sendRadioFeedback(sessionId, trackId, "dislike", globalTrackUid)
+      : sendRadioFeedback(sessionId, trackId, "dislike"));
     onDislike?.();
     toast(t("player.radio.lessLikeThis"), { duration: 1500 });
   };
 
   return (
     <div className="flex items-center gap-1">
-      <button
-        onClick={handleLike}
-        className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
-          liked
-            ? "bg-primary/15 text-primary"
-            : "text-white/30 hover:bg-white/5 hover:text-white/60"
-        }`}
-        title={t("player.radio.moreLikeThis")}
-        aria-label={t("player.radio.moreLikeThis")}
-      >
-        <ThumbsUp size={iconSize} className={liked ? "fill-current" : ""} />
-      </button>
+      {trackId || globalTrackUid ? (
+        <button
+          onClick={handleLike}
+          className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${
+            liked
+              ? "bg-primary/15 text-primary"
+              : "text-white/30 hover:bg-white/5 hover:text-white/60"
+          }`}
+          title={t("player.radio.moreLikeThis")}
+          aria-label={t("player.radio.moreLikeThis")}
+        >
+          <ThumbsUp size={iconSize} className={liked ? "fill-current" : ""} />
+        </button>
+      ) : null}
       <button
         onClick={handleDislike}
         className={`flex ${buttonClass} touch-manipulation items-center justify-center rounded-full transition ${

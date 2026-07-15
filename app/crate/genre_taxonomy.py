@@ -627,7 +627,7 @@ def core_genre_uid(slug: str) -> str:
     return str(uuid.uuid5(_CORE_TAXONOMY_NAMESPACE, normalized_slug))
 
 
-def get_core_taxonomy_descriptor() -> dict:
+def get_core_taxonomy_descriptor(*, include_release: bool = True) -> dict:
     """Describe the shipped taxonomy without consulting node-local overlays."""
     genres = [
         {
@@ -652,7 +652,18 @@ def get_core_taxonomy_descriptor() -> dict:
     serialized = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
     ).encode("utf-8")
-    return {**payload, "digest": f"sha256:{sha256(serialized).hexdigest()}"}
+    descriptor = {
+        **payload,
+        "digest": f"sha256:{sha256(serialized).hexdigest()}",
+    }
+    if include_release:
+        from crate.federation.global_genres import taxonomy_release_health
+
+        release = taxonomy_release_health()
+        descriptor["release"] = release
+        descriptor["signature"] = release.get("signature")
+        descriptor["key_id"] = release.get("key_id")
+    return descriptor
 
 
 _RUNTIME_GRAPH_CACHE: dict | None = None

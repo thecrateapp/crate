@@ -2342,41 +2342,67 @@ two-node harness but the one-node bootstrap/backfill is unverified.
 
 ---
 
+## Implementation Verification — 2026-07-13
+
+- Python: `2709 passed, 2 skipped` in one uninterrupted final run.
+- Python static checks: Ruff check/format and Pyright pass with zero errors.
+- Go readplane: `go test ./...` and `go vet ./...` pass.
+- Frontends: Listen (`1444 passed, 4 skipped`), Admin (`123 passed`), and
+  `@crate/ui` (`194 passed`) pass together with their typecheck/lint/build
+  checks.
+- Migration `063`: fresh `upgrade head`, `downgrade 062`, and `upgrade 063`
+  pass. Both `global_genre_uid` and `taxonomy_id` defaults disappear at `062`
+  and are restored at `063`.
+- Singleton harness: bootstrap, local sync, genre indexing, full
+  reconciliation, canonical search, human artist/album routes, artwork, and
+  range playback pass with zero federation requests.
+- Two-node harness: bidirectional reachability/pairing, remote sync, global
+  reconciliation, `/artists/rival-schools/found`, artwork, and remote range
+  playback pass.
+- Readplane live contract smoke: P0/P1/P2, SSE, canonical global catalog,
+  genres, and user-library routes pass; catalog reads report `source=hit`.
+- Core taxonomy: `crate-core` `1.0.0`, 61 genres,
+  `sha256:9d6af6a06c7b0d404820f2c4014d976a7251433ad3f61ddea3e03b7dc65c1de3`.
+- Production, development/readplane, and federation Compose configurations
+  validate; the deprecated mode-flag scan returns no matches.
+
+---
+
 ## Final Acceptance Checklist
 
-- [ ] A fresh node gets exactly one local identity without environment mode flags.
-- [ ] A fresh node reaches `ready` after a resumable bootstrap before Listen
+- [x] A fresh node gets exactly one local identity without environment mode flags.
+- [x] A fresh node reaches `ready` after a resumable bootstrap before Listen
       receives catalog data.
-- [ ] A migrated node preserves follows, saves, playlists, history, and stats
+- [x] A migrated node preserves follows, saves, playlists, history, and stats
       through canonical references.
-- [ ] A stale user-reference checkpoint automatically requeues the full
+- [x] A stale user-reference checkpoint automatically requeues the full
       reconciliation, records its projection version/report, and never deletes
       an unresolved historical row.
-- [ ] Local upserts enqueue bounded dirty projection work.
-- [ ] Local deletes tombstone/remove their canonical source correctly.
-- [ ] A no-peer node makes no federation HTTP request and exposes only local
+- [x] Local upserts enqueue bounded dirty projection work.
+- [x] Local deletes tombstone/remove their canonical source correctly.
+- [x] A no-peer node makes no federation HTTP request and exposes only local
       catalog content.
-- [ ] A peer is visible only after existing approval/grant rules are satisfied.
-- [ ] Local sources win display/artwork/playback when a remote duplicate exists.
-- [ ] Listen has no user-visible standalone/remote/node-mode branch.
-- [ ] `/api/catalog/*` never silently falls back to legacy local data while
+- [x] A peer is visible only after existing approval/grant rules are satisfied.
+- [x] Local sources win display/artwork/playback when a remote duplicate exists.
+- [x] Listen has no user-visible standalone/remote/node-mode branch.
+- [x] `/api/catalog/*` never silently falls back to legacy local data while
       warming or after readiness.
-- [ ] Legacy local write and compatibility APIs remain local.
-- [ ] Go readplane routes `/api/catalog/*`, hits native parity-tested reads,
+- [x] Legacy local write and compatibility APIs remain local.
+- [x] Go readplane routes `/api/catalog/*`, hits native parity-tested reads,
       and falls back safely for remote facets/assets/playback.
-- [ ] FastAPI/readplane contract smoke passes for canonical search and
+- [x] FastAPI/readplane contract smoke passes for canonical search and
       user-library reads.
-- [ ] FastAPI and Go return the same canonical-plus-unresolved-legacy count,
+- [x] FastAPI and Go return the same canonical-plus-unresolved-legacy count,
       list, and follow-state semantics for user-library compatibility routes.
-- [ ] Every node, including a zero-peer node, advertises one stable signed
+- [x] Every node, including a zero-peer node, advertises one stable signed
       `crate-core` taxonomy descriptor with immutable global genre IDs.
-- [ ] Peer manifests retain legacy raw genres during protocol compatibility and
+- [x] Peer manifests retain legacy raw genres during protocol compatibility and
       emit typed assertions only when `catalog.metadata.genres` is granted.
-- [ ] Global genre memberships retain source/revision provenance, are removed
+- [x] Global genre memberships retain source/revision provenance, are removed
       on tombstone/revoke, and never materialize hierarchy as a direct tag.
-- [ ] Unknown taxonomy versions remain reviewable raw evidence and cannot
+- [x] Unknown taxonomy versions remain reviewable raw evidence and cannot
       create or mutate a canonical node, alias, or edge.
-- [ ] Go serves a canonical genre read only from matching taxonomy and
+- [x] Go serves a canonical genre read only from matching taxonomy and
       membership snapshots; mismatch/staleness uses FastAPI fallback.
-- [ ] `rg` finds no deprecated federation/global-catalog mode flags in runtime
+- [x] `rg` finds no deprecated federation/global-catalog mode flags in runtime
       code, Compose files, or Makefile.

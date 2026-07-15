@@ -852,9 +852,7 @@ class TestPathsSceneCandidateQueries:
             )
 
         rows_by_genre = list_scene_path_candidates(["punk"], limit_per_genre=20)
-        rows_by_artist = {
-            row["artist"]: row for row in rows_by_genre["punk"]
-        }
+        rows_by_artist = {row["artist"]: row for row in rows_by_genre["punk"]}
 
         assert rows_by_artist[direct_artist]["membership_score"] == 1.0
         assert rows_by_artist[alias_artist]["membership_score"] == 0.76

@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from crate.db.repositories import federation as repo
+from crate.db.repositories import federation_trust as trust_repo
 from crate.federation.identity import (
     ensure_keys_dir,
     generate_ed25519_key_pair,
@@ -47,6 +48,14 @@ def bootstrap_federation_identity(
         listen_base_url=listen_base_url,
         active_key_id=key_id,
         private_key_ref=f"federation/keys/{key_id}.pem",
+    )
+
+    trust_repo.upsert_local_key(
+        node_uid=str(node["node_uid"]),
+        key_id=key_id,
+        public_key=public_key_b64,
+        private_key_ref=f"federation/keys/{key_id}.pem",
+        status="active",
     )
 
     repo.update_local_node(

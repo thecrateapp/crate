@@ -42,3 +42,19 @@ def test_catalog_state_failure_keeps_diagnostics_until_next_bootstrap(pg_db):
 
     assert restarted["last_error"] is None
     assert get_catalog_state()["status"] == "backfilling"
+
+
+def test_catalog_state_persists_structured_bootstrap_fields(pg_db):
+    from crate.db.repositories.global_catalog_state import transition_catalog_state
+
+    cursor = {"phase": "local", "cursor": {"entity_type": "album", "after_id": 7}}
+    report = {"artists": 3, "albums": 5}
+
+    state = transition_catalog_state(
+        "backfilling",
+        bootstrap_cursor_json=cursor,
+        user_refs_backfill_report_json=report,
+    )
+
+    assert state["bootstrap_cursor_json"] == cursor
+    assert state["user_refs_backfill_report_json"] == report

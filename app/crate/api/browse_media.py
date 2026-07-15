@@ -144,6 +144,7 @@ _DOWNLOAD_RESPONSES = merge_responses(
 @router.get(
     "/api/search",
     response_model=SearchResponse,
+    response_model_exclude_none=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Search artists, albums, and tracks",
 )
@@ -161,16 +162,12 @@ def api_search(
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
 
-    use_global_catalog = False
+    use_global_catalog = scope == "auto"
     global_catalog_revision = ""
     if scope == "auto":
-        from crate.federation.global_policy import global_catalog_surface_enabled
+        from crate.db.queries.global_catalog import get_global_catalog_revision
 
-        use_global_catalog = global_catalog_surface_enabled("search")
-        if use_global_catalog:
-            from crate.db.queries.global_catalog import get_global_catalog_revision
-
-            global_catalog_revision = get_global_catalog_revision()
+        global_catalog_revision = get_global_catalog_revision()
 
     user_cache_part = f":u:{user.get('id')}" if scope != "local" else ""
     global_cache_part = (
@@ -208,7 +205,6 @@ def api_search(
         set_cache(cache_key, payload, ttl=45)
         return payload
 
-    # Federated search (scope=auto|federated)
     from crate.db.repositories import federation as fed_repo
     from crate.federation.search_fanout import federated_search
 
@@ -224,7 +220,9 @@ def api_search(
     record_later("search.federated.results.artists", len(payload["artists"]))
     record_later("search.federated.results.albums", len(payload["albums"]))
     record_later("search.federated.results.tracks", len(payload["tracks"]))
-    set_cache(cache_key, payload, ttl=45)
+    federation_status = payload.get("federation") or {}
+    if federation_status.get("complete", True):
+        set_cache(cache_key, payload, ttl=45)
     return payload
 
 
@@ -1050,13 +1048,27 @@ def _stream_url_for_track(track: dict, policy: str) -> str:
     return f"/api/stream/{encoded_path}{query}"
 
 
-def _playback_payload_for_track(track: dict, delivery: str) -> dict:
+def _playback_payload_for_track(track: dict, delivery: str, *, user_id: int) -> dict:
     resolution = resolve_playback(track, delivery, enqueue=True)
     if resolution is None:
         raise HTTPException(status_code=404, detail="Track not found")
-    return resolution_to_payload(
+    payload = resolution_to_payload(
         resolution, _stream_url_for_track(track, resolution.requested_policy)
     )
+    from crate.playback_provenance import (
+        issue_playback_session,
+        resolve_local_content_provenance,
+    )
+
+    content_origin, source_node_uid = resolve_local_content_provenance(track.get("id"))
+    payload["playback_session"] = issue_playback_session(
+        user_id=int(user_id),
+        content_origin=content_origin,
+        source_node_uid=source_node_uid,
+    )
+    payload["content_origin"] = content_origin
+    payload["_source_node_uid"] = source_node_uid
+    return payload
 
 
 @router.get(
@@ -1083,11 +1095,11 @@ def api_stream_by_id(
 def api_playback_by_id(
     request: Request, track_id: int, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    user = _require_auth(request)
     track = get_track_delivery_row_by_id(track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _playback_payload_for_track(track, delivery)
+    return _playback_payload_for_track(track, delivery, user_id=user["id"])
 
 
 @router.get(
@@ -1114,11 +1126,11 @@ def api_stream_by_entity_uid(
 def api_playback_by_entity_uid(
     request: Request, entity_uid: str, delivery: str = Query("original")
 ):
-    _require_auth(request)
+    user = _require_auth(request)
     track = get_track_delivery_row_by_entity_uid(entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _playback_payload_for_track(track, delivery)
+    return _playback_payload_for_track(track, delivery, user_id=user["id"])
 
 
 @router.get(

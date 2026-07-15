@@ -95,6 +95,7 @@ def create_task_dedup(
     params: dict | None = None,
     dedup_key: str = "",
     dispatch: bool = True,
+    session=None,
     *,
     dispatch_task_fn: Callable[[str, str], None],
     dumps_fn: Callable[..., str],
@@ -110,13 +111,13 @@ def create_task_dedup(
 
     priority, pool, max_duration, max_retries = task_runtime_config(task_type)
 
-    with transaction_scope() as session:
-        register_tasks_surface_signal_fn(session)
-        session.execute(
+    with optional_scope(session) as current:
+        register_tasks_surface_signal_fn(current)
+        current.execute(
             text("SELECT pg_advisory_xact_lock(hashtext(:dedup_lock_key))"),
             {"dedup_lock_key": dedup_lock_key},
         )
-        result = session.execute(
+        result = current.execute(
             text(
                 """
                 INSERT INTO tasks (
@@ -173,7 +174,7 @@ def create_task_dedup(
             return None
 
         if dispatch:
-            register_after_commit(session, lambda: dispatch_task_fn(task_type, task_id))
+            register_after_commit(current, lambda: dispatch_task_fn(task_type, task_id))
 
     return task_id
 

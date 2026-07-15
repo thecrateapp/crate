@@ -163,12 +163,14 @@ def test_backfill_legacy_library_refs_projects_resolved_local_entities(pg_db):
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 1,
         "album_saves": 1,
+        "track_likes": 0,
         "playlist_tracks": 0,
         "playlist_track_exclusions": 0,
         "play_events": 0,
         "listening_stats_users": 0,
         "unresolved_artist_follows": 0,
         "unresolved_album_saves": 0,
+        "unresolved_track_likes": 0,
         "unresolved_playlist_tracks": 0,
         "unresolved_playlist_track_exclusions": 0,
         "unresolved_play_events": 0,
@@ -186,16 +188,118 @@ def test_backfill_legacy_library_refs_projects_resolved_local_entities(pg_db):
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 0,
         "album_saves": 0,
+        "track_likes": 0,
         "playlist_tracks": 0,
         "playlist_track_exclusions": 0,
         "play_events": 0,
         "listening_stats_users": 0,
         "unresolved_artist_follows": 0,
         "unresolved_album_saves": 0,
+        "unresolved_track_likes": 0,
         "unresolved_playlist_tracks": 0,
         "unresolved_playlist_track_exclusions": 0,
         "unresolved_play_events": 0,
     }
+
+
+def test_backfill_leaves_ambiguous_case_insensitive_artist_follow_unresolved(pg_db):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs,
+        get_user_global_library_counts,
+        list_user_global_artist_follows,
+    )
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_local_catalog
+
+    pg_db.upsert_artist({"name": "Foo", "entity_uid": str(uuid.uuid4())})
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO library_artists (name, entity_uid, updated_at)
+                VALUES ('foo', :entity_uid, NOW())
+                """
+            ),
+            {"entity_uid": str(uuid.uuid4())},
+        )
+    reconcile_local_catalog()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO user_follows (user_id, artist_name, created_at)
+                VALUES (1, 'FOO', NOW())
+                """
+            )
+        )
+
+    result = backfill_legacy_user_library_refs()
+
+    with read_scope() as session:
+        projected = session.execute(
+            text("SELECT COUNT(*) FROM user_global_artist_follows WHERE user_id = 1")
+        ).scalar_one()
+    follows = list_user_global_artist_follows(1)
+    assert projected == 0
+    assert result["unresolved_artist_follows"] == 1
+    assert len(follows) == 1
+    assert follows[0]["artist_name"] == "FOO"
+    assert get_user_global_library_counts(1)["followed_artists"] == 1
+
+
+def test_user_reference_backfill_is_bounded_and_resumable_by_user(pg_db):
+    from crate.db.repositories.global_user_library import (
+        backfill_legacy_user_library_refs_batch,
+    )
+    from crate.db.tx import read_scope, transaction_scope
+
+    artist_uid, _album_uid = _seed_global_artist_and_album(pg_db)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO users (id, email, password_hash, role, created_at)
+                VALUES (2, 'second@example.com', 'hash', 'user', NOW())
+                ON CONFLICT (id) DO NOTHING
+                """
+            )
+        )
+        session.execute(
+            text(
+                """
+                INSERT INTO user_follows (user_id, artist_name, created_at)
+                VALUES (1, 'High Vis', NOW()), (2, 'High Vis', NOW())
+                """
+            )
+        )
+
+    first = backfill_legacy_user_library_refs_batch(batch_size=1, cursor=None)
+    second = backfill_legacy_user_library_refs_batch(
+        batch_size=1, cursor=first["next_cursor"]
+    )
+
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT user_id, global_artist_uid::text AS global_artist_uid
+                    FROM user_global_artist_follows
+                    ORDER BY user_id
+                    """
+                )
+            )
+            .mappings()
+            .all()
+        )
+    assert first["users_processed"] == 1
+    assert first["completed"] is False
+    assert second["users_processed"] == 1
+    assert second["completed"] is True
+    assert [dict(row) for row in rows] == [
+        {"user_id": 1, "global_artist_uid": artist_uid},
+        {"user_id": 2, "global_artist_uid": artist_uid},
+    ]
 
 
 def test_backfill_legacy_library_refs_projects_all_local_track_references(pg_db):
@@ -390,12 +494,14 @@ def test_backfill_legacy_library_refs_projects_all_local_track_references(pg_db)
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 0,
         "album_saves": 0,
+        "track_likes": 0,
         "playlist_tracks": 1,
         "playlist_track_exclusions": 1,
         "play_events": 1,
         "listening_stats_users": 1,
         "unresolved_artist_follows": 0,
         "unresolved_album_saves": 0,
+        "unresolved_track_likes": 0,
         "unresolved_playlist_tracks": 0,
         "unresolved_playlist_track_exclusions": 0,
         "unresolved_play_events": 0,
@@ -443,12 +549,14 @@ def test_backfill_legacy_library_refs_projects_all_local_track_references(pg_db)
     assert backfill_legacy_user_library_refs() == {
         "artist_follows": 0,
         "album_saves": 0,
+        "track_likes": 0,
         "playlist_tracks": 0,
         "playlist_track_exclusions": 0,
         "play_events": 0,
         "listening_stats_users": 0,
         "unresolved_artist_follows": 0,
         "unresolved_album_saves": 0,
+        "unresolved_track_likes": 0,
         "unresolved_playlist_tracks": 0,
         "unresolved_playlist_track_exclusions": 0,
         "unresolved_play_events": 0,

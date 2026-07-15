@@ -493,6 +493,9 @@ func buildGenreProfile(rows []map[string]any, limit int) []map[string]any {
 }
 
 func annotateGenreSummary(row map[string]any, includeEQ bool) {
+	if _, ok := row["track_count"]; !ok {
+		row["track_count"] = 0
+	}
 	canonicalSlug := strings.TrimSpace(stringValue(row["canonical_slug"]))
 	canonicalCoverPath := strings.TrimSpace(stringValue(row["canonical_cover_path"]))
 	mapped := canonicalSlug != ""

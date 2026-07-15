@@ -79,6 +79,31 @@ def test_reconcile_local_catalog_creates_canonical_rows_and_sources(pg_db):
     }
 
 
+def test_local_reconciliation_batch_is_bounded_and_resumable(pg_db):
+    from crate.db.queries.global_catalog import get_global_catalog_counts
+    from crate.federation.global_reconciliation import reconcile_local_catalog_batch
+
+    _seed_local_catalog(pg_db)
+
+    cursor = None
+    batches = []
+    while True:
+        result = reconcile_local_catalog_batch(batch_size=1, cursor=cursor)
+        batches.append(result)
+        assert result["source_rows_seen"] <= 1
+        if result["completed"]:
+            break
+        cursor = result["next_cursor"]
+
+    assert len(batches) > 1
+    assert get_global_catalog_counts() == {
+        "artists": 1,
+        "albums": 1,
+        "tracks": 1,
+        "sources": 3,
+    }
+
+
 def test_reconcile_local_catalog_is_idempotent(pg_db):
     from crate.db.queries.global_catalog import get_global_catalog_counts
     from crate.federation.global_reconciliation import reconcile_local_catalog
@@ -96,6 +121,46 @@ def test_reconcile_local_catalog_is_idempotent(pg_db):
         "tracks": 1,
         "sources": 3,
     }
+
+
+def test_full_local_reconciliation_prunes_a_source_missing_from_write_model(pg_db):
+    from sqlalchemy import text
+
+    from crate.db.queries.global_catalog import get_global_catalog_counts
+    from crate.db.tx import read_scope, transaction_scope
+    from crate.federation.global_reconciliation import reconcile_local_catalog
+
+    artist_uid = str(uuid.uuid4())
+    pg_db.upsert_artist({"name": "Deleted Outside Queue", "entity_uid": artist_uid})
+    reconcile_local_catalog()
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                "DELETE FROM library_artists WHERE entity_uid = CAST(:entity_uid AS uuid)"
+            ),
+            {"entity_uid": artist_uid},
+        )
+
+    reconcile_local_catalog()
+
+    with read_scope() as session:
+        source = (
+            session.execute(
+                text(
+                    """
+                    SELECT source_stale, source_deleted_at
+                    FROM global_catalog_sources
+                    WHERE local_entity_uid = CAST(:entity_uid AS uuid)
+                    """
+                ),
+                {"entity_uid": artist_uid},
+            )
+            .mappings()
+            .one()
+        )
+    assert get_global_catalog_counts()["artists"] == 0
+    assert source["source_stale"] is True
+    assert source["source_deleted_at"] is not None
 
 
 def test_reconcile_local_catalog_prefers_local_sources(pg_db):

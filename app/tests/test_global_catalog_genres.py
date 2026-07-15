@@ -156,16 +156,20 @@ def test_unknown_remote_taxonomy_is_retained_without_global_membership(pg_db):
         )
 
     with read_scope() as session:
-        assertion = session.execute(
-            text(
-                """
+        assertion = (
+            session.execute(
+                text(
+                    """
                 SELECT global_genre_uid, mapping_method, invalidated_at IS NULL AS active
                 FROM global_catalog_genre_assertions
                 WHERE source_id = :source_id
                 """
-            ),
-            {"source_id": source_id},
-        ).mappings().one()
+                ),
+                {"source_id": source_id},
+            )
+            .mappings()
+            .one()
+        )
         memberships = session.execute(
             text(
                 """
@@ -269,17 +273,21 @@ def test_global_genre_snapshots_share_the_exact_core_descriptor(pg_db):
     refresh_global_catalog_genre_snapshots()
 
     with read_scope() as session:
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT scope, payload_json
                 FROM ui_snapshots
                 WHERE scope IN ('global-catalog-taxonomy', 'global-catalog-genres')
                   AND subject_key = 'crate-core'
                 ORDER BY scope
                 """
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
     descriptor = get_core_taxonomy_descriptor()
     expected = {

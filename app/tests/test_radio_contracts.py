@@ -4,6 +4,34 @@ from unittest.mock import patch
 
 
 class TestRadioApiContracts:
+    def test_global_radio_dislike_accepts_a_canonical_track_uid(self, test_app):
+        with patch(
+            "crate.radio_engine.radio_feedback",
+            return_value={"status": "ok", "effect": "exclusion_added"},
+        ) as feedback:
+            resp = test_app.post(
+                "/api/radio/feedback",
+                json={
+                    "session_id": "session-1",
+                    "global_track_uid": "global-track-1",
+                    "action": "dislike",
+                },
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["effect"] == "exclusion_added"
+        feedback.assert_called_once_with(
+            "session-1", None, "dislike", global_track_uid="global-track-1"
+        )
+
+    def test_radio_feedback_requires_a_local_or_global_track_reference(self, test_app):
+        resp = test_app.post(
+            "/api/radio/feedback",
+            json={"session_id": "session-1", "action": "dislike"},
+        )
+
+        assert resp.status_code == 422
+
     def test_radio_stations_returns_personalized_station_groups(self, test_app):
         payload = {
             "artist_stations": [

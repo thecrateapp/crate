@@ -360,6 +360,7 @@ def create_app() -> FastAPI:
         well_known as federation_well_known,
     )
     from crate.api.federation_remote import router as federation_remote_router
+    from crate.api.internal_federation import router as internal_federation_router
     from crate.api.catalog import router as catalog_router
 
     # Public well-known (no auth required)
@@ -400,6 +401,7 @@ def create_app() -> FastAPI:
     app.include_router(duplicates_router)
     app.include_router(subsonic_router)
     app.include_router(federation_router)
+    app.include_router(internal_federation_router)
     app.include_router(federation_remote_router)
     app.include_router(catalog_router)
     app.include_router(browse_router)

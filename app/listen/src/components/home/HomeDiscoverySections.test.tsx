@@ -396,9 +396,7 @@ describe("RecentEntityRow", () => {
       <RecentEntityRow item={item} onClick={vi.fn()} />,
     );
 
-    expect(openRecentItemPath(item)).toBe(
-      "/catalog/albums/blending--album-global-1",
-    );
+    expect(openRecentItemPath(item)).toBe("/artists/high-vis/blending");
     expect(container.innerHTML).toContain(
       "/api/catalog/albums/album-global-1/cover",
     );

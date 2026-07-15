@@ -195,6 +195,40 @@ describe("useApi", () => {
     expect(result.current.data).toEqual({ ok: 2 });
   });
 
+  it("keeps catalog views loading while the mandatory catalog warms", async () => {
+    vi.useFakeTimers();
+    const apiMock = vi.mocked(api);
+    apiMock
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error(JSON.stringify({ detail: "catalog_warming" })),
+          {
+            status: 503,
+            retryAfterMs: 3_000,
+          },
+        ),
+      )
+      .mockResolvedValueOnce({ items: [1] });
+
+    const { result } = renderHook(() =>
+      useApi<{ items: number[] }>("/api/catalog/search"),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.loading).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(result.current.data).toEqual({ items: [1] });
+    expect(result.current.loading).toBe(false);
+  });
+
   it("defers initial revalidation when cached data is good enough for first paint", async () => {
     vi.useFakeTimers();
     const apiMock = vi.mocked(api);

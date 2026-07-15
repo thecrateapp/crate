@@ -222,6 +222,9 @@ def upsert_peer(
                         active_key_id = :active_key_id,
                         public_keys_json = :public_keys_json,
                         capabilities_json = :capabilities_json,
+                        trust_state = :trust_state,
+                        direction = :direction,
+                        default_grant_preset = :default_grant_preset,
                         last_seen_at = :now,
                         updated_at = :now
                     WHERE node_uid = :node_uid
@@ -235,6 +238,9 @@ def upsert_peer(
                     "active_key_id": active_key_id,
                     "public_keys_json": _dump_json(public_keys_json or []),
                     "capabilities_json": _dump_json(capabilities_json or {}),
+                    "trust_state": trust_state,
+                    "direction": direction,
+                    "default_grant_preset": default_grant_preset,
                     "now": now,
                 },
             )
@@ -321,11 +327,96 @@ def update_peer(node_uid: str, **fields) -> dict | None:
 
 
 def disable_peer(node_uid: str) -> dict | None:
-    return update_peer(
-        node_uid,
-        disabled_at=datetime.now(timezone.utc),
-        trust_state="disabled",
-    )
+    disabled_at = datetime.now(timezone.utc)
+    with transaction_scope() as session:
+        peer = (
+            session.execute(
+                text(
+                    """
+                    UPDATE federation_nodes
+                    SET
+                        disabled_at = :disabled_at,
+                        trust_state = 'disabled',
+                        updated_at = :disabled_at
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                    RETURNING *
+                    """
+                ),
+                {"node_uid": node_uid, "disabled_at": disabled_at},
+            )
+            .mappings()
+            .first()
+        )
+        if peer is None:
+            return None
+
+        catalog_items = (
+            session.execute(
+                text(
+                    """
+                    UPDATE federation_catalog_items
+                    SET
+                        deleted_at = :disabled_at,
+                        tombstone_json = jsonb_build_object(
+                            'deleted_at', CAST(:disabled_at AS text),
+                            'reason', 'peer_disabled'
+                        )
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                      AND deleted_at IS NULL
+                    RETURNING entity_type, remote_entity_uid
+                    """
+                ),
+                {"node_uid": node_uid, "disabled_at": disabled_at},
+            )
+            .mappings()
+            .all()
+        )
+
+        from crate.db.repositories.global_catalog_dirty_sources import (
+            enqueue_federated_dirty_source,
+        )
+
+        for item in catalog_items:
+            enqueue_federated_dirty_source(
+                item["entity_type"],
+                node_uid,
+                str(item["remote_entity_uid"]),
+                "delete",
+                session=session,
+            )
+
+        active_sources = (
+            session.execute(
+                text(
+                    """
+                    SELECT entity_type, remote_entity_uid
+                    FROM global_catalog_sources
+                    WHERE node_uid = CAST(:node_uid AS uuid)
+                      AND source_kind = 'federated'
+                      AND source_deleted_at IS NULL
+                    """
+                ),
+                {"node_uid": node_uid},
+            )
+            .mappings()
+            .all()
+        )
+        from crate.db.jobs.global_catalog_reconciliation import (
+            tombstone_federated_source,
+        )
+
+        for source in active_sources:
+            tombstone_federated_source(
+                str(source["entity_type"]),
+                node_uid,
+                str(source["remote_entity_uid"]),
+                session=session,
+            )
+
+    from crate.db.repositories.global_content_cache import invalidate_source_cache
+
+    invalidate_source_cache(node_uid)
+    return dict(peer)
 
 
 # ── Pairing ───────────────────────────────────────────────────────────────
@@ -442,12 +533,15 @@ def upsert_peer_grant(
                 text(
                     "UPDATE federation_peer_grants SET "
                     "preset = :preset, capabilities_json = :caps, "
-                    "constraints_json = :constraints, updated_at = :now "
+                    "constraints_json = :constraints, "
+                    "subject_selector = :sel, constraints_version = 1, "
+                    "policy_revision = policy_revision + 1, updated_at = :now "
                     "WHERE id = :id"
                 ),
                 {
                     "id": existing,
                     "preset": preset,
+                    "sel": principal_selector,
                     "caps": _dump_json(capabilities_json or []),
                     "constraints": _dump_json(constraints_json or {}),
                     "now": now,
@@ -458,10 +552,10 @@ def upsert_peer_grant(
                 text(
                     """
                     INSERT INTO federation_peer_grants
-                        (node_uid, principal_selector, preset,
-                         capabilities_json, constraints_json)
+                        (node_uid, principal_selector, subject_selector, preset,
+                         capabilities_json, constraints_json, valid_from)
                     VALUES
-                        (:node_uid, :sel, :preset, :caps, :constraints)
+                        (:node_uid, :sel, :sel, :preset, :caps, :constraints, :now)
                     """
                 ),
                 {
@@ -470,6 +564,7 @@ def upsert_peer_grant(
                     "preset": preset,
                     "caps": _dump_json(capabilities_json or []),
                     "constraints": _dump_json(constraints_json or {}),
+                    "now": now,
                 },
             )
 

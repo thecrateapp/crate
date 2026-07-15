@@ -10,7 +10,10 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import datetime, timezone
+import base64
+import hashlib
+import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -19,18 +22,41 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
+from crate.federation.contracts import (
+    MIN_PROTOCOL_VERSION,
+    PROTOCOL_VERSION,
+    SIGNATURE_PROFILE,
+    SUPPORTED_PROTOCOL_VERSIONS,
+    FederationErrorCode,
+    FederationProtocolError,
+    NodeDescriptorV1,
+    negotiate_protocol,
+    require_remote_node,
+)
+
 log = logging.getLogger(__name__)
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
-KEYS_DIR = DATA_DIR / "federation" / "keys"
+# Optional explicit override kept for embedders and tests. Normal runtimes resolve
+# the configured path lazily so environment setup does not depend on import order.
+KEYS_DIR: Path | None = None
 KEY_ID_PREFIX = datetime.now(timezone.utc).strftime("%Y-%m")
 
 
+def get_keys_dir() -> Path:
+    if KEYS_DIR is not None:
+        return KEYS_DIR
+    explicit = os.environ.get("FEDERATION_KEYS_DIR", "").strip()
+    if explicit:
+        return Path(explicit)
+    return Path(os.environ.get("DATA_DIR", "./data")) / "federation" / "keys"
+
+
 def ensure_keys_dir() -> Path:
-    KEYS_DIR.mkdir(parents=True, exist_ok=True)
-    if KEYS_DIR.stat().st_mode & 0o777 != 0o700:
-        KEYS_DIR.chmod(0o700)
-    return KEYS_DIR
+    keys_dir = get_keys_dir()
+    keys_dir.mkdir(parents=True, exist_ok=True)
+    if keys_dir.stat().st_mode & 0o777 != 0o700:
+        keys_dir.chmod(0o700)
+    return keys_dir
 
 
 def generate_key_id() -> str:
@@ -45,8 +71,7 @@ def generate_ed25519_key_pair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
 
 
 def store_private_key(key_id: str, private_key: Ed25519PrivateKey) -> Path:
-    ensure_keys_dir()
-    pem_path = KEYS_DIR / f"{key_id}.pem"
+    pem_path = ensure_keys_dir() / f"{key_id}.pem"
     pem_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -58,7 +83,7 @@ def store_private_key(key_id: str, private_key: Ed25519PrivateKey) -> Path:
 
 
 def load_private_key(key_id: str) -> Ed25519PrivateKey:
-    pem_path = KEYS_DIR / f"{key_id}.pem"
+    pem_path = get_keys_dir() / f"{key_id}.pem"
     if not pem_path.exists():
         raise FileNotFoundError(f"Private key not found: {pem_path}")
     private_key = serialization.load_pem_private_key(
@@ -71,13 +96,164 @@ def load_private_key(key_id: str) -> Ed25519PrivateKey:
 
 
 def public_key_to_base64(public_key: Ed25519PublicKey) -> str:
-    import base64
-
     raw = public_key.public_bytes(
         encoding=serialization.Encoding.Raw,
         format=serialization.PublicFormat.Raw,
     )
     return base64.b64encode(raw).decode("ascii")
+
+
+def _descriptor_data(payload: dict | NodeDescriptorV1) -> dict:
+    descriptor = (
+        payload
+        if isinstance(payload, NodeDescriptorV1)
+        else NodeDescriptorV1.model_validate(payload)
+    )
+    return descriptor.model_dump(
+        mode="json",
+        exclude={"descriptor_digest", "signature"},
+    )
+
+
+def canonical_descriptor_bytes(payload: dict | NodeDescriptorV1) -> bytes:
+    return json.dumps(
+        _descriptor_data(payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+
+
+def build_signed_descriptor(
+    *,
+    node_uid: str,
+    display_name: str,
+    api_base_url: str,
+    listen_base_url: str | None,
+    active_key_id: str,
+    public_keys: list[dict],
+    capabilities: dict | list[str],
+    private_key: Ed25519PrivateKey,
+    now: datetime | None = None,
+    software: str = "crate",
+    version: str = "0.0.0",
+    taxonomy_release: dict | None = None,
+) -> dict:
+    signed_at = now or datetime.now(timezone.utc)
+    capability_names = (
+        sorted(str(name) for name, enabled in capabilities.items() if enabled)
+        if isinstance(capabilities, dict)
+        else sorted({str(name) for name in capabilities})
+    )
+    normalized_keys = []
+    for key in public_keys:
+        public_key = key.get("public_key")
+        if isinstance(public_key, Ed25519PublicKey):
+            public_key = public_key_to_base64(public_key)
+        normalized_keys.append(
+            {
+                "key_id": str(key["key_id"]),
+                "algorithm": "ed25519",
+                "public_key": str(public_key),
+                "status": str(key.get("status") or "active"),
+                "not_before": key.get("not_before"),
+                "not_after": key.get("not_after"),
+            }
+        )
+    unsigned = {
+        "node_uid": str(node_uid),
+        "name": display_name,
+        "software": software,
+        "version": version,
+        "api_base_url": api_base_url,
+        "listen_base_url": listen_base_url,
+        "audience": "public",
+        "protocol_version": PROTOCOL_VERSION,
+        "min_protocol_version": MIN_PROTOCOL_VERSION,
+        "federation_protocol_versions": list(SUPPORTED_PROTOCOL_VERSIONS),
+        "signature_profile": SIGNATURE_PROFILE,
+        "signature_versions": [SIGNATURE_PROFILE],
+        "active_key_id": active_key_id,
+        "public_keys": normalized_keys,
+        "capabilities": capability_names,
+        "taxonomy_release": taxonomy_release,
+        "signed_at": signed_at,
+        "expires_at": signed_at + timedelta(minutes=5),
+        "descriptor_digest": "",
+        "key_id": active_key_id,
+        "signature": "",
+    }
+    canonical = canonical_descriptor_bytes(unsigned)
+    digest = hashlib.sha256(canonical).hexdigest()
+    signature = base64.b64encode(private_key.sign(canonical)).decode("ascii")
+    return NodeDescriptorV1.model_validate(
+        {**unsigned, "descriptor_digest": digest, "signature": signature}
+    ).model_dump(mode="json")
+
+
+def verify_signed_descriptor(
+    payload: dict,
+    *,
+    local_node_uid: str,
+    now: datetime | None = None,
+) -> NodeDescriptorV1:
+    descriptor = NodeDescriptorV1.model_validate(payload)
+    require_remote_node(local_node_uid, descriptor.node_uid)
+    negotiate_protocol(descriptor.federation_protocol_versions)
+    if descriptor.signature_profile != SIGNATURE_PROFILE:
+        raise FederationProtocolError(
+            FederationErrorCode.INCOMPATIBLE_VERSION,
+            "Unsupported descriptor signature profile",
+        )
+    current_time = now or datetime.now(timezone.utc)
+    if (
+        descriptor.expires_at < current_time
+        or descriptor.signed_at > current_time + timedelta(seconds=60)
+    ):
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Descriptor is expired or not yet valid",
+        )
+    matching_key = next(
+        (
+            key
+            for key in descriptor.public_keys
+            if key.key_id == descriptor.key_id and key.status in {"active", "retiring"}
+        ),
+        None,
+    )
+    if matching_key is None:
+        raise FederationProtocolError(
+            FederationErrorCode.UNKNOWN_KEY,
+            "Descriptor signing key is not published",
+        )
+    canonical = canonical_descriptor_bytes(descriptor)
+    if not secrets.compare_digest(
+        descriptor.descriptor_digest,
+        hashlib.sha256(canonical).hexdigest(),
+    ):
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Descriptor digest mismatch",
+        )
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(
+            base64.b64decode(matching_key.public_key, validate=True)
+        )
+        public_key.verify(
+            base64.b64decode(descriptor.signature, validate=True), canonical
+        )
+    except (ValueError, TypeError) as exc:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Descriptor signature is invalid",
+        ) from exc
+    except Exception as exc:
+        raise FederationProtocolError(
+            FederationErrorCode.INVALID_DESCRIPTOR,
+            "Descriptor signature is invalid",
+        ) from exc
+    return descriptor
 
 
 def is_valid_key_ref(ref: str) -> bool:

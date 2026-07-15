@@ -1,7 +1,6 @@
 """Users repository — ORM-backed CRUD for users and sessions.
 
-Follows the same pattern as settings.py: Session-based, typed returns,
-optional standalone mode.
+Follows the same pattern as settings.py with optional caller-owned sessions.
 """
 
 from datetime import datetime, timezone
@@ -135,3 +134,37 @@ def count_users(*, session: Session | None = None) -> int:
         return _impl(session)
     with transaction_scope() as s:
         return _impl(s)
+
+
+def get_remote_scrobbling_enabled(
+    user_id: int, *, session: Session | None = None
+) -> bool:
+    def _impl(s: Session) -> bool:
+        value = s.execute(
+            text("SELECT remote_scrobbling_enabled FROM users WHERE id = :user_id"),
+            {"user_id": user_id},
+        ).scalar_one_or_none()
+        return bool(value)
+
+    if session is not None:
+        return _impl(session)
+    with transaction_scope() as s:
+        return _impl(s)
+
+
+def set_remote_scrobbling_enabled(user_id: int, enabled: bool) -> bool:
+    with transaction_scope() as session:
+        value = session.execute(
+            text(
+                """
+                UPDATE users
+                SET remote_scrobbling_enabled = :enabled
+                WHERE id = :user_id
+                RETURNING remote_scrobbling_enabled
+                """
+            ),
+            {"user_id": user_id, "enabled": bool(enabled)},
+        ).scalar_one_or_none()
+        if value is None:
+            raise ValueError("User not found")
+        return bool(value)

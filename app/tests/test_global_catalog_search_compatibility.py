@@ -1,27 +1,22 @@
+from pathlib import Path
 from types import SimpleNamespace
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _request():
     return SimpleNamespace(
         state=SimpleNamespace(
-            user={"id": 1, "email": "listener@cratemusic.app", "role": "user"}
+            user={"id": 1, "email": "admin@cratemusic.app", "role": "admin"}
         )
     )
 
 
-def test_scope_local_ignores_global_catalog_even_when_enabled(monkeypatch):
+def test_admin_search_never_reads_the_canonical_catalog(monkeypatch):
     from crate.api import browse_media
-    from crate.db.queries import global_catalog
-    from crate.federation import global_policy
 
     local_payload = {"artists": [], "albums": [], "tracks": []}
-
-    monkeypatch.setattr(global_policy, "global_catalog_surface_enabled", lambda _: True)
-    monkeypatch.setattr(
-        global_catalog,
-        "search_global_catalog",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("global used")),
-    )
     monkeypatch.setattr(
         browse_media, "_require_auth", lambda request: request.state.user
     )
@@ -30,7 +25,7 @@ def test_scope_local_ignores_global_catalog_even_when_enabled(monkeypatch):
     monkeypatch.setattr(browse_media, "record_later", lambda *args, **kwargs: None)
     monkeypatch.setattr(browse_media, "has_library_data", lambda: True)
     monkeypatch.setattr(
-        browse_media, "search_all_hybrid", lambda q, limit: local_payload
+        browse_media, "search_all_hybrid", lambda query, limit: local_payload
     )
 
     assert (
@@ -38,10 +33,9 @@ def test_scope_local_ignores_global_catalog_even_when_enabled(monkeypatch):
     )
 
 
-def test_scope_auto_uses_global_catalog_when_search_surface_enabled(monkeypatch):
+def test_scope_auto_uses_the_canonical_catalog(monkeypatch):
     from crate.api import browse_media
     from crate.db.queries import global_catalog
-    from crate.federation import global_policy
 
     global_payload = {
         "artists": [{"name": "Rival Schools", "global_uid": "artist-1"}],
@@ -49,8 +43,6 @@ def test_scope_auto_uses_global_catalog_when_search_surface_enabled(monkeypatch)
         "tracks": [],
     }
     cache_keys: list[str] = []
-
-    monkeypatch.setattr(global_policy, "global_catalog_surface_enabled", lambda _: True)
     monkeypatch.setattr(global_catalog, "get_global_catalog_revision", lambda: "rev-1")
     monkeypatch.setattr(
         global_catalog,
@@ -74,46 +66,40 @@ def test_scope_auto_uses_global_catalog_when_search_surface_enabled(monkeypatch)
     assert any(":global:rev-1" in key for key in cache_keys)
 
 
-def test_scope_auto_keeps_federated_search_when_global_surface_disabled(monkeypatch):
+def test_scope_auto_never_falls_back_to_live_fanout(monkeypatch):
     from crate.api import browse_media
-    from crate.federation import global_policy, search_fanout
+    from crate.db.queries import global_catalog
 
-    federated_payload = {
+    global_payload = {
         "artists": [{"name": "Rival Schools"}],
         "albums": [],
         "tracks": [],
     }
-    metrics: list[tuple[str, int]] = []
-
+    monkeypatch.setattr(global_catalog, "get_global_catalog_revision", lambda: "rev-2")
     monkeypatch.setattr(
-        global_policy, "global_catalog_surface_enabled", lambda _: False
-    )
-    monkeypatch.setattr(
-        search_fanout,
-        "federated_search",
-        lambda **kwargs: federated_payload,
-    )
-    monkeypatch.setattr(
-        "crate.db.repositories.federation.get_local_node",
-        lambda: None,
+        global_catalog,
+        "search_global_catalog",
+        lambda *args, **kwargs: global_payload,
     )
     monkeypatch.setattr(
         browse_media, "_require_auth", lambda request: request.state.user
     )
     monkeypatch.setattr(browse_media, "get_cache", lambda *args, **kwargs: None)
     monkeypatch.setattr(browse_media, "set_cache", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        browse_media,
-        "record_later",
-        lambda key, value: metrics.append((key, value)),
-    )
+    monkeypatch.setattr(browse_media, "record_later", lambda *args, **kwargs: None)
 
     assert (
-        browse_media.api_search(_request(), q="Rival", scope="auto")
-        == federated_payload
+        browse_media.api_search(_request(), q="Rival", scope="auto") == global_payload
     )
-    assert metrics == [
-        ("search.federated.results.artists", 1),
-        ("search.federated.results.albums", 0),
-        ("search.federated.results.tracks", 0),
-    ]
+
+
+def test_listen_runtime_uses_only_the_canonical_search_endpoint():
+    runtime_files = (ROOT / "listen" / "src").rglob("*.ts*")
+    matches = {
+        str(path.relative_to(ROOT)): path.read_text(encoding="utf-8")
+        for path in runtime_files
+        if not path.name.endswith((".test.ts", ".test.tsx"))
+        and "/api/search" in path.read_text(encoding="utf-8")
+    }
+
+    assert matches == {}
