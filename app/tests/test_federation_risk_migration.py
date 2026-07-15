@@ -7,7 +7,10 @@ from sqlalchemy import text
 from crate.db.tx import read_scope
 
 
-MIGRATION = Path("app/crate/db/migrations/versions/070_federation_risk_observations.py")
+ROOT = Path(__file__).resolve().parents[2]
+MIGRATION = (
+    ROOT / "app/crate/db/migrations/versions/070_federation_risk_observations.py"
+)
 
 
 def test_risk_migration_has_bounded_non_permanent_state():

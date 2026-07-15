@@ -7,7 +7,8 @@ from sqlalchemy import text
 from crate.db.tx import read_scope, transaction_scope
 
 
-MIGRATION = Path(
+ROOT = Path(__file__).resolve().parents[2]
+MIGRATION = ROOT / (
     "app/crate/db/migrations/versions/069_federation_directory_subscriptions.py"
 )
 

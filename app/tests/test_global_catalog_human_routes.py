@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 import uuid
 
 import pytest
 from sqlalchemy import text
 
 from tests.conftest import PG_AVAILABLE
+
+ROOT = Path(__file__).resolve().parents[2]
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -113,10 +116,8 @@ def test_album_alias_is_scoped_to_artist_and_survives_rename(pg_db):
 
 
 def test_route_alias_migration_is_reversible():
-    from pathlib import Path
-
-    source = Path(
-        "app/crate/db/migrations/versions/067a_global_catalog_route_aliases.py"
+    source = (
+        ROOT / "app/crate/db/migrations/versions/067a_global_catalog_route_aliases.py"
     ).read_text()
     assert 'revision = "067a"' in source
     assert 'down_revision = "067"' in source

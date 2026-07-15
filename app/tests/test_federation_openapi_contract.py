@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def test_advertised_protocol_capabilities_have_openapi_operations(test_app):
     from crate.federation.contracts import CAPABILITIES, CAPABILITY_ENDPOINTS
@@ -28,9 +33,7 @@ def test_federation_openapi_exposes_public_contract_but_not_service_identity(tes
 
 
 def test_protocol_contract_no_longer_claims_global_user_features_are_out_of_scope():
-    from pathlib import Path
-
-    contract = Path("app/crate/federation/contracts.py").read_text()
+    contract = (ROOT / "app/crate/federation/contracts.py").read_text()
 
     for stale_claim in (
         "Favorites/Likes:\n#   - Out of scope",

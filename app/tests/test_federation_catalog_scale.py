@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import inspect
 import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_manifest_query_is_keyset_only_and_bounded():
@@ -21,9 +25,9 @@ def test_manifest_query_is_keyset_only_and_bounded():
 
 
 def test_manifest_indexes_exist_for_all_local_entity_uids():
-    from pathlib import Path
-
-    migration = Path("app/crate/db/migrations/versions/016_entity_uids.py").read_text()
+    migration = (
+        ROOT / "app/crate/db/migrations/versions/016_entity_uids.py"
+    ).read_text()
 
     for table in ("library_artists", "library_albums", "library_tracks"):
         assert f"ON {table}(entity_uid)" in migration

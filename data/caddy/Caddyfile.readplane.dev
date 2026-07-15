@@ -1,0 +1,85 @@
+{
+	local_certs
+}
+
+(readplane_listen) {
+	@readplane_listen {
+		method GET
+		path /api/cache/events /api/catalog/* /api/favorites /api/federation/remote/streams/* /api/genres /api/genres/* /api/me /api/me/albums /api/me/follows /api/me/follows/* /api/me/history /api/me/home/discovery /api/me/home/discovery-stream /api/me/home/essentials /api/me/home/favorite-artists /api/me/home/hero /api/me/home/mixes /api/me/home/radio-stations /api/me/home/radio-stations/* /api/me/home/recently-played /api/me/home/recommended-tracks /api/me/home/suggested-albums /api/me/likes /api/search /api/albums/* /api/artist-slugs/* /api/artists/* /api/tracks/*
+	}
+	handle @readplane_listen {
+		reverse_proxy readplane:8686 {
+			transport http {
+				versions 1.1
+				keepalive off
+			}
+		}
+	}
+}
+
+(auth_api) {
+	@auth_api {
+		path /api/auth/* /api/setup/*
+	}
+	handle @auth_api {
+		reverse_proxy api:8585
+	}
+}
+
+(api_backend) {
+	@api_backend {
+		path /api/*
+	}
+	handle @api_backend {
+		reverse_proxy api:8585
+	}
+}
+
+https://admin.dev.lespedants.org {
+	tls internal
+	route {
+		import auth_api
+		import api_backend
+		handle {
+			reverse_proxy host.docker.internal:5173
+		}
+	}
+}
+
+https://listen.dev.lespedants.org {
+	tls internal
+	route {
+		import auth_api
+		import readplane_listen
+		import api_backend
+		handle {
+			reverse_proxy host.docker.internal:5174
+		}
+	}
+}
+
+https://docs.dev.cratemusic.app {
+	tls internal
+	reverse_proxy host.docker.internal:5175
+}
+
+https://reference.dev.cratemusic.app {
+	tls internal
+	reverse_proxy host.docker.internal:5177
+}
+
+https://www.dev.cratemusic.app {
+	tls internal
+	reverse_proxy host.docker.internal:5176
+}
+
+https://api.dev.lespedants.org {
+	tls internal
+	route {
+		import auth_api
+		import readplane_listen
+		handle {
+			reverse_proxy api:8585
+		}
+	}
+}

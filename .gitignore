@@ -5,6 +5,18 @@ test-data/.tiddl/
 
 # Data directories
 data/
+!app/crate/data/
+app/crate/data/*
+!app/crate/data/taxonomy/
+app/crate/data/taxonomy/*
+!app/crate/data/taxonomy/crate-core-1.0.0.json
+!app/crate/data/taxonomy/crate-core-1.0.0.sig.json
+!app/crate/data/taxonomy/trust-roots.json
+!data/
+data/*
+!data/caddy/
+data/caddy/*
+!data/caddy/Caddyfile.readplane.dev
 media/
 !app/shared/ui/domain/media/
 !app/shared/ui/domain/media/**

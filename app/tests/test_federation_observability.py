@@ -7,6 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 @pytest.mark.parametrize(
     ("local_node", "peers", "expected"),
     [
@@ -83,7 +86,7 @@ def test_admin_health_returns_snapshot_for_unconfigured_node(monkeypatch):
 
 
 def test_slo_document_defines_windows_alerts_and_runbooks():
-    document = Path("docs/technical/federation-slos.md").read_text()
+    document = (ROOT / "docs/technical/federation-slos.md").read_text()
     for text in (
         "99.5%",
         "p95",
@@ -96,7 +99,7 @@ def test_slo_document_defines_windows_alerts_and_runbooks():
 
 
 def test_slo_document_local_runbook_links_resolve():
-    source = Path("docs/technical/federation-slos.md")
+    source = ROOT / "docs/technical/federation-slos.md"
     for target in re.findall(r"\[[^]]+]\(([^)]+)\)", source.read_text()):
         if "://" in target:
             continue
