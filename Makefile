@@ -355,6 +355,10 @@ federation-dev-import-e2e: ## Verify signed remote import, local identity, hashe
 federation-dev-singleton-e2e: ## Verify bootstrap, catalog, taxonomy, and playback with exactly one node
 	@python3 scripts/federation-dev-e2e.py singleton
 
+.PHONY: federation-dev-zero-downtime-e2e
+federation-dev-zero-downtime-e2e: ## Probe catalog availability during singleton sync and reconciliation
+	@python3 scripts/federation-dev-e2e.py zero-downtime
+
 .PHONY: federation-dev-ps
 federation-dev-ps: ## Show federation service status
 	@$(DC_FED) ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
@@ -440,6 +444,25 @@ dev-federation-capacity-test: ## Profile a 900/4.4K/48K federated catalog in the
 		uv run python app/tests/load/federation_catalog_profile.py \
 			--enforce-slo \
 			--output .artifacts/federation-capacity.json; \
+	EXIT=$$?; \
+	$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true; \
+	exit $$EXIT
+
+.PHONY: dev-catalog-search-capacity-test
+dev-catalog-search-capacity-test: ## Gate local search fallback with a 100K-track fixture
+	@$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true
+	@$(DC_TEST) up -d --wait postgres redis
+	@mkdir -p .artifacts
+	@CRATE_POSTGRES_HOST=127.0.0.1 \
+		CRATE_POSTGRES_PORT=5434 \
+		CRATE_POSTGRES_USER=crate \
+		CRATE_POSTGRES_PASSWORD=crate_test \
+		CRATE_POSTGRES_DB=crate_test \
+		REDIS_URL=redis://127.0.0.1:6381/0 \
+		PYTHONPATH=app \
+		uv run python app/tests/load/catalog_search_fallback_profile.py \
+			--enforce-slo \
+			--output .artifacts/catalog-search-fallback-capacity.json; \
 	EXIT=$$?; \
 	$(DC_TEST) down -v --remove-orphans >/dev/null 2>&1 || true; \
 	exit $$EXIT

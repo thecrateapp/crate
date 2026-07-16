@@ -113,3 +113,23 @@ def test_slo_document_local_runbook_links_resolve():
                 if line.startswith("#")
             }
             assert anchor in headings, target
+
+
+def test_slo_and_runbook_cover_zero_downtime_catalog_reads():
+    slos = (ROOT / "docs/technical/federation-slos.md").read_text()
+    runbook = (ROOT / "docs/technical/federation-operations-runbook.md").read_text()
+
+    for text in (
+        "catalog.search.serving_mode",
+        "local-fallback",
+        "global-refreshing",
+        "p95 at or below 300 ms",
+    ):
+        assert text in slos
+    for text in (
+        "Catalog warming or reconciliation failure",
+        "X-Crate-Catalog-Mode",
+        "make dev-catalog-search-capacity-test",
+        "local reads remain available",
+    ):
+        assert text in runbook

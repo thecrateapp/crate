@@ -89,6 +89,7 @@ def get_global_catalog_admin_status() -> dict[str, Any]:
         )
     return {
         "state": state,
+        "serving_mode": global_catalog_state.catalog_serving_mode(state),
         "counts": counts,
         "taxonomy": {
             "id": descriptor["taxonomy_id"],

@@ -1,4 +1,68 @@
+from contextlib import contextmanager
 from unittest.mock import patch
+
+
+class _QueryResult:
+    def __init__(self, *, row=None, scalar_value=None):
+        self.row = row
+        self.scalar_value = scalar_value
+
+    def mappings(self):
+        return self
+
+    def first(self):
+        return self.row
+
+    def one(self):
+        return self.row
+
+    def scalar(self):
+        return self.scalar_value
+
+
+def test_admin_global_catalog_status_reports_serving_mode(monkeypatch):
+    from crate.db.queries import admin_global_catalog
+
+    class _Session:
+        def __init__(self):
+            self.results = iter(
+                [
+                    _QueryResult(row=None),
+                    _QueryResult(scalar_value=0),
+                    _QueryResult(scalar_value=0),
+                    _QueryResult(
+                        row={
+                            "active_assertions": 0,
+                            "unmapped_assertions": 0,
+                            "memberships": 0,
+                        }
+                    ),
+                ]
+            )
+
+        def execute(self, *_args, **_kwargs):
+            return next(self.results)
+
+    @contextmanager
+    def fake_read_scope():
+        yield _Session()
+
+    monkeypatch.setattr(admin_global_catalog, "get_global_catalog_counts", lambda: {})
+    monkeypatch.setattr(
+        admin_global_catalog.global_catalog_state,
+        "get_catalog_state",
+        lambda: {"status": "backfilling", "last_full_reconcile_at": None},
+    )
+    monkeypatch.setattr(
+        admin_global_catalog,
+        "get_core_taxonomy_descriptor",
+        lambda: {"taxonomy_id": "crate-core", "version": "1", "digest": "x"},
+    )
+    monkeypatch.setattr(admin_global_catalog, "read_scope", fake_read_scope)
+
+    status = admin_global_catalog.get_global_catalog_admin_status()
+
+    assert status["serving_mode"] == "local-fallback"
 
 
 def test_admin_global_catalog_status_endpoint(test_app):

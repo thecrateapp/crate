@@ -3,6 +3,7 @@
 
 Modes:
   singleton - validate a fresh one-node catalog without contacting a peer.
+  zero-downtime - probe catalog reads throughout sync and reconciliation tasks.
   pair  - approve A<->B and set trusted_library grants.
   e2e   - pair, sync fixtures, search B from A, and range-probe remote playback.
   global-catalog - validate canonical global catalog search, artwork, and playback.
@@ -72,6 +73,7 @@ class NodeClient:
         headers: dict[str, str] | None = None,
         raw: bool = False,
         timeout: int = 20,
+        include_headers: bool = False,
     ):
         url = path if path.startswith("http") else f"{self.base_url}{path}"
         data = None
@@ -93,7 +95,10 @@ class NodeClient:
                 if raw:
                     return resp.status, resp.headers, resp.read(2048)
                 payload = resp.read().decode("utf-8")
-                return json.loads(payload) if payload else {}
+                decoded = json.loads(payload) if payload else {}
+                if include_headers:
+                    return decoded, resp.headers
+                return decoded
         except urllib.error.HTTPError as exc:
             body_text = exc.read().decode("utf-8", errors="replace")
             raise ApiError(method, url, exc.code, body_text) from exc
@@ -353,6 +358,69 @@ def reconcile_global_catalog(client: NodeClient, mode: str = "full") -> None:
     wait_task(client, task_id, timeout_seconds=360)
 
 
+CATALOG_SERVING_MODES = {
+    "local-fallback",
+    "global-ready",
+    "global-refreshing",
+    "global-degraded",
+}
+
+
+def probe_catalog_while_task_runs(
+    client: NodeClient,
+    task_id: str,
+    track: dict | None = None,
+    timeout_seconds: int = 360,
+) -> set[str]:
+    deadline = time.monotonic() + timeout_seconds
+    modes: set[str] = set()
+    probes = 0
+    while time.monotonic() < deadline:
+        search, headers = client.get(
+            "/api/catalog/search?q=High%20Vis&limit=5",
+            include_headers=True,
+        )
+        mode = str(headers.get("X-Crate-Catalog-Mode") or "")
+        if mode not in CATALOG_SERVING_MODES:
+            raise RuntimeError(
+                f"Canonical search returned invalid serving mode {mode!r}"
+            )
+        if not isinstance(search.get("artists"), list):
+            raise RuntimeError("Canonical search returned an invalid payload")
+        modes.add(mode)
+
+        for path in (
+            "/api/catalog/me/follows",
+            "/api/catalog/me/albums/saved",
+            "/api/catalog/genres",
+        ):
+            client.get(path)
+
+        if track is not None:
+            track_uid = track.get("globalTrackUid") or track.get("global_track_uid")
+            if not track_uid:
+                raise RuntimeError("Zero-downtime track omitted its global UID")
+            encoded = urllib.parse.quote(str(track_uid), safe="")
+            client.get(f"/api/catalog/tracks/{encoded}/info")
+            client.get(f"/api/catalog/tracks/{encoded}/playback")
+
+        probes += 1
+        task = client.get(f"/api/tasks/{urllib.parse.quote(task_id, safe='')}")
+        status = task.get("status")
+        if status == "completed":
+            log(
+                f"{client.name}: zero-downtime probes={probes} "
+                f"modes={','.join(sorted(modes))}"
+            )
+            return modes
+        if status in {"failed", "cancelled"}:
+            raise RuntimeError(
+                f"{client.name}: task {task_id} ended as {status}: {task.get('error')}"
+            )
+        time.sleep(1)
+    raise TimeoutError(f"{client.name}: zero-downtime task {task_id} timed out")
+
+
 def first_global_album_and_track(client: NodeClient) -> tuple[dict, dict]:
     for query in REMOTE_SEARCH_QUERIES:
         encoded = urllib.parse.quote(query)
@@ -500,6 +568,28 @@ def run_singleton_e2e() -> None:
     log("Singleton catalog E2E complete with zero federation requests.")
 
 
+def run_zero_downtime_e2e() -> None:
+    wait_for_status(NODE_A, "Node A")
+    wait_for_listen()
+    client = NodeClient("Singleton Node", NODE_A)
+    client.login()
+
+    sync_task = queue_library_sync(client)
+    probe_catalog_while_task_runs(client, sync_task)
+    index_genres(client)
+    reconcile_global_catalog(client, "full")
+    _album, track = first_global_album_and_track(client)
+
+    queued = client.post("/api/admin/global-catalog/reconcile", {"mode": "full"})
+    task_id = str(queued["task_id"])
+    log(f"{client.name}: queued zero-downtime reconciliation {task_id}")
+    modes = probe_catalog_while_task_runs(client, task_id, track)
+    wait_for_catalog_ready(client)
+    if not modes & {"global-ready", "global-refreshing"}:
+        raise RuntimeError(f"Refresh did not expose a healthy global mode: {modes}")
+    log("Catalog zero-downtime E2E complete.")
+
+
 def run_global_catalog_e2e() -> None:
     wait_for_listen()
     a, b, _a_uid, b_uid = pair_nodes()
@@ -637,9 +727,12 @@ def main() -> int:
         if mode in {"singleton", "singleton-parity"}:
             run_singleton_e2e()
             return 0
+        if mode == "zero-downtime":
+            run_zero_downtime_e2e()
+            return 0
         print(
             "Usage: federation-dev-e2e.py "
-            "[--all|singleton|singleton-parity|pair|e2e|global-catalog|import]",
+            "[--all|singleton|singleton-parity|zero-downtime|pair|e2e|global-catalog|import]",
             file=sys.stderr,
         )
         return 2

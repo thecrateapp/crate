@@ -219,8 +219,23 @@ func mustEnsureGET(ctx context.Context, fastapi contract.Client, readplane contr
 	if expectedSource != "" && source != expectedSource {
 		log.Fatalf("%s source=%s, want %s", item.name, source, expectedSource)
 	}
+	if err := validateCatalogMode(item.path, headers.Get("X-Crate-Catalog-Mode")); err != nil {
+		log.Fatalf("%s catalog mode invalid: %v", item.name, err)
+	}
 	fmt.Printf("ok %-32s source=%s\n", item.name, source)
 	return right
+}
+
+func validateCatalogMode(path string, mode string) error {
+	if !strings.HasPrefix(path, "/api/catalog/search") {
+		return nil
+	}
+	for _, supported := range []string{"local-fallback", "global-ready", "global-refreshing", "global-degraded"} {
+		if mode == supported {
+			return nil
+		}
+	}
+	return fmt.Errorf("X-Crate-Catalog-Mode=%q", mode)
 }
 
 func mustCompareSSE(ctx context.Context, fastapi contract.Client, readplane contract.Client, item check, token string) {

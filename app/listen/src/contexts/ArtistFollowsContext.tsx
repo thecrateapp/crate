@@ -73,7 +73,6 @@ export function ArtistFollowsProvider({ children }: { children: ReactNode }) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
         return;
       }
-      setFollowedArtists([]);
     } finally {
       if (requestRef.current === controller) {
         requestRef.current = null;

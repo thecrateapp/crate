@@ -2,10 +2,41 @@ package catalog
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestBuildLocalFTSQuery(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+	}{
+		{name: "single token", query: "High", want: "high:*"},
+		{name: "multiple tokens", query: "High Vis", want: "high & vis:*"},
+		{name: "punctuation", query: "Björk & París!", want: "björk & parís:*"},
+		{name: "empty", query: "---", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, buildLocalFTSQuery(tt.query))
+		})
+	}
+}
+
+func TestLocalSearchQueriesBoundCandidatesBeforeRanking(t *testing.T) {
+	queries := []string{localArtistSearchSQL, localAlbumSearchSQL, localTrackSearchSQL}
+	for _, query := range queries {
+		assert.Contains(t, query, "fts_candidates AS")
+		assert.Contains(t, query, "substring_candidates AS")
+		assert.Equal(t, 2, strings.Count(query, "LIMIT $4"))
+		assert.NotContains(t, query, "SELECT *")
+	}
+	assert.Contains(t, localTrackSearchSQL, "t.album ILIKE $2")
+	assert.NotContains(t, localTrackSearchSQL, "a.name ILIKE $2")
+}
 
 func TestMain(m *testing.M) {
 	LoadDefaultTaxonomy()

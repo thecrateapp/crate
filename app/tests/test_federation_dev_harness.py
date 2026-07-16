@@ -108,6 +108,24 @@ def test_federation_dev_harness_has_a_real_singleton_acceptance_mode():
     assert "expected zero peers" in script
 
 
+def test_federation_dev_harness_verifies_catalog_zero_downtime():
+    makefile = (ROOT / "Makefile").read_text()
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert "federation-dev-zero-downtime-e2e:" in makefile
+    assert "run_zero_downtime_e2e" in script
+    assert "probe_catalog_while_task_runs" in script
+    assert '"X-Crate-Catalog-Mode"' in script
+    for path in (
+        "/api/catalog/search",
+        "/api/catalog/me/follows",
+        "/api/catalog/me/albums/saved",
+        "/api/catalog/genres",
+        "/api/catalog/tracks/",
+    ):
+        assert path in script
+
+
 def test_federation_dev_harness_routes_remote_streams_through_go_readplane():
     services = _compose()["services"]
     makefile = (ROOT / "Makefile").read_text()

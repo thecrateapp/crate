@@ -54,7 +54,8 @@ describe("GlobalCatalog", () => {
       }
       return {
         data: {
-          enabled: true,
+          serving_mode: "local-fallback",
+          state: { status: "backfilling" },
           counts: { artists: 2, albums: 3, tracks: 4, sources: 5 },
           last_run: null,
           stale_peer_count: 0,
@@ -77,6 +78,12 @@ describe("GlobalCatalog", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Artists")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Local fallback")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "First reconciliation in progress; local reads remain available.",
+      ),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Reconcile" }));
 

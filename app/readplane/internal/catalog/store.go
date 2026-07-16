@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
@@ -188,11 +190,146 @@ const followingArtistNameQuery = `
 		LIMIT 1
 	`
 
+const localArtistSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_artists
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_artists
+		WHERE name ILIKE $2 ESCAPE '\'
+		ORDER BY CASE WHEN name ILIKE $3 ESCAPE '\' THEN 0 ELSE 1 END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.name,
+		       a.album_count, a.has_photo,
+		       COALESCE(ts_rank(a.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN a.name ILIKE $3 ESCAPE '\' THEN 0.3 ELSE 0 END AS prefix_bonus,
+		       CASE WHEN a.name ILIKE $2 ESCAPE '\' THEN 0.15 ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_artists a ON a.id = c.id
+	)
+	SELECT id, entity_uid, slug, name, album_count, has_photo
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, album_count DESC, name ASC
+	LIMIT $5
+`
+
+const localAlbumSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_albums
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_albums
+		WHERE name ILIKE $2 ESCAPE '\'
+		   OR artist ILIKE $2 ESCAPE '\'
+		ORDER BY CASE
+			WHEN name ILIKE $3 ESCAPE '\' THEN 0
+			WHEN artist ILIKE $3 ESCAPE '\' THEN 1
+			ELSE 2
+		END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT a.id, a.entity_uid::text AS entity_uid, a.slug,
+		       a.artist, a.name, a.year, a.has_cover,
+		       ar.id AS artist_id,
+		       ar.entity_uid::text AS artist_entity_uid,
+		       ar.slug AS artist_slug,
+		       COALESCE(ts_rank(a.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN a.name ILIKE $3 ESCAPE '\' THEN 0.3
+		            WHEN a.artist ILIKE $3 ESCAPE '\' THEN 0.2
+		            ELSE 0 END AS prefix_bonus,
+		       CASE WHEN a.name ILIKE $2 ESCAPE '\' THEN 0.15
+		            WHEN a.artist ILIKE $2 ESCAPE '\' THEN 0.1
+		            ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_albums a ON a.id = c.id
+		LEFT JOIN library_artists ar ON ar.name = a.artist
+	)
+	SELECT id, entity_uid, slug, artist, name, year, has_cover,
+	       artist_id, artist_entity_uid, artist_slug
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, year DESC NULLS LAST, name ASC
+	LIMIT $5
+`
+
+const localTrackSearchSQL = `
+	WITH fts_candidates AS (
+		SELECT id
+		FROM library_tracks
+		WHERE NULLIF($1, '') IS NOT NULL
+		  AND search_vector @@ to_tsquery('simple', $1)
+		ORDER BY ts_rank(search_vector, to_tsquery('simple', $1)) DESC, id
+		LIMIT $4
+	), substring_candidates AS (
+		SELECT id
+		FROM library_tracks t
+		WHERE t.title ILIKE $2 ESCAPE '\'
+		   OR t.artist ILIKE $2 ESCAPE '\'
+		   OR t.album ILIKE $2 ESCAPE '\'
+		ORDER BY CASE
+			WHEN t.title ILIKE $3 ESCAPE '\' THEN 0
+			WHEN t.artist ILIKE $3 ESCAPE '\' THEN 1
+			WHEN t.album ILIKE $3 ESCAPE '\' THEN 2
+			ELSE 3
+		END, id
+		LIMIT $4
+	), candidates AS (
+		SELECT id FROM fts_candidates
+		UNION
+		SELECT id FROM substring_candidates
+	), ranked AS (
+		SELECT t.id, t.entity_uid::text AS entity_uid, t.slug, t.title, t.artist,
+		       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
+		       a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
+		       a.name AS album, t.path, t.duration,
+		       COALESCE(ts_rank(t.search_vector, to_tsquery('simple', NULLIF($1, ''))), 0) AS fts_rank,
+		       CASE WHEN t.title ILIKE $3 ESCAPE '\' THEN 0.3
+		            WHEN t.artist ILIKE $3 ESCAPE '\' THEN 0.2
+		            WHEN t.album ILIKE $3 ESCAPE '\' THEN 0.1
+		            ELSE 0 END AS prefix_bonus,
+		       CASE WHEN t.title ILIKE $2 ESCAPE '\' THEN 0.15
+		            WHEN t.artist ILIKE $2 ESCAPE '\' THEN 0.1
+		            WHEN t.album ILIKE $2 ESCAPE '\' THEN 0.05
+		            ELSE 0 END AS substring_bonus
+		FROM candidates c
+		JOIN library_tracks t ON t.id = c.id
+		JOIN library_albums a ON t.album_id = a.id
+		LEFT JOIN library_artists ar ON ar.name = t.artist
+	)
+	SELECT id, entity_uid, slug, title, artist,
+	       artist_id, artist_entity_uid, artist_slug,
+	       album_id, album_entity_uid, album_slug, album, path, duration
+	FROM ranked
+	ORDER BY (fts_rank + prefix_bonus + substring_bonus) DESC, title ASC
+	LIMIT $5
+`
+
 // Store provides read-only catalog queries backed by a PostgreSQL pool.
 type Store struct {
-	pool                 *pgxpool.Pool
-	queryTimeout         time.Duration
-	globalCatalogReadyFn func(context.Context) (bool, error)
+	pool                       *pgxpool.Pool
+	queryTimeout               time.Duration
+	globalCatalogReadyFn       func(context.Context) (bool, error)
+	globalCatalogServingModeFn func(context.Context) (CatalogServingMode, error)
+	localSearchFn              func(context.Context, string, int) (map[string]any, error)
+	globalSearchFn             func(context.Context, string, int) (map[string]any, error)
 }
 
 type historyFallbackRef struct {
@@ -208,12 +345,19 @@ func NewStore(pool *pgxpool.Pool, queryTimeout time.Duration) *Store {
 
 // Search runs parallel artist, album, and track queries for the given search text.
 func (s *Store) Search(ctx context.Context, query string, limit int) (map[string]any, error) {
+	if s.localSearchFn != nil {
+		return s.localSearchFn(ctx, query, limit)
+	}
 	q := strings.TrimSpace(query)
 	cappedLimit := clamp(limit, 1, 50)
-	if len(q) < 2 {
+	if utf8.RuneCountInString(q) < 2 {
 		return map[string]any{"artists": []any{}, "albums": []any{}, "tracks": []any{}}, nil
 	}
-	like := "%" + q + "%"
+	ftsQuery := buildLocalFTSQuery(q)
+	escaped := escapeLocalSearchLike(q)
+	substring := "%" + escaped + "%"
+	prefix := escaped + "%"
+	candidateLimit := clamp(cappedLimit*20, 100, 1000)
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
@@ -225,13 +369,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		artists, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT id, entity_uid::text AS entity_uid, slug, name, album_count, has_photo
-			FROM library_artists
-			WHERE name ILIKE $1
-			ORDER BY listeners DESC NULLS LAST, album_count DESC, name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		artists, err = rowsToMaps(s.pool.Query(
+			gCtx, localArtistSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -243,15 +383,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		albums, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT a.id, a.entity_uid::text AS entity_uid, a.slug, a.artist, a.name, a.year, a.has_cover,
-			       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug
-			FROM library_albums a
-			LEFT JOIN library_artists ar ON ar.name = a.artist
-			WHERE a.name ILIKE $1 OR a.artist ILIKE $1
-			ORDER BY year DESC NULLS LAST, name ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		albums, err = rowsToMaps(s.pool.Query(
+			gCtx, localAlbumSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -266,18 +400,9 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 
 	g.Go(func() error {
 		var err error
-		tracks, err = rowsToMaps(s.pool.Query(gCtx, `
-			SELECT t.id, t.entity_uid::text AS entity_uid, t.slug, t.title, t.artist,
-			       ar.id AS artist_id, ar.entity_uid::text AS artist_entity_uid, ar.slug AS artist_slug,
-			       a.id AS album_id, a.entity_uid::text AS album_entity_uid, a.slug AS album_slug,
-			       a.name AS album, t.path, t.duration
-			FROM library_tracks t
-			JOIN library_albums a ON t.album_id = a.id
-			LEFT JOIN library_artists ar ON ar.name = t.artist
-			WHERE t.title ILIKE $1 OR t.artist ILIKE $1 OR a.name ILIKE $1
-			ORDER BY t.title ASC
-			LIMIT $2
-		`, like, cappedLimit))
+		tracks, err = rowsToMaps(s.pool.Query(
+			gCtx, localTrackSearchSQL, ftsQuery, substring, prefix, candidateLimit, cappedLimit,
+		))
 		if err != nil {
 			return err
 		}
@@ -301,6 +426,28 @@ func (s *Store) Search(ctx context.Context, query string, limit int) (map[string
 		"albums":  albums,
 		"tracks":  tracks,
 	}, nil
+}
+
+func buildLocalFTSQuery(query string) string {
+	terms := strings.FieldsFunc(strings.TrimSpace(query), func(character rune) bool {
+		return !unicode.IsLetter(character) && !unicode.IsDigit(character) && character != '_'
+	})
+	if len(terms) == 0 {
+		return ""
+	}
+	for index, term := range terms {
+		terms[index] = strings.ToLower(term)
+	}
+	terms[len(terms)-1] += ":*"
+	return strings.Join(terms, " & ")
+}
+
+func escapeLocalSearchLike(query string) string {
+	return strings.NewReplacer(
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
+	).Replace(query)
 }
 
 // Favorites returns all favorited items ordered by creation time.

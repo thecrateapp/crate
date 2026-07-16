@@ -187,6 +187,7 @@ func (s *Server) withAccessLog(next http.Handler) http.Handler {
 			"status", recorder.status,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"route_source", recorder.Header().Get("X-Crate-Readplane"),
+			"catalog_mode", recorder.Header().Get("X-Crate-Catalog-Mode"),
 			"trace_id", traceID,
 		)
 	})

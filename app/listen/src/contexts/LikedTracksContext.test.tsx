@@ -25,6 +25,8 @@ function Probe() {
   return (
     <div>
       <output>{liked ? "liked" : "not-liked"}</output>
+      <span>{likes.loading ? "loading" : "idle"}</span>
+      <button onClick={() => void likes.refetch()}>refetch</button>
       <button
         onClick={() =>
           void likes
@@ -103,5 +105,30 @@ describe("LikedTracksProvider global identity", () => {
     await waitFor(() => expect(screen.getByText("liked")).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "unlike" }));
     await waitFor(() => expect(screen.getByText("liked")).toBeInTheDocument());
+  });
+
+  it("preserves the last valid library when a refetch fails", async () => {
+    apiMock
+      .mockResolvedValueOnce([
+        {
+          global_track_uid: "global-1",
+          liked_at: "2026-07-14T00:00:00Z",
+          title: "Remote track",
+          artist: "Remote artist",
+        },
+      ])
+      .mockRejectedValueOnce(new Error("catalog refresh unavailable"));
+    const user = userEvent.setup();
+    render(
+      <LikedTracksProvider>
+        <Probe />
+      </LikedTracksProvider>,
+    );
+    await screen.findByText("liked");
+
+    await user.click(screen.getByRole("button", { name: "refetch" }));
+
+    await waitFor(() => expect(screen.getByText("idle")).toBeInTheDocument());
+    expect(screen.getByText("liked")).toBeInTheDocument();
   });
 });

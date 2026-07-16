@@ -1,16 +1,35 @@
 from unittest.mock import patch
 
 
-def test_catalog_routes_return_retryable_warming_error_until_ready(test_app):
-    with patch(
-        "crate.api.catalog.get_catalog_state",
-        return_value={"status": "backfilling"},
+def test_catalog_library_keeps_legacy_rows_visible_while_backfilling(test_app):
+    legacy_artists = [
+        {
+            "artist_name": "High Vis",
+            "global_artist_uid": None,
+            "artist_id": 7,
+            "artist_entity_uid": "artist-local-7",
+            "artist_slug": "high-vis",
+            "created_at": "2026-07-10T10:00:00+00:00",
+            "album_count": 3,
+            "track_count": 24,
+            "has_photo": True,
+            "photo_url": None,
+        }
+    ]
+    with (
+        patch(
+            "crate.api.catalog.get_catalog_state",
+            return_value={"status": "backfilling"},
+        ),
+        patch(
+            "crate.api.catalog.list_user_global_artist_follows",
+            return_value=legacy_artists,
+        ),
     ):
         response = test_app.get("/api/catalog/me/artists")
 
-    assert response.status_code == 503
-    assert response.headers["Retry-After"] == "3"
-    assert response.json() == {"detail": "catalog_warming"}
+    assert response.status_code == 200
+    assert response.json() == legacy_artists
 
 
 def test_catalog_me_artists_returns_user_global_follows(

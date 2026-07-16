@@ -158,7 +158,10 @@ class TestExploreSearchContract:
         )
 
         with (
-            patch("crate.api.browse_media.has_library_data", return_value=True),
+            patch("crate.local_search.has_library_data", return_value=True),
+            patch("crate.local_search.get_cache", return_value=None),
+            patch("crate.local_search.set_cache"),
+            patch("crate.local_search.record_later"),
             patch("crate.db.queries.browse_media_search.read_scope", mock_scope),
         ):
             resp = test_app.get("/api/search?q=converge&limit=10")

@@ -269,6 +269,9 @@ def create_library_catalog_schema(cur) -> None:
         "CREATE INDEX IF NOT EXISTS idx_tracks_artist_trgm ON library_tracks USING gin(artist gin_trgm_ops)"
     )
     cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tracks_album_trgm ON library_tracks USING gin(album gin_trgm_ops)"
+    )
+    cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_tracks_search_fts ON library_tracks USING gin(search_vector)"
     )
     cur.execute(

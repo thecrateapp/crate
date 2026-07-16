@@ -116,7 +116,6 @@ export function LikedTracksProvider({ children }: { children: ReactNode }) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
         return;
       }
-      setLikedTracks([]);
     } finally {
       if (likedTracksRequestRef.current === controller) {
         likedTracksRequestRef.current = null;

@@ -35,6 +35,105 @@ func TestGlobalCatalogReady(t *testing.T) {
 	}
 }
 
+func TestCatalogServingModeForState(t *testing.T) {
+	tests := []struct {
+		name             string
+		status           string
+		hasFullReconcile bool
+		want             CatalogServingMode
+	}{
+		{name: "cold", status: "cold", want: CatalogLocalFallback},
+		{name: "first backfill", status: "backfilling", want: CatalogLocalFallback},
+		{name: "first failure", status: "failed", want: CatalogLocalFallback},
+		{name: "ready", status: "ready", want: CatalogGlobalReady},
+		{name: "refreshing", status: "backfilling", hasFullReconcile: true, want: CatalogGlobalRefreshing},
+		{name: "degraded", status: "failed", hasFullReconcile: true, want: CatalogGlobalDegraded},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, CatalogServingModeForState(tt.status, tt.hasFullReconcile))
+		})
+	}
+}
+
+func TestCatalogServingModeUsesGlobal(t *testing.T) {
+	tests := []struct {
+		mode CatalogServingMode
+		want bool
+	}{
+		{mode: CatalogLocalFallback, want: false},
+		{mode: CatalogGlobalReady, want: true},
+		{mode: CatalogGlobalRefreshing, want: true},
+		{mode: CatalogGlobalDegraded, want: true},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, tt.mode.UsesGlobal())
+	}
+}
+
+func TestGlobalCatalogServingMode(t *testing.T) {
+	tests := []struct {
+		name string
+		mode CatalogServingMode
+		err  error
+	}{
+		{name: "ready", mode: CatalogGlobalReady},
+		{name: "local fallback", mode: CatalogLocalFallback},
+		{name: "query failure", err: errors.New("database unavailable")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &Store{
+				globalCatalogServingModeFn: func(context.Context) (CatalogServingMode, error) {
+					return tt.mode, tt.err
+				},
+			}
+
+			mode, err := store.GlobalCatalogServingMode(context.Background())
+
+			assert.Equal(t, tt.mode, mode)
+			assert.ErrorIs(t, err, tt.err)
+		})
+	}
+}
+
+func TestCanonicalSearchSelectsAvailableReadModel(t *testing.T) {
+	tests := []struct {
+		name       string
+		mode       CatalogServingMode
+		stateErr   error
+		wantSource string
+		wantMode   CatalogServingMode
+	}{
+		{name: "cold uses local", mode: CatalogLocalFallback, wantSource: "local", wantMode: CatalogLocalFallback},
+		{name: "ready uses global", mode: CatalogGlobalReady, wantSource: "global", wantMode: CatalogGlobalReady},
+		{name: "refreshing uses last global", mode: CatalogGlobalRefreshing, wantSource: "global", wantMode: CatalogGlobalRefreshing},
+		{name: "degraded uses last global", mode: CatalogGlobalDegraded, wantSource: "global", wantMode: CatalogGlobalDegraded},
+		{name: "state failure fails open to local", stateErr: errors.New("state unavailable"), wantSource: "local", wantMode: CatalogLocalFallback},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &Store{
+				globalCatalogServingModeFn: func(context.Context) (CatalogServingMode, error) {
+					return tt.mode, tt.stateErr
+				},
+				localSearchFn: func(context.Context, string, int) (map[string]any, error) {
+					return map[string]any{"source": "local"}, nil
+				},
+				globalSearchFn: func(context.Context, string, int) (map[string]any, error) {
+					return map[string]any{"source": "global"}, nil
+				},
+			}
+
+			payload, mode, err := store.CanonicalSearch(context.Background(), "high vis", 20)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantMode, mode)
+			assert.Equal(t, tt.wantSource, payload["source"])
+		})
+	}
+}
+
 func TestGlobalSearchShortQueryDoesNotHitDatabase(t *testing.T) {
 	store := NewStore(nil, time.Second)
 

@@ -22,7 +22,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 
 interface GlobalCatalogStatus {
-  enabled: boolean;
+  serving_mode:
+    | "global-ready"
+    | "global-refreshing"
+    | "global-degraded"
+    | "local-fallback";
+  state: {
+    status: string;
+  };
   counts: {
     artists: number;
     albums: number;
@@ -77,6 +84,32 @@ function formatDate(value?: string | null) {
 
 function formatNumber(value: number | undefined) {
   return new Intl.NumberFormat().format(value || 0);
+}
+
+function servingModeLabel(mode?: GlobalCatalogStatus["serving_mode"]) {
+  const labels: Record<GlobalCatalogStatus["serving_mode"], string> = {
+    "global-ready": "Global ready",
+    "global-refreshing": "Global refreshing",
+    "global-degraded": "Global degraded",
+    "local-fallback": "Local fallback",
+  };
+  return mode ? labels[mode] : "Unknown";
+}
+
+function servingModeDescription(mode?: GlobalCatalogStatus["serving_mode"]) {
+  if (mode === "local-fallback") {
+    return "First reconciliation in progress; local reads remain available.";
+  }
+  if (mode === "global-refreshing") {
+    return "Reconciliation in progress; serving the last complete global catalog.";
+  }
+  if (mode === "global-degraded") {
+    return "Reconciliation failed; serving the last complete global catalog.";
+  }
+  if (mode === "global-ready") {
+    return "Serving the current complete global catalog.";
+  }
+  return "Catalog serving status is unavailable.";
 }
 
 export function GlobalCatalog() {
@@ -193,18 +226,30 @@ export function GlobalCatalog() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  {status?.enabled ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                  ) : (
+                  {status?.serving_mode === "global-degraded" ? (
                     <AlertTriangle className="h-4 w-4 text-amber-400" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
                   )}
                   Read model
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <Badge variant={status?.enabled ? "default" : "secondary"}>
-                  {status?.enabled ? "Enabled" : "Disabled"}
+                <Badge
+                  variant={
+                    status?.serving_mode === "global-ready"
+                      ? "default"
+                      : "secondary"
+                  }
+                >
+                  {servingModeLabel(status?.serving_mode)}
                 </Badge>
+                <p className="text-muted-foreground">
+                  {servingModeDescription(status?.serving_mode)}
+                </p>
+                <p className="text-muted-foreground">
+                  Reconciliation state: {status?.state.status || "unknown"}
+                </p>
                 <p className="text-muted-foreground">
                   Stale peers: {formatNumber(status?.stale_peer_count)}
                 </p>

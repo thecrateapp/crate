@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from fastapi import Response
 from fastapi.responses import JSONResponse
 
 
@@ -459,6 +460,11 @@ def test_catalog_artists_decade_filter_uses_global_catalog(monkeypatch):
     monkeypatch.setattr(catalog, "_require_auth", lambda _request: {"id": 1})
     monkeypatch.setattr(
         catalog,
+        "get_catalog_state",
+        lambda: {"status": "ready", "last_full_reconcile_at": "2026-07-15"},
+    )
+    monkeypatch.setattr(
+        catalog,
         "get_global_decade_artists",
         lambda **kwargs: (
             captured.update(kwargs)
@@ -490,6 +496,7 @@ def test_catalog_artists_decade_filter_uses_global_catalog(monkeypatch):
 
     payload = catalog.catalog_artists_by_decade(
         SimpleNamespace(),
+        Response(),
         decade="2020s",
         page=1,
         per_page=50,

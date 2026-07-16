@@ -16,7 +16,6 @@ from crate.api._deps import (
 )
 from crate.api.auth import _require_auth
 from crate.api.permissions import require_permission
-from crate.api.browse_shared import fs_search, has_library_data
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
     error_response,
@@ -72,8 +71,8 @@ from crate.db.queries.browse_media import (
     get_track_path_by_entity_uid,
     list_favorites,
     remove_favorite,
-    search_all_hybrid,
 )
+from crate.local_search import search_local_library
 from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.tasks import create_task_dedup
@@ -161,6 +160,8 @@ def api_search(
         return {"artists": [], "albums": [], "tracks": []}
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
+    if scope == "local":
+        return search_local_library(q_stripped, capped_limit)
 
     use_global_catalog = scope == "auto"
     global_catalog_revision = ""
@@ -180,20 +181,6 @@ def api_search(
     cached = get_cache(cache_key, max_age_seconds=30)
     if cached is not None:
         return cached
-
-    if scope == "local":
-        if not has_library_data():
-            result = fs_search(q_stripped)
-            result["tracks"] = []
-            set_cache(cache_key, result, ttl=45)
-            return result
-
-        payload = search_all_hybrid(q_stripped, capped_limit)
-        record_later("search.hybrid.results.artists", len(payload["artists"]))
-        record_later("search.hybrid.results.albums", len(payload["albums"]))
-        record_later("search.hybrid.results.tracks", len(payload["tracks"]))
-        set_cache(cache_key, payload, ttl=45)
-        return payload
 
     if use_global_catalog:
         from crate.db.queries.global_catalog import search_global_catalog

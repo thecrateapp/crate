@@ -16,6 +16,58 @@ import (
 
 var globalSearchFeatSuffix = regexp.MustCompile(`(?i)\s*[\(\[]?\s*(?:feat|ft|featuring)\.?\s+.+?[\)\]]?\s*$`)
 
+// CatalogServingMode separates read availability from reconciliation progress.
+type CatalogServingMode string
+
+const (
+	CatalogGlobalReady      CatalogServingMode = "global-ready"
+	CatalogGlobalRefreshing CatalogServingMode = "global-refreshing"
+	CatalogGlobalDegraded   CatalogServingMode = "global-degraded"
+	CatalogLocalFallback    CatalogServingMode = "local-fallback"
+)
+
+// CatalogServingModeForState maps durable reconciliation state to read behavior.
+func CatalogServingModeForState(status string, hasFullReconcile bool) CatalogServingMode {
+	if status == "ready" {
+		return CatalogGlobalReady
+	}
+	if hasFullReconcile {
+		if status == "backfilling" {
+			return CatalogGlobalRefreshing
+		}
+		return CatalogGlobalDegraded
+	}
+	return CatalogLocalFallback
+}
+
+// UsesGlobal reports whether canonical global rows should serve aggregate reads.
+func (m CatalogServingMode) UsesGlobal() bool {
+	return m != CatalogLocalFallback
+}
+
+// GlobalCatalogServingMode returns the read policy for the current catalog state.
+func (s *Store) GlobalCatalogServingMode(ctx context.Context) (CatalogServingMode, error) {
+	if s.globalCatalogServingModeFn != nil {
+		return s.globalCatalogServingModeFn(ctx)
+	}
+	if s.pool == nil {
+		return CatalogLocalFallback, fmt.Errorf("catalog database pool is unavailable")
+	}
+	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	var status string
+	var hasFullReconcile bool
+	err := s.pool.QueryRow(ctx, `
+		SELECT status, last_full_reconcile_at IS NOT NULL
+		FROM global_catalog_state
+		WHERE singleton = TRUE
+	`).Scan(&status, &hasFullReconcile)
+	if err != nil {
+		return CatalogLocalFallback, err
+	}
+	return CatalogServingModeForState(status, hasFullReconcile), nil
+}
+
 // GlobalCatalogReady reports whether the canonical catalog can serve reads.
 // A cold or backfilling catalog must never fall back to library_* rows.
 func (s *Store) GlobalCatalogReady(ctx context.Context) (bool, error) {
@@ -43,6 +95,9 @@ func (s *Store) GlobalCatalogReady(ctx context.Context) (bool, error) {
 // falls back to library_* tables: a zero-peer node is represented by its local
 // sources in global_catalog_*.
 func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[string]any, error) {
+	if s.globalSearchFn != nil {
+		return s.globalSearchFn(ctx, query, limit)
+	}
 	q := strings.TrimSpace(query)
 	cappedLimit := clamp(limit, 1, 50)
 	if utf8.RuneCountInString(q) < 2 {
@@ -165,6 +220,25 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 		return nil, err
 	}
 	return map[string]any{"artists": artists, "albums": albums, "tracks": tracks}, nil
+}
+
+// CanonicalSearch selects the newest complete read model without making search
+// availability depend on reconciliation progress.
+func (s *Store) CanonicalSearch(
+	ctx context.Context,
+	query string,
+	limit int,
+) (map[string]any, CatalogServingMode, error) {
+	mode, err := s.GlobalCatalogServingMode(ctx)
+	if err != nil {
+		mode = CatalogLocalFallback
+	}
+	if mode.UsesGlobal() {
+		payload, searchErr := s.GlobalSearch(ctx, query, limit)
+		return payload, mode, searchErr
+	}
+	payload, searchErr := s.Search(ctx, query, limit)
+	return payload, mode, searchErr
 }
 
 func normalizeGlobalSearchQuery(query string) string {

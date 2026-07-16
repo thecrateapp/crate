@@ -69,7 +69,6 @@ export function SavedAlbumsProvider({ children }: { children: ReactNode }) {
       if (controller.signal.aborted || (error as Error).name === "AbortError") {
         return;
       }
-      setSavedAlbums([]);
     } finally {
       if (savedAlbumsRequestRef.current === controller) {
         savedAlbumsRequestRef.current = null;

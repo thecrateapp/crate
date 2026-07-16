@@ -159,11 +159,15 @@ def _build_related_genres(session, slug: str | None) -> list[dict]:
     return items[:RELATED_GENRE_LIMIT]
 
 
-def get_genre_detail(slug: str) -> dict | None:
+def get_genre_detail(slug: str, *, include_global_entities: bool = True) -> dict | None:
     with read_scope() as session:
         genre = get_genre_summary_by_slug(session, slug)
         if not genre:
-            return _build_global_only_genre_detail(session, slug)
+            return (
+                _build_global_only_genre_detail(session, slug)
+                if include_global_entities
+                else None
+            )
         if not genre.get("description") and not genre.get("mapped"):
             genre["description"] = (
                 "raw library tag detected in your collection but not yet linked into the curated taxonomy."
@@ -301,7 +305,8 @@ def get_genre_detail(slug: str) -> dict | None:
             .all()
         )
         genre["albums"] = [dict(r) for r in rows]
-        _augment_global_genre_entities(session, genre)
+        if include_global_entities:
+            _augment_global_genre_entities(session, genre)
         genre["artist_count"] = len(genre["artists"])
         genre["album_count"] = len(genre["albums"])
         genre["track_count"] = sum(

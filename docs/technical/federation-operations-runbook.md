@@ -60,6 +60,31 @@ If a peer was offline, keep the overlap or disable that peer. Never silently rep
 - A crash after page persistence but before cursor commit is safe: rerun and let idempotent page application replay.
 - Compare manifest counts/digest and run full verification before marking the source healthy.
 
+## Catalog warming or reconciliation failure
+
+Canonical reads must not return `catalog_warming`. During the first full
+reconciliation, local reads remain available from `library_*`; later refreshes
+and failures serve the last complete global catalog.
+
+1. Check `/api/admin/global-catalog/status` and record `serving_mode`, the
+   reconciliation state, last completed run, and last error.
+2. Request `/api/catalog/search?q=high&limit=5` and inspect
+   `X-Crate-Catalog-Mode`. `local-fallback`, `global-refreshing`, and
+   `global-degraded` are expected serving states and must still return `200`.
+3. If `local-fallback` is slow, run `make dev-catalog-search-capacity-test`.
+   The target refuses databases not named `crate_test`; never point it at
+   production.
+4. Confirm migration `071` completed and inspect query plans for the FTS and
+   trigram candidate indexes. Do not create indexes non-concurrently on a live
+   library.
+5. For `global-degraded`, inspect the failed reconciliation run, correct the
+   bounded root cause, and enqueue one incremental or full reconciliation from
+   Admin. Do not truncate canonical or legacy user-library tables.
+
+Escalate as an availability incident only when canonical and legacy/local
+paths both fail, latency breaches the singleton SLO, or playback/detail routes
+regress. A long first backfill by itself is not downtime.
+
 ## Peer outage
 
 - Search should return local/healthy-source results with

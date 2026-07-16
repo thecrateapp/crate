@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, Request
+import logging
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
 from crate.api.auth import _require_auth as _require_authenticated_user
@@ -55,6 +57,11 @@ from crate.db.queries.global_catalog import (
     list_global_catalog_genres,
     search_global_catalog,
 )
+from crate.db.queries.catalog_local_browse import (
+    get_local_catalog_genre_detail,
+    get_local_decade_artists,
+    list_local_catalog_genres,
+)
 from crate.db.repositories.global_user_library import (
     follow_global_artist,
     is_global_album_saved,
@@ -65,7 +72,10 @@ from crate.db.repositories.global_user_library import (
     unfollow_global_artist,
     unsave_global_album,
 )
-from crate.db.repositories.global_catalog_state import get_catalog_state
+from crate.db.repositories.global_catalog_state import (
+    catalog_serving_mode,
+    get_catalog_state,
+)
 from crate.federation.global_artwork import (
     GlobalArtistNotFound,
     GlobalAlbumNotFound,
@@ -87,9 +97,12 @@ from crate.federation.global_source_resolver import (
     NoGlobalSource,
     resolve_global_source,
 )
+from crate.local_search import search_local_library
+from crate.metrics import record_later
 
 router = APIRouter(tags=["catalog"])
 router.include_router(artist_compat_router)
+log = logging.getLogger(__name__)
 
 
 _TRACK_INFO_REMOTE_FIELDS = {
@@ -138,15 +151,21 @@ _ALBUM_TRACK_REMOTE_FIELDS = {
 
 
 def _require_auth(request: Request) -> dict:
-    """Require an authenticated user and a ready canonical catalog."""
-    user = _require_authenticated_user(request)
-    if get_catalog_state()["status"] != "ready":
-        raise HTTPException(
-            status_code=503,
-            detail="catalog_warming",
-            headers={"Retry-After": "3"},
+    """Require an authenticated catalog user."""
+    return _require_authenticated_user(request)
+
+
+def _catalog_mode(response: Response) -> str:
+    try:
+        mode = catalog_serving_mode(get_catalog_state())
+    except Exception:
+        log.warning(
+            "Global catalog state lookup failed; using local read models",
+            exc_info=True,
         )
-    return user
+        mode = "local-fallback"
+    response.headers["X-Crate-Catalog-Mode"] = mode
+    return mode
 
 
 @router.get(
@@ -158,11 +177,18 @@ def _require_auth(request: Request) -> dict:
 )
 def catalog_search(
     request: Request,
+    response: Response,
     q: str = "",
     limit: int = 20,
     include_sources: bool = Query(default=False),
 ):
     user = _require_auth(request)
+    mode = _catalog_mode(response)
+    record_later("catalog.search.serving_mode", 1, tags={"mode": mode})
+    capped_limit = max(1, min(limit, 50))
+    if mode == "local-fallback":
+        return search_local_library(q, capped_limit)
+
     include_debug_sources = include_sources and user.get("role") in {
         "admin",
         "owner",
@@ -170,7 +196,7 @@ def catalog_search(
     }
     return search_global_catalog(
         q,
-        limit=max(1, min(limit, 50)),
+        limit=capped_limit,
         include_sources=include_debug_sources,
     )
 
@@ -180,18 +206,21 @@ def catalog_search(
     responses=AUTH_ERROR_RESPONSES,
     summary="List canonical global catalog genres",
 )
-def catalog_genres(request: Request):
+def catalog_genres(request: Request, response: Response):
     _require_auth(request)
     from crate.genre_taxonomy import get_core_taxonomy_descriptor
 
     descriptor = get_core_taxonomy_descriptor()
+    mode = _catalog_mode(response)
     return {
         "taxonomy": {
             "id": descriptor["taxonomy_id"],
             "version": descriptor["version"],
             "digest": descriptor["digest"],
         },
-        "items": list_global_catalog_genres(),
+        "items": list_local_catalog_genres()
+        if mode == "local-fallback"
+        else list_global_catalog_genres(),
     }
 
 
@@ -200,9 +229,14 @@ def catalog_genres(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Get a canonical global catalog genre",
 )
-def catalog_genre_detail(request: Request, slug: str):
+def catalog_genre_detail(request: Request, response: Response, slug: str):
     _require_auth(request)
-    payload = get_global_genre_detail(slug)
+    mode = _catalog_mode(response)
+    payload = (
+        get_local_catalog_genre_detail(slug)
+        if mode == "local-fallback"
+        else get_global_genre_detail(slug)
+    )
     if payload is None:
         raise HTTPException(status_code=404, detail="Genre not found")
     return payload
@@ -333,6 +367,7 @@ def catalog_me_unsave_album(request: Request, global_album_uid: str):
 )
 def catalog_artists_by_decade(
     request: Request,
+    response: Response,
     decade: str,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=120),
@@ -344,7 +379,13 @@ def catalog_artists_by_decade(
         raise HTTPException(status_code=400, detail="Invalid decade") from None
     if decade_start < 1000 or decade_start > 9999 or decade_start % 10:
         raise HTTPException(status_code=400, detail="Invalid decade")
-    return get_global_decade_artists(
+    mode = _catalog_mode(response)
+    get_artists = (
+        get_local_decade_artists
+        if mode == "local-fallback"
+        else get_global_decade_artists
+    )
+    return get_artists(
         decade_start=decade_start,
         decade_end=decade_start + 9,
         page=page,

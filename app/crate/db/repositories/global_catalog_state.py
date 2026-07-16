@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from sqlalchemy import text
@@ -11,6 +12,12 @@ from crate.db.tx import optional_scope
 
 
 CatalogStatus = Literal["cold", "backfilling", "ready", "failed"]
+CatalogServingMode = Literal[
+    "global-ready",
+    "global-refreshing",
+    "global-degraded",
+    "local-fallback",
+]
 
 _ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "cold": {"backfilling"},
@@ -27,6 +34,21 @@ _MUTABLE_FIELDS = {
     "last_error",
 }
 _JSON_FIELDS = {"bootstrap_cursor_json", "user_refs_backfill_report_json"}
+
+
+def catalog_serving_mode(state: Mapping[str, Any]) -> CatalogServingMode:
+    status = str(state.get("status") or "cold")
+    if status == "ready":
+        return "global-ready"
+    if state.get("last_full_reconcile_at") is not None:
+        if status == "backfilling":
+            return "global-refreshing"
+        return "global-degraded"
+    return "local-fallback"
+
+
+def catalog_serves_global(state: Mapping[str, Any]) -> bool:
+    return catalog_serving_mode(state) != "local-fallback"
 
 
 def get_catalog_state(*, session=None) -> dict[str, Any]:
@@ -132,4 +154,11 @@ def transition_catalog_state(
     return dict(row)
 
 
-__all__ = ["CatalogStatus", "get_catalog_state", "transition_catalog_state"]
+__all__ = [
+    "CatalogServingMode",
+    "CatalogStatus",
+    "catalog_serves_global",
+    "catalog_serving_mode",
+    "get_catalog_state",
+    "transition_catalog_state",
+]

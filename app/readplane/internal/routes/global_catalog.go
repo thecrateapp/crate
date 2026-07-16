@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/thecrateapp/crate/app/readplane/internal/catalog"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 	"github.com/thecrateapp/crate/app/readplane/internal/snapshots"
 )
@@ -16,11 +17,13 @@ func (s *Server) globalCatalogSearchRoute(w http.ResponseWriter, r *http.Request
 	if !s.requireCatalogAuth(w, r) {
 		return
 	}
-	if !s.requireReadyGlobalCatalog(w, r) {
-		return
-	}
+	s.serveGlobalCatalogSearch(w, r)
+}
+
+func (s *Server) serveGlobalCatalogSearch(w http.ResponseWriter, r *http.Request) {
 	limit := boundedQueryInt(r, "limit", 20, 1, 50)
-	payload, err := s.catalog.GlobalSearch(r.Context(), r.URL.Query().Get("q"), limit)
+	payload, mode, err := s.catalog.CanonicalSearch(r.Context(), r.URL.Query().Get("q"), limit)
+	w.Header().Set("X-Crate-Catalog-Mode", string(mode))
 	s.writeCatalogPayload(w, r, payload, err, "Global catalog search unavailable", "Not found")
 }
 
@@ -31,7 +34,14 @@ func (s *Server) globalCatalogGenresRoute(w http.ResponseWriter, r *http.Request
 	if !s.requireCatalogAuth(w, r) {
 		return
 	}
-	if !s.requireReadyGlobalCatalog(w, r) {
+	mode, err := s.catalog.GlobalCatalogServingMode(r.Context())
+	if err != nil {
+		s.logger.Warn("readplane catalog serving mode check failed", "error", err)
+		mode = catalog.CatalogLocalFallback
+	}
+	w.Header().Set("X-Crate-Catalog-Mode", string(mode))
+	if !catalogGenresUsesSnapshot(mode) {
+		s.fallbackOrRouteMiss(w, r)
 		return
 	}
 	if s.snapshots == nil {
@@ -59,12 +69,13 @@ func (s *Server) globalCatalogGenresRoute(w http.ResponseWriter, r *http.Request
 	}
 }
 
+func catalogGenresUsesSnapshot(mode catalog.CatalogServingMode) bool {
+	return mode.UsesGlobal()
+}
+
 func (s *Server) globalCatalogArtistsRoute(w http.ResponseWriter, r *http.Request) {
 	user, ok := s.requireCatalogUser(w, r)
 	if !ok {
-		return
-	}
-	if !s.requireReadyGlobalCatalog(w, r) {
 		return
 	}
 	payload, err := s.catalog.FollowedArtists(r.Context(), user.ID)
@@ -76,27 +87,8 @@ func (s *Server) globalCatalogAlbumsRoute(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	if !s.requireReadyGlobalCatalog(w, r) {
-		return
-	}
 	payload, err := s.catalog.SavedAlbums(r.Context(), user.ID)
 	s.writeCatalogPayload(w, r, payload, err, "Global album library unavailable", "Not found")
-}
-
-func (s *Server) requireReadyGlobalCatalog(w http.ResponseWriter, r *http.Request) bool {
-	ready, err := s.catalog.GlobalCatalogReady(r.Context())
-	if err != nil {
-		s.logger.Warn("readplane catalog readiness check failed", "error", err)
-		s.catalogUnavailable(w, r, "Global catalog readiness unavailable")
-		return false
-	}
-	if ready {
-		return true
-	}
-	w.Header().Set("Retry-After", "3")
-	httpx.MarkReadplane(w, "hit")
-	httpx.WriteError(w, http.StatusServiceUnavailable, "catalog_warming")
-	return false
 }
 
 func globalCatalogGenresPayload(taxonomy *snapshots.Row, genres *snapshots.Row) (map[string]any, error) {
