@@ -79,4 +79,22 @@ describe("flattenTopBarSearchResults", () => {
 
     expect(item?.origin).toBe("remote");
   });
+
+  it("builds the canonical photo URL for global artists with artwork", () => {
+    const [item] = flattenTopBarSearchResults({
+      artists: [
+        {
+          name: "Converge",
+          global_artist_uid: "artist-global-1",
+          has_photo: true,
+        },
+      ],
+      albums: [],
+      tracks: [],
+    });
+
+    expect(item?.imageUrl).toContain(
+      "/api/catalog/artists/artist-global-1/photo",
+    );
+  });
 });

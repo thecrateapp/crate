@@ -220,6 +220,9 @@ export function flattenTopBarSearchResults(
           artistSlug: artist.slug,
           artistName: artist.name,
         }),
+        imageUrl: artist.has_photo
+          ? artistPhotoApiUrl({ globalArtistUid: globalUid }, { size: 128 })
+          : undefined,
         origin: resultOrigin(artist),
         nodeName: resultNodeName(artist),
       });
