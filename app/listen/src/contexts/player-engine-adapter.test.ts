@@ -30,6 +30,7 @@ vi.mock("@/lib/offline", () => ({
 import {
   toEngineTrack,
   toFreshEngineTrack,
+  toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { getPlaybackSession } from "@/lib/playback-provenance";
 
@@ -143,6 +144,49 @@ describe("player engine adapter", () => {
     expect(apiMock).not.toHaveBeenCalled();
     expect(track.url).toBe(
       "https://listen.example/api/federation/remote/streams/ticket-existing",
+    );
+  });
+
+  it("resolves only the active global track before loading a queue", async () => {
+    apiMock.mockResolvedValueOnce({
+      stream_url: "/api/federation/remote/streams/ticket-current",
+      requested_policy: "original",
+      effective_policy: "balanced",
+      source: {},
+      delivery: {},
+      transcoded: false,
+      cache_hit: false,
+      preparing: false,
+      task_id: null,
+      variant_id: null,
+      variant_status: null,
+      playback_session: "signed-current-playback",
+      content_origin: "remote",
+    });
+    const queue = [
+      {
+        id: "global-track-current",
+        globalTrackUid: "global-track-current",
+        title: "Current Song",
+        artist: "Remote Band",
+      },
+      {
+        id: "global-track-next",
+        globalTrackUid: "global-track-next",
+        title: "Next Song",
+        artist: "Remote Band",
+      },
+    ];
+
+    const tracks = await toStartupEngineTracks(queue, 0);
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/catalog/tracks/global-track-current/playback",
+    );
+    expect(tracks[0]?.url).toContain("ticket-current");
+    expect(tracks[1]?.url).toContain(
+      "/api/catalog/tracks/global-track-next/stream",
     );
   });
 });

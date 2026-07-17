@@ -1,4 +1,5 @@
 import type { Track } from "@/contexts/player-types";
+import { api } from "@/lib/api";
 import { trackPlaybackApiPath } from "@/lib/library-routes";
 import type { PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 
@@ -29,6 +30,20 @@ export interface PlaybackResolution {
   playback_session: string;
   content_origin: "local" | "remote" | "imported";
 }
+
+type PlaybackTrack = Pick<
+  Track,
+  "id" | "globalTrackUid" | "entityUid" | "libraryTrackId" | "path"
+>;
+
+interface CacheEntry {
+  resolution: PlaybackResolution;
+  timestamp: number;
+}
+
+const TRACK_PLAYBACK_TTL_MS = 30 * 1000;
+const trackPlaybackCache = new Map<string, CacheEntry>();
+const inflightTrackPlayback = new Map<string, Promise<PlaybackResolution>>();
 
 type PlaybackQualityForComparison = Pick<
   PlaybackQuality,
@@ -88,10 +103,7 @@ export function playbackResolutionShowsDeliveryQuality(
 }
 
 export function resolveTrackPlaybackUrl(
-  track: Pick<
-    Track,
-    "id" | "globalTrackUid" | "entityUid" | "libraryTrackId" | "path"
-  >,
+  track: PlaybackTrack,
   policy: PlaybackDeliveryPolicy,
 ): string | null {
   const path = trackPlaybackApiPath(track);
@@ -99,6 +111,49 @@ export function resolveTrackPlaybackUrl(
   return policy === "original"
     ? path
     : `${path}?delivery=${encodeURIComponent(policy)}`;
+}
+
+export function getCachedTrackPlayback(url: string): PlaybackResolution | null {
+  const cached = trackPlaybackCache.get(url);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > TRACK_PLAYBACK_TTL_MS) {
+    trackPlaybackCache.delete(url);
+    return null;
+  }
+  return cached.resolution;
+}
+
+async function loadTrackPlayback(url: string): Promise<PlaybackResolution> {
+  const cached = getCachedTrackPlayback(url);
+  if (cached) return cached;
+
+  const existing = inflightTrackPlayback.get(url);
+  if (existing) return existing;
+
+  const request = api<PlaybackResolution>(url)
+    .then((resolution) => {
+      trackPlaybackCache.set(url, { resolution, timestamp: Date.now() });
+      return resolution;
+    })
+    .finally(() => {
+      inflightTrackPlayback.delete(url);
+    });
+
+  inflightTrackPlayback.set(url, request);
+  return request;
+}
+
+export async function fetchTrackPlayback(
+  track: PlaybackTrack,
+  policy: PlaybackDeliveryPolicy,
+): Promise<PlaybackResolution | null> {
+  const url = resolveTrackPlaybackUrl(track, policy);
+  return url ? loadTrackPlayback(url) : null;
+}
+
+export function __resetTrackPlaybackCacheForTests(): void {
+  trackPlaybackCache.clear();
+  inflightTrackPlayback.clear();
 }
 
 export function getTrackQualityFromPlaybackQuality(

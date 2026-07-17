@@ -8,7 +8,7 @@ import {
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import {
   toFreshEngineTrack,
-  toFreshEngineTracks,
+  toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import {
   addTrack as gpAddTrack,
@@ -260,7 +260,10 @@ export function usePlayerQueueActions({
           );
         });
         void (async () => {
-          const engineTracks = await toFreshEngineTracks(tracks);
+          const engineTracks = await toStartupEngineTracks(
+            tracks,
+            normalizedIndex,
+          );
           return nativeEngine.loadQueue({
             revision: createQueueRevision(),
             tracks: engineTracks,
@@ -281,7 +284,10 @@ export function usePlayerQueueActions({
       }
 
       void (async () => {
-        const engineTracks = await toFreshEngineTracks(tracks);
+        const engineTracks = await toStartupEngineTracks(
+          tracks,
+          normalizedIndex,
+        );
         const engineUrls = engineTracks.map((track) => track.url);
 
         stopNativeEngineIfAvailable("before web queue load");

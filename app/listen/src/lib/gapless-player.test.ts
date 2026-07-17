@@ -334,6 +334,24 @@ describe("initPlayer", () => {
     expect(isCurrentTrackFullyBuffered()).toBe(true);
     expect(onAnalyserReady).toHaveBeenCalledWith({});
   });
+
+  it("clears the fully buffered marker when the current track advances", () => {
+    initPlayer();
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    const next = (mock as unknown as Record<string, unknown>).onnext as
+      | ((from: string, to: string) => void)
+      | undefined;
+    switched?.("/tracks/1/stream", {} as AnalyserNode);
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+
+    next?.("/tracks/1/stream", "/tracks/2/stream");
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
 });
 
 // ── destroyPlayer ─────────────────────────────────────────────────

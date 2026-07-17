@@ -26,7 +26,7 @@ def test_stream_ticket_is_bound_to_authorization_and_allows_range_retries(pg_db)
         local_user_id=7,
     )
 
-    assert ticket["expires_at"] <= datetime.now(timezone.utc) + timedelta(minutes=2)
+    assert ticket["expires_at"] <= datetime.now(timezone.utc) + timedelta(minutes=15)
     assert ticket["constraints_json"]["max_bytes"] == 1024
     assert [
         row["ticket_uid"]

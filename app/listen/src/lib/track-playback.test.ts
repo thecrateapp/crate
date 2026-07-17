@@ -1,12 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const apiMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/api", () => ({
+  api: apiMock,
+}));
 
 import {
+  __resetTrackPlaybackCacheForTests,
+  fetchTrackPlayback,
   getTrackQualityFromPlaybackQuality,
   playbackResolutionShowsDeliveryQuality,
   resolveTrackPlaybackUrl,
 } from "@/lib/track-playback";
 
 describe("track playback helpers", () => {
+  beforeEach(() => {
+    apiMock.mockReset();
+    __resetTrackPlaybackCacheForTests();
+  });
+
   it("builds original playback endpoints without a delivery query", () => {
     expect(
       resolveTrackPlaybackUrl(
@@ -45,6 +58,22 @@ describe("track playback helpers", () => {
         "balanced",
       ),
     ).toBe("/api/catalog/tracks/global-track-1/playback?delivery=balanced");
+  });
+
+  it("deduplicates concurrent playback resolution for the active track", async () => {
+    apiMock.mockResolvedValue({ stream_url: "/api/tracks/1/stream" });
+    const track = {
+      id: "global-track-1",
+      globalTrackUid: "global-track-1",
+    };
+
+    const [first, second] = await Promise.all([
+      fetchTrackPlayback(track, "balanced"),
+      fetchTrackPlayback(track, "balanced"),
+    ]);
+
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(second);
   });
 
   it("prefers the codec when mapping delivery quality", () => {

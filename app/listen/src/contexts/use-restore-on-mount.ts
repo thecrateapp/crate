@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { MutableRefObject } from "react";
 
 import type { RepeatMode, Track } from "@/contexts/player-types";
-import { toFreshEngineTracks } from "@/contexts/player-engine-adapter";
+import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
 import { getStoredQueue } from "@/contexts/player-utils";
 import {
   fadeInAndPlay as gpFadeInAndPlay,
@@ -176,7 +176,10 @@ export function useRestoreOnMount({
     }
 
     void (async () => {
-      const engineTracks = await toFreshEngineTracks(restoredQueue);
+      const engineTracks = await toStartupEngineTracks(
+        restoredQueue,
+        restoredIndex,
+      );
       const engineUrls = engineTracks.map((track) => track.url);
       gpLoadQueue(buildEngineUrls(restoredQueue, engineUrls), restoredIndex);
       gpSetLoop(repeatRef.current === "all");

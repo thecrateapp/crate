@@ -259,6 +259,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onprev = (from, to) => {
+    currentTrackFullyBuffered = false;
     currentCallbacks.onPrev?.(from, to);
   };
 
@@ -272,6 +273,7 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onnext = (from, to) => {
+    currentTrackFullyBuffered = false;
     currentCallbacks.onNext?.(from, to);
   };
 
@@ -368,13 +370,16 @@ export function loadQueue(
     urls.every((url, i) => url === currentUrls[i]);
   if (same) {
     if (urls.length > 0 && instance.getIndex() !== startIndex) {
+      currentTrackFullyBuffered = false;
       instance.gotoTrack(startIndex);
     } else if (urls.length > 0 && options.restartIfSameIndex) {
+      currentTrackFullyBuffered = false;
       instance.gotoTrack(startIndex, true);
     }
     return;
   }
 
+  currentTrackFullyBuffered = false;
   instance.removeAllTracks();
   for (const url of urls) {
     instance.addTrack(url);

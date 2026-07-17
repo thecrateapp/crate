@@ -12,6 +12,15 @@ const MOBILE_ENHANCED_AUDIO_KEY = "listen-player-mobile-enhanced-audio";
 
 export type PlaybackDeliveryPolicy = "original" | "balanced" | "data_saver";
 
+type NavigatorConnection = {
+  saveData?: boolean;
+  effectiveType?: string;
+  downlink?: number;
+  rtt?: number;
+  addEventListener?: (type: "change", listener: () => void) => void;
+  removeEventListener?: (type: "change", listener: () => void) => void;
+};
+
 const PLAYBACK_DELIVERY_POLICIES = new Set<PlaybackDeliveryPolicy>([
   "original",
   "balanced",
@@ -23,6 +32,31 @@ function isMobileRuntime(): boolean {
     return false;
   const ua = navigator.userAgent || "";
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || window.innerWidth < 768;
+}
+
+export function getPlaybackDeliveryNetworkHint(): PlaybackDeliveryPolicy | null {
+  if (typeof navigator === "undefined") return null;
+  const connection = (
+    navigator as Navigator & { connection?: NavigatorConnection }
+  ).connection;
+  if (!connection) return null;
+
+  const effectiveType = connection.effectiveType?.toLowerCase();
+  const downlink = connection.downlink ?? Infinity;
+  const rtt = connection.rtt ?? 0;
+  if (
+    connection.saveData ||
+    effectiveType === "slow-2g" ||
+    effectiveType === "2g" ||
+    downlink < 1.5 ||
+    rtt >= 600
+  ) {
+    return "data_saver";
+  }
+  if (effectiveType === "3g" || downlink < 5 || rtt >= 250) {
+    return "balanced";
+  }
+  return null;
 }
 
 function normalizePlaybackDeliveryPolicy(
@@ -40,14 +74,33 @@ export function getDefaultPlaybackDeliveryPolicy(): PlaybackDeliveryPolicy {
 
 export function getPlaybackDeliveryPolicyPreference(): PlaybackDeliveryPolicy {
   try {
+    const explicit = normalizePlaybackDeliveryPolicy(
+      localStorage.getItem(PLAYBACK_DELIVERY_POLICY_KEY),
+    );
     return (
-      normalizePlaybackDeliveryPolicy(
-        localStorage.getItem(PLAYBACK_DELIVERY_POLICY_KEY),
-      ) ?? getDefaultPlaybackDeliveryPolicy()
+      explicit ??
+      getPlaybackDeliveryNetworkHint() ??
+      getDefaultPlaybackDeliveryPolicy()
     );
   } catch {
-    return getDefaultPlaybackDeliveryPolicy();
+    return (
+      getPlaybackDeliveryNetworkHint() ?? getDefaultPlaybackDeliveryPolicy()
+    );
   }
+}
+
+export function subscribeToPlaybackDeliveryNetworkChanges(
+  onChange: () => void,
+): () => void {
+  if (typeof navigator === "undefined") return () => {};
+  const connection = (
+    navigator as Navigator & { connection?: NavigatorConnection }
+  ).connection;
+  if (!connection?.addEventListener || !connection.removeEventListener) {
+    return () => {};
+  }
+  connection.addEventListener("change", onChange);
+  return () => connection.removeEventListener?.("change", onChange);
 }
 
 export function setPlaybackDeliveryPolicyPreference(

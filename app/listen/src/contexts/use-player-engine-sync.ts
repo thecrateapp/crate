@@ -6,7 +6,7 @@ import {
 } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
-import { toFreshEngineTracks } from "@/contexts/player-engine-adapter";
+import { toStartupEngineTracks } from "@/contexts/player-engine-adapter";
 import {
   clampIndex,
   resolveQueueFromUrls,
@@ -273,7 +273,10 @@ export function usePlayerEngineSync({
           );
         });
         void (async () => {
-          const engineTracks = await toFreshEngineTracks(nextQueue);
+          const engineTracks = await toStartupEngineTracks(
+            nextQueue,
+            nextIndex,
+          );
           return androidNativeEngine.loadQueue({
             revision: createQueueRevision(),
             tracks: engineTracks,
@@ -293,7 +296,7 @@ export function usePlayerEngineSync({
       }
 
       void (async () => {
-        const engineTracks = await toFreshEngineTracks(nextQueue);
+        const engineTracks = await toStartupEngineTracks(nextQueue, nextIndex);
         const engineUrls = engineTracks.map((track) => track.url);
 
         stopNativeEngineIfAvailable("before web engine sync");
@@ -311,6 +314,12 @@ export function usePlayerEngineSync({
         } else {
           commitCurrentTime(0);
         }
+
+        if (autoplay) {
+          gpPlay();
+        } else {
+          gpPause();
+        }
       })().catch((error) => {
         console.error("[gapless] failed to sync queue playback:", error);
         commitIsBuffering(false);
@@ -320,10 +329,8 @@ export function usePlayerEngineSync({
       if (autoplay) {
         bufferingIntentRef.current = true;
         commitIsBuffering(true);
-        gpPlay();
       } else {
         bufferingIntentRef.current = false;
-        gpPause();
         commitIsPlaying(false);
         commitIsBuffering(false);
       }

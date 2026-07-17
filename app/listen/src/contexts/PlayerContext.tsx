@@ -32,6 +32,7 @@ import {
 import {
   toFreshEngineTrack,
   toFreshEngineTracks,
+  toStartupEngineTracks,
 } from "@/contexts/player-engine-adapter";
 import { useAuth } from "@/contexts/AuthContext";
 import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
@@ -75,6 +76,7 @@ import { createQueueRevision } from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
   getPlaybackDeliveryPolicyPreference,
+  subscribeToPlaybackDeliveryNetworkChanges,
   getSmartCrossfadePreference,
   getSmartPlaylistSuggestionsCadencePreference,
   getSmartPlaylistSuggestionsPreference,
@@ -435,6 +437,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     isPlayingRef,
     requireUserGestureToResume,
   ]);
+
+  useEffect(() => {
+    return subscribeToPlaybackDeliveryNetworkChanges(() => {
+      setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
+    });
+  }, [setPlaybackDeliveryPolicy]);
   const {
     syncEffectiveCrossfade,
     rememberActiveTrack,
@@ -677,7 +685,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      const engineTracks = await toFreshEngineTracks(queueSnapshot);
+      const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
       await androidNativeEngine.loadQueue({
         revision: createQueueRevision(),
         tracks: engineTracks,
@@ -838,7 +846,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!(await refreshAuthToken())) {
           throw new Error("Could not refresh the native playback token");
         }
-        const engineTracks = await toFreshEngineTracks(queueSnapshot);
+        const engineTracks = await toStartupEngineTracks(queueSnapshot, index);
         await androidNativeEngine.loadQueue({
           revision: createQueueRevision(),
           tracks: engineTracks,

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
 import {
   getCrossfadeDurationPreference,
   setCrossfadeDurationPreference,
@@ -19,6 +19,13 @@ import {
 
 beforeEach(() => {
   localStorage.clear();
+});
+
+afterEach(() => {
+  Object.defineProperty(navigator, "connection", {
+    configurable: true,
+    value: undefined,
+  });
 });
 
 describe("crossfade", () => {
@@ -134,6 +141,25 @@ describe("playback delivery policy", () => {
 
   it("ignores invalid values", () => {
     localStorage.setItem("listen-player-delivery-policy", "invalid");
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
+  });
+
+  it("uses data saver automatically on a constrained connection", () => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { effectiveType: "slow-2g", downlink: 0.5, rtt: 800 },
+    });
+
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("data_saver");
+  });
+
+  it("preserves an explicit quality preference over connection hints", () => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { effectiveType: "slow-2g", downlink: 0.5, rtt: 800 },
+    });
+    setPlaybackDeliveryPolicyPreference("original");
+
     expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
   });
 });

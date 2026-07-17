@@ -14,7 +14,9 @@ from crate.db.tx import read_scope, transaction_scope
 
 log = logging.getLogger(__name__)
 
-TICKET_TTL_MINUTES = 2
+# A ticket is a bounded, authenticated playback session. It is reusable for
+# Range requests but remains subject to per-request policy/revocation checks.
+TICKET_TTL_MINUTES = 15
 
 
 def create_ticket(
