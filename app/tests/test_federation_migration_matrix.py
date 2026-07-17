@@ -133,7 +133,7 @@ def _seed_063_legacy_state() -> dict[str, str]:
 
 
 def _assert_hardened_state(ids: dict[str, str]) -> None:
-    assert _scalar("SELECT version_num FROM alembic_version") == "071"
+    assert _scalar("SELECT version_num FROM alembic_version") == "072"
     assert (
         _scalar(
             "SELECT status FROM federation_local_keys WHERE node_uid = %s",
@@ -183,7 +183,7 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "071"
+    assert _scalar("SELECT version_num FROM alembic_version") == "072"
     for table in (
         "federation_local_keys",
         "federation_catalog_changes",
