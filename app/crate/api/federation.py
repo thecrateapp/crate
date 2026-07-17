@@ -41,9 +41,14 @@ from crate.db.jobs.federation_catalog_changes import (
 )
 from crate.db.repositories import federation as repo
 from crate.db.repositories import federation_trust as trust_repo
+from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
 from crate.federation.authorization import AuthorizationDecision, authorize
 from crate.federation.contracts import CAPABILITIES
 from crate.federation.identity import build_signed_descriptor, load_private_key
+from crate.federation.playback_prepare import (
+    PrepareReservation,
+    acquire_prepare_reservation,
+)
 from crate.federation.pairing import (
     build_ack,
     verify_acceptance,
@@ -60,6 +65,7 @@ from crate.federation.signing import (
     validate_timestamp,
     verify_signature,
 )
+from crate.streaming.service import inspect_playback_preparation, prepare_playback
 
 log = logging.getLogger(__name__)
 _GENRE_SPLIT_RE = re.compile(r"[;,]")
@@ -1998,9 +2004,95 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
 async def prepare_playback_variants(
     body: FederatedPlaybackPrepareBody, request: Request
 ):
-    """Reserve the signed owner-side preparation contract before stream delivery."""
-    _ = body, request
-    raise HTTPException(status_code=503, detail="Playback preparation unavailable")
+    """Best-effort owner-side variant preparation without stream state."""
+    peer = await _require_signed_node_request(request)
+    peer_uid = str(peer["node_uid"])
+    if str(body.requesting_node_uid) != peer_uid:
+        raise HTTPException(status_code=403, detail="requesting_node_uid mismatch")
+
+    assertion = _require_user_assertion(
+        request,
+        peer,
+        purpose="stream.prepare",
+        required_capability="federation.stream.play",
+    )
+    decision = _require_capability(peer, "stream.proxy", assertion=assertion)
+    _require_capability(peer, "stream.transcoded", assertion=assertion)
+    constraints = decision.constraints
+    if (
+        constraints
+        and constraints.delivery
+        and body.delivery_policy not in constraints.delivery
+    ):
+        raise HTTPException(status_code=403, detail="delivery_mode_denied")
+
+    try:
+        redis_client = _request_redis(request)
+    except HTTPException:
+        redis_client = None
+
+    items = []
+    for remote_entity_uid in body.remote_entity_uids:
+        entity_uid = str(remote_entity_uid)
+        if not entity_is_allowed(
+            decision,
+            entity_type="track",
+            entity_uid=entity_uid,
+        ):
+            items.append(
+                {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
+            )
+            continue
+
+        track = get_track_delivery_row_by_entity_uid(entity_uid)
+        if not track:
+            items.append(
+                {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
+            )
+            continue
+
+        inspection = inspect_playback_preparation(track, body.delivery_policy)
+        if inspection is None:
+            items.append(
+                {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
+            )
+            continue
+        if inspection.ready:
+            items.append({"remote_entity_uid": remote_entity_uid, "status": "ready"})
+            continue
+        if not inspection.cache_key:
+            items.append(
+                {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
+            )
+            continue
+
+        reservation = acquire_prepare_reservation(
+            redis_client, peer_uid, inspection.cache_key
+        )
+        if reservation not in {
+            PrepareReservation.ACCEPTED,
+            PrepareReservation.DUPLICATE,
+        }:
+            items.append(
+                {"remote_entity_uid": remote_entity_uid, "status": "rate_limited"}
+            )
+            continue
+
+        resolution = prepare_playback(
+            track,
+            body.delivery_policy,
+            reason="lookahead",
+        )
+        status = (
+            "ready"
+            if resolution and resolution.cache_hit
+            else "preparing"
+            if resolution and resolution.preparing
+            else "unavailable"
+        )
+        items.append({"remote_entity_uid": remote_entity_uid, "status": status})
+
+    return FederatedPlaybackPrepareResponse(items=items)
 
 
 @router.get("/streams/{ticket_uid}")

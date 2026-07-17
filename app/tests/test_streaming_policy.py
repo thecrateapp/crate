@@ -133,6 +133,43 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(
     assert len(marked[0][0]) == 64
 
 
+def test_inspect_playback_preparation_reads_pending_variant_without_writing(
+    monkeypatch, tmp_path
+):
+    from crate.streaming.service import inspect_playback_preparation
+
+    library = tmp_path / "music"
+    track_path = library / "Artist" / "Album" / "track.flac"
+    track_path.parent.mkdir(parents=True)
+    track_path.write_bytes(b"fake flac")
+
+    monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
+    monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key",
+        lambda _key: {"status": "pending", "task_id": None},
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.ensure_variant_record",
+        lambda _payload: (_ for _ in ()).throw(AssertionError("must not write")),
+    )
+
+    inspection = inspect_playback_preparation(
+        {
+            "id": 1,
+            "path": str(track_path),
+            "format": "flac",
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+        "balanced",
+    )
+
+    assert inspection is not None
+    assert inspection.cache_key
+    assert inspection.ready is False
+
+
 def test_resolve_playback_uses_db_quality_without_probing_request_path(
     monkeypatch, tmp_path
 ):

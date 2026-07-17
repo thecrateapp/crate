@@ -48,6 +48,12 @@ class PlaybackResolution:
     variant_status: str | None
 
 
+@dataclass(frozen=True)
+class PlaybackPreparationInspection:
+    cache_key: str | None
+    ready: bool
+
+
 STREAM_MEDIA_TYPES = {
     ".flac": "audio/flac",
     ".mp3": "audio/mpeg",
@@ -305,6 +311,32 @@ def _is_materially_cheaper_variant(resolution: PlaybackResolution) -> bool:
         source_bitrate is not None
         and delivery_bitrate is not None
         and delivery_bitrate < source_bitrate
+    )
+
+
+def inspect_playback_preparation(
+    track: dict, requested_policy: str | None
+) -> PlaybackPreparationInspection | None:
+    """Read current variant readiness without writing metadata or queueing work."""
+    source_path = resolve_source_path(track)
+    if not source_path or not source_path.is_file():
+        return None
+
+    decision = decide_delivery(track, source_path, requested_policy)
+    if decision.passthrough:
+        return PlaybackPreparationInspection(cache_key=None, ready=True)
+
+    descriptor = _descriptor(track, source_path, decision)
+    row = _get_variant_by_cache_key_safely(descriptor["cache_key"])
+    ready = (
+        _ready_variant_resolution(track, source_path, decision, descriptor, row)
+        is not None
+        if row is not None
+        else False
+    )
+    return PlaybackPreparationInspection(
+        cache_key=descriptor["cache_key"],
+        ready=ready,
     )
 
 
