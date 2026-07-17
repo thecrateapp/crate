@@ -3,7 +3,7 @@ import { getStreamUrl } from "@/contexts/player-utils";
 import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
-import { getPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
+import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 import { setPlaybackSession } from "@/lib/playback-provenance";
 
 export function toEngineTrack(
@@ -102,7 +102,7 @@ async function resolveFreshEngineStreamUrl(track: Track): Promise<string> {
 
   const playback = await fetchTrackPlayback(
     track,
-    getPlaybackDeliveryPolicyPreference(),
+    getEffectivePlaybackDeliveryPolicy(),
   );
   if (!playback) return getStreamUrl(track);
   setPlaybackSession(track, playback.playback_session);

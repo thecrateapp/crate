@@ -121,6 +121,10 @@ export function isCurrentTrackFullyBuffered(): boolean {
   return currentTrackFullyBuffered;
 }
 
+export function getCurrentBufferedAheadSeconds(): number {
+  return instance?.getCurrentBufferedAheadSeconds() ?? 0;
+}
+
 export function isPlaybackGestureRequiredError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const candidate = error as Partial<PlaybackGestureRequiredError>;
@@ -228,10 +232,10 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
     crossfadeShape: GAPLESS_CROSSFADE_EQUAL_POWER,
     volume: lastVolume,
     logLevel: GAPLESS_LOG_LEVEL_WARNING,
-    // Keep the live HTML5 pipeline conservative on mobile. Gapless-5's
-    // range math loads the current track plus the next track even with
-    // loadLimit=1; higher values create multiple parallel <audio> loads
-    // and Android WebView/emulators can start dropping audio frames.
+    // Keep the live HTML5 pipeline conservative on mobile. The vendored
+    // loader treats loadLimit=1 as the active source only; higher values
+    // create parallel <audio> loads and Android WebView/emulators can
+    // start dropping audio frames.
     loadLimit: preferHtml5Audio ? 1 : 2,
   });
   appliedVolume = lastVolume;

@@ -39,8 +39,9 @@ import {
 } from "@/lib/track-playback";
 import {
   getPlaybackDeliveryPolicyPreference,
+  getEffectivePlaybackDeliveryPolicy,
   PLAYER_PLAYBACK_PREFS_EVENT,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { triggerHaptic } from "@/lib/haptics";
@@ -551,7 +552,7 @@ export function PlayerBar() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] =
-    useState<PlaybackDeliveryPolicy>(getPlaybackDeliveryPolicyPreference);
+    useState<PlaybackDeliveryPreference>(getPlaybackDeliveryPolicyPreference);
   const [shouldRenderQueuePanel, setShouldRenderQueuePanel] = useState(false);
   const [shouldRenderLyricsPanel, setShouldRenderLyricsPanel] = useState(false);
   const [shouldRenderEqualizerPopover, setShouldRenderEqualizerPopover] =
@@ -664,7 +665,7 @@ export function PlayerBar() {
     const onPrefsChanged = (event: Event) => {
       const nextPolicy = (
         event as CustomEvent<{
-          playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
+          playbackDeliveryPolicy?: PlaybackDeliveryPreference;
         }>
       ).detail?.playbackDeliveryPolicy;
       setPlaybackDeliveryPolicy(
@@ -752,7 +753,7 @@ export function PlayerBar() {
   });
   const { resolution: currentTrackPlayback } = useTrackPlayback(
     displayTrackForQueries,
-    playbackDeliveryPolicy,
+    getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
     {
       enabled: !!displayTrack,
     },

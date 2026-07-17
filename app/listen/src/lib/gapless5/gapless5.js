@@ -49,6 +49,46 @@ const Gapless5State = {
   Error: 5,
 };
 
+function getBufferedAheadSeconds(audio) {
+  if (!audio || !Number.isFinite(audio.currentTime)) {
+    return 0;
+  }
+  const ranges = audio.buffered;
+  if (!ranges || ranges.length === 0) {
+    return 0;
+  }
+  const currentTime = audio.currentTime;
+  for (let index = 0; index < ranges.length; index++) {
+    const start = ranges.start(index);
+    const end = ranges.end(index);
+    if (
+      Number.isFinite(start) &&
+      Number.isFinite(end) &&
+      start <= currentTime &&
+      end >= currentTime
+    ) {
+      return Math.max(0, end - currentTime);
+    }
+  }
+  return 0;
+}
+
+function getLoadableTrackIndices(trackNumber, totalTracks, loadLimit) {
+  if (!Number.isFinite(totalTracks) || totalTracks <= 0) {
+    return [];
+  }
+  const total = Math.floor(totalTracks);
+  if (loadLimit === -1) {
+    return Array.from({ length: total }, (_value, index) => index);
+  }
+
+  const limit = Math.max(1, Math.min(total, Math.floor(loadLimit) || 1));
+  const current = Math.max(0, Math.min(total - 1, Math.floor(trackNumber)));
+  let start = Math.max(0, current - Math.floor((limit - 1) / 2));
+  start = Math.min(start, total - limit);
+  return Array.from({ length: limit }, (_value, index) => start + index);
+}
+
 const devLog = (scope, message, detail, level = "info") => {
   try {
     globalThis.__crateDevLog?.(scope, message, detail, level);
@@ -152,6 +192,13 @@ function Gapless5Source(parentPlayer, parentLog, inAudioPath) {
   };
 
   this.getState = () => state;
+
+  this.getBufferedAheadSeconds = () => {
+    if (buffer !== null) {
+      return Infinity;
+    }
+    return getBufferedAheadSeconds(audio);
+  };
 
   this.unload = (isError) => {
     this.stop();
@@ -1046,23 +1093,15 @@ function Gapless5FileList(
   this.getPlaylistIndex = (index) =>
     this.shuffleMode ? this.shuffledIndices.indexOf(index) : index;
 
-  // inclusive start, exclusive end
-  const generateIntRange = (first, last) =>
-    Array.from({ length: 1 + last - first }, (_v, k) => k + first);
-
   // returns set of actual indices (not shuffled)
   this.loadableTracks = () => {
-    if (this.loadLimit === -1) {
-      return new Set(generateIntRange(0, this.sources.length));
-    }
-    // loadable tracks are a range where size=loadLimit, centered around current track
-    const startTrack = Math.round(
-      Math.max(0, this.trackNumber - (this.loadLimit - 1) / 2),
+    const loadableIndices = new Set(
+      getLoadableTrackIndices(
+        this.trackNumber,
+        this.sources.length,
+        this.loadLimit,
+      ),
     );
-    const endTrack = Math.round(
-      Math.min(this.sources.length, this.trackNumber + this.loadLimit / 2),
-    );
-    const loadableIndices = new Set(generateIntRange(startTrack, endTrack));
     if (player.queuedTrack !== null) {
       loadableIndices.add(this.indexFromTrack(player.queuedTrack));
     }
@@ -1809,6 +1848,10 @@ function Gapless5(options = {}, deprecated = {}) {
 
   this.currentSource = () =>
     this.playlist ? this.playlist.currentSource() : null;
+  this.getCurrentBufferedAheadSeconds = () => {
+    const source = this.currentSource();
+    return source ? source.getBufferedAheadSeconds() : 0;
+  };
   this.currentLength = () =>
     this.currentSource() ? this.currentSource().getLength() : 0;
   this.currentPosition = () =>
@@ -2311,4 +2354,10 @@ function Gapless5(options = {}, deprecated = {}) {
 // so the IIFE silently failed and the named exports were never assigned
 // — importing `{ Gapless5 }` got `undefined` and the app crashed on
 // `new Gapless5(...)`. Replaced with plain ESM exports.
-export { Gapless5, LogLevel, CrossfadeShape };
+export {
+  Gapless5,
+  LogLevel,
+  CrossfadeShape,
+  getBufferedAheadSeconds,
+  getLoadableTrackIndices,
+};

@@ -11,6 +11,7 @@ import {
   getSmartPlaylistSuggestionsCadencePreference,
   setSmartPlaylistSuggestionsCadencePreference,
   getPlaybackDeliveryPolicyPreference,
+  getEffectivePlaybackDeliveryPolicy,
   setPlaybackDeliveryPolicyPreference,
   getMobileEnhancedAudioPreference,
   setMobileEnhancedAudioPreference,
@@ -130,8 +131,9 @@ describe("smart playlist cadence", () => {
 });
 
 describe("playback delivery policy", () => {
-  it("defaults to original on desktop", () => {
-    expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
+  it("defaults to auto while retaining the desktop original policy", () => {
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
+    expect(getEffectivePlaybackDeliveryPolicy()).toBe("original");
   });
 
   it("round-trips balanced", () => {
@@ -141,7 +143,7 @@ describe("playback delivery policy", () => {
 
   it("ignores invalid values", () => {
     localStorage.setItem("listen-player-delivery-policy", "invalid");
-    expect(getPlaybackDeliveryPolicyPreference()).toBe("original");
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
   });
 
   it("uses data saver automatically on a constrained connection", () => {
@@ -150,7 +152,8 @@ describe("playback delivery policy", () => {
       value: { effectiveType: "slow-2g", downlink: 0.5, rtt: 800 },
     });
 
-    expect(getPlaybackDeliveryPolicyPreference()).toBe("data_saver");
+    expect(getPlaybackDeliveryPolicyPreference()).toBe("auto");
+    expect(getEffectivePlaybackDeliveryPolicy()).toBe("data_saver");
   });
 
   it("preserves an explicit quality preference over connection hints", () => {

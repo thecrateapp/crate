@@ -71,6 +71,7 @@ declare module "@/lib/gapless5/gapless5" {
     findTrack(url: string): number;
     isShuffled(): boolean;
     currentLength(): number;
+    getCurrentBufferedAheadSeconds(): number;
     currentPosition(): number;
     totalTracks(): number;
 
@@ -112,6 +113,15 @@ declare module "@/lib/gapless5/gapless5" {
       | ((trackPath: string, analyser: AnalyserNode | null) => void)
       | null;
   }
+
+  export function getBufferedAheadSeconds(
+    audio: Pick<HTMLAudioElement, "buffered" | "currentTime"> | null,
+  ): number;
+  export function getLoadableTrackIndices(
+    trackNumber: number,
+    totalTracks: number,
+    loadLimit: number,
+  ): number[];
 
   export { Gapless5 };
 }

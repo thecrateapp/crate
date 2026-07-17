@@ -64,6 +64,7 @@ function createOptions() {
     rotateTrackerSession: vi.fn(),
     markSeekPosition: vi.fn(),
     recordProgress: vi.fn(),
+    recordPlaybackQualityProgress: vi.fn(),
     pullFromEngine: vi.fn(() => ({ resolvedTrack: TRACK_A })),
     setAnalyserVersion: vi.fn(),
     setCrossfadeTransition: vi.fn(),
@@ -105,6 +106,7 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.bufferingIntentRef.current).toBe(false);
     expect(options.commitIsBuffering).toHaveBeenCalledWith(false);
     expect(options.commitCurrentTime).toHaveBeenCalledWith(12);
+    expect(options.recordPlaybackQualityProgress).toHaveBeenCalledWith(12);
   });
 
   it("marks playback active as soon as the engine accepts a play request", () => {

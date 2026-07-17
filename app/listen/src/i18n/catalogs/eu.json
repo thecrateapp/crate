@@ -1174,6 +1174,8 @@
   "common.toasts.saveFailed": "Ezin izan da gorde",
   "settings.playback.delivery.balanced": "Orekatua",
   "settings.playback.delivery.balancedDescription": "AAC 192 erabilgarria denean",
+  "settings.playback.delivery.auto": "Automatikoa (gomendatua)",
+  "settings.playback.delivery.autoDescription": "Hurrengo pista konexioaren baldintzetara egokitzen du",
   "settings.playback.delivery.original": "Jatorrizko fitxategia",
   "settings.playback.delivery.originalDescription": "Liburutegiko fitxategia",
   "settings.playback.delivery.dataSaver": "Datu aurreztea",

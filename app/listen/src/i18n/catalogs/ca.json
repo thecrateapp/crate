@@ -1174,6 +1174,8 @@
   "common.toasts.saveFailed": "No s’ha pogut desar",
   "settings.playback.delivery.balanced": "Equilibrat",
   "settings.playback.delivery.balancedDescription": "AAC 192 quan sigui útil",
+  "settings.playback.delivery.auto": "Automàtic (recomanat)",
+  "settings.playback.delivery.autoDescription": "Adapta la pista següent a les condicions de connexió",
   "settings.playback.delivery.original": "Fitxer original",
   "settings.playback.delivery.originalDescription": "Fitxer de la biblioteca",
   "settings.playback.delivery.dataSaver": "Estalvi de dades",

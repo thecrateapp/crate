@@ -5,7 +5,7 @@ import { recordDevLog, redactUrl } from "@/lib/dev-logs";
 import { trackStreamApiPath } from "@/lib/library-routes";
 import { stableMobileAudioPipeline } from "@/lib/mobile-audio-mode";
 import { getOfflineNativePlaybackUrl } from "@/lib/offline";
-import { getPlaybackDeliveryPolicyPreference } from "@/lib/player-playback-prefs";
+import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 
 export const STORAGE_KEY = "listen-player-state";
 export const RECENTLY_PLAYED_KEY = "listen-recently-played";
@@ -215,7 +215,7 @@ export function getStreamUrl(track: Track): string {
     {
       track: track.title,
       artist: track.artist,
-      policy: getPlaybackDeliveryPolicyPreference(),
+      policy: getEffectivePlaybackDeliveryPolicy(),
       url: redactUrl(url),
     },
     "debug",
@@ -227,7 +227,7 @@ export function getStreamUrl(track: Track): string {
  *  playback uses the httpOnly session cookie instead of tokenized URLs. */
 function withStreamQuery(url: string): string {
   const params = new URLSearchParams();
-  const delivery = getPlaybackDeliveryPolicyPreference();
+  const delivery = getEffectivePlaybackDeliveryPolicy();
   if (delivery !== "original") {
     params.set("delivery", delivery);
   }

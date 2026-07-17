@@ -40,6 +40,7 @@ import {
   fadeOutAndPause,
   getAnalyserNode,
   getCurrentTrackDuration,
+  getCurrentBufferedAheadSeconds,
   getCurrentTrackUrl,
   getPlayer,
   getPosition,
@@ -87,6 +88,7 @@ type MockGapless5Instance = {
   setPosition: MockFn;
   getPosition: MockFn;
   currentLength: MockFn;
+  getCurrentBufferedAheadSeconds: MockFn;
   getTrack: MockFn;
   getIndex: MockFn;
   getTracks: MockFn;
@@ -119,6 +121,7 @@ function mkMockInstance(
     setPosition: vi.fn(),
     getPosition: vi.fn().mockReturnValue(0),
     currentLength: vi.fn().mockReturnValue(0),
+    getCurrentBufferedAheadSeconds: vi.fn().mockReturnValue(0),
     getTrack: vi.fn().mockReturnValue(""),
     getIndex: vi.fn().mockReturnValue(0),
     getTracks: vi.fn().mockReturnValue([]),
@@ -161,6 +164,15 @@ afterEach(() => {
 describe("isCurrentTrackFullyBuffered", () => {
   it("returns false by default", () => {
     expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
+});
+
+describe("getCurrentBufferedAheadSeconds", () => {
+  it("returns the current engine buffer ahead without exposing the audio element", () => {
+    initPlayer();
+    mock.getCurrentBufferedAheadSeconds.mockReturnValue(6.5);
+
+    expect(getCurrentBufferedAheadSeconds()).toBe(6.5);
   });
 });
 

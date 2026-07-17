@@ -25,6 +25,9 @@ import {
   destroyPlayer as gpDestroyPlayer,
   gotoTrack as gpGotoTrack,
   insertTrack as gpInsertTrack,
+  loadQueue as gpLoadQueue,
+  play as gpPlay,
+  seekTo as gpSeekTo,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
   setVolume as gpSetVolume,
@@ -75,15 +78,20 @@ import type {
 import { createQueueRevision } from "@/lib/playback-engine";
 import {
   getInfinitePlaybackPreference,
+  getEffectivePlaybackDeliveryPolicy,
   getPlaybackDeliveryPolicyPreference,
   subscribeToPlaybackDeliveryNetworkChanges,
   getSmartCrossfadePreference,
   getSmartPlaylistSuggestionsCadencePreference,
   getSmartPlaylistSuggestionsPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
+import {
+  recordPlaybackStall,
+  recordStablePlayback,
+} from "@/lib/playback-network-quality";
 import {
   CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   connectPlayerStateToRemotePlaybackState,
@@ -400,6 +408,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     markSeekPosition,
     recordProgress,
   } = usePlayEventTracker(getPlaybackSnapshot);
+  const recordPlaybackQualityProgress = useCallback((seconds: number) => {
+    recordStablePlayback(seconds);
+  }, []);
+  const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
+    async () => false,
+  );
 
   const {
     beginSoftInterruption,
@@ -415,6 +429,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     bufferingIntentRef,
     commitIsPlaying,
     commitIsBuffering,
+    onPlaybackStall: recordPlaybackStall,
+    recoverCurrentTrack: () => recoverActiveTrackRef.current(),
   });
   const connectTransferPlaybackGuardRef = useRef<number | null>(null);
   const clearConnectTransferPlaybackGuard = useCallback(() => {
@@ -474,6 +490,48 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     clearPrevRestartLatch,
     markSeekPosition,
   });
+
+  recoverActiveTrackRef.current = async () => {
+    const recoveryQueue = queueRef.current;
+    if (recoveryQueue.length === 0) return false;
+    const recoveryIndex = clampIndex(
+      currentIndexRef.current,
+      recoveryQueue.length,
+    );
+    const positionMs = Math.max(0, Math.round(currentTimeRef.current * 1000));
+    const engineTracks = await toStartupEngineTracks(
+      recoveryQueue,
+      recoveryIndex,
+    );
+
+    if (shouldUseAndroidNativePlayer()) {
+      await androidNativeEngine.loadQueue({
+        revision: createQueueRevision(),
+        tracks: engineTracks,
+        currentIndex: recoveryIndex,
+        positionMs,
+        autoplay: true,
+        repeat: repeatRef.current,
+        crossfadeMs: effectiveCrossfadeMsRef.current,
+        volume: lastNonZeroVolumeRef.current,
+      });
+      return true;
+    }
+
+    gpLoadQueue(
+      buildEngineUrls(
+        recoveryQueue,
+        engineTracks.map((track) => track.url),
+      ),
+      recoveryIndex,
+      { restartIfSameIndex: true },
+    );
+    if (positionMs > 0) {
+      gpSeekTo(positionMs);
+    }
+    await gpPlay();
+    return true;
+  };
 
   // Domain-level actions for usePlaybackIntelligence. Verb-oriented
   // instead of raw state setters — the hook no longer needs to reason
@@ -1196,7 +1254,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           crossfadeSeconds?: number;
           smartCrossfadeEnabled?: boolean;
           infinitePlaybackEnabled?: boolean;
-          playbackDeliveryPolicy?: PlaybackDeliveryPolicy;
+          playbackDeliveryPolicy?: PlaybackDeliveryPreference;
           smartPlaylistSuggestionsEnabled?: boolean;
           smartPlaylistSuggestionsCadence?: number;
         }>
@@ -1386,7 +1444,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   ]);
 
   useEffect(() => {
-    preparePlaybackDelivery(queue, currentIndex, playbackDeliveryPolicy);
+    preparePlaybackDelivery(
+      queue,
+      currentIndex,
+      getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
+    );
   }, [currentIndex, playbackDeliveryPolicy, queue]);
 
   const {
@@ -1438,6 +1500,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     rotateTrackerSession,
     markSeekPosition,
     recordProgress,
+    recordPlaybackQualityProgress,
     pullFromEngine,
     setAnalyserVersion,
     setCrossfadeTransition,
@@ -1521,7 +1584,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     pushToEngine,
     advanceCursorTo,
     publishConnectState,
-    playbackDeliveryPolicy,
+    playbackDeliveryPolicy: getEffectivePlaybackDeliveryPolicy(
+      playbackDeliveryPolicy,
+    ),
   });
 
   const clearQueueRef = useRef(clearQueue);

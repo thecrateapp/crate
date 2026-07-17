@@ -69,7 +69,7 @@ import {
   getPlaybackDeliveryPolicyPreference,
   PLAYER_PLAYBACK_PREFS_EVENT,
   setPlaybackDeliveryPolicyPreference,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 
 interface HeroActionButtonProps
@@ -388,7 +388,7 @@ export function JamSession() {
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
 
-  const prevQualityRef = useRef<PlaybackDeliveryPolicy | null>(null);
+  const prevQualityRef = useRef<PlaybackDeliveryPreference | null>(null);
 
   useEffect(() => {
     if (roomId) {

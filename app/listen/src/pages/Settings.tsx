@@ -13,7 +13,7 @@ import {
   setSmartCrossfadePreference,
   setSmartPlaylistSuggestionsCadencePreference,
   setSmartPlaylistSuggestionsPreference,
-  type PlaybackDeliveryPolicy,
+  type PlaybackDeliveryPreference,
 } from "@/lib/player-playback-prefs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -246,10 +246,15 @@ function ToggleRow({
 }
 
 const PLAYBACK_DELIVERY_OPTIONS: {
-  value: PlaybackDeliveryPolicy;
+  value: PlaybackDeliveryPreference;
   labelKey: string;
   descriptionKey: string;
 }[] = [
+  {
+    value: "auto",
+    labelKey: "settings.playback.delivery.auto",
+    descriptionKey: "settings.playback.delivery.autoDescription",
+  },
   {
     value: "balanced",
     labelKey: "settings.playback.delivery.balanced",
@@ -346,7 +351,7 @@ export function Settings() {
             </p>
           </div>
           <div
-            className="grid gap-2 sm:grid-cols-3"
+            className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4"
             role="radiogroup"
             aria-label={t("settings.playback.streamQuality")}
           >

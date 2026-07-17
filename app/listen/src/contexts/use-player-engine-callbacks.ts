@@ -55,6 +55,7 @@ interface UsePlayerEngineCallbacksParams {
   ) => void;
   markSeekPosition: (seconds: number) => void;
   recordProgress: (seconds: number) => void;
+  recordPlaybackQualityProgress: (seconds: number) => void;
   pullFromEngine: (sourceQueue?: Track[]) => {
     resolvedTrack: Track | undefined;
   };
@@ -101,6 +102,7 @@ export function usePlayerEngineCallbacks({
   rotateTrackerSession,
   markSeekPosition,
   recordProgress,
+  recordPlaybackQualityProgress,
   pullFromEngine,
   setAnalyserVersion,
   setCrossfadeTransition,
@@ -115,6 +117,7 @@ export function usePlayerEngineCallbacks({
       }
       commitCurrentTime(positionSeconds);
       recordProgress(positionSeconds);
+      recordPlaybackQualityProgress(positionSeconds);
       if (trackIndex !== currentIndexRef.current && trackIndex >= 0) {
         pullFromEngine();
       }

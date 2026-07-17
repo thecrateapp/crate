@@ -1,3 +1,12 @@
+import {
+  getEffectiveAutoPlaybackPolicy,
+  getPlaybackNetworkHint,
+  getPlaybackQualitySignals,
+  type BrowserNetworkConnection,
+  type ConcretePlaybackDeliveryPolicy,
+  type PlaybackSignals,
+} from "./playback-network-quality";
+
 export const PLAYER_PLAYBACK_PREFS_EVENT = "listen-player-playback-prefs";
 
 const CROSSFADE_DURATION_KEY = "listen-player-crossfade-seconds";
@@ -10,18 +19,16 @@ const SMART_PLAYLIST_SUGGESTIONS_CADENCE_KEY =
 const PLAYBACK_DELIVERY_POLICY_KEY = "listen-player-delivery-policy";
 const MOBILE_ENHANCED_AUDIO_KEY = "listen-player-mobile-enhanced-audio";
 
-export type PlaybackDeliveryPolicy = "original" | "balanced" | "data_saver";
+export type PlaybackDeliveryPolicy = ConcretePlaybackDeliveryPolicy;
+export type PlaybackDeliveryPreference = PlaybackDeliveryPolicy | "auto";
 
-type NavigatorConnection = {
-  saveData?: boolean;
-  effectiveType?: string;
-  downlink?: number;
-  rtt?: number;
+type NavigatorConnection = BrowserNetworkConnection & {
   addEventListener?: (type: "change", listener: () => void) => void;
   removeEventListener?: (type: "change", listener: () => void) => void;
 };
 
-const PLAYBACK_DELIVERY_POLICIES = new Set<PlaybackDeliveryPolicy>([
+const PLAYBACK_DELIVERY_POLICIES = new Set<PlaybackDeliveryPreference>([
+  "auto",
   "original",
   "balanced",
   "data_saver",
@@ -41,30 +48,23 @@ export function getPlaybackDeliveryNetworkHint(): PlaybackDeliveryPolicy | null 
   ).connection;
   if (!connection) return null;
 
-  const effectiveType = connection.effectiveType?.toLowerCase();
-  const downlink = connection.downlink ?? Infinity;
-  const rtt = connection.rtt ?? 0;
-  if (
-    connection.saveData ||
-    effectiveType === "slow-2g" ||
-    effectiveType === "2g" ||
-    downlink < 1.5 ||
-    rtt >= 600
-  ) {
-    return "data_saver";
-  }
-  if (effectiveType === "3g" || downlink < 5 || rtt >= 250) {
-    return "balanced";
-  }
-  return null;
+  const defaultPolicy = getDefaultPlaybackDeliveryPolicy();
+  const effectivePolicy = getEffectiveAutoPlaybackPolicy(
+    getPlaybackNetworkHint(connection),
+    { consecutiveStalls: 0, stablePlaybackSeconds: 0 },
+    defaultPolicy,
+  );
+  return effectivePolicy === defaultPolicy ? null : effectivePolicy;
 }
 
 function normalizePlaybackDeliveryPolicy(
   value: string | null | undefined,
-): PlaybackDeliveryPolicy | null {
+): PlaybackDeliveryPreference | null {
   const normalized = (value || "").trim().toLowerCase().replace(/-/g, "_");
-  return PLAYBACK_DELIVERY_POLICIES.has(normalized as PlaybackDeliveryPolicy)
-    ? (normalized as PlaybackDeliveryPolicy)
+  return PLAYBACK_DELIVERY_POLICIES.has(
+    normalized as PlaybackDeliveryPreference,
+  )
+    ? (normalized as PlaybackDeliveryPreference)
     : null;
 }
 
@@ -72,21 +72,32 @@ export function getDefaultPlaybackDeliveryPolicy(): PlaybackDeliveryPolicy {
   return isMobileRuntime() ? "balanced" : "original";
 }
 
-export function getPlaybackDeliveryPolicyPreference(): PlaybackDeliveryPolicy {
+export function getPlaybackDeliveryPolicyPreference(): PlaybackDeliveryPreference {
   try {
     const explicit = normalizePlaybackDeliveryPolicy(
       localStorage.getItem(PLAYBACK_DELIVERY_POLICY_KEY),
     );
-    return (
-      explicit ??
-      getPlaybackDeliveryNetworkHint() ??
-      getDefaultPlaybackDeliveryPolicy()
-    );
+    return explicit ?? "auto";
   } catch {
-    return (
-      getPlaybackDeliveryNetworkHint() ?? getDefaultPlaybackDeliveryPolicy()
-    );
+    return "auto";
   }
+}
+
+export function getEffectivePlaybackDeliveryPolicy(
+  preference: PlaybackDeliveryPreference = getPlaybackDeliveryPolicyPreference(),
+  signals: PlaybackSignals = getPlaybackQualitySignals(),
+): PlaybackDeliveryPolicy {
+  if (preference !== "auto") return preference;
+  const connection =
+    typeof navigator === "undefined"
+      ? undefined
+      : (navigator as Navigator & { connection?: NavigatorConnection })
+          .connection;
+  return getEffectiveAutoPlaybackPolicy(
+    getPlaybackNetworkHint(connection),
+    signals,
+    getDefaultPlaybackDeliveryPolicy(),
+  );
 }
 
 export function subscribeToPlaybackDeliveryNetworkChanges(
@@ -104,11 +115,9 @@ export function subscribeToPlaybackDeliveryNetworkChanges(
 }
 
 export function setPlaybackDeliveryPolicyPreference(
-  policy: PlaybackDeliveryPolicy,
+  policy: PlaybackDeliveryPreference,
 ) {
-  const value =
-    normalizePlaybackDeliveryPolicy(policy) ??
-    getDefaultPlaybackDeliveryPolicy();
+  const value = normalizePlaybackDeliveryPolicy(policy) ?? "auto";
   try {
     localStorage.setItem(PLAYBACK_DELIVERY_POLICY_KEY, value);
     window.dispatchEvent(

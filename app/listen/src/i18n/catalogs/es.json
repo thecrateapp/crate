@@ -1174,6 +1174,8 @@
   "common.toasts.saveFailed": "No se pudo guardar",
   "settings.playback.delivery.balanced": "Equilibrado",
   "settings.playback.delivery.balancedDescription": "AAC 192 cuando convenga",
+  "settings.playback.delivery.auto": "Automático (recomendado)",
+  "settings.playback.delivery.autoDescription": "Adapta la siguiente pista a las condiciones de conexión",
   "settings.playback.delivery.original": "Fuente original",
   "settings.playback.delivery.originalDescription": "Archivo de biblioteca",
   "settings.playback.delivery.dataSaver": "Ahorro de datos",

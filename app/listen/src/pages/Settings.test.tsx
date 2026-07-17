@@ -70,6 +70,22 @@ describe("Settings", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets the user opt into automatic stream quality", async () => {
+    const user = userEvent.setup();
+    renderWithListenProviders(<Settings />, { locale: "en" });
+
+    const auto = screen.getByRole("radio", { name: /Auto \(recommended\)/i });
+    expect(auto).toHaveAttribute("aria-checked", "true");
+
+    await user.click(screen.getByRole("radio", { name: /^Original/i }));
+    expect(localStorage.getItem("listen-player-delivery-policy")).toBe(
+      "original",
+    );
+
+    await user.click(auto);
+    expect(localStorage.getItem("listen-player-delivery-policy")).toBe("auto");
+  });
+
   it("keeps remote scrobbling opt-in and persists an explicit toggle", async () => {
     const user = userEvent.setup();
     const { api } = await import("@/lib/api");
