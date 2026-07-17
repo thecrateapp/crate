@@ -292,6 +292,9 @@ export function initPlayer(callbacks: GaplessPlayerCallbacks = {}): Gapless5 {
   };
 
   instance.onloadstart = (path) => {
+    if (path === instance?.getTrack()) {
+      currentTrackFullyBuffered = false;
+    }
     recordDevLog("gapless", "load start", redactUrl(path), "debug");
     currentCallbacks.onBuffering?.(path);
   };

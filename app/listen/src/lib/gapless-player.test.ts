@@ -364,6 +364,24 @@ describe("initPlayer", () => {
 
     expect(isCurrentTrackFullyBuffered()).toBe(false);
   });
+
+  it("does not carry a decoded-buffer marker into a newly loading source", () => {
+    mock.getTrack.mockReturnValue("/tracks/2/stream");
+    initPlayer();
+
+    const switched = (mock as unknown as Record<string, unknown>)
+      .onswitchtowebaudio as
+      | ((path: string, analyser: AnalyserNode) => void)
+      | undefined;
+    const loadStart = (mock as unknown as Record<string, unknown>)
+      .onloadstart as ((path: string) => void) | undefined;
+    switched?.("/tracks/2/stream", {} as AnalyserNode);
+    expect(isCurrentTrackFullyBuffered()).toBe(true);
+
+    loadStart?.("/tracks/2/stream");
+
+    expect(isCurrentTrackFullyBuffered()).toBe(false);
+  });
 });
 
 // ── destroyPlayer ─────────────────────────────────────────────────
