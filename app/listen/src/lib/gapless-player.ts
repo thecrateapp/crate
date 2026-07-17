@@ -440,7 +440,9 @@ export function removeTrack(indexOrUrl: number | string): void {
 
 export function replaceTrack(index: number, url: string): void {
   instance?.replaceTrack(index, url);
-  // replaceTrack swaps in-place, no shuffledIndices change needed.
+  // Gapless-5 replaces by removing then inserting, and insertion mutates
+  // shuffledIndices. React owns the queue order, so restore identity order.
+  normalizeShuffledIndices();
 }
 
 function getAudioContext(): AudioContext | null {

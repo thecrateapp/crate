@@ -23,10 +23,13 @@ import { getTrackCacheKey, getStreamUrl } from "@/contexts/player-utils";
 import {
   addTrack as gpAddTrack,
   destroyPlayer as gpDestroyPlayer,
+  getTrackIndex as gpGetTrackIndex,
+  getTracks as gpGetTracks,
   gotoTrack as gpGotoTrack,
   insertTrack as gpInsertTrack,
   loadQueue as gpLoadQueue,
   play as gpPlay,
+  replaceTrack as gpReplaceTrack,
   seekTo as gpSeekTo,
   setLoop as gpSetLoop,
   setSingleMode as gpSetSingleMode,
@@ -56,6 +59,10 @@ import {
   useDesktopTrayNowPlaying,
 } from "@/contexts/use-desktop-tray-commands";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
+import {
+  canApplyNextTrackResolution,
+  getNextTrackIndex,
+} from "@/contexts/player-next-track-resolution";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
 import {
@@ -414,6 +421,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
     async () => false,
   );
+  const nextTrackResolutionKeyRef = useRef<string | null>(null);
 
   const {
     beginSoftInterruption,
@@ -532,6 +540,72 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     await gpPlay();
     return true;
   };
+
+  const preResolveNextTrack = useCallback(() => {
+    if (shouldUseAndroidNativePlayer()) return;
+
+    const queueSnapshot = queueRef.current;
+    const currentIndex = currentIndexRef.current;
+    const nextIndex = getNextTrackIndex(
+      queueSnapshot.length,
+      currentIndex,
+      repeatRef.current,
+    );
+    if (nextIndex === null) return;
+
+    const currentTrack = queueSnapshot[currentIndex];
+    const nextTrack = queueSnapshot[nextIndex];
+    if (!currentTrack || !nextTrack?.globalTrackUid) return;
+
+    const expectedUrl = gpGetTracks()[nextIndex];
+    if (!expectedUrl) return;
+
+    const resolutionKey = [
+      getTrackCacheKey(currentTrack),
+      getTrackCacheKey(nextTrack),
+      currentIndex,
+      nextIndex,
+      expectedUrl,
+    ].join(":");
+    if (nextTrackResolutionKeyRef.current === resolutionKey) return;
+    nextTrackResolutionKeyRef.current = resolutionKey;
+
+    void toFreshEngineTrack(nextTrack)
+      .then((resolvedTrack) => {
+        if (resolvedTrack.url === expectedUrl) return;
+
+        const engineUrls = gpGetTracks();
+        if (
+          !canApplyNextTrackResolution(
+            {
+              queue: queueSnapshot,
+              currentIndex,
+              nextIndex,
+              expectedUrl,
+            },
+            {
+              queue: queueRef.current,
+              currentIndex: currentIndexRef.current,
+              engineIndex: gpGetTrackIndex(),
+              engineUrl: engineUrls[nextIndex],
+            },
+          )
+        ) {
+          return;
+        }
+
+        gpReplaceTrack(nextIndex, resolvedTrack.url);
+        const resolvedUrls = [...engineUrls];
+        resolvedUrls[nextIndex] = resolvedTrack.url;
+        buildEngineUrls(queueSnapshot, resolvedUrls);
+      })
+      .catch((error) => {
+        if (nextTrackResolutionKeyRef.current === resolutionKey) {
+          nextTrackResolutionKeyRef.current = null;
+        }
+        console.warn("[gapless] failed to resolve next track:", error);
+      });
+  }, [buildEngineUrls, currentIndexRef, queueRef, repeatRef]);
 
   // Domain-level actions for usePlaybackIntelligence. Verb-oriented
   // instead of raw state setters — the hook no longer needs to reason
@@ -1501,6 +1575,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     markSeekPosition,
     recordProgress,
     recordPlaybackQualityProgress,
+    onActivePlaybackStarted: preResolveNextTrack,
     pullFromEngine,
     setAnalyserVersion,
     setCrossfadeTransition,

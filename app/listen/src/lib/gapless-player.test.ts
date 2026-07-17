@@ -555,6 +555,15 @@ describe("replaceTrack", () => {
     expect(mock.replaceTrack).toHaveBeenCalledWith(1, "/tracks/new/stream");
   });
 
+  it("restores sequential playlist indices after the underlying remove/insert", () => {
+    initPlayer();
+    mock.playlist.shuffledIndices = [2, 0, 1];
+
+    replaceTrack(1, "/tracks/new/stream");
+
+    expect(mock.playlist.shuffledIndices).toEqual([0, 1, 2]);
+  });
+
   it("is a no-op when no instance exists", () => {
     expect(() => replaceTrack(0, "/tracks/1/stream")).not.toThrow();
   });

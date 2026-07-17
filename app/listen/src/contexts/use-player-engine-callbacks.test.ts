@@ -65,6 +65,7 @@ function createOptions() {
     markSeekPosition: vi.fn(),
     recordProgress: vi.fn(),
     recordPlaybackQualityProgress: vi.fn(),
+    onActivePlaybackStarted: vi.fn(),
     pullFromEngine: vi.fn(() => ({ resolvedTrack: TRACK_A })),
     setAnalyserVersion: vi.fn(),
     setCrossfadeTransition: vi.fn(),
@@ -118,6 +119,15 @@ describe("usePlayerEngineCallbacks", () => {
 
     expect(options.bufferingIntentRef.current).toBe(true);
     expect(options.commitIsPlaying).toHaveBeenCalledWith(true);
+  });
+
+  it("starts bounded next-track resolution only after active playback starts", () => {
+    const options = createOptions();
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlay?.("/stream/a");
+
+    expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
   });
 
   it("applies a deferred seek when the active track finishes loading", () => {
