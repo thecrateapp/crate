@@ -592,6 +592,21 @@ describe("pause", () => {
     expect(mock.pause).toHaveBeenCalled();
   });
 
+  it("resumes the existing source without rebuilding or reloading the queue", async () => {
+    const onBuffering = vi.fn();
+    initPlayer({ onBuffering });
+    mock.getTracks.mockReturnValue(["/tracks/a.flac"]);
+
+    pause();
+    await play();
+
+    expect(mock.pause).toHaveBeenCalledTimes(1);
+    expect(mock.play).toHaveBeenCalledTimes(1);
+    expect(mock.removeAllTracks).not.toHaveBeenCalled();
+    expect(getTracks()).toEqual(["/tracks/a.flac"]);
+    expect(onBuffering).not.toHaveBeenCalled();
+  });
+
   it("is a no-op when no instance exists", () => {
     expect(() => pause()).not.toThrow();
   });
