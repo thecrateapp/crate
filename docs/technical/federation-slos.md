@@ -11,6 +11,8 @@ These objectives apply to the node-first federation protocol. A singleton node i
 | Federated metadata reads | 99.5% success, excluding peer-caused 4xx                   | rolling 30 days    |
 | Search fanout            | p95 at or below 2 seconds with partial results             | rolling 24 hours   |
 | Remote stream TTFB       | p95 at or below 1.5 seconds between reference nodes        | rolling 24 hours   |
+| Playback startup p95     | at or below 2 seconds, local and remote                    | rolling 24 hours   |
+| Playback stall ratio     | below 2% of starts                                         | rolling 24 hours   |
 | Catalog sync lag         | healthy below 5 minutes                                    | per peer           |
 | Security contracts       | zero quota, SSRF, grant, replay, or signature bypasses     | every release      |
 | Import cleanup           | 100% of failures release reservations and temporary files  | rolling 24 hours   |
@@ -24,6 +26,7 @@ Metric labels have bounded cardinality: known peer UUID and an enumerated reason
 | Metadata error budget burn | 15 minutes and 6 hours | 14x / 2x burn rate                                | [Peer degradation](federation-operations-runbook.md#peer-outage)                           |
 | Search fanout latency      | 15 minutes             | p95 above 2 seconds for 3 windows                 | [Peer degradation](federation-operations-runbook.md#peer-outage)                           |
 | Remote stream TTFB         | 15 minutes             | p95 above 1.5 seconds for 3 windows               | [Streaming recovery](federation-operations-runbook.md#stream-incident)                     |
+| Playback QoE regression    | 15 minutes and 6 hours | startup/stall SLO breach                          | [Playback recovery](playback-slos.md#alert-response)                                       |
 | Sync lag                   | 15 minutes             | any approved healthy peer above 5 minutes         | [Catalog recovery](federation-operations-runbook.md#cursor-expired-corrupt-or-stuck-sync)  |
 | Signature or replay flood  | 5 minutes              | score at or above 80                              | [Federation security](federation-operations-runbook.md#signature-replay-or-abuse-incident) |
 | Import cleanup failure     | 10 minutes             | any unreleased reservation after terminal failure | [Import recovery](federation-operations-runbook.md#stuck-or-failed-import)                 |

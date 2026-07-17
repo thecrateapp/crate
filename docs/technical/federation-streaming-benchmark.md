@@ -39,13 +39,13 @@ Traefik routes only `GET /api/federation/remote/streams/*` to the Go readplane. 
 
 1. Go authenticates the local Crate user.
 2. Go sends the opaque local ticket, user id, method, path, audience, and safe Range headers to the protected internal FastAPI endpoint.
-3. FastAPI atomically consumes the local ticket, verifies user binding and peer trust, applies the existing URL policy with DNS pinning, and returns signed headers valid for at most 15 seconds.
+3. FastAPI validates the short-lived reusable playback session, verifies user binding and peer trust, applies the existing URL policy with DNS pinning, and returns signed headers valid for at most 15 seconds. Each Range is authorized independently; the fixed session expiry is not extended.
 4. Go independently validates the authorization, pinned literal IP, host/SNI binding, header allowlist, method, path, audience, and TTL before opening the upstream stream.
 5. Go relays with a fixed 64 KiB buffer and checks Redis revocation between reads. The remote node remains authoritative for grants, ticket validity, quotas, and policy revision.
 
 The readplane never mounts `/data/federation/keys`, receives a private key, follows redirects, uses ambient HTTP proxies, or forwards cookies and local credentials to a peer.
 
-Fallback to FastAPI happens once only when the control plane is unavailable before authorization material is issued. A denial, consumed/expired ticket, invalid authorization, or upstream failure never retries after the capability may have been consumed, preventing duplicate streams and replay.
+Fallback to FastAPI happens once only when the control plane is unavailable before authorization material is issued. A denial, expired/revoked session, invalid authorization, or upstream failure never falls back after the authorization decision, preventing duplicate streams and replay.
 
 ## Reproduction
 
