@@ -146,6 +146,15 @@ def test_federation_dev_harness_routes_remote_streams_through_go_readplane():
     assert "_stream_data_plane_url(stream_url)" in script
 
 
+def test_federation_chaos_harness_checks_reusable_range_sessions():
+    script = (ROOT / "scripts/federation-chaos-e2e.py").read_text()
+
+    assert '"range-resume"' in script
+    assert "scenario_range_resume" in script
+    assert '"bytes=1024-2047"' in script
+    assert "reusable playback session" in script
+
+
 def test_federation_dev_global_e2e_checks_human_catalog_routes():
     script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
 

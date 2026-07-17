@@ -32,6 +32,7 @@ SCENARIOS = (
     "redis-restart",
     "postgres-restart",
     "key-rotation-offline",
+    "range-resume",
     "grant-revocation",
     "readplane-restart",
     "adversarial-contracts",
@@ -137,7 +138,9 @@ def scenario_peer_outage(context: Context, recovery: set[str]) -> None:
         )
         status = search.get("federation") or {}
         if status.get("complete") is not False:
-            raise RuntimeError(f"Peer outage was reported as a complete search: {status}")
+            raise RuntimeError(
+                f"Peer outage was reported as a complete search: {status}"
+            )
         if not any(search.get(kind) for kind in ("artists", "albums", "tracks")):
             raise RuntimeError("Peer outage discarded all local search results")
 
@@ -159,11 +162,15 @@ def scenario_peer_outage(context: Context, recovery: set[str]) -> None:
         except Exception:
             pass
         else:
-            raise RuntimeError("Remote stream succeeded while its source peer was stopped")
+            raise RuntimeError(
+                "Remote stream succeeded while its source peer was stopped"
+            )
     finally:
         start_service("node-b-api", recovery)
         E2E.wait_for_status(E2E.NODE_B, "Node B after peer outage")
-    log("PASS peer-outage: partial search, terminal sync failure, stream denial, recovery")
+    log(
+        "PASS peer-outage: partial search, terminal sync failure, stream denial, recovery"
+    )
 
 
 def scenario_api_restart(context: Context, recovery: set[str]) -> None:
@@ -190,7 +197,9 @@ def scenario_worker_restart(context: Context, recovery: set[str]) -> None:
     start_service("node-a-worker", recovery)
     task = _wait_task_terminal(context.a, task_id, timeout_seconds=240)
     if task.get("status") != "completed":
-        raise RuntimeError(f"Queued reconciliation did not resume after worker restart: {task}")
+        raise RuntimeError(
+            f"Queued reconciliation did not resume after worker restart: {task}"
+        )
     log("PASS worker-restart: queued reconciliation resumed exactly once")
 
 
@@ -264,7 +273,9 @@ def scenario_redis_restart(context: Context, recovery: set[str]) -> None:
     )
     task = _wait_task_terminal(context.a, str(queued["task_id"]), timeout_seconds=240)
     if task.get("status") != "completed":
-        raise RuntimeError(f"Redis recovery left the worker pipeline unavailable: {task}")
+        raise RuntimeError(
+            f"Redis recovery left the worker pipeline unavailable: {task}"
+        )
     log("PASS redis-restart: API and worker queue recovered without manual state edits")
 
 
@@ -303,7 +314,33 @@ def scenario_key_rotation_offline(context: Context, recovery: set[str]) -> None:
             )
         start_service("node-b-api", recovery)
         E2E.wait_for_status(E2E.NODE_B, "Node B after offline key rotation")
-    log("PASS key-rotation-offline: old key stayed active and pending rotation was cancellable")
+    log(
+        "PASS key-rotation-offline: old key stayed active and pending rotation was cancellable"
+    )
+
+
+def scenario_range_resume(context: Context, recovery: set[str]) -> None:
+    """Exercise one reusable playback session across independent Range requests."""
+    del recovery
+    playback = context.a.post(
+        "/api/federation/remote/nodes/"
+        f"{urllib.parse.quote(context.b_uid, safe='')}/tracks/"
+        f"{urllib.parse.quote(str(context.remote_track['remote_entity_uid']), safe='')}/playback"
+    )
+    stream_url = E2E._stream_data_plane_url(str(playback["stream_url"]))
+    for range_value in ("bytes=0-1023", "bytes=1024-2047", "bytes=2048-4095"):
+        status, _headers, body = context.a.request(
+            "GET",
+            stream_url,
+            raw=True,
+            headers={"Range": range_value},
+            timeout=30,
+        )
+        if status not in {200, 206} or not body:
+            raise RuntimeError(
+                f"Reusable playback session failed for {range_value}: status={status}"
+            )
+    log("PASS range-resume: reusable playback session served repeated Range requests")
 
 
 def scenario_grant_revocation(context: Context, recovery: set[str]) -> None:
@@ -362,7 +399,9 @@ def scenario_readplane_restart(context: Context, recovery: set[str]) -> None:
             timeout=30,
         )
         if status not in {200, 206} or not body:
-            raise RuntimeError("FastAPI stream fallback did not preserve remote playback")
+            raise RuntimeError(
+                "FastAPI stream fallback did not preserve remote playback"
+            )
     finally:
         start_service("node-a-readplane", recovery)
         wait_url(f"{E2E.NODE_A_READPLANE}/readyz")
@@ -404,7 +443,9 @@ def scenario_adversarial_contracts(context: Context, recovery: set[str]) -> None
         timeout=300,
         env={**__import__("os").environ, "PYTHONPATH": "app"},
     )
-    log("PASS adversarial-contracts: DNS, skew, signatures, cursors, manifests and directory")
+    log(
+        "PASS adversarial-contracts: DNS, skew, signatures, cursors, manifests and directory"
+    )
 
 
 RUNNERS = {
@@ -415,6 +456,7 @@ RUNNERS = {
     "redis-restart": scenario_redis_restart,
     "postgres-restart": scenario_postgres_restart,
     "key-rotation-offline": scenario_key_rotation_offline,
+    "range-resume": scenario_range_resume,
     "grant-revocation": scenario_grant_revocation,
     "readplane-restart": scenario_readplane_restart,
     "adversarial-contracts": scenario_adversarial_contracts,
@@ -466,7 +508,9 @@ def main() -> int:
     except Exception as exc:
         results.append(
             {
-                "scenario": selected[len(results)] if len(results) < len(selected) else "setup",
+                "scenario": selected[len(results)]
+                if len(results) < len(selected)
+                else "setup",
                 "status": "failed",
                 "error": str(exc),
             }
