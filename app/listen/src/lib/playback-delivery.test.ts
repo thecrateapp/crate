@@ -110,6 +110,25 @@ describe("preparePlaybackDelivery", () => {
     expect(apiFetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("prepares global tracks when their selected source is local", () => {
+    apiFetchMock.mockResolvedValueOnce({});
+    const globalLocalTrack: Track = {
+      ...makeTrack(44),
+      globalTrackUid: "global-track-44",
+      origin: "local",
+    };
+
+    preparePlaybackDelivery([globalLocalTrack], 0, "balanced", {
+      immediate: true,
+    });
+
+    const request = apiFetchMock.mock.calls[0]?.[1];
+    const body = JSON.parse(String(request?.body));
+    expect(body.tracks).toEqual([
+      expect.objectContaining({ global_track_uid: "global-track-44" }),
+    ]);
+  });
+
   it("prepares a 2-track window on save-data connections", async () => {
     const tracks = Array.from({ length: 4 }, (_, index) =>
       makeTrack(index + 1),

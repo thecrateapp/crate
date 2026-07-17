@@ -76,6 +76,11 @@ from crate.local_search import search_local_library
 from crate.metrics import record_later
 from crate.db.queries.browse_media_track_lookup import get_track_info_cols_by_storage_id
 from crate.db.repositories.tasks import create_task_dedup
+from crate.federation.global_playback import (
+    GlobalTrackNotFound,
+    NoPlayableGlobalTrack,
+    resolve_global_track_playback,
+)
 from crate.audio import read_audio_quality
 from crate.streaming.paths import resolve_data_file
 from crate.db.repositories.streaming import (
@@ -1199,6 +1204,22 @@ def api_stream_playback_variant(request: Request, variant_id: str):
 
 
 def _resolve_playback_prepare_track(ref) -> dict | None:
+    if ref.global_track_uid:
+        try:
+            selection = resolve_global_track_playback(ref.global_track_uid)
+        except (GlobalTrackNotFound, NoPlayableGlobalTrack):
+            return None
+        if selection["kind"] != "local":
+            return None
+        entity_uid = selection.get("local_track_entity_uid")
+        if entity_uid:
+            track = get_track_delivery_row_by_entity_uid(entity_uid)
+            if track:
+                return track
+        track_id = selection.get("local_track_id")
+        if track_id is not None:
+            return get_track_delivery_row_by_id(track_id)
+        return None
     if ref.entity_uid:
         return get_track_delivery_row_by_entity_uid(ref.entity_uid)
     if ref.track_id:

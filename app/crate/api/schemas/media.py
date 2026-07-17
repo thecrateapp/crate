@@ -302,6 +302,7 @@ class PlaybackPrepareTrackRequest(BaseModel):
     track_id: int | None = None
     entity_uid: str | None = None
     path: str | None = None
+    global_track_uid: str | None = None
 
 
 class PlaybackPrepareRequest(BaseModel):

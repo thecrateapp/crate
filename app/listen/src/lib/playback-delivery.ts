@@ -29,6 +29,7 @@ function trackRef(track: Track) {
     track_id: numericTrackId(track),
     entity_uid: track.entityUid ?? null,
     path: track.path ?? null,
+    global_track_uid: track.globalTrackUid ?? null,
   };
 }
 
@@ -68,9 +69,12 @@ export function preparePlaybackDelivery(
   if (tracks.length === 0) return;
 
   const refs = tracks
-    .filter((t) => t.origin !== "remote" && !t.globalTrackUid)
+    .filter((t) => t.origin !== "remote")
     .map(trackRef)
-    .filter((ref) => ref.entity_uid || ref.track_id || ref.path);
+    .filter(
+      (ref) =>
+        ref.global_track_uid || ref.entity_uid || ref.track_id || ref.path,
+    );
   if (refs.length === 0) return;
 
   const key = JSON.stringify({ policy, refs });
