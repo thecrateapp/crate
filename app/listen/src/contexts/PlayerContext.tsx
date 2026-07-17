@@ -99,6 +99,12 @@ import {
   recordPlaybackStall,
   recordStablePlayback,
 } from "@/lib/playback-network-quality";
+import { getPlaybackDeliveryProvenance } from "@/lib/playback-provenance";
+import {
+  installPlaybackQoeFlush,
+  recordPlaybackQoe,
+  type PlaybackQoeEventName,
+} from "@/lib/playback-qoe";
 import {
   CRATE_CONNECT_V2_TRANSPORT_ENABLED,
   connectPlayerStateToRemotePlaybackState,
@@ -418,6 +424,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const recordPlaybackQualityProgress = useCallback((seconds: number) => {
     recordStablePlayback(seconds);
   }, []);
+  const recordCurrentPlaybackQoe = useCallback(
+    (
+      event: PlaybackQoeEventName,
+      details: {
+        durationMs?: number;
+        bufferedAheadSeconds?: number;
+        attempt?: number;
+      } = {},
+    ) => {
+      const track = currentTrackRef.current;
+      if (!track) return;
+      const policy = getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy);
+      const provenance = getPlaybackDeliveryProvenance(track);
+      recordPlaybackQoe({
+        event,
+        origin:
+          provenance?.origin ??
+          (track.origin === "remote" ? "remote" : "local"),
+        requestedPolicy: provenance?.requestedPolicy ?? policy,
+        effectivePolicy: provenance?.effectivePolicy ?? policy,
+        ...details,
+      });
+    },
+    [currentTrackRef, playbackDeliveryPolicy],
+  );
   const recoverActiveTrackRef = useRef<() => Promise<boolean>>(
     async () => false,
   );
@@ -437,7 +468,19 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     bufferingIntentRef,
     commitIsPlaying,
     commitIsBuffering,
-    onPlaybackStall: recordPlaybackStall,
+    onPlaybackStall: () => {
+      recordPlaybackStall();
+      recordCurrentPlaybackQoe("stall_start");
+    },
+    onPlaybackStallEnded: (durationMs, bufferedAheadSeconds) => {
+      recordCurrentPlaybackQoe("stall_end", {
+        durationMs,
+        bufferedAheadSeconds,
+      });
+    },
+    onPlaybackRecovered: (attempt) => {
+      recordCurrentPlaybackQoe("recovery", { attempt });
+    },
     recoverCurrentTrack: () => recoverActiveTrackRef.current(),
   });
   const connectTransferPlaybackGuardRef = useRef<number | null>(null);
@@ -467,6 +510,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
     });
   }, [setPlaybackDeliveryPolicy]);
+  useEffect(() => installPlaybackQoeFlush(), []);
   const {
     syncEffectiveCrossfade,
     rememberActiveTrack,
@@ -1575,6 +1619,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     markSeekPosition,
     recordProgress,
     recordPlaybackQualityProgress,
+    recordPlaybackStarted: (durationMs) => {
+      recordCurrentPlaybackQoe("startup", { durationMs });
+    },
     onActivePlaybackStarted: preResolveNextTrack,
     pullFromEngine,
     setAnalyserVersion,

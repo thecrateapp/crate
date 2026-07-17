@@ -35,6 +35,11 @@ interface UseSoftInterruptionOptions {
   commitIsPlaying: (value: boolean) => void;
   commitIsBuffering: (value: boolean) => void;
   onPlaybackStall?: () => void;
+  onPlaybackStallEnded?: (
+    durationMs: number,
+    bufferedAheadSeconds: number,
+  ) => void;
+  onPlaybackRecovered?: (attempt: number) => void;
   recoverCurrentTrack?: () => Promise<boolean>;
 }
 
@@ -70,6 +75,8 @@ export function useSoftInterruption({
   commitIsPlaying,
   commitIsBuffering,
   onPlaybackStall,
+  onPlaybackStallEnded,
+  onPlaybackRecovered,
   recoverCurrentTrack,
 }: UseSoftInterruptionOptions): SoftInterruptionController {
   const softInterruptionReasonRef = useRef<"offline" | "stream" | null>(null);
@@ -78,6 +85,7 @@ export function useSoftInterruption({
   const recoveryTimerRef = useRef<number | null>(null);
   const recoveryProbeInFlightRef = useRef(false);
   const recoveryFailuresRef = useRef(0);
+  const interruptionStartedAtRef = useRef<number | null>(null);
   // Forward-declared so callbacks can reach the latest implementation.
   const maybeResumeRef = useRef<() => Promise<void>>(async () => {});
   const scheduleStallProtectionRef = useRef<() => void>(() => {});
@@ -164,6 +172,7 @@ export function useSoftInterruption({
       softInterruptionReasonRef.current = reason;
       shouldAutoResumeAfterInterruptionRef.current = true;
       onPlaybackStall?.();
+      interruptionStartedAtRef.current = Date.now();
       recoveryProbeInFlightRef.current = false;
       recoveryFailuresRef.current = 0;
       clearStallTimer();
@@ -195,13 +204,20 @@ export function useSoftInterruption({
   );
 
   const cancelSoftInterruption = useCallback(() => {
+    if (interruptionStartedAtRef.current !== null) {
+      onPlaybackStallEnded?.(
+        Math.max(0, Date.now() - interruptionStartedAtRef.current),
+        getCurrentBufferedAheadSeconds(),
+      );
+      interruptionStartedAtRef.current = null;
+    }
     softInterruptionReasonRef.current = null;
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
     recoveryFailuresRef.current = 0;
     clearStallTimer();
     clearRecoveryTimer();
-  }, [clearRecoveryTimer, clearStallTimer]);
+  }, [clearRecoveryTimer, clearStallTimer, onPlaybackStallEnded]);
 
   const settleAfterAppLifecycle = useCallback(() => {
     // Returning from background should be inert: keep the current
@@ -212,6 +228,7 @@ export function useSoftInterruption({
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
     recoveryFailuresRef.current = 0;
+    interruptionStartedAtRef.current = null;
     bufferingIntentRef.current = false;
     clearStallTimer();
     clearRecoveryTimer();
@@ -232,6 +249,7 @@ export function useSoftInterruption({
     shouldAutoResumeAfterInterruptionRef.current = false;
     recoveryProbeInFlightRef.current = false;
     recoveryFailuresRef.current = 0;
+    interruptionStartedAtRef.current = null;
     bufferingIntentRef.current = false;
     clearStallTimer();
     clearRecoveryTimer();
@@ -296,7 +314,10 @@ export function useSoftInterruption({
           recoverCurrentTrack
         ) {
           const refreshed = await recoverCurrentTrack();
-          if (refreshed) return;
+          if (refreshed) {
+            onPlaybackRecovered?.(recoveryFailuresRef.current);
+            return;
+          }
         }
         if (recoveryFailuresRef.current > 3) {
           shouldAutoResumeAfterInterruptionRef.current = false;

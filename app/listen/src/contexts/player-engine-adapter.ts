@@ -4,7 +4,10 @@ import { ensureFreshAuthToken, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { fetchTrackPlayback } from "@/lib/track-playback";
 import type { EngineTrack } from "@/lib/playback-engine";
 import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
-import { setPlaybackSession } from "@/lib/playback-provenance";
+import {
+  setPlaybackDeliveryProvenance,
+  setPlaybackSession,
+} from "@/lib/playback-provenance";
 
 export function toEngineTrack(
   track: Track,
@@ -106,5 +109,6 @@ async function resolveFreshEngineStreamUrl(track: Track): Promise<string> {
   );
   if (!playback) return getStreamUrl(track);
   setPlaybackSession(track, playback.playback_session);
+  setPlaybackDeliveryProvenance(track, playback);
   return resolveMaybeApiAssetUrl(playback.stream_url) || playback.stream_url;
 }

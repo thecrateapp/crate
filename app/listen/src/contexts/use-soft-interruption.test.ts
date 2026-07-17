@@ -45,6 +45,11 @@ function createRefs(
     isBuffering?: boolean;
     bufferingIntent?: boolean;
     onPlaybackStall?: () => void;
+    onPlaybackStallEnded?: (
+      durationMs: number,
+      bufferedAheadSeconds: number,
+    ) => void;
+    onPlaybackRecovered?: (attempt: number) => void;
     recoverCurrentTrack?: () => Promise<boolean>;
   } = {},
 ) {
@@ -66,6 +71,8 @@ function createRefs(
     commitIsPlaying: vi.fn(),
     commitIsBuffering: vi.fn(),
     onPlaybackStall: overrides.onPlaybackStall,
+    onPlaybackStallEnded: overrides.onPlaybackStallEnded,
+    onPlaybackRecovered: overrides.onPlaybackRecovered,
     recoverCurrentTrack: overrides.recoverCurrentTrack,
   };
   return refs;
@@ -132,10 +139,11 @@ describe("useSoftInterruption", () => {
 
   it("refreshes only the active source after two failed recovery probes", async () => {
     const recoverCurrentTrack = vi.fn(async () => true);
+    const onPlaybackRecovered = vi.fn();
     global.fetch = vi.fn(() =>
       Promise.resolve({ ok: false, status: 401, body: null } as Response),
     ) as typeof fetch;
-    const refs = createRefs({ recoverCurrentTrack });
+    const refs = createRefs({ recoverCurrentTrack, onPlaybackRecovered });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
     act(() => {
@@ -147,6 +155,7 @@ describe("useSoftInterruption", () => {
     });
 
     expect(recoverCurrentTrack).toHaveBeenCalledOnce();
+    expect(onPlaybackRecovered).toHaveBeenCalledWith(2);
   });
 
   it("beginSoftInterruption hard-pauses when not playing", () => {
@@ -174,7 +183,8 @@ describe("useSoftInterruption", () => {
   });
 
   it("cancelSoftInterruption resets state", () => {
-    const refs = createRefs();
+    const onPlaybackStallEnded = vi.fn();
+    const refs = createRefs({ onPlaybackStallEnded });
     const { result } = renderHook(() => useSoftInterruption(refs));
 
     act(() => {
@@ -183,9 +193,11 @@ describe("useSoftInterruption", () => {
     expect(result.current.isSoftInterrupted()).toBe(true);
 
     act(() => {
+      vi.advanceTimersByTime(240);
       result.current.cancelSoftInterruption();
     });
     expect(result.current.isSoftInterrupted()).toBe(false);
+    expect(onPlaybackStallEnded).toHaveBeenCalledWith(240, 0);
   });
 
   it("requireUserGestureToResume stops automatic recovery and emits a resume event", () => {
