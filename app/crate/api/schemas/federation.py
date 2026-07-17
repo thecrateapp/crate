@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from crate.federation.contracts import NodeDescriptorV1
 
@@ -38,3 +39,24 @@ class PairingAcceptanceV1(PairingEnvelope):
 class PairingAckV1(PairingEnvelope):
     kind: Literal["pairing_ack"] = "pairing_ack"
     challenge_response: str
+
+
+class FederatedPlaybackPrepareBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requesting_node_uid: UUID
+    delivery_policy: Literal["balanced", "data_saver"]
+    remote_entity_uids: list[UUID] = Field(min_length=1, max_length=2)
+
+
+class FederatedPlaybackPrepareItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    remote_entity_uid: UUID
+    status: Literal["ready", "preparing", "unavailable", "rate_limited"]
+
+
+class FederatedPlaybackPrepareResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[FederatedPlaybackPrepareItem] = Field(default_factory=list)

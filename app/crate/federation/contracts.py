@@ -60,8 +60,12 @@ CAPABILITY_ENDPOINTS: dict[str, tuple[tuple[str, str], ...]] = {
     "stream.proxy": (
         ("POST", "/api/federation/v1/stream-tickets"),
         ("GET", "/api/federation/v1/streams/{ticket_uid}"),
+        ("POST", "/api/federation/v1/playback/prepare"),
     ),
-    "stream.transcoded": (("POST", "/api/federation/v1/stream-tickets"),),
+    "stream.transcoded": (
+        ("POST", "/api/federation/v1/stream-tickets"),
+        ("POST", "/api/federation/v1/playback/prepare"),
+    ),
     "stream.original": (("POST", "/api/federation/v1/stream-tickets"),),
     "import.request": (
         ("GET", "/api/federation/v1/albums/{remote_entity_uid}/import-manifest"),

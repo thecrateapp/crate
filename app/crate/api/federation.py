@@ -24,7 +24,12 @@ from pydantic import BaseModel, Field
 
 from crate.api import browse_artist as browse_artist_api
 from crate.api.openapi_responses import error_response
-from crate.api.schemas.federation import PairingAcceptanceV1, PairingOfferV1
+from crate.api.schemas.federation import (
+    FederatedPlaybackPrepareBody,
+    FederatedPlaybackPrepareResponse,
+    PairingAcceptanceV1,
+    PairingOfferV1,
+)
 from crate.db.queries.federation_manifest import (
     get_federation_manifest_revision_row,
     list_federation_manifest_rows,
@@ -1987,6 +1992,15 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
         "playback_session": (body.playback_session or str(assertion.get("jti") or "")),
         "stream_url": f"/api/federation/v1/streams/{ticket['ticket_uid']}",
     }
+
+
+@router.post("/playback/prepare", response_model=FederatedPlaybackPrepareResponse)
+async def prepare_playback_variants(
+    body: FederatedPlaybackPrepareBody, request: Request
+):
+    """Reserve the signed owner-side preparation contract before stream delivery."""
+    _ = body, request
+    raise HTTPException(status_code=503, detail="Playback preparation unavailable")
 
 
 @router.get("/streams/{ticket_uid}")
