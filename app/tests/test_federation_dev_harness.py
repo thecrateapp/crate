@@ -172,6 +172,13 @@ def test_federation_dev_e2e_accepts_the_documented_all_switch():
     assert "run_import_e2e()" in script
 
 
+def test_federation_dev_e2e_has_a_playback_prepare_canary_mode():
+    script = (ROOT / "scripts/federation-dev-e2e.py").read_text()
+
+    assert "run_playback_prepare_e2e()" in script
+    assert 'mode == "playback-prepare"' in script
+
+
 def test_federation_dev_harness_has_no_obsolete_mode_flags():
     compose_text = (ROOT / "docker-compose.federation-dev.yaml").read_text()
 

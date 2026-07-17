@@ -347,6 +347,10 @@ federation-dev-e2e: ## Pair nodes, sync fixtures, and verify cross-node search +
 federation-dev-global-catalog-e2e: ## Verify Listen-ready global catalog search, artwork, and playback
 	@python3 scripts/federation-dev-e2e.py global-catalog
 
+.PHONY: federation-dev-playback-prepare-e2e
+federation-dev-playback-prepare-e2e: ## Verify remote playback prepare, fallback, and ready variant flow
+	@python3 scripts/federation-dev-e2e.py playback-prepare
+
 .PHONY: federation-dev-import-e2e
 federation-dev-import-e2e: ## Verify signed remote import, local identity, hashes, playback, and cleanup
 	@CRATE_RUN_FEDERATION_E2E=1 PYTHONPATH=app uv run pytest app/tests/test_federation_import_e2e.py -q

@@ -7,6 +7,7 @@ Modes:
   pair  - approve A<->B and set trusted_library grants.
   e2e   - pair, sync fixtures, search B from A, and range-probe remote playback.
   global-catalog - validate canonical global catalog search, artwork, and playback.
+  playback-prepare - validate owner-side remote playback prewarm and fallback.
   import - import a remote-only album and verify its local lifecycle.
 """
 
@@ -442,6 +443,49 @@ def first_global_album_and_track(client: NodeClient) -> tuple[dict, dict]:
     )
 
 
+def first_remote_global_track(client: NodeClient) -> dict:
+    for query in REMOTE_SEARCH_QUERIES:
+        encoded = urllib.parse.quote(query)
+        result = client.get(f"/api/catalog/search?q={encoded}&limit=50")
+        for track in result.get("tracks") or []:
+            global_uid = track.get("globalTrackUid") or track.get("global_track_uid")
+            availability = track.get("availability") or {}
+            if global_uid and (
+                track.get("origin") == "remote"
+                or (availability.get("remote") and not availability.get("local"))
+            ):
+                return track
+    raise RuntimeError("No remote global track found for playback preparation")
+
+
+def request_remote_playback_prepare(client: NodeClient, track: dict) -> str:
+    track_uid = track.get("globalTrackUid") or track.get("global_track_uid")
+    if not track_uid:
+        raise RuntimeError("Remote track has no globalTrackUid")
+    response = client.post(
+        "/api/playback/prepare",
+        {
+            "policy": "data_saver",
+            "tracks": [{"global_track_uid": str(track_uid)}],
+        },
+    )
+    item = next(iter(response.get("items") or []), None)
+    if not item or not item.get("ok"):
+        raise RuntimeError(f"Remote playback prepare was not accepted: {item}")
+    status = "ready" if item.get("cache_hit") else "preparing"
+    log(f"Remote playback prepare {status}: {track_uid}")
+    return status
+
+
+def wait_for_remote_playback_prepare(client: NodeClient, track: dict) -> None:
+    deadline = time.monotonic() + 240
+    while time.monotonic() < deadline:
+        if request_remote_playback_prepare(client, track) == "ready":
+            return
+        time.sleep(2)
+    raise TimeoutError("Remote playback prepare did not become ready")
+
+
 def probe_global_album_cover(client: NodeClient, album: dict) -> None:
     album_uid = urllib.parse.quote(str(album["global_album_uid"]), safe="")
     status, headers, body = client.request(
@@ -603,6 +647,23 @@ def run_global_catalog_e2e() -> None:
     log("Federation global catalog E2E complete.")
 
 
+def run_playback_prepare_e2e() -> None:
+    a, b, _a_uid, b_uid = pair_nodes()
+    sync_fixtures(a, b)
+    sync_remote_catalog(a, b_uid)
+    reconcile_global_catalog(a, "full")
+    track = first_remote_global_track(a)
+
+    initial_status = request_remote_playback_prepare(a, track)
+    # Playback remains valid immediately: the owner falls back to original
+    # while its speculative data-saver variant is still building.
+    resolve_and_probe_global_playback(a, track)
+    if initial_status == "preparing":
+        wait_for_remote_playback_prepare(a, track)
+        resolve_and_probe_global_playback(a, track)
+    log("Federation playback prepare E2E complete.")
+
+
 def _remote_only_album(client: NodeClient, query: str) -> dict:
     result = client.get(f"/api/catalog/search?q={urllib.parse.quote(query)}&limit=50")
     for album in result.get("albums") or []:
@@ -710,6 +771,7 @@ def main() -> int:
         if mode in {"all", "--all"}:
             run_e2e()
             run_global_catalog_e2e()
+            run_playback_prepare_e2e()
             run_import_e2e()
             return 0
         if mode == "pair":
@@ -720,6 +782,9 @@ def main() -> int:
             return 0
         if mode == "global-catalog":
             run_global_catalog_e2e()
+            return 0
+        if mode == "playback-prepare":
+            run_playback_prepare_e2e()
             return 0
         if mode == "import":
             run_import_e2e()
@@ -732,7 +797,7 @@ def main() -> int:
             return 0
         print(
             "Usage: federation-dev-e2e.py "
-            "[--all|singleton|singleton-parity|zero-downtime|pair|e2e|global-catalog|import]",
+            "[--all|singleton|singleton-parity|zero-downtime|pair|e2e|global-catalog|playback-prepare|import]",
             file=sys.stderr,
         )
         return 2
