@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -216,12 +216,17 @@ def _mark_variant_task_safely(cache_key: str, task_id: str | None) -> None:
         )
 
 
-def _create_variant_task_safely(cache_key: str) -> str | None:
+def _create_variant_task_safely(
+    cache_key: str, *, reason: str = "active"
+) -> str | None:
+    priority = 0 if reason == "active" else 2
     try:
         return create_task_dedup(
             "prepare_stream_variant",
             {"cache_key": cache_key},
             dedup_key=cache_key,
+            priority=priority,
+            pool="playback",
         )
     except SQLAlchemyError:
         log.warning(
@@ -253,6 +258,56 @@ def _passthrough_resolution(
     )
 
 
+def _ready_variant_resolution(
+    track: dict,
+    source_path: Path,
+    decision: DeliveryDecision,
+    descriptor: dict,
+    row: dict,
+) -> PlaybackResolution | None:
+    variant_path = resolve_data_file(row.get("relative_path"))
+    if row.get("status") != "ready" or not _variant_matches_descriptor(row, descriptor):
+        return None
+    if not variant_path or not variant_path.is_file():
+        return None
+    source = _source_quality(
+        track, source_path, source_path.stat(), probe_missing=False
+    )
+    delivery = {
+        "format": row.get("delivery_format"),
+        "codec": row.get("delivery_codec"),
+        "bitrate": row.get("delivery_bitrate"),
+        "sample_rate": row.get("delivery_sample_rate"),
+        "bit_depth": None,
+        "bytes": row.get("bytes"),
+        "lossless": False,
+    }
+    return PlaybackResolution(
+        requested_policy=decision.requested_policy,
+        effective_policy=decision.effective_policy,
+        file_path=variant_path,
+        media_type=media_type_for_path(variant_path),
+        source=source,
+        delivery=delivery,
+        transcoded=True,
+        cache_hit=True,
+        preparing=False,
+        task_id=row.get("task_id"),
+        variant_id=row.get("id"),
+        variant_status=row.get("status"),
+    )
+
+
+def _is_materially_cheaper_variant(resolution: PlaybackResolution) -> bool:
+    source_bitrate = bitrate_to_kbps(resolution.source.get("bitrate"))
+    delivery_bitrate = bitrate_to_kbps(resolution.delivery.get("bitrate"))
+    return (
+        source_bitrate is not None
+        and delivery_bitrate is not None
+        and delivery_bitrate < source_bitrate
+    )
+
+
 def resolve_playback(
     track: dict, requested_policy: str | None, *, enqueue: bool = True
 ) -> PlaybackResolution | None:
@@ -275,40 +330,16 @@ def resolve_playback(
             decision.requested_policy,
             "variant_metadata_unavailable",
         )
-    variant_path = resolve_data_file(row.get("relative_path"))
     if row.get("status") == "ready" and not _variant_matches_descriptor(
         row, descriptor
     ):
         _mark_variant_missing_safely(row["cache_key"])
         row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
-        variant_path = resolve_data_file(row.get("relative_path"))
-    if row.get("status") == "ready" and variant_path and variant_path.is_file():
-        source = _source_quality(
-            track, source_path, source_path.stat(), probe_missing=False
-        )
-        delivery = {
-            "format": row.get("delivery_format"),
-            "codec": row.get("delivery_codec"),
-            "bitrate": row.get("delivery_bitrate"),
-            "sample_rate": row.get("delivery_sample_rate"),
-            "bit_depth": None,
-            "bytes": row.get("bytes"),
-            "lossless": False,
-        }
-        return PlaybackResolution(
-            requested_policy=decision.requested_policy,
-            effective_policy=decision.effective_policy,
-            file_path=variant_path,
-            media_type=media_type_for_path(variant_path),
-            source=source,
-            delivery=delivery,
-            transcoded=True,
-            cache_hit=True,
-            preparing=False,
-            task_id=row.get("task_id"),
-            variant_id=row.get("id"),
-            variant_status=row.get("status"),
-        )
+    ready_resolution = _ready_variant_resolution(
+        track, source_path, decision, descriptor, row
+    )
+    if ready_resolution is not None:
+        return ready_resolution
 
     if row.get("status") == "ready":
         _mark_variant_missing_safely(row["cache_key"])
@@ -316,10 +347,35 @@ def resolve_playback(
 
     task_id = row.get("task_id")
     if enqueue:
-        created_task_id = _create_variant_task_safely(row["cache_key"])
+        created_task_id = _create_variant_task_safely(row["cache_key"], reason="active")
         if created_task_id:
             task_id = created_task_id
             _mark_variant_task_safely(row["cache_key"], task_id)
+
+    if decision.requested_policy == "data_saver":
+        balanced_decision = decide_delivery(track, source_path, "balanced")
+        if not balanced_decision.passthrough:
+            balanced_descriptor = _descriptor(track, source_path, balanced_decision)
+            balanced_row = _get_or_ensure_variant_record(balanced_descriptor)
+            if balanced_row is not None:
+                balanced_resolution = _ready_variant_resolution(
+                    track,
+                    source_path,
+                    balanced_decision,
+                    balanced_descriptor,
+                    balanced_row,
+                )
+                if balanced_resolution is not None and _is_materially_cheaper_variant(
+                    balanced_resolution
+                ):
+                    return replace(
+                        balanced_resolution,
+                        requested_policy=decision.requested_policy,
+                        preparing=True,
+                        task_id=task_id,
+                        variant_id=row.get("id"),
+                        variant_status=row.get("status"),
+                    )
 
     fallback = _passthrough_resolution(
         track, source_path, decision.requested_policy, "variant_preparing"
@@ -350,7 +406,7 @@ def resolve_playback(
 
 
 def prepare_playback(
-    track: dict, requested_policy: str | None
+    track: dict, requested_policy: str | None, *, reason: str = "lookahead"
 ) -> PlaybackResolution | None:
     source_path = resolve_source_path(track)
     if not source_path or not source_path.is_file():
@@ -426,7 +482,7 @@ def prepare_playback(
         row = _get_variant_by_cache_key_safely(row["cache_key"]) or row
 
     task_id = row.get("task_id")
-    created_task_id = _create_variant_task_safely(row["cache_key"])
+    created_task_id = _create_variant_task_safely(row["cache_key"], reason=reason)
     if created_task_id:
         task_id = created_task_id
         _mark_variant_task_safely(row["cache_key"], task_id)

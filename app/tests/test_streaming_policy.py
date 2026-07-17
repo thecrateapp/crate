@@ -205,3 +205,69 @@ def test_resolve_playback_falls_back_to_original_when_variant_metadata_fails(
     assert resolution.transcoded is False
     assert resolution.preparing is False
     assert resolution.delivery["reason"] == "variant_metadata_unavailable"
+
+
+def test_data_saver_uses_ready_balanced_variant_while_requested_variant_warms(
+    monkeypatch, tmp_path
+):
+    library = tmp_path / "music"
+    track_path = library / "Artist" / "Album" / "track.flac"
+    track_path.parent.mkdir(parents=True)
+    track_path.write_bytes(b"fake flac")
+    balanced_path = tmp_path / "balanced.m4a"
+    balanced_path.write_bytes(b"aac")
+    enqueued: list[tuple[str, dict]] = []
+
+    def fake_ensure_variant_record(payload: dict) -> dict:
+        status = "ready" if payload["preset"] == "balanced" else "pending"
+        return {
+            **payload,
+            "status": status,
+            "task_id": None,
+            "bytes": balanced_path.stat().st_size if status == "ready" else None,
+            "error": None,
+        }
+
+    monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
+    monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key", lambda _key: None
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.ensure_variant_record", fake_ensure_variant_record
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.resolve_data_file",
+        lambda relative_path: (
+            balanced_path if "/balanced/" in str(relative_path) else None
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.create_task_dedup",
+        lambda *_args, **kwargs: (
+            enqueued.append(("prepare_stream_variant", kwargs)) or "task-data-saver"
+        ),
+    )
+    monkeypatch.setattr(
+        "crate.streaming.service.mark_variant_task", lambda *_args: None
+    )
+
+    resolution = resolve_playback(
+        {
+            "id": 1,
+            "entity_uid": None,
+            "path": str(track_path),
+            "format": "flac",
+            "bitrate": 900000,
+            "sample_rate": 44100,
+            "bit_depth": 16,
+        },
+        "data_saver",
+    )
+
+    assert resolution is not None
+    assert resolution.requested_policy == "data_saver"
+    assert resolution.effective_policy == "balanced"
+    assert resolution.file_path == balanced_path
+    assert resolution.transcoded is True
+    assert resolution.preparing is True
+    assert enqueued[0][1]["priority"] == 0

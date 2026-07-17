@@ -51,6 +51,8 @@ def create_task_dedup(
     dedup_key: str = "",
     dispatch: bool = True,
     *,
+    priority: int | None = None,
+    pool: str | None = None,
     session=None,
 ) -> str | None:
     return _create_task_dedup(
@@ -59,6 +61,8 @@ def create_task_dedup(
         dedup_key,
         dispatch,
         session,
+        priority=priority,
+        pool=pool,
         dispatch_task_fn=dispatch_task,
         dumps_fn=dumps,
         register_tasks_surface_signal_fn=register_tasks_surface_signal,
