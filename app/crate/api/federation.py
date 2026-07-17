@@ -2169,13 +2169,6 @@ async def serve_stream(ticket_uid: str, request: Request):
     if request.method == "HEAD":
         return response
 
-    record_remote_playback_delivery(
-        requested_policy=str(preview.get("delivery_policy") or "balanced"),
-        effective_policy=resolution.effective_policy,
-        cache_hit=resolution.cache_hit,
-        transcoded=resolution.transcoded,
-    )
-
     file_size = int(resolution.file_path.stat().st_size)
     reserved_bytes = requested_byte_count(file_size, request.headers.get("range"))
     ticket_constraints = preview.get("constraints_json") or {}
@@ -2251,6 +2244,13 @@ async def serve_stream(ticket_uid: str, request: Request):
             stream_id,
         )
         raise HTTPException(status_code=404, detail="Ticket not found or expired")
+
+    record_remote_playback_delivery(
+        requested_policy=str(preview.get("delivery_policy") or "balanced"),
+        effective_policy=resolution.effective_policy,
+        cache_hit=resolution.cache_hit,
+        transcoded=resolution.transcoded,
+    )
 
     return FederationQuotaResponse(
         response,
