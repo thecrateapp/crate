@@ -26,6 +26,7 @@ from crate.federation.client import (
     federated_get,
     prepare_outbound_resource,
 )
+from crate.streaming.policy import normalize_policy
 
 
 def _append_federation_event(
@@ -603,6 +604,7 @@ def resolve_remote_playback(
     remote_entity_uid: str,
     request: Request,
     global_track_uid: str | None = None,
+    requested_policy: str = "original",
 ):
     user = _require_auth(request)
     from crate.api.permissions import require_permission
@@ -612,6 +614,7 @@ def resolve_remote_playback(
     local_node = _get_local_node()
     peer = _get_peer(node_uid)
     playback_session = str(uuid.uuid4())
+    delivery_policy = normalize_policy(requested_policy)
 
     from crate.federation.client import federated_post
 
@@ -624,7 +627,7 @@ def resolve_remote_playback(
             private_key_ref=local_node["private_key_ref"],
             json_body={
                 "remote_entity_uid": remote_entity_uid,
-                "delivery_policy": "balanced",
+                "delivery_policy": delivery_policy,
                 "requesting_node_uid": local_node["node_uid"],
                 "playback_session": playback_session,
             },
@@ -652,7 +655,7 @@ def resolve_remote_playback(
     local_ticket = create_local_ticket(
         node_uid=node_uid,
         remote_entity_uid=ticket_data["ticket_uid"],
-        delivery_policy=ticket_data.get("delivery_policy", "balanced"),
+        delivery_policy=ticket_data.get("delivery_policy", delivery_policy),
         subject_hash=outbound_subject_hash(local_node, peer, user),
         local_user_id=int(user["id"]) if user.get("id") is not None else None,
         audience=str(local_node["node_uid"]),
@@ -664,7 +667,7 @@ def resolve_remote_playback(
     return {
         "stream_url": f"/api/federation/remote/streams/{local_ticket['ticket_uid']}",
         "expires_at": local_ticket.get("expires_at"),
-        "delivery_policy": ticket_data.get("delivery_policy", "balanced"),
+        "delivery_policy": ticket_data.get("delivery_policy", delivery_policy),
         "playback_session": issue_playback_session(
             user_id=int(user["id"]),
             global_track_uid=global_track_uid,

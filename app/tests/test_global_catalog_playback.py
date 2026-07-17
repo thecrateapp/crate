@@ -227,6 +227,7 @@ def test_catalog_track_playback_endpoint_uses_local_playback_payload(test_app):
 
 
 def test_catalog_track_playback_endpoint_creates_remote_ticket(test_app):
+    captured: dict = {}
     with pytest.MonkeyPatch.context() as monkeypatch:
         monkeypatch.setattr(
             "crate.api.catalog.resolve_global_track_playback",
@@ -238,24 +239,28 @@ def test_catalog_track_playback_endpoint_creates_remote_ticket(test_app):
         )
         monkeypatch.setattr(
             "crate.api.catalog.resolve_remote_playback",
-            lambda node_uid, remote_entity_uid, request, **_kwargs: {
-                "stream_url": "/api/federation/remote/streams/ticket-1",
-                "expires_at": "2026-07-10T10:00:00Z",
-                "delivery_policy": "balanced",
-                "playback_session": "session-token",
-                "content_origin": "remote",
-            },
+            lambda node_uid, remote_entity_uid, request, **kwargs: (
+                captured.update(kwargs)
+                or {
+                    "stream_url": "/api/federation/remote/streams/ticket-1",
+                    "expires_at": "2026-07-10T10:00:00Z",
+                    "delivery_policy": "data_saver",
+                    "playback_session": "session-token",
+                    "content_origin": "remote",
+                }
+            ),
         )
 
         response = test_app.get(
-            f"/api/catalog/tracks/{uuid.uuid4()}/playback?delivery=balanced"
+            f"/api/catalog/tracks/{uuid.uuid4()}/playback?delivery=data_saver"
         )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["stream_url"] == "/api/federation/remote/streams/ticket-1"
-    assert payload["requested_policy"] == "balanced"
-    assert payload["effective_policy"] == "balanced"
+    assert captured["requested_policy"] == "data_saver"
+    assert payload["requested_policy"] == "data_saver"
+    assert payload["effective_policy"] == "data_saver"
     assert payload["source"]["format"] == "remote"
 
 

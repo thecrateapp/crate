@@ -1281,6 +1281,7 @@ def _catalog_track_playback_payload(
             selection["remote_entity_uid"],
             request,
             global_track_uid=global_track_uid,
+            requested_policy=delivery,
         )
         remote["quality"] = selection.get("quality")
         return _remote_playback_resolution(remote, requested_policy=delivery)

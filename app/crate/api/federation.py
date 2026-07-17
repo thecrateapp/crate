@@ -16,7 +16,7 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -148,7 +148,7 @@ class SearchBody(BaseModel):
 
 class StreamTicketBody(BaseModel):
     remote_entity_uid: str
-    delivery_policy: str = "balanced"
+    delivery_policy: Literal["original", "balanced", "data_saver"] = "balanced"
     requesting_node_uid: str
     playback_session: str = ""
 
@@ -1936,6 +1936,8 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
     )
     if body.delivery_policy == "original":
         _require_capability(peer, "stream.original", assertion=assertion)
+    else:
+        _require_capability(peer, "stream.transcoded", assertion=assertion)
     constraints = decision.constraints
     if constraints and constraints.delivery:
         if body.delivery_policy not in constraints.delivery:

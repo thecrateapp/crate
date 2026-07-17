@@ -26,6 +26,19 @@ class TestPeerStreamGrant:
         ok, err = validate_peer_stream_grant(peer, "balanced")
         assert ok is True
 
+    def test_transcoded_delivery_requires_transcoded_capability(self, monkeypatch):
+        monkeypatch.setattr(
+            "crate.federation.stream_proxy.preset_allows",
+            lambda _preset, capability: capability == "stream.proxy",
+        )
+
+        ok, err = validate_peer_stream_grant(
+            {"default_grant_preset": "listen"}, "data_saver"
+        )
+
+        assert ok is False
+        assert "stream.transcoded" in err
+
     def test_listen_denies_original(self):
         peer = {"default_grant_preset": "listen"}
         ok, err = validate_peer_stream_grant(peer, "original")

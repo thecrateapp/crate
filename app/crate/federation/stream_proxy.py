@@ -162,6 +162,9 @@ def validate_peer_stream_grant(
     if delivery_policy == "original" and not preset_allows(preset, "stream.original"):
         return False, "peer does not have stream.original grant"
 
+    if delivery_policy != "original" and not preset_allows(preset, "stream.transcoded"):
+        return False, "peer does not have stream.transcoded grant"
+
     return True, None
 
 
