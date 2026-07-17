@@ -81,6 +81,7 @@ from crate.federation.global_playback import (
     NoPlayableGlobalTrack,
     resolve_global_track_playback,
 )
+from crate.federation.playback_prepare import prepare_remote_playback_variants
 from crate.audio import read_audio_quality
 from crate.streaming.paths import resolve_data_file
 from crate.db.repositories.streaming import (
@@ -1229,6 +1230,53 @@ def _resolve_playback_prepare_track(ref) -> dict | None:
     return None
 
 
+def _resolve_remote_playback_prepare_target(ref) -> tuple[str, str] | None:
+    if not ref.global_track_uid:
+        return None
+    try:
+        selection = resolve_global_track_playback(ref.global_track_uid)
+    except (GlobalTrackNotFound, NoPlayableGlobalTrack):
+        return None
+    if selection.get("kind") != "remote":
+        return None
+    node_uid = str(selection.get("node_uid") or "")
+    remote_entity_uid = str(selection.get("remote_entity_uid") or "")
+    if not node_uid or not remote_entity_uid:
+        return None
+    return node_uid, remote_entity_uid
+
+
+def _remote_prepare_item(entity_uid: str, status: str) -> dict:
+    if status == "ready":
+        return {
+            "entity_uid": entity_uid,
+            "ok": True,
+            "preparing": False,
+            "cache_hit": True,
+            "transcoded": True,
+        }
+    if status == "preparing":
+        return {
+            "entity_uid": entity_uid,
+            "ok": True,
+            "preparing": True,
+            "cache_hit": False,
+            "transcoded": False,
+        }
+    return {
+        "entity_uid": entity_uid,
+        "ok": False,
+        "preparing": False,
+        "cache_hit": False,
+        "transcoded": False,
+        "error": (
+            "Remote owner rate limited"
+            if status == "rate_limited"
+            else "Remote owner unavailable"
+        ),
+    }
+
+
 @router.post(
     "/api/playback/prepare",
     response_model=PlaybackPrepareResponse,
@@ -1236,13 +1284,20 @@ def _resolve_playback_prepare_track(ref) -> dict | None:
     summary="Queue cached playback variants for upcoming tracks",
 )
 def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
-    _require_auth(request)
+    user = _require_auth(request)
     policy = normalize_policy(body.policy)
-    items = []
+    items: list[dict | None] = []
+    remote_targets: list[tuple[int, str, str]] = []
     for ref in body.tracks[:12]:
         track = _resolve_playback_prepare_track(ref)
         if not track:
-            items.append({"ok": False, "error": "Track not found"})
+            remote_target = _resolve_remote_playback_prepare_target(ref)
+            if remote_target is None:
+                items.append({"ok": False, "error": "Track not found"})
+                continue
+            node_uid, remote_entity_uid = remote_target
+            remote_targets.append((len(items), node_uid, remote_entity_uid))
+            items.append(None)
             continue
         try:
             resolution = prepare_playback(track, policy)
@@ -1273,7 +1328,39 @@ def api_playback_prepare(request: Request, body: PlaybackPrepareRequest):
                     "error": str(exc),
                 }
             )
-    return {"policy": policy, "items": items}
+
+    if remote_targets:
+        selected_node_uid = remote_targets[0][1]
+        selected_targets = [
+            target for target in remote_targets if target[1] == selected_node_uid
+        ][:2]
+        try:
+            statuses = prepare_remote_playback_variants(
+                user=user,
+                node_uid=selected_node_uid,
+                remote_entity_uids=[target[2] for target in selected_targets],
+                delivery_policy=policy,
+            )
+        except Exception:
+            log.debug("Failed to relay remote playback preparation", exc_info=True)
+            statuses = {}
+        selected_indexes = {target[0] for target in selected_targets}
+        for index, _node_uid, remote_entity_uid in remote_targets:
+            if index not in selected_indexes:
+                items[index] = {
+                    "entity_uid": remote_entity_uid,
+                    "ok": False,
+                    "preparing": False,
+                    "cache_hit": False,
+                    "transcoded": False,
+                    "error": "Remote peer preparation deferred",
+                }
+                continue
+            items[index] = _remote_prepare_item(
+                remote_entity_uid,
+                statuses.get(remote_entity_uid, "unavailable"),
+            )
+    return {"policy": policy, "items": [item for item in items if item is not None]}
 
 
 @router.get(

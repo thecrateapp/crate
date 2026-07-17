@@ -6,9 +6,19 @@ import time
 from enum import StrEnum
 from typing import Any
 
+from crate.db.repositories import federation as federation_repo
+from crate.federation.assertions import build_outbound_user_assertion
+from crate.federation.client import SEARCH_TIMEOUT, federated_post
+
 PREPARE_RESERVATION_TTL_SECONDS = 20 * 60
 MAX_PREPARE_RESERVATIONS_PER_PEER = 4
 MAX_PREPARE_RESERVATIONS_GLOBAL = 20
+MAX_REMOTE_PREPARE_TRACKS = 2
+PREPARE_TIMEOUT = SEARCH_TIMEOUT
+
+_REMOTE_PREPARE_STATUSES = frozenset(
+    {"ready", "preparing", "unavailable", "rate_limited"}
+)
 
 
 class PrepareReservation(StrEnum):
@@ -91,10 +101,84 @@ def acquire_prepare_reservation(
     }.get(result, PrepareReservation.UNAVAILABLE)
 
 
+def prepare_remote_playback_variants(
+    *,
+    user: dict[str, Any],
+    node_uid: str,
+    remote_entity_uids: list[str],
+    delivery_policy: str,
+) -> dict[str, str]:
+    """Ask one approved owner to prepare up to two future delivery variants.
+
+    This best-effort hint never creates stream tickets, stores user state, or
+    blocks the actual playback path. Any invalid or failed owner response is
+    deliberately equivalent to no prewarm.
+    """
+    selected_uids = list(dict.fromkeys(str(uid) for uid in remote_entity_uids))[
+        :MAX_REMOTE_PREPARE_TRACKS
+    ]
+    unavailable = {uid: "unavailable" for uid in selected_uids}
+    if not selected_uids or delivery_policy not in {"balanced", "data_saver"}:
+        return unavailable
+
+    local_node = federation_repo.get_local_node()
+    peer = federation_repo.get_peer(node_uid)
+    if (
+        local_node is None
+        or peer is None
+        or peer.get("trust_state") != "approved"
+        or not peer.get("api_base_url")
+    ):
+        return unavailable
+
+    try:
+        assertion = build_outbound_user_assertion(
+            local_node=local_node,
+            peer=peer,
+            user=user,
+            purpose="stream.prepare",
+            capabilities=["federation.stream.play"],
+        )
+        response = federated_post(
+            base_url=str(peer["api_base_url"]),
+            path="/api/federation/v1/playback/prepare",
+            node_id=str(local_node["node_uid"]),
+            key_id=str(local_node["active_key_id"]),
+            private_key_ref=str(local_node["private_key_ref"]),
+            json_body={
+                "requesting_node_uid": str(local_node["node_uid"]),
+                "delivery_policy": delivery_policy,
+                "remote_entity_uids": selected_uids,
+            },
+            timeout=PREPARE_TIMEOUT,
+            user_assertion=assertion,
+        )
+        if response.status_code >= 400:
+            return unavailable
+        payload = response.json()
+    except Exception:
+        return unavailable
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+        return unavailable
+    statuses = dict(unavailable)
+    for item in payload["items"]:
+        if not isinstance(item, dict):
+            continue
+        remote_entity_uid = str(item.get("remote_entity_uid") or "")
+        status = item.get("status")
+        if remote_entity_uid in statuses and status in _REMOTE_PREPARE_STATUSES:
+            statuses[remote_entity_uid] = status
+    return statuses
+
+
 __all__ = [
     "MAX_PREPARE_RESERVATIONS_GLOBAL",
     "MAX_PREPARE_RESERVATIONS_PER_PEER",
+    "MAX_REMOTE_PREPARE_TRACKS",
+    "PREPARE_TIMEOUT",
     "PREPARE_RESERVATION_TTL_SECONDS",
     "PrepareReservation",
     "acquire_prepare_reservation",
+    "prepare_remote_playback_variants",
 ]

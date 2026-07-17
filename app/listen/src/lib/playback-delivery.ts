@@ -5,6 +5,7 @@ import type { PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
 const DESKTOP_PREPARE_WINDOW = 6;
 const MOBILE_PREPARE_WINDOW = 5;
 const SAVE_DATA_PREPARE_WINDOW = 2;
+const REMOTE_PREPARE_WINDOW = 2;
 let lastPrepareKey = "";
 
 interface PreparePlaybackDeliveryOptions {
@@ -53,6 +54,21 @@ export function upcomingDeliveryTracks(
   return queue.slice(start, start + Math.max(1, prepareWindow));
 }
 
+export function upcomingRemoteDeliveryTracks(
+  queue: Track[],
+  currentIndex: number,
+  prepareWindow = REMOTE_PREPARE_WINDOW,
+): Track[] {
+  if (queue.length === 0) return [];
+  const cursor = Math.max(-1, Math.min(currentIndex, queue.length - 1));
+  return queue
+    .slice(cursor + 1)
+    .filter(
+      (track) => track.origin === "remote" && Boolean(track.globalTrackUid),
+    )
+    .slice(0, Math.max(1, prepareWindow));
+}
+
 export function preparePlaybackDelivery(
   queue: Track[],
   currentIndex: number,
@@ -68,13 +84,17 @@ export function preparePlaybackDelivery(
   );
   if (tracks.length === 0) return;
 
-  const refs = tracks
+  const localRefs = tracks
     .filter((t) => t.origin !== "remote")
     .map(trackRef)
     .filter(
       (ref) =>
         ref.global_track_uid || ref.entity_uid || ref.track_id || ref.path,
     );
+  const remoteRefs = upcomingRemoteDeliveryTracks(queue, currentIndex).map(
+    trackRef,
+  );
+  const refs = [...localRefs, ...remoteRefs];
   if (refs.length === 0) return;
 
   const key = JSON.stringify({ policy, refs });

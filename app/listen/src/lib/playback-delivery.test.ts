@@ -9,6 +9,7 @@ vi.mock("@/lib/api", () => ({
 import {
   preparePlaybackDelivery,
   upcomingDeliveryTracks,
+  upcomingRemoteDeliveryTracks,
 } from "@/lib/playback-delivery";
 import type { Track } from "@/contexts/player-types";
 
@@ -68,6 +69,25 @@ describe("upcomingDeliveryTracks", () => {
       ["track-1", "track-2", "track-3"],
     );
   });
+
+  it("selects only the next two remote tracks after the current cursor", () => {
+    const remoteTrack = (index: number): Track => ({
+      ...makeTrack(index),
+      origin: "remote",
+      globalTrackUid: `global-track-${index}`,
+    });
+    const tracks = [
+      makeTrack(1),
+      remoteTrack(2),
+      makeTrack(3),
+      remoteTrack(4),
+      remoteTrack(5),
+    ];
+
+    expect(
+      upcomingRemoteDeliveryTracks(tracks, 0).map((item) => item.id),
+    ).toEqual(["track-2", "track-4"]);
+  });
 });
 
 describe("preparePlaybackDelivery", () => {
@@ -126,6 +146,33 @@ describe("preparePlaybackDelivery", () => {
     const body = JSON.parse(String(request?.body));
     expect(body.tracks).toEqual([
       expect.objectContaining({ global_track_uid: "global-track-44" }),
+    ]);
+  });
+
+  it("includes only the next two remote global tracks in its single prepare request", () => {
+    apiFetchMock.mockResolvedValueOnce({});
+    const remoteTrack = (index: number): Track => ({
+      ...makeTrack(index),
+      origin: "remote",
+      globalTrackUid: `global-track-${index}`,
+    });
+    const tracks = [
+      makeTrack(51),
+      remoteTrack(52),
+      makeTrack(53),
+      remoteTrack(54),
+      remoteTrack(55),
+    ];
+
+    preparePlaybackDelivery(tracks, 0, "balanced", { immediate: true });
+
+    const request = apiFetchMock.mock.calls[0]?.[1];
+    const body = JSON.parse(String(request?.body));
+    expect(body.tracks).toEqual([
+      expect.objectContaining({ track_id: 51 }),
+      expect.objectContaining({ track_id: 53 }),
+      expect.objectContaining({ global_track_uid: "global-track-52" }),
+      expect.objectContaining({ global_track_uid: "global-track-54" }),
     ]);
   });
 
