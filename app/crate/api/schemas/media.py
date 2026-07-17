@@ -328,6 +328,17 @@ class PlaybackPrepareResponse(BaseModel):
     items: list[PlaybackPrepareItemResponse] = Field(default_factory=list)
 
 
+class PlaybackWarmupRequest(BaseModel):
+    limit: int = Field(default=25, ge=1, le=100)
+    max_source_bytes: int = Field(
+        default=1024 * 1024 * 1024,
+        ge=1,
+        le=5 * 1024 * 1024 * 1024,
+    )
+    max_seconds: int = Field(default=60, ge=1, le=600)
+    include_data_saver: bool = False
+
+
 class PlaybackDeliveryStatsResponse(BaseModel):
     tracks: int = 0
     lossless_tracks: int = 0

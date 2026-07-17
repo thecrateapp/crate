@@ -180,6 +180,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_completeness": TaskPoolConfig("maintenance", 3, 3600, 0),
     # Playback delivery
     "prepare_stream_variant": TaskPoolConfig("playback", 0, 1200, 1),
+    "warmup_stream_variants": TaskPoolConfig("maintenance", 3, 900, 0),
     # Playlist generation
     "generate_system_playlist": TaskPoolConfig("fast", 1, 600, 0),
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),

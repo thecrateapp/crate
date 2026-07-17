@@ -43,6 +43,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "verify_storage_v2",
         "wipe_library",
         "write_portable_metadata",
+        "warmup_stream_variants",
     }
 )
 
@@ -64,6 +65,7 @@ MAINTENANCE_WINDOW_TASK_TYPES = frozenset(
         "verify_storage_v2",
         "wipe_library",
         "write_portable_metadata",
+        "warmup_stream_variants",
     }
 )
 

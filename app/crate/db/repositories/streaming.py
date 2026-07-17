@@ -80,6 +80,48 @@ def get_track_delivery_row_by_path(filepath: str) -> dict | None:
         return dict(row) if row else None
 
 
+def list_recent_local_delivery_tracks(limit: int = 25) -> list[dict]:
+    """Return a bounded, local-only warmup candidate set ordered by recent play."""
+    safe_limit = max(1, min(int(limit or 25), 100))
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    SELECT
+                        lt.id,
+                        lt.entity_uid,
+                        lt.path,
+                        lt.title,
+                        lt.artist,
+                        lt.album,
+                        lt.format,
+                        lt.bitrate,
+                        lt.sample_rate,
+                        lt.bit_depth,
+                        lt.duration,
+                        lt.size
+                    FROM (
+                        SELECT track_id, MAX(ended_at) AS last_played_at
+                        FROM user_play_events
+                        WHERE track_id IS NOT NULL
+                        GROUP BY track_id
+                        ORDER BY last_played_at DESC
+                        LIMIT :limit
+                    ) recent
+                    JOIN library_tracks lt ON lt.id = recent.track_id
+                    WHERE lt.path IS NOT NULL AND lt.path <> ''
+                    ORDER BY recent.last_played_at DESC
+                    """
+                ),
+                {"limit": safe_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return [dict(row) for row in rows]
+
+
 def _track_path_candidates(filepath: str) -> list[str]:
     cleaned = str(filepath or "").strip()
     if not cleaned:

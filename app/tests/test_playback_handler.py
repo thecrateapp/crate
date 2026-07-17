@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 from crate.worker_handlers.playback import (
     PLAYBACK_TASK_HANDLERS,
     _handle_prepare_stream_variant,
+    _handle_warmup_stream_variants,
     _max_concurrent_transcodes,
     get_stream_transcode_runtime,
     prune_stream_transcode_slots,
@@ -19,8 +20,12 @@ class TestHandlerRegistration:
             is _handle_prepare_stream_variant
         )
 
-    def test_playback_task_handlers_has_no_other_keys(self):
-        assert set(PLAYBACK_TASK_HANDLERS.keys()) == {"prepare_stream_variant"}
+    def test_playback_task_handlers_registers_bounded_warmup(self):
+        assert "warmup_stream_variants" in PLAYBACK_TASK_HANDLERS
+        assert (
+            PLAYBACK_TASK_HANDLERS["warmup_stream_variants"]
+            is _handle_warmup_stream_variants
+        )
 
 
 class TestMaxConcurrentTranscodes:

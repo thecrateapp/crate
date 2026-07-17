@@ -681,7 +681,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.playback",
         "PLAYBACK_TASK_HANDLERS",
-        ("prepare_stream_variant",),
+        ("prepare_stream_variant", "warmup_stream_variants"),
     ),
 )
 
