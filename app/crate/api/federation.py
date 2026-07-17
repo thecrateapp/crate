@@ -48,6 +48,9 @@ from crate.federation.identity import build_signed_descriptor, load_private_key
 from crate.federation.playback_prepare import (
     PrepareReservation,
     acquire_prepare_reservation,
+    record_playback_prepare_request,
+    record_playback_prepare_result,
+    record_remote_playback_delivery,
 )
 from crate.federation.pairing import (
     build_ack,
@@ -2026,6 +2029,9 @@ async def prepare_playback_variants(
     ):
         raise HTTPException(status_code=403, detail="delivery_mode_denied")
 
+    for _remote_entity_uid in body.remote_entity_uids:
+        record_playback_prepare_request(body.delivery_policy)
+
     try:
         redis_client = _request_redis(request)
     except HTTPException:
@@ -2092,7 +2098,10 @@ async def prepare_playback_variants(
         )
         items.append({"remote_entity_uid": remote_entity_uid, "status": status})
 
-    return FederatedPlaybackPrepareResponse(items=items)
+    response = FederatedPlaybackPrepareResponse(items=items)
+    for item in response.items:
+        record_playback_prepare_result(item.status, body.delivery_policy)
+    return response
 
 
 @router.get("/streams/{ticket_uid}")
@@ -2159,6 +2168,13 @@ async def serve_stream(ticket_uid: str, request: Request):
     )
     if request.method == "HEAD":
         return response
+
+    record_remote_playback_delivery(
+        requested_policy=str(preview.get("delivery_policy") or "balanced"),
+        effective_policy=resolution.effective_policy,
+        cache_hit=resolution.cache_hit,
+        transcoded=resolution.transcoded,
+    )
 
     file_size = int(resolution.file_path.stat().st_size)
     reserved_bytes = requested_byte_count(file_size, request.headers.get("range"))

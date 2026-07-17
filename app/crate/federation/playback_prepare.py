@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from enum import StrEnum
 from typing import Any
@@ -9,16 +10,83 @@ from typing import Any
 from crate.db.repositories import federation as federation_repo
 from crate.federation.assertions import build_outbound_user_assertion
 from crate.federation.client import SEARCH_TIMEOUT, federated_post
+from crate.metrics import record_later
+
+
+def prepare_reservation_limit(environment_key: str, default: int) -> int:
+    """Read a rollback ceiling without allowing an unsafe limit increase."""
+    raw_value = os.environ.get(environment_key)
+    if raw_value is None:
+        return default
+    try:
+        return min(default, max(0, int(raw_value)))
+    except ValueError:
+        return default
+
 
 PREPARE_RESERVATION_TTL_SECONDS = 20 * 60
-MAX_PREPARE_RESERVATIONS_PER_PEER = 4
-MAX_PREPARE_RESERVATIONS_GLOBAL = 20
+MAX_PREPARE_RESERVATIONS_PER_PEER = prepare_reservation_limit(
+    "CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_PER_PEER", 4
+)
+MAX_PREPARE_RESERVATIONS_GLOBAL = prepare_reservation_limit(
+    "CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_GLOBAL", 20
+)
 MAX_REMOTE_PREPARE_TRACKS = 2
 PREPARE_TIMEOUT = SEARCH_TIMEOUT
 
 _REMOTE_PREPARE_STATUSES = frozenset(
     {"ready", "preparing", "unavailable", "rate_limited"}
 )
+
+
+def _metric_tags(requested_policy: str, effective_policy: str) -> dict[str, str]:
+    return {
+        "origin": "remote",
+        "requested_policy": requested_policy,
+        "effective_policy": effective_policy,
+    }
+
+
+def record_playback_prepare_request(delivery_policy: str) -> None:
+    record_later(
+        "federation.playback.prepare.requested",
+        1.0,
+        _metric_tags(delivery_policy, delivery_policy),
+    )
+
+
+def record_playback_prepare_result(status: str, delivery_policy: str) -> None:
+    if status not in _REMOTE_PREPARE_STATUSES:
+        return
+    record_later(
+        f"federation.playback.prepare.{status}",
+        1.0,
+        _metric_tags(delivery_policy, delivery_policy),
+    )
+
+
+def record_remote_playback_delivery(
+    *,
+    requested_policy: str,
+    effective_policy: str,
+    cache_hit: bool,
+    transcoded: bool,
+) -> None:
+    if requested_policy == "original":
+        return
+    metric_name = (
+        "federation.playback.prepare.ready_before_play"
+        if cache_hit and transcoded
+        else "federation.playback.prepare.fallback_original"
+        if effective_policy == "original"
+        else None
+    )
+    if metric_name is not None:
+        record_later(
+            metric_name,
+            1.0,
+            _metric_tags(requested_policy, effective_policy),
+        )
 
 
 class PrepareReservation(StrEnum):
@@ -181,4 +249,8 @@ __all__ = [
     "PrepareReservation",
     "acquire_prepare_reservation",
     "prepare_remote_playback_variants",
+    "prepare_reservation_limit",
+    "record_playback_prepare_request",
+    "record_playback_prepare_result",
+    "record_remote_playback_delivery",
 ]

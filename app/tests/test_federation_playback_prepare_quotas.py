@@ -107,3 +107,18 @@ def test_prepare_reservation_fails_closed_without_redis():
         playback_prepare.acquire_prepare_reservation(None, "peer-a", "variant-a")
         is playback_prepare.PrepareReservation.UNAVAILABLE
     )
+
+
+def test_prepare_reservation_limit_allows_an_operator_to_disable_new_work(
+    monkeypatch,
+):
+    from crate.federation import playback_prepare
+
+    monkeypatch.setenv("CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_PER_PEER", "0")
+
+    assert (
+        playback_prepare.prepare_reservation_limit(
+            "CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_PER_PEER", 4
+        )
+        == 0
+    )
