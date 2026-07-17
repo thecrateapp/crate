@@ -99,7 +99,7 @@ def validate_ticket(
                 text(
                     "SELECT * FROM federation_stream_tickets "
                     "WHERE ticket_uid = :uid AND status = 'active' "
-                    "AND expires_at > :now AND used_at IS NULL FOR UPDATE"
+                    "AND expires_at > :now FOR UPDATE"
                 ),
                 {"uid": ticket_uid, "now": now},
             )
@@ -143,7 +143,10 @@ def validate_ticket(
             return None
         session.execute(
             text(
-                "UPDATE federation_stream_tickets SET used_at = :now "
+                "UPDATE federation_stream_tickets "
+                "SET first_authorized_at = COALESCE(first_authorized_at, :now), "
+                "last_authorized_at = :now, "
+                "authorization_count = authorization_count + 1 "
                 "WHERE ticket_uid = :uid"
             ),
             {"uid": ticket_uid, "now": now},

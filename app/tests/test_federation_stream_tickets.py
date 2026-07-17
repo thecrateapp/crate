@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 
-def test_stream_ticket_is_bound_to_authorization_and_one_time_use(pg_db):
+def test_stream_ticket_is_bound_to_authorization_and_allows_range_retries(pg_db):
     del pg_db
     from crate.db.repositories.federation_stream_tickets import (
         create_ticket,
@@ -49,8 +49,14 @@ def test_stream_ticket_is_bound_to_authorization_and_one_time_use(pg_db):
         validate_ticket(
             str(ticket["ticket_uid"]),
             expected_node_uid="11111111-1111-4111-8111-111111111111",
+            expected_audience="22222222-2222-4222-8222-222222222222",
+            expected_subject="subject-a",
+            expected_local_user_id=7,
+            playback_session="session-a",
+            requested_range="bytes=100-199",
+            current_policy_revision=7,
         )
-        is None
+        is not None
     )
 
 
