@@ -101,6 +101,27 @@ regress. A long first backfill by itself is not downtime.
 - Validate Range with a small request and confirm no client cookie/Authorization appears in peer logs.
 - Run `make dev-federation-stream-benchmark` after any transport change.
 
+## Playback preparation incident
+
+- Check `federation.playback.prepare.requested`, result counters,
+  `ready_before_play`, `fallback_original`, active `prepare_stream_variant`
+  work, and interactive queue wait. These are aggregate-only metrics: never
+  query or label them with a user, peer UID, entity UID, cache key, path, URL,
+  ticket, or assertion.
+- Inspect the bounded reservation keys
+  `federation:playback-prepare:peer:{peer_node_uid}` and
+  `federation:playback-prepare:global`; they are TTL-backed and must not be
+  manually populated or prolonged.
+- If preparation saturation, disk headroom, CPU, iowait, or queue wait affects
+  interactive playback, set
+  `CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_PER_PEER=0` or
+  `CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_GLOBAL=0` on the affected owner and
+  restart its API. New prepare requests fail harmlessly while normal stream tickets remain available.
+- Restore the conservative defaults (four per peer, twenty global) only after
+  resource-governor decisions, fallback-original ratio, and interactive queue
+  wait have recovered for one alert window. Do not clear cached variants as an
+  incident response.
+
 ## Quota incident or Redis restart
 
 - The owner remains authoritative. Confirm Lua quota scripts, per-peer and per-subject keys, reservation TTL, and reconciliation metrics.

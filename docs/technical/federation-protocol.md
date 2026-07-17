@@ -67,6 +67,22 @@ The consumer creates an opaque local relay ticket. In production, Traefik sends 
 
 Safe request headers are `Range`, `If-Range`, and `Accept`. Safe response headers are content type/length/range, ETag, last-modified, and cache control. Cookies, authorization, local paths, bearer tokens, raw remote URLs, and hop-by-hop headers never cross the proxy boundary.
 
+### Bounded playback preparation
+
+`POST /api/federation/v1/playback/prepare` is an advisory, signed owner request
+for one or two owner-local track entity UIDs. It requires the same stream
+grants and entity allowlist as a transcoded stream, plus a user assertion with
+purpose `stream.prepare`. It does not create a ticket, playback session, stream
+URL, byte reservation, or media transfer.
+
+The owner reports only `ready`, `preparing`, `unavailable`, or `rate_limited`.
+Ready variants consume no reservation. New speculative work has four live reservations per peer and twenty per owner, atomically tracked in Redis by
+variant cache key. Active playback remains higher priority and serves the
+original source when the prepared variant is not ready. Owners may lower
+`CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_PER_PEER` or
+`CRATE_FEDERATION_PLAYBACK_PREPARE_MAX_GLOBAL` to `0` for immediate local
+containment; normal stream tickets remain available.
+
 ## Imports
 
 Import is an explicit, administrator-governed transition from a remote source to local ownership. A signed manifest describes album/track identities, relative paths, byte sizes, and SHA-256 hashes. The consumer validates grant and approval, reserves peer/global/disk capacity atomically, downloads only through pinned signed transport into a request-specific staging directory, verifies every hash and aggregate limit, and asks a worker to publish files.

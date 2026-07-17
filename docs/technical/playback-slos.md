@@ -7,19 +7,29 @@ dimension.
 
 ## Service-level objectives
 
-| Signal                  | Objective                                             | Alert window           |
-| ----------------------- | ----------------------------------------------------- | ---------------------- |
-| startup p95             | local and remote first play at or below 2 seconds     | 15 minutes             |
-| stall ratio             | below 2% of playback starts                           | 15 minutes and 6 hours |
-| stall duration          | p95 below 5 seconds                                   | 15 minutes             |
-| range retry             | remote recovery Range authorizations succeed at 99.5% | 15 minutes             |
-| transcode queue wait    | interactive variant work starts within 30 seconds     | 15 minutes             |
-| fallback-original ratio | below 10% for non-original requests after warm cache  | 15 minutes             |
+| Signal                  | Objective                                              | Alert window           |
+| ----------------------- | ------------------------------------------------------ | ---------------------- |
+| startup p95             | local and remote first play at or below 2 seconds      | 15 minutes             |
+| stall ratio             | below 2% of playback starts                            | 15 minutes and 6 hours |
+| stall duration          | p95 below 5 seconds                                    | 15 minutes             |
+| range retry             | remote recovery Range authorizations succeed at 99.5%  | 15 minutes             |
+| transcode queue wait    | interactive variant work starts within 30 seconds      | 15 minutes             |
+| fallback-original ratio | below 10% for non-original requests after warm cache   | 15 minutes             |
+| prepare saturation      | below 5% rate-limited or unavailable owner preparation | 15 minutes             |
+| ready-before-play ratio | does not regress during prewarm canary                 | 15 minutes             |
 
 The client reports bounded startup, stall and recovery events. The API stores
 only minute aggregates (`playback.startup.ms`, `playback.stall.count`,
 `playback.stall.ms`, `playback.recovery.count`); it does not retain a
 per-track QoE history.
+
+Federated preparation adds aggregate-only
+`federation.playback.prepare.requested`, `.ready`, `.preparing`,
+`.unavailable`, `.rate_limited`, `.ready_before_play`, and
+`.fallback_original` counters. Their only tags are `origin`, requested policy,
+and effective policy. `ready_before_play` and `fallback_original` are reported
+when an owner serves a non-original remote request; they do not retain a
+per-user or per-track preparation history.
 
 ## Alert response
 
@@ -46,6 +56,16 @@ resource governor decisions. Pause warmup first; keep interactive priority at
 zero and do not increase concurrency without a measured CPU/iowait margin.
 See the [release gates](playback-release-gates.md#controlled-warmup) for the
 operator controls.
+
+### Preparation saturation or ready-before-play regression
+
+Check owner preparation reservations, delivery-policy breakdown and the
+interactive queue before changing client buffering. Set the affected owner's
+preparation ceiling to zero first; normal ticketed playback must continue with
+the original fallback. Follow the [playback preparation incident
+runbook](federation-operations-runbook.md#playback-preparation-incident) and
+restore the four-per-peer / twenty-global defaults only after a clean alert
+window.
 
 ### Elevated remote TTFB
 

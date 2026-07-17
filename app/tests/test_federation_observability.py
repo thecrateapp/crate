@@ -133,3 +133,31 @@ def test_slo_and_runbook_cover_zero_downtime_catalog_reads():
         "local reads remain available",
     ):
         assert text in runbook
+
+
+def test_playback_prepare_runbook_documents_containment_and_slos():
+    slos = (ROOT / "docs/technical/playback-slos.md").read_text()
+    runbook = (ROOT / "docs/technical/federation-operations-runbook.md").read_text()
+    gates = (ROOT / "docs/technical/playback-release-gates.md").read_text()
+
+    for text in (
+        "ready_before_play",
+        "fallback_original",
+        "prepare saturation",
+        "federation.playback.prepare",
+    ):
+        assert text in slos
+    for text in (
+        "Playback preparation incident",
+        "federation:playback-prepare:peer:",
+        "federation:playback-prepare:global",
+        "normal stream tickets remain available",
+    ):
+        assert text in runbook
+    for text in (
+        "two remote tracks",
+        "four reservations per peer",
+        "twenty reservations per owner",
+        "fallback-original ratio",
+    ):
+        assert text in gates

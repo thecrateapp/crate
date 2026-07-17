@@ -16,6 +16,11 @@ regress merely because it has a global identifier.
 - A local track with a global UID remains eligible for `balanced` and
   `data_saver` preparation. Interactive preparation has priority over lookahead
   and warmup work.
+- A remote queue contributes at most two remote tracks with global IDs to its local
+  preparation request. The browser never contacts an owner or receives a peer
+  URL, ticket, path, task ID, or cache key.
+- Owner preparation is bounded to four reservations per peer and twenty reservations per owner. A denied, slow, or rate-limited request leaves
+  normal ticketed playback available with its original-source fallback.
 - Manual pause/resume retains the queue and source. It neither reloads the
   queue nor performs a fresh catalog resolution when the current source is
   still usable.
@@ -61,8 +66,12 @@ safe and do not need deletion during an incident.
 4. Expose Auto as an opt-in preference only after playback SLOs are healthy.
 5. Enable bounded warmup only after the host has sustained disk and CPU
    headroom.
+6. Canary remote preparation with one approved peer. Confirm the
+   fallback-original ratio does not rise, ready-before-play remains stable,
+   and interactive transcode queue wait stays within its SLO.
 
 Rollback is scoped: hide Auto for a client-policy regression; disable warmup
 for worker pressure; revoke the affected peer stream grant for remote-range
-failures. Do not reintroduce one-shot tickets, delete cache during an incident,
+failures; or set the owner preparation ceiling to zero for speculative-work
+pressure. Do not reintroduce one-shot tickets, delete cache during an incident,
 or turn a local single-node failure into a federation-wide outage.

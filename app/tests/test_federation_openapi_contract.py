@@ -42,3 +42,16 @@ def test_protocol_contract_no_longer_claims_global_user_features_are_out_of_scop
         "behavior matches today (local only)",
     ):
         assert stale_claim not in contract
+
+
+def test_protocol_documents_signed_playback_prepare_without_stream_material():
+    protocol = (ROOT / "docs/technical/federation-protocol.md").read_text()
+
+    for text in (
+        "POST /api/federation/v1/playback/prepare",
+        "stream.prepare",
+        "four live reservations per peer",
+        "twenty per owner",
+        "does not create a ticket",
+    ):
+        assert text in protocol
