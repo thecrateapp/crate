@@ -257,28 +257,21 @@ class TestStatsApiContracts:
             ],
         }
 
-        with (
-            patch("crate.api.me.get_cache", return_value=None),
-            patch("crate.api.me.set_cache") as mock_set_cache,
-            patch(
-                "crate.api.me.get_stats_overview", return_value=overview
-            ) as mock_overview,
-            patch("crate.api.me.get_stats_trends", return_value=trends) as mock_trends,
-            patch(
-                "crate.api.me.get_top_tracks", return_value=top_tracks
-            ) as mock_top_tracks,
-            patch(
-                "crate.api.me.get_top_artists", return_value=top_artists
-            ) as mock_top_artists,
-            patch(
-                "crate.api.me.get_top_albums", return_value=top_albums
-            ) as mock_top_albums,
-            patch(
-                "crate.api.me.get_top_genres", return_value=top_genres
-            ) as mock_top_genres,
-            patch("crate.api.me.get_replay_mix", return_value=replay) as mock_replay,
-            patch("crate.api.me.get_stats_story", return_value=story) as mock_story,
-        ):
+        dashboard = {
+            "window": "90d",
+            "overview": overview,
+            "trends": trends,
+            "top_tracks": {"window": "90d", "items": top_tracks},
+            "top_artists": {"window": "90d", "items": top_artists},
+            "top_albums": {"window": "90d", "items": top_albums},
+            "top_genres": {"window": "90d", "items": top_genres},
+            "replay": replay,
+            "story": story,
+        }
+
+        with patch(
+            "crate.api.me.get_user_stats_dashboard", return_value=dashboard
+        ) as mock_dashboard:
             resp = test_app.get(
                 "/api/me/stats/dashboard"
                 "?window=90d&tracks_limit=5&artists_limit=4&albums_limit=3&genres_limit=2&replay_limit=9"
@@ -330,17 +323,16 @@ class TestStatsApiContracts:
         assert data["story"]["audio_profile"]["energy"] == 0.82
         assert data["story"]["monthly_snapshots"][0]["title"] == "April 2026"
 
-        mock_overview.assert_called_once_with(1, window="90d")
-        mock_trends.assert_called_once_with(1, window="90d")
-        mock_top_tracks.assert_called_once_with(1, window="90d", limit=5)
-        mock_top_artists.assert_called_once_with(1, window="90d", limit=4)
-        mock_top_albums.assert_called_once_with(1, window="90d", limit=3)
-        mock_top_genres.assert_called_once_with(1, window="90d", limit=2)
-        mock_replay.assert_called_once_with(1, window="90d", limit=9)
-        mock_story.assert_called_once_with(1, window="90d")
-        mock_set_cache.assert_called_once()
-        cache_key = mock_set_cache.call_args.args[0]
-        assert cache_key.startswith("listen:stats_dashboard:v5:global:")
+        mock_dashboard.assert_called_once_with(
+            1,
+            window="90d",
+            month=None,
+            tracks_limit=5,
+            artists_limit=4,
+            albums_limit=3,
+            genres_limit=2,
+            replay_limit=9,
+        )
 
     def test_stats_dashboard_supports_month_snapshots(self, test_app):
         period = "month:2026-04"
@@ -407,28 +399,21 @@ class TestStatsApiContracts:
             "monthly_snapshots": [],
         }
 
-        with (
-            patch("crate.api.me.get_cache", return_value=None),
-            patch("crate.api.me.set_cache"),
-            patch(
-                "crate.api.me.get_month_stats_overview", return_value=overview
-            ) as mock_overview,
-            patch(
-                "crate.api.me.get_month_stats_trends", return_value=trends
-            ) as mock_trends,
-            patch(
-                "crate.api.me.get_month_top_tracks", return_value=top_tracks
-            ) as mock_top_tracks,
-            patch(
-                "crate.api.me.get_month_top_artists", return_value=[]
-            ) as mock_artists,
-            patch("crate.api.me.get_month_top_albums", return_value=[]) as mock_albums,
-            patch("crate.api.me.get_month_top_genres", return_value=[]) as mock_genres,
-            patch(
-                "crate.api.me.get_month_replay_mix", return_value=replay
-            ) as mock_replay,
-            patch("crate.api.me.get_stats_story", return_value=story) as mock_story,
-        ):
+        dashboard = {
+            "window": period,
+            "overview": overview,
+            "trends": trends,
+            "top_tracks": {"window": period, "items": top_tracks},
+            "top_artists": {"window": period, "items": []},
+            "top_albums": {"window": period, "items": []},
+            "top_genres": {"window": period, "items": []},
+            "replay": replay,
+            "story": story,
+        }
+
+        with patch(
+            "crate.api.me.get_user_stats_dashboard", return_value=dashboard
+        ) as mock_dashboard:
             resp = test_app.get(
                 "/api/me/stats/dashboard?month=2026-04&tracks_limit=5&artists_limit=4&albums_limit=3&genres_limit=2&replay_limit=9"
             )
@@ -438,14 +423,16 @@ class TestStatsApiContracts:
         assert data["window"] == period
         assert data["overview"]["active_days"] == 4
         assert data["replay"]["title"] == "Replay April 2026"
-        mock_overview.assert_called_once_with(1, "2026-04")
-        mock_trends.assert_called_once_with(1, "2026-04")
-        mock_top_tracks.assert_called_once_with(1, "2026-04", limit=5)
-        mock_artists.assert_called_once_with(1, "2026-04", limit=4)
-        mock_albums.assert_called_once_with(1, "2026-04", limit=3)
-        mock_genres.assert_called_once_with(1, "2026-04", limit=2)
-        mock_replay.assert_called_once_with(1, "2026-04", limit=9)
-        mock_story.assert_called_once_with(1, window="30d", month="2026-04")
+        mock_dashboard.assert_called_once_with(
+            1,
+            window="30d",
+            month="2026-04",
+            tracks_limit=5,
+            artists_limit=4,
+            albums_limit=3,
+            genres_limit=2,
+            replay_limit=9,
+        )
 
     def test_public_user_stats_dashboard_includes_subject_and_affinity(self, test_app):
         dashboard = {

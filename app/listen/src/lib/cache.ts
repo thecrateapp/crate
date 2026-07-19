@@ -20,6 +20,7 @@ interface CacheEntry<T = unknown> {
 }
 
 const STORAGE_KEY = "crate-api-cache:v2";
+const CACHE_EVENT_ID_STORAGE_KEY = "crate-cache-events:last-event-id:v1";
 const memoryCache = new Map<string, CacheEntry>();
 type ScheduledStorageWriteHandle = number | ReturnType<typeof setTimeout>;
 const pendingStorageWrites = new Map<string, ScheduledStorageWriteHandle>();
@@ -267,6 +268,26 @@ const invalidationListeners = new Set<(scope: string) => void>();
 const CACHE_EVENTS_CHANNEL = "cache-invalidations";
 const CACHE_EVENTS_DEGRADE_AFTER_MS = 75_000;
 
+function persistedCacheEventId(): string | null {
+  try {
+    const eventId = localStorage.getItem(CACHE_EVENT_ID_STORAGE_KEY)?.trim();
+    return eventId && /^\d+$/.test(eventId) ? eventId : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistCacheEventId(eventId: string | undefined): void {
+  if (!eventId) return;
+  const normalized = eventId.trim();
+  if (!/^\d+$/.test(normalized)) return;
+  try {
+    localStorage.setItem(CACHE_EVENT_ID_STORAGE_KEY, normalized);
+  } catch {
+    /* cache invalidation still works for the current page */
+  }
+}
+
 /** Subscribe to cache invalidation events. Returns unsubscribe function. */
 export function onCacheInvalidation(fn: (scope: string) => void): () => void {
   invalidationListeners.add(fn);
@@ -288,13 +309,17 @@ export function onCacheEventsHealthChange(
 /** Connect to the SSE cache invalidation stream. Call once at app startup.
  *
  *  The SSE stream carries event IDs (``id: N``). On reconnect, the
- *  browser sends ``Last-Event-ID: N`` automatically, and the server
- *  replays everything the client missed. No custom reconnection
- *  logic needed — EventSource handles it. */
+ *  browser sends ``Last-Event-ID: N`` automatically while the page is
+ *  alive. We also persist the cursor so a full page reload can resume
+ *  without replaying invalidations already applied by the previous page. */
 export function connectCacheEvents(): () => void {
   if (eventSource) return () => {};
 
-  const url = apiSseUrl("/api/cache/events");
+  const lastEventId = persistedCacheEventId();
+  const path = lastEventId
+    ? `/api/cache/events?last_event_id=${encodeURIComponent(lastEventId)}`
+    : "/api/cache/events";
+  const url = apiSseUrl(path);
 
   try {
     eventSource = new EventSource(url, {
@@ -310,6 +335,7 @@ export function connectCacheEvents(): () => void {
     eventSource.onmessage = (event) => {
       const scope = event.data?.trim();
       if (!scope) return;
+      persistCacheEventId(event.lastEventId);
       markSseChannelEvent(CACHE_EVENTS_CHANNEL, {
         degradeAfterMs: CACHE_EVENTS_DEGRADE_AFTER_MS,
       });

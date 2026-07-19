@@ -8,6 +8,8 @@ headers while stripping hop-by-hop headers and blocking local credentials.
 from __future__ import annotations
 
 import inspect
+import threading
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -43,6 +45,11 @@ SAFE_RESPONSE_HEADERS = {
 }
 SAFE_REQUEST_HEADERS = {"range", "if-range", "accept"}
 
+REVOCATION_PROBE_TTL_SECONDS = 0.25
+_REVOCATION_PROBE_MAX_ENTRIES = 4096
+_revocation_probe_cache: dict[tuple[int, str], tuple[float, bool]] = {}
+_revocation_probe_lock = threading.Lock()
+
 
 def requested_byte_count(file_size: int, range_header: str | None) -> int:
     if not range_header or not range_header.lower().startswith("bytes="):
@@ -71,10 +78,43 @@ def _revocation_key(ticket_uid: str) -> str:
 
 def revoke_active_stream(redis_client, ticket_uid: str, *, ttl: int = 300) -> None:
     redis_client.set(_revocation_key(ticket_uid), "1", ex=ttl)
+    with _revocation_probe_lock:
+        _revocation_probe_cache[(id(redis_client), ticket_uid)] = (
+            time.monotonic() + REVOCATION_PROBE_TTL_SECONDS,
+            True,
+        )
 
 
 def is_stream_revoked(redis_client, ticket_uid: str) -> bool:
-    return bool(redis_client.get(_revocation_key(ticket_uid)))
+    cache_key = (id(redis_client), ticket_uid)
+    now = time.monotonic()
+    with _revocation_probe_lock:
+        cached = _revocation_probe_cache.get(cache_key)
+        if cached and cached[0] > now:
+            return cached[1]
+
+    revoked = bool(redis_client.get(_revocation_key(ticket_uid)))
+    with _revocation_probe_lock:
+        if len(_revocation_probe_cache) >= _REVOCATION_PROBE_MAX_ENTRIES:
+            expired = [
+                key
+                for key, (deadline, _) in _revocation_probe_cache.items()
+                if deadline <= now
+            ]
+            for key in expired:
+                _revocation_probe_cache.pop(key, None)
+            if len(_revocation_probe_cache) >= _REVOCATION_PROBE_MAX_ENTRIES:
+                _revocation_probe_cache.clear()
+        _revocation_probe_cache[cache_key] = (
+            now + REVOCATION_PROBE_TTL_SECONDS,
+            revoked,
+        )
+    return revoked
+
+
+def clear_revocation_probe_cache() -> None:
+    with _revocation_probe_lock:
+        _revocation_probe_cache.clear()
 
 
 class _StreamTerminated(Exception):
@@ -190,7 +230,9 @@ __all__ = [
     "SAFE_RESPONSE_HEADERS",
     "TICKET_TTL_MINUTES",
     "FederationQuotaResponse",
+    "REVOCATION_PROBE_TTL_SECONDS",
     "create_ticket",
+    "clear_revocation_probe_cache",
     "filter_request_headers",
     "filter_response_headers",
     "is_stream_revoked",

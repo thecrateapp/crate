@@ -26,6 +26,35 @@ from crate.worker_handlers import (
 log = logging.getLogger(__name__)
 
 
+def _handle_resolve_external_artist_artwork(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    artist_name = str(params.get("artist_name") or "").strip()
+    if not artist_name:
+        return {"error": "Artist name is required"}
+
+    from crate.external_artist_artwork import (
+        mark_external_artist_artwork_missing,
+        persist_external_artist_artwork,
+        resolve_external_artist_artwork,
+    )
+
+    image = resolve_external_artist_artwork(artist_name)
+    if not image:
+        mark_external_artist_artwork_missing(artist_name)
+        return {"status": "missing", "artist_name": artist_name}
+
+    try:
+        persist_external_artist_artwork(artist_name, image)
+    except (OSError, RuntimeError, ValueError):
+        log.debug("External artwork persistence failed for %s", artist_name)
+        mark_external_artist_artwork_missing(artist_name)
+        return {"status": "missing", "artist_name": artist_name}
+
+    return {"status": "cached", "artist_name": artist_name}
+
+
 def _handle_fetch_artwork_all(task_id: str, params: dict, config: dict) -> dict:
     from crate.artwork import fetch_cover_from_caa, save_cover, scan_missing_covers
 
@@ -672,6 +701,7 @@ def _handle_fetch_album_cover(task_id: str, params: dict, config: dict) -> dict:
 
 
 ARTWORK_TASK_HANDLERS: dict[str, TaskHandler] = {
+    "resolve_external_artist_artwork": _handle_resolve_external_artist_artwork,
     "fetch_cover": _handle_fetch_cover,
     "fetch_album_cover": _handle_fetch_album_cover,
     "fetch_artist_covers": _handle_fetch_artist_covers,

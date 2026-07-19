@@ -87,19 +87,14 @@ def _has_probable_setlist(result: dict) -> bool:
     return isinstance(songs, list) and len(songs) > 0
 
 
-def _with_probable_setlist(name: str, result: dict, *, allow_live: bool) -> dict:
+def _with_probable_setlist(name: str, result: dict) -> dict:
     """Fill stale enrichment payloads that were cached before setlists existed."""
     if _has_probable_setlist(result):
         return result
 
     songs = setlistfm.get_cached_probable_setlist(name)
-    if not songs and allow_live:
-        try:
-            songs = setlistfm.get_probable_setlist(name)
-        except Exception:
-            log.debug("Setlist.fm enrichment failed for %s", name, exc_info=True)
-            songs = None
     if not songs:
+        setlistfm.queue_probable_setlist_refresh(name)
         return result
 
     enriched = dict(result or {})
@@ -120,7 +115,7 @@ def get_artist_enrichment(request: Request, name: str):
     cached = get_cache(cache_key, max_age_seconds=86400)
     if cached:
         enriched_cached = _enrich_enrichment_artist_refs(cached)
-        enriched_cached = _with_probable_setlist(name, enriched_cached, allow_live=True)
+        enriched_cached = _with_probable_setlist(name, enriched_cached)
         set_cache(cache_key, enriched_cached)
         return enriched_cached
 
@@ -129,7 +124,7 @@ def get_artist_enrichment(request: Request, name: str):
     if db_artist and db_artist.get("enriched_at"):
         result = _enrich_enrichment_artist_refs(_build_from_db(db_artist))
         if result:
-            result = _with_probable_setlist(name, result, allow_live=True)
+            result = _with_probable_setlist(name, result)
             set_cache(cache_key, result)
             return result
 
@@ -159,17 +154,7 @@ def get_artist_page_enrichment(name: str) -> dict:
                 "total_shows": len(setlist),
             }
         }
-    try:
-        live_setlist = setlistfm.get_probable_setlist(name)
-    except Exception:
-        live_setlist = None
-    if live_setlist:
-        return {
-            "setlist": {
-                "probable_setlist": live_setlist,
-                "total_shows": len(live_setlist),
-            }
-        }
+    setlistfm.queue_probable_setlist_refresh(name)
     return {}
 
 
@@ -317,15 +302,15 @@ def _build_from_db(artist: Mapping[str, Any]) -> dict:
         result["musicbrainz"] = mb
 
     # Setlist.fm (from its own cache, not stored in DB)
-    try:
-        setlist_data = setlistfm.get_probable_setlist(artist.get("name", ""))
-        if setlist_data:
-            result["setlist"] = {
-                "probable_setlist": setlist_data,
-                "total_shows": len(setlist_data),
-            }
-    except Exception:
-        pass
+    artist_name = artist.get("name", "")
+    setlist_data = setlistfm.get_cached_probable_setlist(artist_name)
+    if setlist_data:
+        result["setlist"] = {
+            "probable_setlist": setlist_data,
+            "total_shows": len(setlist_data),
+        }
+    elif artist_name:
+        setlistfm.queue_probable_setlist_refresh(artist_name)
 
     return result
 
@@ -366,15 +351,14 @@ def _fetch_enrichment(name: str) -> dict:
         log.debug("Spotify enrichment failed for %s", name)
 
     # Setlist.fm
-    try:
-        setlist = setlistfm.get_probable_setlist(name)
-        if setlist:
-            result["setlist"] = {
-                "probable_setlist": setlist,
-                "total_shows": len(setlist),
-            }
-    except Exception:
-        log.debug("Setlist.fm enrichment failed for %s", name)
+    setlist = setlistfm.get_cached_probable_setlist(name)
+    if setlist:
+        result["setlist"] = {
+            "probable_setlist": setlist,
+            "total_shows": len(setlist),
+        }
+    else:
+        setlistfm.queue_probable_setlist_refresh(name)
 
     # MusicBrainz extended
     try:
@@ -400,9 +384,10 @@ def create_setlist_playlist(request: Request, name: str):
     if user.get("id") is None:
         raise HTTPException(status_code=403, detail="User account required")
 
-    setlist = setlistfm.get_probable_setlist(name)
+    setlist = setlistfm.get_cached_probable_setlist(name)
     if not setlist:
-        raise HTTPException(status_code=404, detail="No setlist data found")
+        setlistfm.queue_probable_setlist_refresh(name)
+        raise HTTPException(status_code=425, detail="Setlist data is being prepared")
 
     from crate.api.browse_artist import _match_setlist_track
     from crate.db.repositories.playlists import replace_playlist_tracks

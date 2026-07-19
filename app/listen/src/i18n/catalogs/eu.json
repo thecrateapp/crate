@@ -769,6 +769,7 @@
   "artist.meta.listeners": "{count} entzule",
   "artist.loading": "Artista kargatzen.",
   "artist.notFound": "Artista ez da aurkitu",
+  "artist.unavailable": "Artista ez dago erabilgarri aldi baterako",
   "artist.fallbackName": "Artista",
   "artist.playSource.topTracks": "{name} artistaren kanta nagusiak",
   "artist.playSource.probableSetlist": "{name} artistaren setlist probablea",

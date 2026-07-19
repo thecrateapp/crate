@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from crate.db.tx import optional_scope, read_scope
 from crate.federation.global_matching import normalize_name
+from crate.genre_covers import genre_cover_public_url
 from crate.slugs import build_artist_slug, build_public_album_slug
 
 
@@ -25,6 +26,52 @@ def search_global_catalog(
     capped_limit = max(1, min(int(limit or 20), 50))
     if len(q) < 2:
         return {"artists": [], "albums": [], "tracks": []}
+
+    params = {
+        "query": q,
+        "pattern": f"%{_escape_like(q)}%",
+        "normalized_pattern": f"%{_escape_like(normalize_name(q))}%",
+        "limit": capped_limit,
+    }
+    with read_scope() as session:
+        rows = session.execute(_SEARCH_DOCUMENTS_SQL, params).mappings().all()
+
+    projection_ready = any(
+        row["entity_type"] == "__projection__" and row["projection_ready"]
+        for row in rows
+    )
+    if not projection_ready:
+        return _search_global_catalog_legacy(
+            q, capped_limit, include_sources=include_sources
+        )
+
+    result: dict[str, list[dict]] = {
+        "artists": [],
+        "albums": [],
+        "tracks": [],
+    }
+    result_keys = {"artist": "artists", "album": "albums", "track": "tracks"}
+    for row in rows:
+        result_key = result_keys.get(str(row["entity_type"]))
+        if result_key is None:
+            continue
+        payload_raw = row["payload_json"]
+        payload = dict(payload_raw) if isinstance(payload_raw, dict) else {}
+        if include_sources:
+            payload["source_count"] = int(row["source_count"] or 0)
+        result[result_key].append(payload)
+    return result
+
+
+def _search_global_catalog_legacy(
+    query: str,
+    limit: int,
+    *,
+    include_sources: bool = False,
+) -> dict[str, list[dict]]:
+    """Compatibility search while the materialized projection is warming."""
+    q = query.strip()
+    capped_limit = max(1, min(int(limit or 20), 50))
 
     params = {
         "query": q,
@@ -58,6 +105,56 @@ def search_global_catalog(
             .all()
         ]
     return {"artists": artists, "albums": albums, "tracks": tracks}
+
+
+_SEARCH_DOCUMENTS_SQL = text(
+    """
+    WITH projection AS (
+        SELECT status IN ('ready', 'refreshing', 'degraded') AS ready
+        FROM global_catalog_search_projection_state
+        WHERE singleton = true
+    ), ranked AS (
+        SELECT
+            document.entity_type,
+            document.payload_json,
+            document.source_count,
+            true AS projection_ready,
+            ROW_NUMBER() OVER (
+                PARTITION BY document.entity_type
+                ORDER BY
+                    document.has_local DESC,
+                    document.has_healthy_source DESC,
+                    ts_rank_cd(
+                        document.search_vector,
+                        websearch_to_tsquery('simple', :query)
+                    ) DESC,
+                    similarity(document.search_text, :query) DESC,
+                    document.source_count DESC,
+                    document.search_text ASC
+            ) AS kind_rank
+        FROM global_catalog_search_documents document
+        CROSS JOIN projection
+        WHERE projection.ready
+          AND (
+              document.search_vector @@ websearch_to_tsquery('simple', :query)
+              OR document.search_text ILIKE :pattern ESCAPE '\\'
+              OR document.normalized_text ILIKE :normalized_pattern ESCAPE '\\'
+          )
+    ), combined AS (
+        SELECT entity_type, payload_json, source_count, projection_ready,
+               kind_rank, false AS projection_row
+        FROM ranked
+        WHERE kind_rank <= :limit
+        UNION ALL
+        SELECT '__projection__', '{}'::jsonb, 0, COALESCE(ready, false),
+               0, true
+        FROM projection
+    )
+    SELECT entity_type, payload_json, source_count, projection_ready
+    FROM combined
+    ORDER BY projection_row, entity_type, kind_rank
+    """
+)
 
 
 _SOURCE_HEALTH_SQL = """
@@ -247,7 +344,12 @@ def list_global_catalog_genres() -> list[dict]:
 
 def get_global_genre_detail(slug: str) -> dict | None:
     """Return canonical genre members, expanding only locked core parents."""
-    canonical_slug = str(slug or "").strip().lower()
+    from crate.genre_taxonomy import (
+        get_core_taxonomy_descriptor,
+        resolve_genre_slug,
+    )
+
+    canonical_slug = resolve_genre_slug(slug) or str(slug or "").strip().lower()
     if not canonical_slug:
         return None
     with read_scope() as session:
@@ -255,7 +357,13 @@ def get_global_genre_detail(slug: str) -> dict | None:
             session.execute(
                 text(
                     """
-                    SELECT global_genre_uid::text AS global_genre_uid, slug, name
+                    SELECT
+                        global_genre_uid::text AS global_genre_uid,
+                        slug,
+                        name,
+                        description,
+                        external_description,
+                        cover_path
                     FROM genre_taxonomy_nodes
                     WHERE taxonomy_id = 'crate-core'
                       AND slug = :slug
@@ -294,7 +402,9 @@ def get_global_genre_detail(slug: str) -> dict | None:
             .mappings()
             .all()
         )
-    from crate.genre_taxonomy import get_core_taxonomy_descriptor
+
+    artist_payloads = [dict(row) for row in artists]
+    description = taxonomy.get("description") or taxonomy.get("external_description")
 
     return {
         "id": 0,
@@ -303,9 +413,9 @@ def get_global_genre_detail(slug: str) -> dict | None:
         "global_genre_uid": taxonomy["global_genre_uid"],
         "canonical_slug": taxonomy["slug"],
         "canonical_name": taxonomy["name"],
-        "description": None,
-        "canonical_description": None,
-        "cover_url": None,
+        "description": description,
+        "canonical_description": description,
+        "cover_url": _global_genre_cover_url(dict(taxonomy)),
         "artist_count": len(artists),
         "album_count": len(albums),
         "track_count": sum(int(row.get("track_count") or 0) for row in albums),
@@ -314,11 +424,17 @@ def get_global_genre_detail(slug: str) -> dict | None:
             "version": get_core_taxonomy_descriptor()["version"],
             "digest": get_core_taxonomy_descriptor()["digest"],
         },
-        "artists": [dict(row) for row in artists],
+        "artists": artist_payloads,
         "albums": [dict(row) for row in albums],
         "related_genres": [dict(row) for row in related_genres],
         "shows": [],
     }
+
+
+def _global_genre_cover_url(taxonomy: dict) -> str | None:
+    if taxonomy.get("cover_path"):
+        return genre_cover_public_url(str(taxonomy["slug"]), size=1280)
+    return None
 
 
 _GLOBAL_GENRE_ARTISTS_SQL = text(
@@ -362,7 +478,7 @@ _GLOBAL_GENRE_ARTISTS_SQL = text(
             THEN '/api/catalog/artists/' || artist.global_artist_uid::text || '/photo'
             ELSE NULL
         END AS photo_url,
-        NULL::bigint AS listeners,
+        local_artist.listeners,
         CASE
             WHEN inherited.direct_genre_uid = CAST(:global_genre_uid AS uuid)
             THEN 'direct'
@@ -458,6 +574,28 @@ _GLOBAL_GENRE_ALBUMS_SQL = text(
 
 _GLOBAL_GENRE_RELATED_SQL = text(
     """
+    WITH RECURSIVE inherited AS (
+        SELECT
+            membership.entity_type,
+            membership.global_entity_uid,
+            membership.global_genre_uid
+        FROM global_catalog_entity_genres membership
+        WHERE membership.entity_type IN ('artist', 'album')
+        UNION
+        SELECT
+            inherited.entity_type,
+            inherited.global_entity_uid,
+            parent.global_genre_uid
+        FROM inherited
+        JOIN genre_taxonomy_nodes child
+          ON child.taxonomy_id = 'crate-core'
+         AND child.global_genre_uid = inherited.global_genre_uid
+        JOIN genre_taxonomy_edges parent_edge
+          ON parent_edge.source_genre_id = child.id
+         AND parent_edge.relation_type = 'parent'
+         AND parent_edge.locked
+        JOIN genre_taxonomy_nodes parent ON parent.id = parent_edge.target_genre_id
+    )
     SELECT
         related.slug,
         related.name,
@@ -468,21 +606,65 @@ _GLOBAL_GENRE_RELATED_SQL = text(
             WHEN 'related' THEN 'Related'
             ELSE edge.relation_type
         END AS relation_label,
-        related.description,
-        0::integer AS artist_count,
-        0::integer AS album_count,
-        0::integer AS content_score,
-        NULL::text AS cover_url,
-        NULL::text AS top_artist_photo_url
+        COALESCE(related.description, related.external_description) AS description,
+        COALESCE(counts.artist_count, 0)::integer AS artist_count,
+        COALESCE(counts.album_count, 0)::integer AS album_count,
+        (
+            COALESCE(counts.artist_count, 0) * 3
+            + COALESCE(counts.album_count, 0)
+        )::integer AS content_score,
+        CASE
+            WHEN NULLIF(related.cover_path, '') IS NOT NULL THEN
+                '/api/genres/' || related.slug || '/cover?size=640&format=webp'
+            ELSE NULL
+        END AS cover_url,
+        top_artist.global_artist_uid::text AS top_artist_global_uid,
+        top_artist.local_artist_id AS top_artist_id,
+        CASE
+            WHEN top_artist.global_artist_uid IS NOT NULL THEN
+                '/api/catalog/artists/' || top_artist.global_artist_uid::text
+                || '/photo?size=640&format=webp'
+            ELSE NULL
+        END AS top_artist_photo_url
     FROM genre_taxonomy_nodes source
     JOIN genre_taxonomy_edges edge
       ON edge.source_genre_id = source.id
      AND edge.locked
     JOIN genre_taxonomy_nodes related ON related.id = edge.target_genre_id
+    LEFT JOIN LATERAL (
+        SELECT
+            COUNT(DISTINCT inherited.global_entity_uid)
+                FILTER (WHERE inherited.entity_type = 'artist') AS artist_count,
+            COUNT(DISTINCT inherited.global_entity_uid)
+                FILTER (WHERE inherited.entity_type = 'album') AS album_count
+        FROM inherited
+        WHERE inherited.global_genre_uid = related.global_genre_uid
+    ) counts ON TRUE
+    LEFT JOIN LATERAL (
+        SELECT artist.global_artist_uid, artist.local_artist_id
+        FROM global_catalog_artists artist
+        WHERE artist.has_photo
+          AND EXISTS (
+              SELECT 1
+              FROM inherited
+              WHERE inherited.entity_type = 'artist'
+                AND inherited.global_entity_uid = artist.global_artist_uid
+                AND inherited.global_genre_uid = related.global_genre_uid
+          )
+        ORDER BY
+            artist.has_local DESC,
+            artist.source_count DESC,
+            artist.canonical_name ASC
+        LIMIT 1
+    ) top_artist ON TRUE
     WHERE source.taxonomy_id = 'crate-core'
       AND source.global_genre_uid = CAST(:global_genre_uid AS uuid)
       AND related.taxonomy_id = 'crate-core'
       AND edge.relation_type IN ('parent', 'related')
+      AND (
+          COALESCE(counts.artist_count, 0) > 0
+          OR COALESCE(counts.album_count, 0) > 0
+      )
     ORDER BY edge.relation_type, related.name
     """
 )

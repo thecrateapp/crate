@@ -746,8 +746,6 @@ def api_album(request: Request, artist: str, album: str):
                 "bliss_vector": track.get("bliss_vector"),
                 "length_sec": round(duration) if duration else 0,
                 "popularity": track.get("popularity"),
-                "popularity_score": track.get("popularity_score"),
-                "popularity_confidence": track.get("popularity_confidence"),
                 "rating": track.get("rating", 0) or 0,
                 "stream_variants": variant_map.get(track["id"], []),
                 "lyrics": lyrics_map.get(

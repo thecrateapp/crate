@@ -10,13 +10,14 @@ import (
 )
 
 type homeSliceDef struct {
-	payloadKey string
-	wrapItems  bool
+	payloadKey    string
+	wrapItems     bool
+	snapshotScope string
 }
 
 var homeSliceRoutes = map[string]homeSliceDef{
 	"/api/me/home/hero":               {payloadKey: "hero"},
-	"/api/me/home/recently-played":    {payloadKey: "recently_played", wrapItems: true},
+	"/api/me/home/recently-played":    {payloadKey: "recently_played", wrapItems: true, snapshotScope: "home:recently-played"},
 	"/api/me/home/mixes":              {payloadKey: "custom_mixes", wrapItems: true},
 	"/api/me/home/suggested-albums":   {payloadKey: "suggested_albums", wrapItems: true},
 	"/api/me/home/recommended-tracks": {payloadKey: "recommended_tracks", wrapItems: true},
@@ -44,7 +45,11 @@ func (s *Server) homeSlice(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, http.StatusServiceUnavailable, "Fresh home slice requires FastAPI fallback")
 		return
 	}
-	row, err := s.snapshots.Get(r.Context(), "home:discovery", strconv.FormatInt(user.ID, 10))
+	snapshotScope := def.snapshotScope
+	if snapshotScope == "" {
+		snapshotScope = "home:discovery"
+	}
+	row, err := s.snapshots.Get(r.Context(), snapshotScope, strconv.FormatInt(user.ID, 10))
 	if err != nil {
 		if s.tryFallback(w, r) {
 			return

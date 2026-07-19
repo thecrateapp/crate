@@ -47,6 +47,28 @@ func TestSnapshotFreshness(t *testing.T) {
 	})
 }
 
+func TestStoreFreshnessPolicyByScope(t *testing.T) {
+	store := NewStore(nil, time.Second, 10*time.Minute, time.Hour)
+	store.SetScopeFreshness("stats:", 5*time.Minute, 24*time.Hour)
+
+	tests := []struct {
+		name      string
+		scope     string
+		wantMax   time.Duration
+		wantStale time.Duration
+	}{
+		{name: "home uses defaults", scope: "home:discovery", wantMax: 10 * time.Minute, wantStale: time.Hour},
+		{name: "stats uses long stale window", scope: "stats:dashboard", wantMax: 5 * time.Minute, wantStale: 24 * time.Hour},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			maxAge, staleMaxAge := store.freshnessForScope(tt.scope)
+			assert.Equal(t, tt.wantMax, maxAge)
+			assert.Equal(t, tt.wantStale, staleMaxAge)
+		})
+	}
+}
+
 func TestRequireMatchingTaxonomy(t *testing.T) {
 	matchingTaxonomy := &Row{Payload: map[string]any{
 		"taxonomy": map[string]any{

@@ -2,7 +2,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from crate.api.image_variants import resize_image_bytes
+from crate.api.image_variants import clear_image_variant_cache, resize_image_bytes
 
 
 def _make_image_bytes(
@@ -57,3 +57,25 @@ def test_resize_image_bytes_leaves_unsupported_formats_untouched():
 
     assert media_type == "image/svg+xml"
     assert resized == content
+
+
+def test_resize_image_bytes_reuses_materialized_variant(monkeypatch):
+    from crate.api import image_variants
+
+    clear_image_variant_cache()
+    content = _make_image_bytes((1600, 1200), image_format="JPEG")
+    real_open = image_variants.Image.open
+    open_calls = 0
+
+    def counted_open(*args, **kwargs):
+        nonlocal open_calls
+        open_calls += 1
+        return real_open(*args, **kwargs)
+
+    monkeypatch.setattr(image_variants.Image, "open", counted_open)
+
+    first = resize_image_bytes(content, "image/jpeg", size=320, output_format="webp")
+    second = resize_image_bytes(content, "image/jpeg", size=320, output_format="webp")
+
+    assert second == first
+    assert open_calls == 1

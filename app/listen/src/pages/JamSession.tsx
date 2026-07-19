@@ -124,14 +124,17 @@ function searchTrackToTrack(track: SearchTrack): Track {
     },
     {
       cover: track.album
-        ? albumCoverApiUrl({
-            albumId: track.album_id,
-            albumEntityUid: track.album_entity_uid,
-            artistEntityUid: track.artist_entity_uid,
-            albumSlug: track.album_slug,
-            artistName: track.artist,
-            albumName: track.album,
-          })
+        ? albumCoverApiUrl(
+            {
+              albumId: track.album_id,
+              albumEntityUid: track.album_entity_uid,
+              artistEntityUid: track.artist_entity_uid,
+              albumSlug: track.album_slug,
+              artistName: track.artist,
+              albumName: track.album,
+            },
+            { size: 512 },
+          )
         : undefined,
     },
   );

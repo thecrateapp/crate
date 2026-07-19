@@ -115,23 +115,12 @@ from crate.db.queries.user_library import (
     get_replay_mix,
     get_saved_albums,
     get_stats_overview,
-    get_stats_story,
     get_stats_trends,
     get_top_albums,
     get_top_artists,
     get_top_genres,
     get_top_tracks,
     is_following,
-)
-from crate.db.queries.user_library_stats_month import (
-    get_month_replay_mix,
-    get_month_stats_overview,
-    get_month_stats_trends,
-    get_month_top_albums,
-    get_month_top_artists,
-    get_month_top_genres,
-    get_month_top_tracks,
-    month_period_key,
 )
 from crate.db.repositories.artist_suggestions import (
     create_artist_suggestion,
@@ -166,6 +155,7 @@ from crate.db.repositories.user_library import (
     unlike_track,
     unsave_album,
 )
+from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
 from crate.db.repositories.user_library_shared import resolve_track_reference
 from crate.db.repositories.users import (
     get_remote_scrobbling_enabled,
@@ -414,29 +404,22 @@ async def _home_discovery_stream(
 
 
 def _probable_setlists_for_artists(artist_names: list[str]) -> dict[str, list[dict]]:
+    from crate.setlistfm import (
+        get_cached_probable_setlist,
+        queue_probable_setlist_refreshes,
+    )
+
     result: dict[str, list[dict]] = {}
     missing: list[str] = []
     for artist_name in artist_names:
-        cached = get_cache(
-            f"setlistfm:probable:{artist_name.lower()}", max_age_seconds=86400 * 7
-        )
-        songs = cached.get("songs") if isinstance(cached, dict) else None
+        songs = get_cached_probable_setlist(artist_name)
         if songs:
             result[artist_name] = songs
         else:
             missing.append(artist_name)
 
-    # Lazy-fetch from setlist.fm for artists not yet cached
     if missing:
-        from crate.setlistfm import get_probable_setlist
-
-        for artist_name in missing:
-            try:
-                songs = get_probable_setlist(artist_name)
-                if songs:
-                    result[artist_name] = songs
-            except Exception:
-                pass
+        queue_probable_setlist_refreshes(missing)
 
     return result
 
@@ -452,68 +435,16 @@ def _get_cached_stats_dashboard(
     genres_limit: int,
     replay_limit: int,
 ) -> dict:
-    period_key = month_period_key(month) if month else window
-    cache_mode = _listen_global_cache_mode()
-    cache_key = (
-        f"listen:stats_dashboard:v5:{cache_mode}:{user_id}:{period_key}:"
-        f"{tracks_limit}:{artists_limit}:{albums_limit}:{genres_limit}:{replay_limit}"
+    return get_user_stats_dashboard(
+        user_id,
+        window=window,
+        month=month,
+        tracks_limit=tracks_limit,
+        artists_limit=artists_limit,
+        albums_limit=albums_limit,
+        genres_limit=genres_limit,
+        replay_limit=replay_limit,
     )
-    cached = get_cache(cache_key, max_age_seconds=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-    if cached is not None:
-        return cached
-
-    if month:
-        payload = {
-            "window": period_key,
-            "overview": get_month_stats_overview(user_id, month),
-            "trends": get_month_stats_trends(user_id, month),
-            "top_tracks": {
-                "window": period_key,
-                "items": get_month_top_tracks(user_id, month, limit=tracks_limit),
-            },
-            "top_artists": {
-                "window": period_key,
-                "items": get_month_top_artists(user_id, month, limit=artists_limit),
-            },
-            "top_albums": {
-                "window": period_key,
-                "items": get_month_top_albums(user_id, month, limit=albums_limit),
-            },
-            "top_genres": {
-                "window": period_key,
-                "items": get_month_top_genres(user_id, month, limit=genres_limit),
-            },
-            "replay": get_month_replay_mix(user_id, month, limit=replay_limit),
-            "story": get_stats_story(user_id, window=window, month=month),
-        }
-        set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-        return payload
-
-    payload = {
-        "window": window,
-        "overview": get_stats_overview(user_id, window=window),
-        "trends": get_stats_trends(user_id, window=window),
-        "top_tracks": {
-            "window": window,
-            "items": get_top_tracks(user_id, window=window, limit=tracks_limit),
-        },
-        "top_artists": {
-            "window": window,
-            "items": get_top_artists(user_id, window=window, limit=artists_limit),
-        },
-        "top_albums": {
-            "window": window,
-            "items": get_top_albums(user_id, window=window, limit=albums_limit),
-        },
-        "top_genres": {
-            "window": window,
-            "items": get_top_genres(user_id, window=window, limit=genres_limit),
-        },
-        "replay": get_replay_mix(user_id, window=window, limit=replay_limit),
-        "story": get_stats_story(user_id, window=window),
-    }
-    set_cache(cache_key, payload, ttl=_STATS_DASHBOARD_CACHE_TTL_SECONDS)
-    return payload
 
 
 def _build_upcoming_insights(

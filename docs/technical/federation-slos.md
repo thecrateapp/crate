@@ -4,18 +4,22 @@ These objectives apply to the node-first federation protocol. A singleton node i
 
 ## Service-level objectives
 
-| Signal                   | Objective                                                  | Measurement window |
-| ------------------------ | ---------------------------------------------------------- | ------------------ |
-| Singleton catalog reads  | Match the local baseline availability                      | rolling 30 days    |
-| Local catalog search     | p95 at or below 300 ms at the 100K-track reference profile | per release        |
-| Federated metadata reads | 99.5% success, excluding peer-caused 4xx                   | rolling 30 days    |
-| Search fanout            | p95 at or below 2 seconds with partial results             | rolling 24 hours   |
-| Remote stream TTFB       | p95 at or below 1.5 seconds between reference nodes        | rolling 24 hours   |
-| Playback startup p95     | at or below 2 seconds, local and remote                    | rolling 24 hours   |
-| Playback stall ratio     | below 2% of starts                                         | rolling 24 hours   |
-| Catalog sync lag         | healthy below 5 minutes                                    | per peer           |
-| Security contracts       | zero quota, SSRF, grant, replay, or signature bypasses     | every release      |
-| Import cleanup           | 100% of failures release reservations and temporary files  | rolling 24 hours   |
+| Signal                   | Objective                                                    | Measurement window |
+| ------------------------ | ------------------------------------------------------------ | ------------------ |
+| Singleton catalog reads  | Match the local baseline availability                        | rolling 30 days    |
+| Local catalog search     | p95 at or below 300 ms at the 100K-track reference profile   | per release        |
+| Federated metadata reads | 99.5% success, excluding peer-caused 4xx                     | rolling 30 days    |
+| Search fanout            | p95 at or below 2 seconds with partial results               | rolling 24 hours   |
+| Remote stream TTFB       | p95 at or below 1.5 seconds between reference nodes          | rolling 24 hours   |
+| Playback startup p95     | at or below 2 seconds, local and remote                      | rolling 24 hours   |
+| Playback stall ratio     | below 2% of starts                                           | rolling 24 hours   |
+| Catalog sync lag         | healthy below 5 minutes                                      | per peer           |
+| Security contracts       | zero quota, SSRF, grant, replay, or signature bypasses       | every release      |
+| Import cleanup           | 100% of failures release reservations and temporary files    | rolling 24 hours   |
+| Readplane fallback       | below 5% of hot reads outside rollout windows                | rolling 15 minutes |
+| SQL pool saturation      | below 80% and zero indefinite checkout waits                 | rolling 15 minutes |
+| Event outbox delivery    | p95 below 30 seconds; zero unreviewed dead letters           | rolling 15 minutes |
+| Snapshot freshness       | home/stats stale age below 10 minutes during healthy runtime | rolling 15 minutes |
 
 Metric labels have bounded cardinality: known peer UUID and an enumerated reason code only. URLs, tokens, key material, user identifiers, subject assertions, paths, and free-form upstream errors are prohibited.
 
@@ -30,6 +34,9 @@ Metric labels have bounded cardinality: known peer UUID and an enumerated reason
 | Sync lag                   | 15 minutes             | any approved healthy peer above 5 minutes         | [Catalog recovery](federation-operations-runbook.md#cursor-expired-corrupt-or-stuck-sync)  |
 | Signature or replay flood  | 5 minutes              | score at or above 80                              | [Federation security](federation-operations-runbook.md#signature-replay-or-abuse-incident) |
 | Import cleanup failure     | 10 minutes             | any unreleased reservation after terminal failure | [Import recovery](federation-operations-runbook.md#stuck-or-failed-import)                 |
+| Readplane fallback burn    | 15 minutes             | fallback ratio above 5% or circuit open           | [Read plane recovery](federation-operations-runbook.md#read-plane-outage)                  |
+| Database saturation        | 10 minutes             | pool above 80% or canceled acquires increasing    | [Read plane recovery](federation-operations-runbook.md#read-plane-outage)                  |
+| Outbox delivery stalled    | 5 minutes              | oldest pending above 5m or any dead letter        | [Redis recovery](federation-operations-runbook.md#cache-redis-or-durable-redis-incident)   |
 
 Alerts aggregate over a window rather than paging for a single peer request. Temporary risk actions always expire and are reversible from Admin; disabling a peer remains a manual operator decision.
 

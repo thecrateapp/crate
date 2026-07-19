@@ -19,6 +19,8 @@ x-crate-env: &crate-env
   JWT_SECRET: ${JWT_SECRET:-change-me}
   DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin}
   REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+  REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+  REDIS_DURABLE_URL: redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0
   CRATE_METRICS_REDIS_TTL_SECONDS: ${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -26,8 +28,8 @@ x-crate-env: &crate-env
   APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
   APPLE_KEY_ID: ${APPLE_KEY_ID:-}
   APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
-  OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
-  LLM_PROVIDER: ${LLM_PROVIDER:-ollama/llama3.1:8b}
+  OLLAMA_URL: ${OLLAMA_URL:-}
+  LLM_PROVIDER: ${LLM_PROVIDER:-}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -127,6 +129,24 @@ services:
     networks:
       - crate
 
+  crate-redis-durable:
+    image: redis:7-alpine
+    container_name: crate-redis-durable
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ${DATA_DIR}/redis-durable:/data
+    networks:
+      - crate
+
   crate-postgres:
     image: pgvector/pgvector:pg15
     container_name: crate-postgres
@@ -209,6 +229,8 @@ services:
         condition: service_healthy
       crate-redis:
         condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
       crate-media-worker:
         condition: service_started
     networks:
@@ -255,6 +277,8 @@ services:
       CRATE_POSTGRES_HOST: crate-postgres
       CRATE_POSTGRES_PORT: 5432
       REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      REDIS_DURABLE_URL: redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0
       JWT_SECRET: ${JWT_SECRET:-change-me}
       READPLANE_ENABLED: ${READPLANE_ENABLED:-true}
       READPLANE_ENABLE_SSE: ${READPLANE_ENABLE_SSE:-true}
@@ -271,10 +295,15 @@ services:
       READPLANE_QUERY_TIMEOUT_MS: ${READPLANE_QUERY_TIMEOUT_MS:-800}
       READPLANE_SNAPSHOT_MAX_AGE_SECONDS: ${READPLANE_SNAPSHOT_MAX_AGE_SECONDS:-600}
       READPLANE_STALE_MAX_AGE_SECONDS: ${READPLANE_STALE_MAX_AGE_SECONDS:-3600}
+      READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS: ${READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS:-300}
+      READPLANE_STATS_STALE_MAX_AGE_SECONDS: ${READPLANE_STATS_STALE_MAX_AGE_SECONDS:-86400}
+      READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: ${READPLANE_SESSION_TOUCH_INTERVAL_SECONDS:-60}
     depends_on:
       crate-postgres:
         condition: service_healthy
       crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
         condition: service_healthy
       crate-api:
         condition: service_healthy
@@ -286,13 +315,20 @@ services:
     labels:
       traefik.enable: true
       traefik.docker.network: crate
-      traefik.http.routers.crate-readplane-catalog.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && PathPrefix(`/api/catalog/`)
-      traefik.http.routers.crate-readplane-catalog.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
-      traefik.http.routers.crate-readplane-catalog.middlewares: crate-api-compress@docker
-      traefik.http.routers.crate-readplane-catalog.priority: 100
-      traefik.http.routers.crate-readplane-catalog.tls: ${TRAEFIK_TLS_ENABLED:-true}
-      traefik.http.routers.crate-readplane-catalog.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
-      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && PathPrefix(`/api/federation/remote/streams/`)
+      traefik.http.routers.crate-readplane-interactive.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && (PathPrefix(`/api/catalog/`) || PathPrefix(`/api/me/home/`) || PathPrefix(`/api/me/albums`) || PathPrefix(`/api/me/follows`) || PathPrefix(`/api/genres`) || PathPrefix(`/api/artists/`) || PathPrefix(`/api/artist-slugs/`) || PathPrefix(`/api/albums/`) || Path(`/api/auth/me`) || Path(`/api/me`) || Path(`/api/me/history`) || Path(`/api/me/likes`) || Path(`/api/me/stats/dashboard`) || Path(`/api/search`) || Path(`/api/favorites`))
+      traefik.http.routers.crate-readplane-interactive.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-interactive.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-readplane-interactive.priority: 100
+      traefik.http.routers.crate-readplane-interactive.service: crate-readplane-interactive@file
+      traefik.http.routers.crate-readplane-interactive.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-interactive.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-sse.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && (Path(`/api/cache/events`) || Path(`/api/me/home/discovery-stream`))
+      traefik.http.routers.crate-readplane-sse.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-sse.priority: 120
+      traefik.http.routers.crate-readplane-sse.service: crate-readplane-sse@file
+      traefik.http.routers.crate-readplane-sse.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-sse.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && (PathPrefix(`/api/federation/remote/streams/`) || PathPrefix(`/api/tracks/`))
       traefik.http.routers.crate-readplane-stream.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
       traefik.http.routers.crate-readplane-stream.priority: 110
       traefik.http.routers.crate-readplane-stream.tls: ${TRAEFIK_TLS_ENABLED:-true}
@@ -332,6 +368,8 @@ services:
         condition: service_healthy
       crate-redis:
         condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
     networks:
       - crate
     mem_limit: 1536m
@@ -352,6 +390,13 @@ services:
     extends:
       service: crate-worker
     container_name: crate-fast-worker
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "0.35"
@@ -390,6 +435,8 @@ services:
         condition: service_healthy
       crate-redis:
         condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
     networks:
       - crate
     mem_limit: 512m
@@ -416,6 +463,8 @@ services:
       crate-postgres:
         condition: service_healthy
       crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
         condition: service_healthy
     networks:
       - crate
@@ -455,6 +504,8 @@ services:
         condition: service_healthy
       crate-redis:
         condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
     networks:
       - crate
     mem_limit: 2g
@@ -492,6 +543,8 @@ services:
       crate-postgres:
         condition: service_healthy
       crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
         condition: service_healthy
     networks:
       - crate

@@ -72,6 +72,7 @@ export interface ImageAssetOptions {
 
 const artistAssetVersions = new Map<number, string>();
 const albumAssetVersions = new Map<number, string>();
+const genreAssetVersions = new Map<string, string>();
 let globalArtistAssetVersion: string | null = null;
 let globalAlbumAssetVersion: string | null = null;
 
@@ -256,6 +257,11 @@ export function recordAssetInvalidationScope(
     if (Number.isFinite(albumId)) {
       albumAssetVersions.set(albumId, String(version));
     }
+    return;
+  }
+  if (scope.startsWith("genre:")) {
+    const genreSlug = slugifySegment(scope.slice("genre:".length), "");
+    if (genreSlug) genreAssetVersions.set(genreSlug, String(version));
   }
 }
 
@@ -337,10 +343,17 @@ export function artistPhotoApiUrl(
 ) {
   const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
   if (globalArtistUid) {
+    const runtimeVersion =
+      input.artistId != null
+        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
+        : globalArtistAssetVersion;
     return resolveAssetUrl(
       withAssetOptions(
         `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/photo`,
-        options,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
       ),
     );
   }
@@ -379,10 +392,17 @@ export function artistBackgroundApiUrl(
 ) {
   const globalArtistUid = input.globalArtistUid || input.global_artist_uid;
   if (globalArtistUid) {
+    const runtimeVersion =
+      input.artistId != null
+        ? artistAssetVersions.get(input.artistId) ?? globalArtistAssetVersion
+        : globalArtistAssetVersion;
     return resolveAssetUrl(
       withAssetOptions(
         `/api/catalog/artists/${encodeEntityUid(globalArtistUid)}/background`,
-        options,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
       ),
     );
   }
@@ -669,10 +689,17 @@ export function albumCoverApiUrl(
 ) {
   const globalAlbumUid = input.globalAlbumUid || input.global_album_uid;
   if (globalAlbumUid) {
+    const runtimeVersion =
+      input.albumId != null
+        ? albumAssetVersions.get(input.albumId) ?? globalAlbumAssetVersion
+        : globalAlbumAssetVersion;
     return resolveAssetUrl(
       withAssetOptions(
         `/api/catalog/albums/${encodeEntityUid(globalAlbumUid)}/cover`,
-        options,
+        {
+          ...options,
+          version: resolveAssetVersion(options?.version, runtimeVersion),
+        },
       ),
     );
   }
@@ -701,4 +728,18 @@ export function albumCoverApiUrl(
     );
   }
   return "";
+}
+
+export function genreCoverApiUrl(slug: string, options?: ImageAssetOptions) {
+  const normalizedSlug = slugifySegment(slug, "");
+  if (!normalizedSlug) return "";
+  return resolveAssetUrl(
+    withAssetOptions(`/api/genres/${encPath(normalizedSlug)}/cover`, {
+      ...options,
+      version: resolveAssetVersion(
+        options?.version,
+        genreAssetVersions.get(normalizedSlug),
+      ),
+    }),
+  );
 }

@@ -105,6 +105,56 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 	}
 	like := "%" + escapeGlobalSearchLike(q) + "%"
 	normalizedLike := "%" + escapeGlobalSearchLike(normalizeGlobalSearchQuery(q)) + "%"
+	queryCtx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
+	defer cancel()
+	documentRows, err := rowsToMaps(s.pool.Query(queryCtx, `
+		WITH projection AS (
+			SELECT status IN ('ready', 'refreshing', 'degraded') AS ready
+			FROM global_catalog_search_projection_state
+			WHERE singleton = true
+		), ranked AS (
+			SELECT document.entity_type, document.payload_json, true AS projection_ready,
+			       ROW_NUMBER() OVER (
+					PARTITION BY document.entity_type
+					ORDER BY document.has_local DESC,
+					         document.has_healthy_source DESC,
+					         ts_rank_cd(document.search_vector, websearch_to_tsquery('simple', $1)) DESC,
+					         similarity(document.search_text, $1) DESC,
+					         document.source_count DESC,
+					         document.search_text ASC
+				) AS kind_rank
+			FROM global_catalog_search_documents document
+			CROSS JOIN projection
+			WHERE projection.ready
+			  AND (
+				document.search_vector @@ websearch_to_tsquery('simple', $1)
+				OR document.search_text ILIKE $2 ESCAPE '\\'
+				OR document.normalized_text ILIKE $3 ESCAPE '\\'
+			  )
+		), combined AS (
+			SELECT entity_type, payload_json, projection_ready, kind_rank,
+			       false AS projection_row
+			FROM ranked
+			WHERE kind_rank <= $4
+			UNION ALL
+			SELECT '__projection__', '{}'::jsonb, COALESCE(ready, false), 0, true
+			FROM projection
+		)
+		SELECT entity_type, payload_json, projection_ready
+		FROM combined
+		ORDER BY projection_row, entity_type, kind_rank
+	`, q, like, normalizedLike, cappedLimit))
+	if err == nil {
+		if payload, ready := partitionGlobalSearchDocumentRows(documentRows); ready {
+			return payload, nil
+		}
+	}
+	return s.globalSearchLegacy(ctx, q, cappedLimit)
+}
+
+func (s *Store) globalSearchLegacy(ctx context.Context, q string, cappedLimit int) (map[string]any, error) {
+	like := "%" + escapeGlobalSearchLike(q) + "%"
+	normalizedLike := "%" + escapeGlobalSearchLike(normalizeGlobalSearchQuery(q)) + "%"
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
@@ -220,6 +270,33 @@ func (s *Store) GlobalSearch(ctx context.Context, query string, limit int) (map[
 		return nil, err
 	}
 	return map[string]any{"artists": artists, "albums": albums, "tracks": tracks}, nil
+}
+
+func partitionGlobalSearchDocumentRows(rows []map[string]any) (map[string]any, bool) {
+	artists := []map[string]any{}
+	albums := []map[string]any{}
+	tracks := []map[string]any{}
+	ready := false
+	for _, row := range rows {
+		entityType := stringValue(row["entity_type"])
+		if entityType == "__projection__" {
+			ready = boolValue(row["projection_ready"])
+			continue
+		}
+		payload, ok := row["payload_json"].(map[string]any)
+		if !ok {
+			continue
+		}
+		switch entityType {
+		case "artist":
+			artists = append(artists, cloneMap(payload))
+		case "album":
+			albums = append(albums, cloneMap(payload))
+		case "track":
+			tracks = append(tracks, cloneMap(payload))
+		}
+	}
+	return map[string]any{"artists": artists, "albums": albums, "tracks": tracks}, ready
 }
 
 // CanonicalSearch selects the newest complete read model without making search

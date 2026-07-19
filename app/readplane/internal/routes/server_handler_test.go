@@ -758,6 +758,10 @@ func TestHomeDiscovery_SnapshotDependent(t *testing.T) {
 	t.Skip("TEST_GAP: requires valid JWT to reach snapshot Get() call; auth integration needed")
 }
 
+func TestStatsDashboard_NoToken(t *testing.T) {
+	assertUnauthorized(t, newTestServerWithAuth(), http.MethodGet, "/api/me/stats/dashboard")
+}
+
 // ── Snapshot helper (quick sanity on decode/shape) ────────────────────────
 
 func TestSnapshotDecodePayload_Roundtrip(t *testing.T) {

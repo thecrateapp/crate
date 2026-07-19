@@ -263,12 +263,15 @@ export function RadioPage() {
           type: "artist",
           value: a.entity_uid || String(a.id),
           label: a.name,
-          imageUrl: artistPhotoApiUrl({
-            artistId: a.id,
-            artistEntityUid: a.entity_uid,
-            artistSlug: a.slug,
-            artistName: a.name,
-          }),
+          imageUrl: artistPhotoApiUrl(
+            {
+              artistId: a.id,
+              artistEntityUid: a.entity_uid,
+              artistSlug: a.slug,
+              artistName: a.name,
+            },
+            { size: 128 },
+          ),
         });
       }
       for (const a of searchData.albums?.slice(0, 3) ?? []) {
@@ -276,14 +279,17 @@ export function RadioPage() {
           type: "album",
           value: a.entity_uid || String(a.id ?? 0),
           label: `${a.name} — ${a.artist}`,
-          imageUrl: albumCoverApiUrl({
-            albumId: a.id,
-            albumEntityUid: a.entity_uid,
-            artistEntityUid: a.artist_entity_uid,
-            albumSlug: a.slug,
-            albumName: a.name,
-            artistName: a.artist,
-          }),
+          imageUrl: albumCoverApiUrl(
+            {
+              albumId: a.id,
+              albumEntityUid: a.entity_uid,
+              artistEntityUid: a.artist_entity_uid,
+              albumSlug: a.slug,
+              albumName: a.name,
+              artistName: a.artist,
+            },
+            { size: 128 },
+          ),
         });
       }
       setResults(items);

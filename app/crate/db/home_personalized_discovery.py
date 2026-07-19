@@ -44,6 +44,7 @@ def _build_home_recommended_tracks(
     top_genres_lower: list[str],
     limit: int,
     global_artist_uids: list[str] | None = None,
+    global_track_rows: list[dict] | None = None,
 ) -> list[dict]:
     discovery_fallback = _query_discovery_tracks(
         user_id,
@@ -68,7 +69,9 @@ def _build_home_recommended_tracks(
         return local_rows
     return merge_global_track_rows(
         local_rows,
-        global_recommended_track_rows(global_artist_uids or [], limit=limit),
+        global_track_rows
+        if global_track_rows is not None
+        else global_recommended_track_rows(global_artist_uids or [], limit=limit),
         limit=limit,
     )
 
@@ -212,13 +215,14 @@ def build_home_discovery_payload(user_id: int) -> dict:
         precomputed_mixes["my-new-arrivals"] = my_new_arrivals_mix
 
     suggested_albums = _build_home_suggested_albums(recent_releases, 14)
+    global_track_rows = _global_home_track_rows(context, limit=64)
     recommended_tracks = _build_home_recommended_tracks(
         user_id,
         recent_releases=recent_releases,
         interest_artists_lower=interest_artists_lower,
         top_genres_lower=top_genres_lower,
         limit=18,
-        global_artist_uids=global_artist_uids_from_context(context),
+        global_track_rows=global_track_rows,
     )
     custom_mixes = _build_custom_mix_summaries(
         user_id,
@@ -228,7 +232,7 @@ def build_home_discovery_payload(user_id: int) -> dict:
         mix_count=8,
         recent_releases=recent_releases,
         precomputed_mixes=precomputed_mixes,
-        global_track_rows=_global_home_track_rows(context, limit=64),
+        global_track_rows=global_track_rows,
     )
     merged_artists = merged_artists_from_context(context)
     discovery_artists = _build_core_discovery_artists(

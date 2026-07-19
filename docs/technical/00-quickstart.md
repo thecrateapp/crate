@@ -127,13 +127,13 @@ This starts the core stack:
 
 These can be started later from the admin dashboard or manually:
 
-| Service        | Role                                                                 | How to enable                                                                                                  |
-| -------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **slskd**      | Soulseek client — peer-to-peer music search and download             | Included in compose, starts automatically. Configure `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD` in `.env` |
-| **proton-vpn** | VPN proxy for the worker — routes Soulseek traffic through ProtonVPN | Set `PROTONVPN_USER` and `PROTONVPN_PASS` in `.env`. Worker uses it as `SCRAPE_PROXY_URL`                      |
-| **ollama**     | Local LLM inference — generates EQ presets, genre descriptions       | Add to your compose or point `OLLAMA_URL` to an existing instance. Set `LLM_PROVIDER=ollama` in `.env`         |
+| Service        | Role                                                                       | How to enable                                                                                                  |
+| -------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **slskd**      | Soulseek client — peer-to-peer music search and download                   | Included in compose, starts automatically. Configure `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD` in `.env` |
+| **proton-vpn** | VPN proxy for the worker — routes Soulseek traffic through ProtonVPN       | Set `PROTONVPN_USER` and `PROTONVPN_PASS` in `.env`. Worker uses it as `SCRAPE_PROXY_URL`                      |
+| **ollama**     | External local LLM inference — generates EQ presets and genre descriptions | Not bundled. Point `OLLAMA_URL` to an existing instance and set `LLM_PROVIDER=ollama/<model>` in `.env`        |
 
-If you prefer cloud LLMs instead of Ollama, set `LLM_PROVIDER` to `gemini/gemini-2.5-flash` (or any litellm-compatible provider) and provide the corresponding API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.).
+For cloud LLMs, set `LLM_PROVIDER` to `gemini/gemini-2.5-flash` (or any litellm-compatible provider) and provide the corresponding API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.).
 
 Your services will be available at:
 

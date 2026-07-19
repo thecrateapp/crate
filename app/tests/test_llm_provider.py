@@ -1,5 +1,11 @@
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _settings_default(key: str, default: str | None = None) -> str | None:
@@ -31,6 +37,27 @@ def test_get_config_respects_explicit_provider(monkeypatch):
 
     assert config["provider"] == "ollama"
     assert config["model"] == "ollama/custom"
+
+
+def test_compose_stacks_do_not_embed_ollama():
+    for path in sorted(ROOT.glob("docker-compose*.yaml")):
+        source = path.read_text()
+        compose = yaml.safe_load(source) or {}
+        services = compose.get("services") or {}
+        volumes = compose.get("volumes") or {}
+
+        assert "ollama" not in services, path.name
+        assert not any(
+            str(service.get("image", "")).startswith("ollama/")
+            for service in services.values()
+        ), path.name
+        assert not any(
+            "ollama" in (service.get("depends_on") or {})
+            for service in services.values()
+        ), path.name
+        assert not any("ollama" in str(name).lower() for name in volumes), path.name
+        assert "http://ollama:11434" not in source, path.name
+        assert "${LLM_PROVIDER:-ollama" not in source, path.name
 
 
 def test_llm_status_requires_cloud_provider_key(monkeypatch):

@@ -188,6 +188,20 @@ textarea {
     contrast(0.88);
 }
 
+@supports (content-visibility: auto) {
+  .listen-deferred-grid-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  .listen-mobile-dock-glass {
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  }
+}
+
 .listen-glass-panel--dock {
   background: radial-gradient(
       circle at 12% 4%,

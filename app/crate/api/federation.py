@@ -221,7 +221,7 @@ async def _require_signed_node_request(
     """
     if body_bytes is None:
         body_bytes = await request.body() if request.method != "GET" else b""
-    return _verify_signed_node_request(request, body_bytes)
+    return await asyncio.to_thread(_verify_signed_node_request, request, body_bytes)
 
 
 def _verify_signed_node_request(request: Request, body_bytes: bytes) -> dict:
@@ -522,8 +522,8 @@ def _build_local_descriptor(request: Request) -> dict:
 @router.get("/capabilities")
 async def get_capabilities(request: Request):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.search")
-    node = repo.get_local_node()
+    await asyncio.to_thread(_require_capability, peer, "catalog.search")
+    node = await asyncio.to_thread(repo.get_local_node)
     if not node:
         raise HTTPException(status_code=503, detail="Local node not configured")
     caps = (
@@ -543,7 +543,7 @@ async def get_health(request: Request):
     await _require_signed_node_request(request)
     from crate.federation.global_genres import taxonomy_release_health
 
-    taxonomy = taxonomy_release_health()
+    taxonomy = await asyncio.to_thread(taxonomy_release_health)
     return {
         "status": "ok" if taxonomy["status"] == "ok" else "degraded",
         "taxonomy": taxonomy,
@@ -556,16 +556,22 @@ async def get_health(request: Request):
 @router.post("/search")
 async def federated_search(body: SearchBody, request: Request):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="catalog.search",
-        required_capability="federation.catalog.search",
+        "catalog.search",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "catalog.search", assertion=assertion)
-    if not _catalog_policy_allows_live_search(_catalog_share_policy()):
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "catalog.search", assertion=assertion
+    )
+    policy = await asyncio.to_thread(_catalog_share_policy)
+    if not _catalog_policy_allows_live_search(policy):
         return _empty_search_response()
-    payload = handle_remote_search(query=body.q, limit=body.limit)
+    payload = await asyncio.to_thread(
+        handle_remote_search, query=body.q, limit=body.limit
+    )
     return _strip_paths(
         apply_result_limit(
             payload,
@@ -593,13 +599,16 @@ def _strip_paths(result: Any) -> Any:
 @router.get("/albums/{remote_entity_uid}")
 async def federated_album_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="catalog.album.read",
-        required_capability="federation.catalog.search",
+        "catalog.album.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "catalog.album.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "catalog.album.read", assertion=assertion
+    )
     _require_entity_allowed(decision, entity_type="album", entity_uid=remote_entity_uid)
     if not _catalog_policy_allows_item(
         {
@@ -607,10 +616,10 @@ async def federated_album_detail(remote_entity_uid: str, request: Request):
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Album not found")
-    album = _public_album_detail(remote_entity_uid)
+    album = await asyncio.to_thread(_public_album_detail, remote_entity_uid)
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
     return _strip_paths(album)
@@ -619,13 +628,16 @@ async def federated_album_detail(remote_entity_uid: str, request: Request):
 @router.get("/artists/{remote_entity_uid}")
 async def federated_artist_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="catalog.artist.read",
-        required_capability="federation.catalog.search",
+        "catalog.artist.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "catalog.artist.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "catalog.artist.read", assertion=assertion
+    )
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
@@ -635,10 +647,10 @@ async def federated_artist_detail(remote_entity_uid: str, request: Request):
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist not found")
-    artist = _public_artist_detail(remote_entity_uid)
+    artist = await asyncio.to_thread(_public_artist_detail, remote_entity_uid)
     if not artist:
         raise HTTPException(status_code=404, detail="Artist not found")
     return _strip_paths(artist)
@@ -647,13 +659,16 @@ async def federated_artist_detail(remote_entity_uid: str, request: Request):
 @router.get("/tracks/{remote_entity_uid}")
 async def federated_track_detail(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="catalog.track.read",
-        required_capability="federation.catalog.search",
+        "catalog.track.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "catalog.track.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "catalog.track.read", assertion=assertion
+    )
     _require_entity_allowed(decision, entity_type="track", entity_uid=remote_entity_uid)
     if not _catalog_policy_allows_item(
         {
@@ -661,10 +676,10 @@ async def federated_track_detail(remote_entity_uid: str, request: Request):
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Track not found")
-    track = _public_track_detail(remote_entity_uid)
+    track = await asyncio.to_thread(_public_track_detail, remote_entity_uid)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     return _strip_paths(track)
@@ -678,15 +693,19 @@ async def federated_artwork(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="artwork.read",
-        required_capability="federation.catalog.search",
+        "artwork.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "artwork.read", assertion=assertion
+    )
     _require_entity_allowed(decision, entity_type="album", entity_uid=remote_entity_uid)
-    return _serve_federated_album_asset(
+    return await asyncio.to_thread(
+        _serve_federated_album_asset,
         remote_entity_uid,
         size=size,
         image_format=image_format,
@@ -735,13 +754,16 @@ async def federated_artist_photo(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="artist_photo.read",
-        required_capability="federation.catalog.search",
+        "artist_photo.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "artwork.read", assertion=assertion
+    )
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
@@ -751,11 +773,12 @@ async def federated_artist_photo(
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist photo not found")
 
-    return _federated_artist_sidecar_image(
+    return await asyncio.to_thread(
+        _federated_artist_sidecar_image,
         remote_entity_uid,
         candidate_names=_artist_photo_names(),
         size=size,
@@ -772,13 +795,16 @@ async def federated_artist_background(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="artist_background.read",
-        required_capability="federation.catalog.search",
+        "artist_background.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "artwork.read", assertion=assertion
+    )
     _require_entity_allowed(
         decision, entity_type="artist", entity_uid=remote_entity_uid
     )
@@ -788,11 +814,12 @@ async def federated_artist_background(
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Artist background not found")
 
-    return _federated_artist_sidecar_image(
+    return await asyncio.to_thread(
+        _federated_artist_sidecar_image,
         remote_entity_uid,
         candidate_names=_artist_background_names(),
         size=size,
@@ -811,15 +838,18 @@ async def federated_asset(
     image_format: str | None = Query(None, alias="format", pattern="^webp$"),
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="artwork.read",
-        required_capability="federation.catalog.search",
+        "artwork.read",
+        "federation.catalog.search",
     )
     normalized_type = entity_type.strip().lower()
     normalized_asset = asset_name.strip().lower()
-    decision = _require_capability(peer, "artwork.read", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "artwork.read", assertion=assertion
+    )
     _require_entity_allowed(
         decision,
         entity_type=normalized_type,
@@ -831,11 +861,12 @@ async def federated_asset(
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Asset not found")
 
-    return _serve_federated_asset(
+    return await asyncio.to_thread(
+        _serve_federated_asset,
         normalized_type,
         remote_entity_uid,
         normalized_asset,
@@ -957,13 +988,15 @@ async def federated_json_facet(
     request: Request,
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="catalog.facet.read",
-        required_capability="federation.catalog.search",
+        "catalog.facet.read",
+        "federation.catalog.search",
     )
-    decision = _require_capability(
+    decision = await asyncio.to_thread(
+        _require_capability,
         peer,
         _facet_capability(entity_type),
         assertion=assertion,
@@ -979,11 +1012,13 @@ async def federated_json_facet(
             "remote_entity_uid": remote_entity_uid,
             "_share_scope": "library",
         },
-        _catalog_share_policy(),
+        await asyncio.to_thread(_catalog_share_policy),
     ):
         raise HTTPException(status_code=404, detail="Facet not found")
 
-    payload = _public_facet_payload(entity_type, remote_entity_uid, facet)
+    payload = await asyncio.to_thread(
+        _public_facet_payload, entity_type, remote_entity_uid, facet
+    )
     if payload is None:
         raise HTTPException(status_code=404, detail="Facet not found")
     return _strip_paths(payload)
@@ -1159,13 +1194,16 @@ async def federated_album_import_manifest(
     request: Request,
 ):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="import.manifest",
-        required_capability="federation.import.request",
+        "import.manifest",
+        "federation.import.request",
     )
-    decision = _require_capability(peer, "import.pull", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "import.pull", assertion=assertion
+    )
     _require_entity_allowed(
         decision,
         entity_type="album",
@@ -1187,7 +1225,7 @@ async def federated_album_import_manifest(
     max_bytes = constraints.max_import_bytes if constraints else None
     if max_bytes is not None and int(manifest["total_bytes"]) > max_bytes:
         raise HTTPException(status_code=413, detail="import_size_limit")
-    active_key = trust_repo.get_active_local_key()
+    active_key = await asyncio.to_thread(trust_repo.get_active_local_key)
     if not active_key:
         raise HTTPException(
             status_code=503, detail="Federation signing key unavailable"
@@ -1202,13 +1240,16 @@ async def federated_album_import_manifest(
 @router.get("/import-files/{remote_entity_uid}")
 async def federated_import_file(remote_entity_uid: str, request: Request):
     peer = await _require_signed_node_request(request)
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="import.file",
-        required_capability="federation.import.request",
+        "import.file",
+        "federation.import.request",
     )
-    decision = _require_capability(peer, "import.pull", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "import.pull", assertion=assertion
+    )
     _require_entity_allowed(
         decision,
         entity_type="track",
@@ -1218,10 +1259,14 @@ async def federated_import_file(remote_entity_uid: str, request: Request):
     from crate.db.repositories.streaming import get_track_delivery_row_by_entity_uid
     from crate.streaming.service import media_type_for_path, resolve_playback
 
-    track = get_track_delivery_row_by_entity_uid(remote_entity_uid)
+    track = await asyncio.to_thread(
+        get_track_delivery_row_by_entity_uid, remote_entity_uid
+    )
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    resolution = resolve_playback(track, "original", enqueue=False)
+    resolution = await asyncio.to_thread(
+        resolve_playback, track, "original", enqueue=False
+    )
     if resolution is None:
         raise HTTPException(status_code=404, detail="Track not found")
     max_bytes = decision.constraints.max_import_bytes if decision.constraints else None
@@ -1247,7 +1292,7 @@ async def catalog_manifest(
     page_size: int = 100,
 ):
     peer = await _require_signed_node_request(request)
-    decision = _require_capability(peer, "catalog.sync")
+    decision = await asyncio.to_thread(_require_capability, peer, "catalog.sync")
     capped_page = max(0, page)
     capped_page_size = max(1, min(page_size, 500))
     if (
@@ -1259,9 +1304,11 @@ async def catalog_manifest(
             capped_page_size,
             decision.constraints.max_results,
         )
-    genres_allowed = _peer_has_capability(peer, "catalog.metadata.genres")
-    policy = _catalog_share_policy()
-    snapshot = _catalog_manifest_snapshot(policy)
+    genres_allowed = await asyncio.to_thread(
+        _peer_has_capability, peer, "catalog.metadata.genres"
+    )
+    policy = await asyncio.to_thread(_catalog_share_policy)
+    snapshot = await asyncio.to_thread(_catalog_manifest_snapshot, policy)
     peer_uid = str(peer["node_uid"])
     after_entity_type = ""
     after_entity_uid = ""
@@ -1294,14 +1341,16 @@ async def catalog_manifest(
 
     if not cursor:
         # Compatibility for one release. The query remains keyset-based.
-        compatibility_items = _catalog_manifest_items(
+        compatibility_items = await asyncio.to_thread(
+            _catalog_manifest_items,
             page=page,
             page_size=capped_page_size,
             include_genres=genres_allowed,
         )
         items = compatibility_items
     else:
-        items = _catalog_manifest_items_after(
+        items = await asyncio.to_thread(
+            _catalog_manifest_items_after,
             after_entity_type=after_entity_type,
             after_entity_uid=after_entity_uid,
             page_size=capped_page_size,
@@ -1359,7 +1408,7 @@ async def catalog_manifest(
 @router.get("/catalog/delta")
 async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     peer = await _require_signed_node_request(request)
-    _require_capability(peer, "catalog.sync")
+    await asyncio.to_thread(_require_capability, peer, "catalog.sync")
     from crate.federation.catalog import (
         InvalidCatalogCursor,
         decode_catalog_cursor,
@@ -1383,7 +1432,7 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
             )
         after_sequence = int(decoded["position"].get("sequence") or 0)
 
-    floor = catalog_retention_floor()
+    floor = await asyncio.to_thread(catalog_retention_floor)
     if floor and after_sequence < floor - 1:
         raise HTTPException(
             status_code=410,
@@ -1394,11 +1443,12 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
         )
 
     capped_limit = max(1, min(int(limit), 500))
-    changes = list_catalog_changes(
+    changes = await asyncio.to_thread(
+        list_catalog_changes,
         after_sequence=after_sequence,
         limit=capped_limit + 1,
     )
-    policy = _catalog_share_policy()
+    policy = await asyncio.to_thread(_catalog_share_policy)
     items: list[dict[str, Any]] = []
     scanned_sequence = after_sequence
     for change in changes:
@@ -1437,7 +1487,7 @@ async def catalog_delta(request: Request, cursor: str = "", limit: int = 100):
     if byte_truncated and items:
         scanned_sequence = int(items[-1]["sequence"])
 
-    high_water = catalog_high_water_mark()
+    high_water = await asyncio.to_thread(catalog_high_water_mark)
     next_cursor = encode_catalog_cursor(
         peer_uid=peer_uid,
         mode="delta",
@@ -1892,10 +1942,13 @@ async def key_rotation(body: KeyRotationBody, request: Request):
         ) from exc
 
     old_key_id = request.headers.get("X-Crate-Key-Id", "")
-    old_key = trust_repo.get_peer_verification_key(str(peer["node_uid"]), old_key_id)
+    old_key = await asyncio.to_thread(
+        trust_repo.get_peer_verification_key, str(peer["node_uid"]), old_key_id
+    )
     if old_key is None:
         raise HTTPException(status_code=401, detail="Rotation must use the old key")
-    trust_repo.upsert_peer_key(
+    await asyncio.to_thread(
+        trust_repo.upsert_peer_key,
         node_uid=str(peer["node_uid"]),
         key_id=old_key_id,
         public_key=old_key["public_key"],
@@ -1903,7 +1956,8 @@ async def key_rotation(body: KeyRotationBody, request: Request):
         not_before=old_key.get("not_before"),
         not_after=body.grace_until,
     )
-    trust_repo.upsert_peer_key(
+    await asyncio.to_thread(
+        trust_repo.upsert_peer_key,
         node_uid=str(peer["node_uid"]),
         key_id=body.new_key_id,
         public_key=body.new_public_key,
@@ -1911,11 +1965,16 @@ async def key_rotation(body: KeyRotationBody, request: Request):
         not_before=body.activate_at,
         not_after=None,
     )
-    repo.update_peer(
-        peer["node_uid"],
-        public_keys_json=trust_repo.list_peer_public_keys(str(peer["node_uid"])),
+    public_keys = await asyncio.to_thread(
+        trust_repo.list_peer_public_keys, str(peer["node_uid"])
     )
-    repo.record_audit_event(
+    await asyncio.to_thread(
+        repo.update_peer,
+        peer["node_uid"],
+        public_keys_json=public_keys,
+    )
+    await asyncio.to_thread(
+        repo.record_audit_event,
         event_type="key.rotation.received",
         status="success",
         node_uid=peer["node_uid"],
@@ -1933,31 +1992,39 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
     peer_uid = str(peer["node_uid"])
     if body.requesting_node_uid != peer_uid:
         raise HTTPException(status_code=403, detail="requesting_node_uid mismatch")
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="stream.ticket",
-        required_capability="federation.stream.play",
+        "stream.ticket",
+        "federation.stream.play",
     )
 
     from crate.federation.stream_proxy import create_ticket
 
-    decision = _require_capability(peer, "stream.proxy", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "stream.proxy", assertion=assertion
+    )
     _require_entity_allowed(
         decision,
         entity_type="track",
         entity_uid=body.remote_entity_uid,
     )
     if body.delivery_policy == "original":
-        _require_capability(peer, "stream.original", assertion=assertion)
+        await asyncio.to_thread(
+            _require_capability, peer, "stream.original", assertion=assertion
+        )
     else:
-        _require_capability(peer, "stream.transcoded", assertion=assertion)
+        await asyncio.to_thread(
+            _require_capability, peer, "stream.transcoded", assertion=assertion
+        )
     constraints = decision.constraints
     if constraints and constraints.delivery:
         if body.delivery_policy not in constraints.delivery:
             raise HTTPException(status_code=403, detail="delivery_mode_denied")
 
-    ticket = create_ticket(
+    ticket = await asyncio.to_thread(
+        create_ticket,
         node_uid=peer_uid,
         remote_entity_uid=body.remote_entity_uid,
         delivery_policy=body.delivery_policy,
@@ -1972,7 +2039,8 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
         assertion_jti=str(assertion.get("jti") or ""),
     )
 
-    repo.record_audit_event(
+    await asyncio.to_thread(
+        repo.record_audit_event,
         event_type="stream.ticket.created",
         status="success",
         node_uid=peer_uid,
@@ -1983,7 +2051,8 @@ async def create_stream_ticket(body: StreamTicketBody, request: Request):
     )
     from crate.db.domain_events import append_domain_event
 
-    append_domain_event(
+    await asyncio.to_thread(
+        append_domain_event,
         "federation.stream.ticket.created",
         {
             "node_uid": peer_uid,
@@ -2013,14 +2082,19 @@ async def prepare_playback_variants(
     if str(body.requesting_node_uid) != peer_uid:
         raise HTTPException(status_code=403, detail="requesting_node_uid mismatch")
 
-    assertion = _require_user_assertion(
+    assertion = await asyncio.to_thread(
+        _require_user_assertion,
         request,
         peer,
-        purpose="stream.prepare",
-        required_capability="federation.stream.play",
+        "stream.prepare",
+        "federation.stream.play",
     )
-    decision = _require_capability(peer, "stream.proxy", assertion=assertion)
-    _require_capability(peer, "stream.transcoded", assertion=assertion)
+    decision = await asyncio.to_thread(
+        _require_capability, peer, "stream.proxy", assertion=assertion
+    )
+    await asyncio.to_thread(
+        _require_capability, peer, "stream.transcoded", assertion=assertion
+    )
     constraints = decision.constraints
     if (
         constraints
@@ -2030,10 +2104,10 @@ async def prepare_playback_variants(
         raise HTTPException(status_code=403, detail="delivery_mode_denied")
 
     for _remote_entity_uid in body.remote_entity_uids:
-        record_playback_prepare_request(body.delivery_policy)
+        await asyncio.to_thread(record_playback_prepare_request, body.delivery_policy)
 
     try:
-        redis_client = _request_redis(request)
+        redis_client = await asyncio.to_thread(_request_redis, request)
     except HTTPException:
         redis_client = None
 
@@ -2050,14 +2124,18 @@ async def prepare_playback_variants(
             )
             continue
 
-        track = get_track_delivery_row_by_entity_uid(entity_uid)
+        track = await asyncio.to_thread(
+            get_track_delivery_row_by_entity_uid, entity_uid
+        )
         if not track:
             items.append(
                 {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
             )
             continue
 
-        inspection = inspect_playback_preparation(track, body.delivery_policy)
+        inspection = await asyncio.to_thread(
+            inspect_playback_preparation, track, body.delivery_policy
+        )
         if inspection is None:
             items.append(
                 {"remote_entity_uid": remote_entity_uid, "status": "unavailable"}
@@ -2072,8 +2150,11 @@ async def prepare_playback_variants(
             )
             continue
 
-        reservation = acquire_prepare_reservation(
-            redis_client, peer_uid, inspection.cache_key
+        reservation = await asyncio.to_thread(
+            acquire_prepare_reservation,
+            redis_client,
+            peer_uid,
+            inspection.cache_key,
         )
         if reservation not in {
             PrepareReservation.ACCEPTED,
@@ -2084,7 +2165,8 @@ async def prepare_playback_variants(
             )
             continue
 
-        resolution = prepare_playback(
+        resolution = await asyncio.to_thread(
+            prepare_playback,
             track,
             body.delivery_policy,
             reason="lookahead",
@@ -2100,7 +2182,9 @@ async def prepare_playback_variants(
 
     response = FederatedPlaybackPrepareResponse(items=items)
     for item in response.items:
-        record_playback_prepare_result(item.status, body.delivery_policy)
+        await asyncio.to_thread(
+            record_playback_prepare_result, item.status, body.delivery_policy
+        )
     return response
 
 
@@ -2128,15 +2212,21 @@ async def serve_stream(ticket_uid: str, request: Request):
     )
     from crate.streaming.service import media_type_for_path, resolve_playback
 
-    preview = get_ticket(ticket_uid)
+    preview = await asyncio.to_thread(get_ticket, ticket_uid)
     if not preview:
         raise HTTPException(status_code=404, detail="Ticket not found or expired")
     subject_hash = str(preview.get("subject_hash") or "")
-    subject = repo.get_remote_subject(str(peer["node_uid"]), subject_hash) or {}
+    subject = (
+        await asyncio.to_thread(
+            repo.get_remote_subject, str(peer["node_uid"]), subject_hash
+        )
+        or {}
+    )
     roles = subject.get("last_roles_json") or []
     if isinstance(roles, str):
         roles = _json.loads(roles or "[]")
-    decision = _require_capability(
+    decision = await asyncio.to_thread(
+        _require_capability,
         peer,
         "stream.proxy",
         assertion={"sub": subject_hash, "roles": roles},
@@ -2147,11 +2237,14 @@ async def serve_stream(ticket_uid: str, request: Request):
     if str(preview["node_uid"]) != str(peer["node_uid"]):
         raise HTTPException(status_code=403, detail="Ticket belongs to another peer")
 
-    track = get_track_delivery_row_by_entity_uid(preview["remote_entity_uid"])
+    track = await asyncio.to_thread(
+        get_track_delivery_row_by_entity_uid, preview["remote_entity_uid"]
+    )
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    resolution = resolve_playback(
+    resolution = await asyncio.to_thread(
+        resolve_playback,
         track,
         preview.get("delivery_policy") or "balanced",
         enqueue=True,
@@ -2189,8 +2282,9 @@ async def serve_stream(ticket_uid: str, request: Request):
         if constraints and constraints.daily_stream_bytes
         else DEFAULT_DAILY_BYTES_PER_PEER
     )
-    redis_client = _request_redis(request)
-    allowed, reason, stream_id = acquire_stream_slot(
+    redis_client = await asyncio.to_thread(_request_redis, request)
+    allowed, reason, stream_id = await asyncio.to_thread(
+        acquire_stream_slot,
         redis_client,
         str(peer["node_uid"]),
         subject_hash,
@@ -2203,7 +2297,8 @@ async def serve_stream(ticket_uid: str, request: Request):
     )
     if not allowed or not stream_id:
         raise HTTPException(status_code=429, detail=reason or "stream_limit")
-    allowed, reason = reserve_stream_bytes(
+    allowed, reason = await asyncio.to_thread(
+        reserve_stream_bytes,
         redis_client,
         str(peer["node_uid"]),
         reserved_bytes,
@@ -2212,7 +2307,8 @@ async def serve_stream(ticket_uid: str, request: Request):
         max_subject_bytes=min(max_daily_bytes, DEFAULT_DAILY_BYTES_PER_SUBJECT),
     )
     if not allowed:
-        release_stream_slot(
+        await asyncio.to_thread(
+            release_stream_slot,
             redis_client,
             str(peer["node_uid"]),
             subject_hash,
@@ -2220,7 +2316,8 @@ async def serve_stream(ticket_uid: str, request: Request):
         )
         raise HTTPException(status_code=429, detail=reason or "byte_quota")
 
-    ticket = validate_ticket(
+    ticket = await asyncio.to_thread(
+        validate_ticket,
         ticket_uid,
         expected_node_uid=str(peer["node_uid"]),
         expected_audience=str(peer["node_uid"]),
@@ -2230,14 +2327,16 @@ async def serve_stream(ticket_uid: str, request: Request):
         current_policy_revision=decision.policy_revision,
     )
     if not ticket:
-        reconcile_stream_bytes(
+        await asyncio.to_thread(
+            reconcile_stream_bytes,
             redis_client,
             str(peer["node_uid"]),
             reserved_bytes=reserved_bytes,
             actual_bytes=0,
             subject_hash=subject_hash,
         )
-        release_stream_slot(
+        await asyncio.to_thread(
+            release_stream_slot,
             redis_client,
             str(peer["node_uid"]),
             subject_hash,
@@ -2245,7 +2344,8 @@ async def serve_stream(ticket_uid: str, request: Request):
         )
         raise HTTPException(status_code=404, detail="Ticket not found or expired")
 
-    record_remote_playback_delivery(
+    await asyncio.to_thread(
+        record_remote_playback_delivery,
         requested_policy=str(preview.get("delivery_policy") or "balanced"),
         effective_policy=resolution.effective_policy,
         cache_hit=resolution.cache_hit,

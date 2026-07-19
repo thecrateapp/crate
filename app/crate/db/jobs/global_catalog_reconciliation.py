@@ -12,6 +12,9 @@ from typing import Any
 from sqlalchemy import text
 
 from crate.db.domain_events import append_domain_event
+from crate.db.global_catalog_search_projection import (
+    upsert_global_catalog_search_document,
+)
 from crate.db.jobs.global_catalog_routes import (
     claim_album_public_slug,
     claim_artist_public_slug,
@@ -317,6 +320,7 @@ def _reconcile_local_source(session, source: dict[str, Any]) -> None:
     source_id = _upsert_source(session, source, global_uid, preferred=True)
     _project_source_genres(session, source, global_uid, source_id)
     _refresh_source_count(session, entity_type, global_uid)
+    upsert_global_catalog_search_document(entity_type, global_uid, session=session)
 
 
 def _reconcile_federated_source(session, source: dict[str, Any]) -> None:
@@ -363,6 +367,7 @@ def _reconcile_federated_source(session, source: dict[str, Any]) -> None:
     else:
         raise ValueError(f"Unsupported federated catalog entity type: {entity_type}")
     _refresh_source_count(session, entity_type, target_uid)
+    upsert_global_catalog_search_document(entity_type, target_uid, session=session)
 
 
 def tombstone_local_source(entity_type: str, entity_uid: str, *, session) -> None:
@@ -439,6 +444,7 @@ def tombstone_local_source(entity_type: str, entity_uid: str, *, session) -> Non
             ),
             {"global_uid": global_uid},
         )
+    upsert_global_catalog_search_document(entity_type, global_uid, session=session)
 
 
 def tombstone_federated_source(
@@ -524,6 +530,7 @@ def tombstone_federated_source(
             ),
             {"global_uid": global_uid},
         )
+    upsert_global_catalog_search_document(entity_type, global_uid, session=session)
 
 
 def reconcile_local_catalog(batch_size: int = 500) -> dict[str, Any]:

@@ -1,12 +1,38 @@
 package catalog
 
 import (
+	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestArtistTopTracksBySlugPreservesLookupErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "artist missing", err: ErrNotFound},
+		{name: "database unavailable", err: errors.New("database unavailable")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &Store{
+				artistRowFn: func(context.Context, string, ...any) (map[string]any, error) {
+					return nil, tt.err
+				},
+			}
+
+			tracks, err := store.ArtistTopTracksBySlug(context.Background(), "remote-artist", 20)
+
+			assert.Nil(t, tracks)
+			assert.ErrorIs(t, err, tt.err)
+		})
+	}
+}
 
 func TestBuildLocalFTSQuery(t *testing.T) {
 	tests := []struct {

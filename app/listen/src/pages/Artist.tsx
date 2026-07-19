@@ -42,6 +42,7 @@ import {
   artistSharePath,
 } from "@/lib/library-routes";
 import { CrateLoader } from "@/components/ui/CrateLoader";
+import { Button } from "@crate/ui/shadcn/button";
 
 export function Artist() {
   const { t } = useTranslation();
@@ -61,22 +62,16 @@ export function Artist() {
     data: pageData,
     loading,
     error,
+    status,
+    refetch,
   } = useApi<ArtistPageData>(
     routeGlobalArtistUid
       ? `/api/catalog/artists/${encodeURIComponent(routeGlobalArtistUid)}/page`
       : routeArtistSlug
-        ? `/api/artist-slugs/${encodeURIComponent(routeArtistSlug)}/page`
+        ? `/api/artist-slugs/${encodeURIComponent(
+            routeArtistSlug,
+          )}/page?top_tracks_count=50`
         : null,
-    "GET",
-    undefined,
-    { safetyNetMs: 120_000 },
-  );
-  const { data: canonicalTopTracks } = useApi<ArtistTopTrack[]>(
-    routeArtistSlug && !routeGlobalArtistUid
-      ? `/api/artist-slugs/${encodeURIComponent(
-          routeArtistSlug,
-        )}/top-tracks?count=50`
-      : null,
     "GET",
     undefined,
     { safetyNetMs: 120_000 },
@@ -164,8 +159,7 @@ export function Artist() {
     });
   }
   const info: ArtistInfo | undefined = pageData?.info;
-  const topTracks: ArtistTopTrack[] =
-    canonicalTopTracks ?? pageData?.top_tracks ?? [];
+  const topTracks: ArtistTopTrack[] = pageData?.top_tracks ?? [];
   const showsData: { events: ArtistShowEvent[] } | undefined = pageData?.shows;
   const enrichment: ArtistPageEnrichment | undefined = pageData?.enrichment;
 
@@ -264,7 +258,26 @@ export function Artist() {
     return <CrateLoader label={t("artist.loading")} />;
   }
 
-  if (error || !data) {
+  if (status === 404) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">{t("artist.notFound")}</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-20 text-center">
+        <p className="text-muted-foreground">{t("artist.unavailable")}</p>
+        <Button variant="outline" onClick={refetch}>
+          {t("common.retry")}
+        </Button>
+      </div>
+    );
+  }
+
+  if (!data) {
     return (
       <div className="text-center py-20">
         <p className="text-muted-foreground">{t("artist.notFound")}</p>

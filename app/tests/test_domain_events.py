@@ -5,6 +5,8 @@ class _FakeRedisStream:
         self.stream: list[tuple[str, dict]] = []
         self.pending_by_consumer: dict[str, list[tuple[str, dict]]] = {}
         self.delivered_ids: set[str] = set()
+        self.dead_letters: list[tuple[str, dict]] = []
+        self.hashes: dict[str, dict[str, int]] = {}
 
     def xadd(
         self,
@@ -14,6 +16,10 @@ class _FakeRedisStream:
         approximate: bool = True,
     ) -> str:
         del maxlen, approximate
+        if _stream_key.endswith(":dead_letter"):
+            msg_id = f"dlq-{len(self.dead_letters) + 1}-0"
+            self.dead_letters.append((msg_id, dict(fields)))
+            return msg_id
         msg_id = f"{len(self.stream) + 1}-0"
         self.stream.append((msg_id, dict(fields)))
         return msg_id
@@ -71,9 +77,27 @@ class _FakeRedisStream:
             ]
         return len(ids)
 
+    def hincrby(self, key: str, field: str, amount: int) -> int:
+        values = self.hashes.setdefault(key, {})
+        values[field] = values.get(field, 0) + amount
+        return values[field]
+
+    def hdel(self, key: str, *fields: str) -> int:
+        values = self.hashes.setdefault(key, {})
+        removed = 0
+        for field in fields:
+            removed += int(field in values)
+            values.pop(field, None)
+        return removed
+
     def xrange(self, _stream_key: str, _min: str, _max: str, count: int):
         del _min, _max
         return self.stream[:count]
+
+    def xlen(self, stream_key: str) -> int:
+        if stream_key.endswith(":dead_letter"):
+            return len(self.dead_letters)
+        return len(self.stream)
 
 
 def _patch_fake_redis(monkeypatch):
@@ -85,51 +109,45 @@ def _patch_fake_redis(monkeypatch):
     return domain_events, fake_redis
 
 
-def test_append_domain_event_defers_publish_until_after_commit(monkeypatch):
-    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
-    callbacks = []
+class _FakeSession:
+    def __init__(self):
+        self.executed: list[tuple[str, dict]] = []
 
-    monkeypatch.setattr(
-        domain_events,
-        "register_after_commit",
-        lambda session, callback: callbacks.append(callback),
-    )
+    def execute(self, statement, params: dict):
+        self.executed.append((str(statement), dict(params)))
+
+
+def test_append_domain_event_persists_outbox_in_surrounding_transaction(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    session = _FakeSession()
 
     returned = domain_events.append_domain_event(
         "library.scan.completed",
         {"scan_id": 12},
         scope="library",
         subject_key="global",
-        session=object(),
+        session=session,
     )
 
     assert returned == 0
     assert fake_redis.stream == []
-    assert len(callbacks) == 1
-
-    callbacks[0]()
-
-    assert fake_redis.stream == [
-        (
-            "1-0",
-            {
-                "event_type": "library.scan.completed",
-                "scope": "library",
-                "subject_key": "global",
-                "payload_json": '{"scan_id": 12}',
-            },
-        )
-    ]
-    assert domain_events.get_latest_domain_event_id() == 1
+    assert len(session.executed) == 1
+    sql, params = session.executed[0]
+    assert "INSERT INTO domain_event_outbox" in sql
+    assert params["event_type"] == "library.scan.completed"
+    assert params["scope"] == "library"
+    assert params["subject_key"] == "global"
+    assert params["payload_json"] == '{"scan_id": 12}'
+    assert params["event_uid"]
 
 
 def test_list_domain_events_replays_pending_before_consuming_new(monkeypatch):
     domain_events, _fake_redis = _patch_fake_redis(monkeypatch)
 
-    domain_events.append_domain_event(
+    domain_events._publish_domain_event(
         "first.event", {"order": 1}, scope="ops", subject_key="dashboard"
     )
-    domain_events.append_domain_event(
+    domain_events._publish_domain_event(
         "second.event", {"order": 2}, scope="ops", subject_key="dashboard"
     )
 
@@ -143,3 +161,34 @@ def test_list_domain_events_replays_pending_before_consuming_new(monkeypatch):
 
     second = domain_events.list_domain_events(limit=1, consumer_name="worker")
     assert [event["event_type"] for event in second] == ["second.event"]
+
+
+def test_failed_domain_event_retries_then_moves_to_dead_letter(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    event = {
+        "id": "1-0",
+        "event_uid": "event-1",
+        "event_type": "poison.event",
+        "scope": "ops",
+        "subject_key": "dashboard",
+        "payload_json": {"invalid": True},
+    }
+    fake_redis.pending_by_consumer["worker"] = [("1-0", {})]
+
+    assert domain_events.mark_domain_event_failed(event, "boom", max_attempts=2) == 1
+    assert fake_redis.dead_letters == []
+    assert fake_redis.pending_by_consumer["worker"]
+
+    assert domain_events.mark_domain_event_failed(event, "boom", max_attempts=2) == 2
+    assert fake_redis.dead_letters[0][1]["event_uid"] == "event-1"
+    assert fake_redis.dead_letters[0][1]["last_error"] == "boom"
+    assert fake_redis.pending_by_consumer["worker"] == []
+
+
+def test_domain_event_runtime_reports_projection_dead_letters(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    fake_redis.dead_letters.append(("dlq-1-0", {"event_type": "poison.event"}))
+
+    runtime = domain_events.get_domain_event_runtime()
+
+    assert runtime["dead_letter"] == 1

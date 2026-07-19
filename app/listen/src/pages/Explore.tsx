@@ -409,14 +409,17 @@ function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
         playAll(
           data.tracks.map((t) =>
             toPlayableTrack(t, {
-              cover: albumCoverApiUrl({
-                albumId: t.album_id,
-                albumEntityUid: t.album_entity_uid,
-                artistEntityUid: t.artist_entity_uid,
-                albumSlug: t.album_slug,
-                artistName: t.artist,
-                albumName: t.album,
-              }),
+              cover: albumCoverApiUrl(
+                {
+                  albumId: t.album_id,
+                  albumEntityUid: t.album_entity_uid,
+                  artistEntityUid: t.artist_entity_uid,
+                  albumSlug: t.album_slug,
+                  artistName: t.artist,
+                  albumName: t.album,
+                },
+                { size: 512 },
+              ),
             }),
           ),
           0,

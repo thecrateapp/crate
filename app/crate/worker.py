@@ -552,6 +552,8 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "compute_analytics",
             "refresh_user_listening_stats",
+            "refresh_home_discovery_snapshot",
+            "refresh_user_stats_dashboard_snapshot",
             "index_genres",
             "infer_genre_taxonomy",
             "rebuild_genre_taxonomy_proposals",
@@ -570,6 +572,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.artwork",
         "ARTWORK_TASK_HANDLERS",
         (
+            "resolve_external_artist_artwork",
             "fetch_cover",
             "fetch_album_cover",
             "fetch_artist_covers",
@@ -591,6 +594,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "enrich_mbids",
             "process_new_content",
             "compute_completeness",
+            "refresh_probable_setlist",
         ),
     ),
     (

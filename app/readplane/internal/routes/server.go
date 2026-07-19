@@ -32,10 +32,15 @@ type Server struct {
 	redis           *redis.Client
 	auth            *auth.Authenticator
 	catalog         *catalog.Store
+	artistTopTracks artistTopTracksCatalog
 	snapshots       *snapshots.Store
 	fallback        *httpx.FallbackProxy
 	federationProxy *readplanefederation.Proxy
 	logger          *slog.Logger
+}
+
+type artistTopTracksCatalog interface {
+	ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error)
 }
 
 // NewServer assembles a Server from its dependencies.
@@ -50,7 +55,7 @@ func NewServer(
 	federationProxy *readplanefederation.Proxy,
 	logger *slog.Logger,
 ) *Server {
-	return &Server{
+	server := &Server{
 		cfg:             cfg,
 		pool:            pool,
 		redis:           redisClient,
@@ -61,6 +66,10 @@ func NewServer(
 		federationProxy: federationProxy,
 		logger:          logger,
 	}
+	if catalogStore != nil {
+		server.artistTopTracks = catalogStore
+	}
+	return server
 }
 
 // Handler returns the complete HTTP handler with routing and middleware.
@@ -80,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/me/home/essentials", s.route(http.MethodGet, s.homeSlice))
 	mux.HandleFunc("/api/me/home/discovery", s.route(http.MethodGet, s.homeDiscovery))
 	mux.HandleFunc("/api/me/home/discovery-stream", s.route(http.MethodGet, s.homeDiscoveryStream))
+	mux.HandleFunc("/api/me/stats/dashboard", s.route(http.MethodGet, s.statsDashboard))
 	mux.HandleFunc("/api/me/albums", s.route(http.MethodGet, s.myAlbumsRoute))
 	mux.HandleFunc("/api/me/follows", s.route(http.MethodGet, s.myFollowsRoute))
 	mux.HandleFunc("/api/me/follows/", s.route(http.MethodGet, s.myFollowStateRoute))
@@ -236,6 +246,21 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	details["postgres"] = true
+	details["postgres_pool"] = postgres.PoolRuntime(s.pool)
+	if s.fallback != nil {
+		fallbackStats := s.fallback.Stats()
+		details["fallback"] = map[string]any{
+			"attempts":      fallbackStats.Attempts,
+			"successes":     fallbackStats.Successes,
+			"failures":      fallbackStats.Failures,
+			"timeouts":      fallbackStats.Timeouts,
+			"rejected":      fallbackStats.Rejected,
+			"success_ratio": fallbackSuccessRatio(fallbackStats),
+		}
+	}
+	if s.auth != nil {
+		details["auth_cache"] = s.auth.Stats()
+	}
 	if err := postgres.RequiredTablesReady(ctx, s.pool); err != nil {
 		httpx.MarkReadplane(w, "miss")
 		details["error"] = err.Error()
@@ -244,32 +269,44 @@ func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
 	}
 	details["schema"] = true
 
+	redisReady := !s.cfg.EnableSSE
 	if s.cfg.EnableSSE {
 		details["redis"] = false
 		if s.redis == nil {
-			httpx.MarkReadplane(w, "miss")
-			details["error"] = "redis client is nil"
-			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
-			return
+			details["redis_error"] = "redis client is nil"
+		} else if err := redisx.Ping(ctx, s.redis); err != nil {
+			details["redis_error"] = err.Error()
+		} else {
+			redisReady = true
+			details["redis"] = true
 		}
-		if err := redisx.Ping(ctx, s.redis); err != nil {
-			httpx.MarkReadplane(w, "miss")
-			details["error"] = err.Error()
-			_ = httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "details": details})
-			return
-		}
-		details["redis"] = true
 	}
 
+	status, degraded := readinessStatus(true, true, redisReady, s.cfg.EnableSSE)
+	details["degraded"] = degraded
 	httpx.MarkReadplane(w, "hit")
-	_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "details": details})
+	_ = httpx.WriteJSON(w, status, map[string]any{"ok": status == http.StatusOK, "details": details})
+}
+
+func readinessStatus(postgresReady, schemaReady, redisReady, enableSSE bool) (int, bool) {
+	if !postgresReady || !schemaReady {
+		return http.StatusServiceUnavailable, false
+	}
+	return http.StatusOK, enableSSE && !redisReady
+}
+
+func fallbackSuccessRatio(stats httpx.FallbackStats) float64 {
+	if stats.Attempts == 0 {
+		return 0
+	}
+	return float64(stats.Successes) / float64(stats.Attempts)
 }
 
 func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 	if s.tryFallback(w, r) {
 		return
 	}
-	user, err := s.auth.Authenticate(r, false)
+	user, err := s.auth.AuthenticateProfile(r, false)
 	if err != nil {
 		s.fallbackOrAuthError(w, r, err)
 		return

@@ -161,3 +161,49 @@ def test_signal_active_stream_revocations_is_safe_when_redis_is_unavailable(
     monkeypatch.setattr(events, "get_redis", lambda: None)
 
     assert events.signal_active_stream_revocations(node_uid="peer-a") == 0
+
+
+def test_revocation_probe_coalesces_redis_reads_with_bounded_staleness(monkeypatch):
+    from crate.federation import stream_proxy
+
+    now = [10.0]
+    reads: list[str] = []
+
+    class Redis:
+        def get(self, key):
+            reads.append(key)
+            return None
+
+    redis = Redis()
+    monkeypatch.setattr(stream_proxy.time, "monotonic", lambda: now[0])
+    stream_proxy.clear_revocation_probe_cache()
+
+    for _ in range(32):
+        assert stream_proxy.is_stream_revoked(redis, "ticket-a") is False
+    assert len(reads) == 1
+
+    now[0] += stream_proxy.REVOCATION_PROBE_TTL_SECONDS + 0.001
+    assert stream_proxy.is_stream_revoked(redis, "ticket-a") is False
+    assert len(reads) == 2
+
+
+def test_local_revocation_bypasses_the_negative_probe_cache():
+    from crate.federation import stream_proxy
+
+    class Redis:
+        def __init__(self):
+            self.value = None
+
+        def get(self, _key):
+            return self.value
+
+        def set(self, _key, value, ex):
+            del ex
+            self.value = value
+
+    redis = Redis()
+    stream_proxy.clear_revocation_probe_cache()
+
+    assert stream_proxy.is_stream_revoked(redis, "ticket-a") is False
+    stream_proxy.revoke_active_stream(redis, "ticket-a")
+    assert stream_proxy.is_stream_revoked(redis, "ticket-a") is True

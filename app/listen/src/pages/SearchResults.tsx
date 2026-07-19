@@ -113,14 +113,17 @@ function trackAlbumCover(track: SearchData["tracks"][0]) {
   if (trackGlobalUid(track) && globalAlbumUid) {
     return albumCoverApiUrl({ globalAlbumUid }, { size: 128 });
   }
-  return albumCoverApiUrl({
-    albumId: track.album_id,
-    albumEntityUid: track.album_entity_uid,
-    artistEntityUid: track.artist_entity_uid,
-    albumSlug: track.album_slug,
-    artistName: track.artist,
-    albumName: track.album,
-  });
+  return albumCoverApiUrl(
+    {
+      albumId: track.album_id,
+      albumEntityUid: track.album_entity_uid,
+      artistEntityUid: track.artist_entity_uid,
+      albumSlug: track.album_slug,
+      artistName: track.artist,
+      albumName: track.album,
+    },
+    { size: 128 },
+  );
 }
 
 function searchErrorHint(
@@ -342,14 +345,6 @@ export function SearchResults() {
                   artistEntityUid={a.artist_entity_uid}
                   albumSlug={a.slug}
                   year={a.year}
-                  cover={albumCoverApiUrl({
-                    albumId: a.id,
-                    albumEntityUid: a.entity_uid,
-                    artistEntityUid: a.artist_entity_uid,
-                    albumSlug: a.slug,
-                    artistName: a.artist,
-                    albumName: a.name,
-                  })}
                 />
               );
             })}

@@ -149,6 +149,25 @@ services:
     networks:
       - crate
 
+  # Durable coordination — broker, domain events, leases and job progress.
+  crate-redis-durable:
+    image: redis:7-alpine
+    container_name: crate-redis-durable
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - crate_redis_durable:/data
+    networks:
+      - crate
+
   # Crate — PostgreSQL database
   # POSTGRES_USER/PASSWORD/DB only take effect on first volume init.
   # The app connects using CRATE_POSTGRES_* vars from .env.
@@ -243,6 +262,10 @@ services:
       - CRATE_POSTGRES_PASSWORD=${CRATE_POSTGRES_PASSWORD}
       - CRATE_POSTGRES_DB=${CRATE_POSTGRES_DB}
       - CRATE_POSTGRES_HOST=crate-postgres
+      - CRATE_SQLALCHEMY_POOL_TIMEOUT_SECONDS=${CRATE_SQLALCHEMY_POOL_TIMEOUT_SECONDS:-5}
+      - CRATE_POSTGRES_CONNECT_TIMEOUT_SECONDS=${CRATE_POSTGRES_CONNECT_TIMEOUT_SECONDS:-3}
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_API_POSTGRES_STATEMENT_TIMEOUT_MS:-15000}
+      - CRATE_POSTGRES_LOCK_TIMEOUT_MS=${CRATE_POSTGRES_LOCK_TIMEOUT_MS:-3000}
       - POSTGRES_SUPERUSER_USER=${POSTGRES_SUPERUSER_USER:-crate}
       - POSTGRES_SUPERUSER_PASSWORD=${POSTGRES_SUPERUSER_PASSWORD:-crate}
       - POSTGRES_SUPERUSER_DB=${POSTGRES_SUPERUSER_DB:-crate}
@@ -254,13 +277,15 @@ services:
       - APPLE_KEY_ID=${APPLE_KEY_ID:-}
       - APPLE_PRIVATE_KEY=${APPLE_PRIVATE_KEY:-}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
-      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_SSE_REDIS_MAX_CONNECTIONS=${CRATE_SSE_REDIS_MAX_CONNECTIONS:-128}
       - SLSKD_URL=http://slskd:5030
@@ -286,6 +311,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
       - crate-media-worker
     mem_limit: 768m
     mem_reservation: 256m
@@ -332,11 +358,16 @@ services:
       - CRATE_POSTGRES_HOST=crate-postgres
       - CRATE_POSTGRES_PORT=5432
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - JWT_SECRET=${JWT_SECRET}
       - READPLANE_ENABLED=${READPLANE_ENABLED:-true}
       - READPLANE_ENABLE_SSE=${READPLANE_ENABLE_SSE:-true}
       - READPLANE_ROUTE_MODE=${READPLANE_ROUTE_MODE:-active}
       - READPLANE_FALLBACK_ENABLED=${READPLANE_FALLBACK_ENABLED:-true}
+      - READPLANE_FALLBACK_TIMEOUT_MS=${READPLANE_FALLBACK_TIMEOUT_MS:-3000}
+      - READPLANE_FALLBACK_FAILURE_THRESHOLD=${READPLANE_FALLBACK_FAILURE_THRESHOLD:-5}
+      - READPLANE_FALLBACK_OPEN_SECONDS=${READPLANE_FALLBACK_OPEN_SECONDS:-10}
       - READPLANE_FEDERATION_PROXY_ENABLED=${READPLANE_FEDERATION_PROXY_ENABLED:-true}
       - CRATE_READPLANE_SERVICE_TOKEN=${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
       - READPLANE_FEDERATION_CONTROL_TIMEOUT_MS=${READPLANE_FEDERATION_CONTROL_TIMEOUT_MS:-2000}
@@ -348,11 +379,17 @@ services:
       - READPLANE_QUERY_TIMEOUT_MS=${READPLANE_QUERY_TIMEOUT_MS:-800}
       - READPLANE_SNAPSHOT_MAX_AGE_SECONDS=${READPLANE_SNAPSHOT_MAX_AGE_SECONDS:-600}
       - READPLANE_STALE_MAX_AGE_SECONDS=${READPLANE_STALE_MAX_AGE_SECONDS:-3600}
+      - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS=${READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS:-300}
+      - READPLANE_STATS_STALE_MAX_AGE_SECONDS=${READPLANE_STATS_STALE_MAX_AGE_SECONDS:-86400}
+      - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS=${READPLANE_SESSION_TOUCH_INTERVAL_SECONDS:-60}
+      - READPLANE_AUTH_CACHE_TTL_SECONDS=${READPLANE_AUTH_CACHE_TTL_SECONDS:-15}
+      - READPLANE_AUTH_CACHE_MAX_ENTRIES=${READPLANE_AUTH_CACHE_MAX_ENTRIES:-2048}
     networks:
       - crate
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
       - crate-api
     mem_limit: 128m
     mem_reservation: 32m
@@ -366,13 +403,20 @@ services:
     labels:
       traefik.enable: true
       traefik.docker.network: crate
-      traefik.http.routers.crate-readplane-catalog.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && PathPrefix(`/api/catalog/`)
-      traefik.http.routers.crate-readplane-catalog.entryPoints: websecure
-      traefik.http.routers.crate-readplane-catalog.middlewares: crate-api-compress@docker
-      traefik.http.routers.crate-readplane-catalog.priority: 100
-      traefik.http.routers.crate-readplane-catalog.tls: true
-      traefik.http.routers.crate-readplane-catalog.tls.certresolver: letsencrypt
-      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && PathPrefix(`/api/federation/remote/streams/`)
+      traefik.http.routers.crate-readplane-interactive.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && (PathPrefix(`/api/catalog/`) || PathPrefix(`/api/me/home/`) || PathPrefix(`/api/me/albums`) || PathPrefix(`/api/me/follows`) || PathPrefix(`/api/genres`) || PathPrefix(`/api/artists/`) || PathPrefix(`/api/artist-slugs/`) || PathPrefix(`/api/albums/`) || Path(`/api/auth/me`) || Path(`/api/me`) || Path(`/api/me/history`) || Path(`/api/me/likes`) || Path(`/api/me/stats/dashboard`) || Path(`/api/search`) || Path(`/api/favorites`))
+      traefik.http.routers.crate-readplane-interactive.entryPoints: websecure
+      traefik.http.routers.crate-readplane-interactive.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-readplane-interactive.priority: 100
+      traefik.http.routers.crate-readplane-interactive.service: crate-readplane-interactive@file
+      traefik.http.routers.crate-readplane-interactive.tls: true
+      traefik.http.routers.crate-readplane-interactive.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-readplane-sse.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && (Path(`/api/cache/events`) || Path(`/api/me/home/discovery-stream`))
+      traefik.http.routers.crate-readplane-sse.entryPoints: websecure
+      traefik.http.routers.crate-readplane-sse.priority: 120
+      traefik.http.routers.crate-readplane-sse.service: crate-readplane-sse@file
+      traefik.http.routers.crate-readplane-sse.tls: true
+      traefik.http.routers.crate-readplane-sse.tls.certresolver: letsencrypt
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN}`) && Method(`GET`) && (PathPrefix(`/api/federation/remote/streams/`) || PathPrefix(`/api/tracks/`))
       traefik.http.routers.crate-readplane-stream.entryPoints: websecure
       traefik.http.routers.crate-readplane-stream.priority: 110
       traefik.http.routers.crate-readplane-stream.tls: true
@@ -391,6 +435,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - CRATE_WORKER_PROCESSES=${CRATE_WORKER_PROCESSES:-3}
       - FAST_WORKER_PROCESSES=${FAST_WORKER_PROCESSES:-2}
       - MAINTENANCE_WORKER_PROCESSES=${MAINTENANCE_WORKER_PROCESSES:-1}
@@ -419,7 +464,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD}
-      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -441,6 +486,8 @@ services:
       - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES=${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
       - CRATE_FEDERATION_IMPORT_LEASE_SECONDS=${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
@@ -473,6 +520,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
     mem_limit: 1536m
     mem_reservation: 512m
     cpus: "0.75"
@@ -518,6 +566,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=projector
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_PROJECTOR_POSTGRES_STATEMENT_TIMEOUT_MS:-30000}
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
       - DOMAIN=${DOMAIN}
@@ -529,6 +578,8 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=${POSTGRES_SUPERUSER_PASSWORD:-crate}
       - POSTGRES_SUPERUSER_DB=${POSTGRES_SUPERUSER_DB:-crate}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_PROJECTOR_INTERVAL_SECONDS=${CRATE_PROJECTOR_INTERVAL_SECONDS:-5}
       - CRATE_PROJECTOR_BATCH_LIMIT=${CRATE_PROJECTOR_BATCH_LIMIT:-200}
@@ -544,6 +595,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
     mem_limit: 512m
     mem_reservation: 128m
     cpus: "0.25"
@@ -560,6 +612,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
@@ -591,6 +644,8 @@ services:
       - NUMBA_NUM_THREADS=${MAINTENANCE_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${MAINTENANCE_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
       - CRATE_RESOURCE_GOVERNOR_ENABLED=${CRATE_RESOURCE_GOVERNOR_ENABLED:-true}
@@ -618,6 +673,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "0.5"
@@ -645,6 +701,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
@@ -668,6 +725,8 @@ services:
       - NUMBA_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${ANALYSIS_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_RESOURCE_GOVERNOR_ENABLED=${CRATE_RESOURCE_GOVERNOR_ENABLED:-true}
       - CRATE_RESOURCE_MAX_LOAD_RATIO=${CRATE_RESOURCE_MAX_LOAD_RATIO:-0.85}
@@ -694,6 +753,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
     mem_limit: 2g
     mem_reservation: 768m
     cpus: "0.75"
@@ -720,6 +780,7 @@ services:
     environment:
       - TZ=${TZ}
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
@@ -743,6 +804,8 @@ services:
       - NUMBA_NUM_THREADS=${PLAYBACK_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${PLAYBACK_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_STREAM_TRANSCODE_MAX_CONCURRENT=${STREAM_TRANSCODE_MAX_CONCURRENT:-1}
       - CRATE_LEGACY_POOL_MAXCONN=${PLAYBACK_LEGACY_POOL_MAXCONN:-2}
@@ -757,6 +820,7 @@ services:
     depends_on:
       - crate-postgres
       - crate-redis
+      - crate-redis-durable
     mem_limit: 1g
     mem_reservation: 384m
     cpus: "1.0"
@@ -785,7 +849,9 @@ services:
       - TZ=${TZ}
       - DATA_DIR=/data
       - CRATE_MEDIA_WORKER_ADDR=0.0.0.0:8687
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      - REDIS_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD}@crate-redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}
     volumes:
       - ${MEDIA_DIR}/music:/music:ro
       - ${DATA_DIR}/crate:/data
@@ -793,6 +859,7 @@ services:
       - crate
     depends_on:
       - crate-redis
+      - crate-redis-durable
     mem_limit: 256m
     mem_reservation: 64m
     cpus: "0.25"
@@ -826,6 +893,7 @@ services:
     restart: unless-stopped
     depends_on:
       - crate-api
+      - crate-readplane
     networks:
       - crate
     labels:
@@ -846,6 +914,8 @@ services:
 
 volumes:
   crate_redis:
+    driver: local
+  crate_redis_durable:
     driver: local
   crate_postgres:
     driver: local

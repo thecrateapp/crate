@@ -143,6 +143,32 @@ def test_signed_client_rejects_oversized_control_plane_response(monkeypatch):
         client.request("GET", "/health")
 
 
+def test_shared_federation_transport_is_reused_per_timeout(monkeypatch):
+    from crate.federation import client as federation_client
+
+    created: list[object] = []
+
+    class Client:
+        def close(self):
+            return None
+
+    monkeypatch.setattr(
+        federation_client,
+        "_build_client",
+        lambda timeout=federation_client.DEFAULT_TIMEOUT: (
+            created.append(timeout) or Client()
+        ),
+    )
+    federation_client.close_shared_clients()
+
+    first = federation_client.get_shared_client(federation_client.DEFAULT_TIMEOUT)
+    second = federation_client.get_shared_client(federation_client.DEFAULT_TIMEOUT)
+
+    assert first is second
+    assert len(created) == 1
+    federation_client.close_shared_clients()
+
+
 def test_peer_resource_url_is_pinned_and_cannot_change_origin():
     from crate.federation.client import prepare_outbound_resource
     from crate.federation.url_policy import FederationURLPolicy

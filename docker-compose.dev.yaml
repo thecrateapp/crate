@@ -60,6 +60,23 @@ services:
       retries: 12
       start_period: 3s
 
+  redis-durable:
+    image: redis:7-alpine
+    container_name: crate-dev-redis-durable
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD:-redis-dev}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev}
+    volumes:
+      - dev_redis_durable:/data
+    networks:
+      - crate-dev
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
+
   slskd:
     image: slskd/slskd:latest
     container_name: crate-dev-slskd
@@ -116,6 +133,8 @@ services:
       - SETLISTFM_API_KEY=${SETLISTFM_API_KEY:-}
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_SSE_REDIS_MAX_CONNECTIONS=${CRATE_SSE_REDIS_MAX_CONNECTIONS:-128}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
@@ -123,7 +142,7 @@ services:
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -149,6 +168,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
       slskd:
         condition: service_started
@@ -176,6 +197,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - CRATE_WORKER_PROCESSES=${CRATE_WORKER_PROCESSES:-2}
       - FAST_WORKER_PROCESSES=${FAST_WORKER_PROCESSES:-1}
       - MAINTENANCE_WORKER_PROCESSES=${MAINTENANCE_WORKER_PROCESSES:-1}
@@ -203,6 +225,8 @@ services:
       - NUMBA_NUM_THREADS=${CRATE_WORKER_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${CRATE_WORKER_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
@@ -221,6 +245,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
       slskd:
         condition: service_started
@@ -275,8 +301,11 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=projector
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_PROJECTOR_POSTGRES_STATEMENT_TIMEOUT_MS:-30000}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_PROJECTOR_INTERVAL_SECONDS=${CRATE_PROJECTOR_INTERVAL_SECONDS:-5}
       - CRATE_PROJECTOR_BATCH_LIMIT=${CRATE_PROJECTOR_BATCH_LIMIT:-200}
@@ -294,6 +323,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
     mem_limit: 512m
     mem_reservation: 128m
@@ -317,6 +348,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
       - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=${CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED:-false}
@@ -345,6 +377,8 @@ services:
       - NUMBA_NUM_THREADS=${MAINTENANCE_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${MAINTENANCE_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - SLSKD_URL=${SLSKD_URL:-http://slskd:5030}
       - SLSKD_API_KEY=${SLSKD_API_KEY:-}
@@ -362,6 +396,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
       slskd:
         condition: service_started
@@ -398,6 +434,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
       - JWT_SECRET=dev-secret-not-for-production
@@ -412,6 +449,8 @@ services:
       - NUMBA_NUM_THREADS=${ANALYSIS_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${ANALYSIS_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
     volumes:
       - ./app/crate:/app/crate:ro
@@ -425,6 +464,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
     mem_limit: 2g
     mem_reservation: 768m
@@ -458,6 +499,7 @@ services:
       - POSTGRES_SUPERUSER_PASSWORD=crate
       - POSTGRES_SUPERUSER_DB=crate
       - CRATE_RUNTIME=worker
+      - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
       - DOMAIN=${DEV_DOMAIN:-dev.lespedants.org}
       - TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
       - JWT_SECRET=dev-secret-not-for-production
@@ -472,6 +514,8 @@ services:
       - NUMBA_NUM_THREADS=${PLAYBACK_NATIVE_THREADS:-1}
       - CRATE_FFMPEG_THREADS=${PLAYBACK_FFMPEG_THREADS:-1}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
       - CRATE_METRICS_REDIS_TTL_SECONDS=${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
       - CRATE_STREAM_TRANSCODE_MAX_CONCURRENT=${STREAM_TRANSCODE_MAX_CONCURRENT:-1}
     volumes:
@@ -486,6 +530,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      redis-durable:
         condition: service_healthy
     mem_limit: 1g
     mem_reservation: 384m
@@ -512,7 +558,9 @@ services:
       - TZ=Europe/Madrid
       - DATA_DIR=/data
       - CRATE_MEDIA_WORKER_ADDR=0.0.0.0:8687
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0
+      - REDIS_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
+      - REDIS_CACHE_URL=${REDIS_CACHE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis:6379/0}
+      - REDIS_DURABLE_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD:-redis-dev}@redis-durable:6379/0}
     volumes:
       - ./test-music:/music:ro
       - dev_data:/data
@@ -550,20 +598,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: crate-dev-ollama
-    volumes:
-      - dev_ollama:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - crate-dev
-
 volumes:
   dev_postgres:
+  dev_redis_durable:
   dev_data:
   dev_slskd:
   dev_caddy_data:
   dev_caddy_config:
-  dev_ollama:

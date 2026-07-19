@@ -32,7 +32,6 @@ Other compose files are intentionally scoped:
 - `crate-dev-playback-worker`
 - `crate-dev-media-worker`
 - Caddy
-- Ollama when LLM work is enabled locally
 
 The frontends usually run as Vite dev servers outside Docker:
 

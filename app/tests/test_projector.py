@@ -59,6 +59,56 @@ def test_process_domain_events_noops_when_empty(monkeypatch):
     assert result == {"processed": 0, "ops_refreshes": 0, "home_refreshes": 0}
 
 
+def test_process_domain_events_isolates_poison_projection(monkeypatch):
+    from crate import projector
+
+    processed = []
+    failed = []
+    monkeypatch.setattr(
+        projector,
+        "list_domain_events",
+        lambda limit, unprocessed_only=True: [
+            {
+                "id": "1-0",
+                "event_uid": "bad",
+                "event_type": "user.likes.changed",
+                "scope": "user",
+                "subject_key": "1",
+                "payload_json": {"user_id": 1},
+            },
+            {
+                "id": "2-0",
+                "event_uid": "good",
+                "event_type": "user.likes.changed",
+                "scope": "user",
+                "subject_key": "2",
+                "payload_json": {"user_id": 2},
+            },
+        ],
+    )
+
+    def refresh_home(user_id, fresh=False):
+        if user_id == 1:
+            raise RuntimeError("poison projection")
+        return {}
+
+    monkeypatch.setattr(projector, "get_cached_home_discovery", refresh_home)
+    monkeypatch.setattr(
+        projector, "mark_domain_events_processed", lambda ids: processed.extend(ids)
+    )
+    monkeypatch.setattr(
+        projector,
+        "mark_domain_event_failed",
+        lambda event, error: failed.append((event["id"], str(error))) or 1,
+    )
+
+    result = projector.process_domain_events(limit=10)
+
+    assert result == {"processed": 1, "ops_refreshes": 0, "home_refreshes": 1}
+    assert processed == ["2-0"]
+    assert failed == [("1-0", "poison projection")]
+
+
 def test_warm_recent_home_discovery_snapshots_refreshes_recent_users(monkeypatch):
     from crate import projector
 
@@ -128,7 +178,7 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
 ):
     from crate import projector
 
-    calls = {"ops": [], "home": [], "processed": []}
+    calls = {"ops": [], "home": [], "recent": [], "stats": [], "processed": []}
 
     monkeypatch.setattr(
         projector,
@@ -162,15 +212,27 @@ def test_process_domain_events_refreshes_home_for_play_event_and_aggregate_updat
     )
     monkeypatch.setattr(
         projector,
+        "refresh_home_recently_played_snapshot",
+        lambda user_id: calls["recent"].append(user_id) or {},
+    )
+    monkeypatch.setattr(
+        projector,
+        "refresh_user_stats_dashboard_snapshots",
+        lambda user_id: calls["stats"].append(user_id) or 1,
+    )
+    monkeypatch.setattr(
+        projector,
         "mark_domain_events_processed",
         lambda event_ids: calls["processed"].append(event_ids),
     )
 
     result = projector.process_domain_events(limit=50)
 
-    assert result == {"processed": 2, "ops_refreshes": 0, "home_refreshes": 1}
+    assert result == {"processed": 2, "ops_refreshes": 0, "home_refreshes": 2}
     assert calls["ops"] == []
     assert calls["home"] == [(3, True)]
+    assert calls["recent"] == [3]
+    assert calls["stats"] == [3]
     assert calls["processed"] == [["1682349000011-0", "1682349000012-0"]]
 
 

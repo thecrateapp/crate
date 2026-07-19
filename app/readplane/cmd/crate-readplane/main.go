@@ -47,7 +47,18 @@ func main() {
 	}
 
 	var redisClient = mustRedis(ctx, cfg, logger)
-	fallback, err := httpx.NewFallbackProxy(cfg.FallbackEnabled, cfg.APIBase, cfg.Version)
+	var durableRedisClient *redis.Client
+	if cfg.FederationProxyEnabled {
+		durableRedisClient = mustRedisURL(ctx, cfg.DurableRedisURL, cfg.QueryTimeout, logger, "durable")
+	}
+	fallback, err := httpx.NewFallbackProxyWithConfig(httpx.FallbackConfig{
+		Enabled:          cfg.FallbackEnabled,
+		BaseURL:          cfg.APIBase,
+		Version:          cfg.Version,
+		RequestTimeout:   cfg.FallbackTimeout,
+		FailureThreshold: cfg.FallbackFailureThreshold,
+		OpenDuration:     cfg.FallbackOpenDuration,
+	})
 	if err != nil {
 		logger.Error("failed to configure fallback proxy", "error", err)
 		os.Exit(1)
@@ -64,9 +75,17 @@ func main() {
 		}
 	}
 
-	authenticator := auth.NewAuthenticator(pool, cfg.JWTSecret, cfg.QueryTimeout)
+	authenticator := auth.NewAuthenticatorWithCache(
+		pool,
+		cfg.JWTSecret,
+		cfg.QueryTimeout,
+		cfg.AuthCacheTTL,
+		cfg.AuthCacheMaxEntries,
+	)
+	authenticator.SetSessionTouchInterval(cfg.SessionTouchInterval)
 	catalogStore := catalog.NewStore(pool, cfg.QueryTimeout)
 	snapshotStore := snapshots.NewStore(pool, cfg.QueryTimeout, cfg.SnapshotMaxAge, cfg.StaleMaxAge)
+	snapshotStore.SetScopeFreshness("stats:", cfg.StatsSnapshotMaxAge, cfg.StatsStaleMaxAge)
 	var federationProxy *readplanefederation.Proxy
 	if cfg.FederationProxyEnabled {
 		signer, signerErr := readplanefederation.NewControlPlaneSigner(
@@ -85,16 +104,17 @@ func main() {
 			signer,
 			fallback.ServeHTTP,
 			func(checkCtx context.Context, ticketUID string) bool {
-				if redisClient == nil {
+				if durableRedisClient == nil {
 					return false
 				}
 				key := "federation:stream-revoked:{" + ticketUID + "}"
-				revoked, checkErr := redisClient.Exists(checkCtx, key).Result()
+				revoked, checkErr := durableRedisClient.Exists(checkCtx, key).Result()
 				return checkErr != nil || revoked > 0
 			},
 		)
 	}
 	server := routes.NewServer(cfg, pool, redisClient, authenticator, catalogStore, snapshotStore, fallback, federationProxy, logger)
+	go server.RunAuthInvalidation(ctx)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
@@ -119,6 +139,9 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("readplane shutdown failed", "error", err)
 	}
+	if durableRedisClient != nil {
+		_ = durableRedisClient.Close()
+	}
 }
 
 func runHealthcheck() {
@@ -141,15 +164,19 @@ func mustRedis(ctx context.Context, cfg config.Config, logger *slog.Logger) *red
 	if !cfg.EnableSSE {
 		return nil
 	}
-	client, err := redisx.Connect(cfg.RedisURL)
+	return mustRedisURL(ctx, cfg.RedisURL, cfg.QueryTimeout, logger, "cache")
+}
+
+func mustRedisURL(ctx context.Context, redisURL string, timeout time.Duration, logger *slog.Logger, role string) *redis.Client {
+	client, err := redisx.Connect(redisURL)
 	if err != nil {
-		logger.Error("failed to configure redis", "error", err)
+		logger.Error("failed to configure redis", "role", role, "error", err)
 		os.Exit(1)
 	}
-	pingCtx, cancel := context.WithTimeout(ctx, cfg.QueryTimeout)
+	pingCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := redisx.Ping(pingCtx, client); err != nil {
-		logger.Warn("redis ping failed during startup; readiness will stay unhealthy until it recovers", "error", err)
+		logger.Warn("redis ping failed during startup", "role", role, "error", err)
 	}
 	return client
 }

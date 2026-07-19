@@ -80,6 +80,11 @@ and failures serve the last complete global catalog.
 5. For `global-degraded`, inspect the failed reconciliation run, correct the
    bounded root cause, and enqueue one incremental or full reconciliation from
    Admin. Do not truncate canonical or legacy user-library tables.
+6. Check `global_catalog_search_projection_state`. While its status is
+   `warming` or `backfilling`, search deliberately uses the compatibility
+   query. When `ready`, `total_documents` must match the canonical artist,
+   album, and track count. A failed search projection is repaired by resuming
+   the full reconciliation; never truncate the live document table first.
 
 Escalate as an availability incident only when canonical and legacy/local
 paths both fail, latency breaches the singleton SLO, or playback/detail routes
@@ -128,6 +133,41 @@ regress. A long first backfill by itself is not downtime.
 - After Redis recovery, wait for expired slot leases and run reconciliation. Do not manually inflate limits to clear stale entries.
 - Revoke active tickets if Redis integrity is uncertain; clients can resolve fresh playback after recovery.
 
+## Cache Redis or durable Redis incident
+
+Crate uses two explicit roles. `crate-redis` is disposable cache, metrics and
+best-effort pub/sub with `volatile-lru`; `crate-redis-durable` stores Dramatiq,
+domain-event delivery, revocation/lease coordination and job progress with AOF
+and `noeviction`. Durable Redis has an explicit memory ceiling below its
+container limit: write failures and PostgreSQL outbox growth are recoverable;
+an OOM-killed broker is not.
+
+- If cache Redis is unavailable, PostgreSQL/snapshots remain authoritative.
+  Expect lower hit rate and delayed SSE invalidations, but committed events and
+  jobs must remain intact. Restore cache Redis without copying the durable AOF.
+- If durable Redis is unavailable, mutations still commit their transactional
+  outbox rows. Stop queue-producing maintenance if backlog growth threatens
+  PostgreSQL, restore the AOF service, then verify outbox lag drains to zero.
+- Page when `domain_event_outbox.dead_letter > 0`, the oldest pending event is
+  over five minutes, or durable Redis reports an eviction/write error. Do not
+  switch durable Redis to an eviction policy to clear pressure.
+- Back up the `crate_redis_durable` volume together with PostgreSQL. Cache Redis
+  does not require backup.
+
+Upgrade order: deploy both Redis services first while explicitly pointing
+`REDIS_CACHE_URL` and `REDIS_DURABLE_URL` at the previous shared Redis. Drain or
+pause Dramatiq producers and verify DB 1 has no pending queues before switching
+`REDIS_DURABLE_URL` to `crate-redis-durable`; Compose does not copy broker keys
+between services. Apply migrations next, deploy API/workers/projector, wait for
+outbox and search backfills, and enable readplane routing last. For rollback,
+point both role URLs at the previous shared Redis, restart all runtimes, and
+verify broker/outbox queues before removing either service. Never merge AOF
+files by hand.
+
+Failure drill: stop cache Redis and verify home/search serve stale snapshots;
+restart it, then stop durable Redis, commit a harmless mutation, verify an
+outbox row remains pending, restart durable Redis and confirm relay delivery.
+
 ## Signature, replay, or abuse incident
 
 - Identify the peer and bounded reason code from metrics/audit without copying assertions, signatures, URLs, nonces, subject identifiers, or key material into tickets.
@@ -144,6 +184,13 @@ regress. A long first backfill by itself is not downtime.
   once `/readyz` recovers, new requests return to Go.
 - Validate both paths with the `readplane-restart` chaos scenario. Never retry a
   ticket after either proxy has consumed it.
+- Inspect `/readyz` for PostgreSQL pool saturation, fallback success ratio and
+  auth-cache outcomes. Route hot reads back to FastAPI before widening timeout
+  or connection limits; an open fallback circuit is protection, not the root
+  incident.
+- Cache Redis/SSE failure appears as `details.degraded=true` while `/readyz`
+  remains healthy for PostgreSQL-backed JSON reads. PostgreSQL or schema
+  failures remain hard readiness failures.
 
 ## Stuck or failed import
 

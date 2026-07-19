@@ -719,6 +719,7 @@ afterEach(() => {
 
 describe("connectCacheEvents", () => {
   let origEventSource: typeof EventSource;
+  let constructedUrl: string | null;
   let mockEs: {
     onopen: (() => void) | null;
     onmessage: ((e: MessageEvent) => void) | null;
@@ -729,6 +730,7 @@ describe("connectCacheEvents", () => {
 
   beforeEach(() => {
     origEventSource = globalThis.EventSource;
+    constructedUrl = null;
 
     mockEs = {
       onopen: null,
@@ -741,7 +743,8 @@ describe("connectCacheEvents", () => {
     // Return the pre-built mock from the constructor so that
     // connectCacheEvents's property assignments (eventSource.onopen,
     // eventSource.onmessage, etc.) land directly on mockEs.
-    function MockEventSource() {
+    function MockEventSource(url: string | URL) {
+      constructedUrl = String(url);
       return mockEs;
     }
 
@@ -784,6 +787,18 @@ describe("connectCacheEvents", () => {
     );
     expect(mockRecordAssetInvalidationScope).toHaveBeenCalledWith("likes");
     expect(listener).toHaveBeenCalledWith("likes");
+  });
+
+  it("resumes from the last event persisted before a page reload", () => {
+    _safeConnect();
+    mockEs.onmessage!({ data: "library", lastEventId: "42" } as MessageEvent);
+    _disconnectCacheEvents!();
+
+    _safeConnect();
+
+    expect(constructedUrl).toBe(
+      "https://api.example.test/api/cache/events?last_event_id=42",
+    );
   });
 
   it("ignores empty messages", () => {

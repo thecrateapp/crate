@@ -197,7 +197,7 @@ class TestArtistPageEnrichment:
         }
         mock_live.assert_not_called()
 
-    def test_artist_page_enrichment_falls_back_to_live_setlist_when_cache_misses(self):
+    def test_artist_page_enrichment_queues_refresh_when_cache_misses(self):
         with (
             patch("crate.api.enrichment.get_cache", return_value=None),
             patch(
@@ -205,23 +205,17 @@ class TestArtistPageEnrichment:
                 return_value=None,
             ),
             patch(
-                "crate.api.enrichment.setlistfm.get_probable_setlist",
-                return_value=[{"title": "Paranoid Android"}],
-            ) as mock_live,
+                "crate.api.enrichment.setlistfm.queue_probable_setlist_refresh"
+            ) as mock_queue,
         ):
             from crate.api.enrichment import get_artist_page_enrichment
 
             result = get_artist_page_enrichment("Radiohead")
 
-        assert result == {
-            "setlist": {
-                "probable_setlist": [{"title": "Paranoid Android"}],
-                "total_shows": 1,
-            }
-        }
-        mock_live.assert_called_once_with("Radiohead")
+        assert result == {}
+        mock_queue.assert_called_once_with("Radiohead")
 
-    def test_artist_enrichment_completes_stale_cache_without_setlist(self):
+    def test_artist_enrichment_queues_setlist_without_blocking_stale_cache(self):
         cached = {"lastfm": {"bio": "Bio"}}
         request = SimpleNamespace(state=SimpleNamespace(user={"role": "user"}))
 
@@ -233,23 +227,16 @@ class TestArtistPageEnrichment:
                 return_value=None,
             ),
             patch(
-                "crate.api.enrichment.setlistfm.get_probable_setlist",
-                return_value=[{"title": "Pure Morning"}],
-            ) as mock_live,
+                "crate.api.enrichment.setlistfm.queue_probable_setlist_refresh"
+            ) as mock_queue,
             patch("crate.api.enrichment.set_cache") as mock_set_cache,
         ):
             from crate.api.enrichment import get_artist_enrichment
 
             result = get_artist_enrichment(request, "Placebo")
 
-        assert result == {
-            "lastfm": {"bio": "Bio"},
-            "setlist": {
-                "probable_setlist": [{"title": "Pure Morning"}],
-                "total_shows": 1,
-            },
-        }
-        mock_live.assert_called_once_with("Placebo")
+        assert result == {"lastfm": {"bio": "Bio"}}
+        mock_queue.assert_called_once_with("Placebo")
         mock_set_cache.assert_called_once()
 
 

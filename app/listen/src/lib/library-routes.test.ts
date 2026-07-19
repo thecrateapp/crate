@@ -23,11 +23,13 @@ import {
   albumSharePath,
   artistApiPath,
   artistBackgroundApiUrl,
+  genreCoverApiUrl,
   artistPagePath,
   artistPhotoApiUrl,
   artistSharePath,
   artistTopTracksPath,
   isReservedArtistChildSlug,
+  responsiveImageSrcSet,
   recordAssetInvalidationScope,
   trackDownloadApiPath,
   trackEffectiveEqApiPath,
@@ -57,6 +59,18 @@ describe("library route asset helpers", () => {
     expect(url).toBe(
       "https://api.example.test/api/albums/42/cover?size=256&format=webp&token=listen-token",
     );
+  });
+
+  it("builds responsive candidates without duplicating image query params", () => {
+    const srcSet = responsiveImageSrcSet([160, 320], (size) =>
+      albumCoverApiUrl({ albumId: 42 }, { size }),
+    );
+
+    expect(srcSet).toBe(
+      "https://api.example.test/api/albums/42/cover?size=160&format=webp&token=listen-token 160w, " +
+        "https://api.example.test/api/albums/42/cover?size=320&format=webp&token=listen-token 320w",
+    );
+    expect(srcSet).not.toContain("size=160&size=");
   });
 
   it("does not double-prefix URLs already resolved by the shared asset resolver", () => {
@@ -125,6 +139,51 @@ describe("library route asset helpers", () => {
 
     expect(url).toBe(
       "https://api.example.test/api/artists/9/photo?size=128&v=artwork-2&format=webp&token=listen-token",
+    );
+  });
+
+  it("adds the local artist invalidation version to canonical asset URLs", () => {
+    recordAssetInvalidationScope("artist:19", "artwork-global-19");
+
+    const url = artistBackgroundApiUrl(
+      { artistId: 19, globalArtistUid: "artist-global-19" },
+      { size: 1280 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-19/background?size=1280&v=artwork-global-19&format=webp&token=listen-token",
+    );
+
+    expect(
+      artistPhotoApiUrl(
+        { artistId: 19, globalArtistUid: "artist-global-19" },
+        { size: 640 },
+      ),
+    ).toBe(
+      "https://api.example.test/api/catalog/artists/artist-global-19/photo?size=640&v=artwork-global-19&format=webp&token=listen-token",
+    );
+  });
+
+  it("adds the local album invalidation version to canonical cover URLs", () => {
+    recordAssetInvalidationScope("album:23", "artwork-global-23");
+
+    const url = albumCoverApiUrl(
+      { albumId: 23, globalAlbumUid: "album-global-23" },
+      { size: 640 },
+    );
+
+    expect(url).toBe(
+      "https://api.example.test/api/catalog/albums/album-global-23/cover?size=640&v=artwork-global-23&format=webp&token=listen-token",
+    );
+  });
+
+  it("versions curated genre covers from genre invalidation events", () => {
+    recordAssetInvalidationScope("genre:post-metal", "genre-artwork-4");
+
+    const url = genreCoverApiUrl("post-metal", { size: 640 });
+
+    expect(url).toBe(
+      "https://api.example.test/api/genres/post-metal/cover?size=640&v=genre-artwork-4&format=webp&token=listen-token",
     );
   });
 

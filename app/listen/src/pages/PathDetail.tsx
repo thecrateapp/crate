@@ -60,11 +60,14 @@ function mapToPlayerTrack(t: PathTrack): Track {
   return toPlayableTrack(t, {
     cover:
       t.album_id || t.album_entity_uid
-        ? albumCoverApiUrl({
-            albumId: t.album_id,
-            albumEntityUid: t.album_entity_uid,
-            artistEntityUid: t.artist_entity_uid,
-          })
+        ? albumCoverApiUrl(
+            {
+              albumId: t.album_id,
+              albumEntityUid: t.album_entity_uid,
+              artistEntityUid: t.artist_entity_uid,
+            },
+            { size: 512 },
+          )
         : undefined,
   });
 }
@@ -233,11 +236,15 @@ export function PathDetail() {
             <div className="flex items-center gap-3">
               {path.tracks[activeStep]!.album_id && (
                 <img
-                  src={albumCoverApiUrl({
-                    albumId: path.tracks[activeStep]!.album_id!,
-                    albumEntityUid: path.tracks[activeStep]!.album_entity_uid,
-                    artistEntityUid: path.tracks[activeStep]!.artist_entity_uid,
-                  })}
+                  src={albumCoverApiUrl(
+                    {
+                      albumId: path.tracks[activeStep]!.album_id!,
+                      albumEntityUid: path.tracks[activeStep]!.album_entity_uid,
+                      artistEntityUid:
+                        path.tracks[activeStep]!.artist_entity_uid,
+                    },
+                    { size: 80 },
+                  )}
                   alt=""
                   className="h-10 w-10 flex-shrink-0 rounded-lg bg-white/5 object-cover shadow-md"
                 />
@@ -314,11 +321,14 @@ export function PathDetail() {
 
               {t.album_id ? (
                 <img
-                  src={albumCoverApiUrl({
-                    albumId: t.album_id,
-                    albumEntityUid: t.album_entity_uid,
-                    artistEntityUid: t.artist_entity_uid,
-                  })}
+                  src={albumCoverApiUrl(
+                    {
+                      albumId: t.album_id,
+                      albumEntityUid: t.album_entity_uid,
+                      artistEntityUid: t.artist_entity_uid,
+                    },
+                    { size: 80 },
+                  )}
                   alt=""
                   className="h-10 w-10 flex-shrink-0 rounded-md bg-white/5 object-cover"
                 />

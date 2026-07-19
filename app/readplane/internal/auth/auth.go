@@ -1,17 +1,21 @@
 package auth
 
 import (
+	"container/list"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
@@ -45,28 +49,98 @@ type User struct {
 	ConnectedAccounts []ConnectedAccount `json:"connected_accounts"`
 }
 
+// IdentityCacheStats exposes bounded, low-cardinality auth cache diagnostics.
+type IdentityCacheStats struct {
+	Hits          int64
+	Misses        int64
+	Evictions     int64
+	Invalidations int64
+	DBLookups     int64
+	Entries       int
+}
+
+type identityCacheEntry struct {
+	key       string
+	user      *User
+	expiresAt time.Time
+}
+
 // Authenticator validates sessions and loads user data from the database.
 type Authenticator struct {
 	pool         *pgxpool.Pool
 	queryTimeout time.Duration
 	envSecret    string
 
-	mu             sync.Mutex
+	secretMu       sync.Mutex
 	cachedDBSecret string
 	secretLoadedAt time.Time
+
+	cacheTTL        time.Duration
+	cacheMaxEntries int
+	cacheMu         sync.Mutex
+	cache           map[string]*list.Element
+	cacheList       *list.List
+	lookupGroup     singleflight.Group
+	identityLookup  func(context.Context, JWTPayload) (*User, time.Time, error)
+	accountsLookup  func(context.Context, int64) ([]ConnectedAccount, error)
+	hits            atomic.Int64
+	misses          atomic.Int64
+	evictions       atomic.Int64
+	invalidations   atomic.Int64
+	dbLookups       atomic.Int64
+
+	touchMu         sync.Mutex
+	touchInterval   time.Duration
+	touchMaxEntries int
+	lastTouches     map[string]time.Time
+	sessionTouch    func(context.Context, string) error
 }
 
 // NewAuthenticator creates an Authenticator using the given database pool and JWT secret.
 func NewAuthenticator(pool *pgxpool.Pool, envSecret string, queryTimeout time.Duration) *Authenticator {
+	return NewAuthenticatorWithCache(pool, envSecret, queryTimeout, 15*time.Second, 2048)
+}
+
+// NewAuthenticatorWithCache creates an authenticator with a bounded identity cache.
+func NewAuthenticatorWithCache(
+	pool *pgxpool.Pool,
+	envSecret string,
+	queryTimeout time.Duration,
+	cacheTTL time.Duration,
+	cacheMaxEntries int,
+) *Authenticator {
+	if cacheTTL <= 0 {
+		cacheTTL = 15 * time.Second
+	}
+	if cacheMaxEntries <= 0 {
+		cacheMaxEntries = 2048
+	}
 	return &Authenticator{
-		pool:         pool,
-		envSecret:    strings.TrimSpace(envSecret),
-		queryTimeout: queryTimeout,
+		pool:            pool,
+		envSecret:       strings.TrimSpace(envSecret),
+		queryTimeout:    queryTimeout,
+		cacheTTL:        cacheTTL,
+		cacheMaxEntries: cacheMaxEntries,
+		cache:           make(map[string]*list.Element),
+		cacheList:       list.New(),
+		touchInterval:   time.Minute,
+		touchMaxEntries: cacheMaxEntries,
+		lastTouches:     make(map[string]time.Time),
 	}
 }
 
-// Authenticate verifies the request's session token and returns the associated user.
-func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*User, error) {
+// SetSessionTouchInterval controls how often an active session updates last_seen_at.
+func (a *Authenticator) SetSessionTouchInterval(interval time.Duration) {
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	a.touchMu.Lock()
+	a.touchInterval = interval
+	a.touchMu.Unlock()
+}
+
+// AuthenticateIdentity verifies revocation and returns only hot-path identity fields.
+func (a *Authenticator) AuthenticateIdentity(r *http.Request, allowQueryToken bool) (*User, error) {
 	tokens := ExtractTokenCandidates(r, allowQueryToken)
 	if len(tokens) == 0 {
 		return nil, ErrUnauthorized
@@ -82,9 +156,35 @@ func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*Us
 		if err != nil {
 			continue
 		}
-
-		user, err := a.loadUser(r.Context(), payload)
+		key := identityCacheKey(token)
+		if user := a.cacheGet(key, time.Now()); user != nil {
+			a.hits.Add(1)
+			a.touchAuthenticatedSession(user)
+			return user, nil
+		}
+		a.misses.Add(1)
+		value, err, shared := a.lookupGroup.Do(key, func() (any, error) {
+			if user := a.cacheGet(key, time.Now()); user != nil {
+				return user, nil
+			}
+			a.dbLookups.Add(1)
+			lookup := a.identityLookup
+			if lookup == nil {
+				lookup = a.loadIdentity
+			}
+			user, sessionExpiry, lookupErr := lookup(r.Context(), payload)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			a.cacheSet(key, user, identityExpiry(payload, sessionExpiry, a.cacheTTL))
+			return cloneUser(user), nil
+		})
+		if shared {
+			a.hits.Add(1)
+		}
 		if err == nil {
+			user := value.(*User)
+			a.touchAuthenticatedSession(user)
 			return user, nil
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -93,6 +193,132 @@ func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*Us
 	}
 
 	return nil, ErrUnauthorized
+}
+
+func (a *Authenticator) touchAuthenticatedSession(user *User) {
+	if user == nil || user.SessionID == nil {
+		return
+	}
+	a.scheduleSessionTouch(*user.SessionID)
+}
+
+func (a *Authenticator) scheduleSessionTouch(sessionID string) {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return
+	}
+	now := time.Now()
+	if !a.claimSessionTouch(sessionID, now) {
+		return
+	}
+	touch := a.sessionTouch
+	if touch == nil {
+		touch = a.updateSessionLastSeen
+	}
+	go func(claimedAt time.Time) {
+		timeout := a.queryTimeout
+		if timeout <= 0 {
+			timeout = time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		if err := touch(ctx, sessionID); err != nil {
+			a.releaseSessionTouch(sessionID, claimedAt)
+		}
+	}(now)
+}
+
+func (a *Authenticator) claimSessionTouch(sessionID string, now time.Time) bool {
+	a.touchMu.Lock()
+	defer a.touchMu.Unlock()
+	if last, ok := a.lastTouches[sessionID]; ok && now.Sub(last) < a.touchInterval {
+		return false
+	}
+	if _, exists := a.lastTouches[sessionID]; !exists && len(a.lastTouches) >= a.touchMaxEntries {
+		var oldestID string
+		var oldest time.Time
+		for candidateID, touchedAt := range a.lastTouches {
+			if oldestID == "" || touchedAt.Before(oldest) {
+				oldestID = candidateID
+				oldest = touchedAt
+			}
+		}
+		delete(a.lastTouches, oldestID)
+	}
+	a.lastTouches[sessionID] = now
+	return true
+}
+
+func (a *Authenticator) releaseSessionTouch(sessionID string, claimedAt time.Time) {
+	a.touchMu.Lock()
+	defer a.touchMu.Unlock()
+	if current, ok := a.lastTouches[sessionID]; ok && current.Equal(claimedAt) {
+		delete(a.lastTouches, sessionID)
+	}
+}
+
+func (a *Authenticator) updateSessionLastSeen(ctx context.Context, sessionID string) error {
+	_, err := a.pool.Exec(ctx, `
+		UPDATE sessions
+		SET last_seen_at = NOW()
+		WHERE id = $1
+		  AND revoked_at IS NULL
+		  AND expires_at > NOW()
+	`, sessionID)
+	return err
+}
+
+// AuthenticateProfile hydrates connected accounts only for profile responses.
+func (a *Authenticator) AuthenticateProfile(r *http.Request, allowQueryToken bool) (*User, error) {
+	user, err := a.AuthenticateIdentity(r, allowQueryToken)
+	if err != nil {
+		return nil, err
+	}
+	lookup := a.accountsLookup
+	if lookup == nil {
+		lookup = a.connectedAccounts
+	}
+	accounts, err := lookup(r.Context(), user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
+	}
+	profile := cloneUser(user)
+	profile.ConnectedAccounts = accounts
+	return profile, nil
+}
+
+// Authenticate is the backward-compatible minimal-identity entry point.
+func (a *Authenticator) Authenticate(r *http.Request, allowQueryToken bool) (*User, error) {
+	return a.AuthenticateIdentity(r, allowQueryToken)
+}
+
+// InvalidateScope evicts cached revocable identities for auth/session changes.
+func (a *Authenticator) InvalidateScope(scope string) {
+	normalized := strings.ToLower(strings.TrimSpace(scope))
+	if normalized != "auth" && !strings.HasPrefix(normalized, "auth:") &&
+		!strings.HasPrefix(normalized, "session:") && !strings.HasPrefix(normalized, "user:") {
+		return
+	}
+	a.cacheMu.Lock()
+	a.cache = make(map[string]*list.Element)
+	a.cacheList.Init()
+	a.cacheMu.Unlock()
+	a.invalidations.Add(1)
+}
+
+// Stats returns an atomic snapshot of identity-cache behavior.
+func (a *Authenticator) Stats() IdentityCacheStats {
+	a.cacheMu.Lock()
+	entries := len(a.cache)
+	a.cacheMu.Unlock()
+	return IdentityCacheStats{
+		Hits:          a.hits.Load(),
+		Misses:        a.misses.Load(),
+		Evictions:     a.evictions.Load(),
+		Invalidations: a.invalidations.Load(),
+		DBLookups:     a.dbLookups.Load(),
+		Entries:       entries,
+	}
 }
 
 // ExtractToken extracts a bearer token from the Authorization header, query string, or cookies.
@@ -148,13 +374,86 @@ func containsToken(tokens []string, token string) bool {
 	return false
 }
 
+func identityCacheKey(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func identityExpiry(payload JWTPayload, sessionExpiry time.Time, ttl time.Duration) time.Time {
+	expiresAt := time.Now().Add(ttl)
+	if payload.Expires > 0 {
+		tokenExpiry := time.Unix(payload.Expires, 0)
+		if tokenExpiry.Before(expiresAt) {
+			expiresAt = tokenExpiry
+		}
+	}
+	if !sessionExpiry.IsZero() && sessionExpiry.Before(expiresAt) {
+		expiresAt = sessionExpiry
+	}
+	return expiresAt
+}
+
+func (a *Authenticator) cacheGet(key string, now time.Time) *User {
+	a.cacheMu.Lock()
+	defer a.cacheMu.Unlock()
+	element, ok := a.cache[key]
+	if !ok {
+		return nil
+	}
+	entry := element.Value.(*identityCacheEntry)
+	if !now.Before(entry.expiresAt) {
+		delete(a.cache, key)
+		a.cacheList.Remove(element)
+		return nil
+	}
+	a.cacheList.MoveToFront(element)
+	return cloneUser(entry.user)
+}
+
+func (a *Authenticator) cacheSet(key string, user *User, expiresAt time.Time) {
+	if user == nil || !time.Now().Before(expiresAt) {
+		return
+	}
+	a.cacheMu.Lock()
+	defer a.cacheMu.Unlock()
+	if existing, ok := a.cache[key]; ok {
+		entry := existing.Value.(*identityCacheEntry)
+		entry.user = cloneUser(user)
+		entry.expiresAt = expiresAt
+		a.cacheList.MoveToFront(existing)
+		return
+	}
+	element := a.cacheList.PushFront(&identityCacheEntry{
+		key: key, user: cloneUser(user), expiresAt: expiresAt,
+	})
+	a.cache[key] = element
+	for len(a.cache) > a.cacheMaxEntries {
+		oldest := a.cacheList.Back()
+		if oldest == nil {
+			break
+		}
+		delete(a.cache, oldest.Value.(*identityCacheEntry).key)
+		a.cacheList.Remove(oldest)
+		a.evictions.Add(1)
+	}
+}
+
+func cloneUser(user *User) *User {
+	if user == nil {
+		return nil
+	}
+	clone := *user
+	clone.ConnectedAccounts = append([]ConnectedAccount(nil), user.ConnectedAccounts...)
+	return &clone
+}
+
 func (a *Authenticator) jwtSecret(ctx context.Context) (string, error) {
 	if a.envSecret != "" {
 		return a.envSecret, nil
 	}
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.secretMu.Lock()
+	defer a.secretMu.Unlock()
 	if a.cachedDBSecret != "" && time.Since(a.secretLoadedAt) < time.Minute {
 		return a.cachedDBSecret, nil
 	}
@@ -174,13 +473,14 @@ func (a *Authenticator) jwtSecret(ctx context.Context) (string, error) {
 	return a.cachedDBSecret, nil
 }
 
-func (a *Authenticator) loadUser(ctx context.Context, payload JWTPayload) (*User, error) {
+func (a *Authenticator) loadIdentity(ctx context.Context, payload JWTPayload) (*User, time.Time, error) {
 	queryCtx, cancel := postgres.WithTimeout(ctx, a.queryTimeout)
 	defer cancel()
 
 	user := &User{}
 	var username, name, bio, avatar sql.NullString
 	var sessionID sql.NullString
+	var sessionExpiresAt time.Time
 
 	if payload.SessionID != "" {
 		const query = `
@@ -192,7 +492,8 @@ func (a *Authenticator) loadUser(ctx context.Context, payload JWTPayload) (*User
 				u.name,
 				u.bio,
 				u.avatar,
-				s.id
+				s.id,
+				s.expires_at
 			FROM sessions s
 			JOIN users u ON u.id = s.user_id
 			WHERE s.id = $1
@@ -210,8 +511,9 @@ func (a *Authenticator) loadUser(ctx context.Context, payload JWTPayload) (*User
 			&bio,
 			&avatar,
 			&sessionID,
+			&sessionExpiresAt,
 		); err != nil {
-			return nil, err
+			return nil, time.Time{}, err
 		}
 	} else {
 		const query = `
@@ -229,7 +531,7 @@ func (a *Authenticator) loadUser(ctx context.Context, payload JWTPayload) (*User
 			&bio,
 			&avatar,
 		); err != nil {
-			return nil, err
+			return nil, time.Time{}, err
 		}
 	}
 
@@ -242,12 +544,8 @@ func (a *Authenticator) loadUser(ctx context.Context, payload JWTPayload) (*User
 		user.Role = "user"
 	}
 
-	accounts, err := a.connectedAccounts(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
-	user.ConnectedAccounts = accounts
-	return user, nil
+	user.ConnectedAccounts = []ConnectedAccount{}
+	return user, sessionExpiresAt, nil
 }
 
 func (a *Authenticator) connectedAccounts(ctx context.Context, userID int64) ([]ConnectedAccount, error) {

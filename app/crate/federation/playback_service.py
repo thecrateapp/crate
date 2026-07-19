@@ -16,6 +16,7 @@ from crate.federation.client import (
     DEFAULT_TIMEOUT,
     SignedFederationClient,
     federated_post,
+    get_shared_client,
 )
 from crate.federation.global_playback import resolve_global_track_playback
 from crate.federation.stream_proxy import filter_response_headers
@@ -146,6 +147,7 @@ def stream_global_track(
         key_id=local_node["active_key_id"],
         private_key_ref=local_node["private_key_ref"],
         timeout=DEFAULT_TIMEOUT,
+        client=get_shared_client(DEFAULT_TIMEOUT),
     )
     forwarded = {
         name: value

@@ -24,7 +24,10 @@ import {
   albumApiPath,
   albumCoverApiUrl,
   albumPagePath,
+  responsiveImageSrcSet,
 } from "@/lib/library-routes";
+
+const ALBUM_CARD_IMAGE_WIDTHS = [160, 256, 320, 480] as const;
 
 interface AlbumCardProps {
   artist: string;
@@ -98,6 +101,17 @@ export const AlbumCard = memo(function AlbumCard({
     albumCoverApiUrl(albumRouteInput, {
       size: layout === "grid" ? 320 : compact ? 192 : 256,
     });
+  const coverSrcSet = cover
+    ? undefined
+    : responsiveImageSrcSet(ALBUM_CARD_IMAGE_WIDTHS, (size) =>
+        albumCoverApiUrl(albumRouteInput, { size }),
+      );
+  const coverSizes =
+    layout === "grid"
+      ? "(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 17vw"
+      : compact
+        ? "120px"
+        : "160px";
   const saved = isSaved(albumId, globalAlbumUid);
   const offlineState = getAlbumState(albumId);
   const offlineRecord = getAlbumRecord(albumId);
@@ -180,7 +194,7 @@ export const AlbumCard = memo(function AlbumCard({
       className={cn(
         "group snap-start cursor-pointer rounded-xl p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:rounded-xl",
         layout === "grid"
-          ? "w-full min-w-0"
+          ? "listen-deferred-grid-item w-full min-w-0"
           : `flex-shrink-0 ${compact ? "w-[120px]" : "w-[160px]"}`,
         offlineState === "ready"
           ? "bg-cyan-400/[0.04]"
@@ -204,8 +218,11 @@ export const AlbumCard = memo(function AlbumCard({
       <div className="relative aspect-square rounded-lg overflow-hidden bg-white/5 mb-2">
         <img
           src={coverUrl}
+          srcSet={coverSrcSet}
+          sizes={coverSrcSet ? coverSizes : undefined}
           alt={album}
           loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = "none";

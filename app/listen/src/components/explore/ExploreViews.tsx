@@ -46,7 +46,11 @@ import {
   type SystemPlaylist,
   loadSystemPlaylistTracks,
 } from "./explore-model";
-import { artistPhotoApiUrl } from "@/lib/library-routes";
+import {
+  artistBackgroundApiUrl,
+  artistPhotoApiUrl,
+  genreCoverApiUrl,
+} from "@/lib/library-routes";
 
 const GENRE_SECONDARY_ACTION_CLASS =
   "flex min-h-14 min-w-[56px] shrink-0 touch-manipulation flex-col items-center justify-center gap-1 px-1.5 py-1 text-[11px] font-medium text-white/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,211,238,0.32)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
@@ -225,7 +229,24 @@ export function GenreDetailView({
   const isDesktop = useIsDesktop();
   const [startingRadio, setStartingRadio] = useState(false);
   const [expandedShowId, setExpandedShowId] = useState<string | null>(null);
-  const { data, loading } = useApi<GenreDetail>(`/api/catalog/genres/${slug}`);
+  const { data, loading } = useApi<GenreDetail>(
+    `/api/catalog/genres/${slug}`,
+    "GET",
+    undefined,
+    { revalidateIfCached: "never" },
+  );
+  const primaryArtists = useMemo(
+    () =>
+      (data?.artists ?? []).filter(
+        (artist) => artist.membership !== "inherited",
+      ),
+    [data?.artists],
+  );
+  const primaryAlbums = useMemo(
+    () =>
+      (data?.albums ?? []).filter((album) => album.membership !== "inherited"),
+    [data?.albums],
+  );
   const genreShows = data?.shows?.slice(0, 5) ?? [];
   const nextShow = genreShows[0] ?? null;
   const fallbackGenreSlug = data?.canonical_slug || data?.slug;
@@ -234,9 +255,9 @@ export function GenreDetailView({
       buildGenreHeroCoverCandidates(
         data?.cover_url,
         fallbackGenreSlug,
-        data?.artists,
+        primaryArtists,
       ),
-    [data?.cover_url, fallbackGenreSlug, data?.artists],
+    [data?.cover_url, fallbackGenreSlug, primaryArtists],
   );
   const heroCoverFingerprint = heroCoverCandidates.join("|");
   const [heroCoverIndex, setHeroCoverIndex] = useState(0);
@@ -320,13 +341,25 @@ export function GenreDetailView({
     data.canonical_description ||
     data.external_description ||
     t("genre.defaultDescription");
-  const artistCount = data.artist_count ?? data.artists.length;
-  const albumCount = data.album_count ?? data.albums.length;
-  const trackCount =
-    data.track_count ??
-    data.albums.reduce((total, album) => total + (album.track_count || 0), 0);
-  const visibleArtists = isDesktop ? data.artists : data.artists.slice(0, 12);
-  const visibleAlbums = isDesktop ? data.albums : data.albums.slice(0, 12);
+  const hasArtistMemberships = data.artists.some((artist) => artist.membership);
+  const hasAlbumMemberships = data.albums.some((album) => album.membership);
+  const artistCount = hasArtistMemberships
+    ? primaryArtists.length
+    : data.artist_count ?? primaryArtists.length;
+  const albumCount = hasAlbumMemberships
+    ? primaryAlbums.length
+    : data.album_count ?? primaryAlbums.length;
+  const directAlbumTrackCount = primaryAlbums.reduce(
+    (total, album) => total + (album.track_count || 0),
+    0,
+  );
+  const trackCount = hasAlbumMemberships
+    ? directAlbumTrackCount
+    : data.track_count ?? directAlbumTrackCount;
+  const visibleArtists = isDesktop
+    ? primaryArtists
+    : primaryArtists.slice(0, 12);
+  const visibleAlbums = isDesktop ? primaryAlbums : primaryAlbums.slice(0, 12);
   const visibleRelatedGenres = (data.related_genres ?? []).slice(
     0,
     isDesktop ? 12 : 6,
@@ -389,14 +422,17 @@ export function GenreDetailView({
         <section className="relative -mx-4 -mt-4 h-[420px] overflow-hidden sm:-mx-6 sm:-mt-6 sm:h-[400px] lg:-mx-8 lg:-mt-8">
           {heroCoverUrl ? (
             <img
+              key={heroCoverUrl}
               src={heroCoverUrl}
               alt={t("genre.coverAlt", { name: data.name })}
+              decoding="async"
+              fetchPriority="high"
               className="absolute inset-0 h-full w-full scale-[1.02] object-cover brightness-[0.66] contrast-110 opacity-[0.68] saturate-125"
-              onError={(event) => {
+              onError={() => {
                 if (heroCoverIndex + 1 < heroCoverCandidates.length) {
                   setHeroCoverIndex((index) => index + 1);
                 } else {
-                  event.currentTarget.style.display = "none";
+                  setHeroCoverIndex(heroCoverCandidates.length);
                 }
               }}
             />
@@ -681,12 +717,13 @@ function RelatedGenreCard({
           src={coverUrl}
           alt=""
           className="absolute inset-0 -z-10 h-full w-full scale-[1.04] object-cover opacity-35 saturate-125 transition duration-300 group-hover:opacity-45"
-          loading="lazy"
-          onError={(event) => {
+          decoding="async"
+          loading="eager"
+          onError={() => {
             if (imageIndex + 1 < imageCandidates.length) {
               setImageIndex((index) => index + 1);
             } else {
-              event.currentTarget.style.display = "none";
+              setImageIndex(imageCandidates.length);
             }
           }}
         />
@@ -716,11 +753,20 @@ function RelatedGenreCard({
 }
 
 function buildRelatedGenreImageCandidates(genre: RelatedGenre) {
+  const topArtistPhoto = genre.top_artist_global_uid
+    ? artistPhotoApiUrl(
+        {
+          artistId: genre.top_artist_id,
+          globalArtistUid: genre.top_artist_global_uid,
+        },
+        { size: 640, format: "webp" },
+      )
+    : resolveMaybeApiAssetUrl(genre.top_artist_photo_url);
   const candidates = [
-    resolveMaybeApiAssetUrl(genre.cover_url),
-    relatedGenreCoverUrl(genre.page_slug),
-    relatedGenreCoverUrl(genre.slug),
-    resolveMaybeApiAssetUrl(genre.top_artist_photo_url),
+    resolveGenreCoverCandidate(genre.cover_url, 640),
+    topArtistPhoto ? null : relatedGenreCoverUrl(genre.page_slug),
+    topArtistPhoto ? null : relatedGenreCoverUrl(genre.slug),
+    topArtistPhoto,
   ].filter((url): url is string => Boolean(url));
 
   return [...new Set(candidates)];
@@ -729,31 +775,52 @@ function buildRelatedGenreImageCandidates(genre: RelatedGenre) {
 function relatedGenreCoverUrl(slug?: string | null) {
   const normalizedSlug = slug?.trim();
   if (!normalizedSlug) return null;
-  return resolveMaybeApiAssetUrl(
-    `/api/genres/${encodeURIComponent(
-      normalizedSlug,
-    )}/cover?size=640&format=webp`,
-  );
+  return genreCoverApiUrl(normalizedSlug, { size: 640, format: "webp" });
+}
+
+function genreCoverSlugFromUrl(url?: string | null) {
+  const match = url?.match(/\/api\/genres\/([^/?]+)\/cover(?:\?|$)/);
+  if (!match) return null;
+  const encodedSlug = match[1];
+  if (!encodedSlug) return null;
+  try {
+    return decodeURIComponent(encodedSlug);
+  } catch {
+    return encodedSlug;
+  }
+}
+
+function resolveGenreCoverCandidate(
+  url: string | null | undefined,
+  size: number,
+) {
+  if (!url) return null;
+  const genreSlug = genreCoverSlugFromUrl(url);
+  if (genreSlug) {
+    return genreCoverApiUrl(genreSlug, { size, format: "webp" });
+  }
+  if (/\/api\/catalog\/artists\/[^/?]+\/background(?:\?|$)/.test(url)) {
+    return null;
+  }
+  return resolveMaybeApiAssetUrl(url);
 }
 
 function upscaleGenreCoverUrl(
   url?: string | null,
   fallbackSlug?: string | null,
 ) {
-  const candidate =
-    url ||
-    (fallbackSlug
-      ? `/api/genres/${encodeURIComponent(
-          fallbackSlug,
-        )}/cover?size=1280&format=webp`
-      : null);
+  const genreSlug = genreCoverSlugFromUrl(url) || (!url ? fallbackSlug : null);
+  if (genreSlug) {
+    return genreCoverApiUrl(genreSlug, { size: 1280, format: "webp" });
+  }
+  const candidate = url || null;
   const resolved = resolveMaybeApiAssetUrl(candidate);
   if (!resolved) return null;
   const sized = resolved.replace(
     /([?&]size=)640\b/,
     (_, prefix: string) => `${prefix}1280`,
   );
-  return `${sized}${sized.includes("?") ? "&" : "?"}hero=genre-detail-v5`;
+  return sized;
 }
 
 function buildGenreHeroCoverCandidates(
@@ -761,22 +828,30 @@ function buildGenreHeroCoverCandidates(
   fallbackSlug?: string | null,
   artists?: GenreDetail["artists"],
 ) {
-  const primary = upscaleGenreCoverUrl(url);
-  const fallback = fallbackSlug
-    ? upscaleGenreCoverUrl(undefined, fallbackSlug)
-    : null;
-  const fallbackArtistPhoto = buildGenreHeroArtistPhotoFallback(artists);
+  const generatedArtistCover = Boolean(
+    url &&
+      /\/api\/catalog\/artists\/[^/?]+\/(?:background|photo)(?:\?|$)/.test(url),
+  );
+  const primary = generatedArtistCover ? null : upscaleGenreCoverUrl(url);
+  const fallbackArtistBackground =
+    buildGenreHeroArtistBackgroundFallback(artists);
+  const fallback =
+    !generatedArtistCover && fallbackSlug && (url || !fallbackArtistBackground)
+      ? upscaleGenreCoverUrl(undefined, fallbackSlug)
+      : null;
 
   const candidates: string[] = [];
 
   if (primary) candidates.push(primary);
   if (fallback) candidates.push(fallback);
-  if (fallbackArtistPhoto) candidates.push(fallbackArtistPhoto);
+  if (fallbackArtistBackground) candidates.push(fallbackArtistBackground);
 
   return [...new Set(candidates)];
 }
 
-function buildGenreHeroArtistPhotoFallback(artists?: GenreDetail["artists"]) {
+function buildGenreHeroArtistBackgroundFallback(
+  artists?: GenreDetail["artists"],
+) {
   if (!artists?.length) return null;
   const topArtist = artists
     .filter(
@@ -792,7 +867,7 @@ function buildGenreHeroArtistPhotoFallback(artists?: GenreDetail["artists"]) {
 
   if (!topArtist?.artist_id && !topArtist?.global_artist_uid) return null;
 
-  const resolved = artistPhotoApiUrl(
+  const resolved = artistBackgroundApiUrl(
     {
       artistId: topArtist.artist_id,
       globalArtistUid: topArtist.global_artist_uid,
@@ -805,7 +880,7 @@ function buildGenreHeroArtistPhotoFallback(artists?: GenreDetail["artists"]) {
   );
 
   if (!resolved) return null;
-  return `${resolved}${resolved.includes("?") ? "&" : "?"}hero=genre-detail-v5`;
+  return resolved;
 }
 
 export function DecadeDetailView({

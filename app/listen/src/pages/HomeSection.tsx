@@ -40,14 +40,17 @@ function toPlayerTrack(item: HomeRecommendedTrack): Track {
   return toPlayableTrack(item, {
     cover:
       item.artist && item.album
-        ? albumCoverApiUrl({
-            albumId: item.album_id || undefined,
-            albumEntityUid: item.album_entity_uid || undefined,
-            artistEntityUid: item.artist_entity_uid || undefined,
-            albumSlug: item.album_slug || undefined,
-            artistName: item.artist,
-            albumName: item.album,
-          }) || undefined
+        ? albumCoverApiUrl(
+            {
+              albumId: item.album_id || undefined,
+              albumEntityUid: item.album_entity_uid || undefined,
+              artistEntityUid: item.artist_entity_uid || undefined,
+              albumSlug: item.album_slug || undefined,
+              artistName: item.artist,
+              albumName: item.album,
+            },
+            { size: 512 },
+          ) || undefined
         : undefined,
   });
 }

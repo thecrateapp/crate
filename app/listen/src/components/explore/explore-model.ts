@@ -136,6 +136,7 @@ export interface GenreDetail {
     has_photo: boolean;
     photo_url?: string | null;
     listeners: number | null;
+    membership?: "direct" | "inherited";
   }[];
   albums: {
     album_id?: number | null;
@@ -151,6 +152,7 @@ export interface GenreDetail {
     track_count: number;
     has_cover: boolean;
     cover_url?: string | null;
+    membership?: "direct" | "inherited";
   }[];
   shows?: UpcomingItem[];
   related_genres?: {
@@ -164,6 +166,8 @@ export interface GenreDetail {
     album_count: number;
     content_score?: number;
     cover_url?: string | null;
+    top_artist_global_uid?: string | null;
+    top_artist_id?: number | null;
     top_artist_photo_url?: string | null;
   }[];
 }
@@ -199,14 +203,17 @@ export async function loadSystemPlaylistTracks(playlistId: number): Promise<{
       toPlayableTrack(track, {
         cover:
           track.artist && track.album
-            ? albumCoverApiUrl({
-                albumId: track.album_id,
-                albumEntityUid: track.album_entity_uid,
-                artistEntityUid: track.artist_entity_uid,
-                albumSlug: track.album_slug,
-                artistName: track.artist,
-                albumName: track.album,
-              })
+            ? albumCoverApiUrl(
+                {
+                  albumId: track.album_id,
+                  albumEntityUid: track.album_entity_uid,
+                  artistEntityUid: track.artist_entity_uid,
+                  albumSlug: track.album_slug,
+                  artistName: track.artist,
+                  albumName: track.album,
+                },
+                { size: 512 },
+              )
             : data.cover_data_url || undefined,
       }),
     ),

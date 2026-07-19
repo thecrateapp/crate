@@ -186,14 +186,10 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "top-tracks" {
-		if s.tryFallback(w, r) {
-			return
-		}
 		if !s.requireCatalogAuth(w, r) {
 			return
 		}
-		payload, err := s.catalog.ArtistTopTracksBySlug(r.Context(), parts[0], boundedQueryInt(r, "count", 20, 1, 50))
-		s.writeCatalogPayload(w, r, payload, err, "Artist top tracks unavailable", "Not found")
+		s.writeArtistTopTracksBySlug(w, r, parts[0], boundedQueryInt(r, "count", 20, 1, 50))
 		return
 	}
 	if len(parts) == 3 && parts[1] == "albums" {
@@ -208,6 +204,19 @@ func (s *Server) artistSlugRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.fallbackOrRouteMiss(w, r)
+}
+
+func (s *Server) writeArtistTopTracksBySlug(w http.ResponseWriter, r *http.Request, slug string, count int) {
+	store := s.artistTopTracks
+	if store == nil {
+		store = s.catalog
+	}
+	if store == nil {
+		s.catalogUnavailable(w, r, "Readplane catalog unavailable")
+		return
+	}
+	payload, err := store.ArtistTopTracksBySlug(r.Context(), slug, count)
+	s.writeCatalogPayloadOrFallbackNotFound(w, r, payload, err, "Artist top tracks unavailable", "Not found")
 }
 
 func (s *Server) artistRoute(w http.ResponseWriter, r *http.Request) {

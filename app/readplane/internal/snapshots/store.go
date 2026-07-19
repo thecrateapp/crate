@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,15 +45,22 @@ type Row struct {
 
 // Store reads and caches ui_snapshots from PostgreSQL with a small LRU layer.
 type Store struct {
-	pool            *pgxpool.Pool
-	queryTimeout    time.Duration
-	maxAge          time.Duration
-	staleMaxAge     time.Duration
-	cacheTTL        time.Duration
-	cacheMaxEntries int
-	mu              sync.Mutex
-	cache           map[string]*list.Element
-	cacheList       *list.List
+	pool              *pgxpool.Pool
+	queryTimeout      time.Duration
+	maxAge            time.Duration
+	staleMaxAge       time.Duration
+	cacheTTL          time.Duration
+	cacheMaxEntries   int
+	mu                sync.Mutex
+	cache             map[string]*list.Element
+	cacheList         *list.List
+	freshnessPolicies map[string]FreshnessPolicy
+}
+
+// FreshnessPolicy defines when a snapshot becomes stale and when it expires.
+type FreshnessPolicy struct {
+	MaxAge      time.Duration
+	StaleMaxAge time.Duration
 }
 
 type lruEntry struct {
@@ -64,15 +72,41 @@ type lruEntry struct {
 // NewStore creates a snapshot Store with the given pool, timeout, and cache ages.
 func NewStore(pool *pgxpool.Pool, queryTimeout time.Duration, maxAge time.Duration, staleMaxAge time.Duration) *Store {
 	return &Store{
-		pool:            pool,
-		queryTimeout:    queryTimeout,
-		maxAge:          maxAge,
-		staleMaxAge:     staleMaxAge,
-		cacheTTL:        defaultCacheTTL,
-		cacheMaxEntries: defaultCacheMaxEntries,
-		cache:           make(map[string]*list.Element),
-		cacheList:       list.New(),
+		pool:              pool,
+		queryTimeout:      queryTimeout,
+		maxAge:            maxAge,
+		staleMaxAge:       staleMaxAge,
+		cacheTTL:          defaultCacheTTL,
+		cacheMaxEntries:   defaultCacheMaxEntries,
+		cache:             make(map[string]*list.Element),
+		cacheList:         list.New(),
+		freshnessPolicies: make(map[string]FreshnessPolicy),
 	}
+}
+
+// SetScopeFreshness overrides snapshot freshness for scopes with the prefix.
+func (s *Store) SetScopeFreshness(scopePrefix string, maxAge time.Duration, staleMaxAge time.Duration) {
+	prefix := strings.TrimSpace(scopePrefix)
+	if prefix == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.freshnessPolicies[prefix] = FreshnessPolicy{MaxAge: maxAge, StaleMaxAge: staleMaxAge}
+}
+
+func (s *Store) freshnessForScope(scope string) (time.Duration, time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	policy := FreshnessPolicy{MaxAge: s.maxAge, StaleMaxAge: s.staleMaxAge}
+	matchedPrefixLength := 0
+	for prefix, candidate := range s.freshnessPolicies {
+		if strings.HasPrefix(scope, prefix) && len(prefix) > matchedPrefixLength {
+			policy = candidate
+			matchedPrefixLength = len(prefix)
+		}
+	}
+	return policy.MaxAge, policy.StaleMaxAge
 }
 
 // Get returns a cached or freshly loaded snapshot for the given scope and subject.
@@ -129,7 +163,8 @@ func (s *Store) get(ctx context.Context, scope string, subjectKey string, bypass
 		row.Meta.StaleAfter = &staleAfter.Time
 	}
 
-	stale, usable := SnapshotFreshness(row.Meta.BuiltAt, row.Meta.StaleAfter, now, s.maxAge, s.staleMaxAge)
+	maxAge, staleMaxAge := s.freshnessForScope(scope)
+	stale, usable := SnapshotFreshness(row.Meta.BuiltAt, row.Meta.StaleAfter, now, maxAge, staleMaxAge)
 	if !usable {
 		return nil, ErrNotFound
 	}

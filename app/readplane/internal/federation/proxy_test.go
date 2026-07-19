@@ -201,7 +201,10 @@ func TestProxyStopsOnRevocationAndClientCancellation(t *testing.T) {
 
 	var checks atomic.Int32
 	revoked := func(_ context.Context, _ string) bool { return checks.Add(1) > 2 }
-	proxy := NewProxy(ProxyConfig{AllowPrivateNetworks: true}, &staticSigner{authorization: authorizationFor(origin)}, nil, revoked)
+	proxy := NewProxy(ProxyConfig{
+		AllowPrivateNetworks:    true,
+		RevocationCheckInterval: 10 * time.Microsecond,
+	}, &staticSigner{authorization: authorizationFor(origin)}, nil, revoked)
 	ctx, cancel := context.WithCancel(context.Background())
 	request := httptest.NewRequest(http.MethodGet, "/api/federation/remote/streams/"+testTicketUID, nil).WithContext(ctx)
 	response := httptest.NewRecorder()
@@ -219,6 +222,53 @@ func TestProxyStopsOnRevocationAndClientCancellation(t *testing.T) {
 		t.Fatal("proxy did not stop after revocation/cancellation")
 	}
 	assert.Less(t, response.Body.Len(), 1024*1024)
+}
+
+func TestRevocationReaderThrottlesDurableStoreChecks(t *testing.T) {
+	now := time.Unix(100, 0)
+	checks := 0
+	reader := &revocationReader{
+		ctx:           context.Background(),
+		reader:        strings.NewReader("abcdefghijklmnop"),
+		ticketUID:     testTicketUID,
+		check:         func(context.Context, string) bool { checks++; return false },
+		checkInterval: time.Second,
+		now:           func() time.Time { return now },
+	}
+	buffer := make([]byte, 4)
+
+	for range 3 {
+		_, err := reader.Read(buffer)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 1, checks)
+
+	now = now.Add(time.Second)
+	_, err := reader.Read(buffer)
+	require.NoError(t, err)
+	assert.Equal(t, 2, checks)
+}
+
+func TestProxyReusesTransportsPerPinnedPeer(t *testing.T) {
+	proxy := NewProxy(ProxyConfig{}, &staticSigner{}, nil, nil)
+	first := Authorization{
+		ConnectionURL: "https://203.0.113.10:443/stream/one",
+		SNIHostname:   "peer.example",
+	}
+	samePeer := first
+	samePeer.ConnectionURL = "https://203.0.113.10:443/stream/two"
+	newAddress := first
+	newAddress.ConnectionURL = "https://203.0.113.11:443/stream/one"
+
+	firstTransport, err := proxy.transportFor(first)
+	require.NoError(t, err)
+	sameTransport, err := proxy.transportFor(samePeer)
+	require.NoError(t, err)
+	newTransport, err := proxy.transportFor(newAddress)
+	require.NoError(t, err)
+
+	assert.Same(t, firstTransport, sameTransport)
+	assert.NotSame(t, firstTransport, newTransport)
 }
 
 func TestControlPlaneSignerMapsResponsesAndLimitsBodies(t *testing.T) {

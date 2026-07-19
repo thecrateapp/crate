@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,17 @@ import (
 	"github.com/thecrateapp/crate/app/readplane/internal/config"
 	"github.com/thecrateapp/crate/app/readplane/internal/httpx"
 )
+
+type stubArtistTopTracksCatalog struct {
+	calls   int
+	payload []map[string]any
+	err     error
+}
+
+func (s *stubArtistTopTracksCatalog) ArtistTopTracksBySlug(context.Context, string, int) ([]map[string]any, error) {
+	s.calls++
+	return s.payload, s.err
+}
 
 func TestRouteParts(t *testing.T) {
 	t.Run("decodes URL segments", func(t *testing.T) {
@@ -174,6 +186,34 @@ func TestArtistTopTracksSlugFallsBackToFastAPIForGlobalResolution(t *testing.T) 
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "fallback", rec.Header().Get("X-Crate-Readplane"))
+}
+
+func TestArtistTopTracksSlugConsultsCatalogBeforeFallback(t *testing.T) {
+	fallbackCalls := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fallbackCalls++
+		httpx.WriteJSON(w, http.StatusOK, []map[string]any{{"title": "Fallback track"}})
+	}))
+	defer backend.Close()
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	store := &stubArtistTopTracksCatalog{
+		payload: []map[string]any{{"title": "Catalog track"}},
+	}
+	server := &Server{
+		artistTopTracks: store,
+		fallback:        fallback,
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+	req := httptest.NewRequest(http.MethodGet, "/api/artist-slugs/high-vis/top-tracks?count=50", nil)
+	rec := httptest.NewRecorder()
+
+	server.writeArtistTopTracksBySlug(rec, req, "high-vis", 50)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "hit", rec.Header().Get("X-Crate-Readplane"))
+	assert.Equal(t, 1, store.calls)
+	assert.Equal(t, 0, fallbackCalls)
 }
 
 func TestCanonicalCatalogCatchAllFallsBackToFastAPI(t *testing.T) {

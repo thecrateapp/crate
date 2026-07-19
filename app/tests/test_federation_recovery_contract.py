@@ -404,7 +404,7 @@ def test_local_key_rotation_accepts_uuid_loaded_from_postgres(monkeypatch):
     assert result["rotation_uid"] == rotation_uid
 
 
-def test_production_router_has_a_health_checked_fastapi_stream_fallback():
+def test_production_router_has_health_checked_fastapi_readplane_fallbacks():
     from pathlib import Path
 
     import yaml
@@ -413,17 +413,21 @@ def test_production_router_has_a_health_checked_fastapi_stream_fallback():
     dynamic_path = root / "deploy/traefik/federation-readplane.yml"
     dynamic = yaml.safe_load(dynamic_path.read_text())
     services = dynamic["http"]["services"]
-    failover = services["crate-readplane-stream"]["failover"]
-    assert failover == {
-        "service": "crate-readplane-primary",
-        "fallback": "crate-api-stream-fallback",
-    }
+    for service_name in (
+        "crate-readplane-interactive",
+        "crate-readplane-sse",
+        "crate-readplane-stream",
+    ):
+        assert services[service_name]["failover"] == {
+            "service": "crate-readplane-primary",
+            "fallback": "crate-api-read-fallback",
+        }
     assert (
         services["crate-readplane-primary"]["loadBalancer"]["healthCheck"]["path"]
         == "/readyz"
     )
     assert (
-        services["crate-api-stream-fallback"]["loadBalancer"]["healthCheck"]["path"]
+        services["crate-api-read-fallback"]["loadBalancer"]["healthCheck"]["path"]
         == "/api/status"
     )
 
@@ -439,6 +443,19 @@ def test_production_router_has_a_health_checked_fastapi_stream_fallback():
             labels["traefik.http.routers.crate-readplane-stream.service"]
             == "crate-readplane-stream@file"
         )
+        assert (
+            labels["traefik.http.routers.crate-readplane-interactive.service"]
+            == "crate-readplane-interactive@file"
+        )
+        assert (
+            labels["traefik.http.routers.crate-readplane-sse.service"]
+            == "crate-readplane-sse@file"
+        )
+
+    nginx = (root / "app/listen/nginx.conf").read_text()
+    assert "upstream crate_readplane_backend" in nginx
+    assert "server crate-api:8585 backup" in nginx
+    assert "proxy_next_upstream error timeout http_502 http_503 http_504" in nginx
 
     deploy = (root / "scripts/deploy.sh").read_text()
     assert "deploy/traefik/federation-readplane.yml" in deploy

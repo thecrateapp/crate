@@ -70,15 +70,18 @@ function toPlayerTrack(item: HomeRecommendedTrack): Track {
   return toPlayableTrack(item, {
     cover:
       item.artist && item.album
-        ? albumCoverApiUrl({
-            albumId: item.album_id,
-            globalAlbumUid: item.global_album_uid,
-            albumEntityUid: item.album_entity_uid,
-            artistEntityUid: item.artist_entity_uid,
-            albumSlug: item.album_slug,
-            artistName: item.artist,
-            albumName: item.album,
-          }) || undefined
+        ? albumCoverApiUrl(
+            {
+              albumId: item.album_id,
+              globalAlbumUid: item.global_album_uid,
+              albumEntityUid: item.album_entity_uid,
+              artistEntityUid: item.artist_entity_uid,
+              albumSlug: item.album_slug,
+              artistName: item.artist,
+              albumName: item.album,
+            },
+            { size: 512 },
+          ) || undefined
         : undefined,
   });
 }
@@ -568,15 +571,18 @@ export function Home() {
       toPlayableTrack(item, {
         cover:
           item.artist && item.album
-            ? albumCoverApiUrl({
-                albumId: item.album_id,
-                globalAlbumUid: item.global_album_uid,
-                albumEntityUid: item.album_entity_uid,
-                artistEntityUid: item.artist_entity_uid,
-                albumSlug: item.album_slug,
-                artistName: item.artist,
-                albumName: item.album,
-              })
+            ? albumCoverApiUrl(
+                {
+                  albumId: item.album_id,
+                  globalAlbumUid: item.global_album_uid,
+                  albumEntityUid: item.album_entity_uid,
+                  artistEntityUid: item.artist_entity_uid,
+                  albumSlug: item.album_slug,
+                  artistName: item.artist,
+                  albumName: item.album,
+                },
+                { size: 512 },
+              )
             : undefined,
       }),
     );

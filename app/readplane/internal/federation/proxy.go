@@ -10,10 +10,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 const streamBufferSize = 64 * 1024
+const defaultRevocationCheckInterval = time.Second
+const maxPeerTransports = 256
 
 var safeResponseHeaders = map[string]struct{}{
 	"accept-ranges": {}, "cache-control": {}, "content-length": {},
@@ -35,18 +38,21 @@ type RevocationChecker func(context.Context, string) bool
 
 // ProxyConfig controls the bounded stream transport.
 type ProxyConfig struct {
-	AllowPrivateNetworks  bool
-	ConnectTimeout        time.Duration
-	ResponseHeaderTimeout time.Duration
+	AllowPrivateNetworks    bool
+	ConnectTimeout          time.Duration
+	ResponseHeaderTimeout   time.Duration
+	RevocationCheckInterval time.Duration
 }
 
 // Proxy relays a federated media response without buffering the full object.
 type Proxy struct {
-	config    ProxyConfig
-	signer    Signer
-	fallback  FallbackFunc
-	revoked   RevocationChecker
-	transport *http.Transport
+	config         ProxyConfig
+	signer         Signer
+	fallback       FallbackFunc
+	revoked        RevocationChecker
+	transport      *http.Transport
+	transportMu    sync.Mutex
+	peerTransports map[string]*http.Transport
 }
 
 // NewProxy creates a federation stream data-plane proxy.
@@ -56,6 +62,9 @@ func NewProxy(config ProxyConfig, signer Signer, fallback FallbackFunc, revoked 
 	}
 	if config.ResponseHeaderTimeout <= 0 {
 		config.ResponseHeaderTimeout = 10 * time.Second
+	}
+	if config.RevocationCheckInterval <= 0 {
+		config.RevocationCheckInterval = defaultRevocationCheckInterval
 	}
 	dialer := &net.Dialer{Timeout: config.ConnectTimeout, KeepAlive: 30 * time.Second}
 	return &Proxy{
@@ -73,6 +82,7 @@ func NewProxy(config ProxyConfig, signer Signer, fallback FallbackFunc, revoked 
 			TLSHandshakeTimeout:   config.ConnectTimeout,
 			ResponseHeaderTimeout: config.ResponseHeaderTimeout,
 		},
+		peerTransports: make(map[string]*http.Transport),
 	}
 }
 
@@ -132,12 +142,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, request *http.Request, localUse
 	}
 	upstreamRequest.Host = authorization.HostHeader
 
-	transport := p.transport.Clone()
-	if strings.HasPrefix(strings.ToLower(authorization.ConnectionURL), "https://") {
-		transport.TLSClientConfig = &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			ServerName: authorization.SNIHostname,
-		}
+	transport, err := p.transportFor(authorization)
+	if err != nil {
+		http.Error(w, "Invalid federation stream destination", http.StatusBadGateway)
+		return
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -160,14 +168,45 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, request *http.Request, localUse
 	reader := io.Reader(response.Body)
 	if p.revoked != nil {
 		reader = &revocationReader{
-			ctx:       request.Context(),
-			reader:    response.Body,
-			ticketUID: ticketUID,
-			check:     p.revoked,
+			ctx:           request.Context(),
+			reader:        response.Body,
+			ticketUID:     ticketUID,
+			check:         p.revoked,
+			checkInterval: p.config.RevocationCheckInterval,
+			now:           time.Now,
 		}
 	}
 	buffer := make([]byte, streamBufferSize)
 	_, _ = io.CopyBuffer(w, reader, buffer)
+}
+
+func (p *Proxy) transportFor(authorization Authorization) (*http.Transport, error) {
+	connection, err := url.Parse(authorization.ConnectionURL)
+	if err != nil || connection.Scheme == "" || connection.Host == "" {
+		return nil, errors.New("connection URL invalid")
+	}
+	if !strings.EqualFold(connection.Scheme, "https") {
+		return p.transport, nil
+	}
+	key := strings.ToLower(connection.Scheme + "://" + connection.Host + "|" + authorization.SNIHostname)
+	p.transportMu.Lock()
+	defer p.transportMu.Unlock()
+	if transport := p.peerTransports[key]; transport != nil {
+		return transport, nil
+	}
+	if len(p.peerTransports) >= maxPeerTransports {
+		for _, transport := range p.peerTransports {
+			transport.CloseIdleConnections()
+		}
+		p.peerTransports = make(map[string]*http.Transport)
+	}
+	transport := p.transport.Clone()
+	transport.TLSClientConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		ServerName: authorization.SNIHostname,
+	}
+	p.peerTransports[key] = transport
+	return transport, nil
 }
 
 func (p *Proxy) validateAuthorization(auth Authorization, requestPath, ticketUID string, now time.Time) error {
@@ -235,15 +274,30 @@ func copyResponseHeaders(destination, source http.Header) {
 }
 
 type revocationReader struct {
-	ctx       context.Context
-	reader    io.Reader
-	ticketUID string
-	check     RevocationChecker
+	ctx           context.Context
+	reader        io.Reader
+	ticketUID     string
+	check         RevocationChecker
+	checkInterval time.Duration
+	nextCheck     time.Time
+	now           func() time.Time
 }
 
 func (r *revocationReader) Read(buffer []byte) (int, error) {
-	if r.check(r.ctx, r.ticketUID) {
-		return 0, errors.New("federation stream revoked")
+	now := time.Now
+	if r.now != nil {
+		now = r.now
+	}
+	current := now()
+	if r.nextCheck.IsZero() || !current.Before(r.nextCheck) {
+		if r.check(r.ctx, r.ticketUID) {
+			return 0, errors.New("federation stream revoked")
+		}
+		interval := r.checkInterval
+		if interval <= 0 {
+			interval = defaultRevocationCheckInterval
+		}
+		r.nextCheck = current.Add(interval)
 	}
 	return r.reader.Read(buffer)
 }

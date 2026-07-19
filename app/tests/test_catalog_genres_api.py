@@ -32,6 +32,62 @@ def test_global_genre_detail_expands_core_parent_hierarchy_at_read_time(pg_db):
     assert detail["artists"][0]["supporting_source_count"] == 1
 
 
+def test_global_genre_detail_resolves_library_alias_to_canonical_genre(pg_db):
+    from crate.db.queries.global_catalog import get_global_genre_detail
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+    from crate.genre_taxonomy import core_genre_uid
+
+    pg_db.upsert_artist({"name": "Alias Genre Artist", "entity_uid": str(uuid.uuid4())})
+    pg_db.set_artist_genres("Alias Genre Artist", [("hardcore", 1.0, "test")])
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 1
+
+    detail = get_global_genre_detail("hardcore")
+
+    assert detail is not None
+    assert detail["global_genre_uid"] == core_genre_uid("hardcore-punk")
+    assert detail["canonical_slug"] == "hardcore-punk"
+    assert detail["artists"][0]["artist_name"] == "Alias Genre Artist"
+
+
+def test_global_genre_detail_keeps_visual_metadata_for_global_members(pg_db):
+    from crate.db.queries.global_catalog import get_global_genre_detail
+    from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources
+
+    for name, genre in (
+        ("Post Hardcore Visual Artist", "post-hardcore"),
+        ("Emo Visual Artist", "emo"),
+    ):
+        pg_db.upsert_artist(
+            {
+                "name": name,
+                "entity_uid": str(uuid.uuid4()),
+                "has_photo": 1,
+            }
+        )
+        pg_db.set_artist_genres(name, [(genre, 1.0, "test")])
+    assert reconcile_dirty_catalog_sources(limit=10)["completed"] == 2
+
+    detail = get_global_genre_detail("post-hardcore")
+
+    assert detail is not None
+    assert detail["description"]
+    assert any(
+        artist["artist_name"] == "Post Hardcore Visual Artist"
+        for artist in detail["artists"]
+    )
+    assert detail["cover_url"] is None
+
+    emo = next(item for item in detail["related_genres"] if item["slug"] == "emo")
+    assert emo["artist_count"] == 1
+    assert emo["content_score"] == 3
+    assert emo["cover_url"] is None
+    assert emo["top_artist_global_uid"]
+    assert emo["top_artist_id"] is not None
+    assert emo["top_artist_photo_url"].startswith("/api/catalog/artists/")
+    assert emo["top_artist_photo_url"].endswith("/photo?size=640&format=webp")
+    assert all(item["content_score"] > 0 for item in detail["related_genres"])
+
+
 def test_global_track_genre_reports_direct_memberships(pg_db):
     from crate.db.queries.global_catalog import get_global_track_genres
     from crate.federation.global_reconciliation import reconcile_dirty_catalog_sources

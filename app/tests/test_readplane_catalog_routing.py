@@ -19,17 +19,17 @@ def test_dev_caddy_routes_canonical_catalog_reads_through_readplane():
     )
 
 
-def test_production_traefik_routes_only_canonical_catalog_gets_to_readplane():
+def test_production_traefik_routes_canonical_catalog_gets_to_readplane():
     compose = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())
     readplane = compose["services"]["crate-readplane"]
     labels = readplane["labels"]
 
     assert labels["traefik.enable"] is True
-    rule = labels["traefik.http.routers.crate-readplane-catalog.rule"]
+    rule = labels["traefik.http.routers.crate-readplane-interactive.rule"]
     assert "Host(`api.${DOMAIN}`)" in rule
     assert "Method(`GET`)" in rule
     assert "PathPrefix(`/api/catalog/`)" in rule
-    assert labels["traefik.http.routers.crate-readplane-catalog.priority"] > 0
+    assert labels["traefik.http.routers.crate-readplane-interactive.priority"] > 0
     assert (
         labels["traefik.http.services.crate-readplane.loadbalancer.server.port"] == 8686
     )

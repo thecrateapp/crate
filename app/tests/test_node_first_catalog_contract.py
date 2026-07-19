@@ -28,6 +28,7 @@ def test_startup_bootstraps_one_local_node_without_env_flag(monkeypatch):
 
     monkeypatch.setattr(bootstrap.repo, "ensure_local_node", ensure_local_node)
     monkeypatch.setattr(bootstrap.repo, "update_local_node", update_local_node)
+    monkeypatch.setattr(bootstrap.trust_repo, "upsert_local_key", lambda **_kwargs: {})
 
     result = bootstrap.bootstrap_federation_identity()
 
@@ -142,3 +143,75 @@ def test_ready_node_with_an_older_user_ref_backfill_queues_a_catalog_backfill(
         {"triggered_by": "api_startup"},
     )
     assert queued["kwargs"] == {"dedup_key": "bootstrap:global-catalog"}
+
+
+def test_ready_node_without_search_projection_queues_a_catalog_backfill(monkeypatch):
+    from crate import api
+    from crate.db import global_catalog_search_projection
+    from crate.db.repositories import global_catalog_state, tasks
+    from crate.db.repositories.global_user_library import (
+        USER_LIBRARY_REFS_BACKFILL_VERSION,
+    )
+
+    queued: dict[str, object] = {}
+    monkeypatch.setattr(
+        global_catalog_state,
+        "get_catalog_state",
+        lambda: {
+            "status": "ready",
+            "user_refs_backfilled_at": "2026-07-13T10:00:00+00:00",
+            "user_refs_backfill_version": USER_LIBRARY_REFS_BACKFILL_VERSION,
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog_search_projection,
+        "get_global_catalog_search_projection_status",
+        lambda: "warming",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        tasks,
+        "create_task_dedup",
+        lambda *args, **kwargs: queued.update({"args": args, "kwargs": kwargs}),
+    )
+
+    api._queue_global_catalog_bootstrap()
+
+    assert queued["args"] == (
+        "global_catalog_reconcile_full",
+        {"triggered_by": "api_startup"},
+    )
+
+
+def test_ready_node_with_ready_search_projection_skips_catalog_backfill(monkeypatch):
+    from crate import api
+    from crate.db import global_catalog_search_projection
+    from crate.db.repositories import global_catalog_state, tasks
+    from crate.db.repositories.global_user_library import (
+        USER_LIBRARY_REFS_BACKFILL_VERSION,
+    )
+
+    monkeypatch.setattr(
+        global_catalog_state,
+        "get_catalog_state",
+        lambda: {
+            "status": "ready",
+            "user_refs_backfilled_at": "2026-07-13T10:00:00+00:00",
+            "user_refs_backfill_version": USER_LIBRARY_REFS_BACKFILL_VERSION,
+        },
+    )
+    monkeypatch.setattr(
+        global_catalog_search_projection,
+        "get_global_catalog_search_projection_status",
+        lambda: "ready",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        tasks,
+        "create_task_dedup",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("ready projections must not enqueue duplicate work")
+        ),
+    )
+
+    api._queue_global_catalog_bootstrap()

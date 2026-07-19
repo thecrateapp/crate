@@ -944,12 +944,15 @@ function BandcampTab() {
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
                   {contribution.album_id ? (
                     <img
-                      src={albumCoverApiUrl({
-                        albumId: contribution.album_id,
-                        albumEntityUid: contribution.album_entity_uid,
-                        artistName: contribution.artist_name,
-                        albumName: contribution.album_name,
-                      })}
+                      src={albumCoverApiUrl(
+                        {
+                          albumId: contribution.album_id,
+                          albumEntityUid: contribution.album_entity_uid,
+                          artistName: contribution.artist_name,
+                          albumName: contribution.album_name,
+                        },
+                        { size: 128 },
+                      )}
                       alt=""
                       loading="lazy"
                       className="h-full w-full object-cover"
@@ -1121,12 +1124,15 @@ function ContributionArtwork({
     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/8 bg-white/6">
       {contribution.album_id ? (
         <img
-          src={albumCoverApiUrl({
-            albumId: contribution.album_id,
-            albumEntityUid: contribution.album_entity_uid,
-            artistName: contribution.artist_name,
-            albumName: contribution.album_name,
-          })}
+          src={albumCoverApiUrl(
+            {
+              albumId: contribution.album_id,
+              albumEntityUid: contribution.album_entity_uid,
+              artistName: contribution.artist_name,
+              albumName: contribution.album_name,
+            },
+            { size: 128 },
+          )}
           alt=""
           loading="lazy"
           className="h-full w-full object-cover"
@@ -1356,14 +1362,17 @@ function LikedTab() {
         {
           cover:
             t.artist && t.album
-              ? albumCoverApiUrl({
-                  albumId: t.album_id,
-                  albumEntityUid: t.album_entity_uid,
-                  artistEntityUid: t.artist_entity_uid,
-                  albumSlug: t.album_slug,
-                  artistName: t.artist,
-                  albumName: t.album,
-                })
+              ? albumCoverApiUrl(
+                  {
+                    albumId: t.album_id,
+                    albumEntityUid: t.album_entity_uid,
+                    artistEntityUid: t.artist_entity_uid,
+                    albumSlug: t.album_slug,
+                    artistName: t.artist,
+                    albumName: t.album,
+                  },
+                  { size: 512 },
+                )
               : undefined,
         },
       ),
@@ -1419,14 +1428,17 @@ function LikedTab() {
             showAlbum
             albumCover={
               row.artist && row.album
-                ? albumCoverApiUrl({
-                    albumId: row.album_id,
-                    albumEntityUid: row.album_entity_uid,
-                    artistEntityUid: row.artist_entity_uid,
-                    albumSlug: row.album_slug,
-                    artistName: row.artist,
-                    albumName: row.album,
-                  })
+                ? albumCoverApiUrl(
+                    {
+                      albumId: row.album_id,
+                      albumEntityUid: row.album_entity_uid,
+                      artistEntityUid: row.artist_entity_uid,
+                      albumSlug: row.album_slug,
+                      artistName: row.artist,
+                      albumName: row.album,
+                    },
+                    { size: 128 },
+                  )
                 : undefined
             }
             showCoverThumb

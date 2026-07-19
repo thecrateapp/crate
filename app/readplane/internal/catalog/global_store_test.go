@@ -145,6 +145,33 @@ func TestGlobalSearchShortQueryDoesNotHitDatabase(t *testing.T) {
 	assert.Equal(t, []any{}, payload["tracks"])
 }
 
+func TestPartitionGlobalSearchDocumentRows(t *testing.T) {
+	rows := []map[string]any{
+		{
+			"entity_type":      "artist",
+			"payload_json":     map[string]any{"name": "High Vis"},
+			"projection_ready": true,
+		},
+		{
+			"entity_type":      "album",
+			"payload_json":     map[string]any{"name": "Blending"},
+			"projection_ready": true,
+		},
+		{
+			"entity_type":      "__projection__",
+			"payload_json":     map[string]any{},
+			"projection_ready": true,
+		},
+	}
+
+	payload, ready := partitionGlobalSearchDocumentRows(rows)
+
+	assert.True(t, ready)
+	assert.Equal(t, []map[string]any{{"name": "High Vis"}}, payload["artists"])
+	assert.Equal(t, []map[string]any{{"name": "Blending"}}, payload["albums"])
+	assert.Equal(t, []map[string]any{}, payload["tracks"])
+}
+
 func TestNormalizeGlobalSearchQueryMatchesCatalogNormalization(t *testing.T) {
 	tests := []struct {
 		name  string

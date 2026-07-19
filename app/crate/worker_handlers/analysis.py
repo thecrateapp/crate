@@ -141,6 +141,46 @@ def _handle_refresh_user_listening_stats(
     return {"ok": True, "user_id": user_id}
 
 
+def _handle_refresh_home_discovery_snapshot(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    from crate.db.home import get_cached_home_discovery
+
+    user_id = int(params.get("user_id") or 0)
+    if user_id <= 0:
+        return {"ok": False, "error": "Missing user_id"}
+    get_cached_home_discovery(user_id, fresh=True)
+    return {"ok": True, "user_id": user_id}
+
+
+def _handle_refresh_user_stats_dashboard_snapshot(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    from crate.db.user_stats_dashboard_surface import (
+        refresh_user_stats_dashboard_snapshot,
+    )
+    from crate.api.cache_events import broadcast_invalidation
+
+    user_id = int(params.get("user_id") or 0)
+    if user_id <= 0:
+        return {"ok": False, "error": "Missing user_id"}
+    window = str(params.get("window") or "30d")
+    refresh_user_stats_dashboard_snapshot(
+        user_id,
+        window=window,
+        month=params.get("month"),
+        tracks_limit=int(params.get("tracks_limit") or 10),
+        artists_limit=int(params.get("artists_limit") or 8),
+        albums_limit=int(params.get("albums_limit") or 8),
+        genres_limit=int(params.get("genres_limit") or 8),
+        replay_limit=int(params.get("replay_limit") or 30),
+    )
+    broadcast_invalidation("history")
+    return {"ok": True, "user_id": user_id, "window": window}
+
+
 def _handle_analyze_album_full(task_id: str, params: dict, config: dict) -> dict:
     """Analyze audio + compute bliss vectors for a single album."""
     artist = params.get("artist", "")
@@ -1024,6 +1064,8 @@ _PARENT_FINALIZERS["compute_popularity"] = _popularity_finalize
 ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "compute_analytics": _handle_compute_analytics,
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
+    "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,
+    "refresh_user_stats_dashboard_snapshot": _handle_refresh_user_stats_dashboard_snapshot,
     "index_genres": _handle_index_genres,
     "infer_genre_taxonomy": _handle_infer_genre_taxonomy,
     "rebuild_genre_taxonomy_proposals": _handle_rebuild_genre_taxonomy_proposals,

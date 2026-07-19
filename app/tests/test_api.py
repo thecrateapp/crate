@@ -314,14 +314,14 @@ class TestArtistDetailAPI:
                 "crate.api.browse_artist.get_artist_all_tracks", return_value=all_tracks
             ),
             patch(
-                "crate.api.browse_artist.get_top_tracks",
+                "crate.api.browse_artist.get_cached_top_tracks",
                 return_value=[{"title": "Track Two"}, {"title": "Track One"}],
-            ) as mock_top_tracks,
+            ) as mock_cached_top_tracks,
         ):
             payload = browse_artist._get_artist_top_tracks_payload("Tool", count=5)
 
         assert [item["title"] for item in payload[:2]] == ["Track Two", "Track One"]
-        mock_top_tracks.assert_called_once_with("Tool", limit=100)
+        mock_cached_top_tracks.assert_called_once_with("Tool", limit=100)
 
     def test_get_artist_found(self, test_app):
         mock_artist = {

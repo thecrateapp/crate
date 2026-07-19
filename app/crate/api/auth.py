@@ -12,6 +12,7 @@ import jwt
 import requests
 from fastapi import APIRouter, HTTPException, Request
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
+from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -1059,7 +1060,7 @@ def _associated_app_ids() -> list[str]:
 
 
 @router.get("/apple-app-site-association", include_in_schema=False)
-async def apple_app_site_association():
+def apple_app_site_association():
     app_ids = _associated_app_ids()
     if not app_ids:
         raise HTTPException(
@@ -1343,13 +1344,13 @@ class AuthMiddleware:
             token = request.query_params.get("token")
         # 3. Cookie auth — try app-specific cookie first, then default
         if token:
-            user = self._resolve_token_user(token)
+            user = await run_in_threadpool(self._resolve_token_user, token)
         else:
             for cookie_name in _auth_cookie_candidates(request):
                 cookie_token = request.cookies.get(cookie_name)
                 if not cookie_token:
                     continue
-                user = self._resolve_token_user(cookie_token)
+                user = await run_in_threadpool(self._resolve_token_user, cookie_token)
                 if user:
                     break
 
@@ -1457,7 +1458,7 @@ def _require_auth_manage(request: Request) -> dict:
     responses=_AUTH_PUBLIC_RESPONSES,
     summary="Log in with email and password",
 )
-async def login(request: Request, body: LoginRequest):
+def login(request: Request, body: LoginRequest):
     if not _password_enabled():
         raise HTTPException(status_code=403, detail="Password login is disabled")
     _enforce_login_rate_limit(body.email, request)
@@ -1487,7 +1488,7 @@ async def login(request: Request, body: LoginRequest):
     status_code=201,
     summary="Register a new user account",
 )
-async def register(request: Request, body: RegisterRequest):
+def register(request: Request, body: RegisterRequest):
     rate_key = f"register:{body.email}"
     _enforce_login_rate_limit(rate_key, request)
     try:
@@ -1539,7 +1540,7 @@ async def register(request: Request, body: RegisterRequest):
     responses=_AUTH_PUBLIC_RESPONSES,
     summary="Refresh a Listen access token",
 )
-async def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
+def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
     refresh_token = (body.refresh_token if body else None) or request.cookies.get(
         COOKIE_NAME_LISTEN_REFRESH
     )
@@ -1636,7 +1637,7 @@ async def refresh_auth(request: Request, body: RefreshTokenRequest | None = None
     responses=AUTH_ERROR_RESPONSES,
     summary="Log out the current session",
 )
-async def logout(request: Request):
+def logout(request: Request):
     user = getattr(request.state, "user", None)
     if user and user.get("session_id"):
         revoke_session(user["session_id"])
@@ -1654,7 +1655,7 @@ async def logout(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Get the authenticated user profile",
 )
-async def auth_me(request: Request):
+def auth_me(request: Request):
     user = getattr(request.state, "user", None)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -1683,7 +1684,7 @@ async def auth_me(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Proxy a user's external avatar image",
 )
-async def auth_user_avatar(request: Request, user_id: int):
+def auth_user_avatar(request: Request, user_id: int):
     _require_auth(request)
     target = get_user_by_id(user_id)
     avatar = (target or {}).get("avatar")
@@ -1726,7 +1727,7 @@ async def auth_user_avatar(request: Request, user_id: int):
 
 
 @router.get("/verify")
-async def auth_verify(request: Request):
+def auth_verify(request: Request):
     """Hard verify: 401 + redirect if not authenticated (for admin, protected services)."""
     user = getattr(request.state, "user", None)
     if not user:
@@ -1749,7 +1750,7 @@ async def auth_verify(request: Request):
 
 
 @router.get("/verify-soft")
-async def auth_verify_soft(request: Request):
+def auth_verify_soft(request: Request):
     """Soft verify: always 200 and injects identity headers if authenticated."""
     user = getattr(request.state, "user", None)
     response = Response(status_code=200)
@@ -1771,7 +1772,7 @@ async def auth_verify_soft(request: Request):
     response_model=AuthConfigResponse,
     summary="Get public authentication configuration",
 )
-async def auth_config(request: Request):
+def auth_config(request: Request):
     """Return available auth methods (no secrets exposed)."""
     providers = _provider_status(request)
     return {
@@ -1788,7 +1789,7 @@ async def auth_config(request: Request):
     response_model=AuthProvidersResponse,
     summary="List configured authentication providers",
 )
-async def auth_providers(request: Request):
+def auth_providers(request: Request):
     return _provider_status(request)
 
 
@@ -1798,7 +1799,7 @@ async def auth_providers(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="List active sessions for the current user",
 )
-async def auth_sessions(request: Request):
+def auth_sessions(request: Request):
     user = _require_auth(request)
     return list_sessions(user["id"], include_revoked=False)
 
@@ -1809,7 +1810,7 @@ async def auth_sessions(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Refresh the current session heartbeat",
 )
-async def auth_heartbeat(request: Request, body: HeartbeatRequest):
+def auth_heartbeat(request: Request, body: HeartbeatRequest):
     user = _require_auth(request)
     if user.get("session_id"):
         from crate.api.auth_cache import should_touch_session
@@ -1834,7 +1835,7 @@ async def auth_heartbeat(request: Request, body: HeartbeatRequest):
     responses=_AUTH_PRIVATE_RESPONSES,
     summary="Revoke one of the current user's sessions",
 )
-async def auth_revoke_session(request: Request, session_id: str):
+def auth_revoke_session(request: Request, session_id: str):
     user = _require_auth(request)
     sessions = {
         session["id"] for session in list_sessions(user["id"], include_revoked=True)
@@ -1855,7 +1856,7 @@ async def auth_revoke_session(request: Request, session_id: str):
     responses=AUTH_ERROR_RESPONSES,
     summary="Revoke all other sessions for the current user",
 )
-async def auth_revoke_all_sessions(request: Request):
+def auth_revoke_all_sessions(request: Request):
     user = _require_auth(request)
     revoked = revoke_other_sessions(user["id"], user.get("session_id"))
     return {"ok": True, "revoked": revoked}
@@ -1870,7 +1871,7 @@ async def auth_revoke_all_sessions(request: Request):
     responses=_AUTH_PRIVATE_RESPONSES,
     summary="Update the authenticated user's profile",
 )
-async def update_profile(request: Request, body: UpdateProfileRequest):
+def update_profile(request: Request, body: UpdateProfileRequest):
     user = _require_auth(request)
     fields = {}
     if body.name is not None:
@@ -1915,7 +1916,7 @@ async def update_profile(request: Request, body: UpdateProfileRequest):
     responses=_AUTH_PRIVATE_RESPONSES,
     summary="Change the authenticated user's password",
 )
-async def change_password(request: Request, body: ChangePasswordRequest):
+def change_password(request: Request, body: ChangePasswordRequest):
     user = _require_auth(request)
     db_user = get_user_by_id(user["id"])
     if not db_user:
@@ -1938,7 +1939,7 @@ async def change_password(request: Request, body: ChangePasswordRequest):
     responses=AUTH_ERROR_RESPONSES,
     summary="Generate or rotate the Subsonic token",
 )
-async def generate_subsonic_token(request: Request):
+def generate_subsonic_token(request: Request):
     """Generate or regenerate a Subsonic API token for the current user."""
     user = _require_auth(request)
     token = secrets.token_hex(16)
@@ -1952,7 +1953,7 @@ async def generate_subsonic_token(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Delete the Subsonic token",
 )
-async def delete_subsonic_token(request: Request):
+def delete_subsonic_token(request: Request):
     """Remove the Subsonic API token for the current user."""
     user = _require_auth(request)
     update_user(user["id"], subsonic_token=None)
@@ -1965,7 +1966,7 @@ async def delete_subsonic_token(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="Get the current Subsonic token",
 )
-async def get_subsonic_token(request: Request):
+def get_subsonic_token(request: Request):
     """Get the current Subsonic API token (if set)."""
     user = _require_auth(request)
     db_user = get_user_by_id(user["id"])
@@ -1978,11 +1979,11 @@ async def get_subsonic_token(request: Request):
     responses=_AUTH_PUBLIC_RESPONSES,
     summary="Start an OAuth login flow",
 )
-async def oauth_start(request: Request, provider: str, body: OAuthStartRequest):
-    return await _oauth_start_response(request, provider, body, mode="login")
+def oauth_start(request: Request, provider: str, body: OAuthStartRequest):
+    return _oauth_start_response(request, provider, body, mode="login")
 
 
-async def _oauth_start_response(
+def _oauth_start_response(
     request: Request,
     provider: str,
     body: OAuthStartRequest,
@@ -2106,9 +2107,7 @@ def _apple_userinfo(code: str, redirect_uri: str, verifier: str) -> dict:
 
 
 @router.get("/oauth/{provider}/callback")
-async def oauth_callback(
-    request: Request, provider: str, code: str = "", state: str = ""
-):
+def oauth_callback(request: Request, provider: str, code: str = "", state: str = ""):
     provider = provider.lower()
     if provider not in {"google", "apple"}:
         raise HTTPException(status_code=404, detail="Unknown auth provider")
@@ -2318,7 +2317,7 @@ async def oauth_callback(
     responses=_AUTH_PRIVATE_RESPONSES,
     summary="Unlink an OAuth provider from the current account",
 )
-async def oauth_unlink(request: Request, provider: str):
+def oauth_unlink(request: Request, provider: str):
     user = _require_auth(request)
     db_user = get_user_by_id(user["id"])
     if not db_user:
@@ -2348,42 +2347,38 @@ async def oauth_unlink(request: Request, provider: str):
     responses=_AUTH_PRIVATE_RESPONSES,
     summary="Start linking an OAuth provider to the current account",
 )
-async def oauth_link(request: Request, provider: str, body: OAuthStartRequest):
+def oauth_link(request: Request, provider: str, body: OAuthStartRequest):
     user = _require_auth(request)
-    return await _oauth_start_response(
+    return _oauth_start_response(
         request, provider, body, mode="link", user_id=user["id"]
     )
 
 
 @router.post("/unlink-google")
-async def unlink_google(request: Request):
-    return await oauth_unlink(request, "google")
+def unlink_google(request: Request):
+    return oauth_unlink(request, "google")
 
 
 @router.get("/google")
-async def google_login(request: Request, return_to: str | None = None):
-    payload = await oauth_start(
-        request, "google", OAuthStartRequest(return_to=return_to)
-    )
+def google_login(request: Request, return_to: str | None = None):
+    payload = oauth_start(request, "google", OAuthStartRequest(return_to=return_to))
     return RedirectResponse(url=payload["login_url"])
 
 
 @router.get("/google/callback")
-async def google_callback(request: Request, code: str = "", state: str = ""):
-    return await oauth_callback(request, "google", code=code, state=state)
+def google_callback(request: Request, code: str = "", state: str = ""):
+    return oauth_callback(request, "google", code=code, state=state)
 
 
 @router.get("/apple")
-async def apple_login(request: Request, return_to: str | None = None):
-    payload = await oauth_start(
-        request, "apple", OAuthStartRequest(return_to=return_to)
-    )
+def apple_login(request: Request, return_to: str | None = None):
+    payload = oauth_start(request, "apple", OAuthStartRequest(return_to=return_to))
     return RedirectResponse(url=payload["login_url"])
 
 
 @router.get("/apple/callback")
-async def apple_callback(request: Request, code: str = "", state: str = ""):
-    return await oauth_callback(request, "apple", code=code, state=state)
+def apple_callback(request: Request, code: str = "", state: str = ""):
+    return oauth_callback(request, "apple", code=code, state=state)
 
 
 # ── Admin: user management ──────────────────────────────────────
@@ -2395,7 +2390,7 @@ async def apple_callback(request: Request, code: str = "", state: str = ""):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="List users for administration",
 )
-async def admin_list_users(request: Request):
+def admin_list_users(request: Request):
     _require_users_view(request)
     return [_with_capabilities(user) for user in list_users()]
 
@@ -2405,7 +2400,7 @@ async def admin_list_users(request: Request):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="List role presets and capabilities",
 )
-async def admin_list_roles(request: Request):
+def admin_list_roles(request: Request):
     _require_roles_view(request)
     return {
         "capabilities": list(ALL_CAPABILITIES),
@@ -2427,7 +2422,7 @@ async def admin_list_roles(request: Request):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="List provider configuration for administrators",
 )
-async def admin_get_auth_providers(request: Request):
+def admin_get_auth_providers(request: Request):
     _require_auth_manage(request)
     return _provider_status(request)
 
@@ -2438,7 +2433,7 @@ async def admin_get_auth_providers(request: Request):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Get admin-only authentication settings",
 )
-async def admin_get_auth_config(request: Request):
+def admin_get_auth_config(request: Request):
     _require_auth_manage(request)
     return {
         "invite_only": get_setting("auth_invite_only", "false") == "true",
@@ -2451,7 +2446,7 @@ async def admin_get_auth_config(request: Request):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Update admin-only authentication settings",
 )
-async def admin_update_auth_config(request: Request, body: AuthConfigUpdateRequest):
+def admin_update_auth_config(request: Request, body: AuthConfigUpdateRequest):
     _require_auth_manage(request)
     set_setting("auth_invite_only", "true" if body.invite_only else "false")
     return {
@@ -2465,7 +2460,7 @@ async def admin_update_auth_config(request: Request, body: AuthConfigUpdateReque
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Enable or disable an authentication provider",
 )
-async def admin_toggle_auth_provider(
+def admin_toggle_auth_provider(
     request: Request, provider: str, body: ProviderToggleRequest
 ):
     _require_auth_manage(request)
@@ -2481,7 +2476,7 @@ async def admin_toggle_auth_provider(
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Create an authentication invite",
 )
-async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
+def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
     user = _require_users_create(request)
     invite = create_auth_invite(
         user.get("id"),
@@ -2498,7 +2493,7 @@ async def admin_create_auth_invite(request: Request, body: AuthInviteRequest):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="List authentication invites",
 )
-async def admin_list_auth_invites(request: Request):
+def admin_list_auth_invites(request: Request):
     _require_users_view(request)
     return list_auth_invites()
 
@@ -2509,7 +2504,7 @@ async def admin_list_auth_invites(request: Request):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Create a user as an administrator",
 )
-async def admin_create_user(request: Request, body: CreateUserRequest):
+def admin_create_user(request: Request, body: CreateUserRequest):
     admin_user = _require_users_create(request)
     roles = validate_roles(body.roles or [body.role])
     if roles != ["user"]:
@@ -2543,7 +2538,7 @@ async def admin_create_user(request: Request, body: CreateUserRequest):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Get a user with sessions and linked accounts",
 )
-async def admin_get_user_detail(request: Request, user_id: int):
+def admin_get_user_detail(request: Request, user_id: int):
     _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
@@ -2571,9 +2566,7 @@ async def admin_get_user_detail(request: Request, user_id: int):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Update a user's role",
 )
-async def admin_update_user_role(
-    request: Request, user_id: int, body: UpdateUserRoleRequest
-):
+def admin_update_user_role(request: Request, user_id: int, body: UpdateUserRoleRequest):
     admin_user = _require_roles_assign(request)
     next_roles = validate_roles(body.roles or [body.role])
     user = get_user_by_id(user_id)
@@ -2581,7 +2574,7 @@ async def admin_update_user_role(
         raise HTTPException(status_code=404, detail="User not found")
     previous_roles = validate_roles(user.get("roles") or [user.get("role")])
     if previous_roles == next_roles:
-        return await admin_get_user_detail(request, user_id)
+        return admin_get_user_detail(request, user_id)
 
     _ensure_role_change_is_safe(admin_user, user, next_roles)
     set_user_roles(user_id, next_roles, assigned_by=admin_user.get("id"))
@@ -2601,7 +2594,7 @@ async def admin_update_user_role(
         },
         user_id=admin_user.get("id"),
     )
-    return await admin_get_user_detail(request, user_id)
+    return admin_get_user_detail(request, user_id)
 
 
 @router.patch(
@@ -2610,7 +2603,7 @@ async def admin_update_user_role(
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Update a user's lifecycle status",
 )
-async def admin_update_user_status(
+def admin_update_user_status(
     request: Request, user_id: int, body: UpdateUserStatusRequest
 ):
     admin_user = _require_users_status_manage(request)
@@ -2622,7 +2615,7 @@ async def admin_update_user_status(
         raise HTTPException(status_code=404, detail="User not found")
     previous_status = _user_status(user)
     if previous_status == next_status:
-        return await admin_get_user_detail(request, user_id)
+        return admin_get_user_detail(request, user_id)
 
     _ensure_status_change_is_safe(admin_user, user, next_status)
     updated = update_user_status(
@@ -2651,7 +2644,7 @@ async def admin_update_user_status(
         },
         user_id=admin_user.get("id"),
     )
-    return await admin_get_user_detail(request, user_id)
+    return admin_get_user_detail(request, user_id)
 
 
 @router.post(
@@ -2660,7 +2653,7 @@ async def admin_update_user_status(
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Set or reset a user's local password",
 )
-async def admin_set_user_password(
+def admin_set_user_password(
     request: Request, user_id: int, body: AdminSetPasswordRequest
 ):
     admin_user = _require_users_password_manage(request)
@@ -2701,7 +2694,7 @@ async def admin_set_user_password(
     responses=_AUTH_ADMIN_RESPONSES,
     summary="List sessions for a user",
 )
-async def admin_get_user_sessions(request: Request, user_id: int):
+def admin_get_user_sessions(request: Request, user_id: int):
     _require_users_view(request)
     user = get_user_by_id(user_id)
     if not user:
@@ -2715,7 +2708,7 @@ async def admin_get_user_sessions(request: Request, user_id: int):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Revoke a specific user session",
 )
-async def admin_revoke_user_session(request: Request, user_id: int, session_id: str):
+def admin_revoke_user_session(request: Request, user_id: int, session_id: str):
     admin_user = _require_users_sessions_manage(request)
     user = get_user_by_id(user_id)
     if not user:
@@ -2743,7 +2736,7 @@ async def admin_revoke_user_session(request: Request, user_id: int, session_id: 
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Revoke all sessions for a user",
 )
-async def admin_revoke_all_user_sessions(request: Request, user_id: int):
+def admin_revoke_all_user_sessions(request: Request, user_id: int):
     admin_user = _require_users_sessions_manage(request)
     user = get_user_by_id(user_id)
     if not user:
@@ -2765,7 +2758,7 @@ async def admin_revoke_all_user_sessions(request: Request, user_id: int):
     responses=_AUTH_ADMIN_RESPONSES,
     summary="Delete a user",
 )
-async def admin_delete_user(request: Request, user_id: int):
+def admin_delete_user(request: Request, user_id: int):
     admin_user = _require_users_delete(request)
     user = get_user_by_id(user_id)
     if not user:

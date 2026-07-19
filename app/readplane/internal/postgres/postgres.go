@@ -40,6 +40,30 @@ func WithTimeout(parent context.Context, timeout time.Duration) (context.Context
 	return context.WithTimeout(parent, timeout)
 }
 
+// PoolRuntime returns bounded pgx saturation data suitable for health payloads.
+func PoolRuntime(pool *pgxpool.Pool) map[string]any {
+	if pool == nil {
+		return map[string]any{"configured": false}
+	}
+	stats := pool.Stat()
+	maxConns := stats.MaxConns()
+	ratio := float64(0)
+	if maxConns > 0 {
+		ratio = float64(stats.AcquiredConns()) / float64(maxConns)
+	}
+	return map[string]any{
+		"configured":       true,
+		"max_connections":  maxConns,
+		"acquired":         stats.AcquiredConns(),
+		"idle":             stats.IdleConns(),
+		"constructing":     stats.ConstructingConns(),
+		"acquire_count":    stats.AcquireCount(),
+		"empty_acquire":    stats.EmptyAcquireCount(),
+		"canceled_acquire": stats.CanceledAcquireCount(),
+		"saturation_ratio": ratio,
+	}
+}
+
 // IsUndefinedTable reports whether the error is a missing-relation PostgreSQL error.
 func IsUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
@@ -62,6 +86,8 @@ const requiredTablesReadyQuery = `
 			AND to_regclass('public.global_catalog_albums') IS NOT NULL
 			AND to_regclass('public.global_catalog_tracks') IS NOT NULL
 			AND to_regclass('public.global_catalog_sources') IS NOT NULL
+			AND to_regclass('public.global_catalog_search_documents') IS NOT NULL
+			AND to_regclass('public.global_catalog_search_projection_state') IS NOT NULL
 			AND to_regclass('public.global_catalog_state') IS NOT NULL
 			AND to_regclass('public.global_catalog_entity_genres') IS NOT NULL
 			AND to_regclass('public.genre_taxonomy_releases') IS NOT NULL

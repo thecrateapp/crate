@@ -256,6 +256,25 @@ def _install_prepared_stream(monkeypatch, federation_remote) -> None:
     )
 
 
+def test_remote_stream_proxy_reuses_the_application_http_transport(monkeypatch):
+    from crate.api import federation_remote
+
+    created: list[object] = []
+
+    class Client:
+        def __init__(self, **kwargs):
+            created.append(kwargs)
+
+    monkeypatch.setattr(federation_remote.httpx, "AsyncClient", Client)
+    request = _stream_request()
+
+    first = federation_remote._federation_stream_client(request)
+    second = federation_remote._federation_stream_client(request)
+
+    assert first is second
+    assert len(created) == 1
+
+
 def _install_proxy_stream_mocks(
     monkeypatch,
     *,

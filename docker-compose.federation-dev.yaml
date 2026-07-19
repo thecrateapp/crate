@@ -82,6 +82,21 @@ services:
       retries: 12
       start_period: 3s
 
+  node-a-redis-durable:
+    image: redis:7-alpine
+    container_name: fed-a-redis-durable
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction --requirepass redis-dev
+    volumes:
+      - fed_a_redis_durable:/data
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "redis-dev" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
+
   node-a-api:
     build:
       context: ./app
@@ -117,6 +132,8 @@ services:
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-a-redis-durable:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=86400
       - CRATE_SSE_REDIS_MAX_CONNECTIONS=32
       - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=false
@@ -131,7 +148,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
@@ -157,6 +174,8 @@ services:
         condition: service_healthy
       node-a-redis:
         condition: service_healthy
+      node-a-redis-durable:
+        condition: service_healthy
     mem_limit: 512m
     mem_reservation: 192m
     cpus: "0.75"
@@ -170,12 +189,17 @@ services:
       - READPLANE_ADDR=:8686
       - DATABASE_URL=postgresql://crate:crate@node-a-postgres:5432/crate?sslmode=disable
       - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-a-redis-durable:6379/0
       - JWT_SECRET=fed-dev-node-a-jwt-secret-at-least-32-bytes
       - READPLANE_ENABLED=true
       - READPLANE_ENABLE_SSE=true
       - READPLANE_ROUTE_MODE=active
       - READPLANE_FALLBACK_ENABLED=true
       - READPLANE_FEDERATION_PROXY_ENABLED=true
+      - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS=300
+      - READPLANE_STATS_STALE_MAX_AGE_SECONDS=86400
+      - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS=60
       - API_FALLBACK_BASE=http://node-a-api:8585
       - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-a-readplane-service-token-000000
       - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
@@ -187,6 +211,8 @@ services:
       node-a-postgres:
         condition: service_healthy
       node-a-redis:
+        condition: service_healthy
+      node-a-redis-durable:
         condition: service_healthy
       node-a-api:
         condition: service_started
@@ -232,6 +258,8 @@ services:
       - NUMEXPR_NUM_THREADS=1
       - VECLIB_MAXIMUM_THREADS=1
       - REDIS_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-a-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-a-redis-durable:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=86400
       - CRATE_FFMPEG_THREADS=1
       - CRATE_RESOURCE_GOVERNOR_ENABLED=false
@@ -262,6 +290,8 @@ services:
       node-a-postgres:
         condition: service_healthy
       node-a-redis:
+        condition: service_healthy
+      node-a-redis-durable:
         condition: service_healthy
     mem_limit: 768m
     mem_reservation: 256m
@@ -357,6 +387,21 @@ services:
       retries: 12
       start_period: 3s
 
+  node-b-redis-durable:
+    image: redis:7-alpine
+    container_name: fed-b-redis-durable
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 128mb --maxmemory-policy noeviction --requirepass redis-dev
+    volumes:
+      - fed_b_redis_durable:/data
+    networks:
+      - fed-net
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "redis-dev" ping | grep PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 3s
+
   node-b-api:
     build:
       context: ./app
@@ -392,6 +437,8 @@ services:
       - DEFAULT_ADMIN_PASSWORD=admin
       - NUMBA_CACHE_DIR=/tmp/numba_cache
       - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-b-redis-durable:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=86400
       - CRATE_SSE_REDIS_MAX_CONNECTIONS=32
       - CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_ENABLED=false
@@ -406,7 +453,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - AUDIOMUSE_GEMINI_API_KEY=${AUDIOMUSE_GEMINI_API_KEY:-}
-      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_URL=${OLLAMA_URL:-}
       - LLM_PROVIDER=${LLM_PROVIDER:-gemini/gemini-2.5-flash}
       - SLSKD_URL=http://slskd:5030
       - SLSKD_API_KEY=
@@ -430,6 +477,8 @@ services:
         condition: service_healthy
       node-b-redis:
         condition: service_healthy
+      node-b-redis-durable:
+        condition: service_healthy
     mem_limit: 512m
     mem_reservation: 192m
     cpus: "0.75"
@@ -443,12 +492,17 @@ services:
       - READPLANE_ADDR=:8686
       - DATABASE_URL=postgresql://crate:crate@node-b-postgres:5432/crate?sslmode=disable
       - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-b-redis-durable:6379/0
       - JWT_SECRET=fed-dev-node-b-jwt-secret-at-least-32-bytes
       - READPLANE_ENABLED=true
       - READPLANE_ENABLE_SSE=true
       - READPLANE_ROUTE_MODE=active
       - READPLANE_FALLBACK_ENABLED=true
       - READPLANE_FEDERATION_PROXY_ENABLED=true
+      - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS=300
+      - READPLANE_STATS_STALE_MAX_AGE_SECONDS=86400
+      - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS=60
       - API_FALLBACK_BASE=http://node-b-api:8585
       - CRATE_READPLANE_SERVICE_TOKEN=fed-dev-node-b-readplane-service-token-000000
       - CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true
@@ -460,6 +514,8 @@ services:
       node-b-postgres:
         condition: service_healthy
       node-b-redis:
+        condition: service_healthy
+      node-b-redis-durable:
         condition: service_healthy
       node-b-api:
         condition: service_started
@@ -505,6 +561,8 @@ services:
       - NUMEXPR_NUM_THREADS=1
       - VECLIB_MAXIMUM_THREADS=1
       - REDIS_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_CACHE_URL=redis://:redis-dev@node-b-redis:6379/0
+      - REDIS_DURABLE_URL=redis://:redis-dev@node-b-redis-durable:6379/0
       - CRATE_METRICS_REDIS_TTL_SECONDS=86400
       - CRATE_FFMPEG_THREADS=1
       - CRATE_RESOURCE_GOVERNOR_ENABLED=false
@@ -536,6 +594,8 @@ services:
         condition: service_healthy
       node-b-redis:
         condition: service_healthy
+      node-b-redis-durable:
+        condition: service_healthy
     mem_limit: 768m
     mem_reservation: 256m
     cpus: "0.5"
@@ -554,5 +614,7 @@ services:
 volumes:
   fed_a_postgres:
   fed_a_data:
+  fed_a_redis_durable:
   fed_b_postgres:
   fed_b_data:
+  fed_b_redis_durable:

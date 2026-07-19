@@ -330,6 +330,8 @@ type Store struct {
 	globalCatalogServingModeFn func(context.Context) (CatalogServingMode, error)
 	localSearchFn              func(context.Context, string, int) (map[string]any, error)
 	globalSearchFn             func(context.Context, string, int) (map[string]any, error)
+	artistRowFn                func(context.Context, string, ...any) (map[string]any, error)
+	artistTopTracksFn          func(context.Context, string, int) ([]map[string]any, error)
 }
 
 type historyFallbackRef struct {

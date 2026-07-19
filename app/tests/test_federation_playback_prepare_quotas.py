@@ -10,9 +10,15 @@ class FakeRedis:
 
     def eval(self, _script, numkeys, *args):
         assert numkeys == 2
-        peer_key, global_key, cache_key, raw_now, raw_ttl, raw_peer_limit, raw_global_limit = (
-            args
-        )
+        (
+            peer_key,
+            global_key,
+            cache_key,
+            raw_now,
+            raw_ttl,
+            raw_peer_limit,
+            raw_global_limit,
+        ) = args
         now = float(raw_now)
         ttl = float(raw_ttl)
         peer_limit = int(raw_peer_limit)

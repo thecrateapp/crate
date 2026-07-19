@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from urllib.parse import urlparse, urlsplit, urlunsplit
@@ -24,10 +25,42 @@ SEARCH_TIMEOUT = httpx.Timeout(2.0, connect=2.0)
 DEFAULT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 _DEFAULT_URL_POLICY = FederationURLPolicy()
+_shared_clients: dict[tuple[float | None, ...], httpx.Client] = {}
+_shared_clients_lock = threading.Lock()
 
 
 def _build_client(timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> httpx.Client:
-    return httpx.Client(timeout=timeout, follow_redirects=False)
+    return httpx.Client(
+        timeout=timeout,
+        limits=httpx.Limits(
+            max_connections=100,
+            max_keepalive_connections=20,
+            keepalive_expiry=30.0,
+        ),
+        follow_redirects=False,
+    )
+
+
+def _timeout_key(timeout: httpx.Timeout) -> tuple[float | None, ...]:
+    return (timeout.connect, timeout.read, timeout.write, timeout.pool)
+
+
+def get_shared_client(timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> httpx.Client:
+    key = _timeout_key(timeout)
+    with _shared_clients_lock:
+        client = _shared_clients.get(key)
+        if client is None:
+            client = _build_client(timeout)
+            _shared_clients[key] = client
+        return client
+
+
+def close_shared_clients() -> None:
+    with _shared_clients_lock:
+        clients = list(_shared_clients.values())
+        _shared_clients.clear()
+    for client in clients:
+        client.close()
 
 
 def _sanitize_base_url(url: str) -> str:
@@ -79,6 +112,7 @@ class SignedFederationClient:
         timeout: httpx.Timeout = DEFAULT_TIMEOUT,
         policy: FederationURLPolicy | None = None,
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
+        client: httpx.Client | None = None,
     ) -> None:
         self._base_url = base_url
         self._node_id = node_id
@@ -87,7 +121,8 @@ class SignedFederationClient:
         self._policy = policy or _DEFAULT_URL_POLICY
         self._policy.validate_base_url(base_url)
         self._max_response_bytes = max_response_bytes
-        self._client = _build_client(timeout)
+        self._client = client or _build_client(timeout)
+        self._owns_client = client is None
 
     def request(
         self,
@@ -173,7 +208,8 @@ class SignedFederationClient:
             yield response
 
     def close(self) -> None:
-        self._client.close()
+        if self._owns_client:
+            self._client.close()
 
     def __enter__(self) -> SignedFederationClient:
         return self
@@ -357,6 +393,7 @@ def federated_get(
         private_key_ref=private_key_ref,
         timeout=timeout,
         policy=policy,
+        client=get_shared_client(timeout),
     ) as client:
         return client.request(
             "GET",
@@ -383,6 +420,7 @@ def federated_post(
         private_key_ref=private_key_ref,
         timeout=timeout,
         policy=policy,
+        client=get_shared_client(timeout),
     ) as client:
         return client.request(
             "POST",

@@ -57,12 +57,10 @@ def test_playback_prepare_route_is_documented_without_stream_material(test_app):
     schema = test_app.get("/openapi.json").json()
     operation = schema["paths"]["/api/federation/v1/playback/prepare"]["post"]
 
-    request_schema = operation["requestBody"]["content"]["application/json"][
+    request_schema = operation["requestBody"]["content"]["application/json"]["schema"]
+    response_schema = operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]
-    response_schema = operation["responses"]["200"]["content"][
-        "application/json"
-    ]["schema"]
 
     assert request_schema["$ref"].endswith("FederatedPlaybackPrepareBody")
     assert response_schema["$ref"].endswith("FederatedPlaybackPrepareResponse")

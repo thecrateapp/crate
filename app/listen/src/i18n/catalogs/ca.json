@@ -769,6 +769,7 @@
   "artist.meta.listeners": "{count} oients",
   "artist.loading": "Carregant artista.",
   "artist.notFound": "Artista no trobat",
+  "artist.unavailable": "L'artista no està disponible temporalment",
   "artist.fallbackName": "Artista",
   "artist.playSource.topTracks": "Cançons destacades de {name}",
   "artist.playSource.probableSetlist": "Setlist probable de {name}",

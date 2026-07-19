@@ -38,12 +38,33 @@ def _append_federation_event(
 ) -> None:
     from crate.db.domain_events import append_domain_event
 
-    append_domain_event(event_type, payload, scope=scope, subject_key=subject_key)
+    try:
+        append_domain_event(event_type, payload, scope=scope, subject_key=subject_key)
+    except Exception:
+        log.warning("Unable to persist federation telemetry event", exc_info=True)
 
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/federation/remote", tags=["federation"])
+
+
+def _federation_stream_client(request: Request) -> httpx.AsyncClient:
+    state = request.app.state
+    client = getattr(state, "federation_stream_client", None)
+    if client is None:
+        client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(
+                max_connections=100,
+                max_keepalive_connections=20,
+                keepalive_expiry=30.0,
+            ),
+            follow_redirects=False,
+        )
+        state.federation_stream_client = client
+    return client
+
 
 _RESPONSES = {
     **AUTH_ERROR_RESPONSES,
@@ -753,10 +774,7 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
         constraints.get("playback_session") or ""
     )
 
-    client = httpx.AsyncClient(
-        timeout=httpx.Timeout(30.0, connect=10.0),
-        follow_redirects=False,
-    )
+    client = _federation_stream_client(request)
     try:
         upstream = await client.send(
             client.build_request(
@@ -768,7 +786,6 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
             stream=True,
         )
     except Exception as exc:
-        await client.aclose()
         release_stream_slot(redis_client, ticket["node_uid"], subject_hash, stream_id)
         repo.record_audit_event(
             event_type="stream.proxy.failed",
@@ -793,7 +810,6 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
 
     if upstream.status_code >= 400:
         await upstream.aclose()
-        await client.aclose()
         release_stream_slot(redis_client, ticket["node_uid"], subject_hash, stream_id)
         repo.record_audit_event(
             event_type="stream.proxy.failed",
@@ -868,7 +884,6 @@ async def proxy_remote_stream(ticket_uid: str, request: Request):
             log.warning("Proxy stream failed for ticket %s: %s", ticket_uid, e)
         finally:
             await upstream.aclose()
-            await client.aclose()
             release_stream_slot(
                 redis_client, ticket["node_uid"], subject_hash, stream_id
             )

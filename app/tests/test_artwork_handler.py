@@ -47,8 +47,9 @@ def _mock_scan_missing(monkeypatch, return_value=None):
 
 
 class TestHandlerRegistration:
-    def test_artwork_task_handlers_registers_all_eight_handlers(self):
+    def test_artwork_task_handlers_registers_all_handlers(self):
         expected = {
+            "resolve_external_artist_artwork",
             "fetch_cover",
             "fetch_album_cover",
             "fetch_artist_covers",
@@ -63,6 +64,14 @@ class TestHandlerRegistration:
     def test_handlers_are_callable(self):
         for name in ARTWORK_TASK_HANDLERS:
             assert callable(ARTWORK_TASK_HANDLERS[name]), f"{name} not callable"
+
+    def test_external_artist_artwork_uses_interactive_fast_queue(self):
+        from crate.actors import TASK_POOL_CONFIG
+
+        config = TASK_POOL_CONFIG["resolve_external_artist_artwork"]
+
+        assert config.queue == "fast"
+        assert config.priority == 0
 
 
 # ── _handle_fetch_cover ──────────────────────────────────────────

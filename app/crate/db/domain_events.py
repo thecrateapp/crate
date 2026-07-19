@@ -1,9 +1,8 @@
-"""Ephemeral domain-event bus backed by Redis Streams.
+"""Durable transactional domain events relayed to Redis Streams.
 
-Events are short-lived signals consumed by the projector to warm UI
-snapshots. They are published only after the surrounding SQLAlchemy
-transaction commits so the projector never races ahead of database
-state.
+Writers append to a PostgreSQL outbox in their own transaction. The relay
+publishes committed events idempotently and the projector isolates poison
+messages in a Redis dead-letter stream.
 """
 
 from __future__ import annotations
@@ -12,15 +11,17 @@ import json
 import logging
 from typing import Any
 
-from crate.config import get_redis_url
-from crate.db.tx import register_after_commit
+from crate.config import get_durable_redis_url
+from crate.db.domain_event_outbox import enqueue_outbox_event, persist_standalone_event
 
 log = logging.getLogger(__name__)
 
 _STREAM_KEY = "crate:domain_events"
 _GROUP_NAME = "projector"
 _SEQ_COUNTER_KEY = "crate:domain_events:seq"
-_MAX_LEN = 5000
+_ATTEMPTS_KEY = "crate:domain_events:attempts"
+_DEAD_LETTER_KEY = "crate:domain_events:dead_letter"
+_MAX_LEN = 50000
 _BLOCK_MS = 1000
 
 _redis_client: Any | None = None
@@ -35,7 +36,7 @@ def _get_redis() -> Any | None:
         import redis as _redis
 
         _redis_client = _redis.from_url(
-            get_redis_url(),
+            get_durable_redis_url(),
             decode_responses=True,
             socket_timeout=2,
             socket_connect_timeout=2,
@@ -103,34 +104,74 @@ def append_domain_event(
     subject_key: str | None = None,
     session=None,
 ) -> int:
-    """Append a domain event to the Redis stream.
-
-    When a SQLAlchemy ``session`` is supplied, publishing is deferred
-    until after commit so the projector only sees committed state.
-    """
+    """Persist a domain event durably in the current or a short transaction."""
 
     if session is not None:
-
-        def publish_after_commit() -> None:
-            _publish_domain_event(
-                event_type,
-                payload,
-                scope=scope,
-                subject_key=subject_key,
-            )
-
-        register_after_commit(
-            session,
-            publish_after_commit,
+        enqueue_outbox_event(
+            event_type,
+            payload,
+            scope=scope,
+            subject_key=subject_key,
+            session=session,
         )
         return 0
-
-    return _publish_domain_event(
+    persist_standalone_event(
         event_type,
         payload,
         scope=scope,
         subject_key=subject_key,
     )
+    return 0
+
+
+_OUTBOX_PUBLISH_LUA = """
+local existing = redis.call('GET', KEYS[1])
+if existing then
+    local separator = string.find(existing, '|')
+    if separator then
+        return {string.sub(existing, 1, separator - 1), string.sub(existing, separator + 1), '0'}
+    end
+end
+local stream_id = redis.call(
+    'XADD', KEYS[2], 'MAXLEN', '~', ARGV[1], '*',
+    'event_uid', ARGV[2],
+    'event_type', ARGV[3],
+    'scope', ARGV[4],
+    'subject_key', ARGV[5],
+    'payload_json', ARGV[6]
+)
+local sequence = redis.call('INCR', KEYS[3])
+redis.call('SET', KEYS[1], stream_id .. '|' .. sequence, 'EX', ARGV[7])
+return {stream_id, tostring(sequence), '1'}
+"""
+
+
+def publish_outbox_event(event: dict[str, Any]) -> tuple[str, int]:
+    r = _get_redis()
+    if not r:
+        raise RuntimeError("Redis is unavailable")
+    event_uid = str(event["event_uid"])
+    payload = event.get("payload_json") or {}
+    payload_json = (
+        payload if isinstance(payload, str) else json.dumps(payload, default=str)
+    )
+    result = r.eval(
+        _OUTBOX_PUBLISH_LUA,
+        3,
+        f"crate:domain_events:published:{event_uid}",
+        _STREAM_KEY,
+        _SEQ_COUNTER_KEY,
+        str(_MAX_LEN),
+        event_uid,
+        str(event.get("event_type") or ""),
+        str(event.get("scope") or ""),
+        str(event.get("subject_key") or ""),
+        payload_json,
+        str(7 * 24 * 60 * 60),
+    )
+    if not result or len(result) < 2:
+        raise RuntimeError("Redis outbox publish returned no stream id")
+    return str(result[0]), int(result[1])
 
 
 def get_latest_domain_event_id(
@@ -162,6 +203,7 @@ def _decode_stream_messages(
         result.append(
             {
                 "id": msg_id,
+                "event_uid": fields.get("event_uid", ""),
                 "event_type": fields.get("event_type", ""),
                 "scope": fields.get("scope", ""),
                 "subject_key": fields.get("subject_key", ""),
@@ -235,6 +277,7 @@ def get_domain_event_runtime(*, limit: int = 10) -> dict[str, Any]:
         "consumer_group": _GROUP_NAME,
         "latest_sequence": get_latest_domain_event_id(),
         "stream_length": 0,
+        "dead_letter": 0,
         "pending": 0,
         "consumers": 0,
         "lag": 0,
@@ -252,6 +295,11 @@ def get_domain_event_runtime(*, limit: int = 10) -> dict[str, Any]:
         runtime["stream_length"] = int(r.xlen(_STREAM_KEY) or 0)
     except Exception:
         log.debug("Failed to inspect domain-event stream length", exc_info=True)
+
+    try:
+        runtime["dead_letter"] = int(r.xlen(_DEAD_LETTER_KEY) or 0)
+    except Exception:
+        log.debug("Failed to inspect domain-event dead-letter length", exc_info=True)
 
     try:
         groups = r.xinfo_groups(_STREAM_KEY) or []
@@ -294,10 +342,53 @@ def mark_domain_events_processed(event_ids: list, *, session=None) -> None:
         log.debug("Failed to ack domain events", exc_info=True)
 
 
+def mark_domain_event_failed(
+    event: dict[str, Any],
+    error: str | Exception,
+    *,
+    max_attempts: int = 5,
+) -> int:
+    """Record a projection failure and isolate poison messages in a DLQ."""
+    event_id = str(event.get("id") or "")
+    if not event_id:
+        return 0
+    r = _get_redis()
+    if not r or not _ensure_consumer_group():
+        return 0
+    try:
+        attempts = int(r.hincrby(_ATTEMPTS_KEY, event_id, 1))
+        if attempts < max(1, int(max_attempts)):
+            return attempts
+        payload = event.get("payload_json") or {}
+        r.xadd(
+            _DEAD_LETTER_KEY,
+            {
+                "original_id": event_id,
+                "event_uid": str(event.get("event_uid") or ""),
+                "event_type": str(event.get("event_type") or ""),
+                "scope": str(event.get("scope") or ""),
+                "subject_key": str(event.get("subject_key") or ""),
+                "payload_json": json.dumps(payload, default=str),
+                "attempts": str(attempts),
+                "last_error": str(error)[:4000],
+            },
+            maxlen=10000,
+            approximate=True,
+        )
+        r.xack(_STREAM_KEY, _GROUP_NAME, event_id)
+        r.hdel(_ATTEMPTS_KEY, event_id)
+        return attempts
+    except Exception:
+        log.debug("Failed to record domain-event projection failure", exc_info=True)
+        return 0
+
+
 __all__ = [
     "append_domain_event",
     "get_domain_event_runtime",
     "get_latest_domain_event_id",
     "list_domain_events",
+    "mark_domain_event_failed",
     "mark_domain_events_processed",
+    "publish_outbox_event",
 ]

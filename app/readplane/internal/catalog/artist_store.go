@@ -9,6 +9,7 @@ import (
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
+
 func (s *Store) ArtistByID(ctx context.Context, artistID int64) (map[string]any, error) {
 	row, err := s.artistRow(ctx, "id = $1", artistID)
 	if err != nil {
@@ -58,14 +59,14 @@ func (s *Store) ArtistTopTracksByEntityUID(ctx context.Context, entityUID string
 func (s *Store) ArtistTopTracksBySlug(ctx context.Context, slug string, count int) ([]map[string]any, error) {
 	row, err := s.artistRow(ctx, "slug = $1", slug)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return []map[string]any{}, nil
-		}
 		return nil, err
 	}
 	return s.artistTopTracks(ctx, stringValue(row["name"]), count)
 }
 func (s *Store) artistRow(ctx context.Context, predicate string, args ...any) (map[string]any, error) {
+	if s.artistRowFn != nil {
+		return s.artistRowFn(ctx, predicate, args...)
+	}
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 	rows, err := rowsToMaps(s.pool.Query(ctx, `
@@ -144,6 +145,9 @@ func (s *Store) artistPayload(ctx context.Context, artist map[string]any) (map[s
 	}, nil
 }
 func (s *Store) artistTopTracks(ctx context.Context, artistName string, count int) ([]map[string]any, error) {
+	if s.artistTopTracksFn != nil {
+		return s.artistTopTracksFn(ctx, artistName, count)
+	}
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 	rows, err := rowsToMaps(s.pool.Query(ctx, `

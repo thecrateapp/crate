@@ -95,6 +95,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "apply_cover": TaskPoolConfig("fast", 0, 60, 0),
     "fetch_album_cover": TaskPoolConfig("fast", 0, 120, 1),
     "upload_image": TaskPoolConfig("fast", 0, 60, 0),
+    "resolve_external_artist_artwork": TaskPoolConfig("fast", 0, 30, 1),
     "library_upload": TaskPoolConfig("default", 0, 7200, 1),
     "library_withdraw_contribution": TaskPoolConfig("default", 0, 1800, 0),
     "library_cleanup_user_contributions": TaskPoolConfig("default", 1, 3600, 0),
@@ -109,6 +110,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
+    "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
+    "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
+    "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
     "enrich_artist": TaskPoolConfig("fast", 1, 180, 2),

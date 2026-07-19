@@ -7,6 +7,19 @@ import (
 
 	"github.com/thecrateapp/crate/app/readplane/internal/postgres"
 )
+
+const albumTracksQuery = `
+		SELECT id, entity_uid::text AS entity_uid, storage_id::text AS storage_id, filename,
+		       format, size, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
+		       energy, danceability, valence, bliss_vector, duration, popularity,
+		       rating, title, artist, album,
+		       albumartist, track_number, disc_number, year, genre, musicbrainz_albumid,
+		       musicbrainz_trackid, path
+		FROM library_tracks
+		WHERE album_id = $1
+		ORDER BY disc_number, track_number
+	`
+
 func (s *Store) AlbumByID(ctx context.Context, albumID int64) (map[string]any, error) {
 	row, err := s.albumRow(ctx, "a.id = $1", albumID)
 	if err != nil {
@@ -69,17 +82,7 @@ func (s *Store) albumPayload(ctx context.Context, album map[string]any) (map[str
 	ctx, cancel := postgres.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 
-	tracks, err := rowsToMaps(s.pool.Query(ctx, `
-		SELECT id, entity_uid::text AS entity_uid, storage_id::text AS storage_id, filename,
-		       format, size, bitrate, sample_rate, bit_depth, bpm, audio_key, audio_scale,
-		       energy, danceability, valence, bliss_vector, duration, popularity,
-		       popularity_score, popularity_confidence, rating, title, artist, album,
-		       albumartist, track_number, disc_number, year, genre, musicbrainz_albumid,
-		       musicbrainz_trackid, path
-		FROM library_tracks
-		WHERE album_id = $1
-		ORDER BY disc_number, track_number
-	`, albumID))
+	tracks, err := rowsToMaps(s.pool.Query(ctx, albumTracksQuery, albumID))
 	if err != nil {
 		return nil, err
 	}
@@ -117,29 +120,27 @@ func (s *Store) albumPayload(ctx context.Context, album map[string]any) (map[str
 			}
 		}
 		trackList = append(trackList, map[string]any{
-			"id":                    trackID,
-			"entity_uid":            track["entity_uid"],
-			"storage_id":            track["storage_id"],
-			"filename":              stringValue(track["filename"]),
-			"format":                stringValue(track["format"]),
-			"size_mb":               roundFloat(float64(size)/(1024*1024), 1),
-			"bitrate":               bitrateKbps(track["bitrate"]),
-			"sample_rate":           track["sample_rate"],
-			"bit_depth":             track["bit_depth"],
-			"bpm":                   track["bpm"],
-			"audio_key":             track["audio_key"],
-			"audio_scale":           track["audio_scale"],
-			"energy":                track["energy"],
-			"danceability":          track["danceability"],
-			"valence":               track["valence"],
-			"bliss_vector":          normalizeFloatSlice(track["bliss_vector"]),
-			"length_sec":            length,
-			"popularity":            track["popularity"],
-			"popularity_score":      track["popularity_score"],
-			"popularity_confidence": track["popularity_confidence"],
-			"rating":                intValue(track["rating"]),
-			"stream_variants":       variantMap[trackID],
-			"lyrics":                lyricsForTrack(lyricsMap, trackID),
+			"id":              trackID,
+			"entity_uid":      track["entity_uid"],
+			"storage_id":      track["storage_id"],
+			"filename":        stringValue(track["filename"]),
+			"format":          stringValue(track["format"]),
+			"size_mb":         roundFloat(float64(size)/(1024*1024), 1),
+			"bitrate":         bitrateKbps(track["bitrate"]),
+			"sample_rate":     track["sample_rate"],
+			"bit_depth":       track["bit_depth"],
+			"bpm":             track["bpm"],
+			"audio_key":       track["audio_key"],
+			"audio_scale":     track["audio_scale"],
+			"energy":          track["energy"],
+			"danceability":    track["danceability"],
+			"valence":         track["valence"],
+			"bliss_vector":    normalizeFloatSlice(track["bliss_vector"]),
+			"length_sec":      length,
+			"popularity":      track["popularity"],
+			"rating":          intValue(track["rating"]),
+			"stream_variants": variantMap[trackID],
+			"lyrics":          lyricsForTrack(lyricsMap, trackID),
 			"tags": map[string]any{
 				"title":               stringValue(track["title"]),
 				"artist":              stringValue(track["artist"]),

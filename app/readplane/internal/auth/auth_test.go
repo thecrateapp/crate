@@ -1,9 +1,13 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -52,4 +56,104 @@ func TestExtractToken(t *testing.T) {
 
 		assert.Equal(t, []string{"header-token"}, candidates)
 	})
+}
+
+func TestAuthenticateIdentityCachesAndHydratesProfileLazily(t *testing.T) {
+	now := time.Now()
+	token := signTestJWT(t, "secret", map[string]any{
+		"user_id": 12,
+		"email":   "diego@example.com",
+		"sid":     "session-1",
+		"exp":     now.Add(time.Hour).Unix(),
+	})
+	authenticator := NewAuthenticatorWithCache(nil, "secret", time.Second, time.Minute, 10)
+	var identityCalls atomic.Int32
+	var accountCalls atomic.Int32
+	authenticator.identityLookup = func(_ context.Context, payload JWTPayload) (*User, time.Time, error) {
+		identityCalls.Add(1)
+		return &User{ID: payload.UserID, Email: payload.Email, Role: "user"}, now.Add(time.Hour), nil
+	}
+	authenticator.accountsLookup = func(context.Context, int64) ([]ConnectedAccount, error) {
+		accountCalls.Add(1)
+		return []ConnectedAccount{{Provider: "lastfm", Status: "connected"}}, nil
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/search", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+
+	first, err := authenticator.AuthenticateIdentity(request, false)
+	assert.NoError(t, err)
+	second, err := authenticator.AuthenticateIdentity(request, false)
+	assert.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, int32(1), identityCalls.Load())
+	assert.Equal(t, int32(0), accountCalls.Load())
+
+	profile, err := authenticator.AuthenticateProfile(request, false)
+	assert.NoError(t, err)
+	assert.Equal(t, []ConnectedAccount{{Provider: "lastfm", Status: "connected"}}, profile.ConnectedAccounts)
+	assert.Equal(t, int32(1), identityCalls.Load())
+	assert.Equal(t, int32(1), accountCalls.Load())
+}
+
+func TestIdentityCacheIsBoundedInvalidatableAndSingleFlight(t *testing.T) {
+	authenticator := NewAuthenticatorWithCache(nil, "secret", time.Second, time.Minute, 2)
+	var lookups atomic.Int32
+	release := make(chan struct{})
+	authenticator.identityLookup = func(_ context.Context, payload JWTPayload) (*User, time.Time, error) {
+		lookups.Add(1)
+		<-release
+		return &User{ID: payload.UserID, Email: payload.Email, Role: "user"}, time.Now().Add(time.Hour), nil
+	}
+	token := signTestJWT(t, "secret", map[string]any{
+		"user_id": 7, "email": "user@example.com", "exp": time.Now().Add(time.Hour).Unix(),
+	})
+	request := httptest.NewRequest(http.MethodGet, "/api/me/home/discovery", nil)
+	request.Header.Set("Authorization", "Bearer "+token)
+
+	var group sync.WaitGroup
+	group.Add(8)
+	for range 8 {
+		go func() {
+			defer group.Done()
+			_, _ = authenticator.AuthenticateIdentity(request.Clone(context.Background()), false)
+		}()
+	}
+	time.Sleep(10 * time.Millisecond)
+	close(release)
+	group.Wait()
+
+	assert.Equal(t, int32(1), lookups.Load())
+	stats := authenticator.Stats()
+	assert.Equal(t, int64(1), stats.DBLookups)
+	assert.GreaterOrEqual(t, stats.Hits, int64(7))
+	assert.Equal(t, 1, stats.Entries)
+
+	authenticator.InvalidateScope("auth")
+	assert.Equal(t, 0, authenticator.Stats().Entries)
+	assert.Equal(t, int64(1), authenticator.Stats().Invalidations)
+}
+
+func TestSessionLastSeenTouchIsAsynchronousAndThrottled(t *testing.T) {
+	authenticator := NewAuthenticatorWithCache(nil, "secret", time.Second, time.Minute, 10)
+	authenticator.touchInterval = time.Hour
+	touched := make(chan string, 2)
+	authenticator.sessionTouch = func(_ context.Context, sessionID string) error {
+		touched <- sessionID
+		return nil
+	}
+
+	authenticator.scheduleSessionTouch("session-1")
+	authenticator.scheduleSessionTouch("session-1")
+
+	select {
+	case sessionID := <-touched:
+		assert.Equal(t, "session-1", sessionID)
+	case <-time.After(time.Second):
+		t.Fatal("session touch did not run asynchronously")
+	}
+	select {
+	case sessionID := <-touched:
+		t.Fatalf("unexpected duplicate session touch: %s", sessionID)
+	case <-time.After(25 * time.Millisecond):
+	}
 }

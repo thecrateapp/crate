@@ -260,14 +260,17 @@ export function CuratedPlaylist() {
         toPlayableTrack(t, {
           cover:
             t.artist && t.album
-              ? albumCoverApiUrl({
-                  albumId: t.album_id,
-                  albumEntityUid: t.album_entity_uid,
-                  artistEntityUid: t.artist_entity_uid,
-                  albumSlug: t.album_slug,
-                  artistName: t.artist,
-                  albumName: t.album,
-                })
+              ? albumCoverApiUrl(
+                  {
+                    albumId: t.album_id,
+                    albumEntityUid: t.album_entity_uid,
+                    artistEntityUid: t.artist_entity_uid,
+                    albumSlug: t.album_slug,
+                    artistName: t.artist,
+                    albumName: t.album,
+                  },
+                  { size: 512 },
+                )
               : undefined,
         }),
     );

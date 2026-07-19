@@ -30,16 +30,22 @@ export function useResolvedPlayerArtist(
     useState<ResolvedArtistMeta | null>(null);
 
   const artistPhotoUrl = resolvedArtist?.globalArtistUid
-    ? artistPhotoApiUrl({
-        globalArtistUid: resolvedArtist.globalArtistUid,
-        artistName: resolvedArtist.name,
-      })
-    : resolvedArtist?.id != null
-      ? artistPhotoApiUrl({
-          artistId: resolvedArtist.id,
-          artistSlug: resolvedArtist.slug,
+    ? artistPhotoApiUrl(
+        {
+          globalArtistUid: resolvedArtist.globalArtistUid,
           artistName: resolvedArtist.name,
-        })
+        },
+        { size: 256 },
+      )
+    : resolvedArtist?.id != null
+      ? artistPhotoApiUrl(
+          {
+            artistId: resolvedArtist.id,
+            artistSlug: resolvedArtist.slug,
+            artistName: resolvedArtist.name,
+          },
+          { size: 256 },
+        )
       : null;
 
   const artistAvatarUrl =

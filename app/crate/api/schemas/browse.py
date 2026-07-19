@@ -425,8 +425,8 @@ class AlbumTrackResponse(BaseModel):
     bit_depth: int | None = None
     length_sec: int
     popularity: int | None = None
-    popularity_score: float | None = None
-    popularity_confidence: float | None = None
+    popularity_score: float | None = Field(default=None, exclude=True)
+    popularity_confidence: float | None = Field(default=None, exclude=True)
     rating: int | float = 0
     stream_variants: list[AlbumTrackStreamVariantResponse] = Field(default_factory=list)
     lyrics: AlbumTrackLyricsResponse = Field(default_factory=AlbumTrackLyricsResponse)

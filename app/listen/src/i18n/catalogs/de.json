@@ -769,6 +769,7 @@
   "artist.meta.listeners": "{count} Hörer",
   "artist.loading": "Künstler wird geladen.",
   "artist.notFound": "Künstler nicht gefunden",
+  "artist.unavailable": "Künstler vorübergehend nicht verfügbar",
   "artist.fallbackName": "Künstler",
   "artist.playSource.topTracks": "{name} Top-Titel",
   "artist.playSource.probableSetlist": "{name} wahrscheinliche Setlist",

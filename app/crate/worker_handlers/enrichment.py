@@ -1400,6 +1400,20 @@ def _handle_compute_completeness(task_id: str, params: dict, config: dict) -> di
     return {"artists_checked": len(results), "total": total}
 
 
+def _handle_refresh_probable_setlist(task_id: str, params: dict, config: dict) -> dict:
+    del task_id, config
+    from crate.api.cache_events import broadcast_invalidation
+    from crate.setlistfm import refresh_probable_setlist
+    from crate.slugs import build_artist_slug
+
+    artist_name = str(params.get("artist_name") or "").strip()
+    if not artist_name:
+        raise ValueError("artist_name is required")
+    result = refresh_probable_setlist(artist_name)
+    broadcast_invalidation("upcoming", f"artist:{build_artist_slug(artist_name)}")
+    return result
+
+
 ENRICHMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "enrich_artist": _handle_enrich_single,
     "enrich_artists": _handle_enrich_artists,
@@ -1408,4 +1422,5 @@ ENRICHMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "enrich_mbids": _handle_enrich_mbids,
     "process_new_content": _handle_process_new_content,
     "compute_completeness": _handle_compute_completeness,
+    "refresh_probable_setlist": _handle_refresh_probable_setlist,
 }

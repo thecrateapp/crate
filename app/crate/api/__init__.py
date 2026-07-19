@@ -77,6 +77,9 @@ def _bootstrap_federation_identity() -> None:
 
 def _queue_global_catalog_bootstrap() -> None:
     """Ensure the canonical catalog and historical user refs are projected."""
+    from crate.db.global_catalog_search_projection import (
+        get_global_catalog_search_projection_status,
+    )
     from crate.db.repositories.global_catalog_state import get_catalog_state
     from crate.db.repositories.global_user_library import (
         USER_LIBRARY_REFS_BACKFILL_VERSION,
@@ -89,6 +92,7 @@ def _queue_global_catalog_bootstrap() -> None:
         and state.get("user_refs_backfilled_at") is not None
         and state.get("user_refs_backfill_version", 0)
         >= USER_LIBRARY_REFS_BACKFILL_VERSION
+        and get_global_catalog_search_projection_status() == "ready"
     ):
         return
     create_task_dedup(
@@ -96,6 +100,15 @@ def _queue_global_catalog_bootstrap() -> None:
         {"triggered_by": "api_startup"},
         dedup_key="bootstrap:global-catalog",
     )
+
+
+async def _repair_musicbrainz_cache_ttls() -> int:
+    from crate.db.cache_musicbrainz import repair_mb_cache_ttls
+
+    repaired = await asyncio.to_thread(repair_mb_cache_ttls)
+    if repaired:
+        log.info("Applied TTLs to %s legacy MusicBrainz cache entries", repaired)
+    return repaired
 
 
 @asynccontextmanager
@@ -106,6 +119,13 @@ async def lifespan(app: FastAPI):
     from crate.utils import init_musicbrainz
 
     init_musicbrainz()
+    from crate.api.cache_events import (
+        start_cache_invalidation_runtime,
+        stop_cache_invalidation_runtime,
+    )
+
+    start_cache_invalidation_runtime()
+    mb_cache_ttl_repair_task = asyncio.create_task(_repair_musicbrainz_cache_ttls())
 
     # Pre-warm radio graphs so the first radio request does not pay
     # the cost of loading artist similarities, genres, and members
@@ -118,12 +138,28 @@ async def lifespan(app: FastAPI):
         log.warning("Radio graph pre-warm failed", exc_info=True)
 
     radio_refresh_task = asyncio.create_task(_refresh_radio_graphs_periodically())
+    from crate.runtime_saturation import monitor_event_loop_lag
+
+    event_loop_monitor_task = asyncio.create_task(monitor_event_loop_lag())
     try:
         yield
     finally:
+        stop_cache_invalidation_runtime()
+        from crate.federation.client import close_shared_clients
+
+        await asyncio.to_thread(close_shared_clients)
+        federation_stream_client = getattr(app.state, "federation_stream_client", None)
+        if federation_stream_client is not None:
+            await federation_stream_client.aclose()
         radio_refresh_task.cancel()
+        event_loop_monitor_task.cancel()
         try:
-            await radio_refresh_task
+            await asyncio.gather(
+                radio_refresh_task,
+                event_loop_monitor_task,
+                mb_cache_ttl_repair_task,
+                return_exceptions=True,
+            )
         except asyncio.CancelledError:
             pass
 
@@ -300,10 +336,16 @@ def create_app() -> FastAPI:
     from crate.api.auth import AuthMiddleware
     from crate.api.cache_events import CacheInvalidationMiddleware
     from crate.api.metrics_middleware import MetricsMiddleware
+    from crate.api.trace_middleware import (
+        TraceMiddleware,
+        install_trace_id_log_record_factory,
+    )
 
     app.add_middleware(AuthMiddleware)
     app.add_middleware(CacheInvalidationMiddleware)
     app.add_middleware(MetricsMiddleware)
+    install_trace_id_log_record_factory()
+    app.add_middleware(TraceMiddleware)
 
     from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router

@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from collections import Counter
 
 import requests
@@ -10,6 +11,31 @@ from crate.db.cache_store import get_cache, set_cache
 log = logging.getLogger(__name__)
 
 SETLISTFM_BASE = "https://api.setlist.fm/rest/1.0"
+_PROBABLE_TTL_SECONDS = 7 * 86400
+_PENDING_TTL_SECONDS = 15 * 60
+_NEGATIVE_TTL_SECONDS = 6 * 3600
+
+
+class SetlistProviderUnavailable(RuntimeError):
+    pass
+
+
+class SetlistProviderRateLimited(SetlistProviderUnavailable):
+    def __init__(self, retry_after_seconds: float = 60.0) -> None:
+        super().__init__("Setlist.fm rate limit exceeded")
+        self.retry_after_seconds = max(1.0, retry_after_seconds)
+
+
+def _normalized_artist_name(name: str) -> str:
+    return re.sub(r"\s+", " ", (name or "").strip())
+
+
+def _probable_cache_key(name: str) -> str:
+    return f"setlistfm:probable:{_normalized_artist_name(name).casefold()}"
+
+
+def _probable_status_key(name: str) -> str:
+    return f"setlistfm:probable-status:{_normalized_artist_name(name).casefold()}"
 
 
 def _as_list(value) -> list:
@@ -67,12 +93,26 @@ def _api_get(endpoint: str, params: dict | None = None) -> dict | None:
         log.debug("Setlist.fm API key is not configured")
         return None
     try:
+        from crate.provider_rate_limits import wait_for_provider_slot
+
+        wait_for_provider_slot("setlistfm", 1.0)
         resp = requests.get(
             f"{SETLISTFM_BASE}/{endpoint}",
             headers={"x-api-key": key, "Accept": "application/json"},
             params=params or {},
             timeout=10,
         )
+        if resp.status_code == 429:
+            retry_after = (getattr(resp, "headers", {}) or {}).get("Retry-After")
+            try:
+                retry_after_seconds = float(retry_after or 60)
+            except (TypeError, ValueError):
+                retry_after_seconds = 60.0
+            raise SetlistProviderRateLimited(retry_after_seconds)
+        if resp.status_code >= 500:
+            raise SetlistProviderUnavailable(
+                f"Setlist.fm returned HTTP {resp.status_code}"
+            )
         if resp.status_code >= 400:
             log.warning(
                 "Setlist.fm API call failed: endpoint=%s status=%s params=%s body=%s",
@@ -83,6 +123,8 @@ def _api_get(endpoint: str, params: dict | None = None) -> dict | None:
             )
             return None
         return resp.json()
+    except (SetlistProviderRateLimited, SetlistProviderUnavailable):
+        raise
     except RequestException as exc:
         log.warning(
             "Setlist.fm API request failed: endpoint=%s params=%s error=%s",
@@ -90,7 +132,7 @@ def _api_get(endpoint: str, params: dict | None = None) -> dict | None:
             params or {},
             exc,
         )
-        return None
+        raise SetlistProviderUnavailable("Setlist.fm request failed") from exc
     except ValueError as exc:
         log.warning(
             "Setlist.fm API returned invalid JSON: endpoint=%s params=%s error=%s",
@@ -122,13 +164,77 @@ def get_setlists(mbid: str, page: int = 1, per_page: int = 20) -> dict | None:
 
 
 def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
-    cache_key = f"setlistfm:probable:{artist_name.lower()}"
-    cached = get_cache(cache_key, max_age_seconds=86400 * 7)
+    cached = get_cache(
+        _probable_cache_key(artist_name), max_age_seconds=_PROBABLE_TTL_SECONDS
+    )
     if not cached:
         return None
     if isinstance(cached, dict):
         return _normalize_cached_songs(cached.get("songs"))
     return _normalize_cached_songs(cached)
+
+
+def queue_probable_setlist_refresh(artist_name: str) -> str | None:
+    task_ids = queue_probable_setlist_refreshes([artist_name])
+    return task_ids[0] if task_ids else None
+
+
+def queue_probable_setlist_refreshes(artist_names: list[str]) -> list[str]:
+    """Queue cache refreshes without performing provider I/O in the caller."""
+    from crate.db.repositories.tasks import create_task_dedup
+
+    queued: list[str] = []
+    seen: set[str] = set()
+    for raw_name in artist_names:
+        artist_name = _normalized_artist_name(raw_name)
+        normalized = artist_name.casefold()
+        if not artist_name or normalized in seen:
+            continue
+        seen.add(normalized)
+        if get_cached_probable_setlist(artist_name):
+            continue
+        status = get_cache(
+            _probable_status_key(artist_name),
+            max_age_seconds=_NEGATIVE_TTL_SECONDS,
+        )
+        if isinstance(status, dict) and status.get("status") in {"pending", "missing"}:
+            continue
+        set_cache(
+            _probable_status_key(artist_name),
+            {"status": "pending"},
+            ttl=_PENDING_TTL_SECONDS,
+        )
+        task_id = create_task_dedup(
+            "refresh_probable_setlist",
+            {"artist_name": artist_name},
+            dedup_key=normalized,
+        )
+        if task_id:
+            queued.append(task_id)
+    return queued
+
+
+def refresh_probable_setlist(artist_name: str) -> dict:
+    """Refresh one probable setlist from a worker-owned provider call."""
+    normalized_name = _normalized_artist_name(artist_name)
+    songs = get_probable_setlist(normalized_name)
+    if songs:
+        set_cache(
+            _probable_status_key(normalized_name),
+            {"status": "ready"},
+            ttl=_PROBABLE_TTL_SECONDS,
+        )
+        return {
+            "status": "ready",
+            "artist_name": normalized_name,
+            "songs": len(songs),
+        }
+    set_cache(
+        _probable_status_key(normalized_name),
+        {"status": "missing"},
+        ttl=_NEGATIVE_TTL_SECONDS,
+    )
+    return {"status": "missing", "artist_name": normalized_name, "songs": 0}
 
 
 def get_probable_setlist(artist_name: str, num_setlists: int = 30) -> list[dict] | None:
@@ -149,7 +255,9 @@ def get_probable_setlist(artist_name: str, num_setlists: int = 30) -> list[dict]
 
     if result:
         set_cache(
-            f"setlistfm:probable:{artist_name.lower()}", {"songs": result}, ttl=604800
+            _probable_cache_key(artist_name),
+            {"songs": result},
+            ttl=_PROBABLE_TTL_SECONDS,
         )
     return result
 

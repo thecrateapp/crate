@@ -442,10 +442,12 @@ function shapedToTrack(t: ShapedRadioTrack): Track {
     },
     {
       cover: t.album_id
-        ? albumCoverApiUrl({ albumId: t.album_id }) || undefined
+        ? albumCoverApiUrl({ albumId: t.album_id }, { size: 512 }) || undefined
         : t.global_album_uid
-          ? albumCoverApiUrl({ globalAlbumUid: t.global_album_uid }) ||
-            undefined
+          ? albumCoverApiUrl(
+              { globalAlbumUid: t.global_album_uid },
+              { size: 512 },
+            ) || undefined
           : undefined,
     },
   );

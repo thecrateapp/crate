@@ -53,6 +53,11 @@ from crate.api.schemas.browse import (
 from crate.audio import get_audio_files
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.health import get_all_artist_issue_counts, get_artist_issue_count
+from crate.external_artist_artwork import (
+    get_cached_external_artist_artwork,
+    is_external_artist_artwork_missing,
+    queue_external_artist_artwork,
+)
 from crate.db.queries.user_library import get_top_artists
 from crate.db.repositories.library import (
     get_album_quality_map,
@@ -94,7 +99,7 @@ from crate.db.similarities import get_artist_network
 from crate.lastfm import (
     get_artist_info,
     get_cached_artist_info,
-    get_top_tracks,
+    get_cached_top_tracks,
 )
 from crate.storage_layout import resolve_artist_dir
 from crate.slugs import build_public_album_slug
@@ -381,8 +386,6 @@ def _artist_library_info_payload(name: str) -> dict:
 
 def _get_artist_page_info(name: str) -> dict:
     info = get_cached_artist_info(name)
-    if not info:
-        info = get_artist_info(name)
     if info:
         enriched = dict(info)
         enriched["similar"] = _enrich_similar_artists(info.get("similar") or [])
@@ -464,7 +467,10 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
     payload = _build_artist_top_tracks_payload(
         artist_name,
         count=count,
-        lastfm_top=get_top_tracks(artist_name, limit=max(count * 2, 100)),
+        lastfm_top=get_cached_top_tracks(
+            artist_name,
+            limit=max(count * 2, 100),
+        ),
     )
     set_cache(cache_key, payload, ttl=300)
     return payload
@@ -1184,6 +1190,18 @@ def api_artist_background(
                 headers=_IMG_CACHE,
             )
 
+        for photo_name in ARTIST_PHOTO_NAMES:
+            photo = artist_dir / photo_name
+            if photo.exists():
+                media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
+                return build_image_response(
+                    photo.read_bytes(),
+                    media_type,
+                    size=size,
+                    output_format=image_format,
+                    headers=_IMG_CACHE,
+                )
+
     fanart = get_fanart_all_images(name)
     backgrounds = fanart.get("backgrounds", []) if fanart else []
     if backgrounds:
@@ -1256,18 +1274,6 @@ def api_artist_background(
                     )
     except Exception:
         pass
-
-    if artist_dir and artist_dir.is_dir():
-        for photo_name in ARTIST_PHOTO_NAMES:
-            photo = artist_dir / photo_name
-            if photo.exists():
-                media_type = "image/jpeg" if photo.suffix == ".jpg" else "image/png"
-                return build_image_response(
-                    photo.read_bytes(),
-                    media_type,
-                    size=size,
-                    output_format=image_format,
-                )
 
     return Response(status_code=404)
 
@@ -1403,11 +1409,9 @@ def api_artist_shows(request: Request, name: str, limit: int = 10, country: str 
     artist_genres = get_artist_genres_by_name(name, limit=5)
 
     cached = db_get_shows(artist_name=name, country=country or None, limit=limit)
-    probable_setlist = []
-    try:
-        probable_setlist = (setlistfm.get_probable_setlist(name) or [])[:10]
-    except Exception:
-        probable_setlist = []
+    probable_setlist = (setlistfm.get_cached_probable_setlist(name) or [])[:10]
+    if not probable_setlist:
+        setlistfm.queue_probable_setlist_refresh(name)
     if cached:
         attending_show_ids = get_attending_show_ids(
             user["id"],
@@ -1600,8 +1604,9 @@ def api_artist_setlist_playable(request: Request, name: str):
     _require_auth(request)
     from crate import setlistfm
 
-    probable_setlist = setlistfm.get_probable_setlist(name) or []
+    probable_setlist = setlistfm.get_cached_probable_setlist(name) or []
     if not probable_setlist:
+        setlistfm.queue_probable_setlist_refresh(name)
         return {"tracks": []}
 
     artist_row = get_library_artist(name)
@@ -1773,21 +1778,37 @@ def api_external_artist_photo(
     artist_name = name.strip()
     if not artist_name:
         return Response(status_code=404)
-    try:
-        from crate.lastfm import get_best_artist_image
 
-        image_data = get_best_artist_image(artist_name)
-    except Exception:
-        image_data = None
-    if not image_data:
-        return Response(status_code=404)
-    return build_image_response(
-        image_data,
-        "image/jpeg",
-        size=size,
-        output_format=image_format,
-        headers={
+    cached = get_cached_external_artist_artwork(artist_name)
+    if cached is not None:
+        headers = {
             "Cache-Control": "public, max-age=604800, stale-while-revalidate=2592000"
+        }
+        if cached.get("stale", False):
+            headers["Cache-Control"] = (
+                "public, max-age=60, stale-while-revalidate=2592000"
+            )
+            if not is_external_artist_artwork_missing(artist_name):
+                queue_external_artist_artwork(artist_name)
+                headers["X-Crate-External-Artwork"] = "revalidating"
+        return build_image_response(
+            cached["content"],
+            cached["content_type"],
+            size=size,
+            output_format=image_format,
+            headers=headers,
+        )
+
+    if is_external_artist_artwork_missing(artist_name):
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+
+    queue_external_artist_artwork(artist_name)
+    return Response(
+        status_code=404,
+        headers={
+            "Cache-Control": "no-store",
+            "Retry-After": "2",
+            "X-Crate-External-Artwork": "pending",
         },
     )
 

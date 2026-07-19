@@ -11,7 +11,9 @@ from sqlalchemy import text
 from crate.db.cache_runtime import (
     get_redis,
     _mem_cache,
+    _MEM_TTL,
     _mem_delete,
+    _mem_delete_prefix,
     _mem_get,
     _mem_lock,
     _mem_set,
@@ -20,17 +22,26 @@ from crate.db.tx import read_scope, transaction_scope
 
 
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
-    val = _mem_get(key)
+    val = _mem_get(key, max_age_seconds=max_age_seconds)
     if val is not None:
         return val
 
     redis_client = get_redis()
     if redis_client:
         try:
-            raw = redis_client.get(f"cache:{key}")
+            redis_key = f"cache:{key}"
+            pipeline = redis_client.pipeline(transaction=False)
+            pipeline.get(redis_key)
+            pipeline.pttl(redis_key)
+            raw, remaining_ttl_ms = pipeline.execute()
             if raw is not None:
                 val = json.loads(raw)
-                _mem_set(key, val)
+                l1_ttl = _remaining_l1_ttl(
+                    remaining_ttl_ms,
+                    max_age_seconds=max_age_seconds,
+                )
+                if l1_ttl > 0:
+                    _mem_set(key, val, l1_ttl)
                 return val
         except Exception:
             pass
@@ -122,10 +133,7 @@ def delete_cache(key: str) -> None:
 
 
 def delete_cache_prefix(prefix: str) -> None:
-    with _mem_lock:
-        to_delete = [key for key in _mem_cache if key.startswith(prefix)]
-        for key in to_delete:
-            del _mem_cache[key]
+    _mem_delete_prefix(prefix)
 
     redis_client = get_redis()
     if redis_client:
@@ -173,6 +181,24 @@ def clear_all_cache_tables() -> None:
     with transaction_scope() as session:
         session.execute(text("DELETE FROM cache"))
         session.execute(text("DELETE FROM mb_cache"))
+
+
+def _remaining_l1_ttl(
+    remaining_ttl_ms: int | str | None,
+    *,
+    max_age_seconds: int | None,
+) -> float:
+    try:
+        ttl_ms = int(remaining_ttl_ms) if remaining_ttl_ms is not None else -1
+    except (TypeError, ValueError):
+        ttl_ms = -1
+
+    if ttl_ms == -2 or ttl_ms == 0:
+        return 0
+    if ttl_ms > 0:
+        source_ttl = ttl_ms / 1000
+        return min(source_ttl, max_age_seconds) if max_age_seconds else source_ttl
+    return float(max_age_seconds or _MEM_TTL)
 
 
 __all__ = [

@@ -8,6 +8,11 @@ from crate.db.repositories.global_catalog_state import (
     get_catalog_state,
     transition_catalog_state,
 )
+from crate.db.global_catalog_search_projection import (
+    begin_global_catalog_search_rebuild,
+    fail_global_catalog_search_rebuild,
+    rebuild_global_catalog_search_documents_batch,
+)
 from crate.db.repositories.tasks import create_task
 from crate.db.repositories.global_user_library import (
     USER_LIBRARY_REFS_BACKFILL_VERSION,
@@ -129,7 +134,7 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
             if user_refs["completed"]:
                 finalized_report = finalize_user_library_refs_backfill(report)
                 next_cursor_json = {
-                    "phase": "snapshots",
+                    "phase": "search_documents",
                     "cursor": None,
                     "user_refs_report": finalized_report,
                 }
@@ -152,6 +157,37 @@ def _handle_reconcile_full(task_id: str, params: dict, config: dict) -> dict:
                 "phase": "user_refs",
                 "completed": False,
                 "batch": user_refs,
+                "continuation_task_id": continuation_task_id,
+            }
+        if phase == "search_documents":
+            try:
+                begin_global_catalog_search_rebuild()
+                search_documents = rebuild_global_catalog_search_documents_batch(
+                    batch_size=batch_size,
+                    cursor=cursor if isinstance(cursor, dict) else None,
+                )
+            except Exception as exc:
+                fail_global_catalog_search_rebuild(str(exc))
+                raise
+            next_phase = (
+                "snapshots" if search_documents["completed"] else "search_documents"
+            )
+            transition_catalog_state(
+                "backfilling",
+                bootstrap_cursor_json={
+                    "phase": next_phase,
+                    "cursor": search_documents.get("next_cursor"),
+                },
+            )
+            continuation_task_id = _queue_full_reconciliation_continuation(
+                task_id, params, batch_size
+            )
+            return {
+                "status": "continued",
+                "mode": "full",
+                "phase": "search_documents",
+                "completed": False,
+                "batch": search_documents,
                 "continuation_task_id": continuation_task_id,
             }
         if phase != "snapshots":

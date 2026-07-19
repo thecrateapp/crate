@@ -38,7 +38,9 @@ def _patch_authorized_owner(monkeypatch):
         "_require_capability",
         lambda *_args, **_kwargs: SimpleNamespace(constraints=None),
     )
-    monkeypatch.setattr(federation_api, "entity_is_allowed", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        federation_api, "entity_is_allowed", lambda *_args, **_kwargs: True
+    )
     monkeypatch.setattr(
         federation_api,
         "get_track_delivery_row_by_entity_uid",
@@ -79,8 +81,10 @@ def test_owner_queues_authorized_preparation_without_creating_stream_state(monke
     monkeypatch.setattr(
         federation_api,
         "prepare_playback",
-        lambda track, policy, *, reason: prepared.append((track, policy, reason))
-        or SimpleNamespace(cache_hit=False, preparing=True),
+        lambda track, policy, *, reason: (
+            prepared.append((track, policy, reason))
+            or SimpleNamespace(cache_hit=False, preparing=True)
+        ),
         raising=False,
     )
     monkeypatch.setattr(
@@ -116,7 +120,9 @@ def test_owner_returns_ready_without_reserving_or_queueing(monkeypatch):
     monkeypatch.setattr(
         federation_api,
         "prepare_playback",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not queue")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("must not queue")
+        ),
         raising=False,
     )
 
@@ -152,7 +158,9 @@ def test_owner_records_only_aggregate_prepare_outcomes(monkeypatch):
 
 def test_owner_returns_unavailable_for_disallowed_entity(monkeypatch):
     federation_api = _patch_authorized_owner(monkeypatch)
-    monkeypatch.setattr(federation_api, "entity_is_allowed", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        federation_api, "entity_is_allowed", lambda *_args, **_kwargs: False
+    )
 
     result = asyncio.run(federation_api.prepare_playback_variants(_body(), object()))
 
@@ -178,7 +186,9 @@ def test_owner_returns_rate_limited_without_queueing(monkeypatch):
     monkeypatch.setattr(
         federation_api,
         "prepare_playback",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not queue")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("must not queue")
+        ),
         raising=False,
     )
 
