@@ -4,14 +4,17 @@ import ast
 from pathlib import Path
 
 
+FEDERATION_API_PATH = Path(__file__).resolve().parents[1] / "crate/api/federation.py"
+
+
 def test_signed_request_verification_is_offloaded_from_the_event_loop() -> None:
-    source = Path("app/crate/api/federation.py").read_text()
+    source = FEDERATION_API_PATH.read_text()
 
     assert "await asyncio.to_thread(_verify_signed_node_request" in source
 
 
 def test_async_federation_routes_do_not_call_blocking_services_directly() -> None:
-    source = Path("app/crate/api/federation.py").read_text()
+    source = FEDERATION_API_PATH.read_text()
     tree = ast.parse(source)
     blocking_names = {
         "_catalog_manifest_items",

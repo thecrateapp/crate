@@ -100,6 +100,9 @@ def test_prepare_playback_queues_variant_without_reading_source_quality(
     monkeypatch.setattr("crate.streaming.service.library_path", lambda: library)
     monkeypatch.setattr("crate.streaming.service.read_audio_quality", fail_quality)
     monkeypatch.setattr(
+        "crate.streaming.service.get_variant_by_cache_key", lambda _key: None
+    )
+    monkeypatch.setattr(
         "crate.streaming.service.ensure_variant_record", fake_ensure_variant_record
     )
     monkeypatch.setattr(
