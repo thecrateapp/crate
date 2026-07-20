@@ -504,7 +504,8 @@ def test_connect_session_api_includes_active_playback_state(test_app, monkeypatc
     assert data["state"]["position_ms"] == 13_000
 
 
-def test_connect_preferences_are_disabled_by_default_and_user_scoped(test_app):
+def test_connect_preferences_are_disabled_by_default_and_user_scoped(pg_db, test_app):
+    del pg_db
     response = test_app.get("/api/me/connect/preferences")
 
     assert response.status_code == 200

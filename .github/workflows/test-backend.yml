@@ -34,7 +34,7 @@ jobs:
           cache-dependency-path: app/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pyright ruff
+        run: pip install -r requirements.txt pyright==1.1.411 ruff==0.15.22
         working-directory: app
 
       - name: Type check

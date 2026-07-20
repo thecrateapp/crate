@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
@@ -46,6 +46,12 @@ def _artist_metadata_snapshot(artist: LibraryArtist) -> dict[str, Any]:
     }
 
 
+def _required_artist_id(artist: LibraryArtist) -> int:
+    if artist.id is None:
+        raise RuntimeError(f"Library artist {artist.name!r} is missing numeric id")
+    return artist.id
+
+
 def update_artist_metadata(
     *,
     artist_id: int | None = None,
@@ -79,6 +85,7 @@ def update_artist_metadata(
         ).scalar_one_or_none()
         if artist is None:
             return None
+        numeric_artist_id = _required_artist_id(artist)
 
         before = _artist_metadata_snapshot(artist)
         for key, value in values.items():
@@ -93,7 +100,7 @@ def update_artist_metadata(
             artist.updated_at = datetime.now(timezone.utc)
             lock_fields(
                 entity_type="artist",
-                entity_id=int(artist.id),
+                entity_id=numeric_artist_id,
                 field_names=changed_fields,
                 locked_by_user_id=locked_by_user_id,
                 reason="Manual artist metadata edit",
@@ -125,10 +132,11 @@ def update_artist_enrichment(
         ).scalar_one_or_none()
         if artist is None:
             return
+        numeric_artist_id = _required_artist_id(artist)
 
         locked_fields = list_locked_fields(
             entity_type="artist",
-            entity_id=int(artist.id),
+            entity_id=numeric_artist_id,
             session=s,
         )
         field_map = {

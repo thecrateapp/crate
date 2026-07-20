@@ -2540,6 +2540,49 @@ class TestLibraryCRUD:
         assert artist["country"] == "GB"
         assert artist["listeners"] == 200
 
+    def test_manual_artist_metadata_rejects_artist_without_numeric_id(self, pg_db):
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_metadata,
+        )
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Artist Without ID"})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL "
+                    "WHERE name = 'Artist Without ID'"
+                )
+            )
+
+        with pytest.raises(RuntimeError, match="missing numeric id"):
+            update_artist_metadata(
+                artist_name="Artist Without ID",
+                metadata={"bio": "Must not be written"},
+                locked_by_user_id=1,
+            )
+
+    def test_artist_enrichment_rejects_artist_without_numeric_id(self, pg_db):
+        from crate.db.repositories.library_enrichment_writes import (
+            update_artist_enrichment,
+        )
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Enrichment Artist Without ID"})
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_artists SET id = NULL "
+                    "WHERE name = 'Enrichment Artist Without ID'"
+                )
+            )
+
+        with pytest.raises(RuntimeError, match="missing numeric id"):
+            update_artist_enrichment(
+                "Enrichment Artist Without ID",
+                {"bio": "Must not be written"},
+            )
+
     def test_manual_bandcamp_url_clear_blocks_bandcamp_backfill(self, pg_db):
         from crate.db.repositories.bandcamp import set_library_entity_bandcamp_url
         from crate.db.repositories.library_enrichment_writes import (

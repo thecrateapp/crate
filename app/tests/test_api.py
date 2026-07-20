@@ -323,7 +323,8 @@ class TestArtistDetailAPI:
         assert [item["title"] for item in payload[:2]] == ["Track Two", "Track One"]
         mock_cached_top_tracks.assert_called_once_with("Tool", limit=100)
 
-    def test_get_artist_found(self, test_app):
+    def test_get_artist_found(self, pg_db, test_app):
+        del pg_db
         mock_artist = {
             "name": "Tool",
             "track_count": 50,
@@ -408,7 +409,8 @@ class TestArtistDetailAPI:
         assert resp.json()["name"] == "Tool"
         mock_api_artist.assert_called_once_with(ANY, "Tool")
 
-    def test_get_artist_page_by_slug(self, test_app):
+    def test_get_artist_page_by_slug(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "artist": {
                 "id": 7,
@@ -455,7 +457,8 @@ class TestArtistDetailAPI:
             stats_limit=12,
         )
 
-    def test_get_artist_page_bundles_listen_payload(self, test_app):
+    def test_get_artist_page_bundles_listen_payload(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "id": 7,
             "slug": "tool",
@@ -559,7 +562,10 @@ class TestArtistDetailAPI:
         mock_enrichment.assert_called_once_with("Tool")
         mock_set_cache.assert_called_once()
 
-    def test_get_artist_page_falls_back_to_slug_when_artist_id_is_stale(self, test_app):
+    def test_get_artist_page_falls_back_to_slug_when_artist_id_is_stale(
+        self, pg_db, test_app
+    ):
+        del pg_db
         artist_payload = {
             "id": 52,
             "slug": "poison-the-well",
@@ -603,7 +609,8 @@ class TestArtistDetailAPI:
         assert resp.json()["artist"]["name"] == "Poison The Well"
         mock_artist_name_from_ref.assert_called_once_with(52, "poison-the-well")
 
-    def test_get_artist_page_uses_cached_shows_helper(self, test_app):
+    def test_get_artist_page_uses_cached_shows_helper(self, pg_db, test_app):
+        del pg_db
         artist_payload = {
             "id": 52,
             "slug": "poison-the-well",
@@ -690,7 +697,8 @@ class TestArtistDetailAPI:
         assert payload["events"][0]["id"] == "99"
         assert payload["events"][0]["user_attending"] is True
 
-    def test_get_album_by_artist_and_album_slug(self, test_app):
+    def test_get_album_by_artist_and_album_slug(self, pg_db, test_app):
+        del pg_db
         artist = {"id": 5, "slug": "quicksand", "name": "Quicksand"}
         albums = [
             {"id": 14, "slug": "quicksand-slip", "artist": "Quicksand", "name": "Slip"},

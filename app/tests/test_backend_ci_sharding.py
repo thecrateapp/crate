@@ -41,6 +41,8 @@ def test_backend_ci_keeps_quality_checks_outside_database_shards() -> None:
     workflow = WORKFLOW.read_text()
 
     assert "quality:" in workflow
+    assert "pyright==1.1.411" in workflow
+    assert "ruff==0.15.22" in workflow
     assert "python -m pyright" in workflow
     assert "python -m ruff check crate tests" in workflow
     assert "python -m ruff format --check crate tests" in workflow

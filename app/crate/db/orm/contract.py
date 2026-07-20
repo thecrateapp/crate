@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Iterable
+from typing import cast
 
 from sqlalchemy import (
     ARRAY,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Float,
     Integer,
     String,
+    Table,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -74,24 +76,36 @@ def _normalized_ondelete(value: str | None) -> str | None:
     return value.upper() if value else None
 
 
+def _named_column_set(
+    column_names: Iterable[str | None] | None,
+) -> frozenset[str] | None:
+    if column_names is None:
+        return None
+    names = tuple(column_names)
+    if not names or any(name is None for name in names):
+        return None
+    return frozenset(name for name in names if name is not None)
+
+
 def _database_unique_sets(inspector: Inspector, table_name: str) -> set[frozenset[str]]:
-    unique_sets = {
-        frozenset(constraint["column_names"])
-        for constraint in inspector.get_unique_constraints(table_name)
-        if constraint.get("column_names")
-    }
-    unique_sets.update(
-        frozenset(index["column_names"])
-        for index in inspector.get_indexes(table_name)
-        if index.get("unique") and index.get("column_names")
+    unique_sets: set[frozenset[str]] = set()
+    for constraint in inspector.get_unique_constraints(table_name):
+        column_set = _named_column_set(constraint.get("column_names"))
+        if column_set is not None:
+            unique_sets.add(column_set)
+    for index in inspector.get_indexes(table_name):
+        column_set = _named_column_set(index.get("column_names"))
+        if index.get("unique") and column_set is not None:
+            unique_sets.add(column_set)
+    primary_key = _named_column_set(
+        inspector.get_pk_constraint(table_name).get("constrained_columns")
     )
-    primary_key = inspector.get_pk_constraint(table_name).get("constrained_columns", [])
-    if primary_key:
-        unique_sets.add(frozenset(primary_key))
+    if primary_key is not None:
+        unique_sets.add(primary_key)
     return unique_sets
 
 
-def _model_unique_sets(table) -> Iterable[frozenset[str]]:
+def _model_unique_sets(table: Table) -> Iterable[frozenset[str]]:
     for constraint in table.constraints:
         if isinstance(constraint, UniqueConstraint):
             yield frozenset(column.name for column in constraint.columns)
@@ -104,7 +118,7 @@ def find_active_orm_schema_drift(inspector: Inspector) -> list[str]:
     drift: list[str] = []
 
     for model in ACTIVE_ORM_MODELS:
-        table = model.__table__
+        table = cast(Table, model.__table__)
         table_name = table.name
         with warnings.catch_warnings():
             warnings.filterwarnings(
@@ -114,7 +128,7 @@ def find_active_orm_schema_drift(inspector: Inspector) -> list[str]:
             )
             reflected_columns = inspector.get_columns(table_name)
         db_columns = {column["name"]: column for column in reflected_columns}
-        orm_pk = {column.name for column in table.primary_key.columns}
+        orm_pk = {column.name for column in table.primary_key}
         db_pk = set(
             inspector.get_pk_constraint(table_name).get("constrained_columns", [])
         )

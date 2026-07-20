@@ -1,3 +1,5 @@
+import pytest
+
 from crate.worker_handlers.integrations import (
     INTEGRATION_TASK_HANDLERS,
     _handle_sync_shows,
@@ -27,6 +29,13 @@ class TestHandlerRegistration:
 
 
 class TestHandleSyncShows:
+    @pytest.fixture(autouse=True)
+    def _without_sync_locations(self, monkeypatch):
+        monkeypatch.setattr(
+            "crate.worker_handlers.integrations.get_show_sync_locations",
+            lambda: [],
+        )
+
     def test_not_configured_returns_error(self, monkeypatch):
         # is_configured is lazily imported from crate.ticketmaster
         monkeypatch.setattr(
