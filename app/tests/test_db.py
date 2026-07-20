@@ -12,7 +12,7 @@ import psycopg2
 import pytest
 from sqlalchemy import text
 
-from tests.conftest import PG_AVAILABLE, TEST_DB_NAME
+from tests.conftest import PG_AVAILABLE
 
 pytestmark = pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 
@@ -87,7 +87,7 @@ class TestBootstrap:
             finally:
                 conn.close()
 
-        assert _count(TEST_DB_NAME) == 1
+        assert _count(os.environ["CRATE_POSTGRES_DB"]) == 1
         # The main "crate" database only exists in local dev environments.
         # In CI there is only the test database, and a local dev DB can also
         # exist before its schema is bootstrapped, so skip when there is no
@@ -1001,6 +1001,104 @@ class TestHealthQueries:
 
 
 class TestRepairJobs:
+    def test_management_rename_artist_preserves_fk_children_and_paths(self, pg_db):
+        from crate.db.jobs.management import rename_artist_in_db
+        from crate.db.tx import transaction_scope
+
+        old_name = f"Rename Source {uuid4().hex[:8]}"
+        new_name = f"Rename Target {uuid4().hex[:8]}"
+        old_folder = "rename-source"
+        old_root = f"/music/{old_folder}"
+        new_root = f"/music/{new_name}"
+
+        pg_db.upsert_artist({"name": old_name, "folder_name": old_folder})
+        album_id = pg_db.upsert_album(
+            {
+                "artist": old_name,
+                "name": "Rename Album",
+                "path": f"{old_root}/Rename Album",
+            }
+        )
+        pg_db.upsert_track(
+            {
+                "album_id": album_id,
+                "artist": old_name,
+                "albumartist": old_name,
+                "album": "Rename Album",
+                "filename": "01 - Rename.flac",
+                "title": "Rename",
+                "track_number": 1,
+                "format": "flac",
+                "path": f"{old_root}/Rename Album/01 - Rename.flac",
+            }
+        )
+        with transaction_scope() as session:
+            user_id = session.execute(
+                text(
+                    "INSERT INTO users (email, created_at) VALUES (:email, NOW()) "
+                    "RETURNING id"
+                ),
+                {"email": f"rename-{uuid4().hex}@example.test"},
+            ).scalar_one()
+            session.execute(
+                text(
+                    "INSERT INTO user_follows (user_id, artist_name, created_at) "
+                    "VALUES (:user_id, :artist_name, NOW())"
+                ),
+                {"user_id": user_id, "artist_name": old_name},
+            )
+
+        rename_artist_in_db(old_name, new_name, old_folder)
+
+        with transaction_scope() as session:
+            artist = (
+                session.execute(
+                    text(
+                        "SELECT name, folder_name FROM library_artists WHERE name = :name"
+                    ),
+                    {"name": new_name},
+                )
+                .mappings()
+                .one()
+            )
+            album = (
+                session.execute(
+                    text(
+                        "SELECT artist, path FROM library_albums WHERE id = :album_id"
+                    ),
+                    {"album_id": album_id},
+                )
+                .mappings()
+                .one()
+            )
+            track = (
+                session.execute(
+                    text(
+                        "SELECT artist, albumartist, path FROM library_tracks "
+                        "WHERE album_id = :album_id"
+                    ),
+                    {"album_id": album_id},
+                )
+                .mappings()
+                .one()
+            )
+            followed_artist = session.execute(
+                text("SELECT artist_name FROM user_follows WHERE user_id = :user_id"),
+                {"user_id": user_id},
+            ).scalar_one()
+
+        assert dict(artist) == {"name": new_name, "folder_name": new_name}
+        assert dict(album) == {
+            "artist": new_name,
+            "path": f"{new_root}/Rename Album",
+        }
+        assert dict(track) == {
+            "artist": new_name,
+            "albumartist": new_name,
+            "path": f"{new_root}/Rename Album/01 - Rename.flac",
+        }
+        assert followed_artist == new_name
+
     def test_rename_artist_updates_fk_children_without_violation(self, pg_db):
         from crate.db.jobs.repair import rename_artist
         from crate.db.tx import transaction_scope

@@ -136,16 +136,16 @@ def _build_metrics_system() -> dict:
     db_pool = {}
     db_pools = {"combined": {}, "sqlalchemy": {}, "legacy": {}}
     try:
-        from crate.db.engine import _engine
+        from crate.db.engine import get_pool_runtime
 
-        if _engine:
-            pool = _engine.pool
+        pool_runtime = get_pool_runtime()
+        if pool_runtime["configured"]:
             sqlalchemy_pool = {
-                "size": pool.size(),
-                "checked_in": pool.checkedin(),
-                "checked_out": pool.checkedout(),
-                "overflow": pool.overflow(),
-                "total": pool.checkedin() + pool.checkedout(),
+                "size": pool_runtime["size"],
+                "checked_in": pool_runtime["checked_in"],
+                "checked_out": pool_runtime["checked_out"],
+                "overflow": pool_runtime["overflow"],
+                "total": pool_runtime["checked_in"] + pool_runtime["checked_out"],
             }
             db_pools["sqlalchemy"] = sqlalchemy_pool
     except Exception:

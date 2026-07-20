@@ -1,4 +1,5 @@
 from crate.worker_handlers.management import (
+    _handle_move_artist,
     _handle_repair,
     _handle_repair_duplicate_tracks,
 )
@@ -105,6 +106,42 @@ def test_handle_repair_duplicate_tracks_delegates_high_confidence_rows(monkeypat
             ],
         },
     }
+
+
+def test_move_artist_restores_directory_when_database_rename_fails(
+    tmp_path, monkeypatch
+):
+    source = tmp_path / "old-folder"
+    target = tmp_path / "Renamed Artist"
+    source.mkdir()
+    (source / "song.flac").write_bytes(b"audio")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.get_library_artist",
+        lambda _name: {"name": "Old Artist", "folder_name": "old-folder"},
+    )
+
+    def fail_rename(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        "crate.worker_handlers.management.rename_artist_in_db", fail_rename
+    )
+
+    try:
+        _handle_move_artist(
+            "move-artist-1",
+            {"name": "Old Artist", "new_name": "Renamed Artist"},
+            {"library_path": str(tmp_path)},
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "database unavailable"
+    else:
+        raise AssertionError("database failure must be propagated")
+
+    assert source.is_dir()
+    assert (source / "song.flac").read_bytes() == b"audio"
+    assert not target.exists()
 
 
 def test_handle_repair_revalidates_applied_checks(monkeypatch):

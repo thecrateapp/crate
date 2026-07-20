@@ -55,6 +55,68 @@ def _bandcamp_album_url_from_item(item: Mapping[Any, Any]) -> str | None:
     ) or _clean_bandcamp_url(item.get("item_url"), keep_path=True)
 
 
+def get_exact_bandcamp_library_candidates(
+    bandcamp_item_id: int, *, session=None
+) -> dict[str, dict[str, Any] | None] | None:
+    with optional_scope(session) as current:
+        item = (
+            current.execute(
+                text("""
+                SELECT *
+                FROM bandcamp_items
+                WHERE id = :bandcamp_item_id
+                """),
+                {"bandcamp_item_id": bandcamp_item_id},
+            )
+            .mappings()
+            .first()
+        )
+        if not item:
+            return None
+
+        artist_name = str(item.get("artist_name") or "").strip()
+        album_title = str(item.get("album_title") or "").strip()
+        artist = None
+        album = None
+        if artist_name:
+            artist = (
+                current.execute(
+                    text("""
+                    SELECT entity_uid::text AS entity_uid, name
+                    FROM library_artists
+                    WHERE entity_uid IS NOT NULL
+                      AND lower(name) = lower(:artist_name)
+                    LIMIT 1
+                    """),
+                    {"artist_name": artist_name},
+                )
+                .mappings()
+                .first()
+            )
+        if artist_name and album_title:
+            album = (
+                current.execute(
+                    text("""
+                    SELECT entity_uid::text AS entity_uid, artist, name
+                    FROM library_albums
+                    WHERE entity_uid IS NOT NULL
+                      AND lower(artist) = lower(:artist_name)
+                      AND lower(name) = lower(:album_title)
+                    LIMIT 1
+                    """),
+                    {"artist_name": artist_name, "album_title": album_title},
+                )
+                .mappings()
+                .first()
+            )
+
+    return {
+        "item": dict(item),
+        "artist": dict(artist) if artist else None,
+        "album": dict(album) if album else None,
+    }
+
+
 def _sync_confirmed_bandcamp_entity_url(
     session,
     match: Mapping[Any, Any],

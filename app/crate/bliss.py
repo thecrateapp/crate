@@ -6,6 +6,7 @@ import re
 
 from crate.crate_cli import is_available as _crate_cli_is_available
 from crate.crate_cli import run_bliss
+from crate.db.jobs.bliss_storage import store_bliss_vectors
 from crate.db.queries.bliss import (
     build_user_radio_profile,
     get_album_tracks_for_radio,
@@ -22,7 +23,6 @@ from crate.db.queries.bliss import (
     get_similar_artist_rows as _db_get_similar_artist_rows,
     get_similar_artist_tracks_for_radio,
     get_track_with_artist,
-    store_bliss_vectors,
 )
 
 log = logging.getLogger(__name__)

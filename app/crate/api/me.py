@@ -156,13 +156,12 @@ from crate.db.repositories.user_library import (
     unsave_album,
 )
 from crate.db.user_stats_dashboard_surface import get_user_stats_dashboard
-from crate.db.repositories.user_library_shared import resolve_track_reference
+from crate.db.repositories.user_library_shared import resolve_track_reference_read
 from crate.db.repositories.users import (
     get_remote_scrobbling_enabled,
     set_remote_scrobbling_enabled,
 )
 from crate.db.snapshot_events import snapshot_channel
-from crate.db.tx import read_scope
 from crate.slugs import build_public_album_slug
 from crate.playback_provenance import PlaybackSessionInvalid, verify_playback_session
 
@@ -899,13 +898,11 @@ def update_now_playing(request: Request, body: NowPlayingRequest):
 
     resolved_track = None
     if any((body.track_id, body.track_entity_uid, body.track_path)):
-        with read_scope() as session:
-            resolved_track = resolve_track_reference(
-                session,
-                track_id=body.track_id,
-                track_entity_uid=body.track_entity_uid,
-                track_path=body.track_path,
-            )
+        resolved_track = resolve_track_reference_read(
+            track_id=body.track_id,
+            track_entity_uid=body.track_entity_uid,
+            track_path=body.track_path,
+        )
 
     track_entity_uid = body.track_entity_uid or (resolved_track or {}).get(
         "track_entity_uid"

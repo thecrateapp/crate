@@ -988,7 +988,8 @@ def _get_album_id_for_track(pg_db, track_id):
 
 class TestFavorites:
     def test_add_and_list_favorites(self, pg_db):
-        from crate.db.queries.browse_media_favorites import add_favorite, list_favorites
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import add_favorite
 
         add_favorite("track", "42", "2025-01-01T00:00:00Z")
         add_favorite("album", "7", "2025-01-02T00:00:00Z")
@@ -999,7 +1000,8 @@ class TestFavorites:
         assert favs[0]["item_id"] == "7"
 
     def test_add_favorite_idempotent_on_conflict(self, pg_db):
-        from crate.db.queries.browse_media_favorites import add_favorite, list_favorites
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import add_favorite
 
         add_favorite("artist", "99", "2025-01-01T00:00:00Z")
         add_favorite("artist", "99", "2025-01-01T00:00:00Z")
@@ -1013,9 +1015,9 @@ class TestFavorites:
         assert list_favorites() == []
 
     def test_remove_favorite_deletes_by_type_and_id(self, pg_db):
-        from crate.db.queries.browse_media_favorites import (
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import (
             add_favorite,
-            list_favorites,
             remove_favorite,
         )
 
@@ -1028,10 +1030,8 @@ class TestFavorites:
         assert favs[0]["item_id"] == "2"
 
     def test_remove_favorite_noop_when_not_found(self, pg_db):
-        from crate.db.queries.browse_media_favorites import (
-            remove_favorite,
-            list_favorites,
-        )
+        from crate.db.queries.browse_media_favorites import list_favorites
+        from crate.db.repositories.browse_media_favorites import remove_favorite
 
         remove_favorite("track", "nonexistent")
         assert list_favorites() == []

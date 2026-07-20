@@ -64,17 +64,10 @@ def test_discovery_seed_keeps_structured_context(monkeypatch):
     assert context["discovery_excluded_artist_keys"] == ["artist 0"]
 
 
-def test_start_radio_reuses_single_read_session(monkeypatch):
-    from contextlib import contextmanager
-
+def test_start_radio_releases_database_sessions_before_scoring(monkeypatch):
     from crate import radio_engine
 
-    sentinel_session = object()
     seen_sessions = []
-
-    @contextmanager
-    def fake_read_scope():
-        yield sentinel_session
 
     def fake_resolve_seed(_user_id, _seed_type, _seed_value, *, session=None):
         seen_sessions.append(session)
@@ -94,7 +87,6 @@ def test_start_radio_reuses_single_read_session(monkeypatch):
         seen_sessions.append(db_session)
         return []
 
-    monkeypatch.setattr(radio_engine, "read_scope", fake_read_scope)
     monkeypatch.setattr(radio_engine, "_resolve_seed", fake_resolve_seed)
     monkeypatch.setattr(
         radio_engine, "load_feedback_history", fake_load_feedback_history
@@ -105,22 +97,13 @@ def test_start_radio_reuses_single_read_session(monkeypatch):
     result = radio_engine.start_radio(7, seed_type="track", seed_value="1")
 
     assert result is not None
-    assert seen_sessions == [sentinel_session, sentinel_session, sentinel_session]
+    assert seen_sessions == [None, None, None]
 
 
 def test_start_radio_falls_back_to_global_catalog_seed_queue(monkeypatch):
-    from contextlib import contextmanager
-
     from crate import radio_engine
 
-    sentinel_session = object()
     saved_sessions = []
-
-    @contextmanager
-    def fake_read_scope():
-        yield sentinel_session
-
-    monkeypatch.setattr(radio_engine, "read_scope", fake_read_scope)
     monkeypatch.setattr(radio_engine, "_resolve_seed", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         radio_engine,

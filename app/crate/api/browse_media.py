@@ -55,8 +55,8 @@ from crate.equalizer import (
 )
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.repositories.library import set_track_rating
+from crate.db.repositories.browse_media_favorites import add_favorite, remove_favorite
 from crate.db.queries.browse_media import (
-    add_favorite,
     count_mood_presets,
     find_track_id_by_path,
     get_mood_tracks,
@@ -70,7 +70,6 @@ from crate.db.queries.browse_media import (
     get_track_path,
     get_track_path_by_entity_uid,
     list_favorites,
-    remove_favorite,
 )
 from crate.local_search import search_local_library
 from crate.metrics import record_later

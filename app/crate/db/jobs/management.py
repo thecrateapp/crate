@@ -1,7 +1,10 @@
 """DB functions for management worker handlers."""
 
-from crate.db.tx import transaction_scope
+from uuid import uuid4
+
 from sqlalchemy import text
+
+from crate.db.tx import transaction_scope
 
 
 def find_album_path(artist_name: str, album_name: str, escape_like_fn) -> str | None:
@@ -31,51 +34,116 @@ def find_album_path(artist_name: str, album_name: str, escape_like_fn) -> str | 
 
 
 def rename_artist_in_db(old_name: str, new_name: str, old_folder: str) -> None:
+    if not old_name or not new_name:
+        raise ValueError("Artist names cannot be empty")
+    if old_name == new_name:
+        return
+
     with transaction_scope() as session:
+        source_exists = session.execute(
+            text("SELECT 1 FROM library_artists WHERE name = :name"),
+            {"name": old_name},
+        ).scalar_one_or_none()
+        if source_exists is None:
+            raise ValueError(f"Artist not found: {old_name}")
+
+        target_exists = session.execute(
+            text("SELECT 1 FROM library_artists WHERE name = :name"),
+            {"name": new_name},
+        ).scalar_one_or_none()
+        if target_exists is not None:
+            raise ValueError(f"Artist already exists: {new_name}")
+
+        temp_name = f"__crate_tmp__{uuid4().hex}"
         session.execute(
             text(
-                "UPDATE library_artists SET name = :new_name, folder_name = :new_name WHERE name = :old_name"
+                "INSERT INTO library_artists (name, folder_name) VALUES (:name, :folder)"
             ),
-            {"new_name": new_name, "old_name": old_name},
+            {"name": temp_name, "folder": new_name},
         )
         session.execute(
-            text("UPDATE library_albums SET artist = :new WHERE artist = :old"),
+            text("UPDATE library_albums SET artist = :temp WHERE artist = :old"),
+            {"temp": temp_name, "old": old_name},
+        )
+        session.execute(
+            text(
+                "UPDATE artist_genres SET artist_name = :temp WHERE artist_name = :old"
+            ),
+            {"temp": temp_name, "old": old_name},
+        )
+        session.execute(
+            text(
+                "UPDATE library_artists "
+                "SET name = :new, folder_name = :new "
+                "WHERE name = :old"
+            ),
             {"new": new_name, "old": old_name},
         )
         session.execute(
-            text("UPDATE library_tracks SET artist = :new WHERE artist = :old"),
-            {"new": new_name, "old": old_name},
+            text(
+                """
+                UPDATE library_albums
+                SET artist = :new,
+                    path = REPLACE(path, :old_segment, :new_segment),
+                    updated_at = NOW()
+                WHERE artist = :temp
+                """
+            ),
+            {
+                "new": new_name,
+                "temp": temp_name,
+                "old_segment": f"/{old_folder}/",
+                "new_segment": f"/{new_name}/",
+            },
         )
-        albums = (
-            session.execute(
-                text("SELECT id, path FROM library_albums WHERE artist = :artist"),
-                {"artist": new_name},
-            )
-            .mappings()
-            .all()
+        session.execute(
+            text(
+                """
+                UPDATE library_tracks
+                SET artist = CASE WHEN artist = :old THEN :new ELSE artist END,
+                    albumartist = CASE
+                        WHEN albumartist = :old THEN :new
+                        ELSE albumartist
+                    END,
+                    path = REPLACE(path, :old_segment, :new_segment),
+                    updated_at = NOW()
+                WHERE artist = :old
+                   OR albumartist = :old
+                """
+            ),
+            {
+                "old": old_name,
+                "new": new_name,
+                "old_segment": f"/{old_folder}/",
+                "new_segment": f"/{new_name}/",
+            },
         )
-        for row in albums:
-            old_path = row["path"]
-            new_path = old_path.replace(f"/{old_folder}/", f"/{new_name}/", 1)
-            session.execute(
-                text("UPDATE library_albums SET path = :path WHERE id = :id"),
-                {"path": new_path, "id": row["id"]},
-            )
-        tracks = (
-            session.execute(
-                text("SELECT id, path FROM library_tracks WHERE artist = :artist"),
-                {"artist": new_name},
-            )
-            .mappings()
-            .all()
+        session.execute(
+            text(
+                """
+                DELETE FROM user_follows AS old_follow
+                USING user_follows AS new_follow
+                WHERE old_follow.user_id = new_follow.user_id
+                  AND old_follow.artist_name = :old
+                  AND new_follow.artist_name = :new
+                """
+            ),
+            {"old": old_name, "new": new_name},
         )
-        for row in tracks:
-            old_path = row["path"]
-            new_path = old_path.replace(f"/{old_folder}/", f"/{new_name}/", 1)
-            session.execute(
-                text("UPDATE library_tracks SET path = :path WHERE id = :id"),
-                {"path": new_path, "id": row["id"]},
-            )
+        session.execute(
+            text("UPDATE user_follows SET artist_name = :new WHERE artist_name = :old"),
+            {"old": old_name, "new": new_name},
+        )
+        session.execute(
+            text(
+                "UPDATE artist_genres SET artist_name = :new WHERE artist_name = :temp"
+            ),
+            {"new": new_name, "temp": temp_name},
+        )
+        session.execute(
+            text("DELETE FROM library_artists WHERE name = :temp"),
+            {"temp": temp_name},
+        )
 
 
 def find_album_path_for_match(

@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from crate.config import load_config
 from crate.db.domain_events import append_domain_event
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
 
 _STATS_WINDOWS: dict[str, int | None] = {
     "7d": 7,
@@ -211,6 +211,21 @@ def resolve_track_reference(
     }
 
 
+def resolve_track_reference_read(
+    *,
+    track_id: int | None = None,
+    track_entity_uid: str | None = None,
+    track_path: str | None = None,
+) -> dict | None:
+    with read_scope() as session:
+        return resolve_track_reference(
+            session,
+            track_id=track_id,
+            track_entity_uid=track_entity_uid,
+            track_path=track_path,
+        )
+
+
 def emit_user_domain_event(
     session, *, event_type: str, user_id: int, payload: dict | None = None
 ) -> None:
@@ -234,6 +249,7 @@ __all__ = [
     "library_root",
     "relative_track_path",
     "resolve_track_reference",
+    "resolve_track_reference_read",
     "resolve_track_id",
     "utc_now_iso",
 ]

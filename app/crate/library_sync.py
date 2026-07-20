@@ -2,14 +2,13 @@ import json
 import logging
 import subprocess
 from collections import Counter
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Mapping
 
 import mutagen
 
 from crate.audio import read_tags
-from crate.db.engine import get_engine
+from crate.db.advisory_locks import artist_sync_lock as _artist_sync_lock
 from crate.db.repositories.library import (
     delete_album,
     delete_artist,
@@ -175,37 +174,6 @@ def _read_audio_info(
         duration, bitrate = _ffprobe_duration_bitrate(filepath)
 
     return duration, bitrate, sample_rate, bit_depth
-
-
-@contextmanager
-def _artist_sync_lock(artist_name: str):
-    """Serialize filesystem→DB sync per canonical artist across workers.
-
-    Tidal imports can trigger multiple ``sync_artist()`` calls for the same
-    artist at once. Without a cross-process lock, overlapping scans race on
-    ``existing_paths - synced_paths`` and can delete albums the other sync just
-    imported. A session-level advisory lock is a good fit here: it is scoped to
-    the connection lifetime and does not require us to keep a transaction open
-    while reading tags or walking the filesystem.
-    """
-    lock_key = f"library-sync:{artist_name.strip().lower()}"
-    raw = get_engine().raw_connection()
-    try:
-        cursor = raw.cursor()
-        try:
-            cursor.execute("SELECT pg_advisory_lock(hashtext(%s))", (lock_key,))
-        finally:
-            cursor.close()
-        yield
-    finally:
-        try:
-            cursor = raw.cursor()
-            try:
-                cursor.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_key,))
-            finally:
-                cursor.close()
-        finally:
-            raw.close()
 
 
 def _album_artist_root(album_dir: Path) -> Path:

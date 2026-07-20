@@ -9,10 +9,15 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
-from sqlalchemy import text
 
 from crate.db.repositories.settings import get_setting
-from crate.db.tx import optional_scope
+from crate.db.repositories.credential_secrets import (
+    delete_expired_credential_secrets,
+    get_credential_secret,
+    insert_credential_secret,
+    revoke_credential_scope,
+    revoke_credential_secret,
+)
 
 
 class CredentialSecretError(RuntimeError):
@@ -64,25 +69,14 @@ def store_secret(
     expires_at = now + timedelta(seconds=ttl_seconds) if ttl_seconds else None
     plaintext = json.dumps(payload, sort_keys=True).encode("utf-8")
     ciphertext = _fernet().encrypt(plaintext).decode("utf-8")
-    with optional_scope(session) as s:
-        s.execute(
-            text("""
-            INSERT INTO credential_secrets (
-                secret_ref, scope, ciphertext, expires_at, created_at, updated_at
-            )
-            VALUES (
-                :secret_ref, :scope, :ciphertext, :expires_at, :created_at, :updated_at
-            )
-            """),
-            {
-                "secret_ref": ref,
-                "scope": scope,
-                "ciphertext": ciphertext,
-                "expires_at": expires_at,
-                "created_at": now,
-                "updated_at": now,
-            },
-        )
+    insert_credential_secret(
+        secret_ref=ref,
+        scope=scope,
+        ciphertext=ciphertext,
+        expires_at=expires_at,
+        now=now,
+        session=session,
+    )
     return ref
 
 
@@ -90,19 +84,7 @@ def load_secret(
     secret_ref: str, *, scope: str | None = None, session=None
 ) -> dict[str, Any]:
     """Load and decrypt a credential payload."""
-    with optional_scope(session) as s:
-        row = (
-            s.execute(
-                text("""
-                SELECT scope, ciphertext, expires_at, revoked_at
-                FROM credential_secrets
-                WHERE secret_ref = :secret_ref
-                """),
-                {"secret_ref": secret_ref},
-            )
-            .mappings()
-            .first()
-        )
+    row = get_credential_secret(secret_ref, session=session)
     if not row or row.get("revoked_at"):
         raise CredentialSecretError("Credential secret not found")
     if scope and row["scope"] != scope:
@@ -122,42 +104,17 @@ def load_secret(
 
 def revoke_secret(secret_ref: str, *, session=None) -> None:
     now = _utc_now()
-    with optional_scope(session) as s:
-        s.execute(
-            text("""
-            UPDATE credential_secrets
-            SET revoked_at = :now, updated_at = :now
-            WHERE secret_ref = :secret_ref
-            """),
-            {"secret_ref": secret_ref, "now": now},
-        )
+    revoke_credential_secret(secret_ref, now=now, session=session)
 
 
 def revoke_scope(scope: str, *, session=None) -> int:
     now = _utc_now()
-    with optional_scope(session) as s:
-        result = s.execute(
-            text("""
-            UPDATE credential_secrets
-            SET revoked_at = :now, updated_at = :now
-            WHERE scope = :scope AND revoked_at IS NULL
-            """),
-            {"scope": scope, "now": now},
-        )
-        return int(getattr(result, "rowcount", 0) or 0)
+    return revoke_credential_scope(scope, now=now, session=session)
 
 
 def purge_expired_secrets(*, session=None) -> int:
     now = _utc_now()
-    with optional_scope(session) as s:
-        result = s.execute(
-            text("""
-            DELETE FROM credential_secrets
-            WHERE expires_at IS NOT NULL AND expires_at <= :now
-            """),
-            {"now": now},
-        )
-        return int(getattr(result, "rowcount", 0) or 0)
+    return delete_expired_credential_secrets(now=now, session=session)
 
 
 def fingerprint_secret(payload: dict[str, Any]) -> str:

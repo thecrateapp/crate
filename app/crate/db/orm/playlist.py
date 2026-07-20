@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import uuid
+from datetime import datetime
 
 from sqlalchemy import UUID, Boolean, DateTime, Float, ForeignKey, Integer, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -18,33 +17,39 @@ class Playlist(Base):
     description: Mapped[str | None] = mapped_column(Text)
     cover_data_url: Mapped[str | None] = mapped_column(Text)
     cover_path: Mapped[str | None] = mapped_column(Text)
-    user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL")
-    )
-    is_smart: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
-    )
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"))
+    is_smart: Mapped[bool | None] = mapped_column(Boolean, server_default="false")
     smart_rules_json: Mapped[dict | None] = mapped_column(JSON)
-    scope: Mapped[str | None] = mapped_column(Text)
-    visibility: Mapped[str | None] = mapped_column(Text)
+    scope: Mapped[str] = mapped_column(Text, nullable=False, server_default="user")
+    visibility: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="private"
+    )
     is_collaborative: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
-    generation_mode: Mapped[str | None] = mapped_column(Text)
-    auto_refresh_enabled: Mapped[bool | None] = mapped_column(Boolean)
+    generation_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="static"
+    )
+    auto_refresh_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
     is_curated: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default="false"
     )
-    is_active: Mapped[bool | None] = mapped_column(Boolean)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
     managed_by_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL")
+        Integer, ForeignKey("users.id")
     )
     curation_key: Mapped[str | None] = mapped_column(Text)
     featured_rank: Mapped[int | None] = mapped_column(Integer)
     category: Mapped[str | None] = mapped_column(Text)
     track_count: Mapped[int | None] = mapped_column(Integer)
     total_duration: Mapped[float | None] = mapped_column(Float)
-    generation_status: Mapped[str | None] = mapped_column(Text)
+    generation_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="idle"
+    )
     generation_error: Mapped[str | None] = mapped_column(Text)
     last_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
@@ -62,7 +67,9 @@ class PlaylistTrack(Base):
     playlist_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("playlists.id", ondelete="CASCADE"), nullable=False
     )
-    track_id: Mapped[int | None] = mapped_column(Integer)
+    track_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("library_tracks.id", ondelete="SET NULL")
+    )
     global_track_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     track_entity_uid: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     track_storage_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -71,10 +78,12 @@ class PlaylistTrack(Base):
     artist: Mapped[str | None] = mapped_column(Text)
     album: Mapped[str | None] = mapped_column(Text)
     duration: Mapped[float | None] = mapped_column(Float)
-    position: Mapped[int | None] = mapped_column(Integer)
-    source: Mapped[str | None] = mapped_column(Text)
-    locked: Mapped[bool | None] = mapped_column(Boolean)
-    added_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default="manual")
+    locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class PlaylistMember(Base):
@@ -86,11 +95,13 @@ class PlaylistMember(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    role: Mapped[str | None] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default="collab")
     invited_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL")
     )
-    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
 
 
 class UserFollowedPlaylist(Base):

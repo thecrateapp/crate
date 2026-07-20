@@ -24,6 +24,7 @@ REFACTORED_MODULES = [
 class _DbBoundaryVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.transport_calls: list[str] = []
+        self.transport_imports: list[str] = []
         self.facade_imports: list[str] = []
 
     def visit_Call(self, node: ast.Call) -> None:
@@ -33,6 +34,11 @@ class _DbBoundaryVisitor(ast.NodeVisitor):
             "transaction_scope",
         }:
             self.transport_calls.append(f"{func.id}:{node.lineno}")
+        elif isinstance(func, ast.Attribute) and func.attr in {
+            "cursor",
+            "raw_connection",
+        }:
+            self.transport_calls.append(f".{func.attr}:{node.lineno}")
         elif (
             isinstance(func, ast.Attribute)
             and func.attr == "execute"
@@ -45,6 +51,33 @@ class _DbBoundaryVisitor(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         if node.module == "crate.db":
             self.facade_imports.append(f"from crate.db import ...:{node.lineno}")
+        if node.module == "crate.db.tx":
+            forbidden = {"optional_scope", "read_scope", "transaction_scope"}
+            leaked = sorted(
+                alias.name for alias in node.names if alias.name in forbidden
+            )
+            if leaked:
+                self.transport_imports.append(
+                    f"from crate.db.tx import {', '.join(leaked)}:{node.lineno}"
+                )
+        if node.module == "crate.db.engine":
+            allowed = {"get_pool_runtime"}
+            leaked = sorted(
+                alias.name for alias in node.names if alias.name not in allowed
+            )
+            if leaked:
+                self.transport_imports.append(
+                    f"from crate.db.engine import {', '.join(leaked)}:{node.lineno}"
+                )
+        if node.module in {"sqlalchemy", "sqlalchemy.orm"}:
+            forbidden = {"Session", "delete", "insert", "select", "text", "update"}
+            leaked = sorted(
+                alias.name for alias in node.names if alias.name in forbidden
+            )
+            if leaked:
+                self.transport_imports.append(
+                    f"from {node.module} import {', '.join(leaked)}:{node.lineno}"
+                )
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
@@ -67,14 +100,35 @@ def test_no_transport_calls_outside_db_package():
         if "db" in path.parts:
             continue
         visitor = _parse_file(path)
-        if visitor.transport_calls:
-            findings.append(
-                f"{path.relative_to(APP_ROOT)} -> {', '.join(visitor.transport_calls)}"
-            )
+        violations = visitor.transport_imports + visitor.transport_calls
+        if violations:
+            findings.append(f"{path.relative_to(APP_ROOT)} -> {', '.join(violations)}")
 
     assert findings == [], "Direct DB transport leaked outside crate.db:\n" + "\n".join(
         findings
     )
+
+
+def test_query_modules_are_read_only():
+    findings: list[str] = []
+    dml_prefixes = ("delete ", "insert ", "merge ", "update ")
+
+    for path in sorted((DB_ROOT / "queries").rglob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        violations: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module == "crate.db.tx":
+                for alias in node.names:
+                    if alias.name == "transaction_scope":
+                        violations.append(f"transaction_scope import:{node.lineno}")
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                normalized = " ".join(node.value.lower().split())
+                if normalized.startswith(dml_prefixes):
+                    violations.append(f"DML SQL:{node.lineno}")
+        if violations:
+            findings.append(f"{path.relative_to(DB_ROOT)} -> {', '.join(violations)}")
+
+    assert findings == [], "db.queries must remain read-only:\n" + "\n".join(findings)
 
 
 def test_refactored_modules_do_not_use_db_mega_facade():

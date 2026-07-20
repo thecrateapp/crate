@@ -96,8 +96,10 @@ def get_library_artist_by_id(
     artist_id: int, *, session: Session | None = None
 ) -> LibraryArtistRow | None:
     def impl(s: Session) -> LibraryArtistRow | None:
-        row = s.get(LibraryArtist, artist_id)
-        return artist_to_dict(row)
+        row = s.execute(
+            select(LibraryArtist).where(LibraryArtist.id == artist_id).limit(1)
+        ).scalar_one_or_none()
+        return artist_to_dict(row) if row else None
 
     if session is not None:
         return impl(session)

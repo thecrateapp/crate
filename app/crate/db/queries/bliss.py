@@ -23,7 +23,6 @@ from crate.db.queries.bliss_track_lookup import (
     get_seed_tracks_by_paths,
     get_track_with_artist,
 )
-from crate.db.queries.bliss_storage import store_bliss_vectors
 
 __all__ = [
     "build_user_radio_profile",
@@ -41,5 +40,4 @@ __all__ = [
     "get_similar_artist_rows",
     "get_similar_artist_tracks_for_radio",
     "get_track_with_artist",
-    "store_bliss_vectors",
 ]

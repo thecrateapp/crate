@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,8 @@ import psycopg2
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SCHEMA_049_FIXTURE = ROOT / "app/tests/fixtures/schema_049.sql"
+SCHEMA_049_SHA256 = "680a382b3ff73cd81f153753b9b34188e6d5b0408f49438a0da7d2f6e3b3cb71"
 
 
 def _connection():
@@ -19,7 +22,7 @@ def _connection():
         port=os.environ["CRATE_POSTGRES_PORT"],
         user=os.environ["CRATE_POSTGRES_USER"],
         password=os.environ["CRATE_POSTGRES_PASSWORD"],
-        dbname="crate_test",
+        dbname=os.environ["CRATE_POSTGRES_DB"],
     )
 
 
@@ -44,6 +47,176 @@ def _migrate(revision: str, *, downgrade: bool = False) -> None:
     )
     operation = command.downgrade if downgrade else command.upgrade
     operation(config, revision)
+
+
+def _restore_049_schema_fixture() -> None:
+    from crate.db.engine import reset_engine
+
+    reset_engine()
+    fixture = SCHEMA_049_FIXTURE.read_text()
+    assert hashlib.sha256(fixture.encode()).hexdigest() == SCHEMA_049_SHA256
+    connection = _connection()
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("DROP SCHEMA IF EXISTS public CASCADE")
+            cursor.execute("CREATE SCHEMA public")
+            cursor.execute("GRANT ALL ON SCHEMA public TO PUBLIC")
+            cursor.execute(fixture)
+            cursor.execute(
+                "INSERT INTO public.alembic_version (version_num) VALUES ('049')"
+            )
+    finally:
+        connection.close()
+
+
+def _seed_049_user_library_state() -> dict[str, str | int]:
+    artist_uid = str(uuid.uuid4())
+    album_uid = str(uuid.uuid4())
+    track_uid = str(uuid.uuid4())
+    connection = _connection()
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (email, name, password_hash, created_at)
+                VALUES ('legacy@example.test', 'Legacy User', 'hash', NOW())
+                RETURNING id
+                """
+            )
+            user_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO library_artists
+                    (name, folder_name, entity_uid, album_count, track_count)
+                VALUES ('Legacy Artist', 'legacy-artist', %s, 1, 1)
+                RETURNING id
+                """,
+                (artist_uid,),
+            )
+            artist_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO library_albums
+                    (artist, name, path, entity_uid, track_count)
+                VALUES (
+                    'Legacy Artist', 'Legacy Album',
+                    '/music/legacy-artist/legacy-album', %s, 1
+                )
+                RETURNING id
+                """,
+                (album_uid,),
+            )
+            album_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO library_tracks (
+                    album_id, artist, album, filename, title, path, entity_uid
+                ) VALUES (
+                    %s, 'Legacy Artist', 'Legacy Album', '01-legacy.flac',
+                    'Legacy Track',
+                    '/music/legacy-artist/legacy-album/01-legacy.flac', %s
+                )
+                RETURNING id
+                """,
+                (album_id, track_uid),
+            )
+            track_id = cursor.fetchone()[0]
+            cursor.execute(
+                "INSERT INTO user_follows VALUES (%s, 'Legacy Artist', NOW())",
+                (user_id,),
+            )
+            cursor.execute(
+                "INSERT INTO user_saved_albums VALUES (%s, %s, NOW())",
+                (user_id, album_id),
+            )
+            cursor.execute(
+                "INSERT INTO user_liked_tracks VALUES (%s, %s, NOW())",
+                (user_id, track_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO playlists (name, user_id, created_at, updated_at)
+                VALUES ('Legacy Playlist', %s, NOW(), NOW())
+                RETURNING id
+                """,
+                (user_id,),
+            )
+            playlist_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO playlist_tracks (
+                    playlist_id, track_id, track_entity_uid, track_path,
+                    title, artist, album, position, added_at
+                ) VALUES (
+                    %s, %s, %s,
+                    '/music/legacy-artist/legacy-album/01-legacy.flac',
+                    'Legacy Track', 'Legacy Artist', 'Legacy Album', 1, NOW()
+                )
+                """,
+                (playlist_id, track_id, track_uid),
+            )
+            cursor.execute(
+                """
+                INSERT INTO playlist_members
+                    (playlist_id, user_id, role, invited_by, created_at)
+                VALUES (%s, %s, 'owner', %s, NOW())
+                """,
+                (playlist_id, user_id, user_id),
+            )
+            cursor.execute(
+                "INSERT INTO user_followed_playlists VALUES (%s, %s, NOW())",
+                (user_id, playlist_id),
+            )
+            cursor.execute(
+                """
+                INSERT INTO bandcamp_connections (
+                    user_id, username, session_secret_ref, session_fingerprint,
+                    connection_method, created_at, updated_at
+                ) VALUES (
+                    %s, 'legacy-fan', 'legacy-secret', 'fingerprint',
+                    'cookie', NOW(), NOW()
+                ) RETURNING id
+                """,
+                (user_id,),
+            )
+            bandcamp_connection_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO bandcamp_items (
+                    bandcamp_item_id, bandcamp_item_type, artist_name,
+                    album_title, item_url, first_seen_at, updated_at
+                ) VALUES (
+                    4242, 'album', 'Legacy Artist', 'Legacy Album',
+                    'https://legacy.bandcamp.test/album', NOW(), NOW()
+                ) RETURNING id
+                """
+            )
+            bandcamp_item_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO user_bandcamp_items (
+                    user_id, connection_id, bandcamp_item_id, relation_type,
+                    owned, downloadable, last_seen_at
+                ) VALUES (%s, %s, %s, 'collection', TRUE, TRUE, NOW())
+                """,
+                (user_id, bandcamp_connection_id, bandcamp_item_id),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+    return {
+        "user_id": user_id,
+        "artist_id": artist_id,
+        "artist_uid": artist_uid,
+        "album_id": album_id,
+        "album_uid": album_uid,
+        "track_id": track_id,
+        "track_uid": track_uid,
+        "playlist_id": playlist_id,
+        "bandcamp_connection_id": bandcamp_connection_id,
+        "bandcamp_item_id": bandcamp_item_id,
+    }
 
 
 def _scalar(query: str, params: tuple = ()):
@@ -133,7 +306,7 @@ def _seed_063_legacy_state() -> dict[str, str]:
 
 
 def _assert_hardened_state(ids: dict[str, str]) -> None:
-    assert _scalar("SELECT version_num FROM alembic_version") == "075"
+    assert _scalar("SELECT version_num FROM alembic_version") == "076"
     assert (
         _scalar(
             "SELECT status FROM federation_local_keys WHERE node_uid = %s",
@@ -183,7 +356,7 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
 
     _migrate("head")
 
-    assert _scalar("SELECT version_num FROM alembic_version") == "075"
+    assert _scalar("SELECT version_num FROM alembic_version") == "076"
     for table in (
         "federation_local_keys",
         "federation_catalog_changes",
@@ -196,6 +369,102 @@ def test_empty_database_migrates_from_base_to_head(pg_db):
         "global_catalog_search_projection_state",
     ):
         assert _scalar("SELECT to_regclass(%s) IS NOT NULL", (f"public.{table}",))
+
+
+def test_real_main_049_snapshot_upgrades_without_user_data_loss(pg_db):
+    del pg_db
+    _restore_049_schema_fixture()
+    ids = _seed_049_user_library_state()
+
+    _migrate("head")
+
+    assert _scalar("SELECT version_num FROM alembic_version") == "076"
+    assert _scalar("SELECT email FROM users WHERE id = %s", (ids["user_id"],)) == (
+        "legacy@example.test"
+    )
+    assert (
+        _scalar(
+            "SELECT entity_uid::text FROM library_artists WHERE id = %s",
+            (ids["artist_id"],),
+        )
+        == ids["artist_uid"]
+    )
+    assert (
+        _scalar(
+            "SELECT entity_uid::text FROM library_albums WHERE id = %s",
+            (ids["album_id"],),
+        )
+        == ids["album_uid"]
+    )
+    assert (
+        _scalar(
+            "SELECT entity_uid::text FROM library_tracks WHERE id = %s",
+            (ids["track_id"],),
+        )
+        == ids["track_uid"]
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_follows WHERE user_id = %s",
+            (ids["user_id"],),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_saved_albums WHERE user_id = %s",
+            (ids["user_id"],),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_liked_tracks WHERE user_id = %s",
+            (ids["user_id"],),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_global_track_like_repairs "
+            "WHERE user_id = %s AND legacy_track_id = %s AND status = 'unresolved'",
+            (ids["user_id"], ids["track_id"]),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT track_entity_uid::text FROM playlist_tracks WHERE playlist_id = %s",
+            (ids["playlist_id"],),
+        )
+        == ids["track_uid"]
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM playlist_members WHERE playlist_id = %s",
+            (ids["playlist_id"],),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_followed_playlists WHERE user_id = %s",
+            (ids["user_id"],),
+        )
+        == 1
+    )
+    assert (
+        _scalar(
+            "SELECT COUNT(*) FROM user_bandcamp_items "
+            "WHERE user_id = %s AND connection_id = %s AND bandcamp_item_id = %s",
+            (
+                ids["user_id"],
+                ids["bandcamp_connection_id"],
+                ids["bandcamp_item_id"],
+            ),
+        )
+        == 1
+    )
 
 
 def test_063_snapshot_upgrades_without_trust_or_import_escalation(pg_db):

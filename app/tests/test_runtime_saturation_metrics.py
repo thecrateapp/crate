@@ -42,6 +42,42 @@ def test_sqlalchemy_pool_runtime_ignores_uninstrumentable_test_engine(monkeypatc
     }
 
 
+def test_admin_metrics_reads_pool_state_through_public_runtime_api(monkeypatch):
+    import shutil
+
+    from crate.api.admin_metrics import _build_metrics_system
+    from crate.db import engine
+
+    monkeypatch.setattr(
+        engine,
+        "get_pool_runtime",
+        lambda: {
+            "configured": True,
+            "size": 8,
+            "checked_in": 5,
+            "checked_out": 3,
+            "overflow": 1,
+            "saturation_ratio": 0.375,
+        },
+    )
+    monkeypatch.setattr(
+        shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=100, used=40, free=60),
+    )
+
+    snapshot = _build_metrics_system()
+
+    assert snapshot["db_pools"]["sqlalchemy"] == {
+        "size": 8,
+        "checked_in": 5,
+        "checked_out": 3,
+        "overflow": 1,
+        "total": 8,
+    }
+    assert snapshot["db_pool"] == snapshot["db_pools"]["combined"]
+
+
 def test_event_loop_lag_monitor_records_delay(monkeypatch):
     from crate import runtime_saturation
 
