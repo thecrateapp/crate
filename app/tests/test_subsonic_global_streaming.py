@@ -142,6 +142,10 @@ def test_local_global_source_rejects_paths_outside_library(tmp_path):
             return_value={"id": 7, "path": str(outside)},
         ),
         patch("crate.api._deps.library_path", return_value=tmp_path),
+        patch(
+            "crate.playback_provenance.resolve_local_content_provenance",
+            return_value=("local", None),
+        ),
         patch("crate.federation.playback_service._remember_source"),
     ):
         from crate.federation.playback_service import stream_global_track

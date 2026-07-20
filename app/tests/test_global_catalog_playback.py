@@ -216,6 +216,10 @@ def test_catalog_track_playback_endpoint_uses_local_playback_payload(test_app):
                 "content_origin": "local",
             },
         )
+        monkeypatch.setattr(
+            "crate.playback_provenance.issue_playback_session",
+            lambda **_kwargs: "playback-session",
+        )
 
         response = test_app.get(
             f"/api/catalog/tracks/{uuid.uuid4()}/playback?delivery=balanced"
@@ -404,6 +408,10 @@ def test_catalog_track_info_endpoint_returns_remote_global_metadata(test_app):
                 "album": "Guided Tour",
             },
         )
+        monkeypatch.setattr(
+            "crate.api.catalog.resolve_global_source",
+            lambda **_kwargs: {"kind": "local"},
+        )
 
         response = test_app.get(f"/api/catalog/tracks/{uuid.uuid4()}/info")
 
@@ -487,6 +495,10 @@ def test_catalog_track_genre_endpoint_uses_remote_track_info_facet(test_app):
                 "artist": "High Vis",
                 "album": "Blending",
             },
+        )
+        monkeypatch.setattr(
+            "crate.api.catalog.get_global_track_genres",
+            lambda _uid: None,
         )
         monkeypatch.setattr(
             "crate.api.catalog.resolve_global_source",

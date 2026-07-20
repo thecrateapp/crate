@@ -752,6 +752,16 @@ def test_valid_signed_post_body_is_accepted(monkeypatch):
     monkeypatch.setattr(
         federation_api.repo, "get_peer", lambda uid: peer if uid == node_uid else None
     )
+    monkeypatch.setattr(
+        federation_api.trust_repo,
+        "get_peer_verification_key",
+        lambda _node_uid, _key_id: None,
+    )
+    monkeypatch.setattr(
+        federation_api.trust_repo,
+        "list_peer_verification_keys",
+        lambda _node_uid: [],
+    )
 
     result_or_coro = federation_api._require_signed_node_request(request)
     if asyncio.iscoroutine(result_or_coro):
@@ -808,6 +818,16 @@ def test_replayed_signed_post_nonce_is_rejected(monkeypatch):
     }
     monkeypatch.setattr(
         federation_api.repo, "get_peer", lambda uid: peer if uid == node_uid else None
+    )
+    monkeypatch.setattr(
+        federation_api.trust_repo,
+        "get_peer_verification_key",
+        lambda _node_uid, _key_id: None,
+    )
+    monkeypatch.setattr(
+        federation_api.trust_repo,
+        "list_peer_verification_keys",
+        lambda _node_uid: [],
     )
 
     first = federation_api._require_signed_node_request(make_request())

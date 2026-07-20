@@ -140,7 +140,13 @@ class TestKeyMaterialDetection:
         )
 
         with patch("crate.federation.key_verify.repo.get_local_node", mock_get):
-            with patch("crate.federation.key_verify.Path.exists", return_value=False):
+            with (
+                patch(
+                    "crate.federation.key_verify.trust_repo.get_active_local_key",
+                    return_value={"private_key_ref": "federation/keys/missing.pem"},
+                ),
+                patch("crate.federation.key_verify.Path.exists", return_value=False),
+            ):
                 assert _is_key_material_missing() is True
 
 

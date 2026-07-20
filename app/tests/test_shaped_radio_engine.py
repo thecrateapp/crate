@@ -1105,6 +1105,11 @@ def test_daily_discovery_uses_cold_start_genres_when_profile_is_empty(monkeypatc
     monkeypatch.setattr(
         home_builder_mix_generation, "_query_discovery_tracks", fake_query
     )
+    monkeypatch.setattr(
+        home_builder_mix_generation,
+        "_fallback_recent_interest_tracks",
+        lambda *_args, **_kwargs: [],
+    )
 
     home_builder_mix_generation._build_mix_rows(
         1,

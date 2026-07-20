@@ -8,6 +8,10 @@ from tests.conftest import PG_AVAILABLE
 
 @pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
 class TestImportQueueReadModels:
+    @pytest.fixture(autouse=True)
+    def _isolated_database(self, pg_db):
+        del pg_db
+
     def _ensure_tables(self):
         from crate.db.tx import transaction_scope
 
