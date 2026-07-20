@@ -16,6 +16,11 @@ def test_radio_station_payload_splits_artist_and_genre_stations(monkeypatch):
         "get_genre_display_name",
         lambda slug: slug,
     )
+    monkeypatch.setattr(
+        radio_stations,
+        "list_global_collection_artists",
+        lambda **_kwargs: [],
+    )
 
     payload = radio_stations.build_radio_stations_from_context(
         {
