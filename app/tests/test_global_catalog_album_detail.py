@@ -239,6 +239,10 @@ def test_catalog_album_detail_endpoint(test_app):
             "crate.api.catalog.get_global_album_detail",
             lambda uid: {"name": "Blending", "artist": "High Vis", "tracks": []},
         )
+        monkeypatch.setattr(
+            "crate.api.catalog.resolve_global_source",
+            lambda **_kwargs: {"kind": "local"},
+        )
 
         response = test_app.get(f"/api/catalog/albums/{uuid.uuid4()}")
 
