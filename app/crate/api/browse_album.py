@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Mapping
 
-import requests
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
@@ -67,9 +66,6 @@ from crate.track_versions import canonical_track_title_key
 
 router = APIRouter(tags=["browse"])
 log = logging.getLogger(__name__)
-_REMOTE_COVER_SESSION = requests.Session()
-_REMOTE_COVER_TIMEOUT_SECONDS = 10
-_REMOTE_COVER_MIN_BYTES = 1000
 
 _BROWSE_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -95,20 +91,6 @@ _IMAGE_RESPONSES = merge_responses(
         404: error_response("The requested image was not found."),
     },
 )
-
-
-def _fetch_remote_cover(cover_url: str) -> tuple[bytes, str] | None:
-    response = _REMOTE_COVER_SESSION.get(
-        cover_url,
-        headers={"Accept": "image/*"},
-        timeout=_REMOTE_COVER_TIMEOUT_SECONDS,
-    )
-    if response.status_code != 200 or len(response.content) <= _REMOTE_COVER_MIN_BYTES:
-        return None
-    media_type = response.headers.get("content-type") or "image/jpeg"
-    if not media_type.startswith("image/"):
-        return None
-    return response.content, media_type
 
 
 _ZIP_RESPONSES = merge_responses(

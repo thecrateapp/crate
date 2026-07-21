@@ -94,8 +94,6 @@ def test_pre_release_cover_does_not_fetch_remote_image_during_request(
 ):
     from crate.api import browse_album
 
-    remote_calls: list[str] = []
-
     monkeypatch.setattr(
         browse_album,
         "get_release_by_virtual_album_id",
@@ -111,13 +109,11 @@ def test_pre_release_cover_does_not_fetch_remote_image_during_request(
         lambda _album_id: tmp_path / "missing-cover.jpg",
     )
     monkeypatch.setattr(
-        browse_album,
-        "_fetch_remote_cover",
-        lambda url: remote_calls.append(url) or None,
+        "requests.Session.get",
+        _unexpected_request_path_work,
     )
 
     response = browse_album.api_cover_by_id(-46)
 
     assert response.status_code == 200
     assert response.media_type == "image/svg+xml"
-    assert remote_calls == []
