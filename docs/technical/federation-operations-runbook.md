@@ -56,6 +56,36 @@ existing state.
 | Relay error                  | opaque ticket state, grant revision, Range request, owner denial, readplane logs | contain peer/grant first; do not expose a peer URL to a client                   |
 | Import stuck                 | worker task, reservation/lease, manifest digest, staging cleanup                 | reconcile expired lease; resume only the unchanged request                       |
 
+## Catalog warming or reconciliation failure
+
+Canonical reads must not return `catalog_warming`. During a first
+reconciliation, local reads remain available from `library_*`; later refreshes
+and failures serve the last complete global catalog.
+
+1. Inspect the serving mode, reconciliation state, last completed run and last
+   error in Admin.
+2. Request `/api/catalog/search?q=high&limit=5` and inspect
+   `X-Crate-Catalog-Mode`. `local-fallback`, `global-refreshing` and
+   `global-degraded` must still return `200`.
+3. If local fallback is slow, run `make dev-catalog-search-capacity-test` only
+   against its isolated `crate_test` database.
+4. Repair the bounded source failure and queue one supported reconciliation;
+   do not truncate catalog or user-library tables as an incident shortcut.
+
+## Playback preparation incident
+
+Check `federation.playback.prepare.requested`, result counters,
+`ready_before_play`, `fallback_original`, active preparation work and
+interactive queue wait. They are aggregate-only metrics: never add a user,
+entity, cache key, path, URL, ticket or assertion as a label.
+
+Inspect the TTL-backed reservation keys
+`federation:playback-prepare:peer:{peer_node_uid}` and
+`federation:playback-prepare:global`; do not populate or prolong them by hand.
+For preparation saturation or resource pressure, set the affected owner's
+preparation ceilings to zero. New preparation fails harmlessly while normal stream tickets remain available. Restore the conservative limits only after the
+fallback-original ratio and interactive queue wait recover for one alert window.
+
 ## Release evidence
 
 A federation release needs a recorded result for the relevant tests, security

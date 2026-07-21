@@ -30,6 +30,37 @@ Local catalog availability must remain observable while a source is warming or
 degraded. A release needs an explicit catalog serving-mode contract and a
 defined fallback behavior, not a generic 500 metric.
 
+## SLOs, alerts and cardinality
+
+| Signal                   | Objective                                                  | Alert window           | Runbook          |
+| ------------------------ | ---------------------------------------------------------- | ---------------------- | ---------------- |
+| Local catalog search     | p95 at or below 300 ms at the 100K-track reference profile | per release            | capacity gate    |
+| Federated metadata reads | 99.5% success, excluding peer-caused 4xx                   | 15 minutes and 6 hours | peer containment |
+| Search fanout            | p95 at or below 2 seconds with partial results             | 15 minutes             | peer containment |
+| Remote stream TTFB       | p95 at or below 1.5 seconds between reference nodes        | 15 minutes             | stream incident  |
+| Catalog sync lag         | healthy below 5 minutes                                    | 15 minutes             | catalog recovery |
+
+Metric labels have bounded cardinality: an approved peer UID only where policy
+permits it, plus enumerated operation and reason-code values. URLs, tokens,
+key material, user identifiers, assertions, paths and free-form upstream
+errors are prohibited.
+
+## Catalog serving modes
+
+Canonical search emits `catalog.search.serving_mode` and returns the same
+value in `X-Crate-Catalog-Mode`:
+
+- `local-fallback`: first reconciliation is incomplete and reads use local
+  `library_*` models.
+- `global-ready`: the current global catalog is complete.
+- `global-refreshing`: reconciliation runs while the last complete global
+  catalog remains readable.
+- `global-degraded`: reconciliation failed while the last complete global
+  catalog remains readable.
+
+The mode is context, not an outage by itself. Alert on errors or latency, not
+on `local-fallback` or `global-refreshing` alone.
+
 ## Alerting and response
 
 Alert on persistent catalog checkpoint staleness, a rising authorization or URL

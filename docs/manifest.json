@@ -94,7 +94,7 @@
     "route": "/architecture/playback-realtime-and-subsonic",
     "section": "architecture",
     "title": "Playback, realtime and Subsonic",
-    "summary": "Playback surfaces, SSE and compatibility contracts.",
+    "summary": "Playback surfaces, resilience gates, realtime and compatibility contracts.",
     "keywords": ["playback", "sse", "subsonic", "streaming"],
     "order": 98
   },

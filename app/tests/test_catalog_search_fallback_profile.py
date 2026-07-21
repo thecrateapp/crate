@@ -45,9 +45,9 @@ def test_catalog_search_profile_validates_the_search_contract():
 
 def test_catalog_search_capacity_gate_is_exposed_and_documented():
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-    documentation = (
-        ROOT / "docs/technical/catalog-search-fallback-capacity.md"
-    ).read_text(encoding="utf-8")
+    documentation = (ROOT / "docs/technical/federation-capacity.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "dev-catalog-search-capacity-test:" in makefile
     assert "--enforce-slo" in makefile

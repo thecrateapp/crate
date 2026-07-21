@@ -136,9 +136,12 @@ def test_slo_and_runbook_cover_zero_downtime_catalog_reads():
 
 
 def test_playback_prepare_runbook_documents_containment_and_slos():
-    slos = (ROOT / "docs/technical/playback-slos.md").read_text()
+    playback = (
+        ROOT / "docs/technical/09-playback-realtime-and-subsonic.md"
+    ).read_text()
     runbook = (ROOT / "docs/technical/federation-operations-runbook.md").read_text()
-    gates = (ROOT / "docs/technical/playback-release-gates.md").read_text()
+    normalized_playback = re.sub(r"\s+", " ", playback)
+    normalized_runbook = re.sub(r"\s+", " ", runbook)
 
     for text in (
         "ready_before_play",
@@ -146,18 +149,18 @@ def test_playback_prepare_runbook_documents_containment_and_slos():
         "prepare saturation",
         "federation.playback.prepare",
     ):
-        assert text in slos
+        assert text in normalized_playback
     for text in (
         "Playback preparation incident",
         "federation:playback-prepare:peer:",
         "federation:playback-prepare:global",
         "normal stream tickets remain available",
     ):
-        assert text in runbook
+        assert text in normalized_runbook
     for text in (
         "two remote tracks",
         "four reservations per peer",
         "twenty reservations per owner",
         "fallback-original ratio",
     ):
-        assert text in gates
+        assert text in normalized_playback

@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_playback_slos_define_windows_alerts_and_actionable_rollback():
-    document = (ROOT / "docs/technical/playback-slos.md").read_text()
+    document = (
+        ROOT / "docs/technical/09-playback-realtime-and-subsonic.md"
+    ).read_text()
     for text in (
         "startup p95",
         "stall ratio",
@@ -22,7 +24,9 @@ def test_playback_slos_define_windows_alerts_and_actionable_rollback():
 
 
 def test_playback_release_gates_prohibit_sensitive_telemetry_and_document_warmup():
-    document = (ROOT / "docs/technical/playback-release-gates.md").read_text()
+    document = (
+        ROOT / "docs/technical/09-playback-realtime-and-subsonic.md"
+    ).read_text()
     for text in (
         "raw URLs",
         "tokens",
@@ -34,7 +38,7 @@ def test_playback_release_gates_prohibit_sensitive_telemetry_and_document_warmup
 
 
 def test_playback_slo_local_links_resolve():
-    source = ROOT / "docs/technical/playback-slos.md"
+    source = ROOT / "docs/technical/09-playback-realtime-and-subsonic.md"
     for target in re.findall(r"\[[^]]+]\(([^)]+)\)", source.read_text()):
         if "://" in target:
             continue

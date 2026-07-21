@@ -55,9 +55,13 @@ worktrees/
 # Added by code-review-graph
 .code-review-graph/
 
-# Private docs material — plans are internal design notes, Obsidian
-# metadata is personal editor state. Kept on local disk, never in repo.
+# Non-canonical local documentation and personal editor state.
+# Canonical docs are declared in docs/manifest.json.
 docs/plans/
+docs/roadmaps/
+docs/archive/
+docs/audits/
+docs/technical/*-audit.md
 docs/technical/.obsidian/
 app/shared/web/node_modules
 docs/superpowers/

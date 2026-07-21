@@ -44,3 +44,19 @@ Run `make dev-federation-capacity-test` for the repository's isolated profile
 when changing catalog/readplane paths. Attach the generated fixture/result to
 the release evidence and update the SLO thresholds rather than embedding stale
 numbers in this page.
+
+## Local search fallback capacity
+
+The first global reconciliation must not make local search unavailable. The
+isolated `crate_test` profile seeds 1K artists, 10K albums and 100K tracks,
+then exercises common prefixes, multi-token queries, Unicode and substring
+fallback cases through `GET /api/catalog/search`.
+
+```bash
+make dev-catalog-search-capacity-test
+```
+
+The gate writes `.artifacts/catalog-search-fallback-capacity.json` and fails
+when p95 exceeds 300 ms, p99 reaches 800 ms, or a response violates the
+artists/albums/tracks contract. Fix query shape or indexes; do not satisfy the
+gate by increasing a readplane timeout.

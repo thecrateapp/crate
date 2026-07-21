@@ -60,6 +60,6 @@ service boundary, migration/rollback behaviour or federation contract, update
 the relevant canonical document in the same change. Add an automated check when
 the statement can be derived from source.
 
-`docs/plans/`, `docs/roadmaps/`, dated audits and migration notes are internal
-or historical material. They preserve decisions and evidence, but they are not
-part of the hosted reading path and must not be treated as current runbooks.
+Only the canonical documents declared in `docs/manifest.json` are versioned.
+Local plans, roadmaps, archives and audits are ignored and must not be linked
+from the repository or treated as a current runbook.
