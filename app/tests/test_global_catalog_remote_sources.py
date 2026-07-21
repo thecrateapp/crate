@@ -396,6 +396,7 @@ def test_catalog_manifest_snapshot_is_stable_when_catalog_is_empty(monkeypatch):
         "get_federation_manifest_revision_row",
         lambda _policy_params: {"total_items": 0, "latest_update": None},
     )
+    monkeypatch.setattr(federation, "catalog_high_water_mark", lambda: 0)
 
     first = federation._catalog_manifest_snapshot({})
     second = federation._catalog_manifest_snapshot({})
