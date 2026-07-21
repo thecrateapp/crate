@@ -572,6 +572,10 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.artwork",
         "ARTWORK_TASK_HANDLERS",
         (
+            "materialize_artwork_variants",
+            "backfill_artwork_variants",
+            "cleanup_artwork_variants",
+            "repair_artwork_variants",
             "resolve_external_artist_artwork",
             "fetch_cover",
             "fetch_album_cover",
@@ -685,7 +689,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.playback",
         "PLAYBACK_TASK_HANDLERS",
-        ("prepare_stream_variant", "warmup_stream_variants"),
+        (
+            "prepare_stream_variant",
+            "warmup_stream_variants",
+            "cleanup_stream_variants",
+        ),
     ),
 )
 
