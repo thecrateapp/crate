@@ -1,3 +1,15 @@
+---
+title: Library, storage, sync and imports
+summary: Media ownership and worker-controlled publication paths.
+section: architecture
+audience: [developer]
+status: canonical
+order: 80
+verified: 2026-07-21
+sources:
+  [app/crate/library_sync.py, app/crate/worker_handlers, docker-compose.yaml]
+---
+
 # Library, Storage, Sync, and Imports
 
 ## The library as both filesystem and database

@@ -1,61 +1,46 @@
-# Federation catalog capacity
+---
+title: Federation capacity and catalog resilience
+summary: Capacity assumptions, serving modes and reconciliation safety for the global catalog.
+section: federation
+audience: [developer, operator]
+status: canonical
+order: 280
+verified: 2026-07-21
+sources:
+  [
+    app/tests/load/federation_catalog_profile.py,
+    app/readplane/internal/catalog,
+    app/crate/federation,
+  ]
+---
 
-## Supported baseline
+# Federation capacity and catalog resilience
 
-The initial production baseline is 900 artists, 4,400 albums and 48,000
-tracks. The profile creates metadata-only fixtures in an isolated
-`crate_test` PostgreSQL database, scans the complete shareable snapshot with
-500-item keyset pages, appends a 1% delta and removes every fixture in a
-`finally` block. It never creates audio or writes to `/music`.
+Capacity gates must use a representative node shape: current library cardinality,
+peer count, catalog page size, search mix, readplane concurrency, stream load
+and failure injection. A small fixture can prove protocol mechanics but not a
+production fallback or memory budget.
 
-Run:
+## Catalog serving modes
 
-```bash
-make dev-federation-capacity-test
-```
+The catalog contract distinguishes local fallback, global-ready, global-refreshing
+and global-degraded. Reconciliation must preserve a usable last complete or
+local view; clients must not receive an undocumented `catalog_warming` outage.
+Record serving mode in diagnostics and test it under first sync, refresh,
+failure, deletion and recovery.
 
-The report is written to `.artifacts/federation-capacity.json`. The command
-returns non-zero when any acceptance budget fails:
+## Synchronization constraints
 
-- snapshot page p95 below 500 ms;
-- idle delta p95 below 150 ms;
-- 1% delta below 10% of full snapshot time;
-- process RSS growth below 64 MiB;
-- track pages use `idx_lib_tracks_entity_uid` and do not sequentially scan
-  `library_tracks`;
-- pages remain bounded to 500 rows and 2 MiB of serialized items by default.
+- Use bounded/keyset or durable cursor pagination; do not rely on unbounded
+  offset scans for a growing catalog.
+- Persist a page before moving its checkpoint and make replays/tombstones
+  idempotent.
+- Version a manifest over every payload component that affects the published
+  catalog, not merely library row counts.
+- Bound source fan-out, failure budgets, retries and cache freshness so one
+  unhealthy peer cannot degrade local reads.
 
-Wall-clock results depend on the Docker host. CI should retain the JSON report
-and compare the query plan, row count and byte budgets even when timing
-baselines move. A timing exception requires an attached report and must not
-waive keyset, memory, page-size or index-plan checks.
-
-Reference run on 2026-07-15 (local Docker test stack): 53,300 total items,
-107 pages, 3.29 s full snapshot, 32.52 ms page p95, 4.68 ms idle delta
-p95, 7.92 ms for the 480-item delta and 300 KB maximum page. The track plan
-used `idx_lib_tracks_entity_uid` with no sequential scan. This is evidence for
-the current implementation, not a portable timing guarantee.
-
-## Query shape
-
-The initial snapshot scans `library_albums`, `library_artists` and
-`library_tracks` separately in canonical `(entity_type, entity_uid)` order.
-Each scan advances with `entity_uid > cursor` through the existing UUID index;
-there is no `OFFSET`, global `UNION` sort or accumulation of the full catalog
-in worker memory. Policy allowlists and denylists are applied in the indexed
-query before `LIMIT`.
-
-Normal synchronization consumes the durable sequence-based delta every two
-minutes. A full snapshot is reserved for first sync, cursor retention recovery
-and daily drift verification.
-
-## Operational interpretation
-
-- Rising snapshot p95 with a stable index plan usually points to storage or
-  database saturation.
-- A sequential scan or page latency that grows with cursor position is a query
-  regression and blocks release.
-- Delta latency with no changes measures scheduler/DB overhead; a high value
-  indicates connection or lock contention rather than catalog volume.
-- RSS is a high-water mark. Compare before/after growth, not the absolute
-  process footprint.
+Run `make dev-federation-capacity-test` for the repository's isolated profile
+when changing catalog/readplane paths. Attach the generated fixture/result to
+the release evidence and update the SLO thresholds rather than embedding stale
+numbers in this page.

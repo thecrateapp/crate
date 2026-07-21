@@ -1,3 +1,14 @@
+---
+title: API reference
+summary: Focused API reference and compatibility guidance.
+section: reference
+audience: [developer]
+status: canonical
+order: 30
+verified: 2026-07-21
+sources: [app/crate/api, OpenAPI]
+---
+
 # API Notes
 
 This page is a high-level orientation, not a full endpoint inventory.

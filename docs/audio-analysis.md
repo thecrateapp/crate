@@ -1,3 +1,14 @@
+---
+title: Audio analysis reference
+summary: Reference notes for Crate audio-analysis capabilities.
+section: reference
+audience: [developer]
+status: canonical
+order: 40
+verified: 2026-07-21
+sources: [app/crate/audio_analysis.py, app/crate/bliss.py]
+---
+
 # Audio Analysis Notes
 
 This is a compact companion to the full technical docs. The detailed runtime

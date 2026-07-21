@@ -1,3 +1,14 @@
+---
+title: Playback, realtime and Subsonic
+summary: Playback surfaces, SSE and compatibility contracts.
+section: architecture
+audience: [developer]
+status: canonical
+order: 98
+verified: 2026-07-21
+sources: [app/listen, app/readplane, app/crate/api]
+---
+
 # Playback, Realtime, and Subsonic
 
 ## Listen playback architecture

@@ -1,3 +1,14 @@
+---
+title: Backend API and data layer
+summary: FastAPI, PostgreSQL and projection contracts.
+section: architecture
+audience: [developer]
+status: canonical
+order: 60
+verified: 2026-07-21
+sources: [app/crate/api, app/crate/db, app/crate/projector.py]
+---
+
 # Backend API and Data Layer
 
 ## FastAPI application structure

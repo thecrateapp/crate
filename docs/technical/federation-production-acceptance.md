@@ -1,91 +1,59 @@
+---
+title: Federation production acceptance
+summary: Mandatory gates before a federation feature is exposed beyond a controlled two-node environment.
+section: federation
+audience: [developer, operator]
+status: canonical
+order: 290
+verified: 2026-07-21
+sources: [Makefile, scripts/federation-dev-e2e.py, app/tests/test_federation_*]
+---
+
 # Federation production acceptance
 
-This checklist is the release contract for the node-first federation pivot.
-Every Crate installation is a node. A node with no peers is the supported
-singleton topology and does not use a separate runtime mode.
+Federation is accepted per release and capability, not by the existence of a
+descriptor or a successful local demo. A feature is not ready for untrusted
+internet peering until all relevant gates below have current evidence.
 
-## Singleton parity
+## Mandatory gates
 
-- Global catalog contains every local artist, album and track once.
-- Artist and album navigation uses human, source-neutral slugs.
-- Follows, saved albums, likes, history and playlists survive the migration.
-- Artist pages preserve bio, top tracks and probable-setlist contracts.
-- Genre sound-intelligence health returns a typed response, never an internal
-  error caused by missing federation configuration.
-- No UI banner or API behavior depends on a federation feature gate.
-- FastAPI and Go read-plane responses preserve the same public contract.
+1. **Singleton parity:** no approved peer preserves local catalog, playback,
+   auth and failure behavior.
+2. **Trust boundary:** pairing proofs, self-peer rejection, descriptor/key
+   change handling, grant evaluation, revocation and URL/DNS/TLS/redirect
+   policy have focused tests and manual review evidence.
+3. **Identity recovery:** private-key backup/restore and rotation/compromise
+   behavior are tested without silently replacing node identity.
+4. **Catalog correctness:** snapshot/delta/reconciliation are idempotent;
+   deletion, source provenance, taxonomy digest and global serving modes have
+   two-node coverage.
+5. **Playback safety:** the browser sees no peer URL/ticket; owner quota,
+   policy revision/revocation, Range behavior, proxy timeout and fallback paths
+   are exercised under interruption.
+6. **Import containment:** request approval, manifest/hash/path validation,
+   peer/global/disk reservation, worker-only publication and terminal cleanup
+   are demonstrated on two nodes.
+7. **Capacity and SLOs:** representative catalog and stream fixtures meet the
+   agreed throughput/freshness/error budget and emit bounded observability.
+8. **Operations:** an operator can disable a peer/grant, restore keys and
+   database state, reconcile a source and roll forward safely after a failed
+   release.
 
-Automated coverage:
+## Required local evidence
 
 ```bash
-PYTHONPATH=app uv run pytest \
-  app/tests/test_federation_singleton_parity.py \
-  app/tests/test_no_federation_mode_flags.py \
-  app/tests/test_node_first_catalog_contract.py -q
+make federation-dev-up
+make federation-dev-smoke
+make federation-dev-e2e
+make federation-dev-global-catalog-e2e
+make federation-dev-playback-prepare-e2e
+make federation-dev-import-e2e
+make federation-dev-singleton-e2e
+make federation-dev-zero-downtime-e2e
+make federation-dev-down
 ```
 
-Live acceptance:
-
-```bash
-make federation-dev-up-singleton
-python scripts/federation-dev-e2e.py singleton-parity
-```
-
-## Security
-
-- Pairing proves possession of both node keys and requires approval on both
-  nodes.
-- Self-pairing, replay, clock-skew violations and incompatible versions fail
-  before trust is persisted.
-- Outbound URLs use HTTPS in production and reject private/reserved DNS
-  results, redirects and cross-origin resource URLs.
-- Every remote capability is authorized by an active grant at the serving
-  node.
-- Stream slots and bytes are owner-side, atomic and released after failure or
-  disconnect.
-- Grant downgrade or peer revocation invalidates unused tickets and terminates
-  active delivery within the documented bound.
-- Imports are approved, size-bounded, hash-verified and written only by a
-  worker with `/music:rw`.
-
-## Consistency and recovery
-
-- Initial synchronization is a keyset snapshot followed by durable deltas.
-- Delta cursors advance in the same transaction as applied catalog changes.
-- Deletes, hides and restores propagate as source tombstones and never remove
-  local library data.
-- Sync and import operations resume idempotently after API, worker or Redis
-  restart.
-- A cursor older than retention requests a full sync explicitly.
-- Full verification converges to the same read model as incremental sync.
-
-## User-facing capabilities
-
-- Local and remote sources render at the same human URL.
-- Remote playback, explicit local import and unavailable-source states are
-  visible and recoverable.
-- Likes use global track identity and remain present when a peer is offline.
-- Remote external scrobbling is opt-in; local play history is always recorded.
-- Signed directories create candidates only and never approve peers.
-- Open Subsonic keeps legacy IDs and adds global read-only entities.
-
-## Operations
-
-- Admin exposes pairing, peer state, grants, usage, denials, active streams,
-  imports, directories, key rotation, audit and risk observations.
-- Metrics and alerts have bounded cardinality and link to the operations
-  runbook.
-- Database and federation-key backup/restore have been exercised locally.
-- The 900 artist / 4,400 album / 48,000 track profile stays within the
-  documented budgets.
-- The selected streaming data plane is backed by a reproducible benchmark.
-- Upgrade, compatible rollback and re-upgrade pass against a pre-pivot data
-  fixture without user-visible loss.
-
-## Release gate
-
-Production rollout remains a separate, explicitly authorized operation. Before
-deploying, the local two-node canary, chaos suite, migration matrix, complete
-language test suites and pre-commit checks must all be green. Any data-loss,
-SSRF, signature, authorization, quota or singleton-parity failure blocks the
-release.
+Run only the targets relevant to the release, but do not waive a required gate
+without recording the risk owner, containment and expiry. A passing harness is
+necessary but not sufficient: deployment configuration, secret ownership,
+public routing and rollback/migration constraints must match the tested model.

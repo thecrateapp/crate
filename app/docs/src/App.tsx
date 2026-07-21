@@ -10,14 +10,18 @@ import {
   useParams,
 } from "react-router";
 import {
+  Activity,
   ArrowLeft,
   ArrowRight,
   BookOpen,
   ChevronRight,
+  Code2,
   FileText,
   Home,
   Layers3,
   Menu,
+  Network,
+  Rocket,
   Search,
 } from "lucide-react";
 
@@ -26,19 +30,25 @@ import {
   docsBySection,
   getAdjacentDocs,
   getDoc,
+  loadDoc,
   sectionMeta,
+  sourceUrl,
   type DocEntry,
+  type DocHeading,
   type DocSection,
+  type LoadedDoc,
 } from "@/content";
 import { cn } from "@/lib/utils";
 
-function Header({ onMenu }: { onMenu: () => void }) {
-  const navItems: Array<{ label: string; to: string }> = [
-    { label: "Overview", to: "/" },
-    { label: "Technical", to: "/technical" },
-    { label: "Reference", to: "/reference" },
-  ];
+const navItems: Array<{ label: string; to: string }> = [
+  { label: "Overview", to: "/" },
+  { label: "Developer", to: "/developer" },
+  { label: "Operations", to: "/operations" },
+  { label: "Federation", to: "/federation" },
+  { label: "Reference", to: "/reference" },
+];
 
+function Header({ onMenu }: { onMenu: () => void }) {
   return (
     <header className="sticky top-0 z-30 border-b border-cyan-200/12 bg-[#050507]/94 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-5 sm:px-8">
@@ -56,7 +66,7 @@ function Header({ onMenu }: { onMenu: () => void }) {
               Crate Docs
             </div>
             <div className="hidden font-mono text-[11px] uppercase text-white/34 sm:block">
-              Architecture / operations / source
+              Developer / operations / federation
             </div>
           </div>
         </Link>
@@ -85,8 +95,20 @@ function Header({ onMenu }: { onMenu: () => void }) {
 }
 
 function SectionIcon({ section }: { section: DocSection }) {
-  if (section === "technical") return <Layers3 size={18} />;
-  return <BookOpen size={18} />;
+  switch (section) {
+    case "start":
+      return <Rocket size={18} />;
+    case "architecture":
+      return <Layers3 size={18} />;
+    case "developer":
+      return <Code2 size={18} />;
+    case "operations":
+      return <Activity size={18} />;
+    case "federation":
+      return <Network size={18} />;
+    case "reference":
+      return <BookOpen size={18} />;
+  }
 }
 
 function Sidebar({
@@ -103,16 +125,20 @@ function Sidebar({
   searchRef: RefObject<HTMLInputElement | null>;
 }) {
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return docsBySection;
-    return {
-      technical: docsBySection.technical.filter((doc) =>
-        `${doc.title} ${doc.summary}`.toLowerCase().includes(q),
-      ),
-      reference: docsBySection.reference.filter((doc) =>
-        `${doc.title} ${doc.summary}`.toLowerCase().includes(q),
-      ),
-    };
+    const term = query.trim().toLowerCase();
+    if (!term) return docsBySection;
+
+    return (Object.keys(docsBySection) as DocSection[]).reduce(
+      (result, section) => {
+        result[section] = docsBySection[section].filter((doc) =>
+          `${doc.title} ${doc.summary} ${doc.keywords.join(" ")}`
+            .toLowerCase()
+            .includes(term),
+        );
+        return result;
+      },
+      {} as Record<DocSection, DocEntry[]>,
+    );
   }, [query]);
 
   return (
@@ -195,9 +221,40 @@ function Sidebar({
   );
 }
 
+function DocCard({ doc, label }: { doc: DocEntry; label: string }) {
+  return (
+    <Link
+      to={doc.route}
+      className="group border border-white/10 bg-white/[0.018] p-6 transition hover:border-cyan-200/30 hover:bg-[#061014]/34"
+    >
+      <div className="mb-3 font-mono text-[12px] uppercase text-cyan-200/88">
+        {label}
+      </div>
+      <div className="text-xl font-semibold text-white">{doc.title}</div>
+      <p className="mt-2 text-sm leading-6 text-white/58">{doc.summary}</p>
+      <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
+        <span className="font-mono text-[12px] uppercase underline decoration-cyan-200/35 underline-offset-4">
+          Read document
+        </span>
+        <ArrowRight
+          size={16}
+          className="transition group-hover:translate-x-1"
+        />
+      </div>
+    </Link>
+  );
+}
+
 function HomePage() {
-  const technical = docsBySection.technical;
-  const firstTechnical = technical[0];
+  const systemOverview = getDoc("architecture", "system-overview");
+  const readingPath = [
+    docsBySection.start[0],
+    systemOverview,
+    docsBySection.developer[0],
+    docsBySection.operations[0],
+    docsBySection.federation[0],
+  ].filter((doc): doc is DocEntry => Boolean(doc));
+
   return (
     <div className="space-y-10">
       <section className="border-y border-cyan-200/16 bg-[#061014]/28 p-7 sm:p-10">
@@ -206,19 +263,17 @@ function HomePage() {
             Crate Documentation
           </div>
           <h1 className="max-w-[14ch] text-[48px] font-extrabold uppercase leading-[0.9] text-white [text-shadow:0_0_34px_rgba(103,232,249,0.12)] sm:text-[76px]">
-            A self-hosted music platform built for people who still care about
-            their library.
+            The technical field guide for a self-hosted music platform.
           </h1>
           <p className="mt-6 max-w-3xl text-[17px] leading-8 text-white/66 sm:text-[20px] sm:leading-9">
-            Crate manages, enriches, and streams your personal music collection.
-            These docs describe how every subsystem works — the ingestion
-            pipeline, audio analysis, playback engine, API surface, and the
-            frontends that sit on top.
+            Use the right path for local development, a single home instance or
+            project-hosted image-first deployment. Federation is documented as a
+            controlled node-to-node capability, not anonymous public peering.
           </p>
           <div className="mt-6 flex flex-wrap gap-x-8 gap-y-4 py-2">
-            {firstTechnical ? (
+            {systemOverview ? (
               <Link
-                to={firstTechnical.route}
+                to={systemOverview.route}
                 className="font-mono text-[13px] uppercase text-cyan-200 underline decoration-cyan-200/35 underline-offset-4 transition hover:text-cyan-100"
               >
                 Start with the system overview
@@ -236,7 +291,7 @@ function HomePage() {
         </div>
       </section>
 
-      <section className="grid gap-5 lg:grid-cols-2">
+      <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
         {(Object.keys(sectionMeta) as DocSection[]).map((section) => {
           const entry = docsBySection[section][0];
           return (
@@ -269,34 +324,15 @@ function HomePage() {
       <section>
         <div className="mb-4 flex items-center gap-2 font-mono text-[12px] uppercase text-white/45">
           <FileText size={16} />
-          Reading path
+          Canonical reading paths
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
-          {technical.map((doc, index) => (
-            <Link
+          {readingPath.map((doc, index) => (
+            <DocCard
               key={doc.id}
-              to={doc.route}
-              className="group border border-white/10 bg-white/[0.018] p-6 transition hover:border-cyan-200/30 hover:bg-[#061014]/34"
-            >
-              <div className="mb-3 font-mono text-[12px] uppercase text-cyan-200/88">
-                Step {String(index + 1).padStart(2, "0")}
-              </div>
-              <div className="text-xl font-semibold text-white">
-                {doc.title}
-              </div>
-              <p className="mt-2 text-sm leading-6 text-white/58">
-                {doc.summary}
-              </p>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
-                <span className="font-mono text-[12px] uppercase underline decoration-cyan-200/35 underline-offset-4">
-                  Read document
-                </span>
-                <ArrowRight
-                  size={16}
-                  className="transition group-hover:translate-x-1"
-                />
-              </div>
-            </Link>
+              doc={doc}
+              label={`Step ${String(index + 1).padStart(2, "0")}`}
+            />
           ))}
         </div>
       </section>
@@ -308,6 +344,7 @@ function SectionPage() {
   const { section } = useParams();
   if (!section || !(section in docsBySection))
     return <Navigate to="/" replace />;
+
   const typedSection = section as DocSection;
   const entries = docsBySection[typedSection];
   const meta = sectionMeta[typedSection];
@@ -332,36 +369,15 @@ function SectionPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {entries.map((doc) => (
-          <Link
-            key={doc.id}
-            to={doc.route}
-            className="group border border-white/10 bg-white/[0.018] p-6 transition hover:border-cyan-200/30 hover:bg-[#061014]/34"
-          >
-            <div className="mb-2 font-mono text-[12px] uppercase text-cyan-200/88">
-              {meta.label}
-            </div>
-            <div className="text-xl font-semibold text-white">{doc.title}</div>
-            <p className="mt-2 text-sm leading-6 text-white/58">
-              {doc.summary}
-            </p>
-            <div className="mt-4 inline-flex items-center gap-2 text-sm text-cyan-200">
-              <span className="font-mono text-[12px] uppercase underline decoration-cyan-200/35 underline-offset-4">
-                Read document
-              </span>
-              <ArrowRight
-                size={16}
-                className="transition group-hover:translate-x-1"
-              />
-            </div>
-          </Link>
+          <DocCard key={doc.id} doc={doc} label={meta.label} />
         ))}
       </div>
     </div>
   );
 }
 
-function TableOfContents({ doc }: { doc: DocEntry }) {
-  if (!doc.headings.length) return null;
+function TableOfContents({ headings }: { headings: DocHeading[] }) {
+  if (!headings.length) return null;
   return (
     <aside className="hidden xl:block">
       <div className="sticky top-24 border-l border-cyan-200/18 p-5">
@@ -369,13 +385,13 @@ function TableOfContents({ doc }: { doc: DocEntry }) {
           On this page
         </div>
         <nav className="space-y-2">
-          {doc.headings.map((heading) => (
+          {headings.map((heading) => (
             <a
               key={`${heading.level}-${heading.id}`}
               href={`#${heading.id}`}
               className={cn(
                 "docs-toc-link block text-sm leading-5 text-white/55 transition hover:text-cyan-200",
-                heading.level === 3 && "pl-3 text-white/42",
+                heading.level > 2 && "pl-3 text-white/42",
               )}
             >
               {heading.text}
@@ -387,11 +403,34 @@ function TableOfContents({ doc }: { doc: DocEntry }) {
   );
 }
 
-function DocPage() {
-  const params = useParams();
-  const doc = getDoc(params.section, params.slug);
+function LoadedDocument({ doc }: { doc: DocEntry }) {
+  const [loaded, setLoaded] = useState<LoadedDoc>();
+  const [error, setError] = useState<Error>();
 
-  if (!doc) return <Navigate to="/" replace />;
+  useEffect(() => {
+    let active = true;
+    setLoaded(undefined);
+    setError(undefined);
+
+    void loadDoc(doc).then(
+      (value) => {
+        if (active) setLoaded(value);
+      },
+      (reason: unknown) => {
+        if (active) {
+          setError(
+            reason instanceof Error
+              ? reason
+              : new Error("Unable to load document."),
+          );
+        }
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [doc]);
 
   const adjacent = getAdjacentDocs(doc);
 
@@ -404,11 +443,29 @@ function DocPage() {
               <SectionIcon section={doc.section} />
               {sectionMeta[doc.section].label}
             </div>
-            <span className="font-mono text-[11px] text-white/30">
-              {doc.sourcePath}
-            </span>
+            <a
+              href={sourceUrl(doc.sourcePath)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[11px] text-white/45 underline decoration-white/20 underline-offset-4 hover:text-cyan-200"
+            >
+              View source
+            </a>
           </div>
-          <MarkdownArticle markdown={doc.markdown} />
+          {error ? (
+            <div className="border border-red-300/30 bg-red-300/5 p-4 text-sm text-red-100">
+              {error.message}
+            </div>
+          ) : loaded ? (
+            <MarkdownArticle
+              markdown={loaded.markdown}
+              sourcePath={doc.sourcePath}
+            />
+          ) : (
+            <div className="py-16 font-mono text-[12px] uppercase text-white/40">
+              Loading document…
+            </div>
+          )}
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -445,9 +502,17 @@ function DocPage() {
         </div>
       </article>
 
-      <TableOfContents doc={doc} />
+      <TableOfContents headings={loaded?.headings ?? []} />
     </div>
   );
+}
+
+function DocPage() {
+  const params = useParams();
+  const doc = getDoc(params.section, params.slug);
+  if (!doc) return <Navigate to="/" replace />;
+
+  return <LoadedDocument doc={doc} />;
 }
 
 function NotFoundPage() {
@@ -473,7 +538,7 @@ function Breadcrumbs() {
   const location = useLocation();
   const parts = location.pathname.split("/").filter(Boolean);
 
-  if (parts.length === 0) {
+  if (!parts.length) {
     return (
       <div className="mb-5 flex items-center gap-2 font-mono text-[12px] uppercase text-white/32">
         <Home size={14} />

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "check:docs": "node ../../scripts/check-docs.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

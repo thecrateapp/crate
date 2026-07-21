@@ -1,47 +1,42 @@
-# Quickstart — Deploy to Production
+---
+title: Home quickstart
+summary: Install a single Crate instance with the supported home Docker Compose profile.
+section: start
+audience: [operator]
+status: canonical
+order: 10
+verified: 2026-07-21
+sources: [install.sh, docker-compose.home.yaml]
+---
 
-Get Crate running on your server in under 5 minutes.
+# Home quickstart
 
-## One-line installer
+Use this path for a single self-hosted Crate instance. It is intentionally
+different from local development and the project-hosted deployment flow; see
+[Deployment profiles](deployment-profiles.md) before mixing commands between
+them.
 
-For a home server or small self-hosted install, use the installer first. It
-downloads the home Docker Compose stack, creates `.env` and `config.yaml`,
-pulls pre-built GHCR images, and starts Crate.
+## Prerequisites
+
+- Docker Engine and Docker Compose v2.
+- A host with persistent storage for music, PostgreSQL and downloads.
+- A music directory writable by the user that runs Docker.
+- For public HTTPS, a domain managed by Cloudflare and a DNS API token. For a
+  local-only instance, use the `ports`, `hosts` or `dnsmasq` access modes.
+
+The installer writes a mode-specific `docker-compose.yaml`, `config.yaml`,
+Traefik federation proxy configuration and a mode-specific `.env`. Keep that
+directory private: `.env` contains database, JWT, Redis and readplane secrets.
+
+## Install
+
+For an interactive installation:
 
 ```bash
 curl -fsSL https://cratemusic.app/install.sh | bash
 ```
 
-It asks only for:
-
-- install directory
-- music library path
-- access mode
-- public or local domain, depending on the mode
-- optional Cloudflare DNS token for HTTPS public installs
-- initial admin password
-
-Supported access modes:
-
-| Mode         | Use it when                                         | URLs                     |
-| ------------ | --------------------------------------------------- | ------------------------ |
-| `cloudflare` | You have a real domain and want HTTPS via Traefik   | `https://admin.<domain>` |
-| `hosts`      | You want a local domain without wildcard DNS        | `http://admin.<domain>`  |
-| `dnsmasq`    | You want local wildcard DNS such as `*.crate.local` | `http://admin.<domain>`  |
-| `ports`      | You only want direct localhost ports                | `http://localhost:8580`  |
-
-`dnsmasq` mode checks whether dnsmasq is installed and installs/configures it
-on supported Linux distros and macOS with Homebrew.
-
-Crate always starts on local ports too:
-
-| URL                                | App             |
-| ---------------------------------- | --------------- |
-| `http://localhost:8580`            | Admin dashboard |
-| `http://localhost:8581`            | Listening app   |
-| `http://localhost:8585/api/status` | API health      |
-
-For unattended installs:
+For a non-interactive public installation:
 
 ```bash
 curl -fsSL https://cratemusic.app/install.sh \
@@ -49,186 +44,77 @@ curl -fsSL https://cratemusic.app/install.sh \
     CRATE_ACCESS_MODE=cloudflare \
     CRATE_INSTALL_DIR=/opt/crate \
     CRATE_MUSIC_DIR=/srv/music \
-    CRATE_DOMAIN=example.com \
-    CF_DNS_API_TOKEN=cloudflare-token \
-    DEFAULT_ADMIN_PASSWORD=change-me \
+    CRATE_DOMAIN=music.example.com \
+    CF_DNS_API_TOKEN=replace-me \
+    DEFAULT_ADMIN_PASSWORD=replace-me \
     bash
 ```
 
-Local-domain examples:
+For direct local ports instead of a domain:
 
 ```bash
 curl -fsSL https://cratemusic.app/install.sh \
-  | CRATE_ACCESS_MODE=hosts CRATE_DOMAIN=crate.local bash
+  | CRATE_ASSUME_YES=1 CRATE_ACCESS_MODE=ports bash
+```
 
+The installer generates `JWT_SECRET`, `REDIS_PASSWORD` and
+`CRATE_READPLANE_SERVICE_TOKEN` when they are not supplied. Do not rotate or
+delete them casually: the token authenticates API/readplane traffic and Redis
+also carries the task broker and durable streams.
+
+## Access modes and endpoints
+
+| Mode         | Intended use                               | Main endpoints                                                                       |
+| ------------ | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `cloudflare` | Public HTTPS with Cloudflare DNS challenge | `https://admin.<domain>`, `https://listen.<domain>`, `https://api.<domain>`          |
+| `hosts`      | A local domain listed in `/etc/hosts`      | `http://admin.<domain>`                                                              |
+| `dnsmasq`    | Local wildcard DNS                         | `http://admin.<domain>`                                                              |
+| `ports`      | A single machine or LAN port-forwarding    | `http://localhost:8580`, `http://localhost:8581`, `http://localhost:8585/api/status` |
+
+The Admin app creates the first administrator and starts a library scan. Use
+Listen for playback and user-facing library features. Files received by uploads
+or owned-purchase import are staged and published by workers; the API never
+writes the music filesystem directly.
+
+## Verify the installation
+
+From the installation directory:
+
+```bash
+docker compose config -q
+docker compose ps
+docker compose logs --tail=100 crate-api crate-readplane crate-projector
+```
+
+The API health endpoint is `/api/status`. Confirm that API, readplane and the
+projector are healthy before treating the instance as ready. A first library
+scan and enrichment can take time; they run as background work.
+
+## Update a home installation
+
+The installer downloads a Compose-based installation; it is not a repository
+checkout. Therefore `git pull && docker compose up -d --build` is not a valid
+update command for this profile.
+
+Re-run the installer with the same install directory and desired image/ref. It
+refreshes the compose/config files and keeps an existing `.env` unless
+`CRATE_FORCE_ENV=1` is explicitly set:
+
+```bash
 curl -fsSL https://cratemusic.app/install.sh \
-  | CRATE_ACCESS_MODE=dnsmasq CRATE_DOMAIN=crate.local bash
+  | CRATE_INSTALL_DIR=/opt/crate CRATE_REF=main bash
 ```
 
-Use `CRATE_SKIP_START=1` to generate files without starting Docker.
+Before an update, copy the existing `.env` and take a PostgreSQL backup. After
+the update, repeat the verification commands above. If a database migration has
+run, do not assume an image rollback is safe; use a forward fix or restore a
+tested backup.
 
-The rest of this page documents the manual production install path.
+## Next steps
 
-## Prerequisites
-
-- A Linux server (VPS, home server, NAS — anything that runs Docker)
-- Docker and Docker Compose v2 installed
-- A directory containing your music library (FLAC, MP3, AAC, OGG, etc.)
-- A domain name pointing to your server (for HTTPS via Traefik)
-
-## 1. Clone and configure
-
-```bash
-git clone https://github.com/thecrateapp/crate.git
-cd crate
-cp .env.example .env
-```
-
-Edit `.env` with your settings:
-
-```bash
-# Required
-MEDIA_DIR=/path/to/your/media          # Must contain music/ with your library
-DOMAIN=your-domain.com                 # Domain for HTTPS certificates
-TZ=Europe/Madrid                       # Your timezone
-CF_DNS_API_TOKEN=your-cloudflare-token # Cloudflare API token (for Let's Encrypt DNS challenge)
-
-# Ports (defaults work for most setups)
-TRAEFIK_HTTP_PORT=80
-TRAEFIK_HTTPS_PORT=443
-```
-
-## 2. Start the stack
-
-```bash
-docker network create crate
-docker compose up -d
-```
-
-This starts the core stack:
-
-| Service                      | Role                                                     |
-| ---------------------------- | -------------------------------------------------------- |
-| **traefik**                  | Reverse proxy — automatic HTTPS via Let's Encrypt        |
-| **crate-api**                | FastAPI backend — library indexing, API, streaming       |
-| **crate-readplane**          | Go read plane — fast snapshot-backed reads and SSE relay |
-| **crate-worker**             | Fast/default background jobs plus service loop           |
-| **crate-projector**          | Domain events → warmed snapshots/read models             |
-| **crate-maintenance-worker** | Repair, sync, enrichment, and maintenance jobs           |
-| **crate-analysis-worker**    | Audio analysis, fingerprints, and bliss jobs             |
-| **crate-playback-worker**    | Playback prepare/transcode jobs                          |
-| **crate-media-worker**       | Download package generation, ZIP64, progress/cancel      |
-| **crate-ui**                 | Admin web app — manage, curate, analyze your library     |
-| **crate-listen**             | Listening app — playback, radio, discovery, social       |
-| **crate-postgres**           | PostgreSQL 15 with pgvector — all persistent data        |
-| **crate-redis**              | Redis 7 — cache, job broker, real-time SSE               |
-
-### Optional services
-
-These can be started later from the admin dashboard or manually:
-
-| Service        | Role                                                                       | How to enable                                                                                                  |
-| -------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **slskd**      | Soulseek client — peer-to-peer music search and download                   | Included in compose, starts automatically. Configure `SLSKD_SLSK_USERNAME` and `SLSKD_SLSK_PASSWORD` in `.env` |
-| **proton-vpn** | VPN proxy for the worker — routes Soulseek traffic through ProtonVPN       | Set `PROTONVPN_USER` and `PROTONVPN_PASS` in `.env`. Worker uses it as `SCRAPE_PROXY_URL`                      |
-| **ollama**     | External local LLM inference — generates EQ presets and genre descriptions | Not bundled. Point `OLLAMA_URL` to an existing instance and set `LLM_PROVIDER=ollama/<model>` in `.env`        |
-
-For cloud LLMs, set `LLM_PROVIDER` to `gemini/gemini-2.5-flash` (or any litellm-compatible provider) and provide the corresponding API key (`GEMINI_API_KEY`, `OPENAI_API_KEY`, etc.).
-
-Your services will be available at:
-
-| URL                              | App                         |
-| -------------------------------- | --------------------------- |
-| `https://admin.your-domain.com`  | Admin dashboard             |
-| `https://listen.your-domain.com` | Listening app               |
-| `https://api.your-domain.com`    | API (+ Subsonic at `/rest`) |
-
-## 3. Run the setup wizard
-
-Open `https://admin.your-domain.com` in your browser. On first launch, Crate shows a four-step setup wizard:
-
-### Step 1 — Create Admin Account
-
-Enter your name, email, and password. This is your administrator login.
-
-### Step 2 — API Keys (optional)
-
-Crate enriches your library from multiple external sources. Each key is optional — skip any you don't need and add them later in Settings.
-
-| Service          | What it unlocks                                | Get your key                                                      |
-| ---------------- | ---------------------------------------------- | ----------------------------------------------------------------- |
-| **Last.fm**      | Artist bios, similar artists, tags, popularity | [last.fm/api](https://www.last.fm/api/account/create)             |
-| **Ticketmaster** | Upcoming shows for library artists             | [developer.ticketmaster.com](https://developer.ticketmaster.com/) |
-| **Spotify**      | Artist images (Client ID + Secret)             | [developer.spotify.com](https://developer.spotify.com/dashboard)  |
-| **Fanart.tv**    | High-quality artist backgrounds                | [fanart.tv](https://fanart.tv/get-an-api-key/)                    |
-| **Setlist.fm**   | Concert setlists and probable setlists         | [api.setlist.fm](https://api.setlist.fm/docs/1.0/index.html)      |
-
-### Step 3 — Library Scan
-
-Click "Start Scan". Crate will index every file in your music directory, read tags, and build the library database. This runs in the background — you can start using Crate immediately.
-
-### Step 4 — Done
-
-The admin dashboard shows scan progress and library stats. Once indexing finishes, background enrichment kicks in automatically.
-
-## 4. Start listening
-
-Open `https://listen.your-domain.com` and sign in. This is the listening app — browse your library, play music, use radio, discover with Music Paths, follow artists.
-
-**Android:** Download the APK from [GitHub Releases](https://github.com/thecrateapp/crate/releases/latest/download/crate.apk).
-
-**iPhone:** Open the listen URL in Safari → Share → Add to Home Screen.
-
-## 5. Bring in owned music
-
-Crate can start with an existing `/music` folder, but users can also contribute
-music after the instance is running.
-
-- **Bandcamp:** open Listen → Settings → Bandcamp, connect the account, then
-  sync purchases. Owned downloadable purchases can be imported into the shared
-  library with contributor attribution.
-- **Uploads:** open Listen → Upload or Admin → Acquisition → Upload to add
-  loose audio files or ZIP archives.
-
-Both paths stage files first, import through the worker, sync into PostgreSQL,
-record contribution provenance, and refresh the relevant Listen/Admin read
-models through cache/domain events.
-
-## 6. Subsonic clients
-
-Crate is Subsonic-compatible. Point any client at `https://api.your-domain.com/rest`:
-
-- Symfonium, DSub, Ultrasonic (Android)
-- play:Sub (iOS)
-- Submariner (macOS)
-
-## What happens automatically
-
-After setup, Crate runs these background tasks on a schedule:
-
-| Task              | Interval       | What it does                                               |
-| ----------------- | -------------- | ---------------------------------------------------------- |
-| Artist enrichment | 24h            | Bios, photos, similar artists, discographies               |
-| Genre indexing    | On new content | Maps tags to curated taxonomy (60+ canonical nodes)        |
-| Audio analysis    | Continuous     | BPM, key, loudness, energy, mood, danceability             |
-| Bliss vectors     | Continuous     | 20-float acoustic DNA for similarity radio and Music Paths |
-| Popularity        | 24h            | Last.fm listeners and playcount                            |
-| New releases      | 12h            | MusicBrainz release monitoring                             |
-| Shows             | 24h            | Ticketmaster upcoming shows                                |
-
-No manual intervention needed. Check progress at any time in the admin Tasks page.
-
-## Updating
-
-```bash
-cd /path/to/crate
-git pull
-docker compose up -d --build
-```
-
-Or if using pre-built GHCR images:
-
-```bash
-docker compose pull
-docker compose up -d
-```
+- Configure optional enrichment credentials in `.env`, then recreate the
+  affected services with `docker compose up -d`.
+- Read [Operations](operations.md) for Redis, workers and restore handling.
+- Read [Federation overview](federation-overview.md) before exposing or pairing
+  an instance with another node. Federation is not a filesystem replication
+  mechanism.

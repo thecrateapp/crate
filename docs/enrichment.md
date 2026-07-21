@@ -1,3 +1,14 @@
+---
+title: Enrichment reference
+summary: Reference notes for Crate enrichment sources and flow.
+section: reference
+audience: [developer]
+status: canonical
+order: 50
+verified: 2026-07-21
+sources: [app/crate/enrichment.py]
+---
+
 # Enrichment Notes
 
 Crate enriches artist and album metadata from multiple external sources and

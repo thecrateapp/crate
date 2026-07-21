@@ -516,7 +516,7 @@ write_env_file() {
   local install_dir="$2"
   local default_tz default_music_dir default_data_dir default_downloads_dir
   local access_mode domain cf_token admin_password jwt_secret postgres_password puid pgid docker_gid image_owner image_registry
-  local tls_enabled secure_entrypoint cert_resolver
+  local tls_enabled secure_entrypoint cert_resolver redis_password readplane_service_token
 
   default_tz="$(detect_timezone)"
   default_music_dir="${install_dir}/media/music"
@@ -574,6 +574,8 @@ write_env_file() {
 
   jwt_secret="${JWT_SECRET:-$(generate_secret)}"
   postgres_password="${CRATE_POSTGRES_PASSWORD:-$(generate_secret | cut -c1-32)}"
+  redis_password="${REDIS_PASSWORD:-$(generate_secret)}"
+  readplane_service_token="${CRATE_READPLANE_SERVICE_TOKEN:-$(generate_secret)}"
   puid="${PUID:-$(id -u 2>/dev/null || printf "1000")}"
   pgid="${PGID:-$(id -g 2>/dev/null || printf "1000")}"
   docker_gid="${DOCKER_GID:-$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock 2>/dev/null || printf "988")}"
@@ -638,6 +640,8 @@ CRATE_POSTGRES_PASSWORD=$(quote_env_value "${postgres_password}")
 CRATE_POSTGRES_DB=$(quote_env_value "${CRATE_POSTGRES_DB:-crate}")
 
 JWT_SECRET=$(quote_env_value "${jwt_secret}")
+REDIS_PASSWORD=$(quote_env_value "${redis_password}")
+CRATE_READPLANE_SERVICE_TOKEN=$(quote_env_value "${readplane_service_token}")
 DEFAULT_ADMIN_PASSWORD=$(quote_env_value "${admin_password}")
 GOOGLE_CLIENT_ID=$(quote_env_value "${GOOGLE_CLIENT_ID:-}")
 GOOGLE_CLIENT_SECRET=$(quote_env_value "${GOOGLE_CLIENT_SECRET:-}")
@@ -781,10 +785,13 @@ EOF
 install_crate_files() {
   local install_dir="$1"
   run mkdir -p "${install_dir}"
+  run mkdir -p "${install_dir}/deploy/traefik"
 
   info "Downloading Crate compose files from ${CRATE_REPO}@${CRATE_REF}"
   download "${CRATE_RAW_BASE}/docker-compose.home.yaml" "${install_dir}/docker-compose.yaml"
   download "${CRATE_RAW_BASE}/app/config.yaml" "${install_dir}/config.yaml"
+  download "${CRATE_RAW_BASE}/deploy/traefik/federation-readplane.yml" \
+    "${install_dir}/deploy/traefik/federation-readplane.yml"
   success "Installer files are in ${install_dir}"
 }
 

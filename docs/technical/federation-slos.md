@@ -1,59 +1,45 @@
-# Federation SLOs and alerts
+---
+title: Federation SLOs and observability
+summary: Measure catalog, authorization, relay and import behavior without leaking peer or user secrets.
+section: federation
+audience: [operator]
+status: canonical
+order: 250
+verified: 2026-07-21
+sources: [app/crate/federation/health.py, app/readplane, app/tests/load]
+---
 
-These objectives apply to the node-first federation protocol. A singleton node is a valid healthy deployment; the absence of peers is not an incident.
+# Federation SLOs and observability
 
-## Service-level objectives
+Federation metrics are diagnostic aids, not authorization. Keep dimensions
+bounded: operation, result class, capability, serving mode and peer hash/ID
+only where the deployment policy permits it. Never label metrics with full URL,
+assertion, ticket, email, raw local user ID or key material.
 
-| Signal                   | Objective                                                    | Measurement window |
-| ------------------------ | ------------------------------------------------------------ | ------------------ |
-| Singleton catalog reads  | Match the local baseline availability                        | rolling 30 days    |
-| Local catalog search     | p95 at or below 300 ms at the 100K-track reference profile   | per release        |
-| Federated metadata reads | 99.5% success, excluding peer-caused 4xx                     | rolling 30 days    |
-| Search fanout            | p95 at or below 2 seconds with partial results               | rolling 24 hours   |
-| Remote stream TTFB       | p95 at or below 1.5 seconds between reference nodes          | rolling 24 hours   |
-| Playback startup p95     | at or below 2 seconds, local and remote                      | rolling 24 hours   |
-| Playback stall ratio     | below 2% of starts                                           | rolling 24 hours   |
-| Catalog sync lag         | healthy below 5 minutes                                      | per peer           |
-| Security contracts       | zero quota, SSRF, grant, replay, or signature bypasses       | every release      |
-| Import cleanup           | 100% of failures release reservations and temporary files    | rolling 24 hours   |
-| Readplane fallback       | below 5% of hot reads outside rollout windows                | rolling 15 minutes |
-| SQL pool saturation      | below 80% and zero indefinite checkout waits                 | rolling 15 minutes |
-| Event outbox delivery    | p95 below 30 seconds; zero unreviewed dead letters           | rolling 15 minutes |
-| Snapshot freshness       | home/stats stale age below 10 minutes during healthy runtime | rolling 15 minutes |
+## Signals to monitor
 
-Metric labels have bounded cardinality: known peer UUID and an enumerated reason code only. URLs, tokens, key material, user identifiers, subject assertions, paths, and free-form upstream errors are prohibited.
+| Capability         | Primary signals                                                           | Failure interpretation                                           |
+| ------------------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Descriptor/pairing | verification result, pending age, compatibility rejection                 | operator/trust configuration, not a blind retry                  |
+| Catalog            | checkpoint age, page latency, reconciliation duration, serving mode       | stale source, expired cursor or projector/read-model fault       |
+| Search             | complete/partial result, attempted/completed peers, bounded failure class | degraded remote availability, not proof that local search failed |
+| Relay              | ticket denial/revocation, first-byte and Range result, bytes/quota        | policy, readplane, owner or network path fault                   |
+| Import             | queue age, lease/reservation, transferred/declared bytes, cleanup result  | worker, capacity or manifest failure                             |
 
-## Alerts
+Local catalog availability must remain observable while a source is warming or
+degraded. A release needs an explicit catalog serving-mode contract and a
+defined fallback behavior, not a generic 500 metric.
 
-| Alert                      | Alert window           | Threshold                                         | Runbook                                                                                    |
-| -------------------------- | ---------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Metadata error budget burn | 15 minutes and 6 hours | 14x / 2x burn rate                                | [Peer degradation](federation-operations-runbook.md#peer-outage)                           |
-| Search fanout latency      | 15 minutes             | p95 above 2 seconds for 3 windows                 | [Peer degradation](federation-operations-runbook.md#peer-outage)                           |
-| Remote stream TTFB         | 15 minutes             | p95 above 1.5 seconds for 3 windows               | [Streaming recovery](federation-operations-runbook.md#stream-incident)                     |
-| Playback QoE regression    | 15 minutes and 6 hours | startup/stall SLO breach                          | [Playback recovery](playback-slos.md#alert-response)                                       |
-| Sync lag                   | 15 minutes             | any approved healthy peer above 5 minutes         | [Catalog recovery](federation-operations-runbook.md#cursor-expired-corrupt-or-stuck-sync)  |
-| Signature or replay flood  | 5 minutes              | score at or above 80                              | [Federation security](federation-operations-runbook.md#signature-replay-or-abuse-incident) |
-| Import cleanup failure     | 10 minutes             | any unreleased reservation after terminal failure | [Import recovery](federation-operations-runbook.md#stuck-or-failed-import)                 |
-| Readplane fallback burn    | 15 minutes             | fallback ratio above 5% or circuit open           | [Read plane recovery](federation-operations-runbook.md#read-plane-outage)                  |
-| Database saturation        | 10 minutes             | pool above 80% or canceled acquires increasing    | [Read plane recovery](federation-operations-runbook.md#read-plane-outage)                  |
-| Outbox delivery stalled    | 5 minutes              | oldest pending above 5m or any dead letter        | [Redis recovery](federation-operations-runbook.md#cache-redis-or-durable-redis-incident)   |
+## Alerting and response
 
-Alerts aggregate over a window rather than paging for a single peer request. Temporary risk actions always expire and are reversible from Admin; disabling a peer remains a manual operator decision.
+Alert on persistent catalog checkpoint staleness, a rising authorization or URL
+policy denial rate, relay errors above the accepted budget, reservation leaks,
+failed staging cleanup and unexpected peer/key state changes. Use bounded
+reason codes to route the incident to trust, catalog, readplane or worker
+owners. Contain a peer/grant before collecting expensive diagnostics.
 
-## Catalog serving modes
-
-Canonical search emits `catalog.search.serving_mode` with one bounded `mode`
-label and returns the same value in `X-Crate-Catalog-Mode`:
-
-- `local-fallback`: the first global reconciliation has not completed; reads
-  use the existing `library_*` models.
-- `global-ready`: the current global catalog is complete.
-- `global-refreshing`: reconciliation is running while reads use the last
-  complete global catalog.
-- `global-degraded`: reconciliation failed while reads use the last complete
-  global catalog.
-
-The mode is operational context, not an availability signal. Alert on request
-errors or latency, not on `local-fallback` or `global-refreshing` alone. The
-local fallback release gate is p95 at or below 300 ms and p99 below 800 ms on
-the documented 100K-track capacity profile.
+The numerical thresholds are release and capacity-fixture dependent. Set them
+from an accepted benchmark and document the representative node/catalog shape;
+do not copy an arbitrary lab latency into a public SLO. See
+[Federation capacity](federation-capacity.md) and
+[Production acceptance](federation-production-acceptance.md).

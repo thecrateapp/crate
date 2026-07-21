@@ -1,3 +1,14 @@
+---
+title: System overview
+summary: Crate services, data flow and read/write ownership.
+section: architecture
+audience: [developer, operator]
+status: canonical
+order: 50
+verified: 2026-07-21
+sources: [docker-compose.yaml, app/crate, app/readplane]
+---
+
 # System Overview
 
 ## What Crate is
