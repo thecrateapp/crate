@@ -450,6 +450,12 @@ def test_catalog_manifest_hides_all_genre_evidence_without_metadata_grant(
     monkeypatch.setattr(federation, "_require_signed_node_request", fake_peer)
     monkeypatch.setattr(federation, "_require_capability", lambda *_args: None)
     monkeypatch.setattr(federation, "_peer_has_capability", lambda *_args: False)
+    monkeypatch.setattr(federation, "_catalog_share_policy", lambda: {})
+    monkeypatch.setattr(
+        federation,
+        "_catalog_manifest_snapshot",
+        lambda _policy: {"revision": "snapshot-revision", "total_items": 1},
+    )
 
     def fake_items(*, include_genres: bool, **_kwargs):
         item = {"entity_type": "artist", "remote_entity_uid": "artist-1"}
