@@ -75,6 +75,17 @@ The owner remains authoritative for quota, byte reservation, entity constraints,
 policy revision and revocation. Playback preparation is advisory and must not
 reserve a stream or transfer media.
 
+### Bounded playback preparation
+
+`POST /api/federation/v1/playback/prepare` is an advisory, signed owner request
+for one or two owner-local track entity UIDs. It requires the same stream grants
+and entity allowlist as a transcoded stream, plus a user assertion with purpose
+`stream.prepare`. It does not create a ticket, playback session, stream URL,
+byte reservation or media transfer.
+
+The owner reports only `ready`, `preparing`, `unavailable` or `rate_limited`.
+Ready variants consume no reservation. New speculative work has four live reservations per peer and twenty per owner, atomically tracked in Redis by variant cache key. Active playback remains higher priority and serves the original source when the prepared variant is not ready.
+
 ## Compatibility and errors
 
 Protocol version and advertised capability negotiate the allowed contract; a
