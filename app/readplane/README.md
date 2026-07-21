@@ -94,7 +94,6 @@ Native local delivery configuration:
 ```bash
 READPLANE_LOCAL_MEDIA_ENABLED=false
 READPLANE_MUSIC_ROOT=/music
-READPLANE_DATA_ROOT=/data
 READPLANE_CACHE_ROOT=/cache
 ```
 

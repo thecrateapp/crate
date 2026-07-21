@@ -72,10 +72,9 @@ func TestServeMaterializedAlbumArtwork(t *testing.T) {
 
 func TestNewServerResolvesArtworkFromCacheRoot(t *testing.T) {
 	cacheRoot := t.TempDir()
-	dataRoot := t.TempDir()
 	writeRouteArtworkFixture(t, cacheRoot, "album-cover", "album-uid")
 	server := NewServer(
-		config.Config{DataRoot: dataRoot, CacheRoot: cacheRoot},
+		config.Config{CacheRoot: cacheRoot},
 		nil, nil, nil, nil, nil, nil, nil,
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 	)

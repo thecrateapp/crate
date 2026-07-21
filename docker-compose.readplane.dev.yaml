@@ -34,7 +34,7 @@ services:
       READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: "60"
       READPLANE_LOCAL_MEDIA_ENABLED: ${READPLANE_LOCAL_MEDIA_ENABLED:-false}
       READPLANE_MUSIC_ROOT: /music
-      READPLANE_DATA_ROOT: /data
+      READPLANE_CACHE_ROOT: /cache
       HTTP_PROXY: ""
       HTTPS_PROXY: ""
       ALL_PROXY: ""
@@ -45,7 +45,7 @@ services:
       no_proxy: "localhost,127.0.0.1,::1,api,readplane,postgres,redis"
     volumes:
       - ./test-music:/music:ro
-      - dev_data:/data:ro
+      - dev_cache:/cache:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,5 +101,6 @@ services:
       - "host.docker.internal:host-gateway"
 
 volumes:
+  dev_cache:
   dev_readplane_caddy_data:
   dev_readplane_caddy_config:

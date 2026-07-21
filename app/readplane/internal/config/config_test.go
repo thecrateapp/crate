@@ -26,8 +26,7 @@ func TestLoad(t *testing.T) {
 		assert.True(t, cfg.FederationProxyEnabled, "federation proxy should default to true")
 		assert.False(t, cfg.LocalMediaEnabled)
 		assert.Equal(t, "/music", cfg.MusicRoot)
-		assert.Equal(t, "/data", cfg.DataRoot)
-		assert.Equal(t, "/data", cfg.CacheRoot)
+		assert.Equal(t, "/cache", cfg.CacheRoot)
 	})
 
 	t.Run("parses overrides", func(t *testing.T) {
@@ -52,7 +51,6 @@ func TestLoad(t *testing.T) {
 		t.Setenv("REDIS_DURABLE_URL", "redis://durable:6379/0")
 		t.Setenv("READPLANE_LOCAL_MEDIA_ENABLED", "true")
 		t.Setenv("READPLANE_MUSIC_ROOT", "/srv/music")
-		t.Setenv("READPLANE_DATA_ROOT", "/srv/data")
 		t.Setenv("READPLANE_CACHE_ROOT", "/srv/cache")
 
 		cfg := Load("test")
@@ -78,20 +76,17 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, "redis://durable:6379/0", cfg.DurableRedisURL)
 		assert.True(t, cfg.LocalMediaEnabled)
 		assert.Equal(t, "/srv/music", cfg.MusicRoot)
-		assert.Equal(t, "/srv/data", cfg.DataRoot)
 		assert.Equal(t, "/srv/cache", cfg.CacheRoot)
 	})
 
 	t.Run("rejects relative media roots", func(t *testing.T) {
 		t.Setenv("READPLANE_MUSIC_ROOT", "relative/music")
-		t.Setenv("READPLANE_DATA_ROOT", "../data")
 		t.Setenv("READPLANE_CACHE_ROOT", "../cache")
 
 		cfg := Load("test")
 
 		assert.Equal(t, "/music", cfg.MusicRoot)
-		assert.Equal(t, "/data", cfg.DataRoot)
-		assert.Equal(t, "/data", cfg.CacheRoot)
+		assert.Equal(t, "/cache", cfg.CacheRoot)
 	})
 
 	t.Run("builds database URL from Crate Postgres env vars", func(t *testing.T) {

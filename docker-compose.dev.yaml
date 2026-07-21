@@ -109,6 +109,7 @@ services:
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
+      - CACHE_DIR=/cache
       - CRATE_POSTGRES_USER=crate
       - CRATE_POSTGRES_PASSWORD=crate
       - CRATE_POSTGRES_DB=crate
@@ -157,6 +158,7 @@ services:
       - ./app/config.yaml:/app/config.yaml:ro
       - ./test-music:/music:ro
       - dev_data:/data
+      - dev_cache:/cache:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "8585:8585"
@@ -189,6 +191,7 @@ services:
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
+      - CACHE_DIR=/cache
       - CRATE_POSTGRES_USER=crate
       - CRATE_POSTGRES_PASSWORD=crate
       - CRATE_POSTGRES_DB=crate
@@ -239,6 +242,7 @@ services:
       - ./test-music:/music
       - ./data/slskd/downloads/complete:/downloads/soulseek
       - dev_data:/data
+      - dev_cache:/cache
     networks:
       - crate-dev
     depends_on:
@@ -340,6 +344,7 @@ services:
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
+      - CACHE_DIR=/cache
       - CRATE_POSTGRES_USER=crate
       - CRATE_POSTGRES_PASSWORD=crate
       - CRATE_POSTGRES_DB=crate
@@ -390,6 +395,7 @@ services:
       - ./test-music:/music
       - ./data/slskd/downloads/complete:/downloads/soulseek
       - dev_data:/data
+      - dev_cache:/cache
     networks:
       - crate-dev
     depends_on:
@@ -491,6 +497,7 @@ services:
       - TZ=Europe/Madrid
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
+      - CACHE_DIR=/cache
       - CRATE_POSTGRES_USER=crate
       - CRATE_POSTGRES_PASSWORD=crate
       - CRATE_POSTGRES_DB=crate
@@ -524,6 +531,7 @@ services:
       - ./app/config.yaml:/app/config.yaml:ro
       - ./test-music:/music:ro
       - dev_data:/data
+      - dev_cache:/cache
     networks:
       - crate-dev
     depends_on:
@@ -602,6 +610,7 @@ volumes:
   dev_postgres:
   dev_redis_durable:
   dev_data:
+  dev_cache:
   dev_slskd:
   dev_caddy_data:
   dev_caddy_config:

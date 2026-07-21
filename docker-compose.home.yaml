@@ -328,11 +328,9 @@ services:
       READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: ${READPLANE_SESSION_TOUCH_INTERVAL_SECONDS:-60}
       READPLANE_LOCAL_MEDIA_ENABLED: ${READPLANE_LOCAL_MEDIA_ENABLED:-false}
       READPLANE_MUSIC_ROOT: /music
-      READPLANE_DATA_ROOT: /data
       READPLANE_CACHE_ROOT: /cache
     volumes:
       - ${MUSIC_DIR}:/music:ro
-      - ${DATA_DIR}/crate:/data:ro
       - ${CACHE_DIR:-./data/cache}:/cache:ro
     depends_on:
       crate-postgres:

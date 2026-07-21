@@ -59,6 +59,21 @@ def test_runtime_services_mount_separate_regenerable_cache(compose_name):
 @pytest.mark.parametrize(
     "compose_name", ["docker-compose.yaml", "docker-compose.home.yaml"]
 )
+def test_readplane_cannot_mount_private_application_data(compose_name):
+    readplane = yaml.safe_load((ROOT / compose_name).read_text())["services"][
+        "crate-readplane"
+    ]
+    environment = _environment(readplane)
+    volumes = [str(volume) for volume in readplane.get("volumes") or []]
+
+    assert "READPLANE_DATA_ROOT" not in environment
+    assert all(":/data" not in volume for volume in volumes)
+    assert all(volume.endswith(":ro") for volume in volumes)
+
+
+@pytest.mark.parametrize(
+    "compose_name", ["docker-compose.yaml", "docker-compose.home.yaml"]
+)
 def test_maintenance_worker_receives_stream_cache_retention_policy(compose_name):
     service = yaml.safe_load((ROOT / compose_name).read_text())["services"][
         "crate-maintenance-worker"

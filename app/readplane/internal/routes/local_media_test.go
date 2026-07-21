@@ -51,7 +51,6 @@ func TestServeLocalMediaNativeRange(t *testing.T) {
 
 func TestServeLocalMediaReadsTranscodedVariantsFromCacheRoot(t *testing.T) {
 	cacheRoot := t.TempDir()
-	dataRoot := t.TempDir()
 	musicRoot := t.TempDir()
 	sourcePath := filepath.Join(musicRoot, "source.flac")
 	require.NoError(t, os.WriteFile(sourcePath, []byte("source"), 0o644))
@@ -61,7 +60,7 @@ func TestServeLocalMediaReadsTranscodedVariantsFromCacheRoot(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(cacheRoot, relative)), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(cacheRoot, relative), []byte("cached"), 0o644))
 	server := &Server{
-		cfg: config.Config{LocalMediaEnabled: true, MusicRoot: musicRoot, DataRoot: dataRoot, CacheRoot: cacheRoot},
+		cfg: config.Config{LocalMediaEnabled: true, MusicRoot: musicRoot, CacheRoot: cacheRoot},
 		localMedia: stubLocalMediaCatalog{descriptor: catalog.LocalMediaDescriptor{
 			StoredPath: relative, Root: "data", RequestedPolicy: "balanced",
 			EffectivePolicy: "balanced", DeliveryFormat: "opus", Transcoded: true,

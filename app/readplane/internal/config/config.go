@@ -54,13 +54,11 @@ type Config struct {
 	Version                        string
 	LocalMediaEnabled              bool
 	MusicRoot                      string
-	DataRoot                       string
 	CacheRoot                      string
 }
 
 // Load reads environment variables and returns a populated Config.
 func Load(version string) Config {
-	dataRoot := absolutePathEnv("READPLANE_DATA_ROOT", "/data")
 	return Config{
 		Addr:                           stringEnv("READPLANE_ADDR", defaultAddr),
 		DatabaseURL:                    databaseURL(),
@@ -94,8 +92,7 @@ func Load(version string) Config {
 		Version:                        version,
 		LocalMediaEnabled:              boolEnv("READPLANE_LOCAL_MEDIA_ENABLED", false),
 		MusicRoot:                      absolutePathEnv("READPLANE_MUSIC_ROOT", "/music"),
-		DataRoot:                       dataRoot,
-		CacheRoot:                      absolutePathEnv("READPLANE_CACHE_ROOT", dataRoot),
+		CacheRoot:                      absolutePathEnv("READPLANE_CACHE_ROOT", "/cache"),
 	}
 }
 

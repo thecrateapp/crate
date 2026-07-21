@@ -135,8 +135,15 @@ def test_federation_dev_harness_routes_remote_streams_through_go_readplane():
         readplane = services[f"node-{node}-readplane"]
         assert readplane["build"] == {"context": "./app/readplane"}
         assert f"{port}:8686" in readplane["ports"]
-        assert not readplane.get("volumes"), "readplane must never mount signing keys"
         environment = set(readplane["environment"])
+        volumes = set(readplane.get("volumes") or [])
+        assert f"./test-music-federation/node-{node}:/music:ro" in volumes
+        assert f"fed_{node}_cache:/cache:ro" in volumes
+        assert all(":/data" not in volume for volume in volumes)
+        assert "READPLANE_CACHE_ROOT=/cache" in environment
+        assert all(
+            not item.startswith("READPLANE_DATA_ROOT=") for item in environment
+        )
         assert "READPLANE_FEDERATION_PROXY_ENABLED=true" in environment
         assert "CRATE_FEDERATION_DEV_ALLOW_PRIVATE_NETWORKS=true" in environment
 
