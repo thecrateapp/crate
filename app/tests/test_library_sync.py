@@ -8,6 +8,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from crate.entity_ids import artist_entity_uid
+
+
+ALBUM_ENTITY_UID = "22222222-2222-5222-8222-222222222222"
+
 
 def _create_test_library(base: Path):
     """Create a minimal test music library structure."""
@@ -34,7 +41,12 @@ def _create_test_library(base: Path):
 def _fake_upsert_scanned_album(
     *, artist_payload: dict, album_payload: dict, track_payloads: list[dict]
 ):
-    return artist_payload["name"], 1, {track["path"] for track in track_payloads}
+    return (
+        artist_payload["name"],
+        1,
+        ALBUM_ENTITY_UID,
+        {track["path"] for track in track_payloads},
+    )
 
 
 def _fake_upsert_artist(payload: dict):
@@ -89,6 +101,8 @@ class TestLibrarySyncFullSync:
                 )
                 assert any(
                     call.args[0].kind == "artist-photo"
+                    and call.args[0].entity_key
+                    == str(artist_entity_uid(name="Artist One"))
                     and call.kwargs == {"reason": "library-sync"}
                     for call in mock_queue.call_args_list
                 )
@@ -155,6 +169,11 @@ class TestLibrarySyncFullSync:
 
 
 class TestSyncAlbum:
+    @pytest.fixture(autouse=True)
+    def _isolate_artwork_task_queue(self):
+        with patch("crate.library_sync.queue_artwork_materialization"):
+            yield
+
     def test_sync_album_preserves_existing_quality_metadata_for_unchanged_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             lib = Path(tmpdir)
@@ -276,9 +295,7 @@ class TestSyncAlbum:
                 assert len(mock_upsert_scanned.call_args.kwargs["track_payloads"]) == 2
                 queued_asset = mock_queue.call_args.args[0]
                 assert queued_asset.kind == "album-cover"
-                assert queued_asset.entity_key == str(
-                    mock_upsert_scanned.call_args.kwargs["album_payload"]["entity_uid"]
-                )
+                assert queued_asset.entity_key == ALBUM_ENTITY_UID
                 assert mock_queue.call_args.kwargs == {"reason": "library-sync"}
 
     def test_sync_album_refreshes_artist_summary_after_album_upsert(self):

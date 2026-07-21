@@ -52,7 +52,9 @@ class ArtworkAsset:
     def __post_init__(self) -> None:
         if self.kind not in ARTWORK_KINDS:
             raise ValueError(f"Unsupported artwork kind: {self.kind}")
-        if not _SAFE_ENTITY_KEY.fullmatch(self.entity_key or ""):
+        if self.entity_key == "None" or not _SAFE_ENTITY_KEY.fullmatch(
+            self.entity_key or ""
+        ):
             raise ValueError("Unsafe artwork entity key")
 
 

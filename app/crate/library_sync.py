@@ -20,6 +20,7 @@ from crate.db.repositories.library import (
 )
 from crate.db.repositories.library_writes import upsert_artist
 from crate.db.repositories.library_sync_writes import upsert_scanned_album
+from crate.entity_ids import artist_entity_uid as build_artist_entity_uid
 from crate.db.jobs.sync import (
     delete_track_by_path,
     get_album_id_by_path,
@@ -371,6 +372,11 @@ class LibrarySync:
             if existing
             else canonical_entity_uid(primary_folder)
         )
+        if artist_entity_uid is None:
+            artist_entity_uid = build_artist_entity_uid(
+                name=canonical,
+                mbid=existing.get("mbid") if existing else None,
+            )
 
         upsert_artist(
             {
@@ -821,14 +827,14 @@ class LibrarySync:
                 exc_info=True,
             )
 
-        _, album_id, synced_paths = upsert_scanned_album(
+        _, album_id, persisted_album_entity_uid, synced_paths = upsert_scanned_album(
             artist_payload=artist_payload,
             album_payload=album_payload,
             track_payloads=track_data_list,
         )
         if has_cover:
             queue_artwork_materialization(
-                ArtworkAsset("album-cover", str(album_entity_uid)),
+                ArtworkAsset("album-cover", persisted_album_entity_uid),
                 reason="library-sync",
             )
 

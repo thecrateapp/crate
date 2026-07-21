@@ -394,4 +394,4 @@ def mark_stream_variants_missing(cache_keys: list[str]) -> int:
             ),
             {"cache_keys": normalized},
         )
-        return max(0, int(result.rowcount or 0))
+        return max(0, int(getattr(result, "rowcount", 0) or 0))

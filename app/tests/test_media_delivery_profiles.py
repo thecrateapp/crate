@@ -58,3 +58,15 @@ def test_local_stream_slo_requires_contract_speed_and_throughput():
     report["readplane"]["throughput_bytes_per_second"] = 900
     report["readplane"]["ttfb_p95_ms"] = 81
     assert len(local_stream_slo_failures(report, 10)) == 3
+
+
+def test_readplane_race_tests_use_a_cgo_capable_image():
+    workflow = (
+        Path(__file__).parents[2] / ".github/workflows/test-readplane.yml"
+    ).read_text()
+    race_step = workflow.split("- name: Native media race tests", maxsplit=1)[1]
+    race_step = race_step.split("- name:", maxsplit=1)[0]
+
+    assert "golang:1.23-alpine" not in race_step
+    assert "golang:1.23" in race_step
+    assert "go test -race" in race_step

@@ -25,7 +25,9 @@ def test_artwork_asset_uses_safe_stable_identity(monkeypatch, tmp_path):
     )
 
 
-@pytest.mark.parametrize("value", ["", ".", "..", "../escape", "a/b", "a\\b", "a\x00b"])
+@pytest.mark.parametrize(
+    "value", ["", ".", "..", "../escape", "a/b", "a\\b", "a\x00b", "None"]
+)
 def test_artwork_asset_rejects_unsafe_entity_keys(value):
     from crate.artwork_variants import ArtworkAsset
 
